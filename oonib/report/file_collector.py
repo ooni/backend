@@ -8,8 +8,8 @@ from twisted.internet import fdesc
 
 from cyclone import web
 
-from ooni.utils import randomStr
-from ooni import otime
+from oonib import randomStr
+from oonib import otime
 
 from oonib.report import MissingField, InvalidRequestField
 

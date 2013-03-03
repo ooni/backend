@@ -1,4 +1,4 @@
-from ooni.utils import Storage
+from oonib import Storage
 import os
 
 def get_root_path():

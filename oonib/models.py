@@ -2,7 +2,7 @@ __all__ = ['Report', 'TestHelperTMP']
 from storm.twisted.transact import transact
 from storm.locals import *
 
-from ooni.utils import randomStr
+from oonib import randomStr
 from oonib import transactor
 
 def generateReportID():

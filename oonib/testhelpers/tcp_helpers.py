@@ -3,9 +3,9 @@ from twisted.internet.protocol import Protocol, Factory, ServerFactory
 from twisted.internet.error import ConnectionDone
 
 from oonib import config
-from ooni.utils import log
-from ooni.kit.daphn3 import Daphn3Protocol
-from ooni.kit.daphn3 import read_pcap, read_yaml
+from oonib import log
+from oonib.daphn3 import Daphn3Protocol
+from oonib.daphn3 import read_pcap, read_yaml
 
 class TCPEchoProtocol(Protocol):
     def dataReceived(self, data):

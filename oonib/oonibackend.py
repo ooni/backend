@@ -20,7 +20,7 @@ import txtorcon
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
-from ooni.utils import log
+from oonib import log
 
 from oonib import db_threadpool
 from oonib import config

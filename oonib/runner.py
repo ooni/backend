@@ -13,7 +13,7 @@ import txtorcon
 from oonib.report.api import reportingBackend
 
 from oonib import config
-from ooni.utils import log
+from oonib import log
 
 def txSetupFailed(failure):
     log.err("Setup failed")
