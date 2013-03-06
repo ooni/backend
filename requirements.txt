@@ -3,7 +3,6 @@ Pygments>=1.5
 Twisted>=12.2.0
 argparse>=1.2.1
 cyclone>=1.0-rc13
-distribute>=0.6.24
 docutils>=0.9.1
 ipaddr>=2.1.10
 pyOpenSSL>=0.13

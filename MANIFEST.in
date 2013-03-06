@@ -1,0 +1,6 @@
+include requirements.txt
+include AUTHORS
+include HACKING
+include LICENSE
+include Manifest.in
+include README.md

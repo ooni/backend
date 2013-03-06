@@ -22,16 +22,15 @@ def get_requirements():
     return pypi_packages, dependency_links
 
 install_requires, dependency_links = get_requirements()
-
 setup(
-    name="ooni-backend",
+    name="oonib",
     version="0.9",
     author="The Tor Project, Inc",
     url="https://ooni.torproject.org",
     license="LICENSE",
     description="OONI-Probe Backend",
     scripts=["bin/oonib"],
-    packages=['oonib'],
+    packages=find_packages(),
     install_requires=install_requires,
     dependency_links=dependency_links,
 )
