@@ -83,3 +83,9 @@ gpg --verify tor-$TOR_VERSION.tar.gz.asc tor-$TOR_VERSION.tar.gz
 tar xfz tor-$TOR_VERSION.tar.gz
 cd tor-$TOR_VERSION
 ./configure --enable-static-tor --with-libevent-dir=$BUILD/libevent-$LIBEVENT_VERSION --with-openssl-dir=$BUILD/openssl-$OPENSSL_VERSION --with-zlib-dir=$BUILD/zlib-$ZLIB_VERSION --enable-tor2web-mode && make
+
+# copy the binary to $SCRIPT_ROOT
+if [ ! -e $SCRIPT_ROOT/tor ]; then
+  cp src/or/tor $SCRIPT_ROOT
+fi
+cd $SCRIPT_ROOT
