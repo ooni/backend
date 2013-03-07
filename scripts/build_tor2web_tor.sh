@@ -82,4 +82,4 @@ cd $SCRIPT_ROOT
 gpg --verify tor-$TOR_VERSION.tar.gz.asc tor-$TOR_VERSION.tar.gz
 tar xfz tor-$TOR_VERSION.tar.gz
 cd tor-$TOR_VERSION
-echo ./configure --enable-static-tor --with-libevent-dir=$BUILD/libevent-$LIBEVENT_VERSION --with-openssl-dir=$BUILD/openssl-$OPENSSL_VERSION --with-zlib-dir=$BUILD/zlib-$ZLIB_VERSION --enable-tor2web-mode && make
+./configure --enable-static-tor --with-libevent-dir=$BUILD/libevent-$LIBEVENT_VERSION --with-openssl-dir=$BUILD/openssl-$OPENSSL_VERSION --with-zlib-dir=$BUILD/zlib-$ZLIB_VERSION --enable-tor2web-mode && make
