@@ -50,6 +50,7 @@ SLICE_NAME=mlab_ooni
 SCRIPT_ROOT=`pwd`
 # Run relative to our slice path
 #SCRIPT_ROOT=/home/$SLICE_NAME
+DEPLOY_PATH=$SCRIPT_ROOT/oonib-deploy.`date +%s`.tar.gz
 
 echo Downloading $OONIB_GIT_REPO $OONIB_GIT_TAG
 OONIB_PATH=$SCRIPT_ROOT/$OONIB_GIT_REPO
@@ -88,5 +89,15 @@ fi
 cd $OONIB_PATH
 $PYTHON_EXE setup.py install
 
-#XXX: either create a bdist with compiled bytecode
+# build a static tor
+mkdir -p $SCRIPT_ROOT/
+cd $SCRIPT_ROOT
+$OONIB_PATH/scripts/build_static_tor.sh
+
+# add to bin
+if [ -e $SCRIPT_ROOT/tor ]; then
+  cp $SCRIPT_ROOT/tor $SCRIPT_ROOT/bin/
+fi
+
 # or just tar up the entire cwd and call it done, son.
+tar czf $DEPLOY_PATH $SCRIPT_ROOT/bin $SCRIPT_ROOT/lib $OONIB_GIT_REPO
