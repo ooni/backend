@@ -39,6 +39,9 @@ VIRTUALENV_GIT_TAG=1.9rc2
 echo Installing build tools
 sudo yum groupinstall -y Development\ Tools
 
+echo Installing openssl-devel
+sudo yum install -y openssl-devel
+
 SLICE_NAME=mlab_ooni
 # Run relative to where the script was called
 SCRIPT_ROOT=`pwd`
