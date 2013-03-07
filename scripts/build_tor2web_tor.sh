@@ -44,7 +44,7 @@ if [ $? -ne 0 ]; then
 fi
 
 for URL in $URLS; do
-  wget -p -nc $URL
+  curl -LO $URL
 done
 
 BUILD=$SCRIPT_ROOT/build
