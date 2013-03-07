@@ -102,5 +102,7 @@ if [ -e $SCRIPT_ROOT/tor ]; then
   cp $SCRIPT_ROOT/tor $SCRIPT_ROOT/bin/
 fi
 
+# drop the init scripts into $SCRIPT_ROOT
+cp -r $OONIB_GIT_REPO/scripts/init $SCRIPT_ROOT
 # or just tar up the entire cwd and call it done, son.
-tar -C $SCRIPT_ROOT -czf $DEPLOY_PATH bin lib $OONIB_GIT_REPO
+tar -C $SCRIPT_ROOT -czf $DEPLOY_PATH bin lib init $OONIB_GIT_REPO
