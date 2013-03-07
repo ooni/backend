@@ -103,4 +103,4 @@ if [ -e $SCRIPT_ROOT/tor ]; then
 fi
 
 # or just tar up the entire cwd and call it done, son.
-tar czf $DEPLOY_PATH $SCRIPT_ROOT/bin $SCRIPT_ROOT/lib $OONIB_GIT_REPO
+tar -C $SCRIPT_ROOT -czf $DEPLOY_PATH bin lib $OONIB_GIT_REPO
