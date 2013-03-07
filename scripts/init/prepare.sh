@@ -45,6 +45,9 @@ sudo yum install -y openssl-devel
 echo Installing glibc-static
 sudo yum install -y glibc-static
 
+echo Installing python-devel
+sudo yum install -y python-devel
+
 SLICE_NAME=mlab_ooni
 # Run relative to where the script was called
 SCRIPT_ROOT=`pwd`
