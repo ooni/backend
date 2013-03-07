@@ -70,7 +70,7 @@ cd libevent-$LIBEVENT_VERSION
 
 # set up zlib
 cd $SCRIPT_ROOT
-echo "$ZLIB_MD5 zlib-$ZLIB_VERSION.tar.gz" | md5sum -c
+echo "$ZLIB_MD5  zlib-$ZLIB_VERSION.tar.gz" | md5sum -c
 if [ $? -ne 0 ]; then exit ;fi
 
 tar xfz zlib-$ZLIB_VERSION.tar.gz
