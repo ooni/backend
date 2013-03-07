@@ -30,7 +30,7 @@ fi
 # get key for Dr Stephen Henson (openssl)
 gpg --fingerprint 0xd05d8c616e27e66041ecb1b8d57ee597
 if [ $? -ne 0 ]; then 
-  gpg --keyserver pgp.mit.edu --recv-keys 0xd05d8c616e27e66041ecb1b8d57ee597
+  gpg --keyserver pgp.mit.edu --recv-keys 0xF295C759
   gpg --fingerprint 0xd05d8c616e27e66041ecb1b8d57ee597
   if [ $? -ne 0 ]; then exit ;fi
 fi
