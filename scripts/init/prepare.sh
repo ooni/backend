@@ -92,7 +92,7 @@ $PYTHON_EXE setup.py install
 # build a static tor
 mkdir -p $SCRIPT_ROOT/
 cd $SCRIPT_ROOT
-$OONIB_PATH/scripts/build_static_tor.sh
+$OONIB_PATH/scripts/build_tor2web_tor.sh
 
 # add to bin
 if [ -e $SCRIPT_ROOT/tor ]; then
