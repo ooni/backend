@@ -6,20 +6,23 @@
 # XXX: Can we get a newer version of libyaml from a fc-xx repo?
 
 # 2. Generate a ssl certificate
+SCRIPT_ROOT=`pwd`
 cd $SCRIPT_ROOT
-openssl genrsa -des3 -out private.key 4096
-openssl req -new -key private.key -out server.csr
+
+#XXX: we should think about setting these fields more carefully
+OPENSSL_SUBJECT="/C=US/ST=CA/CN="`hostname`
+OPENSSL_PASS=file:$SCRIPT_ROOT/cert.pass
+dd if=/dev/random of=$SCRIPT_ROOT/cert.pass bs=32 count=1
+openssl genrsa -des3 -passout $OPENSSL_PASS -out private.key 4096
+openssl req -new -passin $OPENSSL_PASS -key private.key -out server.csr -subj $OPENSSL_SUBJECT
 cp private.key private.key.org
 
 # Remove passphrase from key
-openssl rsa -in private.key.org -out private.key
+openssl rsa -passin file:$SCRIPT_ROOT/cert.pass -in private.key.org -out private.key
+chmod 600 private.key
 openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
 rm private.key.org
-
-# 2. Set up any config files
-# Lets have a look at our config
-# a. set up the path to our tor binary
-# b. got tor2webmode
+rm cert.pass
 
 # Set up our firewall rules
 # XXX: Confirm that sudo will work with MLAB.
@@ -32,63 +35,37 @@ sudo iptables -t nat -A PREROUTING -p tcp -m udp --dport 53 -j REDIRECT --to-por
 # Map port 53 tcp to config.helpers.dns.tcp_port (default: 57005)
 sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 57005
 
+# drop a config in $SCRIPT_ROOT
+echo "
+backend_version: '0.0.1'
 
-from oonib import Storage
-import os
+main:
+    report_dir: 
+    tor_datadir: 
+    database_uri: 'sqlite:"$SCRIPT_ROOT"/oonib_test_db.db'
+    db_threadpool_size: 10
+    tor_binary: '"$SCRIPT_ROOT"/bin/tor'
+    tor2webmode: true
 
-def get_root_path():
-    this_directory = os.path.dirname(__file__)
-    root = os.path.join(this_directory, '..')
-    root = os.path.abspath(root)
-    return root
+helpers:
+    http_return_request:
+        port: 57001
+        server_version: "Apache"
 
-backend_version = '0.0.1'
+    tcp_echo:
+        port: 57002
 
-# XXX convert this to something that is a proper config file
-main = Storage()
+    daphn3:
+        #yaml_file: "/path/to/data/oonib/daphn3.yaml"
+        #pcap_file: "/path/to/data/server.pcap"
+        port: 57003
 
-# This is the location where submitted reports get stored
-main.report_dir = os.path.join(get_root_path(), 'oonib', 'reports')
+    dns:
+        udp_port: 57004
+        tcp_port: 57005
 
-# This is where tor will place it's Hidden Service hostname and Hidden service
-# private key
-main.tor_datadir = os.path.join(get_root_path(), 'oonib', 'data', 'tor')
-
-main.database_uri = "sqlite:"+get_root_path()+"oonib_test_db.db"
-main.db_threadpool_size = 10
-#main.tor_binary = '/usr/sbin/tor'
-main.tor_binary = '/usr/local/bin/tor'
-
-# This requires compiling Tor with tor2web mode enabled
-# BEWARE!! THIS PROVIDES NO ANONYMITY!!
-# ONLY DO IT IF YOU KNOW WHAT YOU ARE DOING!!
-# HOSTING A COLLECTOR WITH TOR2WEB MODE GIVES YOU NO ANONYMITY!!
-main.tor2webmode = True
-
-helpers = Storage()
-
-helpers.http_return_request = Storage()
-helpers.http_return_request.port = 57001
-# XXX this actually needs to be the advertised Server HTTP header of our web
-# server
-helpers.http_return_request.server_version = "Apache"
-
-helpers.tcp_echo = Storage()
-helpers.tcp_echo.port = 57002
-
-helpers.daphn3 = Storage()
-#helpers.daphn3.yaml_file = "/path/to/data/oonib/daphn3.yaml"
-#helpers.daphn3.pcap_file = "/path/to/data/server.pcap"
-helpers.daphn3.port = 57003
-
-helpers.dns = Storage()
-helpers.dns.udp_port = 57004
-helpers.dns.tcp_port = 57005
-
-helpers.ssl = Storage()
-#helpers.ssl.private_key = /path/to/data/private.key
-#helpers.ssl.certificate = /path/to/data/certificate.crt
-#helpers.ssl.port = 57006
-
-
-
+    ssl:
+        private_key: '"$SCRIPT_ROOT"/private.key'
+        certificate: '"$SCRIPT_ROOT"/certificate.crt'
+        port: 57006
+" > $SCRIPT_ROOT/oonib.conf
