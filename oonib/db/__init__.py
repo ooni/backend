@@ -8,7 +8,7 @@ from storm.uri import URI
 from storm.databases.sqlite import SQLite
 
 from oonib import database, transactor
-from ooni.utils import log
+from oonib import log
 
 @inlineCallbacks
 def createTables():
