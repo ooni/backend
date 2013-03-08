@@ -14,6 +14,7 @@ from oonib.report.api import reportingBackend
 
 from oonib import config
 from oonib import log
+from oonib.options import ServerOptions
 
 def txSetupFailed(failure):
     log.err("Setup failed")
@@ -53,15 +54,13 @@ class OBaseRunner():
     pass
 
 if platformType == "win32":
-    from twisted.scripts._twistw import ServerOptions, \
-                                WindowsApplicationRunner
+    from twisted.scripts._twistw import WindowsApplicationRunner
 
     OBaseRunner = WindowsApplicationRunner
     # XXX Current we don't support windows for the starting of Tor Hidden Service
 
 else:
-    from twisted.scripts._twistd_unix import ServerOptions, \
-                                UnixApplicationRunner
+    from twisted.scripts._twistd_unix import UnixApplicationRunner
     class OBaseRunner(UnixApplicationRunner):
         def postApplication(self):
             """
