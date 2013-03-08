@@ -42,7 +42,7 @@ backend_version: '0.0.1'
 main:
     report_dir: 
     tor_datadir: 
-    database_uri: 'sqlite:"$SCRIPT_ROOT"/oonib_test_db.db'
+    database_uri: 'sqlite:"$SCRIPT_ROOT"//oonib_test_db.db'
     db_threadpool_size: 10
     tor_binary: '"$SCRIPT_ROOT"/bin/tor'
     tor2webmode: true
