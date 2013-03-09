@@ -37,8 +37,6 @@ sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --to-por
 
 # drop a config in $SCRIPT_ROOT
 echo "
-backend_version: '0.0.1'
-
 main:
     report_dir: 
     tor_datadir: 
@@ -46,18 +44,31 @@ main:
     db_threadpool_size: 10
     tor_binary: '"$SCRIPT_ROOT"/bin/tor'
     tor2webmode: true
+    pidfile: 'oonib.pid'
+    nodaemon: true
+    originalname: Null
+    chroot: Null
+    rundir: .
+    umask: Null
+    euid: Null
+    uid: Null
+    gid: Null
+    uuid: Null
+    no_save: true
+    profile: Null
+    debug: Null
 
 helpers:
     http_return_request:
         port: 57001
-        server_version: "Apache"
+        server_version: Apache
 
     tcp_echo:
         port: 57002
 
     daphn3:
-        #yaml_file: "/path/to/data/oonib/daphn3.yaml"
-        #pcap_file: "/path/to/data/server.pcap"
+        yaml_file: Null
+        pcap_file: Null
         port: 57003
 
     dns:
@@ -67,5 +78,4 @@ helpers:
     ssl:
         private_key: '"$SCRIPT_ROOT"/private.key'
         certificate: '"$SCRIPT_ROOT"/certificate.crt'
-        port: 57006
-" > $SCRIPT_ROOT/oonib.conf
+        port: 57006" > $SCRIPT_ROOT/oonib.conf
