@@ -1,0 +1,42 @@
+main:
+    report_dir: 
+    tor_datadir: 
+    database_uri: 'sqlite://oonib_test_db.db'
+    db_threadpool_size: 10
+    tor_binary: '/usr/bin/tor'
+    tor2webmode: true
+    pidfile: 'oonib.pid'
+    nodaemon: true
+    originalname: Null
+    chroot: Null
+    rundir: .
+    umask: Null
+    euid: Null
+    uid: Null
+    gid: Null
+    uuid: Null
+    no_save: true
+    profile: Null
+    debug: Null
+
+helpers:
+    http_return_request:
+        port: 57001
+        server_version: Apache
+
+    tcp_echo:
+        port: 57002
+
+    daphn3:
+        yaml_file: Null
+        pcap_file: Null
+        port: 57003
+
+    dns:
+        udp_port: 57004
+        tcp_port: 57005
+
+    ssl:
+        private_key: 'private.key'
+        certificate: 'certificate.crt'
+        port: 57006
