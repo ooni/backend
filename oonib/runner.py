@@ -12,9 +12,9 @@ import txtorcon
 
 from oonib.report.api import reportingBackend
 
+from oonib import oonibackend
 from oonib import config
 from oonib import log
-from oonib.options import ServerOptions
 
 def txSetupFailed(failure):
     log.err("Setup failed")
@@ -74,6 +74,9 @@ else:
             startTor()
             self.startReactor(None, self.oldstdout, self.oldstderr)
             self.removePID(self.config['pidfile'])
+
+        def createOrGetApplication(self):
+            return oonibackend.application
 
 OBaseRunner.loggerFactory = log.LoggerFactory
 
