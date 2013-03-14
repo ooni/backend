@@ -4,6 +4,7 @@
 # we should have everything in the virtualenv? Or do we need to also get some
 # system libraries? libyaml, anyone?
 # XXX: Can we get a newer version of libyaml from a fc-xx repo?
+source /etc/mlab/slice-functions
 
 # 2. Generate a ssl certificate
 SCRIPT_ROOT=`pwd`
@@ -38,7 +39,7 @@ sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --to-por
 # drop a config in $SCRIPT_ROOT
 echo "
 main:
-    report_dir: 
+    report_dir: '/var/spool/$SLICENAME'
     tor_datadir: 
     database_uri: 'sqlite:"$SCRIPT_ROOT"//oonib_test_db.db'
     db_threadpool_size: 10
