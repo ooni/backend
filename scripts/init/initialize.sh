@@ -31,7 +31,7 @@ sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-por
 # Map port 443 to config.helpers.ssl.port  (default: 57006)
 sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 57006
 # Map port 53 udp to config.helpers.dns.udp_port (default: 57004)
-sudo iptables -t nat -A PREROUTING -p tcp -m udp --dport 53 -j REDIRECT --to-ports 57004
+sudo iptables -t nat -A PREROUTING -p udp -m udp --dport 53 -j REDIRECT --to-ports 57004
 # Map port 53 tcp to config.helpers.dns.tcp_port (default: 57005)
 sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 57005
 
