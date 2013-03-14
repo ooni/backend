@@ -1,4 +1,5 @@
 #!/bin/sh
 
-cd $HOME
-bin/oonib -c $HOME/oonib.conf &
+source /etc/mlab/slice-functions
+cd $SLICEHOME
+bin/oonib -c $SLICEHOME/oonib.conf &
