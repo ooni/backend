@@ -1,5 +1,6 @@
 import yaml
 from oonib import Storage
+from oonib import __version__
 
 from oonib.options import OONIBOptions
 import os
@@ -29,6 +30,7 @@ def loadConfigFile():
     return None, None
 
 main = None
+backend_version = __version__
 
 if not main:
     main, helpers = loadConfigFile()
