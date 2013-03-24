@@ -55,10 +55,14 @@ Add the Tor Project gpg key to apt:
     apt-get update
     apt-get install deb.torproject.org-keyring tor tor-geoipdb
 
-# Update ooni-probe/oonib/config.py
+# Configure oonib
 
-    Set config.main.tor_binary to your Tor path
-    Set config.main.tor2webmode = False
+Copy the example config file
+
+    cp oonib.conf.example oonib.conf
+
+Then edit your configuration to fit your needs. The fields you should probably
+end up changing are `tor_binary`, `report_dir` and `tor_datadir`.
 
 # (For Experts Only) Tor2webmode:
 
