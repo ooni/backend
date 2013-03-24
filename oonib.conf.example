@@ -4,7 +4,7 @@ main:
     database_uri: 'sqlite://oonib_test_db.db'
     db_threadpool_size: 10
     tor_binary: '/usr/bin/tor'
-    tor2webmode: true
+    tor2webmode: false
     pidfile: 'oonib.pid'
     nodaemon: true
     originalname: Null
