@@ -1,4 +1,4 @@
 #!/bin/sh
 source /etc/mlab/slice-functions
 cd $SLICEHOME
-kill `cat $HOME/oonib.pid`
+sudo -u $SLICENAME kill `cat $SLICEHOME/oonib.pid`
