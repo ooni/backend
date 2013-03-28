@@ -26,7 +26,7 @@
 # Solution: Redeploy oonib after upgrading python 2.6.6 to 2.6.8
 
 OONIB_GIT_REPO=ooni-backend
-OONIB_GIT_URL="https://github.com/aagbsn/$OONIB_GIT_REPO.git"
+OONIB_GIT_URL="https://github.com/TheTorProject/$OONIB_GIT_REPO.git"
 OONIB_GIT_TAG=master
 #OONIB_GIT_REPO=oonib
 #OONIB_GIT_URL="https://github.com/TheTorProject/$OONIB_GIT_REPO.git"
