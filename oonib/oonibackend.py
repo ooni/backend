@@ -15,8 +15,6 @@ from twisted.names import dns
 
 from cyclone import web
 
-import txtorcon
-
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
