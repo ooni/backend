@@ -8,4 +8,4 @@ pygeoip>=0.2.5
 # This is a Tor Project mirror with valid SSL/TLS certs that is stable and fast:
 https://people.torproject.org/~ioerror/src/mirrors/ooniprobe/scapy-02-25-2013-tip.zip#egg=scapy
 storm>=0.19
-txtorcon
+txtorcon>=0.7
