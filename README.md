@@ -10,19 +10,17 @@ setting up an ooni-backend are:
 
     # Get git, python, and setuptools:
     sudo apt-get install git python2.7 python2.7-dev python-setuptools
-    cd
     # Grab the get-pip installer to make sure we have pip>=1.3.0 [1]
     curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
     sudo python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
     sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
     # We recommend using a virtualenv and virtualenvwrapper makes this easier:
-    sudo pip install virtualenv virtualenvwrapper
+    sudo pip install --upgrade virtualenv virtualenvwrapper
     # Setup the virtualenv directory:
     export WORKON_HOME=~/.virtualenvs && mkdir -p $WORKON_HOME
     source /usr/local/bin/virtualenvwrapper.sh
     # Clone ooni-backend:
-    git clone https://github.com/TheTorProject/ooni-backend.git
-    cd ooni-backend
+    git clone https://github.com/TheTorProject/ooni-backend.git && cd ooni-backend
     # Create the virtualenv for ooni-backend...
     mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
     # ...and install ooni-backend (sudo is not necessary since we're in a virtualenv):
