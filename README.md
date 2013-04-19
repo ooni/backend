@@ -9,7 +9,7 @@ We recommend that you use a python virtualenv. The recommended commands for
 setting up an ooni-backend are:
 
     # Get git, python, and setuptools:
-    sudo apt-get install git python python-setuptools
+    sudo apt-get install git python2.7 python2.7-dev python-setuptools
     cd
     # Grab the get-pip installer to make sure we have pip>=1.3.0 [1]
     curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
