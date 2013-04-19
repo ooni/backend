@@ -14,6 +14,7 @@ setting up an ooni-backend are:
     # Grab the get-pip installer to make sure we have pip>=1.3.0 [1]
     curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
     sudo python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
+    sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
     # We recommend using a virtualenv and virtualenvwrapper makes this easier:
     sudo pip install virtualenv virtualenvwrapper
     # Setup the virtualenv directory:
