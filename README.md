@@ -5,7 +5,31 @@ The extra dependencies necessary to run OONIB are:
 * twisted-names
 * cyclone: https://github.com/fiorix/cyclone
 
-We recommend that you use a python virtualenv. See OONI's README.md.
+We recommend that you use a python virtualenv. The recommended commands for
+setting up an ooni-backend are:
+
+    # Get git, python, and setuptools:
+    sudo apt-get install git python python-setuptools
+    cd
+    # Grab the get-pip installer to make sure we have pip>=1.3.0 [1]
+    curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
+    sudo python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
+    # We recommend using a virtualenv and virtualenvwrapper makes this easier:
+    sudo pip install virtualenv virtualenvwrapper
+    # Setup the virtualenv directory:
+    export WORKON_HOME=~/.virtualenvs && mkdir -p $WORKON_HOME
+    source /usr/local/bin/virtualenvwrapper.sh
+    # Clone ooni-backend:
+    git clone https://github.com/TheTorProject/ooni-backend.git
+    cd ooni-backend
+    # Create the virtualenv for ooni-backend...
+    mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
+    # ...and install ooni-backend (sudo is not necessary since we're in a virtualenv):
+    python setpy.py install
+
+[1] Note: pip>=1.3.0 is recommended because it included several security
+    patches, including using forcing the use of HTTPS and checking package hash
+    sums before installation.
 
 # Generate self signed certs for OONIB
 
