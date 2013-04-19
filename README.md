@@ -24,6 +24,7 @@ setting up an ooni-backend are:
     # Create the virtualenv for ooni-backend...
     mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
     # ...and install ooni-backend (sudo is not necessary since we're in a virtualenv):
+    pip install --global-option --no-index -r requirements.txt
     python setup.py install
 
 [1] Note: pip>=1.3.0 is recommended because it included several security
