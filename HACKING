@@ -36,108 +36,14 @@ Code Structure
 - HACKING
   The document you are currently reading.
 
-- inputs/
-  Contains input files for tests.
-
 - oonib/
   Contains the OONI probe backend to be run on the ooni-net
-
-- ooni/
-  Contains the main ooni probe comand line client
-
-- ooni/config.py
-  Parts of the code related to parsing OONI
-  configuration files and making them accessible
-  to other components of the software.
-
-- ooni/inputunit.py
-  In here we have functions related to the creation of input
-  units. Input units are how the inputs to be fed to tests are
-  split up into.
-
-- ooni/nettest.py
-  In here is the NetTest API definition. This is how people
-  interested in writing ooniprobe tests will be specifying
-  them.
-
-- ooni/nodes.py
-  Mostly broken code for the remote dispatching of tests.
-
-- ooni/oonicli.py
-  In here we take care of running ooniprobe from the command
-  line interface
-
-- ooni/reporter.py
-  In here goes the logic for the creation of ooniprobe
-  reports.
-
-- ooni/runner.py
-  Handles running ooni.nettests as well as
-  ooni.plugoo.tests.OONITests.
-
-- ooni/otime.py
-  Generation of timestamps, time conversions and all the rest
-
-- ooni/kit/
-  In here go utilities that can be used by tests.
-
-- ooni/lib/
-  XXX this directory is to be removed.
-
-- ooni/utils/
-  In here go internal utilities that are useful to ooniprobe
-
-- ooni/utils/geodata.py
-  In here go functions related to the understanding of
-  geographical information of the probe
-
-- ooni/utils/hacks.py
-  When some software has issues and we need to fix it in a
-  hackish way, we put it in here. This one day will be empty.
-
-- ooni/utils/log.py
-  log realted functions.
-
-- ooni/utils/net.py
-  utilities for networking related operations
-
-- ooni/utils/onion.py
-  Utilities for working with Tor.
-  XXX this code should be removed and merged into txtorcon.
-
-- ooni/utils/txscapy.py
-  Tools for making scapy work well with twisted.
 
 - ooniprobe.conf
   The main OONI-probe configuration file. This can be used
   to configure your OONI CLI, tell it where it should report
   to, where the asset files are located, what should be used
   for control, etc.
-
-Test related conventions
-------------------------
-
-These are the conventions for tests that are written in ooniprobe. That is what
-goes inside of nettests/.
-
-Naming
-......
-
-All methods that are relevant to the test should be all lower case separated by
-underscore.
-
-All variables that are specific to your test should be all lower case separated
-by underscore.
-
-Simplicity
-..........
-
-Tests written in ooniprobe should be as short as possible and should contain as
-little code not related to the measurement as possible. It should be possible
-from reading the test to understand what it does without clutter.
-
-Everything that is not related directly to the test should go inside of the
-test template of which the test you are writing is a subclass of.
 
 
 Style guide
@@ -288,5 +194,3 @@ methods. Even better if you write them also for non-public methods.
 Place docstrings under the def.
 
 For a better overview on how to write docstrings consult: PEP-257
-
-
