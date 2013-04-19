@@ -1,15 +1,16 @@
 language: python
 before_install:
-  - sudo apt-get install build-essential python-dev python-setuptools tor
-  #- curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
-  #- sudo python ./get-pip.py
-  #- sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
+  - echo "deb http://deb.torproject.org/torproject.org wheezy main" | sudo tee -a /etc/apt/sources.list
+  - gpg --keyserver keys.gnupg.net --recv 886DDD89
+  - gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
+  - sudo apt-get update
+  - sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb build-essential python-dev python-setuptools
 python:
   - "3.3"
   - "2.7"
   - "2.6"
 install:
-  - pip install -i "https://pypi.python.org/packages/" --use-mirrors -r requirements.txt
+  - pip install --use-mirrors -r requirements.txt
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:

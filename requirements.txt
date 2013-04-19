@@ -1,6 +1,6 @@
+-i https://pypi.python.org/packages
 https://pypi.python.org/packages/source/P/PyYAML/PyYAML-3.10.tar.gz#md5=74c94a383886519e9e7b3dd1ee540247#egg=PyYAML
 https://pypi.python.org/packages/source/T/Twisted/Twisted-13.0.0.tar.bz2#md5=68afff4e1efd3757d934e39f70c99f57#egg=Twisted
-https://twistedmatrix.com/Releases/Names/13.0/TwistedNames-13.0.0.tar.bz2#md5=9264b6f9fc85e1f7ed31d5fd13eeb48a#egg=TwistedNames
 https://pypi.python.org/packages/source/c/cyclone/cyclone-1.1.tar.gz#md5=477c5ef9cf8902e37105fe450c4d8c5d#egg=cyclone
 https://ipaddr-py.googlecode.com/files/ipaddr-2.1.10.tar.gz#sha1=c608450b077b19773d4f1b5f1ef88b26f6650ce0#egg=ipaddr
 https://pypi.python.org/packages/source/p/pygeoip/pygeoip-0.2.6.zip#md5=b3ac1bfcd535782bc59af78e722cf5c1#egg=pygeoip
