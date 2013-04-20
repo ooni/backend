@@ -4,13 +4,13 @@ before_install:
   - gpg --keyserver keys.gnupg.net --recv 886DDD89
   - gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
   - sudo apt-get update
-  - sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb build-essential python-dev python-setuptools
+  - sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb build-essential python-dev python-setuptools openssl
 python:
-  - "3.3"
+  #- "3.3"
   - "2.7"
   - "2.6"
 install:
-  - pip install --use-mirrors -r requirements.txt
+  - pip install -r requirements.txt --use-mirrors
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:
