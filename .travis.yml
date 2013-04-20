@@ -15,4 +15,9 @@ install:
 # command to run tests, e.g. python setup.py test
 script:
   - cp oonib.conf.example oonib.conf
+  - openssl genrsa -des3 -passout pass:oonib -out private.key 4096
+  - openssl req -new -key private.key -passin pass:oonib -out server.csr
+  - cp private.key private.key.org
+  - openssl rsa -in private.key.org private.key
+  - openssl x509 -passin pass:oonib -req -days365 -in server.csr -signkey private.key -out certificate.crt
   - bin/oonib
