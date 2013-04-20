@@ -18,6 +18,7 @@ transaction>=1.4.1
 storm>=0.19
 #https://pypi.python.org/packages/source/s/storm/storm-0.19.tar.gz#md5=61d1ee4cd2a08639ab917e43fa2c9265#egg=storm
 txtorcon>=0.7
+pyOpenSSL>=0.13
 zope.component>=4.0.0
 zope.event>=4.0.0
 zope.interface>=4.0.1
