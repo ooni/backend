@@ -1,13 +1,52 @@
 # Dependencies and Installation
+  - cp oonib.conf.example oonib.conf
+  - chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
+  - echo "Build successful."
 
-We recommend that you use a python virtualenv. The recommended commands for
-setting up an ooni-backend are:
+## Distro dependencies (Debian)
+There are a few dependencies which we recommend you get from your
+distribution's archives.
 
-    sudo apt-get install build-essential python-dev python-setuptools
-    # Grab the get-pip installer to make sure we have pip>=1.3.0 [1]
+    sudo apt-get install build-essential python-dev python-setuptools openssl
+
+### Tor
+You will need a Tor binary on your system. For complete instructions, see also:
+
+    https://www.torproject.org/docs/tor-doc-unix.html.en
+    https://www.torproject.org/docs/rpms.html.en
+
+If you've already got Tor, or plan to compile it yourself from source, great!
+You can skip this step. Otherwise, if you're installing Tor (or reinstalling),
+you'll want to make sure to get our keyring package in Debian:
+
+    echo "deb http://deb.torproject.org/torproject.org wheezy main" | \
+        sudo tee -a /etc/apt/sources.list
+    gpg --keyserver keys.gnupg.net --recv 886DDD89
+    gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
+    sudo apt-get update
+    sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb
+    
+### Pip (>=1.3.0)
+We recommend using the Pip>=1.3.0 because it included several important
+security and privacy related patches:
+
+ * It forces the use of HTTPS for [PyPI](pypi.python.org).
+ * and checks package hash sums before installation, with support for hashes
+   more collision-resistant than MD5.
+
+The least painful way (that we know of) to install a newer Pip is to use Pip's
+get-pip script:
+
+    # Grab the get-pip installer to make sure we have pip>=1.3.0
     curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
     sudo python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
+    # And make sure we're actually using the newer one:
     sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
+
+### Virtualenv
+We recommend that you use a python virtualenv. The recommended commands for
+setting up this up and installing are:
+
     sudo pip install --upgrade virtualenv virtualenvwrapper
     # Setup the virtualenv directory:
     export WORKON_HOME=~/.virtualenvs && mkdir -p $WORKON_HOME
@@ -15,16 +54,28 @@ setting up an ooni-backend are:
     # Clone ooni-backend:
     git clone https://github.com/TheTorProject/ooni-backend.git && cd ooni-backend
     # Create the virtualenv for ooni-backend...
-    mkvirtualenv -a $PWD -r requirements.txt --unzip-setuptools --setuptools --no-site-packages oonib
+    mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
     # ...and install ooni-backend (sudo is not necessary since we're in a virtualenv):
+    pip install -r requirements.txt --use-mirrors
     python setup.py install
 
-[1] Note: pip>=1.3.0 is recommended because it included several security
-    patches, including using forcing the use of HTTPS and checking package hash
-    sums before installation.
+# Running an OONI collector
 
-# Generate self signed certs for OONIB
+## Configure oonib
 
+Copy the example config file to ```oonib.conf```.
+
+    cp oonib.conf.example oonib.conf
+
+Then edit your configuration to fit your needs. The fields you should probably
+end up changing are ```report_dir``` (the public web server directory where you
+would like ooni-probe clients to be able to submit reports to, for example, if
+the clients should submit POSTs to https://abcdef0123456789.onion/report then
+this would simply be ```'report'```) and ```tor_datadir``` (where you would
+like the spawned Tor process to keep its data). If you compiled Tor yourself,
+you'll likely want to specify it for the ```tor_binary``` option.
+
+## Generate self signed certs for OONIB
 If you want to use the HTTPS test helper, you will need to create a certificate:
 
     openssl genrsa -des3 -out private.key 4096
@@ -34,13 +85,15 @@ If you want to use the HTTPS test helper, you will need to create a certificate:
     openssl rsa -in private.key.org -out private.key
     openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
     rm private.key.org
+    rm server.csr
 
-Don't forget to update oonib/config.py options helpers.ssl.private_key and
-helpers.ssl.certificate
+If you decide to put your certificate and key somewhere else, don't forget to
+update oonib.conf options ```helpers.ssl.private_key``` and
+```helpers.ssl.certificate```!
 
-# Redirect low ports with iptables
-
-The following iptables commands will map connections on low ports to those bound by oonib
+## Redirect low ports with iptables 
+The following iptables commands will map connections on low ports to those
+bound by oonib:
 
     # Map port 80 to config.helpers.http_return_request.port  (default: 57001)
     iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 57001
@@ -50,35 +103,6 @@ The following iptables commands will map connections on low ports to those bound
     iptables -t nat -A PREROUTING -p tcp -m udp --dport 53 -j REDIRECT --tor-ports 
     # Map port 53 tcp to config.helpers.dns.tcp_port (default: 57005)
     iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --tor-ports 
-
-# Install Tor (Debian).
-
-You will need a Tor binary on your system. For complete instructions, see also:
-
-    https://www.torproject.org/docs/tor-doc-unix.html.en
-    https://www.torproject.org/docs/rpms.html.en
-
-Add this line to your /etc/apt/sources.list, replacing <DISTRIBUTION>
-where appropriate:
-
-    deb http://deb.torproject.org/torproject.org <DISTRIBUTION> main
-
-Add the Tor Project gpg key to apt:
-
-    gpg --keyserver keys.gnupg.net --recv 886DDD89
-    gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
-    # Update apt and install the torproject keyring, tor, and geoipdb
-    apt-get update
-    apt-get install deb.torproject.org-keyring tor tor-geoipdb
-
-# Configure oonib
-
-Copy the example config file
-
-    cp oonib.conf.example oonib.conf
-
-Then edit your configuration to fit your needs. The fields you should probably
-end up changing are `tor_binary`, `report_dir` and `tor_datadir`.
 
 # (For Experts Only) Tor2webmode:
 
@@ -122,10 +146,9 @@ Build Tor with enable-tor2web-mode
     ./autogen.sh ; ./configure --enable-tor2web-mode ; make 
     
 Copy the tor binary from src/or/tor somewhere and set the corresponding
-options in oonib/config.py
+options in oonib.conf.
 
 # To launch oonib on system boot
-
 To launch oonib on startup, you may want to use supervisord (www.supervisord.org)
 The following supervisord config will use the virtual environment in
 /home/ooni/venv_oonib and start oonib on boot:
