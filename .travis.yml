@@ -1,4 +1,19 @@
 language: python
+notifications:
+  irc:
+    channels:
+      - "irc.oftc.net#tor-bots"
+      - "irc.oftc.net#ooni"
+    on_success: always
+    on_failure: always
+  email:
+    recipients:
+      - isis@torproject.org
+      - aagbsn@torproject.org
+      - ioerror@torproject.org
+      - hellais@torproject.org
+    on_success: change
+    on_failure: always
 before_install:
   - echo "deb http://deb.torproject.org/torproject.org wheezy main" | sudo tee -a /etc/apt/sources.list
   - gpg --keyserver keys.gnupg.net --recv 886DDD89
