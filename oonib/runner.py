@@ -15,7 +15,8 @@ from twisted.internet import reactor
 from twisted.application import service, internet, app
 from twisted.python.runtime import platformType
 
-import txtorcon
+from txtorcon import TCPHiddenServiceEndpoint, TorConfig
+from txtorcon import launch_tor
 
 from oonib.report.api import reportingBackend
 
@@ -51,14 +52,13 @@ def setupCollector(tor_process_protocol):
     else:
         datadir = config.main.tor_datadir
 
-    torconfig = txtorcon.TorConfig(tor_process_protocol.tor_protocol)
+    torconfig = TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
     # XXX there is currently a bug in txtorcon that prevents data_dir from
     # being passed properly. Details on the bug can be found here:
     # https://github.com/meejah/txtorcon/pull/22
-    hs_endpoint = txtorcon.TCPHiddenServiceEndpoint(reactor, torconfig,
-                                                    public_port,
-                                                    data_dir=datadir)
+    hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
+                                           data_dir=datadir)
     hidden_service = hs_endpoint.listen(reportingBackend)
     hidden_service.addCallback(setup_complete)
     hidden_service.addErrback(txSetupFailed)
@@ -67,18 +67,18 @@ def startTor():
     def updates(prog, tag, summary):
         print("%d%%: %s" % (prog, summary))
 
-    torconfig = txtorcon.TorConfig()
+    torconfig = TorConfig()
     torconfig.SocksPort = config.main.socks_port
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
     torconfig.save()
     if config.main.tor_binary is not None:
-        d = txtorcon.launch_tor(torconfig, reactor,
-                                tor_binary=config.main.tor_binary,
-                                progress_updates=updates)
+        d = launch_tor(torconfig, reactor,
+                       tor_binary=config.main.tor_binary,
+                       progress_updates=updates)
     else:
-        d = txtorcon.launch_tor(torconfig, reactor, progress_updates=updates)
+        d = launch_tor(torconfig, reactor, progress_updates=updates)
     d.addCallback(setupCollector)
     d.addErrback(txSetupFailed)
 
