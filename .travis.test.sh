@@ -10,6 +10,8 @@
 # :version: 0.0.1
 ##############################################################################
 
+set -vx --
+
 function killitwithfire () {
     trap - ALRM
     kill -ALRM $prog 2>/dev/null
