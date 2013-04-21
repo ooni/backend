@@ -22,4 +22,5 @@ script:
   - openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
   - test -f "private.key.org" && rm -f private.key.org
   - test -f "server.csr" && rm -f server.csr
-  - chmod +x .travis.test.sh && ./.travis.test.sh 30 bin/oonib
+  - chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
+  - echo "Build successful."

@@ -24,7 +24,7 @@ function waitforit () {
 
 waitforit $1& prog=$! ; shift ;
 trap "killitwithfire" ALRM INT
-"$@" & wait $1
+"$@"& wait `cat oonib.pid`
 RET=$?
 kill -ALRM $prog
 wait $prog
