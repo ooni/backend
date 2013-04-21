@@ -16,8 +16,10 @@ install:
 script:
   - cp oonib.conf.example oonib.conf
   - openssl genrsa -des3 -passout pass:oonib -out private.key 4096
-  - openssl req -new -key private.key -passin pass:oonib -out server.csr
+  - openssl req -batch -passin pass:oonib -new -key private.key -out server.csr
   - cp private.key private.key.org
-  - openssl rsa -in private.key.org private.key
-  - openssl x509 -passin pass:oonib -req -days365 -in server.csr -signkey private.key -out certificate.crt
+  - openssl rsa -passin pass:oonib -in private.key.org private.key
+  - openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
+  - test -f "private.key.org" && rm -f private.key.org
+  - test -f "server.csr" && rm -f server.csr
   - bin/oonib
