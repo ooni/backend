@@ -6,6 +6,8 @@
 In here we define a runner for the oonib backend system.
 """
 
+from __future__ import print_function
+
 from twisted.internet import reactor
 from twisted.application import service, internet, app
 from twisted.python.runtime import platformType
@@ -24,7 +26,8 @@ def txSetupFailed(failure):
 
 def setupCollector(tor_process_protocol):
     def setup_complete(port):
-        print "Exposed collector Tor hidden service on httpo://%s" % port.onion_uri
+        print("Exposed collector Tor hidden service on httpo://%s"
+              % port.onion_uri)
 
     torconfig = txtorcon.TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
@@ -39,7 +42,7 @@ def setupCollector(tor_process_protocol):
 
 def startTor():
     def updates(prog, tag, summary):
-        print "%d%%: %s" % (prog, summary)
+        print("%d%%: %s" % (prog, summary))
 
     torconfig = txtorcon.TorConfig()
     torconfig.SocksPort = 9055
@@ -60,16 +63,16 @@ if platformType == "win32":
     from twisted.scripts._twistw import WindowsApplicationRunner
 
     OBaseRunner = WindowsApplicationRunner
-    # XXX Current we don't support windows for the starting of Tor Hidden Service
+    # XXX Currently we don't support windows for starting a Tor Hidden Service
+    log.warn(
+        "Apologies! We don't support starting a Tor Hidden Service on Windows.")
 
 else:
     from twisted.scripts._twistd_unix import UnixApplicationRunner
     class OBaseRunner(UnixApplicationRunner):
         def postApplication(self):
-            """
-            To be called after the application is created: start the
-            application and run the reactor. After the reactor stops,
-            clean up PID files and such.
+            """After the application is created, start the application and run
+            the reactor. After the reactor stops, clean up PID files and such.
             """
             self.startApplication(self.application)
             # This is our addition. The rest is taken from
@@ -82,5 +85,3 @@ else:
             return oonibackend.application
 
 OBaseRunner.loggerFactory = log.LoggerFactory
-
-
