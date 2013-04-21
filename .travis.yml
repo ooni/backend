@@ -1,0 +1,41 @@
+language: python
+notifications:
+  irc:
+    channels:
+      - "irc.oftc.net#tor-bots"
+      - "irc.oftc.net#ooni"
+    on_success: always
+    on_failure: always
+  email:
+    recipients:
+      - isis@torproject.org
+      - aagbsn@torproject.org
+      - ioerror@torproject.org
+      - hellais@torproject.org
+    on_success: change
+    on_failure: always
+before_install:
+  - echo "deb http://deb.torproject.org/torproject.org wheezy main" | sudo tee -a /etc/apt/sources.list
+  - gpg --keyserver keys.gnupg.net --recv 886DDD89
+  - gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
+  - sudo apt-get update
+  - sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb build-essential python-dev python-setuptools openssl
+python:
+  #- "3.3"
+  - "2.7"
+  - "2.6"
+install:
+  - pip install -r .requirements.travis --use-mirrors
+  - python setup.py install
+# command to run tests, e.g. python setup.py test
+script:
+  - cp oonib.conf.example oonib.conf
+  - openssl genrsa -des3 -passout pass:oonib -out private.key 4096
+  - openssl req -batch -passin pass:oonib -new -key private.key -out server.csr
+  - cp private.key private.key.org
+  - openssl rsa -passin pass:oonib -in private.key.org -out private.key
+  - openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
+  - test -f "private.key.org" && rm -f private.key.org
+  - test -f "server.csr" && rm -f server.csr
+  - chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
+  - echo "Build successful."

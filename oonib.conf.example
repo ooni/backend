@@ -1,9 +1,11 @@
 main:
-    report_dir: 
-    tor_datadir: 
+    report_dir: Null
+    logfile: Null
+    tor_datadir: Null
     database_uri: 'sqlite://oonib_test_db.db'
     db_threadpool_size: 10
-    tor_binary: '/usr/bin/tor'
+    tor_binary: Null
+    socks_port: 9055
     tor2webmode: false
     pidfile: 'oonib.pid'
     nodaemon: true

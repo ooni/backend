@@ -1,4 +1,5 @@
--i https://pypi.python.org/packages
+## we do not want to override the PI URI for TravisCI:
+#-i https://pypi.python.org/packages
 PyYAML>=3.10
 #https://pypi.python.org/packages/source/P/PyYAML/PyYAML-3.10.tar.gz#md5=74c94a383886519e9e7b3dd1ee540247#egg=PyYAML
 Twisted>=12.2.0
