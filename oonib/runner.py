@@ -11,6 +11,8 @@ from __future__ import print_function
 import tempfile
 import os
 
+from shutil import rmtree
+
 from twisted.internet import reactor
 from twisted.application import service, internet, app
 from twisted.python.runtime import platformType
@@ -105,12 +107,9 @@ else:
             self.startReactor(None, self.oldstdout, self.oldstderr)
             self.removePID(self.config['pidfile'])
             if os.path.exists(tempfile.gettempdir()):
-                try:
-                    log.msg("Removing temporary directory: %s"
-                            % tempfile.gettempdir())
-                    os.removedirs(tempfile.gettempdir())
-                except OSError as ose:
-                    log.err(ose)
+                log.msg("Removing temporary directory: %s"
+                        % tempfile.gettempdir())
+                rmtree(tempfile.gettempdir(), onerror=log.err)
 
         def createOrGetApplication(self):
             return oonibackend.application
