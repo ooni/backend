@@ -68,7 +68,7 @@ def startTor():
         print("%d%%: %s" % (prog, summary))
 
     torconfig = txtorcon.TorConfig()
-    torconfig.SocksPort = 9055
+    torconfig.SocksPort = config.main.socks_port
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
