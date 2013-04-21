@@ -1,7 +1,9 @@
+# -*- encoding: utf-8 -*-
+#
+# :authors: Arturo Filastò, Isis Lovecruft
+# :licence: see LICENSE for details
 """
 In here we define a runner for the oonib backend system.
-We are just extending the
-
 """
 
 from twisted.internet import reactor
