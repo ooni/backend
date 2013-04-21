@@ -8,6 +8,9 @@ In here we define a runner for the oonib backend system.
 
 from __future__ import print_function
 
+import tempfile
+import os
+
 from twisted.internet import reactor
 from twisted.application import service, internet, app
 from twisted.python.runtime import platformType
@@ -20,6 +23,17 @@ from oonib import oonibackend
 from oonib import config
 from oonib import log
 
+
+class OBaseRunner(object):
+    pass
+
+
+_repo_dir = os.path.join(os.getcwd().split('ooni-backend')[0], 'ooni-backend')
+tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
+if not os.path.isdir(tempfile.gettempdir()):
+    os.makedirs(tempfile.gettempdir())
+_temp_dir = tempfile.mkdtemp()
+
 def txSetupFailed(failure):
     log.err("Setup failed")
     log.exception(failure)
@@ -29,13 +43,22 @@ def setupCollector(tor_process_protocol):
         print("Exposed collector Tor hidden service on httpo://%s"
               % port.onion_uri)
 
+    if config.main.tor_datadir is None:
+        log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
+        log.msg("Creating tmp directory in current directory for datadir.")
+        log.debug("Using %s" % _temp_dir)
+        datadir = _temp_dir
+    else:
+        datadir = config.main.tor_datadir
+
     torconfig = txtorcon.TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
     # XXX there is currently a bug in txtorcon that prevents data_dir from
     # being passed properly. Details on the bug can be found here:
     # https://github.com/meejah/txtorcon/pull/22
     hs_endpoint = txtorcon.TCPHiddenServiceEndpoint(reactor, torconfig,
-            public_port, data_dir=config.main.tor_datadir)
+                                                    public_port,
+                                                    data_dir=datadir)
     hidden_service = hs_endpoint.listen(reportingBackend)
     hidden_service.addCallback(setup_complete)
     hidden_service.addErrback(txSetupFailed)
@@ -56,8 +79,6 @@ def startTor():
     d.addCallback(setupCollector)
     d.addErrback(txSetupFailed)
 
-class OBaseRunner():
-    pass
 
 if platformType == "win32":
     from twisted.scripts._twistw import WindowsApplicationRunner
@@ -80,6 +101,13 @@ else:
             startTor()
             self.startReactor(None, self.oldstdout, self.oldstderr)
             self.removePID(self.config['pidfile'])
+            if os.path.exists(tempfile.gettempdir()):
+                try:
+                    log.msg("Removing temporary directory: %s"
+                            % tempfile.gettempdir())
+                    os.removedirs(tempfile.gettempdir())
+                except OSError as ose:
+                    log.err(ose)
 
         def createOrGetApplication(self):
             return oonibackend.application
