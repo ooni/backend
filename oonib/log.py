@@ -1,3 +1,11 @@
+# -*- encoding: utf-8 -*-
+#
+# :authors: Arturo Filastò, Isis Lovecruft
+# :licence: see LICENSE for details
+"""
+Twisted logger for the ooni backend system.
+"""
+
 import sys
 import os
 import logging
@@ -28,16 +36,16 @@ def start(logfile=None, application_name="oonib"):
     daily_logfile = None
 
     if not logfile:
-        logfile = config.basic.logfile
+        logfile = config.main.logfile
 
     log_folder = os.path.dirname(logfile)
     log_filename = os.path.basename(logfile)
 
     daily_logfile = DailyLogFile(log_filename, log_folder)
 
-    txlog.msg("Starting %s on %s (%s UTC)" %  (application_name, otime.prettyDateNow(),
-                                                 otime.utcPrettyDateNow()))
-
+    txlog.msg("Starting %s on %s (%s UTC)" % (application_name,
+                                              otime.prettyDateNow(),
+                                              otime.utcPrettyDateNow()))
     txlog.startLoggingWithObserver(LogWithNoPrefix(sys.stdout).emit)
     txlog.addObserver(txlog.FileLogObserver(daily_logfile).emit)
 
@@ -48,8 +56,11 @@ def msg(msg, *arg, **kw):
     print "%s" % msg
 
 def debug(msg, *arg, **kw):
-    if config.advanced.debug:
+    if config.main.debug:
         print "[D] %s" % msg
+
+def warn(msg, *arg, **kw):
+    print "[W] %s" % msg
 
 def err(msg, *arg, **kw):
     print "[!] %s" % msg
