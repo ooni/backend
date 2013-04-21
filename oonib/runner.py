@@ -73,9 +73,12 @@ def startTor():
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
     torconfig.save()
-    d = txtorcon.launch_tor(torconfig, reactor,
-            tor_binary=config.main.tor_binary,
-            progress_updates=updates)
+    if config.main.tor_binary is not None:
+        d = txtorcon.launch_tor(torconfig, reactor,
+                                tor_binary=config.main.tor_binary,
+                                progress_updates=updates)
+    else:
+        d = txtorcon.launch_tor(torconfig, reactor, progress_updates=updates)
     d.addCallback(setupCollector)
     d.addErrback(txSetupFailed)
 
