@@ -15,19 +15,21 @@ set -vx --
 function killitwithfire () {
     trap - ALRM
     kill -ALRM $prog 2>/dev/null
-    kill $! 2>/dev/null && exit 124
+    kill -9 $! 2>/dev/null && exit 0
 }
 
 function waitforit () {
     trap "killitwithfire" ALRM
-    sleep $1 & wait
+    sleep $1& wait
     kill -ALRM $$
 }
 
 waitforit $1& prog=$! ; shift ;
 trap "killitwithfire" ALRM INT
-"$@"& wait `cat oonib.pid`
+"$@"& wait $!
 RET=$?
-kill -ALRM $prog
-wait $prog
+if [[ "$(ps -ef | awk -v pid=$prog '$2==pid{print}{}')" != "" ]]; then
+    kill -ALRM $prog
+    wait $prog
+fi
 exit $RET
