@@ -6,6 +6,10 @@ from twisted.python import log, usage
 from twisted.internet import reactor
 from twisted.application import app
 
+# Hack to set the proper sys.path. Overcomes the export PYTHONPATH pain.
+sys.path[:] = map(os.path.abspath, sys.path)
+sys.path.insert(0, os.path.abspath(os.getcwd()))
+
 from oonib import runner, config
 from oonib.oonibackend import application
 
