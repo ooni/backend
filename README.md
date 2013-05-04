@@ -88,8 +88,7 @@ If you want to use the HTTPS test helper, you will need to create a certificate:
     rm server.csr
 
 If you decide to put your certificate and key somewhere else, don't forget to
-update oonib.conf options ```helpers.ssl.private_key``` and
-```helpers.ssl.certificate```!
+update oonib.conf options ```helpers.ssl.private_key``` and ```helpers.ssl.certificate``` !
 
 ## Redirect low ports with iptables 
 The following iptables commands will map connections on low ports to those
@@ -104,13 +103,13 @@ bound by oonib:
     # Map port 53 tcp to config.helpers.dns.tcp_port (default: 57005)
     iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --tor-ports 
 
-# (For Experts Only) Tor2webmode:
+# (For Experts Only) Tor2webmode: 
+**WARNING**: provides no anonymity! Use only if you know what you are doing!
+Tor2webmode will improve the performance of the collector Hidden Service by
+discarding server-side anonymity.
 
-WARNING: provides no anonymity! Use only if you know what you are doing!
-Tor2webmode will improve the performance of the collector Hidden Service
-by discarding server-side anonymity.
-
-You will need to build Tor from source. At the time of writing, the latest stable Tor is tor-0.2.3.25. You should use the most recent stable Tor.
+You will need to build Tor from source. At the time of writing, the latest
+stable Tor is tor-0.2.3.25. You should use the most recent stable Tor.
 
 Example:
 
