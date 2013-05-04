@@ -4,6 +4,9 @@
 # we should have everything in the virtualenv? Or do we need to also get some
 # system libraries? libyaml, anyone?
 # XXX: Can we get a newer version of libyaml from a fc-xx repo?
+#
+# we'll need libyaml.h from the system's libraries, afaik. i don't know what
+# the fc* repos have though. --isis
 source /etc/mlab/slice-functions
 
 # 2. Generate a ssl certificate
