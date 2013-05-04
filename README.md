@@ -57,6 +57,9 @@ setting up this up and installing are:
     mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
     # ...and install ooni-backend (sudo is not necessary since we're in a virtualenv):
     pip install -r requirements.txt --use-mirrors
+    # Note: it is important that you install the requirements before you run
+    # the setup.py script. If you fail to do so they will be downloaded over
+    # plaintext.
     python setup.py install
 
 # Running an OONI collector
