@@ -161,3 +161,13 @@ The following supervisord config will use the virtual environment in
     autostart=true
     user=oonib
     directory=/home/oonib/
+
+# Testing with vagrant
+
+To test the deployment of oonib you may use [vagrant](http://www.vagrantup.com).
+
+Once installed you will be able to install oonib in the virtual machine via:
+
+```
+vagrant up
+```
