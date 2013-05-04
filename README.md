@@ -1,7 +1,4 @@
 # Dependencies and Installation
-  - cp oonib.conf.example oonib.conf
-  - chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
-  - echo "Build successful."
 
 ## Distro dependencies (Debian)
 There are a few dependencies which we recommend you get from your
