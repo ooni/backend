@@ -23,7 +23,7 @@ you'll want to make sure to get our keyring package in Debian:
 ```
 echo "deb http://deb.torproject.org/torproject.org wheezy main" | \
     sudo tee -a /etc/apt/sources.list
-gpg --keyserver keys.gnupg.net --recv 886DDD89
+gpg --keyserver keys.gnupg.net --recv EE8CBC9E886DDD89
 gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
 sudo apt-get update
 sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb
@@ -144,7 +144,8 @@ tag tor-0.2.3.25
 tagger Roger Dingledine <arma@torproject.org> 1353399116 -0500
 
 tag 0.2.3.25
-gpg: Signature made Tue 20 Nov 2012 08:11:59 AM UTC using RSA key ID 19F78451
+gpg: Signature made Tue 20 Nov 2012 08:11:59 UTC
+gpg:                using RSA key C218525819F78451
 gpg: Good signature from "Roger Dingledine <arma@mit.edu>"
 gpg:                 aka "Roger Dingledine <arma@freehaven.net>"
 gpg:                 aka "Roger Dingledine <arma@torproject.org>"
@@ -153,13 +154,15 @@ gpg:                 aka "Roger Dingledine <arma@torproject.org>"
 It is always good idea to verify.
 
 ```
-gpg --fingerprint 19F78451
-pub   4096R/19F78451 2010-05-07
+$ gpg --recv-keys C218525819F78451
+[...]
+$ gpg --fingerprint C218525819F78451
+pub   4096R/C218525819F78451 2010-05-07
       Key fingerprint = F65C E37F 04BA 5B36 0AE6  EE17 C218 5258 19F7 8451
-uid                  Roger Dingledine <arma@mit.edu>
-uid                  Roger Dingledine <arma@freehaven.net>
-uid                  Roger Dingledine <arma@torproject.org>
-sub   4096R/9B11185C 2012-05-02 [expires: 2013-05-02]
+      uid               [  full  ] Roger Dingledine <arma@mit.edu>
+      uid               [  full  ] Roger Dingledine <arma@freehaven.net>
+      uid               [  full  ] Roger Dingledine <arma@torproject.org>
+      sub   4096R/690234AC0DCC0FE1 2013-05-09 [expires: 2014-05-09]
 ```
 
 Build Tor with enable-tor2web-mode
