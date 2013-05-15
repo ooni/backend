@@ -40,4 +40,11 @@ pyOpenSSL>=0.13
 zope.component>=4.0.0
 zope.event>=4.0.0
 zope.interface>=4.0.1
-pysqlite
+##
+## pysqlite2 is required for sqlite support in Storm, see
+## https://storm.canonical.com/Manual#Dependencies-2
+##
+## If not installed, Storm and ooni-backend will still work, but will keep an
+## in-memory database, which in some cases may slow the server.
+##
+pysqlite>=2.6.0
