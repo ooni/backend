@@ -87,7 +87,7 @@ this would simply be ```'report'```) and ```tor_datadir``` (where you would
 like the spawned Tor process to keep its data). If you compiled Tor yourself,
 you'll likely want to specify it for the ```tor_binary``` option.
 
-## Generate self signed certs for OONIB
+### Generate self signed certs for OONIB
 If you want to use the HTTPS test helper, you will need to create a certificate:
 
 ```
@@ -104,7 +104,7 @@ rm server.csr
 If you decide to put your certificate and key somewhere else, don't forget to
 update oonib.conf options ```helpers.ssl.private_key``` and ```helpers.ssl.certificate``` !
 
-## Redirect low ports with iptables
+### Redirect low ports with iptables
 The following iptables commands will map connections on low ports to those
 bound by oonib:
 
@@ -119,7 +119,7 @@ iptables -t nat -A PREROUTING -p tcp -m udp --dport 53 -j REDIRECT --tor-ports
 iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --tor-ports
 ```
 
-# (For Experts Only) Tor2webmode:
+### (For Experts Only) Tor2webmode:
 **WARNING**: provides no anonymity! Use only if you know what you are doing!
 Tor2webmode will improve the performance of the collector Hidden Service by
 discarding server-side anonymity.
@@ -174,7 +174,7 @@ Build Tor with enable-tor2web-mode
 Copy the tor binary from src/or/tor somewhere and set the corresponding
 options in oonib.conf.
 
-# To launch oonib on system boot
+## To launch oonib on system boot
 To launch oonib on startup, you may want to use supervisord (www.supervisord.org)
 The following supervisord config will use the virtual environment in
 /home/ooni/venv_oonib and start oonib on boot:
@@ -187,7 +187,7 @@ user=oonib
 directory=/home/oonib/
 ```
 
-# Testing with vagrant
+## Testing with vagrant
 
 To test the deployment of oonib you may use [vagrant](http://www.vagrantup.com).
 
