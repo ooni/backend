@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # 1. Fetch any dependencies
 # we should have everything in the virtualenv? Or do we need to also get some
@@ -28,35 +28,38 @@ openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate
 rm private.key.org
 rm cert.pass
 
-# Set up our firewall rules
-# XXX: Confirm that sudo will work with MLAB.
-# Map port 80 to config.helpers.http_return_request.port  (default: 57001)
-sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 57001
-# Map port 443 to config.helpers.ssl.port  (default: 57006)
-sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 57006
-# Map port 53 udp to config.helpers.dns.udp_port (default: 57004)
-sudo iptables -t nat -A PREROUTING -p udp -m udp --dport 53 -j REDIRECT --to-ports 57004
-# Map port 53 tcp to config.helpers.dns.tcp_port (default: 57005)
-sudo iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 57005
+# get the UID and GID to drop privileges to
+OONIB_UID=`id -u $SLICENAME`
+OONIB_GID=`id -g $SLICENAME`
+
+# randomly select either a tcp backend helper or a http backend helper to listen on port 80. Otherwise, bind to port 81
+coin=$[$RANDOM % 2]
+if [[ $coin > 0 ]]; then
+  TCP_ECHO_PORT=80
+  HTTP_ECHO_PORT=81
+else
+  TCP_ECHO_PORT=81
+  HTTP_ECHO_PORT=80
+fi
 
 # drop a config in $SCRIPT_ROOT
 echo "
 main:
     report_dir: '/var/spool/$SLICENAME'
     tor_datadir: 
-    database_uri: 'sqlite:"$SCRIPT_ROOT"//oonib_test_db.db'
+    database_uri: 'sqlite://"$SCRIPT_ROOT"/oonib_test_db.db'
     db_threadpool_size: 10
     tor_binary: '"$SCRIPT_ROOT"/bin/tor'
     tor2webmode: true
     pidfile: 'oonib.pid'
-    nodaemon: true
+    nodaemon: false
     originalname: Null
     chroot: Null
     rundir: .
     umask: Null
     euid: Null
-    uid: Null
-    gid: Null
+    uid: $OONIB_UID
+    gid: $OONIB_GID
     uuid: Null
     no_save: true
     profile: Null
@@ -64,11 +67,11 @@ main:
 
 helpers:
     http_return_request:
-        port: 57001
+        port: $HTTP_ECHO_PORT
         server_version: Apache
 
     tcp_echo:
-        port: 57002
+        port: $TCP_ECHO_PORT
 
     daphn3:
         yaml_file: Null
@@ -82,4 +85,4 @@ helpers:
     ssl:
         private_key: '"$SCRIPT_ROOT"/private.key'
         certificate: '"$SCRIPT_ROOT"/certificate.crt'
-        port: 57006" > $SCRIPT_ROOT/oonib.conf
+        port: 443" > $SCRIPT_ROOT/oonib.conf
