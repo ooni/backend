@@ -104,7 +104,7 @@ rm server.csr
 If you decide to put your certificate and key somewhere else, don't forget to
 update oonib.conf options ```helpers.ssl.private_key``` and ```helpers.ssl.certificate``` !
 
-## Redirect low ports with iptables 
+## Redirect low ports with iptables
 The following iptables commands will map connections on low ports to those
 bound by oonib:
 
@@ -114,12 +114,12 @@ iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 57
 # Map port 443 to config.helpers.ssl.port  (default: 57006)
 iptables -t nat -A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 57006
 # Map port 53 udp to config.helpers.dns.udp_port (default: 57004)
-iptables -t nat -A PREROUTING -p tcp -m udp --dport 53 -j REDIRECT --tor-ports 
+iptables -t nat -A PREROUTING -p tcp -m udp --dport 53 -j REDIRECT --tor-ports
 # Map port 53 tcp to config.helpers.dns.tcp_port (default: 57005)
-iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --tor-ports 
+iptables -t nat -A PREROUTING -p tcp -m tcp --dport 53 -j REDIRECT --tor-ports
 ```
 
-# (For Experts Only) Tor2webmode: 
+# (For Experts Only) Tor2webmode:
 **WARNING**: provides no anonymity! Use only if you know what you are doing!
 Tor2webmode will improve the performance of the collector Hidden Service by
 discarding server-side anonymity.
@@ -142,7 +142,7 @@ object 17c24b3118224d6536c41fa4e1493a831fb29f0a
 type commit
 tag tor-0.2.3.25
 tagger Roger Dingledine <arma@torproject.org> 1353399116 -0500
-    
+
 tag 0.2.3.25
 gpg: Signature made Tue 20 Nov 2012 08:11:59 AM UTC using RSA key ID 19F78451
 gpg: Good signature from "Roger Dingledine <arma@mit.edu>"
@@ -165,9 +165,9 @@ sub   4096R/9B11185C 2012-05-02 [expires: 2013-05-02]
 Build Tor with enable-tor2web-mode
 
 ```
-./autogen.sh ; ./configure --enable-tor2web-mode ; make 
+./autogen.sh ; ./configure --enable-tor2web-mode ; make
 ```
-   
+
 Copy the tor binary from src/or/tor somewhere and set the corresponding
 options in oonib.conf.
 
