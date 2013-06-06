@@ -1,5 +1,16 @@
 from __future__ import with_statement
-from setuptools import setup, find_packages
+from __future__ import absolute_import
+
+import setuptools
+
+import versioneer
+versioneer.versionfile_source = 'oonib/_version.py'
+versioneer.versionfile_build = 'oonib/_version.py'
+# tag format must be v1.2.3
+versioneer.tag_prefix = 'v'
+# build unpacks into 'oonib-1.2.3'
+versioneer.parentdir_prefix = 'oonib'
+
 
 def get_requirements():
     with open('requirements.txt', 'r') as f:
@@ -24,15 +35,19 @@ def get_requirements():
     return pypi_packages, dependency_links
 
 install_requires, dependency_links = get_requirements()
-setup(
+
+setuptools.setup(
     name="oonib",
-    version="0.9",
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     author="The Tor Project, Inc",
     url="https://ooni.torproject.org",
-    license="LICENSE",
-    description="OONI-Probe Backend",
+    license="BSD",
+    description="""\
+Backend network test helper and report collector for the OONI \
+censorship-detection framework""",
     scripts=["bin/oonib"],
-    packages=find_packages(),
+    packages=setuptools.find_packages(),
     install_requires=install_requires,
     dependency_links=dependency_links,
 )
