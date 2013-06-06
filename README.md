@@ -42,7 +42,7 @@ get-pip script:
 
 ```
 # Grab the get-pip installer to make sure we have pip>=1.3.0
-curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
+wget https://raw.github.com/pypa/pip/master/contrib/get-pip.py
 sudo python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
 # And make sure we're actually using the newer one:
 sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
