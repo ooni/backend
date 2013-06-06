@@ -8,16 +8,16 @@ import re
 from ipaddr import IPAddress
 from datetime import timedelta
 from datetime import datetime
-from ooni.otime import fromTimestamp, timestamp
-from ooni.otime import InvalidTimestampFormat, utcDateNow
-from ooni.utils import log
+from oonib.otime import fromTimestamp, timestamp
+from oonib.otime import InvalidTimestampFormat, utcDateNow
+from oonib import log
 
 ###############################################################################
 # You can set some config options here                                        #
 ###############################################################################
 report_age = 1 # hours
-report_archive_dir = '/home/user/oonib/reports/archived'
-report_source_dir = '/home/user/oonib/reports'
+report_archive_dir = '/var/spool/mlab_ooni/archived'
+report_source_dir = '/var/spool/mlab_ooni'
 valid_test_versions = ['0.1', '0.1.1', '0.4', '0.1.3']
 default_probe_cc = '??'
 target_permission = 0444
