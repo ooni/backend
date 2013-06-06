@@ -33,9 +33,6 @@ class OBaseRunner(object):
 
 _repo_dir = os.path.join(os.getcwd().split('ooni-backend')[0], 'ooni-backend')
 tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
-if not os.path.isdir(tempfile.gettempdir()):
-    os.makedirs(tempfile.gettempdir())
-_temp_dir = tempfile.mkdtemp()
 
 def txSetupFailed(failure):
     log.err("Setup failed")
@@ -45,6 +42,10 @@ def setupCollector(tor_process_protocol):
     def setup_complete(port):
         print("Exposed collector Tor hidden service on httpo://%s"
               % port.onion_uri)
+
+    if not os.path.isdir(tempfile.gettempdir()):
+        os.makedirs(tempfile.gettempdir())
+    _temp_dir = tempfile.mkdtemp()
 
     if config.main.tor_datadir is None:
         log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
