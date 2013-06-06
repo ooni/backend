@@ -131,8 +131,9 @@ class NewReportHandlerFile(web.RequestHandler):
         test_name = report_data['test_name']
         test_version = report_data['test_version']
         probe_asn = report_data['probe_asn']
-        content = report_data['content']
+        content = json.loads(report_data['content'])
         content['backend_version'] = config.backend_version
+        content = json.dumps(content)
 
         if not probe_asn:
             probe_asn = "AS0"
