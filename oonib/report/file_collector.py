@@ -1,5 +1,6 @@
 import random
 import string
+import yaml
 import json
 import re
 import os
@@ -131,9 +132,10 @@ class NewReportHandlerFile(web.RequestHandler):
         test_name = report_data['test_name']
         test_version = report_data['test_version']
         probe_asn = report_data['probe_asn']
-        content = json.loads(report_data['content'])
+        content = yaml.safe_load(report_data['content'])
         content['backend_version'] = config.backend_version
-        content = json.dumps(content)
+        serialized_content = yaml.dump(content)
+        content = "---\n" + serialized_content + '...\n'
 
         if not probe_asn:
             probe_asn = "AS0"
