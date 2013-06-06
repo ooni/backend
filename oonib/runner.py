@@ -72,8 +72,6 @@ def startTor():
 
     torconfig = TorConfig()
     torconfig.SocksPort = config.main.socks_port
-    if config.main.uid:
-        torconfig.User = config.main.uid
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
