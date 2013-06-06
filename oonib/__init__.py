@@ -76,3 +76,7 @@ database = SQLite(URI(config.main.database_uri))
 db_threadpool = ThreadPool(0, config.main.db_threadpool_size)
 db_threadpool.start()
 transactor = Transactor(db_threadpool)
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
