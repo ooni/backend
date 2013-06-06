@@ -46,6 +46,7 @@ def start(logfile=None, application_name="oonib"):
     txlog.msg("Starting %s on %s (%s UTC)" % (application_name,
                                               otime.prettyDateNow(),
                                               otime.utcPrettyDateNow()))
+    txlog.msg("oonib version %s" % config.backend_version)
     txlog.startLoggingWithObserver(LogWithNoPrefix(sys.stdout).emit)
     txlog.addObserver(txlog.FileLogObserver(daily_logfile).emit)
 

@@ -16,7 +16,7 @@ from storm.databases.sqlite import SQLite
 import string
 import random
 
-__version__ = '0.0.1'
+__version__ = '0.9'
 
 class Storage(dict):
     """

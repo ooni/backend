@@ -132,6 +132,7 @@ class NewReportHandlerFile(web.RequestHandler):
         test_version = report_data['test_version']
         probe_asn = report_data['probe_asn']
         content = report_data['content']
+        content['backend_version'] = config.backend_version
 
         if not probe_asn:
             probe_asn = "AS0"
@@ -148,8 +149,7 @@ class NewReportHandlerFile(web.RequestHandler):
                 'report_id': report_id
         }
 
-        self.writeToReport(report_filename,
-                report_data['content'])
+        self.writeToReport(report_filename, content)
 
         self.write(response)
 
