@@ -19,7 +19,6 @@ if config.main.chroot:
 
 if not config.main.nodaemon:
     sys.argv.append('-y')
-    sys.argv.append(backend_script)
 
 def runApp(config):
     runner.OBaseRunner(config).run()
