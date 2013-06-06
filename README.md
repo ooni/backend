@@ -9,12 +9,12 @@ sudo apt-get install build-essential python-dev python-setuptools openssl
 ```
 
 ### Tor
-You will need a Tor binary on your system. For complete instructions, see also:
 
-```
-https://www.torproject.org/docs/tor-doc-unix.html.en
-https://www.torproject.org/docs/rpms.html.en
-```
+You will need a Tor binary on your system. For complete instructions, see our
+docs on building and running
+[Tor on Linux/BSD/Unix](https://www.torproject.org/docs/tor-doc-unix.html.en),
+or, if you're using RedHat or Fedora, see our infomation on
+[obtaining RPM builds](https://www.torproject.org/docs/rpms.html.en).  ```
 
 If you've already got Tor, or plan to compile it yourself from source, great!
 You can skip this step. Otherwise, if you're installing Tor (or reinstalling),
