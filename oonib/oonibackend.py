@@ -23,7 +23,12 @@ from oonib import log
 from oonib import db_threadpool
 from oonib import config
 
-application = service.Application('oonibackend')
+if config.uid and config.gid:
+    application = service.Application('oonibackend', uid=config.uid,
+                                      gid=config.gid)
+else:
+    application = service.Application('oonibackend')
+
 serviceCollection = service.IServiceCollection(application)
 
 if config.helpers.ssl.port:
