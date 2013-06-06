@@ -23,9 +23,9 @@ from oonib import log
 from oonib import db_threadpool
 from oonib import config
 
-if config.uid and config.gid:
-    application = service.Application('oonibackend', uid=config.uid,
-                                      gid=config.gid)
+if config.main.uid and config.main.gid:
+    application = service.Application('oonibackend', uid=config.main.uid,
+                                      gid=config.main.gid)
 else:
     application = service.Application('oonibackend')
 

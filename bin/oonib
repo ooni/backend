@@ -13,8 +13,13 @@ sys.path.insert(0, os.path.abspath(os.getcwd()))
 from oonib import runner, config
 from oonib.oonibackend import application
 
-# Uncomment this line to daemonize
-#sys.argv[1:] = ['-y', backend_script]
+if config.main.chroot:
+    sys.argv.append('--chroot')
+    sys.argv.append(config.chroot)
+
+if not config.main.nodaemon:
+    sys.argv.append('-y')
+    sys.argv.append(backend_script)
 
 def runApp(config):
     runner.OBaseRunner(config).run()
