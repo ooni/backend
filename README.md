@@ -5,7 +5,9 @@ There are a few dependencies which we recommend you get from your
 distribution's archives.
 
 ```
-sudo apt-get install build-essential python-dev python-setuptools openssl
+sudo apt-get install build-essential hardening-wrapper python-dev python-setuptools openssl
+## Enable compiler hardening flags while building Python extensions:
+export DEB_BUILD_HARDENING=1
 ```
 
 ### Tor
