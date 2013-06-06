@@ -161,9 +161,9 @@ $ gpg --recv-keys C218525819F78451
 $ gpg --fingerprint C218525819F78451
 pub   4096R/C218525819F78451 2010-05-07
       Key fingerprint = F65C E37F 04BA 5B36 0AE6  EE17 C218 5258 19F7 8451
-      uid               [  full  ] Roger Dingledine <arma@mit.edu>
-      uid               [  full  ] Roger Dingledine <arma@freehaven.net>
-      uid               [  full  ] Roger Dingledine <arma@torproject.org>
+      uid               Roger Dingledine <arma@mit.edu>
+      uid               Roger Dingledine <arma@freehaven.net>
+      uid               Roger Dingledine <arma@torproject.org>
       sub   4096R/690234AC0DCC0FE1 2013-05-09 [expires: 2014-05-09]
 ```
 
