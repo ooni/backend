@@ -32,7 +32,6 @@ class OBaseRunner(object):
 
 
 _repo_dir = os.path.join(os.getcwd().split('ooni-backend')[0], 'ooni-backend')
-tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
 
 def txSetupFailed(failure):
     log.err("Setup failed")
@@ -43,6 +42,7 @@ def setupCollector(tor_process_protocol):
         print("Exposed collector Tor hidden service on httpo://%s"
               % port.onion_uri)
 
+    tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
     if not os.path.isdir(tempfile.gettempdir()):
         os.makedirs(tempfile.gettempdir())
     _temp_dir = tempfile.mkdtemp()
@@ -72,6 +72,8 @@ def startTor():
 
     torconfig = TorConfig()
     torconfig.SocksPort = config.main.socks_port
+    if config.main.uid:
+        torconfig.User = config.main.uid
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
