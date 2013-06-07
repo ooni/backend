@@ -31,6 +31,7 @@ def loadConfigFile():
 
 main = None
 backend_version = __version__
+reports = {}
 
 if not main:
     main, helpers = loadConfigFile()

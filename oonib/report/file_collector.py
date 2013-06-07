@@ -1,11 +1,14 @@
 import random
 import string
+import time
 import yaml
 import json
 import re
 import os
 
-from twisted.internet import fdesc
+from datetime import datetime
+
+from twisted.internet import fdesc, reactor
 
 from cyclone import web
 
@@ -37,8 +40,6 @@ def parseUpdateReportRequest(request):
         raise InvalidRequestField('report_id')
 
     return parsed_request
-
-
 
 def parseNewReportRequest(request):
     """
@@ -73,6 +74,16 @@ def parseNewReportRequest(request):
             raise InvalidRequestField(k)
 
     return parsed_request
+
+def get_report_path(report_id):
+    return os.path.join(config.main.report_dir, report_id)
+
+def stale_check(report_id):
+    if (time.time() - config.reports[report_id]) > config.main.stale_time:
+        try:
+            close_report(report_id)
+        except ReportNotFound:
+            pass
 
 class NewReportHandlerFile(web.RequestHandler):
     """
@@ -152,6 +163,10 @@ class NewReportHandlerFile(web.RequestHandler):
                 'report_id': report_id
         }
 
+        config.reports[report_id] = time.time()
+
+        reactor.callLater(config.main.stale_time, stale_check, report_id)
+
         self.writeToReport(report_filename, content)
 
         self.write(response)
@@ -178,6 +193,9 @@ class NewReportHandlerFile(web.RequestHandler):
         report_filename = os.path.join(config.main.report_dir,
                 report_id)
 
+        config.reports[report_id] = time.time()
+        reactor.callLater(config.main.stale_time, stale_check, report_id)
+
         self.updateReport(report_filename, parsed_request['content'])
 
     def updateReport(self, report_filename, data):
@@ -186,6 +204,42 @@ class NewReportHandlerFile(web.RequestHandler):
                 fdesc.setNonBlocking(fd.fileno())
                 fdesc.writeToFD(fd.fileno(), data)
         except IOError as e:
+            web.HTTPError(404, "Report not found")
+
+class ReportNotFound(Exception):
+    pass
+
+def close_report(report_id):
+    report_filename = get_report_path(report_id)
+    try:
+        with open(report_filename) as fd:
+            yaml_data = ''.join(fd.readline() for _ in range(12))
+            report_details = yaml.safe_load(yaml_data)
+    except IOError:
+        raise ReportNotFound
+
+    timestamp = otime.timestamp(datetime.fromtimestamp(report_details['start_time']))
+    dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
+            timestamp=timestamp,
+            **report_details)
+
+    dst_path = os.path.join(config.main.archive_dir,
+                            report_details['probe_cc'])
+
+    if not os.path.isdir(dst_path):
+        os.mkdir(dst_path)
+
+    dst_path = os.path.join(dst_path, dst_filename)
+    os.rename(report_filename, dst_path)
+
+class CloseReportHandlerFile(web.RequestHandler):
+    def get(self):
+        pass
+
+    def post(self, report_id):
+        try:
+            close_report(report_id)
+        except ReportNotFound:
             web.HTTPError(404, "Report not found")
 
 class PCAPReportHandler(web.RequestHandler):

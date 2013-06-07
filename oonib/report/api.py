@@ -99,6 +99,7 @@ class NewReportHandlerDB(web.RequestHandler):
 
 
 reportingBackendAPI = [
+    (r"/report/([a-zA-Z0-9_\-]+)/close", file_collector.CloseReportHandlerFile),
     (r"/report", file_collector.NewReportHandlerFile),
     (r"/pcap", file_collector.PCAPReportHandler)
 ]

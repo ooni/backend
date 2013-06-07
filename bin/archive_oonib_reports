@@ -10,7 +10,7 @@ from datetime import timedelta
 from datetime import datetime
 from oonib.otime import fromTimestamp, timestamp
 from oonib.otime import InvalidTimestampFormat, utcDateNow
-from oonib import log
+from oonib import log, __version__
 
 ###############################################################################
 # You can set some config options here                                        #
@@ -88,7 +88,7 @@ def get_test_name(fields):
 
 def get_target_or_fail(fields, report):
     # set the target filename
-    reportFormatVersion = fields['test_version']
+    reportFormatVersion = __version__
     CC                  = fields['probe_cc']
     # XXX: wouldn't hurt to check timestamp for sanity again?
     dateInISO8601Format,__,__ = os.path.basename(report).split('_')
