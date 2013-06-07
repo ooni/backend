@@ -1,3 +1,4 @@
+from oonib import __version__
 from __future__ import with_statement
 from setuptools import setup, find_packages
 
@@ -26,7 +27,7 @@ def get_requirements():
 install_requires, dependency_links = get_requirements()
 setup(
     name="oonib",
-    version="0.9",
+    version=__version__,
     author="The Tor Project, Inc",
     url="https://ooni.torproject.org",
     license="LICENSE",
