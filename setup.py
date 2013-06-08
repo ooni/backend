@@ -1,5 +1,6 @@
-from oonib import __version__
 from __future__ import with_statement
+
+from oonib import __version__
 from setuptools import setup, find_packages
 
 def get_requirements():
