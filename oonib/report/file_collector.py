@@ -189,7 +189,7 @@ class NewReportHandlerFile(web.RequestHandler):
 
         report_id = parsed_request['report_id']
 
-        print "Got this request %s" % parsed_request
+        log.debug("Got this request %s" % parsed_request)
         report_filename = os.path.join(config.main.report_dir,
                 report_id)
 

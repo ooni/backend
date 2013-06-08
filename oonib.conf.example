@@ -20,7 +20,7 @@ main:
     uuid: Null
     no_save: true
     profile: Null
-    debug: Null
+    debug: false
     stale_time: 3600
 
 helpers:
