@@ -6,17 +6,13 @@
 In here we shall keep track of all variables and objects that should be
 instantiated only once and be common to pieces of GLBackend code.
 """
-__all__ = ['database', 'db_threadpool', 'Storage', 'randomStr']
-
-from twisted.python.threadpool import ThreadPool
-
-from storm.uri import URI
-from storm.twisted.transact import Transactor
-from storm.databases.sqlite import SQLite
-import string
-import random
 
 __version__ = '0.9.1'
+
+__all__ = ['Storage', 'randomStr']
+
+import string
+import random
 
 class Storage(dict):
     """
@@ -69,10 +65,3 @@ def randomStr(length, num=True):
     if num:
         chars += string.digits
     return ''.join(random.choice(chars) for x in range(length))
-
-from oonib import config
-
-database = SQLite(URI(config.main.database_uri))
-db_threadpool = ThreadPool(0, config.main.db_threadpool_size)
-db_threadpool.start()
-transactor = Transactor(db_threadpool)

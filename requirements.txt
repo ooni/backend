@@ -32,8 +32,6 @@ pygeoip>=0.2.6
 ##
 https://people.torproject.org/~ioerror/src/mirrors/ooniprobe/scapy-02-25-2013-tip.zip#egg=scapy
 transaction>=1.4.1
-#https://pypi.python.org/packages/source/t/transaction/transaction-1.4.1.zip#md5=8db2680bc0f999219861a67b8f335a88#egg=transaction
-storm>=0.19
 #https://pypi.python.org/packages/source/s/storm/storm-0.19.tar.gz#md5=61d1ee4cd2a08639ab917e43fa2c9265#egg=storm
 txtorcon>=0.7
 pyOpenSSL>=0.13

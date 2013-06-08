@@ -20,7 +20,7 @@ from cyclone import web
 from oonib import otime
 from oonib import randomStr
 
-from oonib import models, config
+from oonib import config
 from oonib.report import file_collector
 
 def parseUpdateReportRequest(request):
@@ -44,59 +44,6 @@ def parseUpdateReportRequest(request):
         raise InvalidRequestField('report_id')
 
     return parsed_request
-
-
-class NewReportHandlerDB(web.RequestHandler):
-    """
-    Responsible for creating and updating reports via database.
-    XXX this is not yet fully implemented.
-    """
-
-    @web.asynchronous
-    @defer.inlineCallbacks
-    def post(self):
-        """
-        Creates a new report with the input to the database.
-        XXX this is not yet implemented.
-
-        * Request
-
-          {'software_name': 'XXX',
-           'software_version': 'XXX',
-           'test_name': 'XXX',
-           'test_version': 'XXX',
-           'progress': 'XXX',
-           'content': 'XXX'
-           }
-
-          Optional:
-            'test_helper': 'XXX'
-            'client_ip': 'XXX'
-
-          * Response
-
-          {'backend_version': 'XXX', 'report_id': 'XXX'}
-
-        """
-        report_data = json.loads(self.request.body)
-        new_report = models.Report()
-        log.debug("Got this request %s" % report_data)
-        result = yield new_report.new(report_data)
-        self.write(result)
-        self.finish()
-
-    def put(self):
-        """
-        Update an already existing report with the database.
-
-        XXX this is not yet implemented.
-
-          {'report_id': 'XXX',
-           'content': 'XXX'
-          }
-        """
-        pass
-
 
 reportingBackendAPI = [
     (r"/report/([a-zA-Z0-9_\-]+)/close", file_collector.CloseReportHandlerFile),

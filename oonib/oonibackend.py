@@ -20,7 +20,6 @@ from oonib.testhelpers import http_helpers, tcp_helpers
 
 from oonib import log
 
-from oonib import db_threadpool
 from oonib import config
 
 if config.main.uid and config.main.gid:
@@ -73,5 +72,3 @@ if config.helpers.http_return_request.port:
             int(config.helpers.http_return_request.port),
             http_helpers.HTTPReturnJSONHeadersHelper())
     http_return_request_helper.setServiceParent(serviceCollection)
-
-reactor.addSystemEventTrigger('after', 'shutdown', db_threadpool.stop)
