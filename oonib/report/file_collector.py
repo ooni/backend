@@ -17,7 +17,7 @@ from oonib import otime
 
 from oonib.report import MissingField, InvalidRequestField
 
-from oonib import config
+from oonib import config, log
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
@@ -74,6 +74,41 @@ def parseNewReportRequest(request):
             raise InvalidRequestField(k)
 
     return parsed_request
+
+class InvalidReportHeader(Exception):
+    pass
+
+class MissingReportHeaderKey(InvalidReportHeader):
+    pass
+
+def validate_report_header(report_header):
+    required_keys = ['probe_asn', 'probe_cc', 'probe_ip', 'software_name',
+            'software_version', 'test_name', 'test_version']
+    for key in required_keys:
+        if key not in report_header:
+            raise MissingReportHeaderKey(key)
+
+    if report_header['probe_asn'] is None:
+        report_header['probe_asn'] = 'AS0'
+
+    if not re.match('AS[0-9]+$', report_header['probe_asn']):
+        raise InvalidReportHeader('probe_asn')
+
+    # If no country is known, set it to be ZZ (user assigned value in ISO 3166)
+    if report_header['probe_cc'] is None:
+        report_header['probe_cc'] = 'ZZ'
+
+    if not re.match('[a-zA-Z]{2}$', report_header['probe_cc']):
+        raise InvalidReportHeader('probe_cc')
+
+    if not re.match('[a-z_\-]+$', report_header['test_name']):
+        raise InvalidReportHeader('test_name')
+
+
+    if not re.match('([0-9]+\.)+[0-9]+$', report_header['test_version']):
+        raise InvalidReportHeader('test_version')
+
+    return report_header
 
 def get_report_path(report_id):
     return os.path.join(config.main.report_dir, report_id)
@@ -145,8 +180,18 @@ class NewReportHandlerFile(web.RequestHandler):
         probe_asn = report_data['probe_asn']
         content = yaml.safe_load(report_data['content'])
         content['backend_version'] = config.backend_version
-        serialized_content = yaml.dump(content)
-        content = "---\n" + serialized_content + '...\n'
+
+        try:
+            report_header = validate_report_header(content)
+
+        except MissingReportHeaderKey, key:
+            raise web.HTTPError(406, "Missing report header key %s" % key)
+
+        except InvalidReportHeader, key:
+            raise web.HTTPError(406, "Invalid report header %s" % key)
+
+        report_header = yaml.dump(report_header)
+        content = "---\n" + report_header + '...\n'
 
         if not probe_asn:
             probe_asn = "AS0"
