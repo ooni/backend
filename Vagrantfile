@@ -111,7 +111,7 @@ Vagrant.configure("2") do |config|
 end
 
 $setup_script = <<SCRIPT
-apt-get -y install curl python-setuptools python-dev
+apt-get -y install curl python-setuptools python-dev libsqlite3-dev
 
 echo "Updating to the latest version of PIP"
 cd /tmp/
