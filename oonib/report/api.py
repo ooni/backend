@@ -49,8 +49,10 @@ reportingBackendAPI = [
     (r"/report/([a-zA-Z0-9_\-]+)/close", file_collector.CloseReportHandlerFile),
     (r"/report", file_collector.NewReportHandlerFile),
     (r"/pcap", file_collector.PCAPReportHandler),
-    (r"/deck/([a-z0-9]{40})$", web.StaticFileHandler, {"path": config.deck_dir}),
-    (r"/input/([a-z0-9]{40})$", web.StaticFileHandler, {"path": config.input_dir}),
+    (r"/deck/([a-z0-9]{40})$", web.StaticFileHandler, {"path":
+        config.main.deck_dir}),
+    (r"/input/([a-z0-9]{40})$", web.StaticFileHandler, {"path":
+        config.main.input_dir}),
 ]
 
 reportingBackend = web.Application(reportingBackendAPI, debug=True)
