@@ -32,10 +32,12 @@ class LogWithNoPrefix(txlog.FileLogObserver):
         util.untilConcludes(self.write, "%s\n" % text)
         util.untilConcludes(self.flush)  # Hoorj!
 
-def start(logfile=None, application_name="oonib"):
+def start(application_name="oonib"):
     daily_logfile = None
 
-    if not logfile:
+    if not config.main.logfile:
+        logfile = 'oonib.log'
+    else:
         logfile = config.main.logfile
 
     log_folder = os.path.dirname(logfile)
@@ -85,8 +87,7 @@ class LoggerFactory(object):
         pass
 
     def start(self, application):
-        # XXX parametrize this
-        start('oonib.log', "OONIB")
+        start("OONIB")
 
     def stop(self):
         txlog.msg("Stopping OONIB")
