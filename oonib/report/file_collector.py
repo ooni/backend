@@ -1,23 +1,17 @@
+import glob
+import json
+import os
 import random
+import re
 import string
 import time
 import yaml
-import json
-import re
-import os
-
-from datetime import datetime
-
-from twisted.internet import fdesc, reactor
 
 from cyclone import web
-
-from oonib import randomStr
-from oonib import otime
-
+from datetime import datetime
+from oonib import randomStr, otime, config, log
 from oonib.report import MissingField, InvalidRequestField
-
-from oonib import config, log
+from twisted.internet import fdesc, reactor
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
