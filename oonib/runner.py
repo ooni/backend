@@ -47,14 +47,6 @@ def setupCollector(tor_process_protocol):
         os.makedirs(tempfile.gettempdir())
     _temp_dir = tempfile.mkdtemp()
 
-    if config.main.tor_datadir is None:
-        log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
-        log.msg("Creating tmp directory in current directory for datadir.")
-        log.debug("Using %s" % _temp_dir)
-        datadir = _temp_dir
-    else:
-        datadir = config.main.tor_datadir
-
     torconfig = TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
     # XXX there is currently a bug in txtorcon that prevents data_dir from
@@ -75,6 +67,14 @@ def startTor():
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
+    if config.main.tor_datadir is None:
+        log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
+        log.msg("Creating tmp directory in current directory for datadir.")
+        log.debug("Using %s" % _temp_dir)
+        datadir = _temp_dir
+    else:
+        datadir = config.main.tor_datadir
+    torconfig.DataDirectory = datadir
     torconfig.save()
     if config.main.tor_binary is not None:
         d = launch_tor(torconfig, reactor,
