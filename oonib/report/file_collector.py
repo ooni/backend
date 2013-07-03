@@ -287,3 +287,17 @@ class PCAPReportHandler(web.RequestHandler):
 
     def post(self):
         pass
+
+class DeckListHandler(web.RequestHandler):
+    def get(self):
+        if not config.main.deck_dir: return
+        path = os.path.abspath(config.main.deck_dir) + "/*"
+        decknames = map(os.path.basename, glob.iglob(path))
+        self.write(json.dumps(decknames))
+
+class InputListHandler(web.RequestHandler):
+    def get(self):
+        if not config.main.input_dir: return
+        path = os.path.abspath(config.main.input_dir) + "/*"
+        inputnames = map(os.path.basename, glob.iglob(path))
+        self.write(json.dumps(decknames))
