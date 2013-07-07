@@ -20,7 +20,10 @@ from twisted.python.runtime import platformType
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
 
-from oonib.report.api import reportingBackend
+from oonib.report.api import reportAPI 
+from oonib.deck.api import deckAPI
+from oonib.input.api import inputAPI
+from oonib.policy.api import policyAPI
 
 from oonib import oonibackend
 from oonib import config
@@ -30,7 +33,6 @@ from oonib import log
 class OBaseRunner(object):
     pass
 
-
 _repo_dir = os.path.join(os.getcwd().split('ooni-backend')[0], 'ooni-backend')
 
 def txSetupFailed(failure):
@@ -39,6 +41,7 @@ def txSetupFailed(failure):
 
 def setupCollector(tor_process_protocol):
     def setup_complete(port):
+        #XXX: drop some other noise about what API are available on this machine
         print("Exposed collector Tor hidden service on httpo://%s"
               % port.onion_uri)
 
@@ -52,9 +55,14 @@ def setupCollector(tor_process_protocol):
     # XXX there is currently a bug in txtorcon that prevents data_dir from
     # being passed properly. Details on the bug can be found here:
     # https://github.com/meejah/txtorcon/pull/22
+
+    #XXX: set up the various API endpoints, if configured and enabled
+    #XXX: also set up a separate keyed hidden service for collectors to push their status to, if the bouncer is enabled
     hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
                                            data_dir=datadir)
-    hidden_service = hs_endpoint.listen(reportingBackend)
+    EnabledAPIs = []
+    EnabledAPIs.append(reportAPI)
+    hidden_service = hs_endpoint.listen(EnabledAPIs)
     hidden_service.addCallback(setup_complete)
     hidden_service.addErrback(txSetupFailed)
 
