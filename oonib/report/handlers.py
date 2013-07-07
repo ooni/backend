@@ -1,7 +1,5 @@
-import glob
 import json
 import os
-import random
 import re
 import string
 import time
@@ -10,8 +8,13 @@ import yaml
 from cyclone import web
 from datetime import datetime
 from oonib import randomStr, otime, config, log
-from oonib.report import MissingField, InvalidRequestField
 from twisted.internet import fdesc, reactor
+
+class MissingField(Exception):
+    pass
+
+class InvalidRequestField(Exception):
+    pass
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
@@ -287,17 +290,3 @@ class PCAPReportHandler(web.RequestHandler):
 
     def post(self):
         pass
-
-class DeckListHandler(web.RequestHandler):
-    def get(self):
-        if not config.main.deck_dir: return
-        path = os.path.abspath(config.main.deck_dir) + "/*"
-        decknames = map(os.path.basename, glob.iglob(path))
-        self.write(json.dumps(decknames))
-
-class InputListHandler(web.RequestHandler):
-    def get(self):
-        if not config.main.input_dir: return
-        path = os.path.abspath(config.main.input_dir) + "/*"
-        inputnames = map(os.path.basename, glob.iglob(path))
-        self.write(json.dumps(decknames))
