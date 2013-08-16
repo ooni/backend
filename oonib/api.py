@@ -1,3 +1,5 @@
+from cyclone import web
+
 from oonib.deck.api import deckAPI
 from oonib.report.api import reportAPI
 from oonib.inputs.api import inputsAPI
@@ -6,17 +8,21 @@ from oonib.bouncer.api import bouncerAPI
 
 from oonib import config
 
-oonibAPI = []
-oonibAPI += reportAPI
+ooniBackendAPI = []
+ooniBackendAPI += reportAPI
 
 if config.main.inputs_dir:
-    oonibAPI += inputsAPI
+    ooniBackendAPI += inputsAPI
 
 if config.main.deck_dir:
-    oonibAPI += deckAPI
+    ooniBackendAPI += deckAPI
 
 if config.main.policy_file:
-    oonibAPI += policyAPI
+    ooniBackendAPI += policyAPI
 
 if config.main.bouncer_file:
-    oonibAPI += bouncerAPI
+    ooniBackendAPI += bouncerAPI
+
+print ooniBackendAPI
+
+ooniBackend = web.Application(ooniBackendAPI, debug=True)

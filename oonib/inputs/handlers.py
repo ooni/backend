@@ -1,10 +1,12 @@
+import glob
+import json
+import os
+
+import yaml
+
 from oonib.handlers import OONIBHandler
 
 from oonib import config
-
-import json
-import os
-import yaml
 
 class InputsDescHandler(OONIBHandler):
     def get(self, inputID):
@@ -12,7 +14,7 @@ class InputsDescHandler(OONIBHandler):
         # see oonib.md in ooni-spec
         bn = os.path.basename(inputID) + ".desc"
         try:
-            f = open(os.path.join(config.main.input_dir, bn))
+            f = open(os.path.join(config.main.inputs_dir, bn))
             a = {}
             inputDesc = yaml.safe_load(f)
             a['id'] = inputID
@@ -24,12 +26,11 @@ class InputsDescHandler(OONIBHandler):
 
 class InputsListHandler(OONIBHandler):
     def get(self):
-        if not config.main.input_dir: return
-        path = os.path.abspath(config.main.input_dir) + "/*"
+        path = os.path.abspath(config.main.inputs_dir) + "/*"
         inputnames = map(os.path.basename, glob.iglob(path))
         inputList = []
         for inputname in inputnames:
-            f = open(os.path.join(config.main.input_dir, deckname))
+            f = open(os.path.join(config.main.inputs_dir, inputname))
             d = yaml.safe_load(f)
             inputList.append({
                 'id': inputname,

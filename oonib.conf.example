@@ -28,6 +28,8 @@ main:
     debug: false
     stale_time: 3600
 
+    tor_hidden_service: true
+
 helpers:
     http_return_request:
         port: 57001

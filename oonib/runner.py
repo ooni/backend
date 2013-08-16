@@ -21,7 +21,7 @@ from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
 
 from oonib.report.api import reportAPI 
-from oonib.api import oonibAPI
+from oonib.api import ooniBackend
 
 from oonib import oonibackend
 from oonib import config
@@ -37,7 +37,7 @@ def txSetupFailed(failure):
     log.err("Setup failed")
     log.exception(failure)
 
-def setupCollector(tor_process_protocol):
+def setupCollector(tor_process_protocol, datadir):
     def setup_complete(port):
         #XXX: drop some other noise about what API are available on this machine
         print("Exposed collector Tor hidden service on httpo://%s"
@@ -53,7 +53,7 @@ def setupCollector(tor_process_protocol):
     #XXX: also set up a separate keyed hidden service for collectors to push their status to, if the bouncer is enabled
     hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
                                            data_dir=datadir)
-    hidden_service = hs_endpoint.listen(oonibAPI)
+    hidden_service = hs_endpoint.listen(ooniBackend)
     hidden_service.addCallback(setup_complete)
     hidden_service.addErrback(txSetupFailed)
 
@@ -86,9 +86,8 @@ def startTor():
                        progress_updates=updates)
     else:
         d = launch_tor(torconfig, reactor, progress_updates=updates)
-    d.addCallback(setupCollector)
+    d.addCallback(setupCollector, datadir)
     d.addErrback(txSetupFailed)
-
 
 if platformType == "win32":
     from twisted.scripts._twistw import WindowsApplicationRunner
@@ -108,7 +107,10 @@ else:
             self.startApplication(self.application)
             # This is our addition. The rest is taken from
             # twisted/scripts/_twistd_unix.py 12.2.0
-            startTor()
+            if config.main.tor_hidden_service:
+                startTor()
+            else:
+                reactor.listenTCP(8888, ooniBackend, interface="127.0.0.1")
             self.startReactor(None, self.oldstdout, self.oldstderr)
             self.removePID(self.config['pidfile'])
             if os.path.exists(tempfile.gettempdir()):
