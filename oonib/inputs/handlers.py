@@ -26,7 +26,7 @@ class InputsDescHandler(OONIBHandler):
 
 class InputsListHandler(OONIBHandler):
     def get(self):
-        path = os.path.abspath(config.main.inputs_dir) + "/*"
+        path = os.path.abspath(config.main.inputs_dir) + "/*.desc"
         inputnames = map(os.path.basename, glob.iglob(path))
         inputList = []
         for inputname in inputnames:
