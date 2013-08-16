@@ -1,8 +1,11 @@
 main:
     report_dir: Null
     archive_dir: Null
-    input_dir: Null
+    inputs_dir: Null
     deck_dir: Null
+    policy_file: Null
+    bouncer_file: Null
+
     logfile: Null
     tor_datadir: Null
     database_uri: 'sqlite://oonib_test_db.db'

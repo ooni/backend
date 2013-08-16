@@ -1,8 +1,6 @@
-from oonib.bouncer.handlers import *
+from oonib.bouncer import handlers
 #XXX: if bouncer is configured
 bouncerAPI = [
         #return a collector and helper of the requested type
-        (r"/bouncer", BouncerQueryHandler),
-        #XXX: register a collector or helper
-        (r"/register", CollectorRegisterHandler),
+        (r"/bouncer", handlers.BouncerQueryHandler),
 ]

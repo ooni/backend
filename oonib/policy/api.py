@@ -1,6 +1,4 @@
-from cyclone import web
 from oonib.policy import handlers
-from oonib import config
 
 #XXX: if policy is configured
 policyAPI = [
