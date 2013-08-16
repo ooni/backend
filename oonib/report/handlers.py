@@ -1,6 +1,4 @@
-import json
-import os
-import re
+import random
 import string
 import time
 import yaml
@@ -14,6 +12,8 @@ from twisted.internet import fdesc, reactor
 class MissingField(Exception):
     pass
 
+from oonib import randomStr
+from oonib import otime
 class InvalidRequestField(Exception):
     pass
 
