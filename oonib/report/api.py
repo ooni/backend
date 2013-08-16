@@ -47,6 +47,7 @@ def parseUpdateReportRequest(request):
 
 reportingBackendAPI = [
     (r"/report/([a-zA-Z0-9_\-]+)/close", file_collector.CloseReportHandlerFile),
+    (r"/report/([a-zA-Z0-9_\-]+)", file_collector.UpdateReportHandlerFile),
     (r"/report", file_collector.NewReportHandlerFile),
     (r"/pcap", file_collector.PCAPReportHandler)
 ]

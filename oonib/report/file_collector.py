@@ -120,7 +120,46 @@ def stale_check(report_id):
         except ReportNotFound:
             pass
 
-class NewReportHandlerFile(web.RequestHandler):
+class UpdateReportHandlerFile(web.RequestHandler):
+    def writeToReport(self, report_filename, data):
+        with open(report_filename, 'w+') as fd:
+            fdesc.setNonBlocking(fd.fileno())
+            fdesc.writeToFD(fd.fileno(), data)
+
+    def put(self, report_id=None):
+        """
+        Update an already existing report.
+
+          {
+           'report_id': 'XXX',
+           'content': 'XXX'
+          }
+        """
+        if not report_id:
+            parsed_request = parseUpdateReportRequest(self.request.body)
+            report_id = parsed_request['report_id']
+        else:
+            parsed_request = json.loads(self.request.body)
+
+        log.debug("Got this request %s" % parsed_request)
+        report_filename = os.path.join(config.main.report_dir,
+                report_id)
+
+        config.reports[report_id] = time.time()
+        reactor.callLater(config.main.stale_time, stale_check, report_id)
+
+        self.updateReport(report_filename, parsed_request['content'])
+
+    def updateReport(self, report_filename, data):
+        try:
+            with open(report_filename, 'a+') as fd:
+                fdesc.setNonBlocking(fd.fileno())
+                fdesc.writeToFD(fd.fileno(), data)
+        except IOError as e:
+            web.HTTPError(404, "Report not found")
+
+
+class NewReportHandlerFile(UpdateReportHandlerFile):
     """
     Responsible for creating and updating reports by writing to flat file.
     """
@@ -216,40 +255,6 @@ class NewReportHandlerFile(web.RequestHandler):
 
         self.write(response)
 
-    def writeToReport(self, report_filename, data):
-        with open(report_filename, 'w+') as fd:
-            fdesc.setNonBlocking(fd.fileno())
-            fdesc.writeToFD(fd.fileno(), data)
-
-    def put(self):
-        """
-        Update an already existing report.
-
-          {
-           'report_id': 'XXX',
-           'content': 'XXX'
-          }
-        """
-        parsed_request = parseUpdateReportRequest(self.request.body)
-
-        report_id = parsed_request['report_id']
-
-        log.debug("Got this request %s" % parsed_request)
-        report_filename = os.path.join(config.main.report_dir,
-                report_id)
-
-        config.reports[report_id] = time.time()
-        reactor.callLater(config.main.stale_time, stale_check, report_id)
-
-        self.updateReport(report_filename, parsed_request['content'])
-
-    def updateReport(self, report_filename, data):
-        try:
-            with open(report_filename, 'a+') as fd:
-                fdesc.setNonBlocking(fd.fileno())
-                fdesc.writeToFD(fd.fileno(), data)
-        except IOError as e:
-            web.HTTPError(404, "Report not found")
 
 class ReportNotFound(Exception):
     pass
