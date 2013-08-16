@@ -21,10 +21,6 @@ from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
 
 from oonib.report.api import reportAPI 
-from oonib.deck.api import deckAPI
-from oonib.inputs.api import inputsAPI
-from oonib.policy.api import policyAPI
-from oonib.bouncer.api import bouncerAPI
 from oonib.api import oonibAPI
 
 from oonib import oonibackend
@@ -47,11 +43,6 @@ def setupCollector(tor_process_protocol):
         print("Exposed collector Tor hidden service on httpo://%s"
               % port.onion_uri)
 
-    tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
-    if not os.path.isdir(tempfile.gettempdir()):
-        os.makedirs(tempfile.gettempdir())
-    _temp_dir = tempfile.mkdtemp()
-
     torconfig = TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
     # XXX there is currently a bug in txtorcon that prevents data_dir from
@@ -69,6 +60,11 @@ def setupCollector(tor_process_protocol):
 def startTor():
     def updates(prog, tag, summary):
         print("%d%%: %s" % (prog, summary))
+
+    tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
+    if not os.path.isdir(tempfile.gettempdir()):
+        os.makedirs(tempfile.gettempdir())
+    _temp_dir = tempfile.mkdtemp()
 
     torconfig = TorConfig()
     torconfig.SocksPort = config.main.socks_port

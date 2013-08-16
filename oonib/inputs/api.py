@@ -1,5 +1,5 @@
 from cyclone import web
-from oonib.input import handlers
+from oonib.inputs import handlers
 from oonib import config
 
 inputsAPI = [

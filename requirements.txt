@@ -1,22 +1,4 @@
--i https://pypi.python.org/packages
-##
-## The above line replaces pip's default package index, and this line is
-## removed from the .requirements.travis file, due to its incompatibility
-## with the '--use-mirrors' option that TravisCI recommends. 
-##
-## The URLs in this file which have been commented out are due to a design
-## problem in pip-1.3.0, where it ships with a default package index of
-## 'https://pypi.python.org/simple', which though *it* was over SSL as
-## promised, it still crawled the links on a module's PyPI page, which contains
-## arbitrary links, such as project homepages, created by the PyPI maintainer
-## of the module.  see
-##
-## https://github.com/TheTorProject/ooni-backend/pull/1#discussion_r4084881 for
-## a detailed description of the problem, and why these links may still be
-## useful until pip is updated again.
-##
-PyYAML>=3.10
-#https://pypi.python.org/packages/source/P/PyYAML/PyYAML-3.10.tar.gz#md5=74c94a383886519e9e7b3dd1ee540247#egg=PyYAML
+PyYaml
 Twisted>=12.2.0
 #https://pypi.python.org/packages/source/T/Twisted/Twisted-13.0.0.tar.bz2#md5=68afff4e1efd3757d934e39f70c99f57#egg=Twisted
 cyclone>=1.1

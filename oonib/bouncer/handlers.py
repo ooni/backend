@@ -1,4 +1,6 @@
-class BouncerQueryHandler(web.RequestHandler):
+from oonib.handlers import OONIBHandler
+
+class BouncerQueryHandler(OONIBHandler):
     def get(self):
         #XXX unused
         pass

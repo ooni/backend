@@ -1,4 +1,4 @@
-from oonib.api import OONIBHandler
+from oonib.handlers import OONIBHandler
 
 class DeckDescHandler(OONIBHandler):
     def get(self, deckID):
