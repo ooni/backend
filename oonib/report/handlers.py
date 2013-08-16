@@ -5,7 +5,8 @@ import string
 import time
 import yaml
 
-from cyclone import web
+from oonib.api import OONIBHandler
+
 from datetime import datetime
 from oonib import randomStr, otime, config, log
 from twisted.internet import fdesc, reactor
@@ -117,7 +118,7 @@ def stale_check(report_id):
         except ReportNotFound:
             pass
 
-class NewReportHandlerFile(web.RequestHandler):
+class NewReportHandlerFile(OONIBHandler):
     """
     Responsible for creating and updating reports by writing to flat file.
     """
@@ -165,9 +166,9 @@ class NewReportHandlerFile(web.RequestHandler):
         try:
             report_data = parseNewReportRequest(self.request.body)
         except InvalidRequestField, e:
-            raise web.HTTPError(400, "Invalid Request Field %s" % e)
+            raise OONIBError(400, "Invalid Request Field %s" % e)
         except MissingField, e:
-            raise web.HTTPError(400, "Missing Request Field %s" % e)
+            raise OONIBError(400, "Missing Request Field %s" % e)
 
         print "Parsed this data %s" % report_data
         software_name = report_data['software_name']
@@ -182,10 +183,10 @@ class NewReportHandlerFile(web.RequestHandler):
             report_header = validate_report_header(content)
 
         except MissingReportHeaderKey, key:
-            raise web.HTTPError(406, "Missing report header key %s" % key)
+            raise OONIBError(406, "Missing report header key %s" % key)
 
         except InvalidReportHeader, key:
-            raise web.HTTPError(406, "Invalid report header %s" % key)
+            raise OONIBError(406, "Invalid report header %s" % key)
 
         report_header = yaml.dump(report_header)
         content = "---\n" + report_header + '...\n'
@@ -246,7 +247,7 @@ class NewReportHandlerFile(web.RequestHandler):
                 fdesc.setNonBlocking(fd.fileno())
                 fdesc.writeToFD(fd.fileno(), data)
         except IOError as e:
-            web.HTTPError(404, "Report not found")
+            OONIBError(404, "Report not found")
 
 class ReportNotFound(Exception):
     pass
@@ -274,7 +275,7 @@ def close_report(report_id):
     dst_path = os.path.join(dst_path, dst_filename)
     os.rename(report_filename, dst_path)
 
-class CloseReportHandlerFile(web.RequestHandler):
+class CloseReportHandlerFile(OONIBHandler):
     def get(self):
         pass
 
@@ -282,9 +283,9 @@ class CloseReportHandlerFile(web.RequestHandler):
         try:
             close_report(report_id)
         except ReportNotFound:
-            web.HTTPError(404, "Report not found")
+            OONIBError(404, "Report not found")
 
-class PCAPReportHandler(web.RequestHandler):
+class PCAPReportHandler(OONIBHandler):
     def get(self):
         pass
 

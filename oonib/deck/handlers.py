@@ -1,6 +1,6 @@
-from cyclone import web
+from oonib.api import OONIBHandler
 
-class DeckDescHandler(web.RequestHandler):
+class DeckDescHandler(OONIBHandler):
     def get(self, deckID):
         bn = os.path.basename(deckID)
         try:
@@ -16,7 +16,7 @@ class DeckDescHandler(web.RequestHandler):
         except KeyError:
             log.err("Deck %s missing required keys!" % deckID)
 
-class DeckListHandler(web.RequestHandler):
+class DeckListHandler(OONIBHandler):
     def get(self):
         if not config.main.deck_dir: return
         path = os.path.abspath(config.main.deck_dir) + "/*"

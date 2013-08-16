@@ -1,15 +1,20 @@
-from cyclone import web
+from oonib.api import OONIBHandler
+
 from oonib import config
 import json
 import os
 import yaml
 
-class NetTestPolicyHandler(web.RequestHandler):
+class NetTestPolicyHandler(OONIBHandler):
     def get(self):
-        #XXX: returns a list of accepted NetTests
+        """
+        returns a list of accepted NetTests
+        """
         pass
 
-class InputPolicyHandler(web.RequestHandler):
+class InputPolicyHandler(OONIBHandler):
     def get(self):
+        """
+        return list of input ids
+        """
         pass
-        #XXX return list of input ids

@@ -1,10 +1,10 @@
 main:
-    report_dir: Null
-    archive_dir: Null
-    inputs_dir: Null
-    deck_dir: Null
-    policy_file: Null
-    bouncer_file: Null
+    report_dir: data/reports/
+    archive_dir: data/archive/
+    inputs_dir: data/inputs/
+    deck_dir: data/decks/
+    policy_file: data/policy.yaml
+    bouncer_file: data/bouncer.yaml
 
     logfile: Null
     tor_datadir: Null

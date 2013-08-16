@@ -25,6 +25,7 @@ from oonib.deck.api import deckAPI
 from oonib.inputs.api import inputsAPI
 from oonib.policy.api import policyAPI
 from oonib.bouncer.api import bouncerAPI
+from oonib.api import oonibAPI
 
 from oonib import oonibackend
 from oonib import config
@@ -61,22 +62,7 @@ def setupCollector(tor_process_protocol):
     #XXX: also set up a separate keyed hidden service for collectors to push their status to, if the bouncer is enabled
     hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
                                            data_dir=datadir)
-    enabledAPIs = []
-    enabledAPIs += reportAPI
-
-    if config.inputs_dir:
-        enabledAPIs += inputsAPI
-
-    if config.deck_dir:
-        enabledAPIs += deckAPI
-
-    if config.policy_file:
-        enabledAPIs += policyAPI
-
-    if config.bouncer_file:
-        enabledAPIs += bouncerAPI
-
-    hidden_service = hs_endpoint.listen(enabledAPIs)
+    hidden_service = hs_endpoint.listen(oonibAPI)
     hidden_service.addCallback(setup_complete)
     hidden_service.addErrback(txSetupFailed)
 
