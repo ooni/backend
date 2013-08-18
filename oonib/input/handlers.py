@@ -1,28 +1,25 @@
 import glob
 import json
 import os
-
 import yaml
 
 from oonib.handlers import OONIBHandler
-
-from oonib import config
+from oonib import config, log
 
 class InputDescHandler(OONIBHandler):
     def get(self, inputID):
-        #XXX return the input descriptor
-        # see oonib.md in ooni-spec
         bn = os.path.basename(inputID) + ".desc"
         try:
             f = open(os.path.join(config.main.input_dir, bn))
             a = {}
             inputDesc = yaml.safe_load(f)
-            a['id'] = inputID
-            a['name'] = inputDesc['name']
-            a['description'] = inputDesc['description']
+            for k in ['name', 'description', 'version', 'author', 'date']:
+                a[k] = inputDesc[k]
             self.write(json.dumps(a))
-        except Exception:
+        except IOError:
             log.err("No Input Descriptor found for id %s" % inputID) 
+        except Exception, e:
+            log.err("Invalid Input Descriptor found for id %s" % inputID) 
 
 class InputListHandler(OONIBHandler):
     def get(self):
