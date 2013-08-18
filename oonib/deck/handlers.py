@@ -14,9 +14,8 @@ class DeckDescHandler(OONIBHandler):
             f = open(os.path.join(config.main.deck_dir, bn))
             a = {}
             deckDesc = yaml.safe_load(f)
-            a['id'] = deckID
-            a['name'] = deckDesc['name']
-            a['description'] = deckDesc['description']
+            for k in ['name', 'description', 'version', 'author', 'date']:
+                a[k] = deckDesc[k]
             self.write(json.dumps(a))
         except IOError:
             log.err("Deck %s missing" % deckID)
