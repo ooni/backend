@@ -8,13 +8,13 @@ from oonib.handlers import OONIBHandler
 
 from oonib import config
 
-class InputsDescHandler(OONIBHandler):
+class InputDescHandler(OONIBHandler):
     def get(self, inputID):
         #XXX return the input descriptor
         # see oonib.md in ooni-spec
         bn = os.path.basename(inputID) + ".desc"
         try:
-            f = open(os.path.join(config.main.inputs_dir, bn))
+            f = open(os.path.join(config.main.input_dir, bn))
             a = {}
             inputDesc = yaml.safe_load(f)
             a['id'] = inputID
@@ -24,13 +24,13 @@ class InputsDescHandler(OONIBHandler):
         except Exception:
             log.err("No Input Descriptor found for id %s" % inputID) 
 
-class InputsListHandler(OONIBHandler):
+class InputListHandler(OONIBHandler):
     def get(self):
-        path = os.path.abspath(config.main.inputs_dir) + "/*.desc"
+        path = os.path.abspath(config.main.input_dir) + "/*.desc"
         inputnames = map(os.path.basename, glob.iglob(path))
         inputList = []
         for inputname in inputnames:
-            f = open(os.path.join(config.main.inputs_dir, inputname))
+            f = open(os.path.join(config.main.input_dir, inputname))
             d = yaml.safe_load(f)
             inputList.append({
                 'id': inputname,

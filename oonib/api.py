@@ -2,7 +2,7 @@ from cyclone import web
 
 from oonib.deck.api import deckAPI
 from oonib.report.api import reportAPI
-from oonib.inputs.api import inputsAPI
+from oonib.input.api import inputAPI
 from oonib.policy.api import policyAPI
 from oonib.bouncer.api import bouncerAPI
 
@@ -11,8 +11,8 @@ from oonib import config
 ooniBackendAPI = []
 ooniBackendAPI += reportAPI
 
-if config.main.inputs_dir:
-    ooniBackendAPI += inputsAPI
+if config.main.input_dir:
+    ooniBackendAPI += inputAPI
 
 if config.main.deck_dir:
     ooniBackendAPI += deckAPI

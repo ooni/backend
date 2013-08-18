@@ -1,7 +1,7 @@
 main:
     report_dir: data/reports/
     archive_dir: data/archive/
-    inputs_dir: data/inputs/
+    input_dir: data/inputs/
     deck_dir: data/decks/
     policy_file: data/policy.yaml
     bouncer_file: data/bouncer.yaml
