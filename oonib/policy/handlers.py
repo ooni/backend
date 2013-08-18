@@ -10,11 +10,15 @@ class NetTestPolicyHandler(OONIBHandler):
         """
         returns a list of accepted NetTests
         """
-        pass
+        with open(config.main.policy_file) as f:
+            p = yaml.safe_load(f)
+            self.write(json.dumps(p['nettest']))
 
 class InputPolicyHandler(OONIBHandler):
     def get(self):
         """
         return list of input ids
         """
-        pass
+        with open(config.main.policy_file) as f:
+            p = yaml.safe_load(f)
+            self.write(json.dumps(p['input']))
