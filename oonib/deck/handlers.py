@@ -1,4 +1,11 @@
+import glob
+import json
+import os
+import re
+import yaml
+
 from oonib.handlers import OONIBHandler
+from oonib import config, log
 
 class DeckDescHandler(OONIBHandler):
     def get(self, deckID):
@@ -21,6 +28,7 @@ class DeckListHandler(OONIBHandler):
         if not config.main.deck_dir: return
         path = os.path.abspath(config.main.deck_dir) + "/*"
         decknames = map(os.path.basename, glob.iglob(path))
+        decknames = filter(lambda y: re.match("[a-z0-9]{40}", y), decknames)
         deckList = []
         for deckname in decknames:
             f = open(os.path.join(config.main.deck_dir, deckname))
@@ -29,5 +37,3 @@ class DeckListHandler(OONIBHandler):
                 'description': d['description']})
             f.close()
         self.write(json.dumps(deckList))
-
-
