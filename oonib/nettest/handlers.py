@@ -10,16 +10,18 @@ class NetTestDescHandler(OONIBHandler):
     def get(self, netTestID):
         bn = os.path.basename(netTestID) + ".desc"
         try:
-            f = open(os.path.join(config.main.nettest_dir, bn))
-            a = {}
-            netTestDesc = yaml.safe_load(f)
-            for k in ['name', 'description', 'version', 'author', 'date']:
-                a[k] = netTestDesc[k]
-            self.write(json.dumps(a))
+            with open(os.path.join(config.main.nettest_dir, bn)) as f:
+                response = {}
+                netTestDesc = yaml.safe_load(f)
+                for k in ['name', 'description', 'version', 'author', 'date']:
+                    response[k] = netTestDesc[k]
+            self.write(response)
         except IOError:
             log.err("No NetTest Descriptor found for id %s" % netTestID) 
+            self.set_status(404)
+            self.write({'error': 'missing-nettest'})
+ 
         except Exception, e:
             log.err("Invalid NetTest Descriptor found for id %s" % netTestID) 
-
-
-
+            self.set_status(500)
+            self.write({'error': 'invalid-nettest-descriptor'})

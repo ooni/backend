@@ -23,6 +23,4 @@ if config.main.policy_file:
 if config.main.bouncer_file:
     ooniBackendAPI += bouncerAPI
 
-print ooniBackendAPI
-
 ooniBackend = web.Application(ooniBackendAPI, debug=True)

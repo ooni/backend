@@ -12,7 +12,7 @@ class NetTestPolicyHandler(OONIBHandler):
         """
         with open(config.main.policy_file) as f:
             p = yaml.safe_load(f)
-            self.write(json.dumps(p['nettest']))
+            self.write(p['nettest'])
 
 class InputPolicyHandler(OONIBHandler):
     def get(self):
@@ -21,4 +21,4 @@ class InputPolicyHandler(OONIBHandler):
         """
         with open(config.main.policy_file) as f:
             p = yaml.safe_load(f)
-            self.write(json.dumps(p['input']))
+            self.write(p['input'])

@@ -22,10 +22,6 @@ class BouncerQueryHandler(OONIBHandler):
                         'helper-address': helperAddress
                     })
 
-    def get(self):
-        #XXX unused
-        pass
-
     def post(self):
         try:
             query = json.loads(self.request.body)

@@ -10,16 +10,21 @@ class InputDescHandler(OONIBHandler):
     def get(self, inputID):
         bn = os.path.basename(inputID) + ".desc"
         try:
-            f = open(os.path.join(config.main.input_dir, bn))
-            a = {}
-            inputDesc = yaml.safe_load(f)
-            for k in ['name', 'description', 'version', 'author', 'date']:
-                a[k] = inputDesc[k]
-            self.write(json.dumps(a))
+            with open(os.path.join(config.main.input_dir, bn)) as f:
+                response = {}
+                inputDesc = yaml.safe_load(f)
+                for k in ['name', 'description', 'version', 'author', 'date']:
+                    response[k] = inputDesc[k]
+            self.write(response)
         except IOError:
             log.err("No Input Descriptor found for id %s" % inputID) 
+            self.set_status(404)
+            self.write({'error': 'missing-input'})
+ 
         except Exception, e:
             log.err("Invalid Input Descriptor found for id %s" % inputID) 
+            self.set_status(500)
+            self.write({'error': 'invalid-input-descriptor'})
 
 class InputListHandler(OONIBHandler):
     def get(self):
@@ -27,12 +32,11 @@ class InputListHandler(OONIBHandler):
         inputnames = map(os.path.basename, glob.iglob(path))
         inputList = []
         for inputname in inputnames:
-            f = open(os.path.join(config.main.input_dir, inputname))
-            d = yaml.safe_load(f)
-            inputList.append({
-                'id': inputname,
-                'name': d['name'],
-                'description': d['description']
-            })
-            f.close()
-        self.write(json.dumps(inputList))
+            with open(os.path.join(config.main.input_dir, inputname)) as f:
+                d = yaml.safe_load(f)
+                inputList.append({
+                    'id': inputname,
+                    'name': d['name'],
+                    'description': d['description']
+                })
+        self.write(inputList)
