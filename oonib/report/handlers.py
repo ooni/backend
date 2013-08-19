@@ -125,10 +125,8 @@ class NewReportHandlerFile(OONIBHandler):
 
     def checkPolicy(self):
         policy = Policy()
-        if not self.inputHash in policy.input.values():
-            raise e.InvalidInputHash
-        if self.testName not in policy.nettest.keys():
-            raise e.InvalidNettestName
+        policy.validateInputHash(self.inputHash)
+        policy.validateNettest(self.testName)
         # XXX add support for version checking too.
 
     def post(self):

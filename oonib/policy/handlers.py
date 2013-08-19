@@ -1,3 +1,4 @@
+from oonib import errors as e
 from oonib.handlers import OONIBHandler
 
 from oonib import config
@@ -14,6 +15,25 @@ class Policy(object):
             p = yaml.safe_load(f)
             self.nettest = list(p['nettest'])
             self.input = list(p['input'])
+
+    def validateInputHash(self, input_hash):
+        valid = False
+        for i in self.input:
+            if input_hash == i['id']:
+                valid = True
+                break
+        if not valid:
+            raise e.InvalidInputHash
+
+    def validateNettest(self, nettest_name):
+        # XXX add support for version checking too.
+        valid = False
+        for nt in self.nettest:
+            if nettest_name == nt['name']:
+                valid = True
+                break
+        if not valid:
+            raise e.InvalidNettestName
 
 class PolicyHandler(OONIBHandler):
     def initialize(self):
