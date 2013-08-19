@@ -6,48 +6,53 @@ main:
     policy_file: data/policy.yaml
     bouncer_file: data/bouncer.yaml
 
-    logfile: Null
-    tor_datadir: Null
+    logfile: null
+    tor_datadir: null
     database_uri: 'sqlite://oonib_test_db.db'
     db_threadpool_size: 10
-    tor_binary: Null
+    tor_binary: null
     socks_port: 9055
     tor2webmode: false
     pidfile: 'oonib.pid'
     nodaemon: true
-    originalname: Null
-    chroot: Null
+    originalname: null
+    chroot: null
     rundir: .
-    umask: Null
-    euid: Null
-    uid: Null
-    gid: Null
-    uuid: Null
+    umask: null
+    euid: null
+    uid: null
+    gid: null
+    uuid: null
     no_save: true
-    profile: Null
+    profile: null
     debug: false
     stale_time: 3600
 
     tor_hidden_service: true
 
 helpers:
-    http_return_request:
+    http-return-json-headers:
+        address: null
         port: 57001
         server_version: Apache
 
-    tcp_echo:
+    tcp-echo:
+        address: null
         port: 57002
 
     daphn3:
-        yaml_file: Null
-        pcap_file: Null
+        address: null
+        yaml_file: null
+        pcap_file: null
         port: 57003
 
     dns:
+        address: null
         udp_port: 57004
         tcp_port: 57005
 
     ssl:
+        address: null
         private_key: 'private.key'
         certificate: 'certificate.crt'
         port: 57006

@@ -3,6 +3,13 @@ from cyclone.web import HTTPError
 class OONIBError(HTTPError):
     pass
 
+class InvalidRequest(OONIBError):
+    pass
+
+class NoHelperFound(OONIBError):
+    status_code = 404
+    log_message = 'no-helper-found'
+
 class InvalidInputHash(OONIBError):
     status_code = 400
     log_message = 'invalid-input-hash'
@@ -38,3 +45,14 @@ class InvalidReportHeader(OONIBError):
 class ReportNotFound(OONIBError):
     status_code = 404
     log_message = "report-not-found"
+
+class NoValidCollector(OONIBError):
+    pass
+
+class TestHelpersKeyMissing(OONIBError):
+    status_code = 400
+    log_message = "test-helpers-key-missing"
+
+class TestHelperNotFound(OONIBError):
+    status_code = 400
+    log_message = "test-helper-not-found"

@@ -20,10 +20,12 @@ class DeckDescHandler(OONIBHandler):
                 for k in ['name', 'description', 'version', 'author', 'date']:
                     response[k] = deckDesc[k]
             self.write(response)
+
         except IOError:
             log.err("Deck %s missing" % deckID)
             self.set_status(404)
             self.write({'error': 'missing-deck'})
+
         except KeyError:
             self.set_status(400)
             log.err("Deck %s missing required keys!" % deckID)

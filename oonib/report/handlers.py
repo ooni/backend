@@ -70,6 +70,13 @@ def parseNewReportRequest(request):
             continue
         else:
             raise InvalidRequestField(k)
+    
+    try:
+        test_helper = parsed_request['test_helper']
+        if not re.match(regexp, str(test_helper)):
+            raise InvalidRequestField('test_helper')
+    except KeyError:
+        pass
 
     return parsed_request
 
@@ -127,7 +134,6 @@ class NewReportHandlerFile(OONIBHandler):
         policy = Policy()
         policy.validateInputHash(self.inputHash)
         policy.validateNettest(self.testName)
-        # XXX add support for version checking too.
 
     def post(self):
         """
@@ -219,9 +225,21 @@ class NewReportHandlerFile(OONIBHandler):
         # random nonce
         report_filename = os.path.join(config.main.report_dir, report_id)
 
-        response = {'backend_version': config.backend_version,
-                'report_id': report_id
+        response = {
+            'backend_version': config.backend_version,
+            'report_id': report_id
         }
+        
+        try:
+            requested_helper = report_data['test_helper']
+        except KeyError:
+            pass
+
+        if requested_helper:
+            try:
+                response['test_helper_address'] = config.helpers[requested_helper].address
+            except KeyError:
+                raise e.TestHelperNotFound
 
         config.reports[report_id] = time.time()
 
