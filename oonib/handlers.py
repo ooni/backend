@@ -15,6 +15,3 @@ class OONIBHandler(web.RequestHandler):
             self.set_header("Content-Type", "application/json")
         else:
             web.RequestHandler.write(self, chunk)
-
-class OONIBError(web.HTTPError):
-    pass

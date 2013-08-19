@@ -3,7 +3,9 @@ import string
 import time
 import yaml
 
+from oonib import errors as e
 from oonib.handlers import OONIBHandler
+from oonib.policy.handlers import Policy
 
 from datetime import datetime
 from oonib import randomStr, otime, config, log
@@ -121,6 +123,14 @@ class NewReportHandlerFile(OONIBHandler):
     Responsible for creating and updating reports by writing to flat file.
     """
 
+    def checkPolicy(self):
+        policy = Policy()
+        if not self.inputHash in policy.input.values():
+            raise e.InvalidInputHash
+        if self.testName not in policy.nettest.keys():
+            raise e.InvalidNettestName
+        # XXX add support for version checking too.
+
     def post(self):
         """
         Creates a new report with the input
@@ -164,16 +174,27 @@ class NewReportHandlerFile(OONIBHandler):
         try:
             report_data = parseNewReportRequest(self.request.body)
         except InvalidRequestField, e:
-            raise OONIBError(400, "Invalid Request Field %s" % e)
+            raise e.InvalidRequestField(e)
         except MissingField, e:
-            raise OONIBError(400, "Missing Request Field %s" % e)
+            raise e.MissingRequestField(e)
 
-        print "Parsed this data %s" % report_data
+        log.debug("Parsed this data %s" % report_data)
+
         software_name = report_data['software_name']
         software_version = report_data['software_version']
-        test_name = report_data['test_name']
-        test_version = report_data['test_version']
+
         probe_asn = report_data['probe_asn']
+
+        self.testName = report_data['test_name']
+        self.testVersion = report_data['test_version']
+       
+        if config.main.policy_file:
+            try:
+                self.inputHash = report_data['input_hash']
+            except KeyError:
+                raise e.InputHashNotProvided
+            self.checkPolicy()
+
         content = yaml.safe_load(report_data['content'])
         content['backend_version'] = config.backend_version
 
@@ -181,10 +202,10 @@ class NewReportHandlerFile(OONIBHandler):
             report_header = validate_report_header(content)
 
         except MissingReportHeaderKey, key:
-            raise OONIBError(406, "Missing report header key %s" % key)
+            raise e.MissingReportHeaderKey(key)
 
         except InvalidReportHeader, key:
-            raise OONIBError(406, "Invalid report header %s" % key)
+            raise e.InvalidReportHeaderKey(key)
 
         report_header = yaml.dump(report_header)
         content = "---\n" + report_header + '...\n'
@@ -245,7 +266,7 @@ class NewReportHandlerFile(OONIBHandler):
                 fdesc.setNonBlocking(fd.fileno())
                 fdesc.writeToFD(fd.fileno(), data)
         except IOError as e:
-            OONIBError(404, "Report not found")
+            e.OONIBError(404, "Report not found")
 
 class ReportNotFound(Exception):
     pass
@@ -281,7 +302,7 @@ class CloseReportHandlerFile(OONIBHandler):
         try:
             close_report(report_id)
         except ReportNotFound:
-            OONIBError(404, "Report not found")
+            e.ReportNotFound
 
 class PCAPReportHandler(OONIBHandler):
     def get(self):
