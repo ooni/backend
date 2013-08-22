@@ -1,2 +1,2 @@
-{id: 37e60e13536f6afe47a830bfb6b371b5cf65da66d7ad65137344679b24fdccd1, name: Alexa Top 1k domains, description: 'The Alexa list of most visited domains fetched from here: http://www.alexa.com/topsites'}
+{id: 37e60e13536f6afe47a830bfb6b371b5cf65da66d7ad65137344679b24fdccd1, name: Alexa Top 1k domains, description: 'The Alexa list of most visited domains fetched from here: http://www.alexa.com/topsites', version: 1, author: ooni, date: 2013-08-21T210221Z}
 

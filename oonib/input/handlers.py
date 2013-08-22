@@ -15,6 +15,7 @@ class InputDescHandler(OONIBHandler):
                 inputDesc = yaml.safe_load(f)
                 for k in ['name', 'description', 'version', 'author', 'date']:
                     response[k] = inputDesc[k]
+                response['id'] = inputID
             self.write(response)
         except IOError:
             log.err("No Input Descriptor found for id %s" % inputID) 
