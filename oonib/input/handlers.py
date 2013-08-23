@@ -23,6 +23,7 @@ class InputDescHandler(OONIBHandler):
             self.write({'error': 'missing-input'})
  
         except Exception, e:
+            log.exception(e)
             log.err("Invalid Input Descriptor found for id %s" % inputID) 
             self.set_status(500)
             self.write({'error': 'invalid-input-descriptor'})

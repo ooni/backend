@@ -132,7 +132,8 @@ class NewReportHandlerFile(OONIBHandler):
 
     def checkPolicy(self):
         policy = Policy()
-        policy.validateInputHash(self.inputHash)
+        for input_hash in self.inputHashes:
+            policy.validateInputHash(input_hash)
         policy.validateNettest(self.testName)
 
     def post(self):
@@ -194,7 +195,7 @@ class NewReportHandlerFile(OONIBHandler):
        
         if config.main.policy_file:
             try:
-                self.inputHash = report_data['input_hash']
+                self.inputHashes = report_data['input_hashes']
             except KeyError:
                 raise e.InputHashNotProvided
             self.checkPolicy()

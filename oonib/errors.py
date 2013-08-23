@@ -1,7 +1,8 @@
 from cyclone.web import HTTPError
 
 class OONIBError(HTTPError):
-    pass
+    def __init__(self):
+        pass
 
 class InvalidRequest(OONIBError):
     pass

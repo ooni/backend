@@ -1,6 +1,7 @@
 import json 
 import random
 import yaml
+from oonib import errors as e
 from oonib.handlers import OONIBHandler
 from oonib import config
 
@@ -51,12 +52,17 @@ class Bouncer(object):
         requested_helpers = ['a', 'b', 'c']
         will return:
          {
-            'httpo://thirteenchars1.onion': {
-                'a': '127.0.0.1',
-                'b': 'http://127.0.0.1',
-                'c': '127.0.0.1:590',
-            }
+            'a': '127.0.0.1',
+            'b': 'http://127.0.0.1',
+            'c': '127.0.0.1:590',
+            'collector': 'httpo://thirteenchars1.onion'
          }
+
+         or 
+
+         {}
+
+         if no valid helper was found
 
         """
         result = {}
@@ -65,7 +71,19 @@ class Bouncer(object):
                 if collector not in result.keys():
                     result[collector] = {}
                 result[collector][helper_name] = helper_address
-        return result
+
+        helper_list = []
+        for collector, helpers in result.items():
+            if len(helpers) == len(requested_helpers):
+                valid_helpers = helpers
+                valid_helpers['collector'] = collector
+                helper_list.append(valid_helpers)
+            else:
+                continue
+        if len(helper_list) == 0:
+            return {}
+        else:
+            return random.choice(helper_list)
 
 class BouncerQueryHandler(OONIBHandler):
     def initialize(self):
@@ -95,6 +113,5 @@ class BouncerQueryHandler(OONIBHandler):
         except KeyError:
             raise e.TestHelpersKeyMissing
 
-        response = {}
-        response['collector'] = self.bouncer.filterHelperAddresses(requested_helpers)
+        response = self.bouncer.filterHelperAddresses(requested_helpers)
         self.write(response)
