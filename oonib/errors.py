@@ -12,15 +12,15 @@ class NoHelperFound(OONIBError):
     log_message = 'no-helper-found'
 
 class InvalidInputHash(OONIBError):
-    status_code = 400
+    status_code = 406
     log_message = 'invalid-input-hash'
 
 class InvalidNettestName(OONIBError):
-    status_code = 400
+    status_code = 406
     log_message = 'invalid-nettest-name'
 
 class InputHashNotProvided(OONIBError):
-    status_code = 400
+    status_code = 406
     log_message = 'input-hash-not-provided'
 
 class InvalidRequestField(OONIBError):
