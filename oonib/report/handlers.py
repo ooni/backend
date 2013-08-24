@@ -1,4 +1,7 @@
+import json
+import os
 import random
+import re
 import string
 import time
 import yaml
@@ -231,10 +234,11 @@ class NewReportHandlerFile(OONIBHandler):
             'report_id': report_id
         }
         
+
         try:
             requested_helper = report_data['test_helper']
         except KeyError:
-            pass
+            requested_helper = None
 
         if requested_helper:
             try:
