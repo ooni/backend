@@ -21,7 +21,7 @@ from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
 
 from oonib.report.api import reportAPI 
-from oonib.api import ooniBackend
+from oonib.api import ooniBackend, ooniBouncer
 
 from oonib import oonibackend
 from oonib import config
@@ -52,10 +52,29 @@ def setupCollector(tor_process_protocol, datadir):
     #XXX: set up the various API endpoints, if configured and enabled
     #XXX: also set up a separate keyed hidden service for collectors to push their status to, if the bouncer is enabled
     hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
-                                           data_dir=datadir)
-    hidden_service = hs_endpoint.listen(ooniBackend)
-    hidden_service.addCallback(setup_complete)
-    hidden_service.addErrback(txSetupFailed)
+                                           data_dir=os.path.join(datadir, 'collector'))
+    d = hs_endpoint.listen(ooniBackend)
+    
+    d.addCallback(setup_complete)
+    d.addErrback(txSetupFailed)
+
+    return tor_process_protocol
+
+def setupBouncer(tor_process_protocol, datadir):
+    def setup_complete(port):
+        #XXX: drop some other noise about what API are available on this machine
+        print("Exposed bouncer Tor hidden service on httpo://%s"
+              % port.onion_uri)
+
+    torconfig = TorConfig(tor_process_protocol.tor_protocol)
+    public_port = 80
+
+    hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
+                                           data_dir=os.path.join(datadir, 'bouncer'))
+
+    d = hs_endpoint.listen(ooniBouncer)
+    d.addCallback(setup_complete)
+    d.addErrback(txSetupFailed)
 
 def startTor():
     def updates(prog, tag, summary):
@@ -87,6 +106,8 @@ def startTor():
     else:
         d = launch_tor(torconfig, reactor, progress_updates=updates)
     d.addCallback(setupCollector, datadir)
+    if ooniBouncer:
+        d.addCallback(setupBouncer, datadir)
     d.addErrback(txSetupFailed)
 
 if platformType == "win32":
@@ -110,7 +131,9 @@ else:
             if config.main.tor_hidden_service:
                 startTor()
             else:
-                reactor.listenTCP(8888, ooniBackend, interface="127.0.0.1")
+                if ooniBouncer:
+                    reactor.listenTCP(8888, ooniBouncer, interface="127.0.0.1")
+                reactor.listenTCP(8889, ooniBackend, interface="127.0.0.1")
             self.startReactor(None, self.oldstdout, self.oldstderr)
             self.removePID(self.config['pidfile'])
             if os.path.exists(tempfile.gettempdir()):

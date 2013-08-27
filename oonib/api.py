@@ -8,6 +8,7 @@ from oonib.bouncer.api import bouncerAPI
 
 from oonib import config
 
+ooniBouncer = None
 ooniBackendAPI = []
 ooniBackendAPI += reportAPI
 
@@ -21,6 +22,6 @@ if config.main.policy_file:
     ooniBackendAPI += policyAPI
 
 if config.main.bouncer_file:
-    ooniBackendAPI += bouncerAPI
+    ooniBouncer = web.Application(bouncerAPI, debug=True)
 
 ooniBackend = web.Application(ooniBackendAPI, debug=True)
