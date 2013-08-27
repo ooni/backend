@@ -55,5 +55,6 @@ class TestHelpersKeyMissing(OONIBError):
     log_message = "test-helpers-key-missing"
 
 class TestHelperNotFound(OONIBError):
-    status_code = 400
+    status_code = 404
     log_message = "test-helper-not-found"
+

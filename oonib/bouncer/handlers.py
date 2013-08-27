@@ -36,7 +36,7 @@ class Bouncer(object):
         try:
             helpers = self.knownHelpers[helper_name]
         except KeyError:
-            raise e.NoHelperFound
+            raise e.TestHelperNotFound
         
         helpers_dict = {}
         for helper in helpers:
@@ -52,15 +52,26 @@ class Bouncer(object):
         requested_helpers = ['a', 'b', 'c']
         will return:
          {
-            'a': '127.0.0.1',
-            'b': 'http://127.0.0.1',
-            'c': '127.0.0.1:590',
-            'collector': 'httpo://thirteenchars1.onion'
+            'a': {
+                'address': '127.0.0.1',
+                'collector': 'httpo://thirteenchars1.onion'
+            },
+            'b': {
+                'address': '127.0.0.1:8081',
+                'collector': 'httpo://thirteenchars1.onion'
+            },
+            'c': {
+                'address': 'http://127.0.0.1',
+                'collector': 'httpo://thirteenchars2.onion'
+            },
+            'default': {
+                'collector': 'httpo://thirteenchars1.onion'
+            }
          }
 
          or 
 
-         {}
+         {'error': 'test-helper-not-found'}
 
          if no valid helper was found
 
@@ -72,18 +83,37 @@ class Bouncer(object):
                     result[collector] = {}
                 result[collector][helper_name] = helper_address
 
-        helper_list = []
+        # {
+        #   'foo.onion': {'some-helper': 'some-address'},
+        #   'foo2.onion': {'some-helper': 'some-addres2'}
+        # }
+
+        response = {}
+        default_collector = None
+        max_helper_count = 0
         for collector, helpers in result.items():
-            if len(helpers) == len(requested_helpers):
-                valid_helpers = helpers
-                valid_helpers['collector'] = collector
-                helper_list.append(valid_helpers)
+            if len(helpers) > max_helper_count:
+                default_collector = collector
             else:
                 continue
-        if len(helper_list) == 0:
-            return {}
-        else:
-            return random.choice(helper_list)
+
+        response['default'] = {}
+        response['default']['collector'] = default_collector
+
+        if not len(result[default_collector]) == len(requested_helpers):
+            found_helpers = set(result[default_collector].items())
+            for missing_helper in found_helpers.difference(requested_helpers):
+                collector, address = random.choice(self.getHelperAddress(missing_helper).items())
+                response[missing_helper] = {}
+                response[missing_helper]['collector'] = collector
+                response[missing_helper]['address'] = address
+
+        for name, address in result[default_collector].items():
+            response[name] = {}
+            response[name]['address'] = address
+            response[name]['collector'] = default_collector
+        
+        return response
 
 class BouncerQueryHandler(OONIBHandler):
     def initialize(self):
