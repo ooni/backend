@@ -4,6 +4,7 @@ import os
 import re
 import yaml
 
+from oonib import errors as e
 from oonib.handlers import OONIBHandler
 from oonib import config, log
 
@@ -12,7 +13,7 @@ class DeckDescHandler(OONIBHandler):
         # note:
         # we don't have to sanitize deckID, because it's already checked
         # against matching a certain pattern in the handler.
-        bn = os.path.basename(deckID)
+        bn = os.path.basename(deckID + '.desc')
         try:
             with open(os.path.join(config.main.deck_dir, bn)) as f:
                 response = {}
@@ -23,23 +24,21 @@ class DeckDescHandler(OONIBHandler):
 
         except IOError:
             log.err("Deck %s missing" % deckID)
-            self.set_status(404)
-            self.write({'error': 'missing-deck'})
+            raise e.MissingDeck
 
         except KeyError:
-            self.set_status(400)
             log.err("Deck %s missing required keys!" % deckID)
-            self.write({'error': 'missing-deck-keys'})
+            raise e.MissingDeckKeys
 
 class DeckListHandler(OONIBHandler):
     def get(self):
         if not config.main.deck_dir: 
             self.set_status(501)
-            self.write({'error': 'no-decks-configured'})
-            return
+            raise e.NoDecksConfigured
+
         path = os.path.abspath(config.main.deck_dir) + "/*"
         decknames = map(os.path.basename, glob.iglob(path))
-        decknames = filter(lambda y: re.match("[a-z0-9]{40}", y), decknames)
+        decknames = filter(lambda y: re.match("[a-z0-9]{64}.desc", y), decknames)
         deckList = []
         for deckname in decknames:
             with open(os.path.join(config.main.deck_dir, deckname)) as f: 

@@ -1,11 +1,14 @@
 from cyclone.web import HTTPError
 
 class OONIBError(HTTPError):
+    status_code = 500
+    log_message = 'oonib-error'
     def __init__(self):
         pass
 
 class InvalidRequest(OONIBError):
-    pass
+    status_code = 400
+    log_message = 'invalid-request'
 
 class NoHelperFound(OONIBError):
     status_code = 404
@@ -37,6 +40,18 @@ class MissingReportHeaderKey(OONIBError):
     def __init__(self, key):
         self.status_code = 406
         self.log_message = "missing-report-header-key %s" % key
+
+class MissingDeckKeys(OONIBError):
+    status_code = 400
+    log_message = "missing-deck-keys"
+
+class MissingDeck(OONIBError):
+    status_code = 400
+    log_message = "missing-deck"
+
+class NoDecksConfigured(OONIBError):
+    status_code = 501
+    log_message = "no-decks-configured"
 
 class InvalidReportHeader(OONIBError):
     def __init__(self, key):
