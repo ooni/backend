@@ -12,5 +12,4 @@ class DNSTestHelper(server.DNSServerFactory):
                                          caches = caches, clients = [resolver],
                                          verbose = verbose)
     def handleQuery(self, message, protocol, address):
-        print message, protocol, address
         server.DNSServerFactory.handleQuery(self, message, protocol, address)

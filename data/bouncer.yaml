@@ -1,0 +1,5 @@
+collector:
+  httpo://nkvphnp3p6agi5qq.onion:
+    test-helper: {dns: 93.95.227.200, http-return-json-headers: 'http://93.95.227.200'}
+  httpo://nkvphnp3p6agi5q1.onion:
+    test-helper: {dns: 93.22.227.200, http-return-json-headers: 'http://93.95.227.220'}

@@ -109,7 +109,7 @@ The following iptables commands will map connections on low ports to those
 bound by oonib:
 
 ```
-# Map port 80 to config.helpers.http_return_request.port  (default: 57001)
+# Map port 80 to config.helpers['http-return-json-headers'].port  (default: 57001)
 iptables -t nat -A PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 57001
 # Map port 443 to config.helpers.ssl.port  (default: 57006)
 iptables -t nat -A PREROUTING -p tcp -m tcp --dport 443 -j REDIRECT --to-ports 57006

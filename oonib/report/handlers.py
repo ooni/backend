@@ -1,23 +1,24 @@
+import json
+import os
 import random
+import re
 import string
 import time
 import yaml
-import json
-import re
-import os
+
+from oonib import errors as e
+from oonib.handlers import OONIBHandler
+from oonib.policy.handlers import Policy
 
 from datetime import datetime
-
+from oonib import randomStr, otime, config, log
 from twisted.internet import fdesc, reactor
 
-from cyclone import web
+class MissingField(Exception):
+    pass
 
-from oonib import randomStr
-from oonib import otime
-
-from oonib.report import MissingField, InvalidRequestField
-
-from oonib import config, log
+class InvalidRequestField(Exception):
+    pass
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
@@ -72,6 +73,13 @@ def parseNewReportRequest(request):
             continue
         else:
             raise InvalidRequestField(k)
+    
+    try:
+        test_helper = parsed_request['test_helper']
+        if not re.match(regexp, str(test_helper)):
+            raise InvalidRequestField('test_helper')
+    except KeyError:
+        pass
 
     return parsed_request
 
@@ -120,49 +128,16 @@ def stale_check(report_id):
         except ReportNotFound:
             pass
 
-class UpdateReportHandlerFile(web.RequestHandler):
-    def writeToReport(self, report_filename, data):
-        with open(report_filename, 'w+') as fd:
-            fdesc.setNonBlocking(fd.fileno())
-            fdesc.writeToFD(fd.fileno(), data)
-
-    def put(self, report_id=None):
-        """
-        Update an already existing report.
-
-          {
-           'report_id': 'XXX',
-           'content': 'XXX'
-          }
-        """
-        if not report_id:
-            parsed_request = parseUpdateReportRequest(self.request.body)
-            report_id = parsed_request['report_id']
-        else:
-            parsed_request = json.loads(self.request.body)
-
-        log.debug("Got this request %s" % parsed_request)
-        report_filename = os.path.join(config.main.report_dir,
-                report_id)
-
-        config.reports[report_id] = time.time()
-        reactor.callLater(config.main.stale_time, stale_check, report_id)
-
-        self.updateReport(report_filename, parsed_request['content'])
-
-    def updateReport(self, report_filename, data):
-        try:
-            with open(report_filename, 'a+') as fd:
-                fdesc.setNonBlocking(fd.fileno())
-                fdesc.writeToFD(fd.fileno(), data)
-        except IOError as e:
-            web.HTTPError(404, "Report not found")
-
-
-class NewReportHandlerFile(UpdateReportHandlerFile):
+class NewReportHandlerFile(OONIBHandler):
     """
     Responsible for creating and updating reports by writing to flat file.
     """
+
+    def checkPolicy(self):
+        policy = Policy()
+        for input_hash in self.inputHashes:
+            policy.validateInputHash(input_hash)
+        policy.validateNettest(self.testName)
 
     def post(self):
         """
@@ -207,16 +182,27 @@ class NewReportHandlerFile(UpdateReportHandlerFile):
         try:
             report_data = parseNewReportRequest(self.request.body)
         except InvalidRequestField, e:
-            raise web.HTTPError(400, "Invalid Request Field %s" % e)
+            raise e.InvalidRequestField(e)
         except MissingField, e:
-            raise web.HTTPError(400, "Missing Request Field %s" % e)
+            raise e.MissingRequestField(e)
 
-        print "Parsed this data %s" % report_data
+        log.debug("Parsed this data %s" % report_data)
+
         software_name = report_data['software_name']
         software_version = report_data['software_version']
-        test_name = report_data['test_name']
-        test_version = report_data['test_version']
+
         probe_asn = report_data['probe_asn']
+
+        self.testName = report_data['test_name']
+        self.testVersion = report_data['test_version']
+       
+        if config.main.policy_file:
+            try:
+                self.inputHashes = report_data['input_hashes']
+            except KeyError:
+                raise e.InputHashNotProvided
+            self.checkPolicy()
+
         content = yaml.safe_load(report_data['content'])
         content['backend_version'] = config.backend_version
 
@@ -224,10 +210,10 @@ class NewReportHandlerFile(UpdateReportHandlerFile):
             report_header = validate_report_header(content)
 
         except MissingReportHeaderKey, key:
-            raise web.HTTPError(406, "Missing report header key %s" % key)
+            raise e.MissingReportHeaderKey(key)
 
         except InvalidReportHeader, key:
-            raise web.HTTPError(406, "Invalid report header %s" % key)
+            raise e.InvalidReportHeaderKey(key)
 
         report_header = yaml.dump(report_header)
         content = "---\n" + report_header + '...\n'
@@ -243,9 +229,22 @@ class NewReportHandlerFile(UpdateReportHandlerFile):
         # random nonce
         report_filename = os.path.join(config.main.report_dir, report_id)
 
-        response = {'backend_version': config.backend_version,
-                'report_id': report_id
+        response = {
+            'backend_version': config.backend_version,
+            'report_id': report_id
         }
+        
+
+        try:
+            requested_helper = report_data['test_helper']
+        except KeyError:
+            requested_helper = None
+
+        if requested_helper:
+            try:
+                response['test_helper_address'] = config.helpers[requested_helper].address
+            except KeyError:
+                raise e.TestHelperNotFound
 
         config.reports[report_id] = time.time()
 
@@ -255,6 +254,40 @@ class NewReportHandlerFile(UpdateReportHandlerFile):
 
         self.write(response)
 
+    def writeToReport(self, report_filename, data):
+        with open(report_filename, 'w+') as fd:
+            fdesc.setNonBlocking(fd.fileno())
+            fdesc.writeToFD(fd.fileno(), data)
+
+    def put(self):
+        """
+        Update an already existing report.
+
+          {
+           'report_id': 'XXX',
+           'content': 'XXX'
+          }
+        """
+        parsed_request = parseUpdateReportRequest(self.request.body)
+
+        report_id = parsed_request['report_id']
+
+        log.debug("Got this request %s" % parsed_request)
+        report_filename = os.path.join(config.main.report_dir,
+                report_id)
+
+        config.reports[report_id] = time.time()
+        reactor.callLater(config.main.stale_time, stale_check, report_id)
+
+        self.updateReport(report_filename, parsed_request['content'])
+
+    def updateReport(self, report_filename, data):
+        try:
+            with open(report_filename, 'a+') as fd:
+                fdesc.setNonBlocking(fd.fileno())
+                fdesc.writeToFD(fd.fileno(), data)
+        except IOError as e:
+            e.OONIBError(404, "Report not found")
 
 class ReportNotFound(Exception):
     pass
@@ -282,7 +315,7 @@ def close_report(report_id):
     dst_path = os.path.join(dst_path, dst_filename)
     os.rename(report_filename, dst_path)
 
-class CloseReportHandlerFile(web.RequestHandler):
+class CloseReportHandlerFile(OONIBHandler):
     def get(self):
         pass
 
@@ -290,9 +323,9 @@ class CloseReportHandlerFile(web.RequestHandler):
         try:
             close_report(report_id)
         except ReportNotFound:
-            web.HTTPError(404, "Report not found")
+            e.ReportNotFound
 
-class PCAPReportHandler(web.RequestHandler):
+class PCAPReportHandler(OONIBHandler):
     def get(self):
         pass
 
