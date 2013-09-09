@@ -9,6 +9,18 @@ class Bouncer(object):
     def __init__(self):
         self.knownHelpers = {}
         self.updateKnownHelpers()
+        self.updateKnownCollectors()
+
+    def updateKnownCollectors(self):
+        """
+        Returns the list of all known collectors
+        """
+        self.knownCollectors = []
+        with open(config.main.bouncer_file) as f:
+            bouncerFile = yaml.safe_load(f)
+            for collectorName, helpers in bouncerFile['collector'].items():
+                if collectorName not in self.knownCollectors:
+                    self.knownCollectors.append(collectorName)
         
     def updateKnownHelpers(self):
         with open(config.main.bouncer_file) as f:
@@ -76,43 +88,26 @@ class Bouncer(object):
          if no valid helper was found
 
         """
-        result = {}
-        for helper_name in requested_helpers:
-            for collector, helper_address in self.getHelperAddresses(helper_name).items():
-                if collector not in result.keys():
-                    result[collector] = {}
-                result[collector][helper_name] = helper_address
-
-        # {
-        #   'foo.onion': {'some-helper': 'some-address'},
-        #   'foo2.onion': {'some-helper': 'some-addres2'}
-        # }
-
         response = {}
-        default_collector = None
-        max_helper_count = 0
-        for collector, helpers in result.items():
-            if len(helpers) > max_helper_count:
-                default_collector = collector
-            else:
-                continue
+        for helper_name in requested_helpers:
+            try:
+                # If we can, try to pick the same collector.
+                choices = self.getHelperAddresses(helper_name)
+                for item in response.values():
+                    if item['collector'] in choices.keys():
+                        choice = item
+                        continue
+                # Or default to a random selection
+                else:
+                    c,h = random.choice(choices.items())
+                    choice = {'collector': c, 'address': h}
+                response[helper_name] = choice
 
-        response['default'] = {}
-        response['default']['collector'] = default_collector
+            except e.TestHelperNotFound:
+                response = {'error': 'test-helper-not-found'}
+                return response
 
-        if not len(result[default_collector]) == len(requested_helpers):
-            found_helpers = set(result[default_collector].items())
-            for missing_helper in found_helpers.difference(requested_helpers):
-                collector, address = random.choice(self.getHelperAddress(missing_helper).items())
-                response[missing_helper] = {}
-                response[missing_helper]['collector'] = collector
-                response[missing_helper]['address'] = address
-
-        for name, address in result[default_collector].items():
-            response[name] = {}
-            response[name]['address'] = address
-            response[name]['collector'] = default_collector
-        
+        response['default'] = {'collector': random.choice(self.knownCollectors)}
         return response
 
 class BouncerQueryHandler(OONIBHandler):
