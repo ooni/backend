@@ -96,7 +96,7 @@ class Bouncer(object):
                 for item in response.values():
                     if item['collector'] in choices.keys():
                         choice = item
-                        continue
+                        break
                 # Or default to a random selection
                 else:
                     c,h = random.choice(choices.items())
