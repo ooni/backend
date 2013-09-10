@@ -95,7 +95,7 @@ class Bouncer(object):
                 choices = self.getHelperAddresses(helper_name)
                 for item in response.values():
                     if item['collector'] in choices.keys():
-                        choice = item
+                        choice = choices[item['collector']]
                         break
                 # Or default to a random selection
                 else:
