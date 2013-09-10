@@ -94,14 +94,15 @@ class Bouncer(object):
                 # If we can, try to pick the same collector.
                 choices = self.getHelperAddresses(helper_name)
                 for item in response.values():
-                    if item['collector'] in choices.keys():
-                        choice = choices[item['collector']]
+                    c = item['collector']
+                    h = choices[c]
+                    if c in choices.keys():
                         break
                 # Or default to a random selection
                 else:
                     c,h = random.choice(choices.items())
-                    choice = {'collector': c, 'address': h}
-                response[helper_name] = choice
+
+                response[helper_name] = {'collector': c, 'address': h}
 
             except e.TestHelperNotFound:
                 response = {'error': 'test-helper-not-found'}
