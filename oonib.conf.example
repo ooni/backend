@@ -50,6 +50,7 @@ helpers:
         address: null
         udp_port: 57004
         tcp_port: 57005
+        resolver_address: '8.8.8.8:53'
 
     ssl:
         address: null
