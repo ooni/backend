@@ -37,44 +37,21 @@ def txSetupFailed(failure):
     log.err("Setup failed")
     log.exception(failure)
 
-def setupCollector(tor_process_protocol, datadir, torconfig):
+def setupHSEndpoint(tor_process_protocol, torconfig, endpoint):
+    endpointName = endpoint.settings['name']
     def setup_complete(port):
-        #XXX: drop some other noise about what API are available on this machine
-        print("Exposed collector Tor hidden service on httpo://%s"
-              % port.onion_uri)
+        print("Exposed %s Tor hidden service on httpo://%s" % (endpointName,
+            port.onion_uri))
 
     public_port = 80
-    # XXX there is currently a bug in txtorcon that prevents data_dir from
-    # being passed properly. Details on the bug can be found here:
-    # https://github.com/meejah/txtorcon/pull/22
-
-    #XXX: set up the various API endpoints, if configured and enabled
-    #XXX: also set up a separate keyed hidden service for collectors to push their status to, if the bouncer is enabled
     hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
-                                           data_dir=os.path.join(datadir, 'collector'))
-    d = hs_endpoint.listen(ooniBackend)
-    
+            data_dir=os.path.join(torconfig.DataDirectory, endpointName))
+    d = hs_endpoint.listen(endpoint)
     d.addCallback(setup_complete)
     d.addErrback(txSetupFailed)
+    return d
 
-    return tor_process_protocol
-
-def setupBouncer(tor_process_protocol, datadir, torconfig):
-    def setup_complete(port):
-        #XXX: drop some other noise about what API are available on this machine
-        print("Exposed bouncer Tor hidden service on httpo://%s"
-              % port.onion_uri)
-
-    public_port = 80
-
-    hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
-                                           data_dir=os.path.join(datadir, 'bouncer'))
-
-    d = hs_endpoint.listen(ooniBouncer)
-    d.addCallback(setup_complete)
-    d.addErrback(txSetupFailed)
-
-def startTor():
+def startTor(torconfig):
     def updates(prog, tag, summary):
         print("%d%%: %s" % (prog, summary))
 
@@ -83,7 +60,6 @@ def startTor():
         os.makedirs(tempfile.gettempdir())
     _temp_dir = tempfile.mkdtemp()
 
-    torconfig = TorConfig()
     torconfig.SocksPort = config.main.socks_port
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
@@ -103,10 +79,7 @@ def startTor():
                        progress_updates=updates)
     else:
         d = launch_tor(torconfig, reactor, progress_updates=updates)
-    d.addCallback(setupCollector, datadir, torconfig)
-    if ooniBouncer:
-        d.addCallback(setupBouncer, datadir, torconfig)
-    d.addErrback(txSetupFailed)
+    return d
 
 if platformType == "win32":
     from twisted.scripts._twistw import WindowsApplicationRunner
@@ -127,7 +100,11 @@ else:
             # This is our addition. The rest is taken from
             # twisted/scripts/_twistd_unix.py 12.2.0
             if config.main.tor_hidden_service:
-                startTor()
+                torconfig = TorConfig()
+                d = startTor(torconfig)
+                d.addCallback(setupHSEndpoint, torconfig, ooniBackend)
+                if ooniBouncer:
+                    d.addCallback(setupHSEndpoint, torconfig, ooniBouncer)
             else:
                 if ooniBouncer:
                     reactor.listenTCP(8888, ooniBouncer, interface="127.0.0.1")
