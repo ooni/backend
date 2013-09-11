@@ -37,13 +37,12 @@ def txSetupFailed(failure):
     log.err("Setup failed")
     log.exception(failure)
 
-def setupCollector(tor_process_protocol, datadir):
+def setupCollector(tor_process_protocol, datadir, torconfig):
     def setup_complete(port):
         #XXX: drop some other noise about what API are available on this machine
         print("Exposed collector Tor hidden service on httpo://%s"
               % port.onion_uri)
 
-    torconfig = TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
     # XXX there is currently a bug in txtorcon that prevents data_dir from
     # being passed properly. Details on the bug can be found here:
@@ -60,13 +59,12 @@ def setupCollector(tor_process_protocol, datadir):
 
     return tor_process_protocol
 
-def setupBouncer(tor_process_protocol, datadir):
+def setupBouncer(tor_process_protocol, datadir, torconfig):
     def setup_complete(port):
         #XXX: drop some other noise about what API are available on this machine
         print("Exposed bouncer Tor hidden service on httpo://%s"
               % port.onion_uri)
 
-    torconfig = TorConfig(tor_process_protocol.tor_protocol)
     public_port = 80
 
     hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
@@ -105,9 +103,9 @@ def startTor():
                        progress_updates=updates)
     else:
         d = launch_tor(torconfig, reactor, progress_updates=updates)
-    d.addCallback(setupCollector, datadir)
+    d.addCallback(setupCollector, datadir, torconfig)
     if ooniBouncer:
-        d.addCallback(setupBouncer, datadir)
+        d.addCallback(setupBouncer, datadir, torconfig)
     d.addErrback(txSetupFailed)
 
 if platformType == "win32":
