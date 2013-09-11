@@ -111,6 +111,7 @@ Vagrant.configure("2") do |config|
 end
 
 $setup_script = <<SCRIPT
+apt-get update
 apt-get -y install curl python-setuptools python-dev libsqlite3-dev
 
 echo "Updating to the latest version of PIP"
@@ -132,13 +133,13 @@ mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
 
 echo "Installing Tor..."
 
-echo "deb http://deb.torproject.org/torproject.org precise main" >> /etc/apt/source.list
+echo "deb http://deb.torproject.org/torproject.org precise main" >> /etc/apt/sources.list
 
 gpg --keyserver keys.gnupg.net --recv 886DDD89
 gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | apt-key add -
 
 apt-get update
-apt-get install deb.torproject.org-keyring tor tor-geoipdb
+apt-get -y install deb.torproject.org-keyring tor tor-geoipdb
 
 cd /data/oonib
 
