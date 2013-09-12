@@ -22,6 +22,6 @@ if config.main.policy_file:
     ooniBackendAPI += policyAPI
 
 if config.main.bouncer_file:
-    ooniBouncer = web.Application(bouncerAPI, debug=True)
+    ooniBouncer = web.Application(bouncerAPI, debug=True, name='bouncer')
 
-ooniBackend = web.Application(ooniBackendAPI, debug=True)
+ooniBackend = web.Application(ooniBackendAPI, debug=True, name='collector')
