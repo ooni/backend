@@ -13,11 +13,16 @@ class Policy(object):
     def __init__(self):
         with open(config.main.policy_file) as f:
             p = yaml.safe_load(f)
-            self.nettest = list(p['nettest'])
-            self.input = list(p['input'])
+            self.input = self.nettest = []
+            if 'nettest' in p.keys():
+                self.nettest = list(p['nettest'])
+            if 'input' in p.keys():
+                self.input = list(p['input'])
 
     def validateInputHash(self, input_hash):
         valid = False
+        if not self.input:
+            valid = True
         for i in self.input:
             if input_hash == i['id']:
                 valid = True
@@ -28,6 +33,8 @@ class Policy(object):
     def validateNettest(self, nettest_name):
         # XXX add support for version checking too.
         valid = False
+        if self.nettest:
+            valid = True
         for nt in self.nettest:
             if nettest_name == nt['name']:
                 valid = True
