@@ -28,6 +28,21 @@ from oonib import config
 from oonib import log
 
 
+from txtorcon import __version__ as txtorcon_version
+if txtorcon_version < '0.9.0':
+    """
+    Fix for bug in txtorcon versions < 0.9.0 where TCPHiddenServiceEndpoint
+    listens on all interfaces by default.
+    """
+    def create_listener(self, proto):
+        self._update_onion(self.hiddenservice.dir)
+        self.tcp_endpoint = TCP4ServerEndpoint(self.reactor, self.listen_port,
+                interface='127.0.0.1')
+        d = self.tcp_endpoint.listen(self.protocolfactory)
+        d.addCallback(self._add_attributes).addErrback(self._retry_local_port)
+        return d
+    TCPHiddenServiceEndpoint._create_listener =  create_listener
+
 class OBaseRunner(object):
     pass
 
