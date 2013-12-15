@@ -5,7 +5,7 @@ There are a few dependencies which we recommend you get from your
 distribution's archives.
 
 ```
-sudo apt-get install build-essential python-dev python-setuptools openssl
+sudo apt-get install build-essential python-dev python-setuptools openssl libsqlite3-dev
 ```
 
 ### Tor
