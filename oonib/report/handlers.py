@@ -181,10 +181,10 @@ class NewReportHandlerFile(OONIBHandler):
         # XXX here we should validate and sanitize the request
         try:
             report_data = parseNewReportRequest(self.request.body)
-        except InvalidRequestField, e:
-            raise e.InvalidRequestField(e)
-        except MissingField, e:
-            raise e.MissingRequestField(e)
+        except InvalidRequestField, exc:
+            raise e.InvalidRequestField(exc)
+        except MissingField, exc:
+            raise e.MissingRequestField(exc)
 
         log.debug("Parsed this data %s" % report_data)
 
