@@ -59,7 +59,7 @@ def parseNewReportRequest(request):
     }
 
     parsed_request = json.loads(request)
-    if not parsed_request['probe_asn']:
+    if 'probe_asn' not in parsed_request or not parsed_request['probe_asn']:
         parsed_request['probe_asn'] = 'AS0'
 
     for k, regexp in expected_request.items():
@@ -181,9 +181,9 @@ class NewReportHandlerFile(OONIBHandler):
         # XXX here we should validate and sanitize the request
         try:
             report_data = parseNewReportRequest(self.request.body)
-        except InvalidRequestField, exc:
+        except InvalidRequestField as exc:
             raise e.InvalidRequestField(exc)
-        except MissingField, exc:
+        except MissingField as exc:
             raise e.MissingRequestField(exc)
 
         log.debug("Parsed this data %s" % report_data)
