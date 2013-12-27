@@ -213,7 +213,7 @@ class NewReportHandlerFile(OONIBHandler):
             raise e.MissingReportHeaderKey(key)
 
         except InvalidReportHeader, key:
-            raise e.InvalidReportHeaderKey(key)
+            raise e.InvalidReportHeader(key)
 
         report_header = yaml.dump(report_header)
         content = "---\n" + report_header + '...\n'
@@ -286,7 +286,7 @@ class NewReportHandlerFile(OONIBHandler):
             with open(report_filename, 'a+') as fd:
                 fdesc.setNonBlocking(fd.fileno())
                 fdesc.writeToFD(fd.fileno(), data)
-        except IOError as e:
+        except IOError as exc:
             e.OONIBError(404, "Report not found")
 
 class ReportNotFound(Exception):
