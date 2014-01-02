@@ -59,7 +59,7 @@ def parseNewReportRequest(request):
     }
 
     parsed_request = json.loads(request)
-    if not parsed_request['probe_asn']:
+    if 'probe_asn' not in parsed_request or not parsed_request['probe_asn']:
         parsed_request['probe_asn'] = 'AS0'
 
     for k, regexp in expected_request.items():
@@ -181,10 +181,10 @@ class NewReportHandlerFile(OONIBHandler):
         # XXX here we should validate and sanitize the request
         try:
             report_data = parseNewReportRequest(self.request.body)
-        except InvalidRequestField, e:
-            raise e.InvalidRequestField(e)
-        except MissingField, e:
-            raise e.MissingRequestField(e)
+        except InvalidRequestField as exc:
+            raise e.InvalidRequestField(exc)
+        except MissingField as exc:
+            raise e.MissingRequestField(exc)
 
         log.debug("Parsed this data %s" % report_data)
 
@@ -213,7 +213,7 @@ class NewReportHandlerFile(OONIBHandler):
             raise e.MissingReportHeaderKey(key)
 
         except InvalidReportHeader, key:
-            raise e.InvalidReportHeaderKey(key)
+            raise e.InvalidReportHeader(key)
 
         report_header = yaml.dump(report_header)
         content = "---\n" + report_header + '...\n'
@@ -286,7 +286,7 @@ class NewReportHandlerFile(OONIBHandler):
             with open(report_filename, 'a+') as fd:
                 fdesc.setNonBlocking(fd.fileno())
                 fdesc.writeToFD(fd.fileno(), data)
-        except IOError as e:
+        except IOError as exc:
             e.OONIBError(404, "Report not found")
 
 class ReportNotFound(Exception):
