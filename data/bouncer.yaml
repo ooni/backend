@@ -1,5 +1,3 @@
 collector:
-  httpo://nkvphnp3p6agi5qq.onion:
-    test-helper: {dns: 93.95.227.200, http-return-json-headers: 'http://93.95.227.200'}
-  httpo://nkvphnp3p6agi5q1.onion:
-    test-helper: {dns: 93.22.227.200, http-return-json-headers: 'http://93.95.227.220'}
+  httpo://ihiderha53f36lsd.onion:
+      test-helper: {dns: '93.95.227.200:57004', http-return-json-headers: 'http://93.95.227.200', ssl: 'https://93.95.227.20', tcp-echo: '213.138.109.232', traceroute: '93.95.227.200'}
