@@ -258,17 +258,27 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
                 raise e.InputHashNotProvided
             self.checkPolicy()
         
-        content = yaml.safe_load(report_data['content'])
+        if 'content' in report_data:
+            content = yaml.safe_load(report_data['content'])
+            try:
+                report_header = validate_report_header(content)
+
+            except MissingReportHeaderKey, key:
+                raise e.MissingReportHeaderKey(key)
+
+            except InvalidReportHeader, key:
+                raise e.InvalidReportHeader(key)
+        else:
+            content = {
+                'software_name': software_name,
+                'software_version': software_version,
+                'probe_asn': probe_asn,
+                'test_name': self.testName,
+                'test_version': self.testVersion,
+                'input_hashes': self.inputHashes
+            }
+
         content['backend_version'] = config.backend_version
-
-        try:
-            report_header = validate_report_header(content)
-
-        except MissingReportHeaderKey, key:
-            raise e.MissingReportHeaderKey(key)
-
-        except InvalidReportHeader, key:
-            raise e.InvalidReportHeader(key)
 
         report_header = yaml.dump(report_header)
         content = "---\n" + report_header + '...\n'
@@ -289,7 +299,6 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
             'report_id': report_id
         }
         
-
         try:
             requested_helper = report_data['test_helper']
         except KeyError:
