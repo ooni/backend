@@ -66,7 +66,7 @@ class Report(object):
         dst_path = os.path.join(dst_path, dst_filename)
         os.rename(report_filename, dst_path)
 
-        del config.reports[report_id]
+        del config.reports[self.report_id]
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
