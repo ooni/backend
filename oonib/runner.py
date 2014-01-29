@@ -46,56 +46,6 @@ if txtorcon_version < '0.9.0':
 class OBaseRunner(object):
     pass
 
-_repo_dir = os.path.join(os.getcwd().split('ooni-backend')[0], 'ooni-backend')
-
-def txSetupFailed(failure):
-    log.err("Setup failed")
-    log.exception(failure)
-
-def setupHSEndpoint(tor_process_protocol, torconfig, endpoint):
-    endpointName = endpoint.settings['name']
-    def setup_complete(port):
-        print("Exposed %s Tor hidden service on httpo://%s" % (endpointName,
-            port.onion_uri))
-
-    public_port = 80
-    hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
-            data_dir=os.path.join(torconfig.DataDirectory, endpointName))
-    d = hs_endpoint.listen(endpoint)
-    d.addCallback(setup_complete)
-    d.addErrback(txSetupFailed)
-    return d
-
-def startTor(torconfig):
-    def updates(prog, tag, summary):
-        print("%d%%: %s" % (prog, summary))
-
-    tempfile.tempdir = os.path.join(_repo_dir, 'tmp')
-    if not os.path.isdir(tempfile.gettempdir()):
-        os.makedirs(tempfile.gettempdir())
-    _temp_dir = tempfile.mkdtemp()
-
-    torconfig.SocksPort = config.main.socks_port
-    if config.main.tor2webmode:
-        torconfig.Tor2webMode = 1
-        torconfig.CircuitBuildTimeout = 60
-    if config.main.tor_datadir is None:
-        log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
-        log.msg("Creating tmp directory in current directory for datadir.")
-        log.debug("Using %s" % _temp_dir)
-        datadir = _temp_dir
-    else:
-        datadir = config.main.tor_datadir
-    torconfig.DataDirectory = datadir
-    torconfig.save()
-    if config.main.tor_binary is not None:
-        d = launch_tor(torconfig, reactor,
-                       tor_binary=config.main.tor_binary,
-                       progress_updates=updates)
-    else:
-        d = launch_tor(torconfig, reactor, progress_updates=updates)
-    return d
-
 if platformType == "win32":
     from twisted.scripts._twistw import WindowsApplicationRunner
 
@@ -107,6 +57,50 @@ if platformType == "win32":
 else:
     from twisted.scripts._twistd_unix import UnixApplicationRunner
     class OBaseRunner(UnixApplicationRunner):
+        temporary_data_dir = None
+
+        def txSetupFailed(self, failure):
+            log.err("Setup failed")
+            log.exception(failure)
+
+        def setupHSEndpoint(self, tor_process_protocol, torconfig, endpoint):
+            endpointName = endpoint.settings['name']
+            def setup_complete(port):
+                print("Exposed %s Tor hidden service on httpo://%s" % (endpointName,
+                    port.onion_uri))
+
+            public_port = 80
+            hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
+                    data_dir=os.path.join(torconfig.DataDirectory, endpointName))
+            d = hs_endpoint.listen(endpoint)
+            d.addCallback(setup_complete)
+            d.addErrback(self.txSetupFailed)
+            return d
+
+        def startTor(self, torconfig):
+            def updates(prog, tag, summary):
+                print("%d%%: %s" % (prog, summary))
+            
+            torconfig.SocksPort = config.main.socks_port
+            if config.main.tor2webmode:
+                torconfig.Tor2webMode = 1
+                torconfig.CircuitBuildTimeout = 60
+            if config.main.tor_datadir is None:
+                self.temporary_data_dir = tempfile.mkdtemp()
+                log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
+                log.warn("Using %s" % self.temporary_data_dir)
+                torconfig.DataDirectory = self.temporary_data_dir
+            else:
+                torconfig.DataDirectory = config.main.tor_datadir
+            torconfig.save()
+            if config.main.tor_binary is not None:
+                d = launch_tor(torconfig, reactor,
+                               tor_binary=config.main.tor_binary,
+                               progress_updates=updates)
+            else:
+                d = launch_tor(torconfig, reactor, progress_updates=updates)
+            return d
+
         def postApplication(self):
             """After the application is created, start the application and run
             the reactor. After the reactor stops, clean up PID files and such.
@@ -116,20 +110,20 @@ else:
             # twisted/scripts/_twistd_unix.py 12.2.0
             if config.main.tor_hidden_service:
                 torconfig = TorConfig()
-                d = startTor(torconfig)
-                d.addCallback(setupHSEndpoint, torconfig, ooniBackend)
+                d = self.startTor(torconfig)
+                d.addCallback(self.setupHSEndpoint, torconfig, ooniBackend)
                 if ooniBouncer:
-                    d.addCallback(setupHSEndpoint, torconfig, ooniBouncer)
+                    d.addCallback(self.setupHSEndpoint, torconfig, ooniBouncer)
             else:
                 if ooniBouncer:
                     reactor.listenTCP(8888, ooniBouncer, interface="127.0.0.1")
                 reactor.listenTCP(8889, ooniBackend, interface="127.0.0.1")
             self.startReactor(None, self.oldstdout, self.oldstderr)
             self.removePID(self.config['pidfile'])
-            if os.path.exists(tempfile.gettempdir()):
+            if self.temporary_data_dir:
                 log.msg("Removing temporary directory: %s"
-                        % tempfile.gettempdir())
-                rmtree(tempfile.gettempdir(), onerror=log.err)
+                        % self.temporary_data_dir)
+                rmtree(self.temporary_data_dir, onerror=log.err)
 
         def createOrGetApplication(self):
             return oonibackend.application
