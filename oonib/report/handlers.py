@@ -47,8 +47,8 @@ class Report(object):
         report_filename = get_report_path(self.report_id)
         try:
             with open(report_filename) as fd:
-                yaml_data = ''.join(fd.readline() for _ in range(12))
-                report_details = yaml.safe_load(yaml_data)
+                g = yaml.safe_load_all(fd)
+                report_details = g.next()
         except IOError:
             raise ReportNotFound
 
@@ -243,13 +243,14 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
 
         log.debug("Parsed this data %s" % report_data)
 
-        software_name = report_data['software_name']
-        software_version = report_data['software_version']
+        software_name = str(report_data['software_name'])
+        software_version = str(report_data['software_version'])
 
-        probe_asn = report_data['probe_asn']
+        probe_asn = str(report_data['probe_asn'])
+        probe_cc = str(report_data['probe_cc'])
 
-        self.testName = report_data['test_name']
-        self.testVersion = report_data['test_version']
+        self.testName = str(report_data['test_name'])
+        self.testVersion = str(report_data['test_version'])
        
         if config.main.policy_file:
             try:
@@ -273,14 +274,16 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
                 'software_name': software_name,
                 'software_version': software_version,
                 'probe_asn': probe_asn,
+                'probe_cc': probe_cc,
                 'test_name': self.testName,
                 'test_version': self.testVersion,
-                'input_hashes': self.inputHashes
+                'input_hashes': self.inputHashes,
+                'start_time': time.time()
             }
 
         content['backend_version'] = config.backend_version
 
-        report_header = yaml.dump(report_header)
+        report_header = yaml.dump(content)
         content = "---\n" + report_header + '...\n'
 
         if not probe_asn:
