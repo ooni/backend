@@ -351,10 +351,10 @@ class CloseReportHandlerFile(OONIBHandler):
         pass
 
     def post(self, report_id):
-        try:
-            close_report(report_id)
-        except ReportNotFound:
-            e.ReportNotFound
+        if report_id in config.reports:
+            config.reports[report_id].close()
+        else:
+            raise e.ReportNotFound
 
 class PCAPReportHandler(OONIBHandler):
     def get(self):
