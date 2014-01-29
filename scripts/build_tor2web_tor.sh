@@ -4,7 +4,7 @@
 OPENSSL_VERSION=1.0.1e
 LIBEVENT_VERSION=2.0.21-stable
 ZLIB_VERSION=1.2.8
-TOR_VERSION=0.2.4.17-rc
+TOR_VERSION=0.2.4.20
 ZLIB_MD5=44d667c142d7cda120332623eab69f40
 
 SCRIPT_ROOT=`pwd`
@@ -80,6 +80,7 @@ cd zlib-$ZLIB_VERSION
 # set up tor with tor2web mode
 cd $SCRIPT_ROOT
 gpg --verify tor-$TOR_VERSION.tar.gz.asc tor-$TOR_VERSION.tar.gz
+if [ $? -ne 0 ];then exit ;fi
 tar xfz tor-$TOR_VERSION.tar.gz
 cd tor-$TOR_VERSION
 ./configure --enable-static-tor --with-libevent-dir=$BUILD/libevent-$LIBEVENT_VERSION --with-openssl-dir=$BUILD/openssl-$OPENSSL_VERSION --with-zlib-dir=$BUILD/zlib-$ZLIB_VERSION --enable-tor2web-mode && make
