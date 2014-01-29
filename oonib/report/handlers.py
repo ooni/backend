@@ -20,6 +20,54 @@ class MissingField(Exception):
 class InvalidRequestField(Exception):
     pass
 
+class Report(object):
+    def __init__(self, report_id):
+        self.report_id = report_id
+        self.delayed_call = None
+
+        self.refresh()
+    
+    def refresh(self):
+        self.last_updated = time.time()
+        if self.delayed_call:
+            self.delayed_call.cancel()
+        self.delayed_call = reactor.callLater(config.main.stale_time, self.stale_check)
+
+    def stale_check(self):
+        if (time.time() - self.last_updated) > config.main.stale_time:
+            try:
+                self.close()
+            except ReportNotFound:
+                pass
+
+    def close(self):
+        def get_report_path(report_id):
+            return os.path.join(config.main.report_dir, report_id)
+
+        report_filename = get_report_path(self.report_id)
+        try:
+            with open(report_filename) as fd:
+                yaml_data = ''.join(fd.readline() for _ in range(12))
+                report_details = yaml.safe_load(yaml_data)
+        except IOError:
+            raise ReportNotFound
+
+        timestamp = otime.timestamp(datetime.fromtimestamp(report_details['start_time']))
+        dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
+                timestamp=timestamp,
+                **report_details)
+
+        dst_path = os.path.join(config.main.archive_dir,
+                                report_details['probe_cc'])
+
+        if not os.path.isdir(dst_path):
+            os.mkdir(dst_path)
+
+        dst_path = os.path.join(dst_path, dst_filename)
+        os.rename(report_filename, dst_path)
+
+        del config.reports[report_id]
+
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
 
@@ -118,17 +166,24 @@ def validate_report_header(report_header):
 
     return report_header
 
-def get_report_path(report_id):
-    return os.path.join(config.main.report_dir, report_id)
+class UpdateReportMixin(object):
+    def updateReport(self, report_id, parsed_request):
 
-def stale_check(report_id):
-    if (time.time() - config.reports[report_id]) > config.main.stale_time:
+        log.debug("Got this request %s" % parsed_request)
+        report_filename = os.path.join(config.main.report_dir,
+                report_id)
+        
+        config.reports[report_id].refresh()
+
         try:
-            close_report(report_id)
-        except ReportNotFound:
-            pass
+            with open(report_filename, 'a+') as fd:
+                fdesc.setNonBlocking(fd.fileno())
+                fdesc.writeToFD(fd.fileno(), parsed_request['content'])
+        except IOError as exc:
+            e.OONIBError(404, "Report not found")
+        self.write({})
 
-class NewReportHandlerFile(OONIBHandler):
+class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
     """
     Responsible for creating and updating reports by writing to flat file.
     """
@@ -202,7 +257,7 @@ class NewReportHandlerFile(OONIBHandler):
             except KeyError:
                 raise e.InputHashNotProvided
             self.checkPolicy()
-
+        
         content = yaml.safe_load(report_data['content'])
         content['backend_version'] = config.backend_version
 
@@ -245,10 +300,8 @@ class NewReportHandlerFile(OONIBHandler):
                 response['test_helper_address'] = config.helpers[requested_helper].address
             except KeyError:
                 raise e.TestHelperNotFound
-
-        config.reports[report_id] = time.time()
-
-        reactor.callLater(config.main.stale_time, stale_check, report_id)
+        
+        config.reports[report_id] = Report(report_id)
 
         self.writeToReport(report_filename, content)
 
@@ -269,51 +322,20 @@ class NewReportHandlerFile(OONIBHandler):
           }
         """
         parsed_request = parseUpdateReportRequest(self.request.body)
-
         report_id = parsed_request['report_id']
 
-        log.debug("Got this request %s" % parsed_request)
-        report_filename = os.path.join(config.main.report_dir,
-                report_id)
+        self.updateReport(report_id, parsed_request)
 
-        config.reports[report_id] = time.time()
-        reactor.callLater(config.main.stale_time, stale_check, report_id)
-
-        self.updateReport(report_filename, parsed_request['content'])
-
-    def updateReport(self, report_filename, data):
+class UpdateReportHandlerFile(OONIBHandler, UpdateReportMixin):
+    def post(self, report_id):
         try:
-            with open(report_filename, 'a+') as fd:
-                fdesc.setNonBlocking(fd.fileno())
-                fdesc.writeToFD(fd.fileno(), data)
-        except IOError as exc:
-            e.OONIBError(404, "Report not found")
+            parsed_request = json.loads(self.request.body)
+        except ValueError:
+            raise e.InvalidRequest
+        self.updateReport(report_id, parsed_request)
 
 class ReportNotFound(Exception):
     pass
-
-def close_report(report_id):
-    report_filename = get_report_path(report_id)
-    try:
-        with open(report_filename) as fd:
-            yaml_data = ''.join(fd.readline() for _ in range(12))
-            report_details = yaml.safe_load(yaml_data)
-    except IOError:
-        raise ReportNotFound
-
-    timestamp = otime.timestamp(datetime.fromtimestamp(report_details['start_time']))
-    dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
-            timestamp=timestamp,
-            **report_details)
-
-    dst_path = os.path.join(config.main.archive_dir,
-                            report_details['probe_cc'])
-
-    if not os.path.isdir(dst_path):
-        os.mkdir(dst_path)
-
-    dst_path = os.path.join(dst_path, dst_filename)
-    os.rename(report_filename, dst_path)
 
 class CloseReportHandlerFile(OONIBHandler):
     def get(self):
