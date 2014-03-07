@@ -33,7 +33,7 @@ setup(
     url="https://ooni.torproject.org",
     license="LICENSE",
     description="OONI-Probe Backend",
-    scripts=["bin/oonib", "bin/archive_oonib_reports"],
+    scripts=["bin/oonib", "bin/oonibadmin", "bin/archive_oonib_reports"],
     packages=find_packages(),
     install_requires=install_requires,
     dependency_links=dependency_links,
