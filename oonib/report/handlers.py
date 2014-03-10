@@ -245,9 +245,12 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
 
         software_name = str(report_data['software_name'])
         software_version = str(report_data['software_version'])
-
+        
         probe_asn = str(report_data['probe_asn'])
-        probe_cc = str(report_data['probe_cc'])
+        try:
+            probe_cc = str(report_data['probe_cc'])
+        except:
+            probe_cc = 'ZZ'
 
         self.testName = str(report_data['test_name'])
         self.testVersion = str(report_data['test_version'])
