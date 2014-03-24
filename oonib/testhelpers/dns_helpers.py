@@ -3,7 +3,7 @@ from twisted.internet import reactor
 from twisted.names import dns
 from twisted.names import client, server
 
-from oonib import config
+from oonib.config import config
 
 class DNSTestHelper(server.DNSServerFactory):
     def __init__(self, authorities = None,

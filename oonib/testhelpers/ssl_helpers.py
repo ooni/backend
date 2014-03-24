@@ -1,5 +1,5 @@
 from twisted.internet import ssl
-from oonib import config
+from oonib.config import config
 
 class SSLContext(ssl.DefaultOpenSSLContextFactory):
     def __init__(self, *args, **kw):

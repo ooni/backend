@@ -1,37 +1,55 @@
 import yaml
+from oonib import errors as e
 from oonib import Storage
 from oonib import __version__
 
 from oonib.options import OONIBOptions
 import os
 
-def get_root_path():
-    this_directory = os.path.dirname(__file__)
-    root = os.path.join(this_directory, '..')
-    root = os.path.abspath(root)
-    return root
-
-def loadConfigFile():
+class Config(object):
+    main = None
+    helpers = None
+    reports = {}
+    backend_version = __version__
     opts = OONIBOptions()
-    opts.parseOptions()
-    if 'config' in opts.keys():
-        with open(opts['config']) as f:
-            config_file_contents = '\n'.join(f.readlines())
-            configuration = yaml.safe_load(config_file_contents)
-            main = Storage(opts)
-            for k, v in configuration['main'].items():
-                main[k] = v
-            helpers = Storage()
-            for k, v in configuration['helpers'].items():
-                helpers[k] = Storage()
-                for k2, v2 in v.items():
-                    helpers[k][k2] = v2
-            return main, helpers
-    return None, None
 
-main = None
+    def __init__(self):
+        self.opts.parseOptions()
+
+    def load(self):
+        try:
+            config_file = self.opts['config']
+        except KeyError:
+            raise e.ConfigFileNotSpecified
+
+        try:
+            with open(self.opts['config']) as f:
+                configuration = yaml.safe_load(f)
+        except IOError:
+            raise e.ConfigFileDoesNotExist(self.opts['config'])
+
+        self.main = Storage()
+        for k, v in configuration['main'].items():
+            self.main[k] = v
+        self.helpers = Storage()
+        for name, helper in configuration['helpers'].items():
+            self.helpers[name] = Storage()
+            for k, v in helper.items():
+                self.helpers[name][k] = v
+        self.check_paths()
+    
+    def check_paths(self):
+        if not self.main.report_dir or not os.path.isdir(self.main.report_dir):
+            raise e.InvalidReportDirectory(self.main.report_dir)
+        if not self.main.archive_dir or not os.path.isdir(self.main.archive_dir):
+            raise e.InvalidArchiveDirectory(self.main.report_dir)
+
+        if self.main.input_dir and not os.path.isdir(self.main.input_dir):
+            raise e.InvalidInputDirectory(self.main.input_dir)
+        if self.main.deck_dir and not os.path.isdir(self.main.deck_dir):
+            raise e.InvalidDeckDirectory(self.main.deck_dir)
+
 backend_version = __version__
 reports = {}
 
-if not main:
-    main, helpers = loadConfigFile()
+config = Config()

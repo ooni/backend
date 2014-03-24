@@ -1,10 +1,11 @@
-from oonib import errors as e
-from oonib.handlers import OONIBHandler
-
-from oonib import config
 import json
 import os
 import yaml
+
+from oonib import errors as e
+from oonib.handlers import OONIBHandler
+
+from oonib.config import config
 
 class Policy(object):
     nettest = None

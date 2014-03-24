@@ -3,7 +3,7 @@ import random
 import yaml
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
-from oonib import config
+from oonib.config import config
 
 class Bouncer(object):
     def __init__(self):
@@ -138,6 +138,11 @@ class BouncerQueryHandler(OONIBHandler):
             requested_helpers = query['test-helpers']
         except KeyError:
             raise e.TestHelpersKeyMissing
+        
+        try:
+            assert isinstance(requested_helpers, list)
+        except AssertionError:
+            raise e.InvalidRequest
 
         response = self.bouncer.filterHelperAddresses(requested_helpers)
         self.write(response)

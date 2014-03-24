@@ -20,7 +20,7 @@ from oonib.testhelpers import http_helpers, tcp_helpers
 
 from oonib import log
 
-from oonib import config
+from oonib.config import config
 
 if config.main.uid and config.main.gid:
     application = service.Application('oonibackend', uid=config.main.uid,

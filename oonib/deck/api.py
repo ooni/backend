@@ -1,6 +1,6 @@
 from cyclone import web
 from oonib.deck import handlers
-from oonib import config
+from oonib.config import config
 
 deckAPI = [
     (r"/deck", handlers.DeckListHandler),

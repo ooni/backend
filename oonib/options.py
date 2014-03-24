@@ -7,7 +7,6 @@ if platformType == "win32":
 else:
     from twisted.scripts._twistd_unix import ServerOptions
 
-#class OONIBOptions(usage.Options):
 class OONIBOptions(usage.Options):
     synopsis = """%s [options] [path to test].py """
 
