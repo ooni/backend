@@ -22,11 +22,10 @@ from txtorcon import launch_tor
 
 from oonib.report.api import reportAPI 
 from oonib.api import ooniBackend, ooniBouncer
+from oonib.config import config
 
 from oonib import oonibackend
-from oonib import config
 from oonib import log
-
 
 from txtorcon import __version__ as txtorcon_version
 if txtorcon_version < '0.9.0':

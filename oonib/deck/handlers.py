@@ -6,7 +6,8 @@ import yaml
 
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
-from oonib import config, log
+from oonib import log
+from oonib.config import config
 
 class DeckDescHandler(OONIBHandler):
     def get(self, deckID):

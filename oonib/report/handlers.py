@@ -1,18 +1,20 @@
-import json
-import os
 import random
-import re
 import string
 import time
 import yaml
+import json
+import os
+import re
+
+from twisted.internet import fdesc, reactor
 
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
 from oonib.policy.handlers import Policy
 
 from datetime import datetime
-from oonib import randomStr, otime, config, log
-from twisted.internet import fdesc, reactor
+from oonib import randomStr, otime, log
+from oonib.config import config
 
 class MissingField(Exception):
     pass

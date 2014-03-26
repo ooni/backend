@@ -1,6 +1,6 @@
 from cyclone import web
 from oonib.input import handlers
-from oonib import config
+from oonib.config import config
 
 inputAPI = [
     (r"/input", handlers.InputListHandler),

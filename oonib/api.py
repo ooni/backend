@@ -6,7 +6,7 @@ from oonib.input.api import inputAPI
 from oonib.policy.api import policyAPI
 from oonib.bouncer.api import bouncerAPI
 
-from oonib import config
+from oonib.config import config
 
 ooniBouncer = None
 ooniBackendAPI = []

@@ -4,7 +4,8 @@ import os
 import yaml
 
 from oonib.handlers import OONIBHandler
-from oonib import config, log
+from oonib import log
+from oonib.config import config
 
 class InputDescHandler(OONIBHandler):
     def get(self, inputID):

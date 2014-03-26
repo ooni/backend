@@ -10,7 +10,33 @@ from twisted.application import app
 sys.path[:] = map(os.path.abspath, sys.path)
 sys.path.insert(0, os.path.abspath(os.getcwd()))
 
-from oonib import runner, config
+from oonib import errors as e
+from oonib.config import config
+
+try:
+    config.load()
+except e.ConfigFileNotSpecified:
+    print "Config file not specified!"
+    print "Use -c to specify one!"
+    config.usageOptions()
+    sys.exit(1)
+except e.ConfigFileDoesNotExist, path:
+    print "Config file \"%s\" does not exist!" % path
+    sys.exit(2)
+except e.InvalidReportDirectory, path:
+    print "Invalid report directory: %s!" % path
+    sys.exit(3)
+except e.InvalidArchiveDirectory, path:
+    print "Invalid archive directory: %s!" % path
+    sys.exit(4)
+except e.InvalidInputDirectory, path:
+    print "Invalid input directory: %s" % path
+    sys.exit(5)
+except e.InvalidDeckDirectory, path:
+    print "Invalid deck directory: %s" % path
+    sys.exit(6)
+
+from oonib import runner
 from oonib.oonibackend import application
 
 if config.main.chroot:

@@ -73,3 +73,15 @@ class TestHelperNotFound(OONIBError):
     status_code = 404
     log_message = "test-helper-not-found"
 
+class ConfigFileNotSpecified(Exception): pass
+
+class ConfigFileDoesNotExist(Exception): pass
+
+class InvalidReportDirectory(Exception): pass
+
+class InvalidArchiveDirectory(Exception): pass
+
+class InvalidInputDirectory(Exception): pass
+
+class InvalidDeckDirectory(Exception): pass
+
