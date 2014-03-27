@@ -99,6 +99,7 @@ def parseNewReportRequest(request):
     version_string = re.compile("[0-9A-Za-z_\-\.]+$")
     name = re.compile("[a-zA-Z0-9_\- ]+$")
     probe_asn = re.compile("AS[0-9]+$")
+    test_helper = re.compile("[A-Za-z0-9_\-]+$")
 
     expected_request = {
      'software_name': name,
@@ -125,8 +126,8 @@ def parseNewReportRequest(request):
             raise InvalidRequestField(k)
     
     try:
-        test_helper = parsed_request['test_helper']
-        if not re.match(regexp, str(test_helper)):
+        requested_test_helper = parsed_request['test_helper']
+        if not re.match(test_helper, str(requested_test_helper)):
             raise InvalidRequestField('test_helper')
     except KeyError:
         pass
