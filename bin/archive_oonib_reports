@@ -50,13 +50,13 @@ def validate_fields(fields):
     # or not we should support > 2 character CC
     if fields['probe_cc'] is None:
         fields['probe_cc'] = default_probe_cc
-    if not re.match('[A-Z\?]{2,4}', fields['probe_cc'].upper()):
+    if not re.match('[A-Z\?]{2,4}$', fields['probe_cc'].upper()):
         raise InvalidReportField('probe_cc')
 
     # check report ASN
     if fields['probe_asn'] is None:
         fields['probe_asn'] = 'AS0'
-    if not re.match('^AS[0-9]{1,10}', fields['probe_asn'].upper()):
+    if not re.match('^AS[0-9]{1,10}$', fields['probe_asn'].upper()):
         raise InvalidReportField('probe_asn')
 
     # check report timestamp
