@@ -115,19 +115,6 @@ class BouncerQueryHandler(OONIBHandler):
     def initialize(self):
         self.bouncer = Bouncer()
 
-    def updateKnownHelpers(self):
-        with open(config.main.bouncer_file) as f:
-            bouncerFile = yaml.safe_load(f)
-            for collectorName, helpers in bouncerFile['collector'].items():
-                for helperName, helperAddress in helpers['test-helper'].items():
-                    if helperName not in self.knownHelpers.keys():
-                        self.knownHelpers[helperName] = []
-                  
-                    self.knownHelpers[helperName].append({
-                        'collector-name': collectorName,
-                        'helper-address': helperAddress
-                    })
-
     def post(self):
         try:
             query = json.loads(self.request.body)
