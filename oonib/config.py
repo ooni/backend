@@ -42,7 +42,7 @@ class Config(object):
         if not self.main.report_dir or not os.path.isdir(self.main.report_dir):
             raise e.InvalidReportDirectory(self.main.report_dir)
         if not self.main.archive_dir or not os.path.isdir(self.main.archive_dir):
-            raise e.InvalidArchiveDirectory(self.main.report_dir)
+            raise e.InvalidArchiveDirectory(self.main.archive_dir)
 
         if self.main.input_dir and not os.path.isdir(self.main.input_dir):
             raise e.InvalidInputDirectory(self.main.input_dir)
