@@ -16,9 +16,9 @@ class Policy(object):
             p = yaml.safe_load(f)
         self.input = []
         self.nettest = []
-        if 'nettest' in p.keys():
+        if 'nettest' in p:
             self.nettest = list(p['nettest'])
-        if 'input' in p.keys():
+        if 'input' in p:
             self.input = list(p['input'])
 
     def validateInputHash(self, input_hash):
