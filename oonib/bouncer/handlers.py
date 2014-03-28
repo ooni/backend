@@ -7,33 +7,31 @@ from oonib.config import config
 
 class Bouncer(object):
     def __init__(self):
-        self.knownHelpers = {}
-        self.updateKnownHelpers()
-        self.updateKnownCollectors()
+        with open(config.main.bouncer_file) as f:
+            bouncerFile = yaml.safe_load(f)
+        self.updateKnownHelpers(bouncerFile)
+        self.updateKnownCollectors(bouncerFile)
 
-    def updateKnownCollectors(self):
+    def updateKnownCollectors(self, bouncerFile):
         """
-        Returns the list of all known collectors
+        Initialize the list of all known collectors
         """
         self.knownCollectors = []
-        with open(config.main.bouncer_file) as f:
-            bouncerFile = yaml.safe_load(f)
-            for collectorName, helpers in bouncerFile['collector'].items():
-                if collectorName not in self.knownCollectors:
-                    self.knownCollectors.append(collectorName)
+        for collectorName, helpers in bouncerFile['collector'].items():
+            if collectorName not in self.knownCollectors:
+                self.knownCollectors.append(collectorName)
         
-    def updateKnownHelpers(self):
-        with open(config.main.bouncer_file) as f:
-            bouncerFile = yaml.safe_load(f)
-            for collectorName, helpers in bouncerFile['collector'].items():
-                for helperName, helperAddress in helpers['test-helper'].items():
-                    if helperName not in self.knownHelpers.keys():
-                        self.knownHelpers[helperName] = []
-                  
-                    self.knownHelpers[helperName].append({
-                        'collector-name': collectorName,
-                        'helper-address': helperAddress
-                    })
+    def updateKnownHelpers(self, bouncerFile):
+        self.knownHelpers = {}
+        for collectorName, helpers in bouncerFile['collector'].items():
+            for helperName, helperAddress in helpers['test-helper'].items():
+                if helperName not in self.knownHelpers.keys():
+                    self.knownHelpers[helperName] = []
+
+                self.knownHelpers[helperName].append({
+                    'collector-name': collectorName,
+                    'helper-address': helperAddress
+                })
 
     def getHelperAddresses(self, helper_name):
         """
