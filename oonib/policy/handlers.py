@@ -14,11 +14,11 @@ class Policy(object):
     def __init__(self):
         with open(config.main.policy_file) as f:
             p = yaml.safe_load(f)
-            self.input = self.nettest = []
-            if 'nettest' in p.keys():
-                self.nettest = list(p['nettest'])
-            if 'input' in p.keys():
-                self.input = list(p['input'])
+        self.input = self.nettest = []
+        if 'nettest' in p.keys():
+            self.nettest = list(p['nettest'])
+        if 'input' in p.keys():
+            self.input = list(p['input'])
 
     def validateInputHash(self, input_hash):
         valid = False
