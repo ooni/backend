@@ -34,7 +34,7 @@ class Policy(object):
     def validateNettest(self, nettest_name):
         # XXX add support for version checking too.
         valid = False
-        if self.nettest:
+        if not self.nettest:
             valid = True
         for nt in self.nettest:
             if nettest_name == nt['name']:
