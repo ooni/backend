@@ -33,15 +33,9 @@ class Policy(object):
 
     def validateNettest(self, nettest_name):
         # XXX add support for version checking too.
-        valid = False
-        if not self.nettest:
-            valid = True
-        for nt in self.nettest:
-            if nettest_name == nt['name']:
-                valid = True
-                break
-        if not valid:
-            raise e.InvalidNettestName
+        if self.nettest:
+            if not any(nt['name'] == nettest_name for nt in self.nettest):
+                raise e.InvalidNettestName
 
 class PolicyHandler(OONIBHandler):
     def initialize(self):
