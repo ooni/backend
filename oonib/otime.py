@@ -82,7 +82,7 @@ def timestamp(t=None):
         If not specified will default to the current time
         in UTC.
     """
-    if not t:
+    if t is None:
         t = datetime.utcnow()
     ISO8601 = "%Y-%m-%dT%H%M%SZ"
     return t.strftime(ISO8601)
