@@ -95,14 +95,13 @@ class Bouncer(object):
                 choices = self.getHelperAddresses(helper_name)
                 for item in response.values():
                     c = item['collector']
-                    h = choices[c]
-                    if c in choices.keys():
+                    if c in choices:
                         break
                 # Or default to a random selection
                 else:
-                    c,h = random.choice(choices.items())
+                    c = random.choice(choices)
 
-                response[helper_name] = {'collector': c, 'address': h}
+                response[helper_name] = {'collector': c, 'address': choices[c]}
 
             except e.TestHelperNotFound:
                 response = {'error': 'test-helper-not-found'}
