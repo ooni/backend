@@ -28,7 +28,7 @@ from oonib import oonibackend
 from oonib import log
 
 from txtorcon import __version__ as txtorcon_version
-if txtorcon_version < '0.9.0':
+if tuple(map(int, txtorcon_version.split('.'))) < (0,9,0):
     """
     Fix for bug in txtorcon versions < 0.9.0 where TCPHiddenServiceEndpoint
     listens on all interfaces by default.
