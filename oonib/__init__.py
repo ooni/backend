@@ -25,7 +25,6 @@ class Storage(dict):
         2
         >>> del o.a
         >>> o.a
-        None
     """
     def __getattr__(self, key):
         return self.get(key)
