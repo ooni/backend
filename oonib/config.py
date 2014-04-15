@@ -23,19 +23,17 @@ class Config(object):
             raise e.ConfigFileNotSpecified
 
         try:
-            with open(self.opts['config']) as f:
+            with open(config_file) as f:
                 configuration = yaml.safe_load(f)
         except IOError:
-            raise e.ConfigFileDoesNotExist(self.opts['config'])
+            raise e.ConfigFileDoesNotExist(config_file)
 
-        self.main = Storage()
-        for k, v in configuration['main'].items():
-            self.main[k] = v
+        self.main = Storage(configuration['main'].items())
+
         self.helpers = Storage()
         for name, helper in configuration['helpers'].items():
-            self.helpers[name] = Storage()
-            for k, v in helper.items():
-                self.helpers[name][k] = v
+            self.helpers[name] = Storage(helper.items())
+
         self.check_paths()
     
     def check_paths(self):
