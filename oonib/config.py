@@ -39,15 +39,13 @@ class Config(object):
         self.check_paths()
     
     def check_paths(self):
-        if not self.main.report_dir or not os.path.isdir(self.main.report_dir):
-            raise e.InvalidReportDirectory(self.main.report_dir)
-        if not self.main.archive_dir or not os.path.isdir(self.main.archive_dir):
-            raise e.InvalidArchiveDirectory(self.main.archive_dir)
-
-        if self.main.input_dir and not os.path.isdir(self.main.input_dir):
-            raise e.InvalidInputDirectory(self.main.input_dir)
-        if self.main.deck_dir and not os.path.isdir(self.main.deck_dir):
-            raise e.InvalidDeckDirectory(self.main.deck_dir)
+        def check_path(directory, complaint):
+            if not (directory and os.path.isdir(directory)):
+                raise complaint(directory)
+        check_path(self.main.report_dir,  e.InvalidReportDirectory)
+        check_path(self.main.archive_dir, e.InvalidArchiveDirectory)
+        check_path(self.main.input_dir,   e.InvalidInputDirectory)
+        check_path(self.main.deck_dir,    e.InvalidDeckDirectory)
 
 backend_version = __version__
 reports = {}
