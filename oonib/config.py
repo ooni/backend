@@ -46,6 +46,5 @@ class Config(object):
         check_path(self.main.deck_dir,    e.InvalidDeckDirectory)
 
 backend_version = __version__
-reports = {}
 
 config = Config()
