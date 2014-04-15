@@ -28,10 +28,7 @@ class Storage(dict):
         None
     """
     def __getattr__(self, key):
-        try:
-            return self[key]
-        except KeyError, k:
-            return None
+        return self.get(key)
 
     def __setattr__(self, key, value):
         self[key] = value
@@ -49,8 +46,7 @@ class Storage(dict):
         return dict(self)
 
     def __setstate__(self, value):
-        for (k, v) in value.items():
-            self[k] = v
+        self.update(value.items())
 
 def randomStr(length, num=True):
     """
