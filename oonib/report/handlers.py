@@ -305,10 +305,7 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
             'report_id': report_id
         }
         
-        try:
-            requested_helper = report_data['test_helper']
-        except KeyError:
-            requested_helper = None
+        requested_helper = report_data.get('test_helper')
 
         if requested_helper:
             try:
