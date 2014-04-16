@@ -123,9 +123,7 @@ class BouncerQueryHandler(OONIBHandler):
         except KeyError:
             raise e.TestHelpersKeyMissing
         
-        try:
-            assert isinstance(requested_helpers, list)
-        except AssertionError:
+        if not isinstance(requested_helpers, list):
             raise e.InvalidRequest
 
         response = self.bouncer.filterHelperAddresses(requested_helpers)
