@@ -1,6 +1,5 @@
 from twisted.python import usage
 from twisted.python.runtime import platformType
-from twisted.python import usage
 
 if platformType == "win32":
     from twisted.scripts._twistw import ServerOptions
