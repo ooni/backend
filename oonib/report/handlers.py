@@ -250,10 +250,7 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
         software_version = str(report_data['software_version'])
         
         probe_asn = str(report_data['probe_asn'])
-        try:
-            probe_cc = str(report_data['probe_cc'])
-        except:
-            probe_cc = 'ZZ'
+        probe_cc = str(report_data.get('probe_cc', 'ZZ'))
 
         self.testName = str(report_data['test_name'])
         self.testVersion = str(report_data['test_version'])
@@ -308,10 +305,7 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
             'report_id': report_id
         }
         
-        try:
-            requested_helper = report_data['test_helper']
-        except KeyError:
-            requested_helper = None
+        requested_helper = report_data.get('test_helper')
 
         if requested_helper:
             try:

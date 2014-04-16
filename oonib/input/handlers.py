@@ -11,23 +11,27 @@ class InputDescHandler(OONIBHandler):
     def get(self, inputID):
         bn = os.path.basename(inputID) + ".desc"
         try:
-            with open(os.path.join(config.main.input_dir, bn)) as f:
-                response = {}
-                inputDesc = yaml.safe_load(f)
-                for k in ['name', 'description', 'version', 'author', 'date']:
-                    response[k] = inputDesc[k]
-                response['id'] = inputID
-            self.write(response)
+            f = open(os.path.join(config.main.input_dir, bn))
         except IOError:
             log.err("No Input Descriptor found for id %s" % inputID) 
             self.set_status(404)
             self.write({'error': 'missing-input'})
+            return
+        with f:
+            inputDesc = yaml.safe_load(f)
  
-        except Exception, e:
-            log.exception(e)
-            log.err("Invalid Input Descriptor found for id %s" % inputID) 
-            self.set_status(500)
-            self.write({'error': 'invalid-input-descriptor'})
+        response = {'id': inputID}
+        for k in ['name', 'description', 'version', 'author', 'date']:
+            try:
+                response[k] = inputDesc[k]
+            except Exception, e: # XXX this should probably be KeyError
+                log.exception(e)
+                log.err("Invalid Input Descriptor found for id %s" % inputID) 
+                self.set_status(500)
+                self.write({'error': 'invalid-input-descriptor'})
+                return
+
+        self.write(response)
 
 class InputListHandler(OONIBHandler):
     def get(self):
