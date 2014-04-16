@@ -40,11 +40,11 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
     length = 0
     maxHeaders = 500
     requestLine = ''
-    headers = []
 
     timeOut = 60 * 60 * 12
 
     def __init__(self):
+        self.headers = []
         self.requests = []
 
     def connectionMade(self):
@@ -98,9 +98,7 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
 class HTTPReturnJSONHeadersHelper(protocol.ServerFactory):
     protocol = SimpleHTTPChannel
     def buildProtocol(self, addr):
-        p = self.protocol()
-        p.headers = []
-        return p
+        return self.protocol()
 
 class HTTPTrapAll(RequestHandler):
     def _execute(self, transforms, *args, **kwargs):
