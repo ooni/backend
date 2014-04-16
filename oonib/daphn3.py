@@ -17,13 +17,6 @@ def read_pcap(filename):
 
     packets = rdpcap(filename)
 
-    checking_first_packet = True
-    client_ip_addr = None
-    server_ip_addr = None
-
-    ssl_packets = []
-    messages = []
-
     """
     pcap assumptions:
 
@@ -42,21 +35,23 @@ def read_pcap(filename):
     Minimally validate the pcap and also find out what's the client
     and server IP addresses.
     """
-    for packet in packets:
-        if checking_first_packet:
+    ssl_packets = []
+    client_ip_addr = None
+    server_ip_addr = None
+    for i, packet in enumerate(packets):
+        if i == 0:
             client_ip_addr = packet[IP].src
-            checking_first_packet = False
-        else:
-            if packet[IP].src != client_ip_addr:
-                server_ip_addr = packet[IP].src
+        elif packet[IP].src != client_ip_addr:
+            server_ip_addr = packet[IP].src
 
         try:
-            if (packet[Raw]):
+            if packet[Raw]:
                 ssl_packets.append(packet)
         except IndexError:
             pass
 
     """Form our list."""
+    messages = []
     for packet in ssl_packets:
         if packet[IP].src == client_ip_addr:
             messages.append({"client": str(packet[Raw])})
