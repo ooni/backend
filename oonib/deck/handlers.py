@@ -16,18 +16,20 @@ class DeckDescHandler(OONIBHandler):
         # against matching a certain pattern in the handler.
         bn = os.path.basename(deckID + '.desc')
         try:
-            with open(os.path.join(config.main.deck_dir, bn)) as f:
-                response = {}
-                deckDesc = yaml.safe_load(f)
-                for k in ['name', 'description', 'version', 'author', 'date']:
-                    response[k] = deckDesc[k]
+            f = open(os.path.join(config.main.deck_dir, bn))
         except IOError:
             log.err("Deck %s missing" % deckID)
             raise e.MissingDeck
-        except KeyError:
-            log.err("Deck %s missing required keys!" % deckID)
-            raise e.MissingDeckKeys
+        with f:
+            deckDesc = yaml.safe_load(f)
 
+        response = {}
+        for k in ['name', 'description', 'version', 'author', 'date']:
+            try:
+                response[k] = deckDesc[k]
+            except KeyError:
+                log.err("Deck %s missing required keys!" % deckID)
+                raise e.MissingDeckKeys
         self.write(response)
 
 class DeckListHandler(OONIBHandler):
