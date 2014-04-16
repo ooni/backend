@@ -21,15 +21,14 @@ class DeckDescHandler(OONIBHandler):
                 deckDesc = yaml.safe_load(f)
                 for k in ['name', 'description', 'version', 'author', 'date']:
                     response[k] = deckDesc[k]
-            self.write(response)
-
         except IOError:
             log.err("Deck %s missing" % deckID)
             raise e.MissingDeck
-
         except KeyError:
             log.err("Deck %s missing required keys!" % deckID)
             raise e.MissingDeckKeys
+
+        self.write(response)
 
 class DeckListHandler(OONIBHandler):
     def get(self):
