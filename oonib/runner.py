@@ -35,7 +35,7 @@ if tuple(map(int, txtorcon_version.split('.'))) < (0,9,0):
     """
     def create_listener(self, proto):
         self._update_onion(self.hiddenservice.dir)
-        self.tcp_endpoint = TCP4ServerEndpoint(self.reactor, self.listen_port,
+        self.tcp_endpoint = TCP4ServerEndpoint(self.reactor, self.listen_port, # XXX missing import -- has this code ever been tested?
                 interface='127.0.0.1')
         d = self.tcp_endpoint.listen(self.protocolfactory)
         d.addCallback(self._add_attributes).addErrback(self._retry_local_port)
