@@ -97,7 +97,7 @@ class Bouncer(object):
                         break
                 # Or default to a random selection
                 else:
-                    c = random.choice(choices)
+                    c = random.choice(choices.keys())
 
                 response[helper_name] = {'collector': c, 'address': choices[c]}
 
