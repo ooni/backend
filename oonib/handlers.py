@@ -6,8 +6,10 @@ from cyclone import web
 class OONIBHandler(web.RequestHandler):
     def write_error(self, status_code, exception=None, **kw):
         self.set_status(status_code)
-        if exception:
+        if hasattr(exception, 'log_message'):
             self.write({'error': exception.log_message})
+        else:
+            self.write({'error': 'error'})
 
     def write(self, chunk):
         """
