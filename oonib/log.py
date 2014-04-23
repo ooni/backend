@@ -6,8 +6,9 @@
 Twisted logger for the ooni backend system.
 """
 
-import sys
 import os
+import sys
+import codecs
 import logging
 import traceback
 
@@ -19,9 +20,32 @@ from twisted.python.logfile import DailyLogFile
 from oonib import otime
 from oonib.config import config
 
-## Get rid of the annoying "No route found for
-## IPv6 destination warnings":
+# Get rid of the annoying "No route found for
+# IPv6 destination warnings":
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
+
+def log_encode(logmsg):
+    """
+    I encode logmsg (a str or unicode) as printable ASCII. Each case
+    gets a distinct prefix, so that people differentiate a unicode
+    from a utf-8-encoded-byte-string or binary gunk that would
+    otherwise result in the same final output.
+    """
+    if isinstance(logmsg, unicode):
+        return codecs.encode(logmsg, 'unicode_escape')
+    elif isinstance(logmsg, str):
+        try:
+            unicodelogmsg = logmsg.decode('utf-8')
+        except UnicodeDecodeError:
+            return codecs.encode(logmsg, 'string_escape')
+        else:
+            return codecs.encode(unicodelogmsg, 'unicode_escape')
+    else:
+        raise Exception("I accept only a unicode object or a string, "
+                        "not a %s object like %r" % (type(logmsg),
+                                                     repr(logmsg)))
+
 
 class LogWithNoPrefix(txlog.FileLogObserver):
     def emit(self, eventDict):
@@ -31,6 +55,7 @@ class LogWithNoPrefix(txlog.FileLogObserver):
 
         util.untilConcludes(self.write, "%s\n" % text)
         util.untilConcludes(self.flush)  # Hoorj!
+
 
 def start(application_name="oonib"):
     daily_logfile = None
@@ -52,21 +77,27 @@ def start(application_name="oonib"):
     txlog.startLoggingWithObserver(LogWithNoPrefix(sys.stdout).emit)
     txlog.addObserver(txlog.FileLogObserver(daily_logfile).emit)
 
+
 def stop():
     print "Stopping OONI"
 
+
 def msg(msg, *arg, **kw):
-    print "%s" % msg
+    print "%s" % log_encode(msg)
+
 
 def debug(msg, *arg, **kw):
     if config.main.debug:
-        print "[D] %s" % msg
+        print "[D] %s" % log_encode(msg)
+
 
 def warn(msg, *arg, **kw):
-    print "[W] %s" % msg
+    print "[W] %s" % log_encode(msg)
+
 
 def err(msg, *arg, **kw):
-    print "[!] %s" % msg
+    print "[!] %s" % log_encode(msg)
+
 
 def exception(error):
     """
@@ -78,6 +109,7 @@ def exception(error):
     else:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         traceback.print_exception(exc_type, exc_value, exc_traceback)
+
 
 class LoggerFactory(object):
     """
@@ -91,4 +123,3 @@ class LoggerFactory(object):
 
     def stop(self):
         txlog.msg("Stopping OONIB")
-
