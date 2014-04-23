@@ -5,7 +5,7 @@ OPENSSL_VERSION=1.0.1e
 LIBEVENT_VERSION=2.0.21-stable
 ZLIB_VERSION=1.2.8
 TOR_VERSION=0.2.4.20
-ZLIB_MD5=44d667c142d7cda120332623eab69f40
+ZLIB_SHA256=36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d
 
 SCRIPT_ROOT=`pwd`
 
@@ -70,7 +70,7 @@ cd libevent-$LIBEVENT_VERSION
 
 # set up zlib
 cd $SCRIPT_ROOT
-echo "$ZLIB_MD5  zlib-$ZLIB_VERSION.tar.gz" | md5sum -c
+echo "$ZLIB_SHA256  zlib-$ZLIB_VERSION.tar.gz" | shasum -a 256 -c
 if [ $? -ne 0 ]; then exit ;fi
 
 tar xfz zlib-$ZLIB_VERSION.tar.gz
