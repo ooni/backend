@@ -83,6 +83,11 @@ class ReportNotFound(OONIBError):
     log_message = "report-not-found"
 
 
+class CollectorNotFound(OONIBError):
+    status_code = 404
+    log_message = "collector-not-found"
+
+
 class NoValidCollector(OONIBError):
     pass
 
@@ -90,6 +95,11 @@ class NoValidCollector(OONIBError):
 class TestHelpersKeyMissing(OONIBError):
     status_code = 400
     log_message = "test-helpers-key-missing"
+
+
+class TestHelpersOrNetTestsKeyMissing(OONIBError):
+    status_code = 400
+    log_message = "test-helpers-or-net-test-key-missing"
 
 
 class TestHelperNotFound(OONIBError):
