@@ -112,7 +112,7 @@ end
 
 $setup_script = <<SCRIPT
 apt-get update
-apt-get -y install curl python-setuptools python-dev libsqlite3-dev
+apt-get -y install curl python-setuptools python-dev libsqlite3-dev libffi-dev
 
 echo "Updating to the latest version of PIP"
 cd /tmp/
