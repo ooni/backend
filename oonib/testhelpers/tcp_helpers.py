@@ -1,15 +1,15 @@
-
 from twisted.internet.protocol import Protocol, Factory, ServerFactory
-from twisted.internet.error import ConnectionDone
 
 from oonib.config import config
 from oonib import log
 from oonib.daphn3 import Daphn3Protocol
 from oonib.daphn3 import read_pcap, read_yaml
 
+
 class TCPEchoProtocol(Protocol):
     def dataReceived(self, data):
         self.transport.write(data)
+
 
 class TCPEchoHelper(Factory):
     """
@@ -24,8 +24,11 @@ elif config.helpers.daphn3.pcap_file:
     daphn3Steps = read_yaml(config.helpers.daphn3.pcap_file)
 
 else:
-    daphn3Steps = [{'client': 'client_packet'}, 
-        {'server': 'server_packet'}]
+    daphn3Steps = [
+        {'client': 'client_packet'},
+        {'server': 'server_packet'}
+    ]
+
 
 class Daphn3ServerProtocol(Daphn3Protocol):
     def nextStep(self):

@@ -1,9 +1,10 @@
-import json 
+import json
 import random
 import yaml
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
 from oonib.config import config
+
 
 class Bouncer(object):
     def __init__(self):
@@ -20,7 +21,7 @@ class Bouncer(object):
         for collectorName, helpers in bouncerFile['collector'].items():
             if collectorName not in self.knownCollectors:
                 self.knownCollectors.append(collectorName)
-        
+
     def updateKnownHelpers(self, bouncerFile):
         self.knownHelpers = {}
         for collectorName, helpers in bouncerFile['collector'].items():
@@ -47,13 +48,13 @@ class Bouncer(object):
             helpers = self.knownHelpers[helper_name]
         except KeyError:
             raise e.TestHelperNotFound
-        
+
         helpers_dict = {}
         for helper in helpers:
             helpers_dict[helper['collector-name']] = helper['helper-address']
 
         return helpers_dict
-    
+
     def filterHelperAddresses(self, requested_helpers):
         """
         Returns a dict of collectors that support all the requested_helpers.
@@ -79,7 +80,7 @@ class Bouncer(object):
             }
          }
 
-         or 
+         or
 
          {'error': 'test-helper-not-found'}
 
@@ -105,8 +106,10 @@ class Bouncer(object):
                 response = {'error': 'test-helper-not-found'}
                 return response
 
-        response['default'] = {'collector': random.choice(self.knownCollectors)}
+        response['default'] = {'collector':
+                               random.choice(self.knownCollectors)}
         return response
+
 
 class BouncerQueryHandler(OONIBHandler):
     def initialize(self):
@@ -122,7 +125,7 @@ class BouncerQueryHandler(OONIBHandler):
             requested_helpers = query['test-helpers']
         except KeyError:
             raise e.TestHelpersKeyMissing
-        
+
         if not isinstance(requested_helpers, list):
             raise e.InvalidRequest
 

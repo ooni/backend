@@ -3,12 +3,16 @@ import types
 from cyclone import escape
 from cyclone import web
 
+from oonib import log
+
+
 class OONIBHandler(web.RequestHandler):
     def write_error(self, status_code, exception=None, **kw):
         self.set_status(status_code)
         if hasattr(exception, 'log_message'):
             self.write({'error': exception.log_message})
         else:
+            log.error(exception)
             self.write({'error': 'error'})
 
     def write(self, chunk):

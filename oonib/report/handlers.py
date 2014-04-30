@@ -1,5 +1,3 @@
-import random
-import string
 import time
 import yaml
 import json
@@ -16,35 +14,48 @@ from datetime import datetime
 from oonib import randomStr, otime, log
 from oonib.config import config
 
-class MissingField(Exception):
-    pass
 
-class InvalidRequestField(Exception):
-    pass
+def report_file_name(report_details):
+    timestamp = otime.timestamp(datetime.fromtimestamp(report_details['start_time']))
+    dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
+                timestamp=timestamp,
+                **report_details)
+    return dst_filename
 
 class Report(object):
-    def __init__(self, report_id):
+    delayed_call = None
+
+    def __init__(self, report_id,
+                 stale_time,
+                 report_dir,
+                 archive_dir,
+                 reports):
         self.report_id = report_id
-        self.delayed_call = None
+
+        self.stale_time = stale_time
+        self.report_dir = report_dir
+        self.archive_dir = archive_dir
+        self.reports = reports
 
         self.refresh()
-    
+
     def refresh(self):
         self.last_updated = time.time()
         if self.delayed_call:
             self.delayed_call.cancel()
-        self.delayed_call = reactor.callLater(config.main.stale_time, self.stale_check)
+        self.delayed_call = reactor.callLater(self.stale_time,
+                                              self.stale_check)
 
     def stale_check(self):
-        if (time.time() - self.last_updated) > config.main.stale_time:
+        if (time.time() - self.last_updated) > self.stale_time:
             try:
                 self.close()
-            except ReportNotFound:
+            except e.ReportNotFound:
                 pass
 
     def close(self):
         def get_report_path(report_id):
-            return os.path.join(config.main.report_dir, report_id)
+            return os.path.join(self.report_dir, report_id)
 
         report_filename = get_report_path(self.report_id)
         try:
@@ -52,14 +63,10 @@ class Report(object):
                 g = yaml.safe_load_all(fd)
                 report_details = g.next()
         except IOError:
-            raise ReportNotFound
+            raise e.ReportNotFound
 
-        timestamp = otime.timestamp(datetime.fromtimestamp(report_details['start_time']))
-        dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
-                timestamp=timestamp,
-                **report_details)
-
-        dst_path = os.path.join(config.main.archive_dir,
+        dst_filename = report_file_name(report_details)
+        dst_path = os.path.join(self.archive_dir,
                                 report_details['probe_cc'])
 
         if not os.path.isdir(dst_path):
@@ -68,7 +75,8 @@ class Report(object):
         dst_path = os.path.join(dst_path, dst_filename)
         os.rename(report_filename, dst_path)
 
-        del config.reports[self.report_id]
+        self.delayed_call.cancel()
+        del self.reports[self.report_id]
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
@@ -85,10 +93,10 @@ def parseUpdateReportRequest(request):
     try:
         report_id = parsed_request['report_id']
     except KeyError:
-        raise MissingField('report_id')
+        raise e.MissingField('report_id')
 
     if not re.match(report_id_regexp, report_id):
-        raise InvalidRequestField('report_id')
+        raise e.InvalidRequestField('report_id')
 
     return parsed_request
 
@@ -117,79 +125,82 @@ def parseNewReportRequest(request):
         try:
             value_to_check = parsed_request[k]
         except KeyError:
-            raise MissingField(k)
+            raise e.MissingField(k)
 
         print "Matching %s with %s | %s" % (regexp, value_to_check, k)
         if re.match(regexp, str(value_to_check)):
             continue
         else:
-            raise InvalidRequestField(k)
-    
+            raise e.InvalidRequestField(k)
+
     try:
         requested_test_helper = parsed_request['test_helper']
         if not re.match(test_helper, str(requested_test_helper)):
-            raise InvalidRequestField('test_helper')
+            raise e.InvalidRequestField('test_helper')
     except KeyError:
         pass
 
     return parsed_request
-
-class InvalidReportHeader(Exception):
-    pass
-
-class MissingReportHeaderKey(InvalidReportHeader):
-    pass
 
 def validate_report_header(report_header):
     required_keys = ['probe_asn', 'probe_cc', 'probe_ip', 'software_name',
             'software_version', 'test_name', 'test_version']
     for key in required_keys:
         if key not in report_header:
-            raise MissingReportHeaderKey(key)
+            raise e.MissingReportHeaderKey(key)
 
     if report_header['probe_asn'] is None:
         report_header['probe_asn'] = 'AS0'
 
     if not re.match('AS[0-9]+$', report_header['probe_asn']):
-        raise InvalidReportHeader('probe_asn')
+        raise e.InvalidReportHeader('probe_asn')
 
     # If no country is known, set it to be ZZ (user assigned value in ISO 3166)
     if report_header['probe_cc'] is None:
         report_header['probe_cc'] = 'ZZ'
 
     if not re.match('[a-zA-Z]{2}$', report_header['probe_cc']):
-        raise InvalidReportHeader('probe_cc')
+        raise e.InvalidReportHeader('probe_cc')
 
     if not re.match('[a-z_\-]+$', report_header['test_name']):
-        raise InvalidReportHeader('test_name')
+        raise e.InvalidReportHeader('test_name')
 
 
     if not re.match('([0-9]+\.)+[0-9]+$', report_header['test_version']):
-        raise InvalidReportHeader('test_version')
+        raise e.InvalidReportHeader('test_version')
 
     return report_header
+
+class ReportHandler(OONIBHandler):
+    def initialize(self):
+        self.archive_dir = config.main.archive_dir
+        self.report_dir = config.main.report_dir
+        self.reports = config.reports
+        self.policy_file = config.main.policy_file
+        self.helpers = config.helpers
+        self.stale_time = config.main.stale_time
 
 class UpdateReportMixin(object):
     def updateReport(self, report_id, parsed_request):
 
         log.debug("Got this request %s" % parsed_request)
-        report_filename = os.path.join(config.main.report_dir,
+        report_filename = os.path.join(self.report_dir,
                 report_id)
-        
-        config.reports[report_id].refresh()
+
+        self.reports[report_id].refresh()
 
         try:
             with open(report_filename, 'a+') as fd:
-                fdesc.setNonBlocking(fd.fileno())
-                fdesc.writeToFD(fd.fileno(), parsed_request['content'])
-        except IOError as exc:
+                fd.write(parsed_request['content'])
+        except IOError:
             e.OONIBError(404, "Report not found")
-        self.write({})
+        self.write({'status': 'success'})
 
-class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
+class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
     """
     Responsible for creating and updating reports by writing to flat file.
     """
+    inputHashes = None
 
     def checkPolicy(self):
         policy = Policy()
@@ -236,42 +247,31 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
           {'backend_version': 'XXX', 'report_id': 'XXX'}
 
         """
-        # XXX here we should validate and sanitize the request
-        try:
-            report_data = parseNewReportRequest(self.request.body)
-        except InvalidRequestField as exc:
-            raise e.InvalidRequestField(exc)
-        except MissingField as exc:
-            raise e.MissingRequestField(exc)
+        # Note: the request is being validated inside of parseNewReportRequest.
+        report_data = parseNewReportRequest(self.request.body)
 
         log.debug("Parsed this data %s" % report_data)
 
         software_name = str(report_data['software_name'])
         software_version = str(report_data['software_version'])
-        
+
         probe_asn = str(report_data['probe_asn'])
         probe_cc = str(report_data.get('probe_cc', 'ZZ'))
 
         self.testName = str(report_data['test_name'])
         self.testVersion = str(report_data['test_version'])
-       
-        if config.main.policy_file:
+
+        if self.policy_file:
             try:
                 self.inputHashes = report_data['input_hashes']
             except KeyError:
                 raise e.InputHashNotProvided
             self.checkPolicy()
-        
+
         if 'content' in report_data:
             content = yaml.safe_load(report_data['content'])
-            try:
-                report_header = validate_report_header(content)
+            report_header = validate_report_header(content)
 
-            except MissingReportHeaderKey, key:
-                raise e.MissingReportHeaderKey(key)
-
-            except InvalidReportHeader, key:
-                raise e.InvalidReportHeader(key)
         else:
             content = {
                 'software_name': software_name,
@@ -298,22 +298,26 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
 
         # The report filename contains the timestamp of the report plus a
         # random nonce
-        report_filename = os.path.join(config.main.report_dir, report_id)
+        report_filename = os.path.join(self.report_dir, report_id)
 
         response = {
             'backend_version': config.backend_version,
             'report_id': report_id
         }
-        
+
         requested_helper = report_data.get('test_helper')
 
         if requested_helper:
             try:
-                response['test_helper_address'] = config.helpers[requested_helper].address
+                response['test_helper_address'] = self.helpers[requested_helper].address
             except KeyError:
                 raise e.TestHelperNotFound
-        
-        config.reports[report_id] = Report(report_id)
+
+        self.reports[report_id] = Report(report_id,
+                                         self.stale_time,
+                                         self.report_dir,
+                                         self.archive_dir,
+                                         self.reports)
 
         self.writeToReport(report_filename, content)
 
@@ -338,7 +342,7 @@ class NewReportHandlerFile(OONIBHandler, UpdateReportMixin):
 
         self.updateReport(report_id, parsed_request)
 
-class UpdateReportHandlerFile(OONIBHandler, UpdateReportMixin):
+class UpdateReportHandlerFile(ReportHandler, UpdateReportMixin):
     def post(self, report_id):
         try:
             parsed_request = json.loads(self.request.body)
@@ -346,20 +350,17 @@ class UpdateReportHandlerFile(OONIBHandler, UpdateReportMixin):
             raise e.InvalidRequest
         self.updateReport(report_id, parsed_request)
 
-class ReportNotFound(Exception):
-    pass
-
-class CloseReportHandlerFile(OONIBHandler):
+class CloseReportHandlerFile(ReportHandler):
     def get(self):
         pass
 
     def post(self, report_id):
-        if report_id in config.reports:
-            config.reports[report_id].close()
+        if report_id in self.reports:
+            self.reports[report_id].close()
         else:
             raise e.ReportNotFound
 
-class PCAPReportHandler(OONIBHandler):
+class PCAPReportHandler(ReportHandler):
     def get(self):
         pass
 

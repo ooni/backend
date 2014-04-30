@@ -1,5 +1,4 @@
 import glob
-import json
 import os
 import re
 import yaml
@@ -8,6 +7,7 @@ from oonib import errors as e
 from oonib.handlers import OONIBHandler
 from oonib import log
 from oonib.config import config
+
 
 class DeckDescHandler(OONIBHandler):
     def get(self, deckID):
@@ -32,18 +32,20 @@ class DeckDescHandler(OONIBHandler):
                 raise e.MissingDeckKeys
         self.write(response)
 
+
 class DeckListHandler(OONIBHandler):
     def get(self):
-        if not config.main.deck_dir: 
+        if not config.main.deck_dir:
             self.set_status(501)
             raise e.NoDecksConfigured
 
         path = os.path.abspath(config.main.deck_dir) + "/*"
         decknames = map(os.path.basename, glob.iglob(path))
-        decknames = filter(lambda y: re.match("[a-z0-9]{64}.desc", y), decknames)
+        decknames = filter(lambda y: re.match("[a-z0-9]{64}.desc", y),
+                           decknames)
         deckList = []
         for deckname in decknames:
-            with open(os.path.join(config.main.deck_dir, deckname)) as f: 
+            with open(os.path.join(config.main.deck_dir, deckname)) as f:
                 d = yaml.safe_load(f)
                 deckList.append({
                     'id': deckname,

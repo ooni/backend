@@ -19,8 +19,8 @@ from twisted.python.logfile import DailyLogFile
 from oonib import otime
 from oonib.config import config
 
-## Get rid of the annoying "No route found for
-## IPv6 destination warnings":
+# Get rid of the annoying "No route found for
+# IPv6 destination warnings":
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 class LogWithNoPrefix(txlog.FileLogObserver):
@@ -59,7 +59,7 @@ def msg(msg, *arg, **kw):
     print "%s" % msg
 
 def debug(msg, *arg, **kw):
-    if config.main.debug:
+    if config.main.get('debug'):
         print "[D] %s" % msg
 
 def warn(msg, *arg, **kw):
@@ -91,4 +91,3 @@ class LoggerFactory(object):
 
     def stop(self):
         txlog.msg("Stopping OONIB")
-

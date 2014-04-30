@@ -2,16 +2,15 @@ import json
 import random
 import string
 
-from twisted.application import internet, service
-from twisted.internet import protocol, reactor, defer
-from twisted.protocols import basic
-from twisted.web import resource, server, static, http
-from twisted.web.microdom import escape
+from twisted.internet import protocol, defer
 
 from cyclone.web import RequestHandler, Application
 
 from twisted.protocols import policies, basic
 from twisted.web.http import Request
+
+from oonib import log
+
 
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
     """
@@ -85,7 +84,8 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
                 headers_dict[k] = []
             headers_dict[k].append(v)
 
-        response = {'request_headers': self.headers,
+        response = {
+            'request_headers': self.headers,
             'request_line': self.requestLine,
             'headers_dict': headers_dict
         }
@@ -97,8 +97,10 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
 
 class HTTPReturnJSONHeadersHelper(protocol.ServerFactory):
     protocol = SimpleHTTPChannel
+
     def buildProtocol(self, addr):
         return self.protocol()
+
 
 class HTTPTrapAll(RequestHandler):
     def _execute(self, transforms, *args, **kwargs):
@@ -149,4 +151,3 @@ HTTPRandomPageHelper = Application([
     # XXX add regexps here
     (r"/(.*)/(.*)", HTTPRandomPage)
 ])
-

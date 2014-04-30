@@ -1,11 +1,12 @@
 import glob
-import json
 import os
 import yaml
 
 from oonib.handlers import OONIBHandler
 from oonib import log
+from oonib import errors as e
 from oonib.config import config
+
 
 class InputDescHandler(OONIBHandler):
     def get(self, inputID):
@@ -13,25 +14,21 @@ class InputDescHandler(OONIBHandler):
         try:
             f = open(os.path.join(config.main.input_dir, bn))
         except IOError:
-            log.err("No Input Descriptor found for id %s" % inputID) 
-            self.set_status(404)
-            self.write({'error': 'missing-input'})
-            return
+            log.err("No Input Descriptor found for id %s" % inputID)
+            raise e.InputDescriptorNotFound
         with f:
             inputDesc = yaml.safe_load(f)
- 
+
         response = {'id': inputID}
         for k in ['name', 'description', 'version', 'author', 'date']:
             try:
                 response[k] = inputDesc[k]
-            except Exception, e: # XXX this should probably be KeyError
-                log.exception(e)
-                log.err("Invalid Input Descriptor found for id %s" % inputID) 
-                self.set_status(500)
-                self.write({'error': 'invalid-input-descriptor'})
-                return
+            except KeyError:
+                log.err("Invalid Input Descriptor found for id %s" % inputID)
+                raise e.InputDescriptorNotFound
 
         self.write(response)
+
 
 class InputListHandler(OONIBHandler):
     def get(self):
