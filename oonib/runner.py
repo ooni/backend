@@ -1,7 +1,3 @@
-# -*- encoding: utf-8 -*-
-#
-# :authors: Arturo Filastò, Isis Lovecruft
-# :licence: see LICENSE for details
 """
 In here we define a runner for the oonib backend system.
 """
@@ -13,14 +9,12 @@ import os
 
 from shutil import rmtree
 
-from twisted.internet import reactor
-from twisted.application import service, internet, app
+from twisted.internet import reactor, endpoints
 from twisted.python.runtime import platformType
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
 
-from oonib.report.api import reportAPI
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
 
@@ -28,15 +22,16 @@ from oonib import oonibackend
 from oonib import log
 
 from txtorcon import __version__ as txtorcon_version
-if tuple(map(int, txtorcon_version.split('.'))) < (0,9,0):
+if tuple(map(int, txtorcon_version.split('.'))) < (0, 9, 0):
     """
     Fix for bug in txtorcon versions < 0.9.0 where TCPHiddenServiceEndpoint
     listens on all interfaces by default.
     """
     def create_listener(self, proto):
         self._update_onion(self.hiddenservice.dir)
-        self.tcp_endpoint = TCP4ServerEndpoint(self.reactor, self.listen_port, # XXX missing import -- has this code ever been tested?
-                interface='127.0.0.1')
+        self.tcp_endpoint = endpoints.TCP4ServerEndpoint(self.reactor,
+                                                         self.listen_port,
+                                                         interface='127.0.0.1')
         d = self.tcp_endpoint.listen(self.protocolfactory)
         d.addCallback(self._add_attributes).addErrback(self._retry_local_port)
         return d
@@ -64,13 +59,17 @@ else:
 
         def setupHSEndpoint(self, tor_process_protocol, torconfig, endpoint):
             endpointName = endpoint.settings['name']
+
             def setup_complete(port):
-                print("Exposed %s Tor hidden service on httpo://%s" % (endpointName,
-                    port.onion_uri))
+                print("Exposed %s Tor hidden service "
+                      "on httpo://%s" % (endpointName, port.onion_uri))
 
             public_port = 80
-            hs_endpoint = TCPHiddenServiceEndpoint(reactor, torconfig, public_port,
-                    data_dir=os.path.join(torconfig.DataDirectory, endpointName))
+            data_dir = os.path.join(torconfig.DataDirectory, endpointName)
+            hs_endpoint = TCPHiddenServiceEndpoint(reactor,
+                                                   torconfig,
+                                                   public_port,
+                                                   data_dir=data_dir)
             d = hs_endpoint.listen(endpoint)
             d.addCallback(setup_complete)
             d.addErrback(self.txSetupFailed)

@@ -93,10 +93,11 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
                 headers_dict[k] = []
             headers_dict[k].append(v)
 
-        response = {'request_headers': self.headers,
-                    'request_line': self.requestLine,
-                    'headers_dict': headers_dict
-                    }
+        response = {
+            'request_headers': self.headers,
+            'request_line': self.requestLine,
+            'headers_dict': headers_dict
+        }
         json_response = json.dumps(response)
         self.transport.write('HTTP/1.1 200 OK\r\n\r\n')
         self.transport.write('%s' % json_response)

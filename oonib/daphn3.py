@@ -96,7 +96,7 @@ def daphn3Mutate(steps, step_idx, mutation_idx):
         if idx == step_idx:
             step_string = step.values()[0]
             step_key = step.keys()[0]
-            mutated_string = daphn3MutateString(step_string, 
+            mutated_string = daphn3MutateString(step_string,
                     mutation_idx)
             mutated_steps.append({step_key: mutated_string})
         else:
@@ -121,7 +121,7 @@ class Daphn3Protocol(protocol.Protocol):
     def _current_step_data(self):
         step_idx, mutation_idx = self.factory.mutation
         log.debug("Mutating %s %s" % (step_idx, mutation_idx))
-        mutated_step = daphn3Mutate(self.steps, 
+        mutated_step = daphn3Mutate(self.steps,
                 step_idx, mutation_idx)
         log.debug("Mutated packet into %s" % mutated_step)
         return mutated_step[self.current_step].values()[0]

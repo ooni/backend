@@ -1,11 +1,10 @@
-import json
-import os
 import yaml
 
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
 
 from oonib.config import config
+
 
 class Policy(object):
     nettest = None
@@ -38,9 +37,11 @@ class Policy(object):
             if not any(nt['name'] == nettest_name for nt in self.nettest):
                 raise e.InvalidNettestName
 
+
 class PolicyHandler(OONIBHandler):
     def initialize(self):
         self.policy = Policy()
+
 
 class NetTestPolicyHandler(PolicyHandler):
     def get(self):
@@ -49,10 +50,10 @@ class NetTestPolicyHandler(PolicyHandler):
         """
         self.write(self.policy.nettest)
 
+
 class InputPolicyHandler(PolicyHandler):
     def get(self):
         """
         return list of input ids
         """
         self.write(self.policy.input)
-
