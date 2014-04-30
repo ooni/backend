@@ -6,17 +6,16 @@ from oonib import __version__
 from oonib.options import OONIBOptions
 import os
 
+
 class Config(object):
-    main = None
-    helpers = None
+    main = {}
+    helpers = {}
     reports = {}
     backend_version = __version__
     opts = OONIBOptions()
 
-    def __init__(self):
-        self.opts.parseOptions()
-
     def load(self):
+        self.opts.parseOptions()
         try:
             config_file = self.opts['config']
         except KeyError:
@@ -35,7 +34,7 @@ class Config(object):
             self.helpers[name] = Storage(helper.items())
 
         self.check_paths()
-    
+
     def check_paths(self):
         def check_path(directory, complaint):
             if not (directory and os.path.isdir(directory)):
