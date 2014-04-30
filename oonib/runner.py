@@ -20,7 +20,7 @@ from twisted.python.runtime import platformType
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
 
-from oonib.report.api import reportAPI 
+from oonib.report.api import reportAPI
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
 
@@ -79,7 +79,7 @@ else:
         def startTor(self, torconfig):
             def updates(prog, tag, summary):
                 print("%d%%: %s" % (prog, summary))
-            
+
             torconfig.SocksPort = config.main.socks_port
             if config.main.tor2webmode:
                 torconfig.Tor2webMode = 1

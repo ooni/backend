@@ -13,6 +13,8 @@ from cyclone.web import RequestHandler, Application
 from twisted.protocols import policies, basic
 from twisted.web.http import Request
 
+from oonib import randomStr
+
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
     """
     This is a simplified version of twisted.web.http.HTTPChannel to overcome
@@ -140,6 +142,7 @@ class HTTPRandomPage(HTTPTrapAll):
         return data
 
     def all(self, length, keyword):
+        self.set_header('Content-Disposition', 'attachment; filename="%s.txt"' % randomStr(10))
         length = 100
         if length > 100000:
             length = 100000

@@ -7,10 +7,7 @@
 # In here we start all the test helpers that are required by ooniprobe and
 # start the report collector
 
-from twisted.application import internet
-from twisted.internet import  reactor
 from twisted.application import internet, service
-from twisted.application.service import Application
 from twisted.names import dns
 
 from cyclone import web
