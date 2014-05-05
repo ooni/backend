@@ -88,7 +88,7 @@ def msg(msg, *arg, **kw):
 
 def debug(msg, *arg, **kw):
     if config.main.get('debug'):
-        print "[D] %s" % msg
+        print "[D] %s" % log_encode(msg)
 
 
 def warn(msg, *arg, **kw):
