@@ -51,7 +51,8 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
         self.setTimeout(self.timeOut)
 
     def lineReceived(self, line):
-        if len(self.__header) >= self.maxHeaderLineLength:
+        if (len(self.__header) + len(line)) >= self.maxHeaderLineLength \
+                and not self.__first_line:
             log.err("Maximum header length reached.")
             return self.transport.loseConnection()
 
