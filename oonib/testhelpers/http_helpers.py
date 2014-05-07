@@ -9,7 +9,7 @@ from cyclone.web import RequestHandler, Application
 from twisted.protocols import policies, basic
 from twisted.web.http import Request
 
-from oonib import log
+from oonib import log, randomStr
 
 
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
