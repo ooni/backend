@@ -8,7 +8,8 @@ __version__ = '1.0.0'
 __all__ = ['Storage', 'randomStr']
 
 import string
-import random
+from random import SystemRandom
+random = SystemRandom()
 
 
 class Storage(dict):
