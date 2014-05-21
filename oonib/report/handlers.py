@@ -16,11 +16,14 @@ from oonib.config import config
 
 
 def report_file_name(report_details):
-    timestamp = otime.timestamp(datetime.fromtimestamp(report_details['start_time']))
+    timestamp = otime.timestamp(
+        datetime.fromtimestamp(
+            report_details['start_time']))
     dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
-                timestamp=timestamp,
-                **report_details)
+        timestamp=timestamp,
+        **report_details)
     return dst_filename
+
 
 class Report(object):
     delayed_call = None
@@ -75,8 +78,10 @@ class Report(object):
         dst_path = os.path.join(dst_path, dst_filename)
         os.rename(report_filename, dst_path)
 
-        self.delayed_call.cancel()
+        if not self.delayed_call.called:
+            self.delayed_call.cancel()
         del self.reports[self.report_id]
+
 
 def parseUpdateReportRequest(request):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
@@ -100,6 +105,7 @@ def parseUpdateReportRequest(request):
 
     return parsed_request
 
+
 def parseNewReportRequest(request):
     """
     Here we parse a new report request.
@@ -110,11 +116,11 @@ def parseNewReportRequest(request):
     test_helper = re.compile("[A-Za-z0-9_\-]+$")
 
     expected_request = {
-     'software_name': name,
-     'software_version': version_string,
-     'test_name': name,
-     'test_version': version_string,
-     'probe_asn': probe_asn
+        'software_name': name,
+        'software_version': version_string,
+        'test_name': name,
+        'test_version': version_string,
+        'probe_asn': probe_asn
     }
 
     parsed_request = json.loads(request)
@@ -142,9 +148,10 @@ def parseNewReportRequest(request):
 
     return parsed_request
 
+
 def validate_report_header(report_header):
     required_keys = ['probe_asn', 'probe_cc', 'probe_ip', 'software_name',
-            'software_version', 'test_name', 'test_version']
+                     'software_version', 'test_name', 'test_version']
     for key in required_keys:
         if key not in report_header:
             raise e.MissingReportHeaderKey(key)
@@ -165,13 +172,14 @@ def validate_report_header(report_header):
     if not re.match('[a-z_\-]+$', report_header['test_name']):
         raise e.InvalidReportHeader('test_name')
 
-
     if not re.match('([0-9]+\.)+[0-9]+$', report_header['test_version']):
         raise e.InvalidReportHeader('test_version')
 
     return report_header
 
+
 class ReportHandler(OONIBHandler):
+
     def initialize(self):
         self.archive_dir = config.main.archive_dir
         self.report_dir = config.main.report_dir
@@ -180,12 +188,14 @@ class ReportHandler(OONIBHandler):
         self.helpers = config.helpers
         self.stale_time = config.main.stale_time
 
+
 class UpdateReportMixin(object):
+
     def updateReport(self, report_id, parsed_request):
 
         log.debug("Got this request %s" % parsed_request)
         report_filename = os.path.join(self.report_dir,
-                report_id)
+                                       report_id)
 
         self.reports[report_id].refresh()
 
@@ -196,7 +206,9 @@ class UpdateReportMixin(object):
             e.OONIBError(404, "Report not found")
         self.write({'status': 'success'})
 
+
 class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
+
     """
     Responsible for creating and updating reports by writing to flat file.
     """
@@ -293,8 +305,8 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             probe_asn = "AS0"
 
         report_id = otime.timestamp() + '_' \
-                + probe_asn + '_' \
-                + randomStr(50)
+            + probe_asn + '_' \
+            + randomStr(50)
 
         # The report filename contains the timestamp of the report plus a
         # random nonce
@@ -309,7 +321,8 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
 
         if requested_helper:
             try:
-                response['test_helper_address'] = self.helpers[requested_helper].address
+                response['test_helper_address'] = self.helpers[
+                    requested_helper].address
             except KeyError:
                 raise e.TestHelperNotFound
 
@@ -342,7 +355,9 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
 
         self.updateReport(report_id, parsed_request)
 
+
 class UpdateReportHandlerFile(ReportHandler, UpdateReportMixin):
+
     def post(self, report_id):
         try:
             parsed_request = json.loads(self.request.body)
@@ -350,7 +365,9 @@ class UpdateReportHandlerFile(ReportHandler, UpdateReportMixin):
             raise e.InvalidRequest
         self.updateReport(report_id, parsed_request)
 
+
 class CloseReportHandlerFile(ReportHandler):
+
     def get(self):
         pass
 
@@ -360,7 +377,9 @@ class CloseReportHandlerFile(ReportHandler):
         else:
             raise e.ReportNotFound
 
+
 class PCAPReportHandler(ReportHandler):
+
     def get(self):
         pass
 
