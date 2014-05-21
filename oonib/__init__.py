@@ -3,12 +3,13 @@ In here we shall keep track of all variables and objects that should be
 instantiated only once and be common to pieces of GLBackend code.
 """
 
-__version__ = '1.0.0-rc6'
+__version__ = '1.0.0'
 
 __all__ = ['Storage', 'randomStr']
 
 import string
 import random
+
 
 class Storage(dict):
     """
@@ -36,7 +37,7 @@ class Storage(dict):
         try:
             del self[key]
         except KeyError, k:
-            raise AttributeError, k
+            raise AttributeError(k)
 
     def __repr__(self):
         return '<Storage ' + dict.__repr__(self) + '>'
@@ -46,6 +47,7 @@ class Storage(dict):
 
     def __setstate__(self, value):
         self.update(value.items())
+
 
 def randomStr(length, num=True):
     """
