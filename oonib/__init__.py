@@ -3,7 +3,7 @@ In here we shall keep track of all variables and objects that should be
 instantiated only once and be common to pieces of GLBackend code.
 """
 
-__version__ = '1.0.0'
+__version__ = '1.0.2'
 
 __all__ = ['Storage', 'randomStr']
 
