@@ -19,10 +19,10 @@ https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz.asc
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz"
 
-if [ command -v shasum ]; then
+if [ `command -v shasum` ]; then
   SHA256SUM='shasum -a 256'
 fi
-if [ command -v sha256sum ]; then
+if [ `command -v sha256sum` ]; then
   SHA256SUM='sha256sum'
 fi
 if [ ! $SHA256SUM ]; then
