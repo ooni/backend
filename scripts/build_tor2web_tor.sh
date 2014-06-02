@@ -19,6 +19,17 @@ https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz.asc
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz"
 
+if [ command -v shasum ]; then
+  SHA256SUM='shasum -a 256'
+fi
+if [ command -v sha256sum ]; then
+  SHA256SUM='sha256sum'
+fi
+if [ ! $SHA256SUM ]; then
+  echo "Could not find a suitable command for computing sha256 hash!";
+  exit;
+fi
+
 # get key for nickm (libevent)
 gpg --fingerprint 0xb35bf85bf19489d04e28c33c21194ebb165733ea
 if [ $? -ne 0 ]; then 
@@ -70,7 +81,7 @@ cd libevent-$LIBEVENT_VERSION
 
 # set up zlib
 cd $SCRIPT_ROOT
-echo "$ZLIB_SHA256  zlib-$ZLIB_VERSION.tar.gz" | shasum -a 256 -c
+echo "$ZLIB_SHA256  zlib-$ZLIB_VERSION.tar.gz" | $SHA256SUM -c
 if [ $? -ne 0 ]; then exit ;fi
 
 tar xfz zlib-$ZLIB_VERSION.tar.gz
