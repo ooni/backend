@@ -52,6 +52,12 @@ helpers:
         tcp_port: 57005
         resolver_address: '8.8.8.8:53'
 
+    dns_discovery:
+        address: null
+        udp_port: 53
+        tcp_port: 53
+        resolver_address: null
+
     ssl:
         address: null
         private_key: 'private.key'
