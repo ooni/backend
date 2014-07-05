@@ -87,6 +87,7 @@ class TestReport(HandlerTestCase):
         response_body = json.loads(response.body)
         self.assertIn('backend_version', response_body)
         self.assertIn('report_id', response_body)
+        self.filenames.add(response_body['report_id'])
 
     @defer.inlineCallbacks
     def test_create_invalid_report(self):
@@ -121,6 +122,7 @@ class TestReport(HandlerTestCase):
         response_body = json.loads(response.body)
 
         with open(report_id) as f:
+            self.filenames.add(report_id)
             written_report = yaml.safe_load_all(f)
 
             written_report_header = written_report.next()
@@ -165,9 +167,12 @@ class TestReport(HandlerTestCase):
         written_report_path = os.path.join(written_report_header['probe_cc'],
                                            report_file_name(written_report_header))
         with open(written_report_path) as f:
+            self.filenames.add(written_report_path)
             written_report = yaml.safe_load_all(f)
             written_report.next()
 
             for i in range(report_entry_count):
                 self.assertEqual(yaml.safe_load(sample_report_entry),
                                  written_report.next())
+
+        self.directories.add('ZZ')

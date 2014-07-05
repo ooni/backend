@@ -1,5 +1,7 @@
+import os
 import socket
 import json
+import shutil
 
 from twisted.internet import reactor, defer
 from twisted.trial import unittest
@@ -38,11 +40,17 @@ class HandlerTestCase(unittest.TestCase):
         return self._port
 
     def setUp(self, *args, **kw):
+        self.filenames = set()
+        self.directories = set()
         if self.app:
             self._listener = reactor.listenTCP(self.port, self.app)
         return unittest.TestCase.setUp(self, *args, **kw)
 
     def tearDown(self):
+        for filename in self.filenames:
+            os.remove(filename)
+        for dir in self.directories:
+            shutil.rmtree(dir)
         if self._listener:
             for report in reports.values():
                 try:
