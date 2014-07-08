@@ -9,8 +9,10 @@ from oonib import log
 class OONIBHandler(web.RequestHandler):
     def write_error(self, status_code, exception=None, **kw):
         self.set_status(status_code)
-        if hasattr(exception, 'log_message'):
+        if hasattr(exception, 'log_message') and exception.log_message is not None:
             self.write({'error': exception.log_message})
+        elif 400 <= status_code < 600:
+            self.write({'error': status_code})
         else:
             log.error(exception)
             self.write({'error': 'error'})

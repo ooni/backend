@@ -1,5 +1,6 @@
 from cyclone import web
 
+from oonib.main.api import mainAPI
 from oonib.deck.api import deckAPI
 from oonib.report.api import reportAPI
 from oonib.input.api import inputAPI
@@ -24,4 +25,5 @@ if config.main.policy_file:
 if config.main.bouncer_file:
     ooniBouncer = web.Application(bouncerAPI, debug=True, name='bouncer')
 
+ooniBackendAPI += mainAPI
 ooniBackend = web.Application(ooniBackendAPI, debug=True, name='collector')
