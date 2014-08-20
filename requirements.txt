@@ -27,3 +27,4 @@ zope.interface>=4.0.1
 ## in-memory database, which in some cases may slow the server.
 ##
 pysqlite>=2.6.0
+service-identity
