@@ -1,3 +1,18 @@
 collector:
   httpo://ihiderha53f36lsd.onion:
-      test-helper: {dns: '93.95.227.200:57004', http-return-json-headers: 'http://93.95.227.200', ssl: 'https://93.95.227.20', tcp-echo: '213.138.109.232', traceroute: '93.95.227.200'}
+    policy:
+      input:
+      - {id: 37e60e13536f6afe47a830bfb6b371b5cf65da66d7ad65137344679b24fdccd1}
+      - {id: e0611ecd28bead38a7afeb4dda8ae3449d0fc2e1ba53fa7355f2799dce9af290}
+      nettest:
+      - {name: dns_consistency, version: '0.5'}
+      - {name: http_requests_test, version: 0.2.3}
+      - {name: tcp_connect, version: '0.1'}
+      - {name: captivep, version: '0.2'}
+      - {name: daphn3, version: '0.1'}
+      - {name: dns_spoof, version: '0.2'}
+      - {name: http_header_field_manipulation, version: 0.1.3}
+      - {name: http_invalid_request_line, version: 0.1.4}
+      - {name: multiprotocol_traceroute_test, version: 0.1.1}
+    test-helper: {dns: '93.95.227.200:57004', http-return-json-headers: 'http://93.95.227.200',
+      ssl: 'https://93.95.227.20', tcp-echo: 213.138.109.232, traceroute: 93.95.227.200}
