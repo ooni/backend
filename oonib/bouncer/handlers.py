@@ -7,24 +7,30 @@ from oonib.config import config
 
 
 class Bouncer(object):
-    def __init__(self):
-        with open(config.main.bouncer_file) as f:
-            bouncerFile = yaml.safe_load(f)
-        self.updateKnownHelpers(bouncerFile)
-        self.updateKnownCollectors(bouncerFile)
 
-    def updateKnownCollectors(self, bouncerFile):
+    def __init__(self, bouncer_file):
+        with open(bouncer_file) as f:
+            self.bouncerFile = yaml.safe_load(f)
+        self.updateKnownHelpers()
+        self.updateKnownCollectors()
+
+    def updateKnownCollectors(self):
         """
         Initialize the list of all known collectors
         """
-        self.knownCollectors = []
-        for collectorName, helpers in bouncerFile['collector'].items():
-            if collectorName not in self.knownCollectors:
-                self.knownCollectors.append(collectorName)
+        self.knownCollectorsWithPolicy = []
+        self.knownCollectorsWithoutPolicy = []
+        for collectorName, content in self.bouncerFile['collector'].items():
+            if content.get('policy') is not None and \
+                    collectorName not in self.knownCollectorsWithPolicy:
+                self.knownCollectorsWithPolicy.append(collectorName)
+            elif content.get('policy') is None and \
+                    collectorName not in self.knownCollectorsWithoutPolicy:
+                self.knownCollectorsWithoutPolicy.append(collectorName)
 
-    def updateKnownHelpers(self, bouncerFile):
+    def updateKnownHelpers(self):
         self.knownHelpers = {}
-        for collectorName, helpers in bouncerFile['collector'].items():
+        for collectorName, helpers in self.bouncerFile['collector'].items():
             for helperName, helperAddress in helpers['test-helper'].items():
                 if helperName not in self.knownHelpers.keys():
                     self.knownHelpers[helperName] = []
@@ -106,14 +112,63 @@ class Bouncer(object):
                 response = {'error': 'test-helper-not-found'}
                 return response
 
-        response['default'] = {'collector':
-                               random.choice(self.knownCollectors)}
+        if len(self.knownCollectorsWithoutPolicy) > 0:
+            default_collector = random.choice(
+                self.knownCollectorsWithoutPolicy)
+        else:
+            default_collector = None
+        response['default'] = {'collector': default_collector}
         return response
+
+    def collectorAccepting(self, net_test_name, input_hashes, test_helpers):
+        for collector_address in self.knownCollectorsWithPolicy:
+            collector = self.bouncerFile['collector'][collector_address]
+            supported_net_tests = [x['name'] for x in collector['policy']['nettest']]
+            supported_input_hashes = [x['id'] for x in collector['policy']['input']]
+            if net_test_name not in supported_net_tests:
+                continue
+            if any([input_hash not in supported_input_hashes for input_hash in input_hashes]):
+                continue
+            if all([x in collector['test-helper'].keys() for x in test_helpers]):
+                return collector_address
+        if len(self.knownCollectorsWithoutPolicy) > 0:
+            return random.choice(self.knownCollectorsWithoutPolicy)
+        else:
+            raise e.CollectorNotFound
+
+    def filterByNetTests(self, requested_nettests):
+        """
+        Here we will return a list containing test helpers and collectors for
+        the required nettests.
+        We give favour to the collectors that have a stricter policy and if
+        those fail we will resort to using the collectors with a more lax
+        policy.
+        """
+        nettests = []
+        for requested_nettest in requested_nettests:
+            collector = self.collectorAccepting(
+                requested_nettest['name'],
+                requested_nettest['input-hashes'],
+                requested_nettest['test-helpers'])
+            test_helpers = {}
+            for test_helper in requested_nettest['test-helpers']:
+                test_helpers[test_helper] = self.bouncerFile['collector'][collector]['test-helper'][test_helper]
+
+            nettest = {
+                'name': requested_nettest['name'],
+                'version': requested_nettest['version'],
+                'input-hashes': requested_nettest['input-hashes'],
+                'test-helpers': test_helpers,
+                'collector': collector,
+            }
+            nettests.append(nettest)
+        return {'net-tests': nettests}
 
 
 class BouncerQueryHandler(OONIBHandler):
+
     def initialize(self):
-        self.bouncer = Bouncer()
+        self.bouncer = Bouncer(config.main.bouncer_file)
 
     def post(self):
         try:
@@ -121,13 +176,16 @@ class BouncerQueryHandler(OONIBHandler):
         except ValueError:
             raise e.InvalidRequest
 
-        try:
+        if 'test-helpers' in query:
             requested_helpers = query['test-helpers']
-        except KeyError:
-            raise e.TestHelpersKeyMissing
+            if not isinstance(requested_helpers, list):
+                raise e.InvalidRequest
+            response = self.bouncer.filterHelperAddresses(requested_helpers)
 
-        if not isinstance(requested_helpers, list):
-            raise e.InvalidRequest
+        elif 'net-tests' in query:
+            response = self.bouncer.filterByNetTests(query['net-tests'])
 
-        response = self.bouncer.filterHelperAddresses(requested_helpers)
+        else:
+            raise e.TestHelpersOrNetTestsKeyMissing
+
         self.write(response)
