@@ -8,7 +8,7 @@ collector:
       - {name: dns_consistency, version: '0.5'}
       - {name: http_requests_test, version: 0.2.3}
       - {name: tcp_connect, version: '0.1'}
-      - {name: captivep, version: '0.2'}
+      - {name: captiveportal, version: '0.2'}
       - {name: daphn3, version: '0.1'}
       - {name: dns_spoof, version: '0.2'}
       - {name: http_header_field_manipulation, version: 0.1.3}

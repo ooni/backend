@@ -1,3 +1,4 @@
+import sys
 import os
 import socket
 import json
@@ -5,6 +6,8 @@ import shutil
 
 from twisted.internet import reactor, defer
 from twisted.trial import unittest
+
+from oonib.config import config
 
 from cyclone import httpclient
 
@@ -32,6 +35,7 @@ class HandlerTestCase(unittest.TestCase):
     app = None
     _port = None
     _listener = None
+    config_filename = ''
 
     @property
     def port(self):
@@ -39,16 +43,27 @@ class HandlerTestCase(unittest.TestCase):
             self._port = random_unused_port()
         return self._port
 
+    def make_dir(self, dir):
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+            self.directories.add(dir)
+
     def setUp(self, *args, **kw):
         self.filenames = set()
         self.directories = set()
+        self.old_arguments = sys.argv
+        if self.config_filename != '':
+            sys.argv = ['test_oonib', '-c', self.config_filename]
+            config.load()
         if self.app:
             self._listener = reactor.listenTCP(self.port, self.app)
-        return unittest.TestCase.setUp(self, *args, **kw)
+        return super(HandlerTestCase, self).setUp()
 
     def tearDown(self):
+        sys.argv = self.old_arguments
         for filename in self.filenames:
-            os.remove(filename)
+            if os.path.exists(filename):
+                os.remove(filename)
         for dir in self.directories:
             shutil.rmtree(dir)
         if self._listener:
