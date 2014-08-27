@@ -4,6 +4,7 @@ In here we define a runner for the oonib backend system.
 
 from __future__ import print_function
 
+from distutils.version import LooseVersion
 import tempfile
 import os
 
@@ -14,6 +15,7 @@ from twisted.python.runtime import platformType
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
+from txtorcon import __version__ as txtorcon_version
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
@@ -66,10 +68,16 @@ else:
 
             public_port = 80
             data_dir = os.path.join(torconfig.DataDirectory, endpointName)
-            hs_endpoint = TCPHiddenServiceEndpoint(reactor,
-                                                   torconfig,
-                                                   public_port,
-                                                   data_dir=data_dir)
+            if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
+                hs_endpoint = TCPHiddenServiceEndpoint(reactor,
+                                                       torconfig,
+                                                       public_port,
+                                                       hidden_service_dir=data_dir)
+            else:
+                hs_endpoint = TCPHiddenServiceEndpoint(reactor,
+                                                       torconfig,
+                                                       public_port,
+                                                       data_dir=data_dir)
             d = hs_endpoint.listen(endpoint)
             d.addCallback(setup_complete)
             d.addErrback(self.txSetupFailed)
