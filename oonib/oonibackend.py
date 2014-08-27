@@ -7,6 +7,8 @@
 # In here we start all the test helpers that are required by ooniprobe and
 # start the report collector
 
+from distutils.version import LooseVersion
+
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
 from oonib.onion import startTor
@@ -20,6 +22,7 @@ from twisted.internet import reactor
 from twisted.names import dns
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
+from txtorcon import __version__ as txtorcon_version
 
 if config.main.uid and config.main.gid:
     application = service.Application('oonibackend', uid=config.main.uid,
@@ -89,17 +92,24 @@ if config.helpers['http-return-json-headers'].port:
         http_helpers.HTTPReturnJSONHeadersHelper())
 multiService.addService(http_return_request_helper)
 
+
 # add the tor collector service here
 if config.main.tor_hidden_service:
     torconfig = TorConfig()
     d = startTor(torconfig)
 
+    def getHSEndpoint(data_dir):
+        if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
+            return TCPHiddenServiceEndpoint(reactor,
+                torconfig, 80, hidden_service_dir=data_dir)
+        else:
+            return TCPHiddenServiceEndpoint(reactor,
+                torconfig, 80, data_dir=data_dir)
+
     def addCollector(torControlProtocol):
         data_dir = os.path.join(torconfig.DataDirectory, 'collector')
         collector_service = internet.StreamServerEndpointService(
-                TCPHiddenServiceEndpoint(reactor,
-                    torconfig, 80,
-                    hidden_service_dir=data_dir),
+                getHSEndpoint(data_dir),
                 ooniBackend)
         multiService.addService(collector_service)
         collector_service.startService()
@@ -110,11 +120,8 @@ if config.main.tor_hidden_service:
     if ooniBouncer:
         def addBouncer(torControlProtocol):
             data_dir = os.path.join(torconfig.DataDirectory, 'bouncer')
-
             bouncer_service = internet.StreamServerEndpointService(
-                    TCPHiddenServiceEndpoint(reactor,
-                        torconfig, 80,
-                        hidden_service_dir=data_dir),
+                    getHSEndpoint(data_dir),
                     ooniBouncer)
             multiService.addService(bouncer_service)
             bouncer_service.startService()
