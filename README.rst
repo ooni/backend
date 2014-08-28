@@ -4,7 +4,7 @@ oonibackend: backend infrastructure for ooniprobe
 .. image:: https://travis-ci.org/TheTorProject/ooni-backend.png?branch=master
     :target: https://travis-ci.org/TheTorProject/ooni-backend
 
-.. image:: https://coveralls.io/repos/TheTorProject/ooni-backend/badge.png
+.. image:: https://coveralls.io/repos/TheTorProject/ooni-backend/badge.png?branch=master
     :target: https://coveralls.io/r/TheTorProject/ooni-backend
 
 oonibackend is used by ooniprobe to discover the addresses of test helpers (via
