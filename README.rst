@@ -20,7 +20,7 @@ Dependencies and Installation
 =============================
 
 Distro dependencies (Debian)
-------------------=---------
+----------------------------
 
 There are a few dependencies which we recommend you get from your
 distribution's archives::
