@@ -63,8 +63,12 @@ else:
             endpointName = endpoint.settings['name']
 
             def setup_complete(port):
+                if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
+                    onion_uri = port.address.onion_uri
+                else:
+                    onion_uri = port.onion_uri
                 print("Exposed %s Tor hidden service "
-                      "on httpo://%s" % (endpointName, port.onion_uri))
+                      "on httpo://%s" % (endpointName, onion_uri))
 
             public_port = 80
             data_dir = os.path.join(torconfig.DataDirectory, endpointName)
