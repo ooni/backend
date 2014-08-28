@@ -25,7 +25,8 @@ python:
   - "2.7"
   - "2.6"
 install:
-  - pip install -r .requirements.travis --use-mirrors
+  - pip install -r .requirements.txt --use-mirrors
+  - pip install coveralls
   - python setup.py install
 # command to run tests, e.g. python setup.py test
 script:
@@ -39,3 +40,6 @@ script:
   - test -f "server.csr" && rm -f server.csr
   - chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
   - echo "Build successful."
+  - $(which coverage) run $(which trial) oonib
+after_success:
+  - pip install coveralls
