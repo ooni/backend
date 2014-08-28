@@ -7,6 +7,15 @@ oonibackend: backend infrastructure for ooniprobe
 .. image:: https://coveralls.io/repos/TheTorProject/ooni-backend/badge.png
     :target: https://coveralls.io/r/TheTorProject/ooni-backend
 
+oonibackend is used by ooniprobe to discover the addresses of test helpers (via
+the bouncer) to submit reports to (via the collector) and to perform some
+measurements that require a backend system to talk to (via test helpers).
+
+If you are interested in supporting the OONI project by running this backend
+infrastructure follow this guide and then inform OONI developers of the address
+of your collector and test helper by sending an email to
+ooni-talk@lists.torproject.org.
+
 Dependencies and Installation
 =============================
 
