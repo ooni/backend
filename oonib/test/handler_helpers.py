@@ -45,12 +45,16 @@ class HandlerTestCase(unittest.TestCase):
 
     def make_dir(self, dir):
         if not os.path.exists(dir):
-            os.mkdir(dir)
-            self.directories.add(dir)
+            os.makedirs(dir)
+            try:
+                self.directories.add(dir)
+            except AttributeError:
+                self.directories = set([dir])
 
     def setUp(self, *args, **kw):
         self.filenames = set()
-        self.directories = set()
+        if 'directories' not in dir(self):
+            self.directories = set()
         self.old_arguments = sys.argv
         if self.config_filename != '':
             sys.argv = ['test_oonib', '-c', self.config_filename]
