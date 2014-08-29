@@ -125,7 +125,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('error', response_body)
@@ -133,6 +133,35 @@ class TestBouncer(BaseTestBouncer):
 
     @defer.inlineCallbacks
     def test_net_tests(self):
+        data = {
+            'net-tests': [
+                {
+                    "test-helpers": [],
+                    "input-hashes": [],
+                    "name": 'fake_nettest',
+                    "version": '1.0',
+                },
+            ]
+        }
+
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
+        response_body = json.loads(response.body)
+
+        self.assertIn('net-tests', response_body)
+        self.assertEqual(len(response_body['net-tests']), 1)
+        self.assertIn('name', response_body['net-tests'][0])
+        self.assertEqual(response_body['net-tests'][0]['name'], 'fake_nettest')
+        self.assertIn('version', response_body['net-tests'][0])
+        self.assertEqual(response_body['net-tests'][0]['version'], '1.0')
+        self.assertIn('input-hashes', response_body['net-tests'][0])
+        self.assertEqual(len(response_body['net-tests'][0]['input-hashes']), 0)
+        self.assertIn('test-helpers', response_body['net-tests'][0])
+        self.assertEqual(len(response_body['net-tests'][0]['test-helpers']), 0)
+        self.assertIn('collector', response_body['net-tests'][0])
+        self.assertEqual(response_body['net-tests'][0]['collector'], 'fake_address')
+
+    @defer.inlineCallbacks
+    def test_backward_compatibility(self):
         data = {
             'net-tests': [
                 {
@@ -179,7 +208,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('net-tests', response_body)
@@ -202,7 +231,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('error', response_body)
@@ -221,7 +250,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('net-tests', response_body)
@@ -245,7 +274,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('error', response_body)
@@ -264,7 +293,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('net-tests', response_body)
@@ -288,7 +317,7 @@ class TestBouncer(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('error', response_body)
@@ -328,7 +357,7 @@ class TestDefaultCollector(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('net-tests', response_body)
@@ -366,7 +395,7 @@ class TestMultipleCollectors(BaseTestBouncer):
             ]
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('net-tests', response_body)
@@ -396,7 +425,7 @@ class TestHelperTests(BaseTestBouncer):
         data = {
             'test-helpers': ['invalid_test_helper']
         }
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/test-helpers', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertIn('error', response_body)
@@ -404,6 +433,26 @@ class TestHelperTests(BaseTestBouncer):
 
     @defer.inlineCallbacks
     def test_multiple_collectors(self):
+        data = {
+            'test-helpers': ['fake_test_helper']
+        }
+
+        response = yield self.request('/bouncer/test-helpers', 'POST', data)
+        response_body = json.loads(response.body)
+
+        self.assertEqual(len(response_body), 2)
+        self.assertIn('fake_test_helper', response_body)
+        self.assertIn('collector', response_body['fake_test_helper'])
+        self.assertIn(response_body['fake_test_helper']['collector'], ['fake_addressA', 'fake_addressB'])
+        self.assertIn('address', response_body['fake_test_helper'])
+        self.assertEqual('fake_hostname', response_body['fake_test_helper']['address'])
+
+        self.assertIn('default', response_body)
+        self.assertIn('collector', response_body['default'])
+        self.assertEqual('fake_addressB', response_body['default']['collector'])
+
+    @defer.inlineCallbacks
+    def test_backward_compatibility(self):
         data = {
             'test-helpers': ['fake_test_helper']
         }
@@ -428,7 +477,7 @@ class TestHelperTests(BaseTestBouncer):
             'test-helpers': ['fake_test_helper', 'exotic_test_helper']
         }
 
-        response = yield self.request('/bouncer', 'POST', data)
+        response = yield self.request('/bouncer/test-helpers', 'POST', data)
         response_body = json.loads(response.body)
 
         self.assertEqual(len(response_body), 3)
