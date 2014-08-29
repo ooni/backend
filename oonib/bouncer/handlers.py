@@ -165,27 +165,49 @@ class Bouncer(object):
         return {'net-tests': nettests}
 
 
-class BouncerQueryHandler(OONIBHandler):
-
+class BouncerHandlerBase(OONIBHandler):
     def initialize(self):
         self.bouncer = Bouncer(config.main.bouncer_file)
 
-    def post(self):
-        try:
-            query = json.loads(self.request.body)
-        except ValueError:
-            raise e.InvalidRequest
+    def load_query(self):
+        if not 'query' in dir(self):
+            try:
+                self.query = json.loads(self.request.body)
+            except ValueError:
+                raise e.InvalidRequest
 
-        if 'test-helpers' in query:
-            requested_helpers = query['test-helpers']
+
+class BouncerTestHelpers(BouncerHandlerBase):
+    def post(self):
+        self.load_query()
+        if 'test-helpers' in self.query:
+            requested_helpers = self.query['test-helpers']
             if not isinstance(requested_helpers, list):
                 raise e.InvalidRequest
             response = self.bouncer.filterHelperAddresses(requested_helpers)
-
-        elif 'net-tests' in query:
-            response = self.bouncer.filterByNetTests(query['net-tests'])
-
         else:
-            raise e.TestHelpersOrNetTestsKeyMissing
+            raise e.InvalidRequest
 
         self.write(response)
+
+
+class BouncerNetTests(BouncerHandlerBase):
+    def post(self):
+        self.load_query()
+        if 'net-tests' in self.query:
+            response = self.bouncer.filterByNetTests(self.query['net-tests'])
+        else:
+            raise e.InvalidRequest
+
+        self.write(response)
+
+
+class BouncerQueryHandler(BouncerNetTests, BouncerTestHelpers):
+    def post(self):
+        self.load_query()
+        if 'test-helpers' in self.query:
+            BouncerTestHelpers.post(self)
+        elif 'net-tests' in self.query:
+            BouncerNetTests.post(self)
+        else:
+            raise e.TestHelpersOrNetTestsKeyMissing
