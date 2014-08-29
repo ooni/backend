@@ -57,6 +57,21 @@ total: false
 ...
 """
 
+sample_report_header = """---
+input_hashes: []
+options: []
+probe_asn: AS0
+probe_cc: ZZ
+probe_city: null
+probe_ip: 127.0.0.1
+software_name: ooniprobe
+software_version: 1.1.0
+start_time: 0
+test_name: fake_test
+test_version: 0.1.0
+...
+"""
+
 for _, handler in reportAPI:
     handler.initialize = mock_initialize
 
@@ -74,6 +89,7 @@ class TestReport(HandlerTestCase):
             "POST", data)
         defer.returnValue(response)
 
+
     @defer.inlineCallbacks
     def test_create_valid_report(self):
         data = {
@@ -82,6 +98,22 @@ class TestReport(HandlerTestCase):
             'test_name': 'some-test',
             'test_version': '0.1',
             'probe_asn': 'AS0'
+        }
+        response = yield self.request('/report', "POST", data)
+        response_body = json.loads(response.body)
+        self.assertIn('backend_version', response_body)
+        self.assertIn('report_id', response_body)
+        self.filenames.add(response_body['report_id'])
+
+    @defer.inlineCallbacks
+    def test_create_valid_report_with_content(self):
+        data = {
+            'software_name': 'ooni-test',
+            'software_version': '0.1',
+            'test_name': 'some-test',
+            'test_version': '0.1',
+            'probe_asn': 'AS0',
+            'content': sample_report_header
         }
         response = yield self.request('/report', "POST", data)
         response_body = json.loads(response.body)
