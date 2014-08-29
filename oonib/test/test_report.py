@@ -133,7 +133,8 @@ class TestReport(HandlerTestCase):
         response = yield self.request('/report', "POST", data)
         response_body = json.loads(response.body)
         self.assertIn('error', response_body)
-        self.assertEqual(response_body['error'], 'invalid-request-field probe_asn')
+        self.assertEqual(response_body['error'],
+                         'invalid-request-field probe_asn')
 
     @defer.inlineCallbacks
     def test_create_and_update_report(self):

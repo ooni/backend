@@ -15,7 +15,6 @@ from twisted.python.runtime import platformType
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
-from txtorcon import __version__ as txtorcon_version
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config

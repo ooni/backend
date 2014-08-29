@@ -233,7 +233,7 @@ class TestBouncer(BaseTestBouncer):
         self.assertEqual(response_body['net-tests'][0]['input-hashes'][0], 'fake_id')
 
     @defer.inlineCallbacks
-    def test_net_tests_with_input(self):
+    def test_net_tests_with_input_invalid_id(self):
         data = {
             'net-tests': [
                 {
@@ -324,7 +324,7 @@ class TestDefaultCollector(BaseTestBouncer):
                     "input-hashes": [],
                     "name": 'imaginary_nettest',
                     "version": '1.0',
-                },
+                }
             ]
         }
 
