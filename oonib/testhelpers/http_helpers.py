@@ -85,7 +85,7 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
 
         if len(self.headers) >= self.maxHeaders:
             log.err("Maximum number of headers received.")
-            return self.transport.loseConnection()
+            self.closeConnection()
 
     def allHeadersReceived(self):
         headers_dict = {}
@@ -102,6 +102,14 @@ class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
         json_response = json.dumps(response)
         self.transport.write('HTTP/1.1 200 OK\r\n\r\n')
         self.transport.write('%s' % json_response)
+
+        self.closeConnection()
+
+    def closeConnection(self):
+        if self._TimeoutMixin__timeoutCall and \
+                not self._TimeoutMixin__timeoutCall.called:
+            self._TimeoutMixin__timeoutCall.cancel()
+            self._TimeoutMixin__timeoutCall = None
         self.transport.loseConnection()
 
 
@@ -158,7 +166,7 @@ class HTTPRandomPage(HTTPTrapAll):
         length = 100
         if length > 100000:
             length = 100000
-        return self.genRandomPage(length, keyword)
+        self.write(self.genRandomPage(length, keyword))
 
 HTTPRandomPageHelper = Application([
     # XXX add regexps here

@@ -79,11 +79,12 @@ class HandlerTestCase(unittest.TestCase):
             self._listener.stopListening()
 
     @defer.inlineCallbacks
-    def request(self, path, method="GET", postdata=None):
+    def request(self, path, method="GET", postdata=None, headers={}):
         url = "http://localhost:%s%s" % (self.port, path)
         if isinstance(postdata, dict):
             postdata = json.dumps(postdata)
 
         response = yield httpclient.fetch(url, method=method,
-                                          postdata=postdata)
+                                          postdata=postdata,
+                                          headers=headers)
         defer.returnValue(response)
