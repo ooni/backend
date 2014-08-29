@@ -106,16 +106,22 @@ if config.main.tor_hidden_service:
             return TCPHiddenServiceEndpoint(reactor,
                 torconfig, 80, data_dir=data_dir)
 
+    def printOnionEndpoint(endpointService):
+        print("Exposed %s Tor hidden service on httpo://%s" %
+                (endpointService.name, endpointService.endpoint.onion_uri))
+
     def addCollector(torControlProtocol):
         data_dir = os.path.join(torconfig.DataDirectory, 'collector')
         collector_service = internet.StreamServerEndpointService(
                 getHSEndpoint(data_dir),
                 ooniBackend)
+        collector_service.setName('collector')
         multiService.addService(collector_service)
         collector_service.startService()
-        return torControlProtocol
+        return collector_service
 
     d.addCallback(addCollector)
+    d.addCallback(printOnionEndpoint)
 
     if ooniBouncer:
         def addBouncer(torControlProtocol):
@@ -123,11 +129,13 @@ if config.main.tor_hidden_service:
             bouncer_service = internet.StreamServerEndpointService(
                     getHSEndpoint(data_dir),
                     ooniBouncer)
+            bouncer_service.setName('bouncer')
             multiService.addService(bouncer_service)
             bouncer_service.startService()
-            return torControlProtocol
+            return bouncer_service
 
         d.addCallback(addBouncer)
+        d.addCallback(printOnionEndpoint)
 else:
     if ooniBouncer:
         bouncer_service = internet.TCPServer(8888, ooniBouncer, interface="127.0.0.1")
