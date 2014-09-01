@@ -7,6 +7,7 @@ collector:
       nettest:
       - {name: dns_consistency, version: '0.5'}
       - {name: http_requests_test, version: 0.2.3}
+      - {name: http_requests, version: 0.2.3}
       - {name: tcp_connect, version: '0.1'}
       - {name: captiveportal, version: '0.2'}
       - {name: daphn3, version: '0.1'}
