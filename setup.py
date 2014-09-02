@@ -84,6 +84,7 @@ setup(
     name="oonibackend",
     version=__version__,
     author="The Tor Project, Inc",
+    author_email="ooni-dev@torproject.org",
     url="https://ooni.torproject.org",
     license="BSD 2 clause",
     description="Open Observatory of Network Interference Backend",
@@ -103,7 +104,7 @@ setup(
         "Intended Audience :: Information Technology",
         "Intended Audience :: Science/Research",
         "Intended Audience :: Telecommunications Industry",
-        "License :: OSI Approved :: BSD License"
+        "License :: OSI Approved :: BSD License",
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2 :: Only",

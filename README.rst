@@ -91,7 +91,7 @@ Running an OONI collector
 =========================
 
 Configure oonib
---------------
+---------------
 
 Copy the example config file to ``oonib.conf``::
 
