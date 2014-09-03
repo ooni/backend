@@ -90,7 +90,7 @@ if config.helpers['http-return-json-headers'].port:
     http_return_request_helper = internet.TCPServer(
         int(config.helpers['http-return-json-headers'].port),
         http_helpers.HTTPReturnJSONHeadersHelper())
-multiService.addService(http_return_request_helper)
+    multiService.addService(http_return_request_helper)
 
 
 # add the tor collector service here
