@@ -1,3 +1,16 @@
+ChangeLog
+=========
+
+
+1.1.1 (Wed, 3 Sep 2014)
+-----------------------
+
+* Fix daemonize API breakage when upgrading from Twisted <= 13.1 to >= 13.2
+  https://trac.torproject.org/projects/tor/ticket/12644
+
+* Make it possible to use a reports directory on a different volume than the
+  archive directory.
+
 1.1.0 (Tue, 2 Sep 2014)
 -----------------------
 
