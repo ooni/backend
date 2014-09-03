@@ -1,3 +1,4 @@
+import shutil
 import time
 import yaml
 import json
@@ -76,7 +77,7 @@ class Report(object):
             os.mkdir(dst_path)
 
         dst_path = os.path.join(dst_path, dst_filename)
-        os.rename(report_filename, dst_path)
+        shutil.move(report_filename, dst_path)
 
         if not self.delayed_call.called:
             self.delayed_call.cancel()
