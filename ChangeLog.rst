@@ -1,6 +1,9 @@
 ChangeLog
 =========
+1.1.2 (Wed, 3 Sep 2014)
+-----------------------
 
+* Fix bug that lead oonib not running when a test helper was disabled.
 
 1.1.1 (Wed, 3 Sep 2014)
 -----------------------
