@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.getcwd()))
 
 from oonib import errors as e
 from oonib.config import config
+from oonib.log import LoggerFactory
 
 try:
     config.load()
@@ -36,9 +37,6 @@ except e.InvalidDeckDirectory, path:
     print "Invalid deck directory: %s" % path
     sys.exit(6)
 
-from oonib import runner
-from oonib.oonibackend import application
-
 if config.main.chroot:
     sys.argv.append('--chroot')
     sys.argv.append(config.chroot)
@@ -46,6 +44,12 @@ if config.main.chroot:
 if not config.main.nodaemon:
     sys.argv.append('-y')
 
-def runApp(config):
-    runner.OBaseRunner(config).run()
-runApp(config.main)
+from oonib.oonibackend import application
+
+from twisted.scripts._twistd_unix import UnixApplicationRunner
+class OBaseRunner(UnixApplicationRunner):
+    temporary_data_dir = None
+    def createOrGetApplication(self):
+        return application
+OBaseRunner.loggerFactory = LoggerFactory
+OBaseRunner(config.main).run()
