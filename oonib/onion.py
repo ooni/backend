@@ -74,6 +74,9 @@ def startTor(torconfig):
             torconfig.DataDirectory = os.path.abspath(config.main.tor_datadir)
         else:
             raise Exception
+
+    tor_log_file = os.path.join(torconfig.DataDirectory, "tor.log")
+    torconfig.Log = ["notice stdout", "notice file %s" % tor_log_file]
     torconfig.save()
     if not hasattr(torconfig, 'ControlPort'):
         control_port = int(randomFreePort())
