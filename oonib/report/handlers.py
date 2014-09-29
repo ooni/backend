@@ -28,7 +28,7 @@ def report_file_name(archive_dir, report_details):
         minute=timestamp.strftime("%M"),
         second=timestamp.strftime("%S")
     )
-    report_file_template = "{test_name}-{iso8601_timestamp}-{probe_asn}-probe.yamloo"
+    report_file_template = "{probe_cc}/{test_name}-{iso8601_timestamp}-{probe_asn}-probe.yamloo"
     if config.main.report_file_template:
         report_file_template = config.main.report_file_template
     dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
