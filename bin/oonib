@@ -51,5 +51,6 @@ class OBaseRunner(UnixApplicationRunner):
     temporary_data_dir = None
     def createOrGetApplication(self):
         return application
+
 OBaseRunner.loggerFactory = LoggerFactory
 OBaseRunner(config.main).run()

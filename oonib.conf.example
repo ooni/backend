@@ -29,7 +29,7 @@ main:
     stale_time: 3600
 
     tor_hidden_service: true
-
+    report_file_template: '{test_name}-{iso8601_timestamp}-{probe_asn}-probe.yamloo'
 helpers:
     http-return-json-headers:
         address: null

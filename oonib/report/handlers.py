@@ -16,13 +16,25 @@ from oonib import randomStr, otime, log
 from oonib.config import config
 
 
-def report_file_name(report_details):
-    timestamp = otime.timestamp(
-        datetime.fromtimestamp(
-            report_details['start_time']))
-    dst_filename = '{test_name}-{timestamp}-{probe_asn}-probe.yamloo'.format(
-        timestamp=timestamp,
-        **report_details)
+def report_file_name(archive_dir, report_details):
+    timestamp = datetime.fromtimestamp(report_details['start_time'])
+    keys = dict(
+        report_details.items(),
+        iso8601_timestamp=otime.timestamp(timestamp),
+        year=timestamp.strftime("%Y"),
+        month=timestamp.strftime("%m"),
+        day=timestamp.strftime("%d"),
+        hour=timestamp.strftime("%H"),
+        minute=timestamp.strftime("%M"),
+        second=timestamp.strftime("%S")
+    )
+    report_file_template = "{test_name}-{iso8601_timestamp}-{probe_asn}-probe.yamloo"
+    if config.main.report_file_template:
+        report_file_template = config.main.report_file_template
+    dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
+    dst_dir = os.path.dirname(dst_filename)
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
     return dst_filename
 
 
@@ -69,15 +81,8 @@ class Report(object):
         except IOError:
             raise e.ReportNotFound
 
-        dst_filename = report_file_name(report_details)
-        dst_path = os.path.join(self.archive_dir,
-                                report_details['probe_cc'])
-
-        if not os.path.isdir(dst_path):
-            os.mkdir(dst_path)
-
-        dst_path = os.path.join(dst_path, dst_filename)
-        shutil.move(report_filename, dst_path)
+        dst_filename = report_file_name(self.archive_dir, report_details)
+        shutil.move(report_filename, dst_filename)
 
         if not self.delayed_call.called:
             self.delayed_call.cancel()
