@@ -1,6 +1,6 @@
 import json
-import random
 import yaml
+import random
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
 from oonib.config import config
@@ -9,7 +9,11 @@ from oonib.config import config
 class Bouncer(object):
 
     def __init__(self, bouncer_file):
-        with open(bouncer_file) as f:
+        self.bouncerFilename = bouncer_file
+        self.load()
+
+    def load(self):
+        with open(self.bouncerFilename) as f:
             self.bouncerFile = yaml.safe_load(f)
         self.updateKnownHelpers()
         self.updateKnownCollectors()
@@ -123,13 +127,17 @@ class Bouncer(object):
     def collectorAccepting(self, net_test_name, input_hashes, test_helpers):
         for collector_address in self.knownCollectorsWithPolicy:
             collector = self.bouncerFile['collector'][collector_address]
-            supported_net_tests = [x['name'] for x in collector['policy']['nettest']]
-            supported_input_hashes = [x['id'] for x in collector['policy']['input']]
+            supported_net_tests = [x['name'] for x in
+                                   collector['policy']['nettest']]
+            supported_input_hashes = [x['id'] for x in
+                                      collector['policy']['input']]
             if net_test_name not in supported_net_tests:
                 continue
-            if any([input_hash not in supported_input_hashes for input_hash in input_hashes]):
+            if any([input_hash not in supported_input_hashes for input_hash in
+                    input_hashes]):
                 continue
-            if all([x in collector['test-helper'].keys() for x in test_helpers]):
+            if all([x in collector['test-helper'].keys() for x in
+                    test_helpers]):
                 return collector_address
         if len(self.knownCollectorsWithoutPolicy) > 0:
             return random.choice(self.knownCollectorsWithoutPolicy)
