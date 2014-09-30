@@ -1,6 +1,6 @@
 ChangeLog
 =========
-1.1.3 (Wed, 3 Sep 2014)
+1.1.3 (Mon, 29 Sep 2014)
 -----------------------
 
 * Add support for specifying the report archive path from config file
