@@ -1,5 +1,10 @@
 ChangeLog
 =========
+1.1.4 (Wed, 1 Oct 2014)
+-----------------------
+
+* Fix bug that lead test helpers to not being started
+
 1.1.3 (Mon, 29 Sep 2014)
 -----------------------
 
