@@ -89,7 +89,8 @@ class CollectorNotFound(OONIBError):
 
 
 class NoValidCollector(OONIBError):
-    pass
+    status_code = 400
+    log_message = "no-valid-collector"
 
 
 class TestHelpersKeyMissing(OONIBError):

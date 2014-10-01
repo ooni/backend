@@ -38,6 +38,7 @@ if config.helpers['ssl'].port:
                                     http_helpers.HTTPReturnJSONHeadersHelper(),
                                     ssl_helpers.SSLContext(config))
     multiService.addService(ssl_helper)
+    ssl_helper.startService()
 
 # Start the DNS Server related services
 if config.helpers['dns'].tcp_port:
@@ -45,6 +46,7 @@ if config.helpers['dns'].tcp_port:
     tcp_dns_helper = internet.TCPServer(int(config.helpers['dns'].tcp_port),
                                         dns_helpers.DNSTestHelper())
     multiService.addService(tcp_dns_helper)
+    tcp_dns_helper.startService()
 
 if config.helpers['dns'].udp_port:
     print "Starting UDP DNS Helper on %s" % config.helpers['dns'].udp_port
@@ -52,22 +54,26 @@ if config.helpers['dns'].udp_port:
     udp_dns_helper = internet.UDPServer(int(config.helpers['dns'].udp_port),
                                         udp_dns_factory)
     multiService.addService(udp_dns_helper)
+    udp_dns_helper.startService()
 
 if config.helpers['dns_discovery'].udp_port:
     print ("Starting UDP DNS Discovery Helper on %s" %
            config.helpers['dns_discovery'].udp_port)
-    udp_dns_discovery = internet.UDPServer(int(config.helpers['dns_discovery'].udp_port),
-                                           dns.DNSDatagramProtocol(
-                                               dns_helpers.DNSResolverDiscovery()
-                                           ))
+    udp_dns_discovery = internet.UDPServer(
+        int(config.helpers['dns_discovery'].udp_port),
+        dns.DNSDatagramProtocol(dns_helpers.DNSResolverDiscovery())
+    )
     multiService.addService(udp_dns_discovery)
 
 if config.helpers['dns_discovery'].tcp_port:
     print ("Starting TCP DNS Discovery Helper on %s" %
            config.helpers['dns_discovery'].tcp_port)
-    tcp_dns_discovery = internet.TCPServer(int(config.helpers['dns_discovery'].tcp_port),
-                                           dns_helpers.DNSResolverDiscovery())
+    tcp_dns_discovery = internet.TCPServer(
+        int(config.helpers['dns_discovery'].tcp_port),
+        dns_helpers.DNSResolverDiscovery()
+    )
     multiService.addService(tcp_dns_discovery)
+    tcp_dns_discovery.startService()
 
 
 # XXX this needs to be ported
@@ -77,6 +83,7 @@ if config.helpers['daphn3'].port:
     daphn3_helper = internet.TCPServer(int(config.helpers['daphn3'].port),
                                        tcp_helpers.Daphn3Server())
     multiService.addService(daphn3_helper)
+    daphn3_helper.startService()
 
 
 if config.helpers['tcp-echo'].port:
@@ -84,13 +91,16 @@ if config.helpers['tcp-echo'].port:
     tcp_echo_helper = internet.TCPServer(int(config.helpers['tcp-echo'].port),
                                          tcp_helpers.TCPEchoHelper())
     multiService.addService(tcp_echo_helper)
+    tcp_echo_helper.startService()
 
 if config.helpers['http-return-json-headers'].port:
-    print "Starting HTTP return request helper on %s" % config.helpers['http-return-json-headers'].port
+    print ("Starting HTTP return request helper on %s" %
+           config.helpers['http-return-json-headers'].port)
     http_return_request_helper = internet.TCPServer(
         int(config.helpers['http-return-json-headers'].port),
         http_helpers.HTTPReturnJSONHeadersHelper())
     multiService.addService(http_return_request_helper)
+    http_return_request_helper.startService()
 
 
 # add the tor collector service here
@@ -101,20 +111,24 @@ if config.main.tor_hidden_service:
     def getHSEndpoint(data_dir):
         if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
             return TCPHiddenServiceEndpoint(reactor,
-                torconfig, 80, hidden_service_dir=data_dir)
+                                            torconfig,
+                                            80,
+                                            hidden_service_dir=data_dir)
         else:
             return TCPHiddenServiceEndpoint(reactor,
-                torconfig, 80, data_dir=data_dir)
+                                            torconfig,
+                                            80,
+                                            data_dir=data_dir)
 
     def printOnionEndpoint(endpointService):
-        print("Exposed %s Tor hidden service on httpo://%s" %
-                (endpointService.name, endpointService.endpoint.onion_uri))
+        print ("Exposed %s Tor hidden service on httpo://%s" %
+               (endpointService.name, endpointService.endpoint.onion_uri))
 
     def addCollector(torControlProtocol):
         data_dir = os.path.join(torconfig.DataDirectory, 'collector')
         collector_service = internet.StreamServerEndpointService(
-                getHSEndpoint(data_dir),
-                ooniBackend)
+            getHSEndpoint(data_dir), ooniBackend
+        )
         collector_service.setName('collector')
         multiService.addService(collector_service)
         collector_service.startService()
@@ -127,8 +141,8 @@ if config.main.tor_hidden_service:
         def addBouncer(torControlProtocol):
             data_dir = os.path.join(torconfig.DataDirectory, 'bouncer')
             bouncer_service = internet.StreamServerEndpointService(
-                    getHSEndpoint(data_dir),
-                    ooniBouncer)
+                getHSEndpoint(data_dir), ooniBouncer
+            )
             bouncer_service.setName('bouncer')
             multiService.addService(bouncer_service)
             bouncer_service.startService()
@@ -138,9 +152,11 @@ if config.main.tor_hidden_service:
         d.addCallback(printOnionEndpoint)
 else:
     if ooniBouncer:
-        bouncer_service = internet.TCPServer(8888, ooniBouncer, interface="127.0.0.1")
+        bouncer_service = internet.TCPServer(8888, ooniBouncer,
+                                             interface="127.0.0.1")
         multiService.addService(bouncer_service)
         bouncer_service.startService()
-    collector_service = internet.TCPServer(8889, ooniBackend, interface="127.0.0.1")
+    collector_service = internet.TCPServer(8889, ooniBackend,
+                                           interface="127.0.0.1")
     multiService.addService(collector_service)
     collector_service.startService()
