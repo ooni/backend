@@ -202,14 +202,16 @@ class UpdateReportMixin(object):
         log.debug("Got this request %s" % parsed_request)
         report_filename = os.path.join(self.report_dir,
                                        report_id)
-
-        self.reports[report_id].refresh()
+        try:
+            self.reports[report_id].refresh()
+        except KeyError:
+            raise e.OONIBError(404, "Report not found")
 
         try:
             with open(report_filename, 'a+') as fd:
                 fd.write(parsed_request['content'])
         except IOError:
-            e.OONIBError(404, "Report not found")
+            raise e.OONIBError(404, "Report not found")
         self.write({'status': 'success'})
 
 
