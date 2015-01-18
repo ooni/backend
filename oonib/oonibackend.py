@@ -36,7 +36,7 @@ if config.helpers['ssl'].port:
     print "Starting SSL helper on %s" % config.helpers['ssl'].port
     ssl_helper = internet.SSLServer(int(config.helpers['ssl'].port),
                                     http_helpers.HTTPReturnJSONHeadersHelper(),
-                                    ssl_helpers.SSLContext(config))
+                                    ssl_helpers.SmartConnectionCreatorFactory())
     multiService.addService(ssl_helper)
     ssl_helper.startService()
 
