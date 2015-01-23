@@ -160,7 +160,14 @@ class Bouncer(object):
                 requested_nettest['test-helpers'])
             test_helpers = {}
             for test_helper in requested_nettest['test-helpers']:
-                test_helpers[test_helper] = self.bouncerFile['collector'][collector]['test-helper'][test_helper]
+                try:
+                    test_helpers[test_helper] = self.bouncerFile['collector'][collector]['test-helper'][test_helper]
+                except KeyError:
+                    helpers = self.knownHelpers.get(test_helper)
+                    if not helpers:
+                        raise e.CollectorNotFound
+                    helper = random.choice(helpers)
+                    test_helpers[test_helper] = helper['helper-address']
 
             nettest = {
                 'name': requested_nettest['name'],
@@ -178,7 +185,7 @@ class BouncerHandlerBase(OONIBHandler):
         self.bouncer = Bouncer(config.main.bouncer_file)
 
     def load_query(self):
-        if not 'query' in dir(self):
+        if 'query' not in dir(self):
             try:
                 self.query = json.loads(self.request.body)
             except ValueError:
