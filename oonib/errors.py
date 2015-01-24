@@ -2,11 +2,9 @@ from cyclone.web import HTTPError
 
 
 class OONIBError(HTTPError):
-    status_code = 500
-    log_message = 'oonib-error'
-
-    def __init__(self):
-        pass
+    def __init__(self, status_code=500, log_message='oonib-error'):
+        self.status_code = status_code
+        self.log_message = log_message
 
 
 class InvalidRequest(OONIBError):
