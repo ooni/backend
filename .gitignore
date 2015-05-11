@@ -1,1 +1,5 @@
 client.cfg
+.DS_Store
+_build
+_resources
+logs
