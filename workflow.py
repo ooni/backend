@@ -170,6 +170,8 @@ class S3RawReportsImporter(luigi.Task):
     tmp = luigi.Parameter()
     log_filename = luigi.Parameter()
 
+    kafka_client = None
+
     def get_uri(self):
         return "s3n://%s/%s" % (self.bucket, self.filename)
 
@@ -183,19 +185,21 @@ class S3RawReportsImporter(luigi.Task):
     def output(self):
         return luigi.LocalTarget(self.tmp, self.filename)
 
+
     def publish(self, data, data_type):
-        from pykafka import KafkaClient
-        config = get_config()
-        client = KafkaClient(config.get('kafka', 'hosts'))
+        message = json_dumps(data)
 
         topic = client.topics[data_type]
-        producer = topic.get_producer()
-        producer.produce(data)
+        producer = KeyedProducer(self.client)
+        producer.send(topic, data['report_id'], message)
 
-        # s = StringIO.StringIO()
-        # json_dump(data, s)
 
     def run(self):
+        from pykafka import KafkaClient
+        config = get_config()
+
+        self.kafka_client = KafkaClient(config.get('kafka', 'hosts'))
+
         o = self.output()
         i = self.input()
         with ReportProcessor(i, self.log_filename) as reports:

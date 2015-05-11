@@ -21,3 +21,8 @@ def json_dump(data, fh):
     encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
     for chunk in encoder.iterencode(data):
         fh.write(chunk)
+
+
+def json_dumps(data):
+    encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
+    return encoder.encode(data)
