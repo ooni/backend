@@ -1,11 +1,9 @@
 from luigi.configuration import get_config
+
+from pykafka import KafkaClient
 config = get_config()
 kafka_hosts = config.get('kafka', 'hosts')
 
-"""
-# This is using pykafka, but it's not on pypi...
-
-from pykafka import KafkaClient
 config = get_config()
 client = KafkaClient()
 raw_topic = client.topics['raw']
@@ -37,3 +35,4 @@ for message in consumer:
     #
     # **messages that are not marked w/ task_done currently do not commit!
     kafka.task_done(message)
+"""
