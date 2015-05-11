@@ -1,8 +1,8 @@
-import re
 import os
+import time
 import random
 import string
-import shutil
+# import StringIO
 import traceback
 from datetime import datetime
 
@@ -44,10 +44,11 @@ class S3GzipTask(ExternalTask):
 
 
 class ReportProcessor(object):
-    def __init__(self, in_file, raw_file, sanitised_file, log_filename=None):
+    _end_time = None
+    _start_time = None
+
+    def __init__(self, in_file, log_filename=None):
         self.in_file = in_file
-        self.raw_file = raw_file
-        self.sanitised_file = sanitised_file
         if not log_filename:
             log_filename = datetime.now().strftime("%Y-%m-%dT%H%M%S.imported")
         self.log_filename = log_filename
@@ -63,9 +64,11 @@ class ReportProcessor(object):
             self.write_json_entry(message, fh)
 
     def open(self):
+        self._start_time = time.time()
         self.in_fh = self.in_file.open("r")
-        self.raw_fh = self.raw_file.open("a")
-        self.sanitised_fh = self.sanitised_file.open("a")
+
+        self._report = yaml.safe_load_all(self.in_fh)
+        self.process_header(self._report)
 
     def done(self):
         with open(self.log_filename, 'a') as fh:
@@ -79,8 +82,6 @@ class ReportProcessor(object):
         if exc_type:
             self.failure(exc_type, value, traceback, "exit")
         self.in_fh.close()
-        self.raw_fh.close()
-        self.sanitised_fh.close()
 
     def write_json_entry(self, entry, fh):
         json_dump(entry, fh)
@@ -89,51 +90,73 @@ class ReportProcessor(object):
     def sanitise_header(self, entry):
         return entry
 
+    @property
+    def header(self):
+        return {
+            "raw": self._raw_header,
+            "sanitised": self._sanitised_header
+        }
+
     def process_header(self, report):
-        self.header = report.next()
+        self._raw_header = report.next()
 
         date = datetime.fromtimestamp(self.header["start_time"])
         date = date.strftime("%Y-%m-%d")
-        if not self.header.get("report_id"):
+        if not self._raw_header.get("report_id"):
             nonce = ''.join(random.choice(string.ascii_lowercase)
                             for x in xrange(40))
-            self.header["report_id"] = date + nonce
+            self._raw_header["report_id"] = date + nonce
 
-        header_entry = self.header.copy()
+        header_entry = self._raw_header.copy()
         header_entry["record_type"] = "report_header"
 
-        self.write_json_entry(header_entry, self.raw_fh)
-        sanitised_header = self.sanitise_header(header_entry)
-        self.write_json_entry(sanitised_header, self.sanitised_fh)
+        self._sanitised_header = self.sanitise_header(header_entry)
 
     def sanitise_entry(self, entry):
         # XXX we probably want to ignore these sorts of tests
-        if not self.header.get('test_name'):
+        if not self._sanitised_header.get('test_name'):
             self.failure("MISSING TEST_NAME", "sanitise_entry")
             return entry
-        return sanitise.run(self.header['test_name'],
-                            entry)
+        return sanitise.run(self.header['test_name'], entry)
 
     def process_entry(self, entry):
-        entry.update(self.header)
         entry["record_type"] = "measurement"
 
-        self.write_json_entry(entry, self.raw_fh)
-        sanitised_entry = self.sanitise_entry(entry)
-        self.write_json_entry(sanitised_entry, self.sanitised_fh)
+        raw_entry = entry.copy()
+        sanitised_entry = entry.copy()
+
+        raw_entry.update(self._raw_header)
+        sanitised_entry.update(self._sanitised_header)
+        sanitised_entry = self.sanitise_entry(sanitised_entry)
+        return sanitised_entry, raw_entry
+
+    @property
+    def footer(self):
+        raw = self._raw_header.copy()
+        sanitised = self._sanitised_header.copy()
+        if not self._end_time:
+            self._end_time = time.time()
+
+        extra_keys = {
+            'signature': 'XXX',
+            'stage_1_process_time': self._start_time - self._end_time
+        }
+
+        raw.update(extra_keys)
+        sanitised.update(extra_keys)
+
+        return {
+            "raw": raw,
+            "sanitised": sanitised
+        }
 
     def process(self):
-        report = yaml.safe_load_all(self.in_fh)
-
-        self.process_header(report)
-
         while True:
             try:
-                entry = report.next()
+                entry = self._report.next()
                 if not entry:
                     continue
-                self.process_entry(entry)
-                yield entry
+                yield self.process_entry(entry)
             except StopIteration:
                 self.done()
                 break
@@ -157,81 +180,35 @@ class S3RawReportsImporter(luigi.Task):
     def logfile(self):
         return os.path.join(self.tmp, 'streams.log')
 
-    def complete(self):
-        uri = self.input().path
-        try:
-            with open(self.log_filename) as f:
-                for line in f:
-                    if line.strip() == uri:
-                        return True
-        except:
-            return False
-        return False
-
     def output(self):
-        filename = re.search('-(\d{4}-\d{2}-\d{2})T', self.filename).group(1)
-        raw_dst = os.path.join(self.tmp, "streams",
-                               "%s-raw.json" % filename)
-        sanitised_dst = os.path.join(self.tmp, "streams",
-                                     "%s-sanitised.json" % filename)
-        return {
-            "sanitised": luigi.LocalTarget(sanitised_dst),
-            "raw": luigi.LocalTarget(raw_dst)
-        }
+        return luigi.LocalTarget(self.tmp, self.filename)
+
+    def publish(self, data, data_type):
+        from pykafka import KafkaClient
+        config = get_config()
+        client = KafkaClient(config.get('kafka', 'hosts'))
+
+        topic = client.topics[data_type]
+        producer = topic.get_producer()
+        producer.produce(data)
+
+        # s = StringIO.StringIO()
+        # json_dump(data, s)
 
     def run(self):
         o = self.output()
         i = self.input()
-        with ReportProcessor(i, o['raw'],
-                             o['sanitised'], self.log_filename) as reports:
-            for entry in reports.process():
-                pass
+        with ReportProcessor(i, self.log_filename) as reports:
+            self.publish(reports.header['raw'], 'raw-header')
+            self.publish(reports.header['sanitised'], 'sanitised-header')
+            for sanitised_entry, raw_entry in reports.process():
+                self.publish(raw_entry, 'raw-measurement')
+                self.publish(sanitised_entry, 'sanitised-measurement')
+            footer = reports.footer
+            self.publish(footer['raw'], 'raw-footer')
+            self.publish(footer['sanitised'], 'sanitised-footer')
+        o.close()
 
-
-class ReportStreams(luigi.Task):
-    date = luigi.DateParameter()
-    report_dir = luigi.Parameter()
-
-    def output(self):
-        filename = self.date.strftime('streams/%Y-%m-%d.json')
-        return luigi.LocalTarget(os.path.join(self.report_dir, filename))
-
-
-class StreamTMPToHDFS(luigi.Task):
-    date = luigi.DateParameter()
-    report_dir = luigi.Parameter()
-
-    def requires(self):
-        return ReportStreams(date=self.date,
-                             report_dir=self.report_dir)
-
-    def output(self):
-        filename = self.date.strftime('streams/%Y-%m-%d.json')
-        return luigi.hdfs.HdfsTarget(os.path.join('/reports', filename))
-
-    def run(self):
-        output = self.output()
-        if output.exists():
-            output.remove()
-
-        with self.input().open('r') as in_file:
-            with output.open('w') as out_file:
-                shutil.copyfileobj(in_file, out_file)
-
-
-class StreamsSanitiser(luigi.Task):
-    date_interval = luigi.DateIntervalParameter()
-    report_dir = luigi.Parameter()
-
-    def requires(self):
-        tasks = []
-        for date in self.date_interval:
-            tasks.append(ReportStreams(date=date,
-                                       report_dir=self.report_dir))
-        return tasks
-
-    def run(self):
-        pass
 
 if __name__ == "__main__":
     luigi.interface.setup_interface_logging()
