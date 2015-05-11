@@ -80,7 +80,7 @@ class ReportProcessor(object):
 
     def __exit__(self, exc_type, value, traceback):
         if exc_type:
-            self.failure(exc_type, value, traceback, "exit")
+            self.failure(traceback, "exit")
         self.in_fh.close()
 
     def write_json_entry(self, entry, fh):
@@ -195,13 +195,14 @@ class S3RawReportsImporter(luigi.Task):
 
 
     def run(self):
-        from pykafka import KafkaClient
+        from kafka import KafkaClient
         config = get_config()
 
         self.kafka_client = KafkaClient(config.get('kafka', 'hosts'))
 
         o = self.output()
         i = self.input()
+        output = o.open()
         with ReportProcessor(i, self.log_filename) as reports:
             self.publish(reports.header['raw'], 'raw')
             self.publish(reports.header['sanitised'], 'sanitised')
@@ -211,7 +212,7 @@ class S3RawReportsImporter(luigi.Task):
             footer = reports.footer
             self.publish(footer['raw'], 'raw')
             self.publish(footer['sanitised'], 'sanitised')
-        o.close()
+        output.close()
 
 
 if __name__ == "__main__":
