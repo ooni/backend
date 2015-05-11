@@ -1,11 +1,8 @@
 import re
 import os
-import json
 import random
 import string
 import shutil
-import base64
-import hashlib
 import traceback
 from datetime import datetime
 
@@ -20,6 +17,8 @@ from luigi.s3 import S3Target
 from luigi.configuration import get_config
 # from luigi.contrib.spark import SparkSubmitTask, PySparkTask
 import sanitise
+from util import json_dump
+
 
 def list_raw_reports():
     config = get_config()
@@ -35,25 +34,6 @@ def list_raw_reports():
     keys = bucket.list('reports')
     for key in keys:
         yield (S3_BUCKET_NAME, key.name)
-
-
-encode_basestring_ascii_orig = json.encoder.encode_basestring_ascii
-def encode_basestring_ascii(o):
-    try:
-        return encode_basestring_ascii_orig(o)
-    except UnicodeDecodeError:
-        return json.dumps({"base64": base64.b64encode(o)})
-json.encoder.encode_basestring_ascii = encode_basestring_ascii
-
-def json_default(o):
-    if isinstance(o, set):
-        return list(o)
-    return json.JSONEncoder.default(o)
-
-def json_dump(data, fh):
-    encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
-    for chunk in encoder.iterencode(data):
-        fh.write(chunk)
 
 
 class S3GzipTask(ExternalTask):
@@ -202,9 +182,11 @@ class S3RawReportsImporter(luigi.Task):
     def run(self):
         o = self.output()
         i = self.input()
-        with ReportProcessor(i, o['raw'], o['sanitised'], self.log_filename) as reports:
+        with ReportProcessor(i, o['raw'],
+                             o['sanitised'], self.log_filename) as reports:
             for entry in reports.process():
                 pass
+
 
 class ReportStreams(luigi.Task):
     date = luigi.DateParameter()
