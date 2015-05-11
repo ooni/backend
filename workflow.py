@@ -100,7 +100,7 @@ class ReportProcessor(object):
     def process_header(self, report):
         self._raw_header = report.next()
 
-        date = datetime.fromtimestamp(self.header["start_time"])
+        date = datetime.fromtimestamp(self._raw_header["start_time"])
         date = date.strftime("%Y-%m-%d")
         if not self._raw_header.get("report_id"):
             nonce = ''.join(random.choice(string.ascii_lowercase)
@@ -117,7 +117,7 @@ class ReportProcessor(object):
         if not self._sanitised_header.get('test_name'):
             self.failure("MISSING TEST_NAME", "sanitise_entry")
             return entry
-        return sanitise.run(self.header['test_name'], entry)
+        return sanitise.run(self._raw_header['test_name'], entry)
 
     def process_entry(self, entry):
         entry["record_type"] = "measurement"

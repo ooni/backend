@@ -1,6 +1,6 @@
 from luigi.configuration import get_config
-
 from pykafka import KafkaClient
+
 config = get_config()
 kafka_hosts = config.get('kafka', 'hosts')
 
