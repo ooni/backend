@@ -151,7 +151,7 @@ def default(entry):
 
 
 def run(test_name, entry):
-    sanitisers = get_sanitisers()
+    sanitisers = get_sanitisers(test_name)
     if not sanitisers:
         return entry
     if not isinstance(sanitisers, list):
