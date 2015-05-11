@@ -199,13 +199,13 @@ class S3RawReportsImporter(luigi.Task):
         o = self.output()
         i = self.input()
         with ReportProcessor(i, self.log_filename) as reports:
-            self.publish(reports.header['raw'], 'raw-header')
+            self.publish(reports.header['raw'], 'raw')
             self.publish(reports.header['sanitised'], 'sanitised-header')
             for sanitised_entry, raw_entry in reports.process():
-                self.publish(raw_entry, 'raw-measurement')
+                self.publish(raw_entry, 'raw')
                 self.publish(sanitised_entry, 'sanitised-measurement')
             footer = reports.footer
-            self.publish(footer['raw'], 'raw-footer')
+            self.publish(footer['raw'], 'raw')
             self.publish(footer['sanitised'], 'sanitised-footer')
         o.close()
 
