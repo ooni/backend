@@ -187,9 +187,8 @@ class S3RawReportsImporter(luigi.Task):
     def publish(self, data, data_type):
         message = json_dumps(data)
 
-        topic = self.kafka_client.topics[data_type]
         producer = KeyedProducer(self.kafka_client)
-        producer.send(topic, data['report_id'], message)
+        producer.send(data_type, data['report_id'], message)
 
     def run(self):
         config = get_config()
