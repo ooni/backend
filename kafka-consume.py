@@ -49,6 +49,7 @@ class BucketManager(object):
 config = get_config()
 kafka_hosts = config.get('kafka', 'hosts')
 
+bucket_manager = BucketManager()
 consumer = KafkaConsumer('raw', 'sanitised',
                          metadata_broker_list=[kafka_hosts],
                          group_id='report_processor',
@@ -61,4 +62,6 @@ for message in consumer:
     print("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition,
                                          message.offset, message.key,
                                          message.value))
+
+    bucket_manager.add_to_report_bucket(message.key, message.value)
     consumer.task_done(message)
