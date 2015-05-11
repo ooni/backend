@@ -14,7 +14,7 @@ json.encoder.encode_basestring_ascii = encode_basestring_ascii
 def json_default(o):
     if isinstance(o, set):
         return list(o)
-    return json.JSONEncoder.default(o)
+    return {"error": "could-not-serialize %s" % str(o)}
 
 
 def json_dump(data, fh):

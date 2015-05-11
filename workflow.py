@@ -182,10 +182,6 @@ class S3RawReportsImporter(luigi.Task):
     def logfile(self):
         return os.path.join(self.tmp, 'streams.log')
 
-    def output(self):
-        return luigi.LocalTarget(self.tmp, self.filename)
-
-
     def publish(self, data, data_type):
         message = json_dumps(data)
 
@@ -200,9 +196,7 @@ class S3RawReportsImporter(luigi.Task):
 
         self.kafka_client = KafkaClient(config.get('kafka', 'hosts'))
 
-        o = self.output()
         i = self.input()
-        output = o.open()
         with ReportProcessor(i, self.log_filename) as reports:
             self.publish(reports.header['raw'], 'raw')
             self.publish(reports.header['sanitised'], 'sanitised')
@@ -212,7 +206,6 @@ class S3RawReportsImporter(luigi.Task):
             footer = reports.footer
             self.publish(footer['raw'], 'raw')
             self.publish(footer['sanitised'], 'sanitised')
-        output.close()
 
 
 if __name__ == "__main__":
