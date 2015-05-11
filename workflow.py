@@ -17,7 +17,9 @@ from luigi.s3 import S3Target
 from luigi.configuration import get_config
 # from luigi.contrib.spark import SparkSubmitTask, PySparkTask
 import sanitise
-from util import json_dump
+from util import json_dump, json_dumps
+
+from kafka import KafkaClient, KeyedProducer
 
 
 def list_raw_reports():
@@ -185,13 +187,11 @@ class S3RawReportsImporter(luigi.Task):
     def publish(self, data, data_type):
         message = json_dumps(data)
 
-        topic = client.topics[data_type]
-        producer = KeyedProducer(self.client)
+        topic = self.kafka_client.topics[data_type]
+        producer = KeyedProducer(self.kafka_client)
         producer.send(topic, data['report_id'], message)
 
-
     def run(self):
-        from kafka import KafkaClient
         config = get_config()
 
         self.kafka_client = KafkaClient(config.get('kafka', 'hosts'))
