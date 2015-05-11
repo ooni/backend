@@ -1,0 +1,5 @@
+[aws]
+access-key-id: XXX
+secret-access-key: YYY
+s3-bucket-name: ooni-raw-reports
+
