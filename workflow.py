@@ -184,11 +184,11 @@ class S3RawReportsImporter(luigi.Task):
     def logfile(self):
         return os.path.join(self.tmp, 'streams.log')
 
-    def publish(self, data, data_type):
+    def publish(self, data, topic, data_type):
         message = json_dumps(data)
 
         producer = KeyedProducer(self.kafka_client)
-        producer.send(data_type, data['report_id'], message)
+        producer.send(topic, data['report_id'], data_type + message)
 
     def run(self):
         config = get_config()
@@ -197,14 +197,14 @@ class S3RawReportsImporter(luigi.Task):
 
         i = self.input()
         with ReportProcessor(i, self.log_filename) as reports:
-            self.publish(reports.header['raw'], 'raw')
-            self.publish(reports.header['sanitised'], 'sanitised')
+            self.publish(reports.header['raw'], 'raw', 'h')
+            self.publish(reports.header['sanitised'], 'sanitised', 'h')
             for sanitised_entry, raw_entry in reports.process():
-                self.publish(raw_entry, 'raw')
-                self.publish(sanitised_entry, 'sanitised')
+                self.publish(raw_entry, 'raw', 'e')
+                self.publish(sanitised_entry, 'sanitised', 'e')
             footer = reports.footer
-            self.publish(footer['raw'], 'raw')
-            self.publish(footer['sanitised'], 'sanitised')
+            self.publish(footer['raw'], 'raw', 'f')
+            self.publish(footer['sanitised'], 'sanitised', 'f')
 
 
 if __name__ == "__main__":
