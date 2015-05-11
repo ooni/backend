@@ -1,4 +1,5 @@
 from luigi.configuration import get_config
+config = get_config()
 kafka_hosts = config.get('kafka', 'hosts')
 
 """
@@ -19,7 +20,7 @@ from kafka import KafkaConsumer
 # more advanced consumer -- multiple topics w/ auto commit offset
 # management
 consumer = KafkaConsumer('raw', 'sanitised',
-                        bootstrap_servers=[kafka_hosts],
+                        metadata_broker_list=[kafka_hosts],
                         group_id='report_processor',
                         auto_commit_enable=True,
                         auto_commit_interval_ms=30 * 1000,
