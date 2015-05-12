@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import io
 import gzip
 import time
 import random
@@ -106,6 +107,10 @@ class Report(object):
                 self.failure(traceback.format_exc(), "process_entry")
 
 
+class GzipReader(gzip.GzipFile, io.BufferedReader):
+    pass
+
+
 class ReportStreamEmitter(object):
     def __init__(self):
         self.connect_to_s3()
@@ -120,7 +125,7 @@ class ReportStreamEmitter(object):
 
     def parse(self, report_file):
         report_file.open('r')
-        in_file = gzip.GzipFile(fileobj=report_file)
+        in_file = GzipReader(fileobj=report_file)
         report = Report(in_file)
         yield report.header['sanitised'], report.header['raw']
         for sanitised_report, raw_report in report.process():
