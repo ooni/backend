@@ -5,7 +5,7 @@ from streamparse.bolt import Bolt
 from kafka import KafkaClient, KeyedProducer, SimpleProducer
 
 
-class ReportBolt(Bolt):
+class KafkaBolt(Bolt):
 
     def initialize(self, conf, ctx):
         self.kafka_client = KafkaClient(conf['kafka']['hosts'])
