@@ -122,12 +122,13 @@ class ReportStreamEmitter(object):
         self.bucket = self.s3_connection.get_bucket(BUCKET_NAME)
 
     def parse(self, report_file):
-        with report_file.open('r') as in_file:
-            report = Report(in_file)
-            yield report.header['sanitised'], report.header['raw']
-            for sanitised_report, raw_report in report.process():
-                yield sanitised_report, raw_report
-            yield report.footer['sanitised'], report.footer['raw']
+        in_file = report_file.open('r')
+        report = Report(in_file)
+        yield report.header['sanitised'], report.header['raw']
+        for sanitised_report, raw_report in report.process():
+            yield sanitised_report, raw_report
+        yield report.footer['sanitised'], report.footer['raw']
+        in_file.close()
 
     def emit(self):
         for report_file in self.next_report():
