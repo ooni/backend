@@ -16,6 +16,7 @@ class BucketManager(object):
         self.report_buckets = {}
 
     def flush_date_bucket(self, date):
+        print "Flushing %s" % date
         self.date_buckets[date].seek(0)
         with open(os.path.join(self.output_dir, date), 'a+') as f:
             shutil.copyfileobj(self.date_buckets[date], f)
