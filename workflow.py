@@ -19,7 +19,7 @@ from luigi.configuration import get_config
 import sanitise
 from util import json_dump, json_dumps
 
-from kafka import KafkaClient, KeyedProducer
+from kafka import KafkaClient, KeyedProducer, SimpleProducer
 
 
 def list_raw_reports():
@@ -190,6 +190,10 @@ class S3RawReportsImporter(luigi.Task):
         producer = KeyedProducer(self.kafka_client)
         producer.send(topic, data['report_id'], data_type + message)
 
+    def finished(self, topic):
+        producer = SimpleProducer(self.kafka_client)
+        producer.send_messages(topic, 'd')
+
     def run(self):
         config = get_config()
 
@@ -205,7 +209,8 @@ class S3RawReportsImporter(luigi.Task):
             footer = reports.footer
             self.publish(footer['raw'], 'raw', 'f')
             self.publish(footer['sanitised'], 'sanitised', 'f')
-
+        self.finished('raw')
+        self.finished('sanitised')
 
 if __name__ == "__main__":
     luigi.interface.setup_interface_logging()
