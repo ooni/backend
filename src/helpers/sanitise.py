@@ -1,8 +1,10 @@
 import re
-import json
 import hashlib
 
-bridge_db_mapping = json.load(open('bridge-db.json'))
+try:
+    from helpers.settings import bridge_db_mapping
+except ImportError:
+    print "Copy src/helpers/settings.example to src/helpers/settings.py and configure it"
 
 
 def get_sanitisers(test_name):

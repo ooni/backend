@@ -10,6 +10,7 @@ import yaml
 from streamparse.spout import Spout
 
 from helpers import sanitise
+from helpers.settings import config
 
 
 class Report(object):
@@ -109,15 +110,14 @@ class Report(object):
 
 
 class ReportStreamEmitter(object):
-    def __init__(self, stormconf):
-        self.stormconf = stormconf
+    def __init__(self):
         self.connect_to_s3()
 
     def connect_to_s3(self):
         from boto.s3.connection import S3Connection
-        ACCESS_KEY_ID = self.stormconf["aws"]["access-key-id"]
-        SECRET_ACCESS_KEY = self.stormconf["aws"]["secret-access-key"]
-        BUCKET_NAME = self.stormconf["aws"]["s3-bucket-name"]
+        ACCESS_KEY_ID = config["aws"]["access-key-id"]
+        SECRET_ACCESS_KEY = config["aws"]["secret-access-key"]
+        BUCKET_NAME = config["aws"]["s3-bucket-name"]
         self.s3_connection = S3Connection(ACCESS_KEY_ID, SECRET_ACCESS_KEY)
         self.bucket = self.s3_connection.get_bucket(BUCKET_NAME)
 
@@ -142,7 +142,7 @@ class ReportStreamEmitter(object):
 class S3ReportsSpout(Spout):
 
     def initialize(self, stormconf, context):
-        self.report_emitter = ReportStreamEmitter(stormconf)
+        self.report_emitter = ReportStreamEmitter()
         self.reports = self.report_emitter.emit()
 
     def next_tuple(self):

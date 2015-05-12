@@ -3,12 +3,13 @@ from __future__ import absolute_import, print_function, unicode_literals
 from streamparse.bolt import Bolt
 
 from kafka import KafkaClient, KeyedProducer, SimpleProducer
+from helpers.settings import config
 
 
 class KafkaBolt(Bolt):
 
     def initialize(self, conf, ctx):
-        self.kafka_client = KafkaClient(conf['kafka']['hosts'])
+        self.kafka_client = KafkaClient(config['kafka']['hosts'])
         self.keyed_producer = KeyedProducer(self.kafka_client)
         self.simple_producer = SimpleProducer(self.kafka_client)
 
