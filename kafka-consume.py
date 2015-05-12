@@ -17,7 +17,7 @@ class BucketManager(object):
 
     def flush_date_bucket(self, date):
         self.date_buckets[date].seek(0)
-        with open(os.path.join(self.output_dir), 'a+') as f:
+        with open(os.path.join(self.output_dir, date), 'a+') as f:
             shutil.copyfileobj(self.date_buckets[date], f)
         del self.date_buckets[date]
 
