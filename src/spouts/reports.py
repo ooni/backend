@@ -130,8 +130,8 @@ class ReportStreamEmitter(object):
             yield report.footer['sanitised'], report.footer['raw']
 
     def emit(self):
-        for report in self.next_report():
-            for sanitised_report, raw_report in self.parse():
+        for report_file in self.next_report():
+            for sanitised_report, raw_report in self.parse(report_file):
                 yield sanitised_report, raw_report
 
     def next_report(self):
