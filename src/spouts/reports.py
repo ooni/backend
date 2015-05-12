@@ -18,19 +18,15 @@ class Report(object):
     _start_time = None
 
     def __init__(self, in_file):
+        self._start_time = time.time()
+
         self.in_file = in_file
-        self.open()
+        self._report = yaml.safe_load_all(self.in_file)
+        self.process_header(self._report)
 
     def failure(self, traceback, state):
         print("Fail in %s" % state)
         print(traceback)
-
-    def open(self):
-        self._start_time = time.time()
-        self.in_fh = self.in_file.open("r")
-
-        self._report = yaml.safe_load_all(self.in_fh)
-        self.process_header(self._report)
 
     def sanitise_header(self, entry):
         return entry
