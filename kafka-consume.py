@@ -43,7 +43,7 @@ class BucketManager(object):
             self.report_buckets[report_id].read()
         )
         del self.report_buckets[report_id]
-        if self.date_buckets.len > self.max_bucket_size:
+        if self.date_buckets[report_date].len > self.max_bucket_size:
             self.flush_date_bucket(report_date)
 
 config = get_config()
