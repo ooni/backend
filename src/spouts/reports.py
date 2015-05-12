@@ -139,7 +139,7 @@ class ReportStreamEmitter(object):
             yield key
 
 
-class S3ReportSpout(Spout):
+class S3ReportsSpout(Spout):
 
     def initialize(self, stormconf, context):
         self.report_emitter = ReportStreamEmitter(stormconf)
