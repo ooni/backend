@@ -110,7 +110,7 @@ class ReportProcessor(object):
             self._raw_header["report_id"] = date + nonce
 
         header_entry = self._raw_header.copy()
-        header_entry["record_type"] = "report_header"
+        header_entry["record_type"] = "header"
 
         self._sanitised_header = self.sanitise_header(header_entry)
 
@@ -140,7 +140,7 @@ class ReportProcessor(object):
             self._end_time = time.time()
 
         extra_keys = {
-            'signature': 'XXX',
+            "record_type": "footer",
             'stage_1_process_time': self._start_time - self._end_time
         }
 

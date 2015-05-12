@@ -2,6 +2,11 @@
     "library": "",
     "topology_specs": "topologies/",
     "virtualenv_specs": "virtualenvs/",
+    "aws": {
+      "access-key-id": null,
+      "secret-access-key": null,
+      "s3-bucket-name": null,
+    },
     "envs": {
         "prod": {
             "user": "",

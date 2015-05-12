@@ -45,7 +45,7 @@ class BucketManager(object):
         report_id = message.key
         if not self.message_queue_bucket['reports'].get(report_id):
             self.message_queue_bucket['reports'][report_id] = []
-        self.message_queue_bucket['reports'].append(message)
+        self.message_queue_bucket['reports'][report_id].append(message)
 
         if data[0] in ('e', 'h'):
             self.add_to_report_bucket(report_id, data[1:])
@@ -89,7 +89,7 @@ config = get_config()
 kafka_hosts = config.get('kafka', 'hosts')
 
 consumer = KafkaConsumer('raw', 'sanitised',
-                         metadata_broker_list=[kafka_hosts],
+                         bootstrap_servers=[kafka_hosts],
                          group_id='report_processor',
                          auto_commit_enable=True,
                          auto_commit_interval_ms=30 * 1000,
