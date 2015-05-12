@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import gzip
 import time
 import random
 import string
@@ -119,11 +120,13 @@ class ReportStreamEmitter(object):
 
     def parse(self, report_file):
         report_file.open('r')
-        report = Report(report_file)
+        in_file = gzip.GzipFile(fileobj=report_file)
+        report = Report(in_file)
         yield report.header['sanitised'], report.header['raw']
         for sanitised_report, raw_report in report.process():
             yield sanitised_report, raw_report
         yield report.footer['sanitised'], report.footer['raw']
+        in_file.close()
         report_file.close()
 
     def emit(self):
