@@ -83,10 +83,11 @@ class BucketManager(object):
 
         # If we have reached the acceptable block size we can flush to disk
         if self.date_buckets[report_date].len > self.max_bucket_size:
-            print "Flushing date bucket"
+            print("Flushing date bucket %s" % report_date)
             self.flush_date_bucket(report_date)
         else:
-            print "Date bucket is not yet full current size: %s" % self.date_buckets[report_date].len
+            print("Date bucket is not yet full current size: %s" %
+                  self.date_buckets[report_date].len)
 
 kafka_hosts = "manager.infra.ooni.nu:6667"
 
@@ -102,9 +103,8 @@ sanitised_bucket_manager = BucketManager(consumer, '.sanitised')
 
 # Infinite iteration
 for message in consumer:
-    print("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition,
-                                         message.offset, message.key,
-                                         message.value))
+    print("%s:%d:%d: key=%s" % (message.topic, message.partition,
+                                message.offset, message.key,))
 
     if message.topic == 'raw':
         raw_bucket_manager.add_message(message)
