@@ -3,3 +3,5 @@ client.cfg
 _build
 _resources
 logs
+*.pyc
+src/helpers/settings.py
