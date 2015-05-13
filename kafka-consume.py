@@ -4,7 +4,9 @@ import json
 import shutil
 from datetime import datetime
 from StringIO import StringIO
+
 from kafka import KafkaConsumer
+from kafka.common import ConsumerTimeout
 
 
 class TimedStringIO(StringIO):
@@ -21,23 +23,30 @@ class TimedStringIO(StringIO):
 
     def write(self, s):
         self._last_write = time.time()
+        self.reset_timeout()
         return StringIO.write(self, s)
 
 
 class BucketManager(object):
     max_bucket_size = 1024 * 1024 * 64
-    timeout = 30
     output_dir = '/data1/reports/'
 
-    def __init__(self, consumer, suffix):
+    def __init__(self, consumer, suffix, timeout=30):
         self.consumer = consumer
         self.suffix = suffix
+        self.timeout = timeout
+
         self.date_buckets = {}
         self.report_buckets = {}
         self.message_queue_bucket = {
             'reports': {},
             'dates': {}
         }
+
+    def check_timeouts(self):
+        for date, string in self.date_buckets.items():
+            if string.timed_out:
+                self.flush_date_bucket(date)
 
     def flush_date_bucket(self, date):
         self.date_buckets[date].seek(0)
@@ -101,32 +110,38 @@ class BucketManager(object):
         del self.report_buckets[report_id]
 
         # If we have reached the acceptable block size we can flush to disk
-        if self.date_buckets[report_date].len > self.max_bucket_size or \
-                self.date_buckets[report_date].timed_out is True:
+        if self.date_buckets[report_date].len > self.max_bucket_size:
             print("Flushing date bucket %s" % report_date)
             self.flush_date_bucket(report_date)
         else:
             print("Date bucket is not yet full current size: %s" %
                   self.date_buckets[report_date].len)
 
-kafka_hosts = "manager.infra.ooni.nu:6667"
 
+def consume_messages(raw_bucket_manager, sanitised_bucket_manager):
+    for message in consumer:
+        if message.topic == 'raw':
+            raw_bucket_manager.add_message(message)
+        elif message.topic == 'sanitised':
+            sanitised_bucket_manager.add_message(message)
+
+bucket_timeout = 30
+kafka_hosts = "manager.infra.ooni.nu:6667"
 consumer = KafkaConsumer('raw', 'sanitised',
                          metadata_broker_list=[kafka_hosts],
                          group_id='report_processor',
                          auto_commit_enable=True,
+                         consumer_timeout_ms=bucket_timeout * 1000,
                          auto_commit_interval_ms=30 * 1000,
                          auto_offset_reset='smallest')
 
-raw_bucket_manager = BucketManager(consumer, '.raw')
-sanitised_bucket_manager = BucketManager(consumer, '.sanitised')
+raw_bucket_manager = BucketManager(consumer, '.raw', bucket_timeout)
+sanitised_bucket_manager = BucketManager(consumer, '.sanitised',
+                                         bucket_timeout)
 
-# Infinite iteration
-for message in consumer:
-    # print("%s:%d:%d: key=%s" % (message.topic, message.partition,
-    #                             message.offset, message.key,))
-
-    if message.topic == 'raw':
-        raw_bucket_manager.add_message(message)
-    elif message.topic == 'sanitised':
-        sanitised_bucket_manager.add_message(message)
+while True:
+    try:
+        consume_messages()
+    except ConsumerTimeout:
+        raw_bucket_manager.check_timeouts()
+        sanitised_bucket_manager.check_timeouts()
