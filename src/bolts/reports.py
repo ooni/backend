@@ -1,6 +1,5 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
-import six
 from streamparse.bolt import Bolt
 
 from kafka import KafkaClient, KeyedProducer, SimpleProducer
@@ -17,7 +16,7 @@ class KafkaBolt(Bolt):
 
     def process(self, tup):
         report_id, record_type, report = tup.values
-        json_data = six.binary_type(json_dumps(report))
+        json_data = bytes(json_dumps(report))
         if record_type == "entry":
             self.keyed_producer.send('sanitised', report_id, 'e' + json_data)
         elif record_type == "header":
