@@ -8,7 +8,7 @@
     {"report-spout" (python-spout-spec
           options
           "spouts.reports.S3ReportsSpout"
-          ["report-id", "report-json"])
+          ["report-id", "record-type", "report-json"])
     }
     ;; bolt configuration
     {"kafka-bolt" (python-bolt-spec
