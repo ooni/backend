@@ -48,7 +48,7 @@ class Report(object):
             self._raw_header["report_id"] = date + nonce
 
         header_entry = self._raw_header.copy()
-        header_entry["record_type"] = "report_header"
+        header_entry["record_type"] = "header"
 
         self._sanitised_header = self.sanitise_header(header_entry)
 
@@ -60,7 +60,7 @@ class Report(object):
         return sanitise.run(self._raw_header['test_name'], entry)
 
     def process_entry(self, entry):
-        entry["record_type"] = "measurement"
+        entry["record_type"] = "entry"
 
         raw_entry = entry.copy()
         sanitised_entry = entry.copy()
@@ -78,7 +78,7 @@ class Report(object):
             self._end_time = time.time()
 
         extra_keys = {
-            'signature': 'XXX',
+            'record_type': 'footer',
             'stage_1_process_time': self._start_time - self._end_time
         }
 
