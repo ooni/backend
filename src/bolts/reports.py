@@ -27,3 +27,4 @@ class KafkaBolt(Bolt):
             payload = str("f" + json_data)
         self.keyed_producer.send(topic, report_id, payload)
         self.log('Processing: %s' % report_id)
+        self.ack(tup)

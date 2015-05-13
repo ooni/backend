@@ -18,6 +18,7 @@ class S3ReportsSpout(Spout):
             report_id = sanitised_report['report_id']
             t = [report_id, sanitised_report['record_type'], sanitised_report]
             self.emit(t)
+            self.ack(t)
         except StopIteration:
             self.log("Finished")
         except Exception:
