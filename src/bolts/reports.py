@@ -16,11 +16,12 @@ class KafkaBolt(Bolt):
 
     def process(self, tup):
         report_id, record_type, report = tup.values
-        json_data = bytes(json_dumps(report))
+        json_data = str(json_dumps(report))
+        report_id = str(report_id)
         if record_type == "entry":
-            self.keyed_producer.send('sanitised', report_id, 'e' + json_data)
+            self.keyed_producer.send("sanitised", report_id, "e" + json_data)
         elif record_type == "header":
-            self.keyed_producer.send('sanitised', report_id, 'h' + json_data)
+            self.keyed_producer.send("sanitised", report_id, "h" + json_data)
         elif record_type == "footer":
-            self.keyed_producer.send('sanitised', report_id, 'f' + json_data)
+            self.keyed_producer.send("sanitised", report_id, "f" + json_data)
         self.log('Processing: %s' % report_id)
