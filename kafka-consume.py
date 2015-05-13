@@ -23,7 +23,6 @@ class TimedStringIO(StringIO):
 
     def write(self, s):
         self._last_write = time.time()
-        self.reset_timeout()
         return StringIO.write(self, s)
 
 
