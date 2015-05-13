@@ -141,7 +141,7 @@ sanitised_bucket_manager = BucketManager(consumer, '.sanitised',
 
 while True:
     try:
-        consume_messages()
+        consume_messages(raw_bucket_manager, sanitised_bucket_manager)
     except ConsumerTimeout:
         raw_bucket_manager.check_timeouts()
         sanitised_bucket_manager.check_timeouts()
