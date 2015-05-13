@@ -49,6 +49,7 @@ class BucketManager(object):
         if data[0] in ('e', 'h'):
             self.add_to_report_bucket(report_id, data[1:])
         elif data[0] == 'f':
+            print "Got a footer"
             report = json.loads(data[1:])
             self.add_to_date_bucket(report)
         elif data[0] == 'd':
@@ -82,7 +83,10 @@ class BucketManager(object):
 
         # If we have reached the acceptable block size we can flush to disk
         if self.date_buckets[report_date].len > self.max_bucket_size:
+            print "Flushing date bucket"
             self.flush_date_bucket(report_date)
+        else:
+            print "Date bucket is not yet full current size: %s" % self.date_buckets[report_date].len
 
 kafka_hosts = "manager.infra.ooni.nu:6667"
 
