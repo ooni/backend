@@ -48,6 +48,7 @@ class BucketManager(object):
                 self.flush_date_bucket(date)
 
     def flush_date_bucket(self, date):
+        print("Flushing date bucket %s" % date)
         self.date_buckets[date].seek(0)
         with open(os.path.join(self.output_dir,
                                date + self.suffix), 'a+') as f:
@@ -110,7 +111,6 @@ class BucketManager(object):
 
         # If we have reached the acceptable block size we can flush to disk
         if self.date_buckets[report_date].len > self.max_bucket_size:
-            print("Flushing date bucket %s" % report_date)
             self.flush_date_bucket(report_date)
         else:
             print("Date bucket is not yet full current size: %s" %
