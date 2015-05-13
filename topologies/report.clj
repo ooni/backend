@@ -18,7 +18,7 @@
           {"report-spout" ["report-id"]}
           "bolts.reports.KafkaBolt"
           []
-          :p 1
+          :p 12
           )
     }
   ]
