@@ -4,6 +4,7 @@ from streamparse.bolt import Bolt
 
 from kafka import KafkaClient, KeyedProducer, SimpleProducer
 from helpers.settings import config
+from helpers.util import json_dumps
 
 
 class KafkaBolt(Bolt):
@@ -14,7 +15,8 @@ class KafkaBolt(Bolt):
         self.simple_producer = SimpleProducer(self.kafka_client)
 
     def process(self, tup):
-        report_id, record_type, json_data = tup.values
+        report_id, record_type, report = tup.values
+        json_data = json_dumps(report)
         if record_type == "entry":
             self.keyed_producer.send('sanitised', report_id, 'e' + json_data)
         elif record_type == "header":
