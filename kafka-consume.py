@@ -3,7 +3,6 @@ import json
 import shutil
 from datetime import datetime
 from StringIO import StringIO
-from luigi.configuration import get_config
 from kafka import KafkaConsumer
 
 
@@ -85,11 +84,10 @@ class BucketManager(object):
         if self.date_buckets[report_date].len > self.max_bucket_size:
             self.flush_date_bucket(report_date)
 
-config = get_config()
-kafka_hosts = config.get('kafka', 'hosts')
+kafka_hosts = "manager.infra.ooni.nu:6667"
 
 consumer = KafkaConsumer('raw', 'sanitised',
-                         bootstrap_servers=[kafka_hosts],
+                         metadata_broker_list=[kafka_hosts],
                          group_id='report_processor',
                          auto_commit_enable=True,
                          auto_commit_interval_ms=30 * 1000,
