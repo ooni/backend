@@ -23,10 +23,6 @@ class Report(object):
         self._report = yaml.safe_load_all(self.in_file)
         self.process_header(self._report)
 
-    def failure(self, traceback, state):
-        print("Fail in %s" % state)
-        print(traceback)
-
     def sanitise_header(self, entry):
         return entry
 
@@ -55,7 +51,7 @@ class Report(object):
     def sanitise_entry(self, entry):
         # XXX we probably want to ignore these sorts of tests
         if not self._sanitised_header.get('test_name'):
-            self.failure("MISSING TEST_NAME", "sanitise_entry")
+            print("MISSING TEST_NAME", "sanitise_entry")
             return entry
         return sanitise.run(self._raw_header['test_name'], entry)
 
@@ -99,8 +95,6 @@ class Report(object):
                 yield self.process_entry(entry)
             except StopIteration:
                 break
-            except Exception:
-                self.failure(traceback.format_exc(), "process_entry")
 
 
 def uncompress_to_disk(report_file):

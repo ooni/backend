@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import shutil
 from datetime import datetime
@@ -6,8 +7,26 @@ from StringIO import StringIO
 from kafka import KafkaConsumer
 
 
+class TimedStringIO(StringIO):
+    def __init__(self, timeout=10, *args, **kw):
+        self.timeout = timeout
+        self._last_write = time.time()
+        StringIO.__init__(self, *args, **kw)
+
+    @property
+    def timed_out(self):
+        if time.time() - self._last_write > self.timeout:
+            return True
+        return False
+
+    def write(self, s):
+        self._last_write = time.time()
+        return StringIO.write(self, s)
+
+
 class BucketManager(object):
     max_bucket_size = 1024 * 1024 * 64
+    timeout = 30
     output_dir = '/data1/reports/'
 
     def __init__(self, consumer, suffix):
@@ -57,7 +76,7 @@ class BucketManager(object):
 
     def add_to_report_bucket(self, report_id, report_data):
         if not self.report_buckets.get(report_id):
-            self.report_buckets[report_id] = StringIO()
+            self.report_buckets[report_id] = TimedStringIO(self.timeout)
         self.report_buckets[report_id].write(report_data)
         self.report_buckets[report_id].write("\n")
 
@@ -66,7 +85,7 @@ class BucketManager(object):
             report['start_time']).strftime('%Y-%m-%d')
         report_id = report['report_id']
         if not self.date_buckets.get(report_date):
-            self.date_buckets[report_date] = StringIO()
+            self.date_buckets[report_date] = TimedStringIO(self.timeout)
 
         # Move the messages from the report bucket into the date bucket
         if not self.message_queue_bucket['dates'].get(report_date):
@@ -82,7 +101,8 @@ class BucketManager(object):
         del self.report_buckets[report_id]
 
         # If we have reached the acceptable block size we can flush to disk
-        if self.date_buckets[report_date].len > self.max_bucket_size:
+        if self.date_buckets[report_date].len > self.max_bucket_size or \
+                self.date_buckets[report_date].timed_out is True:
             print("Flushing date bucket %s" % report_date)
             self.flush_date_bucket(report_date)
         else:
@@ -103,8 +123,8 @@ sanitised_bucket_manager = BucketManager(consumer, '.sanitised')
 
 # Infinite iteration
 for message in consumer:
-    print("%s:%d:%d: key=%s" % (message.topic, message.partition,
-                                message.offset, message.key,))
+    # print("%s:%d:%d: key=%s" % (message.topic, message.partition,
+    #                             message.offset, message.key,))
 
     if message.topic == 'raw':
         raw_bucket_manager.add_message(message)
