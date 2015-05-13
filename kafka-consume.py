@@ -117,12 +117,17 @@ class BucketManager(object):
                   self.date_buckets[report_date].len)
 
 
-def consume_messages(raw_bucket_manager, sanitised_bucket_manager):
+def consume_messages(raw_bucket_manager, sanitised_bucket_manager, timeout):
+    last_check = time.time()
     for message in consumer:
         if message.topic == 'raw':
             raw_bucket_manager.add_message(message)
         elif message.topic == 'sanitised':
             sanitised_bucket_manager.add_message(message)
+
+        if time.time() - last_check > timeout:
+            raw_bucket_manager.check_timeouts()
+            sanitised_bucket_manager.check_timeouts()
 
 bucket_timeout = 30
 kafka_hosts = "manager.infra.ooni.nu:6667"
