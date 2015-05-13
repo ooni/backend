@@ -50,9 +50,12 @@ class BucketManager(object):
     def flush_date_bucket(self, date):
         print("Flushing date bucket %s" % date)
         self.date_buckets[date].seek(0)
-        with open(os.path.join(self.output_dir,
-                               date + self.suffix), 'a+') as f:
-            shutil.copyfileobj(self.date_buckets[date], f)
+        base_name = os.path.join(self.output_dir, date + self.suffix)
+        idx = 1
+        while os.path.exists("%s-%s" % (base_name, idx)):
+            dst_file = "%s"
+        with open(dst_file, 'w+') as out_file:
+            shutil.copyfileobj(self.date_buckets[date], out_file)
         while True:
             try:
                 message = self.message_queue_bucket['dates'][date].pop()
@@ -100,8 +103,12 @@ class BucketManager(object):
         # Move the messages from the report bucket into the date bucket
         if not self.message_queue_bucket['dates'].get(report_date):
             self.message_queue_bucket['dates'][report_date] = []
-        self.message_queue_bucket['dates'][report_date] += \
-            self.message_queue_bucket['reports'].pop(report_id)
+        while True:
+            try:
+                m = self.message_queue_bucket['reports'][report_id].pop()
+                self.message_queue_bucket['dates'][report_date] += m
+            except IndexError:
+                break
 
         # Move the reports from the report bucket into the date bucket
         self.report_buckets[report_id].seek(0)
