@@ -15,5 +15,5 @@ class S3ReportsSpout(Spout):
     def next_tuple(self):
         sanitised_report, raw_report = next(self.reports)
         report_id = sanitised_report['report_id']
-        t = (report_id, sanitised_report['record_type'], sanitised_report)
+        t = [report_id, sanitised_report['record_type'], sanitised_report]
         self.emit(t)
