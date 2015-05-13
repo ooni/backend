@@ -1,25 +1,34 @@
 (ns report
-  (:use     [streamparse.specs])
+  (:use     
+      [backtype.storm.clojure]
+      [reports.spouts.report_uri_spout :only [spout] :rename {spout report-uri-spout}]
+      [streamparse.specs]
+  )
   (:gen-class))
 
 (defn report [options]
    [
-    ;; spout configuration
-    {"report-spout" (python-spout-spec
-          options
-          "spouts.reports.S3ReportsSpout"
-          ["report-id", "record-type", "report-json"]
-          :p 24
-          )
-    }
+    ;; spout configurations
+    {"report-uri-spout" (spout-spec report-uri-spout :p 1)}
+
     ;; bolt configuration
-    {"kafka-bolt" (python-bolt-spec
-          options
-          {"report-spout" ["report-id"]}
-          "bolts.reports.KafkaBolt"
-          []
-          :p 12
-          )
+    {
+      
+      "report-parse-bolt" (python-bolt-spec
+        options
+        {"report-uri-spout" :shuffle}
+        "bolts.reports.ReportParseBolt"
+        ["report-id", "record-type", "report-json"]
+        :p 12)
+
+      "kafka-bolt" (python-bolt-spec
+        options
+        {"report-spout" ["report-id"]}
+        "bolts.reports.KafkaBolt"
+        []
+        :p 1)
+
+
     }
   ]
 )

@@ -6,7 +6,7 @@ from datetime import datetime
 from StringIO import StringIO
 
 from kafka import KafkaConsumer
-from kafka.common import ConsumerTimeout
+from kafka.common import ConsumerTimeout, KafkaMessage
 
 
 class TimedStringIO(StringIO):
@@ -51,21 +51,27 @@ class BucketManager(object):
         print("Flushing date bucket %s" % date)
         self.date_buckets[date].seek(0)
         base_name = os.path.join(self.output_dir, date + self.suffix)
-        idx = 1
-        dst_file = "%s-%s" % (base_name, idx)
+        idx = 0
         while os.path.exists("%s-%s" % (base_name, idx)):
-            dst_file = "%s-%s" % (base_name, idx)
+            idx += 1
+        dst_file = "%s-%s" % (base_name, idx)
         with open(dst_file, 'w+') as out_file:
             shutil.copyfileobj(self.date_buckets[date], out_file)
         while True:
             try:
                 message = self.message_queue_bucket['dates'][date].pop()
+                if isinstance(message, KafkaMessage):
+                    print("It's of the good type")
+                else:
+                    print("No good")
+                    print(message)
                 self.consumer.task_done(message)
             except IndexError:
                 break
-        del self.date_buckets[date]
         # Let's also flush the consumer commit log
         self.consumer.commit()
+        # Delete the date in this key
+        del self.date_buckets[date]
 
     def flush_all(self):
         for date, _ in self.date_buckets.items():
@@ -76,16 +82,22 @@ class BucketManager(object):
         report_id = message.key
         if not self.message_queue_bucket['reports'].get(report_id):
             self.message_queue_bucket['reports'][report_id] = []
+        if isinstance(message, KafkaMessage):
+            # print("Reports: It's of the good type")
+            pass
+        else:
+            print("Reports: No good")
+            print(message)
         self.message_queue_bucket['reports'][report_id].append(message)
 
-        if data[0] in ('e', 'h'):
+        if data[0] in ("e", "h"):
+            print("Got a %s" % data[0])
             self.add_to_report_bucket(report_id, data[1:])
-        elif data[0] == 'f':
-            print "Got a footer"
+        elif data[0] == "f":
             report = json.loads(data[1:])
             self.add_to_report_bucket(report_id, data[1:])
             self.add_to_date_bucket(report)
-        elif data[0] == 'd':
+        elif data[0] == "d":
             self.flush_all()
 
     def add_to_report_bucket(self, report_id, report_data):
@@ -107,7 +119,13 @@ class BucketManager(object):
         while True:
             try:
                 m = self.message_queue_bucket['reports'][report_id].pop()
-                self.message_queue_bucket['dates'][report_date] += m
+                if isinstance(m, KafkaMessage):
+                    pass
+                    # print("Reports: It's of the good type")
+                else:
+                    print("Dates: No good")
+                    print(m)
+                self.message_queue_bucket['dates'][report_date].append(m)
             except IndexError:
                 break
 
