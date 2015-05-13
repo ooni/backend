@@ -79,6 +79,7 @@ class BucketManager(object):
         elif data[0] == 'f':
             print "Got a footer"
             report = json.loads(data[1:])
+            self.add_to_report_bucket(report_id, data[1:])
             self.add_to_date_bucket(report)
         elif data[0] == 'd':
             self.flush_all()
