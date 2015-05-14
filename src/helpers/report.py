@@ -8,11 +8,10 @@ from helpers import sanitise
 
 
 class Report(object):
-    _end_time = None
-    _start_time = None
-
     def __init__(self, in_file):
         self._start_time = time.time()
+        self._end_time = None
+        self._skipped_line = 0
 
         self.in_file = in_file
         self._report = yaml.safe_load_all(self.in_file)
@@ -91,6 +90,18 @@ class Report(object):
             "sanitised": sanitised
         }
 
+    def _restart_from_line(self, line_number):
+        """
+        This is used to skip to the specified line number in case of YAML
+        parsing erorrs. We also add to self._skipped_line since the YAML parsed
+        will consider the line count as relative to the start of the document.
+        """
+        self._skipped_line = line_number+self._skipped_line+1
+        self.in_file.seek(0)
+        for _ in xrange(self._skipped_line):
+            self.in_file.readline()
+        self._report = yaml.safe_load_all(self.in_file)
+
     def process(self):
         while True:
             try:
@@ -100,4 +111,7 @@ class Report(object):
                 yield self.process_entry(entry)
             except StopIteration:
                 break
+            except Exception as exc:
+                self._restart_from_line(exc.problem_mark.line)
+                continue
         self._end_time = time.time()
