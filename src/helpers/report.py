@@ -1,4 +1,3 @@
-import os
 import time
 import random
 import string
@@ -20,10 +19,10 @@ class Report(object):
         self.process_header(self._report)
 
     def entries(self):
-        yield report.header['sanitised'], report.header['raw']
+        yield self.header['sanitised'], self.header['raw']
         for sanitised_report, raw_report in self.process():
             yield sanitised_report, raw_report
-        yield report.footer['sanitised'], report.footer['raw']
+        yield self.footer['sanitised'], self.footer['raw']
 
     def sanitise_header(self, entry):
         return entry
@@ -102,15 +101,3 @@ class Report(object):
             except StopIteration:
                 break
         self._end_time = time.time()
-
-
-
-class XXReport(object):
-    def emit(self):
-        for report_file in self.next_report():
-            for sanitised_report, raw_report in self.parse(report_file):
-                yield sanitised_report, raw_report
-
-    def next_report(self):
-        for key in self.bucket.list(self.folder):
-            yield key

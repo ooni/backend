@@ -1,8 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 import os
 
-from urlparse import urlparse
-
 from streamparse.bolt import Bolt
 
 from kafka import KafkaClient, KeyedProducer, SimpleProducer
@@ -10,7 +8,8 @@ from helpers.settings import config
 from helpers.util import json_dumps
 
 from helpers.s3 import S3Downloader
-from helpers.reports import Report
+from helpers.report import Report
+
 
 class ReportParseBolt(Bolt):
     def initialize(self, stormconf, ctx):
@@ -23,7 +22,7 @@ class ReportParseBolt(Bolt):
     def process(self, tup):
         report_uri = tup.values[0]
         if report_uri.startswith('s3'):
-            in_file = self.s3_downloader(uri)
+            in_file = self.s3_downloader.download(report_uri)
         else:
             self.fail(tup)
             raise Exception("Unsupported URI")
@@ -31,8 +30,11 @@ class ReportParseBolt(Bolt):
         for sanitised_entry, raw_entry in report.entries():
             report_id = sanitised_entry["report_id"]
             record_type = sanitised_entry["record_type"]
-            self.emit([report_id, record_type, sanitised_entry])
-        os.remove(in_file.path)
+            s_report_data = json_dumps(sanitised_entry)
+            self.emit([report_id, record_type, s_report_data])
+        in_file.close()
+        os.remove(in_file.name)
+
 
 class KafkaBolt(Bolt):
 
@@ -42,9 +44,9 @@ class KafkaBolt(Bolt):
         self.simple_producer = SimpleProducer(self.kafka_client)
 
     def process(self, tup):
-        report_id, record_type, report = tup.values
+        report_id, record_type, report_data = tup.values
         self.log('Processing: %s' % report_id)
-        json_data = json_dumps(report)
+        json_data = str(report_data)
         report_id = str(report_id)
         topic = str("sanitised")
         if record_type == "entry":

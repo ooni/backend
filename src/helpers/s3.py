@@ -19,7 +19,8 @@ class S3Downloader(object):
             if not chunk:
                 break
             fp.write(decompressor.decompress(chunk))
-        fp.close()
+        fp.flush()
+        fp.seek(0)
 
     def download(self, uri, fp=None):
         p = urlparse(uri)
@@ -31,7 +32,7 @@ class S3Downloader(object):
         key.open('r')
 
         if fp is None:
-            fp = tempfile.NamedTemporaryFile('wb',
+            fp = tempfile.NamedTemporaryFile('wb+',
                                              prefix='s3-downloader-tmp',
                                              delete=False)
         if p.path.endswith('.gz'):

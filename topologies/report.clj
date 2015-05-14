@@ -23,7 +23,7 @@
 
       "kafka-bolt" (python-bolt-spec
         options
-        {"report-spout" ["report-id"]}
+        {"report-parse-bolt" ["report-id"]}
         "bolts.reports.KafkaBolt"
         []
         :p 1)
