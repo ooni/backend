@@ -112,6 +112,9 @@ class Report(object):
             except StopIteration:
                 break
             except Exception as exc:
-                self._restart_from_line(exc.problem_mark.line)
+                if hasattr(exc, 'problem_mark'):
+                    self._restart_from_line(exc.problem_mark.line)
+                else:
+                    raise exc
                 continue
         self._end_time = time.time()

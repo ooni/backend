@@ -19,13 +19,7 @@ class ReportParseBolt(Bolt):
         self.s3_downloader = S3Downloader(access_key_id, secret_access_key,
                                           bucket_name)
 
-    def process(self, tup):
-        report_uri = tup.values[0]
-        if report_uri.startswith('s3'):
-            in_file = self.s3_downloader.download(report_uri)
-        else:
-            self.fail(tup)
-            raise Exception("Unsupported URI")
+    def process_report(self, in_file):
         report = Report(in_file)
         for sanitised_entry, raw_entry in report.entries():
             report_id = sanitised_entry["report_id"]
@@ -35,6 +29,19 @@ class ReportParseBolt(Bolt):
         in_file.close()
         os.remove(in_file.name)
 
+    def process(self, tup):
+        report_uri = tup.values[0]
+        if report_uri.startswith('s3'):
+            in_file = self.s3_downloader.download(report_uri)
+        else:
+            self.fail(tup)
+            raise Exception("Unsupported URI")
+
+        try:
+            self.process_report(in_file)
+        except Exception as exc:
+            self.fail(tup)
+            raise exc
 
 class KafkaBolt(Bolt):
 
