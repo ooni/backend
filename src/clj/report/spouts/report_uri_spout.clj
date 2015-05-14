@@ -1,4 +1,4 @@
-(ns reports.spouts.report_uri_spout
+(ns report.spouts.report_uri_spout
   (:import [storm.kafka SpoutConfig KafkaSpout KafkaConfig KafkaConfig
                         StringScheme ZkHosts]
            [backtype.storm.spout SchemeAsMultiScheme]))

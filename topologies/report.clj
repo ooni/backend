@@ -1,7 +1,7 @@
 (ns report
   (:use     
       [backtype.storm.clojure]
-      [reports.spouts.report_uri_spout :only [spout] :rename {spout report-uri-spout}]
+      [report.spouts.report_uri_spout :only [spout] :rename {spout report-uri-spout}]
       [streamparse.specs]
   )
   (:gen-class))
