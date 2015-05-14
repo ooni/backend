@@ -108,7 +108,7 @@ def null(entry):
 
 
 def bridge_reachability_tcp_connect(entry):
-    if entry['input'].strip() in bridge_db_mapping.keys():
+    if entry['input'] and entry['input'].strip() in bridge_db_mapping.keys():
         b = bridge_db_mapping[entry['input'].strip()]
         fingerprint = b['fingerprint'].decode('hex')
         hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
@@ -122,7 +122,8 @@ def bridge_reachability(entry):
     if not entry.get('bridge_address'):
         entry['bridge_address'] = entry['input']
 
-    if entry['bridge_address'].strip() in bridge_db_mapping:
+    if entry['bridge_address'] and \
+            entry['bridge_address'].strip() in bridge_db_mapping:
         b = bridge_db_mapping[entry['bridge_address'].strip()]
         entry['distributor'] = b['distributor']
         entry['transport'] = b['transport']
