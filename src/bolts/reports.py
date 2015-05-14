@@ -41,6 +41,7 @@ class ReportParseBolt(Bolt):
             self.process_report(in_file)
         except Exception as exc:
             self.fail(tup)
+            print(traceback.format_exc())
             raise exc
 
 class KafkaBolt(Bolt):
