@@ -19,14 +19,14 @@
         {"report-uri-spout" :shuffle}
         "bolts.reports.ReportParseBolt"
         ["report-id", "record-type", "report-json"]
-        :p 12)
+        :p 24)
 
       "kafka-bolt" (python-bolt-spec
         options
         {"report-parse-bolt" ["report-id"]}
         "bolts.reports.KafkaBolt"
         []
-        :p 1)
+        :p 12)
 
 
     }

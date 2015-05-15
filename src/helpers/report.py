@@ -115,6 +115,8 @@ class Report(object):
                 if hasattr(exc, 'problem_mark'):
                     self._restart_from_line(exc.problem_mark.line)
                 else:
+                    print("Failed in processing the entry")
+                    print(traceback.format_exc())
                     raise exc
                 continue
         self._end_time = time.time()
