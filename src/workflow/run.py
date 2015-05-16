@@ -142,12 +142,6 @@ class ReportParsePipe(Pipe):
             report_id = sanitised_entry["report_id"]
             record_type = sanitised_entry["record_type"]
             s_report_data = json_dumps(sanitised_entry)
-            if record_type == "entry":
-                s_report_data = str("e" + s_report_data)
-            elif record_type == "header":
-                s_report_data = str("h" + s_report_data)
-            elif record_type == "footer":
-                s_report_data = str("f" + s_report_data)
             yield report_id, record_type, s_report_data
         in_file.close()
         os.remove(in_file.name)
