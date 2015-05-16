@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from multiprocessing import Process, Semaphore, Queue
 
 
@@ -14,6 +15,9 @@ class BaseNode(object):
         self.pipes = []
         self.start_time = None
         self.initialize()
+
+    def log(self, msg):
+        print("%s: %s" % (datetime.now(), msg))
 
     def send(self, data):
         for pipe in self.pipes:

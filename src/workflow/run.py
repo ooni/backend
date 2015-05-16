@@ -124,6 +124,7 @@ class S3AddressEmitter(Emitter):
 
         for key in bucket.list(folder):
             report_uri = "s3://%s/%s" % (bucket_name, key.name)
+            self.log("Emitting %s" % report_uri)
             yield report_uri
 
 
@@ -152,6 +153,7 @@ class ReportParsePipe(Pipe):
         os.remove(in_file.name)
 
     def process(self, report_uri):
+        self.log("Got %s" % report_uri)
         if report_uri.startswith('s3'):
             in_file = self.s3_downloader.download(report_uri)
         else:
@@ -187,7 +189,13 @@ class BucketPipe(Pipe):
         self.bucket_manager = BucketManager(".sanitised", self.timeout)
 
     def process(self, data):
+        self.log("Bucketing %s" % data)
         self.bucket_manager.add_message(data)
         if time.time() - self.last_check > self.timeout:
             self.bucket_manager.check_timeouts()
             self.last_check = time.time()
+
+s3_address_emitter = S3AddressEmitter(1)
+report_parse_pipe = ReportParsePipe(24)
+serialize_pipe = SerializePipe(12)
+bucket_pipe = BucketPipe(1)
