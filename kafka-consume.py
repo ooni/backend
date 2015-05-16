@@ -5,9 +5,12 @@ import shutil
 from datetime import datetime
 from StringIO import StringIO
 
-from kafka import KafkaConsumer
-from kafka.common import ConsumerTimeout, KafkaMessage
+# from kafka import KafkaConsumer
+# from kafka.common import ConsumerTimeout, KafkaMessage
 
+from pykafka.commit import Message as KafkaMessage
+from pykafka.exceptions import ConsumerStoppedException
+from pykafka import KafkaClient
 
 class TimedStringIO(StringIO):
     def __init__(self, timeout=10, *args, **kw):
@@ -144,36 +147,37 @@ class BucketManager(object):
                   self.date_buckets[report_date].len)
 
 
-def consume_messages(raw_bucket_manager, sanitised_bucket_manager, timeout):
+def consume_messages(consumer, bucket_manager, timeout):
     last_check = time.time()
     for message in consumer:
-        if message.topic == 'raw':
-            raw_bucket_manager.add_message(message)
-        elif message.topic == 'sanitised':
-            sanitised_bucket_manager.add_message(message)
-
+        bucket_manager.add_message(message)
         if time.time() - last_check > timeout:
-            raw_bucket_manager.check_timeouts()
-            sanitised_bucket_manager.check_timeouts()
+            bucket_manager.check_timeouts()
 
 bucket_timeout = 30
 kafka_hosts = "manager.infra.ooni.nu:6667"
-consumer = KafkaConsumer('raw', 'sanitised',
-                         metadata_broker_list=[kafka_hosts],
-                         group_id='report_processor',
-                         auto_commit_enable=True,
-                         consumer_timeout_ms=bucket_timeout * 1000,
-                         auto_commit_interval_ms=30 * 1000,
-                         auto_offset_reset='smallest')
+topic_name = "sanitised"
 
-raw_bucket_manager = BucketManager(consumer, '.raw', bucket_timeout)
-sanitised_bucket_manager = BucketManager(consumer, '.sanitised',
-                                         bucket_timeout)
+# consumer = KafkaConsumer('raw', 'sanitised',
+#                          metadata_broker_list=[kafka_hosts],
+#                          group_id='report_processor',
+#                          auto_commit_enable=True,
+#                          consumer_timeout_ms=bucket_timeout * 1000,
+#                          auto_commit_interval_ms=30 * 1000,
+#                          auto_offset_reset='smallest')
+
+client = KafkaClient(hosts=kafka_hosts)
+consumer = client.topics[topic_name].get_simple_consumer(
+    consumer_group="report_"+topic_name,
+    auto_commit_enable=True,
+    auto_commit_interval_ms=30 * 1000,
+    consumer_timeout_ms=bucket_timeout * 1000
+)
+
+bucket_manager = BucketManager(consumer, "."+topic_name, bucket_timeout)
 
 while True:
     try:
-        consume_messages(raw_bucket_manager, sanitised_bucket_manager,
-                         bucket_timeout)
-    except ConsumerTimeout:
-        raw_bucket_manager.check_timeouts()
-        sanitised_bucket_manager.check_timeouts()
+        consume_messages(consumer, bucket_manager, bucket_timeout)
+    except ConsumerStoppedException:
+        bucket_manager.check_timeouts()
