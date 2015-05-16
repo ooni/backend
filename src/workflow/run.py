@@ -72,10 +72,8 @@ class BucketManager(object):
         for date, _ in self.date_buckets.items():
             self.flush_date_bucket(date)
 
-    def add_message(self, message):
-        report_id, data = message
+    def add_message(self, report_id, data):
         if data[0] in ("e", "h"):
-            print("Got a %s" % data[0])
             self.add_to_report_bucket(report_id, data[1:])
         elif data[0] == "f":
             report = json.loads(data[1:])
@@ -142,7 +140,8 @@ class ReportParsePipe(Pipe):
             report_id = sanitised_entry["report_id"]
             record_type = sanitised_entry["record_type"]
             s_report_data = json_dumps(sanitised_entry)
-            yield report_id, record_type, s_report_data
+            r_report_data = json_dumps(raw_entry)
+            yield report_id, record_type, s_report_data, r_report_data
         in_file.close()
         os.remove(in_file.name)
 
@@ -154,8 +153,8 @@ class ReportParsePipe(Pipe):
             raise Exception("Unsupported URI")
 
         try:
-            for i, s, r in self.process_report(in_file):
-                yield i, s, r
+            for r_id, r_type, s_d, r_d in self.process_report(in_file):
+                yield r_id, r_type, s_d, r_d
         except Exception as exc:
             print(traceback.format_exc())
             raise exc
@@ -163,31 +162,39 @@ class ReportParsePipe(Pipe):
 
 class SerializePipe(Pipe):
     def process(self, data):
-        report_id, record_type, report_data = data
+        report_id, record_type, s_payload, r_payload = data
         self.log('Processing: %s' % report_id)
-        json_data = str(report_data)
+        s_payload = str(s_payload)
+        r_payload = str(r_payload)
         report_id = str(report_id)
         if record_type == "entry":
-            payload = str("e" + json_data)
+            s_payload = str("e" + s_payload)
+            r_payload = str("e" + r_payload)
         elif record_type == "header":
-            payload = str("h" + json_data)
+            s_payload = str("h" + s_payload)
+            r_payload = str("h" + r_payload)
         elif record_type == "footer":
-            payload = str("f" + json_data)
-        yield report_id, payload
+            s_payload = str("f" + s_payload)
+            r_payload = str("f" + r_payload)
+        yield report_id, s_payload, r_payload
 
 
 class BucketPipe(Pipe):
     def initialize(self):
         self.last_check = time.time()
         self.timeout = 30
-        self.bucket_manager = BucketManager(".sanitised", self.timeout)
+        self.raw_bucket_manager = BucketManager(".raw", self.timeout)
+        self.sanitised_bucket_manager = BucketManager(".raw", self.timeout)
 
     def process(self, data):
-        self.log("Bucketing")
-        print(data)
-        self.bucket_manager.add_message(data)
+        report_id = data[0]
+        s_payload, r_payload = data[1:]
+        self.log("Bucketing %s" % report_id)
+        self.sanitised_bucket_manager.add_message(report_id, s_payload)
+        self.raw_bucket_manager.add_message(report_id, r_payload)
         if time.time() - self.last_check > self.timeout:
-            self.bucket_manager.check_timeouts()
+            self.sanitised_bucket_manager.check_timeouts()
+            self.raw_bucket_manager.check_timeouts()
             self.last_check = time.time()
 
 s3_address_emitter = S3AddressEmitter(1)

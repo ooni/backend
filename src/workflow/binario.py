@@ -5,7 +5,7 @@ from multiprocessing import Process, Semaphore, JoinableQueue
 
 
 class BaseNode(object):
-    def __init__(self, concurrency=1):
+    def __init__(self, concurrency=1, *args, **kw):
         self.concurrency = concurrency
 
         self.input_queue = JoinableQueue()
@@ -17,7 +17,7 @@ class BaseNode(object):
 
         self.pipes = []
         self.start_time = None
-        self.initialize()
+        self.initialize(*args, **kw)
 
     def initialize(self):
         pass
