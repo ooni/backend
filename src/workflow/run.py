@@ -199,3 +199,9 @@ s3_address_emitter = S3AddressEmitter(1)
 report_parse_pipe = ReportParsePipe(24)
 serialize_pipe = SerializePipe(12)
 bucket_pipe = BucketPipe(1)
+
+s3_address_emitter.into(report_parse_pipe)
+report_parse_pipe.into(serialize_pipe)
+serialize_pipe.into(bucket_pipe)
+
+s3_address_emitter.start()
