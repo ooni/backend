@@ -160,7 +160,8 @@ class ReportParsePipe(Pipe):
             raise Exception("Unsupported URI")
 
         try:
-            self.process_report(in_file)
+            for s, r in self.process_report(in_file):
+                yield s, r
         except Exception as exc:
             print(traceback.format_exc())
             raise exc
