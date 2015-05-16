@@ -173,14 +173,13 @@ class SerializePipe(Pipe):
         self.log('Processing: %s' % report_id)
         json_data = str(report_data)
         report_id = str(report_id)
-        topic = str("sanitised")
         if record_type == "entry":
             payload = str("e" + json_data)
         elif record_type == "header":
             payload = str("h" + json_data)
         elif record_type == "footer":
             payload = str("f" + json_data)
-        self.keyed_producer.send(topic, report_id, payload)
+        yield report_id, payload
 
 
 class BucketPipe(Pipe):
