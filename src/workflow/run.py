@@ -59,11 +59,12 @@ class BucketManager(object):
         print("Flushing date bucket %s" % date)
         self.date_buckets[date].seek(0)
         base_name = os.path.join(self.output_dir, date + self.suffix)
-        idx = 0
-        while os.path.exists("%s-%s" % (base_name, idx)):
-            idx += 1
-        dst_file = "%s-%s" % (base_name, idx)
-        with open(dst_file, 'w+') as out_file:
+        # Currently disabled generating new names for entries
+        # idx = 0
+        # while os.path.exists("%s-%s" % (base_name, idx)):
+        #     idx += 1
+        # dst_file = "%s-%s" % (base_name, idx)
+        with open(base_name, 'a+') as out_file:
             shutil.copyfileobj(self.date_buckets[date], out_file)
         # Delete the date in this key
         del self.date_buckets[date]
