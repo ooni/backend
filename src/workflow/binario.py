@@ -16,6 +16,9 @@ class BaseNode(object):
         self.start_time = None
         self.initialize()
 
+    def initialize(self):
+        pass
+
     def log(self, msg):
         print("%s: %s" % (datetime.now(), msg))
 
