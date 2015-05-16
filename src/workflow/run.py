@@ -189,7 +189,8 @@ class BucketPipe(Pipe):
         self.bucket_manager = BucketManager(".sanitised", self.timeout)
 
     def process(self, data):
-        self.log("Bucketing %s" % data)
+        self.log("Bucketing")
+        print(data)
         self.bucket_manager.add_message(data)
         if time.time() - self.last_check > self.timeout:
             self.bucket_manager.check_timeouts()
