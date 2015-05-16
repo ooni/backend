@@ -72,11 +72,12 @@ class Pipe(BaseNode):
         while True:
             data = self.input_queue.get()
             try:
-                items = iter(self.process(data))
+                output = self.process(data)
+                items = iter(output)
                 for output in items:
                     self.send(output)
             except TypeError:
-                pass
+                self.send(output)
             except Exception:
                 print("Failed to process")
                 print(traceback.format_exc())
