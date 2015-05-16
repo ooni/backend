@@ -1,15 +1,17 @@
 import time
 import traceback
 from datetime import datetime
-from multiprocessing import Process, Semaphore, Queue
+from multiprocessing import Process, Semaphore, JoinableQueue
 
 
 class BaseNode(object):
     def __init__(self, concurrency=1):
         self.concurrency = concurrency
 
-        self.input_queue = Queue()
-        self.output_queue = Queue()
+        self.input_queue = JoinableQueue()
+        self.output_queue = JoinableQueue()
+
+        self.processes = []
 
         self.semaphore = Semaphore(concurrency)
 
@@ -20,6 +22,9 @@ class BaseNode(object):
     def initialize(self):
         pass
 
+    def finished(self):
+        pass
+
     def log(self, msg):
         print("%s: %s" % (datetime.now(), msg))
 
@@ -27,11 +32,25 @@ class BaseNode(object):
         for pipe in self.pipes:
             pipe.semaphore.acquire()
             self.output_queue.put(data)
-            pipe.receive()
 
     def into(self, pipe):
         pipe.input_queue = self.output_queue
         self.pipes.append(pipe)
+
+    def start(self):
+        self.start_time = time.time()
+        for _ in xrange(self.concurrency):
+            p = Process(target=self._consume_input)
+            self.processes.append(p)
+            p.start()
+
+        for pipe in self.pipes:
+            pipe.start()
+
+    def done(self):
+        for pipe in self.pipes:
+            pipe.input_queue.join()
+            pipe.finished()
 
 
 class Emitter(BaseNode):
@@ -42,33 +61,24 @@ class Emitter(BaseNode):
     def _consume_input(self):
         for data in self.emit():
             self.send(data)
-
-    def start(self):
-        consumer_process = Process(target=self._consume_input)
-        self._start_time = time.time()
-        consumer_process.start()
+        self.done()
 
 
 class Pipe(BaseNode):
     def process(self, data):
         raise NotImplemented()
 
-    def _run_process(self):
-        data = self.input_queue.get()
-        try:
-            items = iter(self.process(data))
-            for output in items:
-                self.send(output)
-        except TypeError:
-            pass
-        except Exception:
-            print("Failed to process")
-            print(traceback.format_exc())
-        self._processed()
-
-    def _processed(self):
-        self.semaphore.release()
-
-    def receive(self):
-        p = Process(target=self._run_process)
-        p.start()
+    def _consume_input(self):
+        while True:
+            data = self.input_queue.get()
+            try:
+                items = iter(self.process(data))
+                for output in items:
+                    self.send(output)
+            except TypeError:
+                pass
+            except Exception:
+                print("Failed to process")
+                print(traceback.format_exc())
+            self.semaphore.release()
+            self.input_queue.task_done()
