@@ -32,6 +32,7 @@ class S3ReportUploadPipe(Pipe):
     def process(self, source_path):
         bucket_name = config["aws"]["s3-bucket-name"]
         dst_path = os.path.join("new-reports", os.path.basename(source_path))
+        self.log("Upload %s to %s" % (source_path, dst_path))
         self.s3_uploader.upload(bucket_name, source_path, dst_path)
 
 
