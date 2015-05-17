@@ -99,7 +99,7 @@ class Pipe(BaseNode):
         while True:
             data = self.input_queue.get()
             try:
-                self._run_process()
+                self._run_process(data)
             except Exception:
                 self.failed(data, traceback.format_exc())
 
