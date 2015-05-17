@@ -1,3 +1,4 @@
+import json
 import time
 import traceback
 from datetime import datetime
@@ -5,11 +6,15 @@ from multiprocessing import Process, Semaphore, JoinableQueue
 
 
 class BaseNode(object):
-    def __init__(self, concurrency=1, *args, **kw):
+    def __init__(self, concurrency=1, fail_log_filename="fail.log", *args,
+                 **kw):
         self.concurrency = concurrency
 
         self.input_queue = JoinableQueue()
         self.output_queue = JoinableQueue()
+
+        if fail_log_filename:
+            self.fail_log = open(fail_log_filename, "a+")
 
         self.processes = []
 
@@ -23,10 +28,23 @@ class BaseNode(object):
         pass
 
     def finished(self):
-        pass
+        self.fail_log.close()
+        self.log("Finished %s" % self)
 
     def log(self, msg):
         print("%s: %s" % (datetime.now(), msg))
+
+    def failed(self, data, tb):
+        self.log("Failed to process %s" % data)
+        print(tb)
+        if not self.fail_log:
+            return
+        payload = {
+            "data": data,
+            "traceback": tb
+        }
+        self.fail_log.write(json.dumps(payload))
+        self.fail_log.write("\w")
 
     def send(self, data):
         for pipe in self.pipes:
@@ -67,18 +85,23 @@ class Pipe(BaseNode):
     def process(self, data):
         raise NotImplemented()
 
+    def _run_process(self, data):
+        output = self.process(data)
+        try:
+            items = iter(output)
+        except TypeError:
+            return self.send(output)
+
+        for output in items:
+            self.send(output)
+
     def _consume_input(self):
         while True:
             data = self.input_queue.get()
-            output = self.process(data)
             try:
-                items = iter(output)
-                for output in items:
-                    self.send(output)
-            except TypeError:
-                self.send(output)
+                self._run_process()
             except Exception:
-                print("Failed to process")
-                print(traceback.format_exc())
+                self.failed(data, traceback.format_exc())
+
             self.semaphore.release()
             self.input_queue.task_done()
