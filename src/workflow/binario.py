@@ -55,8 +55,7 @@ class BaseNode(object):
 
 class Emitter(BaseNode):
     def emit(self):
-        for i in xrange(100):
-            yield i
+        raise NotImplemented
 
     def _consume_input(self):
         for data in self.emit():
@@ -71,8 +70,8 @@ class Pipe(BaseNode):
     def _consume_input(self):
         while True:
             data = self.input_queue.get()
+            output = self.process(data)
             try:
-                output = self.process(data)
                 items = iter(output)
                 for output in items:
                     self.send(output)
