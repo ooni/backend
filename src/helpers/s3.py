@@ -37,7 +37,7 @@ class S3Downloader(S3CachedConnector):
     def download(self, uri, fp=None):
         p = urlparse(uri)
         bucket_name = p.netloc
-        key = self.cache_bucket(bucket_name).get_key(p.path)
+        key = self.get_bucket(bucket_name).get_key(p.path)
         key.open('r')
 
         if fp is None:
@@ -61,7 +61,7 @@ class S3Uploader(S3CachedConnector):
             dst_path = os.path.basename(source_path)
 
         source_size = os.stat(source_path).st_size
-        bucket = self.cache_bucket(bucket_name)
+        bucket = self.get_bucket(bucket_name)
         mp = bucket.initiate_multipart_upload(dst_path)
 
         chunk_count = int(math.ceil(source_size / float(self.chunk_size)))
