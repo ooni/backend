@@ -44,7 +44,7 @@ class BaseNode(object):
             "traceback": tb
         }
         self.fail_log.write(json.dumps(payload))
-        self.fail_log.write("\w")
+        self.fail_log.write("\n")
 
     def send(self, data):
         for pipe in self.pipes:
