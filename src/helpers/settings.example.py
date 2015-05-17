@@ -6,7 +6,8 @@ config = {
     },
     "kafka": {
         "hosts": None
-    }
+    },
+    "raw_reports_dir": "/data/pipeline/raw"
 }
 bridge_db_mapping = {
 }
