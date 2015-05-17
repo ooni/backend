@@ -185,7 +185,8 @@ class BucketPipe(Pipe):
         self.last_check = time.time()
         self.timeout = 30
         self.raw_bucket_manager = BucketManager(".raw", self.timeout)
-        self.sanitised_bucket_manager = BucketManager(".raw", self.timeout)
+        self.sanitised_bucket_manager = BucketManager(".sanitised",
+                                                      self.timeout)
 
     def process(self, data):
         report_id = data[0]
