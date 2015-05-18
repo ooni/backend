@@ -48,6 +48,7 @@ class S3Downloader(S3CachedConnector):
             self.uncompress_to_disk(key, fp)
         else:
             key.get_contents_to_file(fp)
+            fp.seek(0)
         key.close()
         return fp
 

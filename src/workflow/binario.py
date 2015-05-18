@@ -45,6 +45,7 @@ class BaseNode(object):
         }
         self.fail_log.write(json.dumps(payload))
         self.fail_log.write("\n")
+        self.fail_log.flush()
 
     def send(self, data):
         for pipe in self.pipes:
