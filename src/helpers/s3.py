@@ -47,7 +47,7 @@ class S3Downloader(S3CachedConnector):
         if p.path.endswith('.gz'):
             self.uncompress_to_disk(key, fp)
         else:
-            self.get_contents_to_file(fp)
+            key.get_contents_to_file(fp)
         key.close()
         return fp
 
