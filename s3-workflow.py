@@ -43,7 +43,7 @@ class S3RawReportsRenameUncompress(luigi.Task):
         return S3GzipTask(self.get_uri())
 
     def output(self):
-        parts = self.filename.split("-")
+        parts = self.filename.replace("reports/", "").split("-")
         date = '-'.join(parts[-5:-2])
         asn = parts[-2]
         ext = parts[-1].replace(".gz", "")
