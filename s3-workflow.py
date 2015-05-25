@@ -67,8 +67,6 @@ if __name__ == "__main__":
                             worker_processes=worker_processes)
 
     for bucket, filename in list_raw_reports():
-        if idx == 16:
-            break
         print "Working on %s" % filename
         task = S3RawReportsRenameUncompress(bucket=bucket,
                                             filename=filename)
