@@ -38,16 +38,25 @@ class S3CopyRawReport(luigi.Task):
     def output(self):
         try:
             parts = os.path.basename(self.src).split("-")
-            date = date_parse('-'.join(parts[-5:-2]))
+            ext = parts[-1]
+            if ext.startswith("probe") or \
+                    ext.startswith("backend"):
+                date = date_parse('-'.join(parts[-5:-2]))
+                asn = parts[-2]
+                test_name = '-'.join(parts[:-5])
+            else:
+                date = date_parse('-'.join(parts[-4:-1]))
+                asn = parts[-1]
+                test_name = '-'.join(parts[:-4])
             # To facilitate sorting and splitting around "-" we convert the
             # date to be something like: 20150101T000015Z
             timestamp = date.strftime("%Y%m%dT%H%M%SZ")
             filename = "{date}-{asn}-{test_name}-{df_version}-{ext}".format(
                 date=timestamp,
-                asn=parts[-2],
-                test_name='-'.join(parts[:-5]),
+                asn=asn,
+                test_name=test_name,
                 df_version="v1",
-                ext=parts[-1].replace(".gz", "").replace(".yamloo", ".yaml")
+                ext=ext.replace(".gz", "").replace(".yamloo", ".yaml")
             )
             uri = os.path.join(self.dst, date.strftime("%Y-%m-%d"), filename)
             return S3Target(uri)
