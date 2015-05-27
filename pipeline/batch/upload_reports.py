@@ -67,9 +67,9 @@ def run(src_directory, dst, worker_processes, limit=None):
     for filename in list_report_files(src_directory):
         if limit is not None and idx >= limit:
             break
+        idx += 1
         print("Working on %s" % filename)
         task = S3CopyRawReport(src=filename, dst=dst)
         w.add(task)
-        idx += 1
     w.run()
     w.stop()
