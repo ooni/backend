@@ -36,7 +36,7 @@ class S3CopyRawReport(luigi.Task):
         return ReportSource(self.src)
 
     def output(self):
-        parts = os.path.basename(self.src.replace("reports/", ""))
+        parts = os.path.basename(self.src).split("-")
         date = '-'.join(parts[-5:-2])
         # To facilitate sorting and splitting around "-" we convert the date to
         # be something like: 20150101T000015Z
