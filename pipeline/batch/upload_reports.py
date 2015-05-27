@@ -36,20 +36,24 @@ class S3CopyRawReport(luigi.Task):
         return ReportSource(self.src)
 
     def output(self):
-        parts = os.path.basename(self.src).split("-")
-        date = '-'.join(parts[-5:-2])
-        # To facilitate sorting and splitting around "-" we convert the date to
-        # be something like: 20150101T000015Z
-        timestamp = date_parse(date).strftime("%Y%m%dT%H%M%SZ")
-        filename = "{timestamp}-{asn}-{test_name}-{df_version}-{ext}".format(
-            timestamp=timestamp,
-            asn=parts[-2],
-            test_name='-'.join(parts[:-5]),
-            df_version="v1",
-            ext=parts[-1].replace(".gz", "").replace(".yamloo", ".yaml")
-        )
-        uri = os.path.join(self.dst, filename)
-        return S3Target(uri)
+        try:
+            parts = os.path.basename(self.src).split("-")
+            date = '-'.join(parts[-5:-2])
+            # To facilitate sorting and splitting around "-" we convert the date to
+            # be something like: 20150101T000015Z
+            timestamp = date_parse(date).strftime("%Y%m%dT%H%M%SZ")
+            filename = "{timestamp}-{asn}-{test_name}-{df_version}-{ext}".format(
+                timestamp=timestamp,
+                asn=parts[-2],
+                test_name='-'.join(parts[:-5]),
+                df_version="v1",
+                ext=parts[-1].replace(".gz", "").replace(".yamloo", ".yaml")
+            )
+            uri = os.path.join(self.dst, filename)
+            return S3Target(uri)
+        except Exception:
+            filename = "FAILED-" + os.path.basename(self.src)
+            return S3Target(os.path.join(self.dst, filename))
 
     def run(self):
         with self.input().open('r') as in_file:
