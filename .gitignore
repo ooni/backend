@@ -4,4 +4,4 @@ _build
 _resources
 logs
 *.pyc
-src/helpers/settings.py
+pipeline/helpers/settings.py
