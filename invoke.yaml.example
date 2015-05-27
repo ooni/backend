@@ -1,5 +1,5 @@
 aws:
-  access-key-id: ""
-  secret-access-key: ""
+  access_key_id: ""
+  secret_access_key: ""
 kafka:
   hosts: "127.0.0.1:9092"

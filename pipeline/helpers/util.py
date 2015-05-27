@@ -1,5 +1,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+# XXX add support for python 3
+from urlparse import urlparse
 import base64
 import json
 import os
@@ -31,13 +33,40 @@ def json_dumps(data):
     return encoder.encode(data)
 
 
-def list_report_files(directory):
+def _walk_local_directory(directory):
+    for root, dirs, files in os.walk(directory):
+        for filename in files:
+            yield os.path.join(root, filename)
+
+
+def _s3_walker(aws_access_key_id, aws_secret_access_key):
+    from boto.s3.connection import S3Connection
+    con = S3Connection(aws_access_key_id, aws_secret_access_key)
+
+    def _walk_s3_directory(directory):
+        p = urlparse(directory)
+        bucket_name = p.netloc
+        bucket = con.get_bucket(bucket_name)
+        keys = bucket.list(p.path)
+        for key in keys:
+            yield os.path.join(bucket_name, key.name)
+    return _walk_s3_directory
+
+
+def list_report_files(directory, aws_access_key_id=None,
+                      aws_secret_access_key=None):
     def is_report_file(filename):
         possible_extensions = (".yamloo", ".yamloo.gz", ".yaml", "yaml.gz")
         if any(filename.endswith(ext) for ext in possible_extensions):
             return True
         return False
-    for root, dirs, files in os.walk(directory):
-        for filename in files:
-            if is_report_file(filename):
-                yield os.path.join(root, filename)
+
+    if directory.startswith("s3n://"):
+        assert aws_access_key_id is not None
+        assert aws_secret_access_key is not None
+        walker = _s3_walker(aws_access_key_id, aws_secret_access_key)
+    else:
+        walker = _walk_local_directory
+    for path in walker(directory):
+        if is_report_file(path):
+            yield path
