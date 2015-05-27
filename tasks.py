@@ -11,6 +11,8 @@ def realtime(ctx):
 @task
 def upload_reports(ctx, src, dst="s3://ooni-private/reports-raw/yaml/",
                    workers=16, limit=None):
+    if limit is not None:
+        limit = int(limit)
     from pipeline.batch import upload_reports
     upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
                        limit=limit)
