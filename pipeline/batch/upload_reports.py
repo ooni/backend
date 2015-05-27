@@ -38,22 +38,22 @@ class S3CopyRawReport(luigi.Task):
     def output(self):
         try:
             parts = os.path.basename(self.src).split("-")
-            date = '-'.join(parts[-5:-2])
-            # To facilitate sorting and splitting around "-" we convert the date to
-            # be something like: 20150101T000015Z
-            timestamp = date_parse(date).strftime("%Y%m%dT%H%M%SZ")
-            filename = "{timestamp}-{asn}-{test_name}-{df_version}-{ext}".format(
-                timestamp=timestamp,
+            date = date_parse('-'.join(parts[-5:-2]))
+            # To facilitate sorting and splitting around "-" we convert the
+            # date to be something like: 20150101T000015Z
+            timestamp = date.strftime("%Y%m%dT%H%M%SZ")
+            filename = "{date}-{asn}-{test_name}-{df_version}-{ext}".format(
+                date=timestamp,
                 asn=parts[-2],
                 test_name='-'.join(parts[:-5]),
                 df_version="v1",
                 ext=parts[-1].replace(".gz", "").replace(".yamloo", ".yaml")
             )
-            uri = os.path.join(self.dst, filename)
+            uri = os.path.join(self.dst, date.strftime("%Y-%m-%d"), filename)
             return S3Target(uri)
         except Exception:
-            filename = "FAILED-" + os.path.basename(self.src)
-            return S3Target(os.path.join(self.dst, filename))
+            return S3Target(os.path.join(self.dst, "failed",
+                                         os.path.basename(self.src)))
 
     def run(self):
         with self.input().open('r') as in_file:
