@@ -5,11 +5,11 @@ import traceback
 from streamparse.bolt import Bolt
 
 from kafka import KafkaClient, KeyedProducer, SimpleProducer
-from helpers.settings import config
-from helpers.util import json_dumps
+from pipeline.helpers.settings import config
+from pipeline.helpers.util import json_dumps
 
-from helpers.s3 import S3Downloader
-from helpers.report import Report
+from pipeline.helpers.s3 import S3Downloader
+from pipeline.helpers.report import Report
 
 
 class ReportParseBolt(Bolt):
@@ -44,6 +44,7 @@ class ReportParseBolt(Bolt):
             self.fail(tup)
             print(traceback.format_exc())
             raise exc
+
 
 class KafkaBolt(Bolt):
 

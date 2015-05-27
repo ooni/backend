@@ -1,6 +1,7 @@
 awscli
 boto
 PyYAML
-#streamparse
-https://github.com/Parsely/streamparse/archive/master.zip
+streamparse
 filechunkio
+luigi
+invoke

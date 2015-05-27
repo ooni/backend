@@ -1,5 +1,8 @@
+from __future__ import absolute_import, print_function, unicode_literals
+
 import base64
 import json
+import os
 
 
 def encode_basestring_ascii(o):
@@ -26,3 +29,15 @@ def json_dump(data, fh):
 def json_dumps(data):
     encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
     return encoder.encode(data)
+
+
+def list_report_files(directory):
+    def is_report_file(filename):
+        possible_extensions = (".yamloo", ".yamloo.gz", ".yaml", "yaml.gz")
+        if any(filename.endswith(ext) for ext in possible_extensions):
+            return True
+        return False
+    for root, dirs, files in os.walk(directory):
+        for filename in files:
+            if is_report_file(filename):
+                yield os.path.join(root, filename)

@@ -1,10 +1,13 @@
+from __future__ import absolute_import, print_function, unicode_literals
+
 import re
 import hashlib
 
 try:
-    from helpers.settings import bridge_db_mapping
+    from pipeline.helpers.settings import bridge_db_mapping
 except ImportError:
-    print "Copy src/helpers/settings.example to src/helpers/settings.py and configure it"
+    print("Copy pipeline/helpers/settings.example.py to"
+          " pipeline/helpers/settings.py and configure it")
 
 
 def get_sanitisers(test_name):

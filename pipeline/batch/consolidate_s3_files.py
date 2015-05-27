@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function, unicode_literals
+
 import shutil
 
 import luigi
@@ -67,7 +69,7 @@ if __name__ == "__main__":
                             worker_processes=worker_processes)
 
     for bucket, filename in list_raw_reports():
-        print "Working on %s" % filename
+        print("Working on %s" % filename)
         task = S3RawReportsRenameUncompress(bucket=bucket,
                                             filename=filename)
         w.add(task)

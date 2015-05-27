@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function, unicode_literals
+
 import time
 import random
 import string
@@ -5,7 +7,7 @@ import traceback
 from datetime import datetime
 
 import yaml
-from helpers import sanitise
+from pipeline.helpers import sanitise
 
 
 class Report(object):

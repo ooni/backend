@@ -1,11 +1,10 @@
+from __future__ import absolute_import, print_function, unicode_literals
+
 import os
-import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
-from workflow.binario import Emitter, Pipe
-
-from helpers.settings import config
-from helpers.s3 import S3Uploader
+from pipeline.helpers.binario import Emitter, Pipe
+from pipeline.helpers.settings import config
+from pipeline.helpers.s3 import S3Uploader
 
 
 class LocalFileEmitter(Emitter):

@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import json
 import shutil
@@ -9,8 +8,7 @@ from StringIO import StringIO
 
 from boto.s3.connection import S3Connection
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
-from workflow.binario import Emitter, Pipe
+from pipeline.helpers.binario import Emitter, Pipe
 from helpers.settings import config
 from helpers.util import json_dumps
 
