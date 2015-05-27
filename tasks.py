@@ -26,7 +26,7 @@ def upload_reports(ctx, src, dst="s3://ooni-private/reports-raw/yaml/",
     if limit is not None:
         limit = int(limit)
     from pipeline.batch import upload_reports
-    _create_luigi_cfg()
+    _create_luigi_cfg(ctx)
     upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
                        limit=limit)
 
