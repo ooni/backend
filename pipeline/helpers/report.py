@@ -43,7 +43,7 @@ class Report(object):
     def process_header(self, report):
         self._raw_header = report.next()
         self._raw_header["record_type"] = "header"
-        self._raw_header["report_filename"] = os.path.basename(self.in_file.name)
+        self._raw_header["report_filename"] = os.path.basename(self.in_file.path)
 
         date = datetime.fromtimestamp(self._raw_header["start_time"])
         date = date.strftime("%Y-%m-%d")
@@ -123,7 +123,7 @@ class Report(object):
                 if hasattr(exc, 'problem_mark'):
                     self._restart_from_line(exc.problem_mark.line)
                 else:
-                    logger.error("failed to process the entry for %s" % self.in_file.name)
+                    logger.error("failed to process the entry for %s" % self.in_file.path)
                     logger.error(traceback.format_exc())
                     raise exc
                 continue
