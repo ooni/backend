@@ -1,13 +1,11 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import os
-import zlib
 import time
 import random
 import string
 import logging
 import traceback
-from base64 import b64encode
 from datetime import datetime
 
 import yaml
@@ -84,22 +82,6 @@ mappings = {
 }
 
 
-def fix_http_template(entry):
-    requests = []
-    for request in entry["requests"]:
-        try:
-            request["response"]["body"] = unicode(request["response"]["body"])
-        except UnicodeDecodeError:
-            request["response"]["body"] = {
-                "encoding": "base64.gzip",
-                "data": b64encode(zlib.compress(request["response"]["body"])),
-                "doc": "b64encode(zlib.compress(data))"
-            }
-        requests.append(request)
-    entry["requests"] = requests
-    return requests
-
-
 class Report(object):
     def __init__(self, in_file, bridge_db, path):
         self.bridge_db = bridge_db
@@ -151,14 +133,8 @@ class Report(object):
             return entry
         return sanitise.run(self._raw_header['test_name'], entry, self.bridge_db)
 
-    def fix_entry(self, entry):
+    def add_record_type(self, entry):
         entry["record_type"] = "entry"
-        if not self._sanitised_header.get('test_name'):
-            logger.error("test_name is missing in %s" % entry["report_id"])
-            return entry
-        test_name = self._sanitised_header.get('test_name')
-        if "http_requests" in mappings.get(test_name):
-            entry = fix_http_template(entry)
         return entry
 
     def process_entry(self, entry):
@@ -168,8 +144,8 @@ class Report(object):
         raw_entry.update(self._raw_header)
         sanitised_entry.update(self._sanitised_header)
 
-        raw_entry = self.fix_entry(raw_entry)
-        sanitised_entry = self.fix_entry(sanitised_entry)
+        raw_entry = self.add_record_type(raw_entry)
+        sanitised_entry = self.add_record_type(sanitised_entry)
 
         sanitised_entry = self.sanitise_entry(sanitised_entry)
         return sanitised_entry, raw_entry
