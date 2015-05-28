@@ -9,15 +9,14 @@ import os
 
 import yaml
 
+def json_default(o):
+    if isinstance(o, set):
+        return list(o)
+    return {"error": "could-not-serialize %s" % str(o)}
+
 
 def json_encoder():
     import json
-
-    def json_default(o):
-        if isinstance(o, set):
-            return list(o)
-        return {"error": "could-not-serialize %s" % str(o)}
-
     def encode_basestring_ascii(o):
         try:
             return encode_basestring_ascii_orig(o)
@@ -27,6 +26,7 @@ def json_encoder():
     encode_basestring_ascii_orig = json.encoder.encode_basestring_ascii
     json.encoder.encode_basestring_ascii = encode_basestring_ascii
     encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
+    return encoder
 
 
 def json_dump(data, fh):
@@ -40,9 +40,9 @@ def json_dump(data, fh):
 
 def json_dumps(data):
     try:
-        import ujson
-        return ujson.dumps(data)
-    except ImportError:
+        import simplejson
+        return simplejson.dumps(data, default=json_default)
+    except Exception:
         encoder = json_encoder()
         return encoder.encode(data)
 
