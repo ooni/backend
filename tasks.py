@@ -24,13 +24,15 @@ def realtime(ctx):
 
 
 @task
-def generate_streams(ctx, src, date_interval,
+def generate_streams(ctx, src, date_interval, workers=16,
                      dst_private="s3n://ooni-private/",
-                     dst_public="s3n://ooni-public/"):
+                     dst_public="s3n://ooni-public/",
+                     bridge_db_path="s3n://ooni-private/bridge_reachability/bridge_db.json"):
     from pipeline.batch import sanitise
     _create_luigi_cfg()
     sanitise.run(dst_private=dst_private, dst_public=dst_public, src=src,
-                 date_interval=date_interval)
+                 date_interval=date_interval, bridge_db_path=bridge_db_path,
+                 worker_processes=workers)
 
 
 @task
