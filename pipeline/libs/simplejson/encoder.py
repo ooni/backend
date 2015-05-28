@@ -63,7 +63,10 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
             s = s.decode('utf-8')
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
-            s = s.decode('utf-8')
+            try:
+                s = s.decode('utf-8')
+            except UnicodeDecodeError:
+                s = s.decode('utf-8', 'ignore')
     def replace(match):
         s = match.group(0)
         try:
