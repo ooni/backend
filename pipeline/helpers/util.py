@@ -1,11 +1,13 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import zlib
 import time
 import logging
 import logging.config
 # XXX add support for python 3
 from urlparse import urlparse
-import base64
+import collections
+from base64 import b64encode
 import os
 
 import yaml
@@ -18,6 +20,13 @@ def json_default(o):
 
 def json_encoder():
     import json
+    encode_basestring_ascii_orig = json.encoder.encode_basestring_ascii
+    def encode_basestring_ascii(o):
+        try:
+            return encode_basestring_ascii_orig(o)
+        except UnicodeDecodeError:
+            return json.dumps({"base64": b64encode(o)})
+    json.encoder.encode_basestring_ascii = encode_basestring_ascii
     encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
     return encoder
 
@@ -25,7 +34,10 @@ def json_encoder():
 def json_dump(data, fh):
     try:
         import ujson
-        ujson.dump(data, fh)
+        try:
+            ujson.dump(data, fh)
+        except:
+            ujson.dump(fix_data(data), fh)
     except ImportError:
         encoder = json_encoder()
         for chunk in encoder.iterencode(data):

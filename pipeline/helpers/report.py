@@ -83,7 +83,8 @@ mappings = {
     "keyword_filtering_detection_based_on_rst_packets": False
 }
 
-def fix_http_requests(entry):
+
+def fix_http_template(entry):
     requests = []
     for request in entry["requests"]:
         try:
@@ -157,7 +158,7 @@ class Report(object):
             return entry
         test_name = self._sanitised_header.get('test_name')
         if "http_requests" in mappings.get(test_name):
-            entry = fix_http_requests(entry)
+            entry = fix_http_template(entry)
         return entry
 
     def process_entry(self, entry):
