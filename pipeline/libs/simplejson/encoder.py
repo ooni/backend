@@ -350,6 +350,15 @@ class JSONEncoder(object):
                 Decimal=decimal.Decimal)
         try:
             return _iterencode(o, 0)
+        except UnicodeDecodeError:
+            from base64 import b64encode
+            import zlib
+            o = {
+                "encoding": "base64.gzip",
+                "data": b64encode(zlib.compress(o)),
+                "doc": "b64encode(zlib.compress(o))"
+            }
+            return _iterencode(o, 0)
         finally:
             key_memo.clear()
 

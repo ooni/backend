@@ -6,11 +6,11 @@ import logging
 import logging.config
 # XXX add support for python 3
 from urlparse import urlparse
-import collections
 from base64 import b64encode
 import os
 
 import yaml
+from pipeline.libs import simplejson
 
 def json_default(o):
     if isinstance(o, set):
@@ -18,38 +18,8 @@ def json_default(o):
     return {"error": "could-not-serialize %s" % str(o)}
 
 
-def json_encoder():
-    import json
-    encode_basestring_ascii_orig = json.encoder.encode_basestring_ascii
-    def encode_basestring_ascii(o):
-        try:
-            return encode_basestring_ascii_orig(o)
-        except UnicodeDecodeError:
-            return json.dumps({"base64": b64encode(o)})
-    json.encoder.encode_basestring_ascii = encode_basestring_ascii
-    encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
-    return encoder
-
-
-def json_dump(data, fh):
-    try:
-        import ujson
-        try:
-            ujson.dump(data, fh)
-        except:
-            ujson.dump(fix_data(data), fh)
-    except ImportError:
-        encoder = json_encoder()
-        for chunk in encoder.iterencode(data):
-            fh.write(chunk)
-
 def json_dumps(data):
-    try:
-        import simplejson
-        return simplejson.dumps(data, ensure_ascii=True, default=json_default)
-    except ImportError:
-        encoder = json_encoder()
-        return encoder.encode(data)
+    return simplejson.dumps(data, ensure_ascii=True, default=json_default)
 
 
 def yaml_dump(data, fh):
