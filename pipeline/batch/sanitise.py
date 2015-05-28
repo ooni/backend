@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import traceback
 
 import luigi
 import luigi.worker
@@ -59,14 +60,18 @@ class AggregateYAMLReports(ExternalTask):
         with target.open('r') as in_file:
             report = Report(in_file, self.bridge_db)
             for sanitised_entry, raw_entry in report.entries():
-                logger.debug("writing sanitised entry to stream")
-                sanitised_streams.write(json_dumps(sanitised_entry))
-                sanitised_streams.write("\n")
-                logger.debug("writing raw entry to stream")
-                raw_streams.write(json_dumps(raw_entry))
-                raw_streams.write("\n")
-                logger.debug("writing sanitised yaml file")
-                yaml_dump(sanitised_entry, sanitised_yaml)
+                try:
+                    logger.debug("writing sanitised entry to stream")
+                    sanitised_streams.write(json_dumps(sanitised_entry))
+                    sanitised_streams.write("\n")
+                    logger.debug("writing raw entry to stream")
+                    raw_streams.write(json_dumps(raw_entry))
+                    raw_streams.write("\n")
+                    logger.debug("writing sanitised yaml file")
+                    yaml_dump(sanitised_entry, sanitised_yaml)
+                except Exception:
+                    logger.error("error in processing %s" % filename)
+                    logger.error(traceback.format_exc())
         sanitised_yaml.close()
 
     def run(self):

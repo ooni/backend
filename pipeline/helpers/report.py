@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import os
 import time
 import random
 import string
@@ -42,6 +43,7 @@ class Report(object):
     def process_header(self, report):
         self._raw_header = report.next()
         self._raw_header["record_type"] = "header"
+        self._raw_header["report_filename"] = os.path.basename(self.in_file.name)
 
         date = datetime.fromtimestamp(self._raw_header["start_time"])
         date = date.strftime("%Y-%m-%d")
