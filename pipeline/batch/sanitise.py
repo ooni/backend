@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 
 import luigi
 import luigi.worker
@@ -11,6 +12,7 @@ from pipeline.helpers.report import Report
 from pipeline.helpers.util import json_dumps, yaml_dump
 from pipeline.helpers.util import list_report_files, get_luigi_target
 
+logger = logging.getLogger('ooni-pipeline')
 
 class AggregateYAMLReports(ExternalTask):
     src = luigi.Parameter()
@@ -19,6 +21,9 @@ class AggregateYAMLReports(ExternalTask):
     bridge_db = luigi.Parameter()
 
     date = luigi.DateParameter()
+
+    def __str__(self):
+        return "AggregateYAMLReports()"
 
     def output(self):
         sanitised_streams = get_luigi_target(os.path.join(
@@ -50,17 +55,17 @@ class AggregateYAMLReports(ExternalTask):
             self.date.strftime("%Y-%m-%d"),
             sanitised_yaml_filename
         )).open('w')
+        logger.info("Sanitising %s" % filename)
         with target.open('r') as in_file:
             report = Report(in_file, self.bridge_db)
-            print("Working it")
             for sanitised_entry, raw_entry in report.entries():
-                s_data = json_dumps(sanitised_entry)
-                sanitised_streams.write(s_data)
+                logger.debug("writing sanitised entry to stream")
+                sanitised_streams.write(json_dumps(sanitised_entry))
                 sanitised_streams.write("\n")
-                print("Writing")
-                print(s_data)
+                logger.debug("writing raw entry to stream")
                 raw_streams.write(json_dumps(raw_entry))
                 raw_streams.write("\n")
+                logger.debug("writing sanitised yaml file")
                 yaml_dump(sanitised_entry, sanitised_yaml)
         sanitised_yaml.close()
 
@@ -72,11 +77,11 @@ class AggregateYAMLReports(ExternalTask):
 
         reports_path = os.path.join(self.src,
                                     self.date.strftime("%Y-%m-%d"))
-        print("Listing path %s" % reports_path)
+        logger.debug("listing path %s" % reports_path)
         for filename in list_report_files(reports_path,
                                           config.get("s3", "aws_access_key_id"),
                                           config.get("s3", "aws_secret_access_key")):
-            print("Got filename %s" % filename)
+            logger.debug("got filename %s" % filename)
             self.process_report(filename, sanitised_streams, raw_streams)
         raw_streams.close()
         sanitised_streams.close()
@@ -104,7 +109,6 @@ def run(src, dst_private, dst_public, date_interval, bridge_db_path,
     with get_luigi_target(bridge_db_path).open('r') as f:
         bridge_db = json.load(f)
 
-    luigi.interface.setup_interface_logging()
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
@@ -119,7 +123,7 @@ def run(src, dst_private, dst_public, date_interval, bridge_db_path,
         raise ValueError("Invalid date interval")
 
     for date in interval:
-        print("Working on %s" % date)
+        logger.debug("working on %s" % date)
         task = AggregateYAMLReports(dst_private=dst_private,
                                     dst_public=dst_public, src=src, date=date,
                                     bridge_db=bridge_db)

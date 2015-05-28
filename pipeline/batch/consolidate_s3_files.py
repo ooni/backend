@@ -60,7 +60,6 @@ class S3RawReportsRenameUncompress(luigi.Task):
                 shutil.copyfileobj(in_file, out_file)
 
 if __name__ == "__main__":
-    luigi.interface.setup_interface_logging()
     sch = luigi.scheduler.CentralPlannerScheduler()
     tasks = []
     worker_processes = 16

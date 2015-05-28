@@ -2,6 +2,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import os
 import shutil
+import logging
 
 from dateutil.parser import parse as date_parse
 
@@ -15,6 +16,7 @@ from luigi.file import LocalTarget
 
 from pipeline.helpers.util import list_report_files
 
+logger = logging.getLogger('ooni-pipeline')
 
 class ReportSource(ExternalTask):
     src = luigi.Parameter()
@@ -78,7 +80,6 @@ class S3CopyRawReport(luigi.Task):
 
 
 def run(src_directory, dst, worker_processes, limit=None):
-    luigi.interface.setup_interface_logging()
     sch = luigi.scheduler.CentralPlannerScheduler()
     idx = 0
     w = luigi.worker.Worker(scheduler=sch,
@@ -88,7 +89,7 @@ def run(src_directory, dst, worker_processes, limit=None):
         if limit is not None and idx >= limit:
             break
         idx += 1
-        print("Working on %s" % filename)
+        logging.info("uploading %s" % filename)
         task = S3CopyRawReport(src=filename, dst=dst)
         w.add(task)
     w.run()

@@ -3,12 +3,14 @@ from __future__ import absolute_import, print_function, unicode_literals
 import time
 import random
 import string
+import logging
 import traceback
 from datetime import datetime
 
 import yaml
 from pipeline.helpers import sanitise
 
+logger = logging.getLogger('ooni-pipeline')
 
 class Report(object):
     def __init__(self, in_file, bridge_db):
@@ -55,7 +57,7 @@ class Report(object):
     def sanitise_entry(self, entry):
         # XXX we probably want to ignore these sorts of tests
         if not self._sanitised_header.get('test_name'):
-            print("MISSING TEST_NAME", "sanitise_entry")
+            logger.error("test_name is missing in %s" % entry["report_id"])
             return entry
         return sanitise.run(self._raw_header['test_name'], entry, self.bridge_db)
 
@@ -119,8 +121,8 @@ class Report(object):
                 if hasattr(exc, 'problem_mark'):
                     self._restart_from_line(exc.problem_mark.line)
                 else:
-                    print("Failed in processing the entry")
-                    print(traceback.format_exc())
+                    logger.error("failed to process the entry for %s" % self.in_file.name)
+                    logger.error(traceback.format_exc())
                     raise exc
                 continue
         self._end_time = time.time()
