@@ -45,4 +45,4 @@ def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
     upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
                        limit=limit)
 
-ns = Collection(upload_reports)
+ns = Collection(upload_reports, generate_streams)
