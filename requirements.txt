@@ -5,3 +5,4 @@ streamparse
 filechunkio
 luigi
 invoke
+ujson
