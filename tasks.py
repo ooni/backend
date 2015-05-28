@@ -45,4 +45,13 @@ def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
     upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
                        limit=limit)
 
-ns = Collection(upload_reports, generate_streams)
+@task
+def list_reports(ctx):
+    _create_luigi_cfg()
+    from pipeline.helpers.util import list_report_files
+    for f in list_report_files("s3n://ooni-private/reports-raw/yaml/2013-05-03",
+                               config["aws"]["access_key_id"],
+                               config["aws"]["secret_access_key"]):
+        print(f)
+
+ns = Collection(upload_reports, generate_streams, list_reports)
