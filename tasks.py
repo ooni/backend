@@ -3,7 +3,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 from invoke.config import Config
 from invoke import Collection, ctask as task
 
-config = Config()
+config = Config(runtime_path="invoke.yaml")
 
 
 def _create_luigi_cfg():

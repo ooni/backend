@@ -46,7 +46,7 @@ class S3CopyRawReport(luigi.Task):
                 test_name = '-'.join(parts[:-5])
             else:
                 date = date_parse('-'.join(parts[-4:-1]))
-                asn = parts[-1]
+                asn = parts[-1].split(".")[0]
                 test_name = '-'.join(parts[:-4])
             # To facilitate sorting and splitting around "-" we convert the
             # date to be something like: 20150101T000015Z
