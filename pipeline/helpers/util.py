@@ -18,13 +18,6 @@ def json_default(o):
 
 def json_encoder():
     import json
-    encode_basestring_ascii_orig = json.encoder.encode_basestring_ascii
-    def encode_basestring_ascii(o):
-        try:
-            return encode_basestring_ascii_orig(o)
-        except UnicodeDecodeError:
-            return json.dumps({"base64": base64.b64encode(o)})
-    json.encoder.encode_basestring_ascii = encode_basestring_ascii
     encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
     return encoder
 
@@ -42,7 +35,7 @@ def json_dumps(data):
     try:
         import simplejson
         return simplejson.dumps(data, ensure_ascii=True, default=json_default)
-    except Exception:
+    except ImportError:
         encoder = json_encoder()
         return encoder.encode(data)
 
