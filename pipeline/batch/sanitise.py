@@ -1,40 +1,32 @@
 import os
+import json
 
 import luigi
 import luigi.worker
 import luigi.hdfs
 from luigi.task import ExternalTask
-from luigi.format import GzipFormat
-from luigi.s3 import S3Target
-from luigi.file import LocalTarget
 
 from pipeline.helpers.report import Report
 from pipeline.helpers.util import json_dumps, yaml_dump
-from pipeline.helpers.util import list_report_files
+from pipeline.helpers.util import list_report_files, get_luigi_target
 
 
 class AggregateYAMLReports(ExternalTask):
     src = luigi.Parameter()
     dst_private = luigi.Parameter()
     dst_public = luigi.Parameter()
+    bridge_db = luigi.Parameter()
+
     date = luigi.DateParameter()
 
-    def get_target(self, path):
-        file_format = None
-        if path.endswith(".gz"):
-            file_format = GzipFormat()
-        if path.startswith("s3n://"):
-            return S3Target(self.src, format=file_format)
-        return LocalTarget(self.src, format=file_format)
-
     def output(self):
-        sanitised_streams = self.get_target(os.path.join(
+        sanitised_streams = get_luigi_target(os.path.join(
             self.dst_public,
             "reports-sanitised",
             "streams",
             self.date.strftime("%Y-%m-%y.json")
         ))
-        raw_streams = self.get_target(os.path.join(
+        raw_streams = self.get_luigi_target(os.path.join(
             self.dst_private,
             "reports-raw",
             "streams",
@@ -46,11 +38,11 @@ class AggregateYAMLReports(ExternalTask):
         }
 
     def process_report(self, filename, sanitised_streams, raw_streams):
-        target = self.get_target(filename)
+        target = self.get_luigi_target(filename)
         sanitised_yaml_filename = os.path.basename(filename)
         if not sanitised_yaml_filename.endswith(".gz"):
             sanitised_yaml_filename = sanitised_yaml_filename + ".gz"
-        sanitised_yaml = self.get_target(os.path.join(
+        sanitised_yaml = self.get_luigi_target(os.path.join(
             self.dst_public,
             "reports-sanitised",
             "yaml",
@@ -95,7 +87,12 @@ class RawReportsSanitiser(luigi.Task):
         ]
 
 
-def run(src, dst_private, dst_public, date_interval, worker_processes=16):
+def run(src, dst_private, dst_public, date_interval, bridge_db_path,
+        worker_processes=16):
+
+    with get_luigi_target(bridge_db_path).open('r') as f:
+        bridge_db = json.loads(f)
+
     luigi.interface.setup_interface_logging()
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
@@ -113,7 +110,8 @@ def run(src, dst_private, dst_public, date_interval, worker_processes=16):
     for date in interval:
         print("Working on %s" % date)
         task = AggregateYAMLReports(dst_private=dst_private,
-                                    dst_public=dst_public, src=src, date=date)
+                                    dst_public=dst_public, src=src, date=date,
+                                    bridge_db=bridge_db)
         w.add(task)
     w.run()
     w.stop()

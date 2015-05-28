@@ -76,3 +76,16 @@ def list_report_files(directory, aws_access_key_id=None,
     for path in walker(directory):
         if is_report_file(path):
             yield path
+
+
+def get_luigi_target(self, path):
+    from luigi.s3 import S3Target
+    from luigi.file import LocalTarget
+    from luigi.format import GzipFormat
+
+    file_format = None
+    if path.endswith(".gz"):
+        file_format = GzipFormat()
+    if path.startswith("s3n://"):
+        return S3Target(path, format=file_format)
+    return LocalTarget(path, format=file_format)

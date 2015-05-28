@@ -3,51 +3,117 @@ from __future__ import absolute_import, print_function, unicode_literals
 import re
 import hashlib
 
-try:
-    from pipeline.helpers.settings import bridge_db_mapping
-except ImportError:
-    print("Copy pipeline/helpers/settings.example.py to"
-          " pipeline/helpers/settings.py and configure it")
+
+class Sanitisers(object):
+    def __init__(self, bridge_db):
+        self.bridge_db = bridge_db
+
+    def http_template(self, entry):
+        return entry
+
+    def http_requests(self, entry):
+        return entry
+
+    def scapy_template(self, entry):
+        return entry
+
+    def dns_template(self, entry):
+        return entry
+
+    def dns_consistency(self, entry):
+        return entry
+
+    def captive_portal(self, entry):
+        return entry
+
+    def null(self, entry):
+        return entry
+
+    def bridge_reachability_tcp_connect(self, entry):
+        if entry['input'] and entry['input'].strip() in self.bridge_db.keys():
+            b = self.bridge_db[entry['input'].strip()]
+            fingerprint = b['fingerprint'].decode('hex')
+            hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
+            entry['bridge_hashed_fingerprint'] = hashed_fingerprint
+            entry['input'] = hashed_fingerprint
+            return entry
+        return entry
+
+    def bridge_reachability(self, entry):
+        if not entry.get('bridge_address'):
+            entry['bridge_address'] = entry['input']
+
+        if entry['bridge_address'] and \
+                entry['bridge_address'].strip() in self.bridge_db:
+            b = self.bridge_db[entry['bridge_address'].strip()]
+            entry['distributor'] = b['distributor']
+            entry['transport'] = b['transport']
+            fingerprint = b['fingerprint'].decode('hex')
+            hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
+            entry['input'] = hashed_fingerprint
+            entry['bridge_address'] = None
+            regexp = ("(Learned fingerprint ([A-Z0-9]+)"
+                    "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
+                    "((new bridge descriptor .+?\s+"
+                    "at (([0-9]+\.){3}[0-9]+)))")
+            if entry.get('tor_log'):
+                entry['tor_log'] = re.sub(regexp, "[REDACTED]", entry['tor_log'])
+            else:
+                entry['tor_log'] = None
+        else:
+            entry['distributor'] = None
+            hashed_fingerprint = None
+
+        entry['bridge_hashed_fingerprint'] = hashed_fingerprint
+
+        return entry
+
+    def tcp_connect(self, entry):
+        entry = self.bridge_reachability_tcp_connect(entry)
+        return entry
+
+    def default(self, entry):
+        return entry
 
 
 def get_sanitisers(test_name):
     sanitise_mapping = {
-        "http_host": http_template,
-        "HTTP Host": http_template,
+        "http_host": "http_template",
+        "HTTP Host": "http_template",
 
-        "http_requests_test": [http_template,
-                               http_requests],
-        "http_requests": [http_template, http_requests],
-        "HTTP Requests Test": [http_template,
-                               http_requests],
+        "http_requests_test": ["http_template",
+                               "http_requests"],
+        "http_requests": ["http_template", "http_requests"],
+        "HTTP Requests Test": ["http_template",
+                               "http_requests"],
 
-        "bridge_reachability": bridge_reachability,
-        "bridgereachability": bridge_reachability,
+        "bridge_reachability": "bridge_reachability",
+        "bridgereachability": "bridge_reachability",
 
-        "TCP Connect": tcp_connect,
-        "tcp_connect": tcp_connect,
+        "TCP Connect": "tcp_connect",
+        "tcp_connect": "tcp_connect",
 
-        "DNS tamper": [dns_template, dns_consistency],
-        "dns_consistency": [dns_template, dns_consistency],
+        "DNS tamper": ["dns_template", "dns_consistency"],
+        "dns_consistency": ["dns_template", "dns_consistency"],
 
-        "HTTP Invalid Request Line": null,
-        "http_invalid_request_line": null,
+        "HTTP Invalid Request Line": "null",
+        "http_invalid_request_line": "null",
 
-        "http_header_field_manipulation": null,
-        "HTTP Header Field Manipulation": null,
+        "http_header_field_manipulation": "null",
+        "HTTP Header Field Manipulation": "null",
 
-        "Multi Protocol Traceroute Test": [scapy_template],
-        "multi_protocol_traceroute_test": [scapy_template],
-        "traceroute": [scapy_template],
+        "Multi Protocol Traceroute Test": ["scapy_template"],
+        "multi_protocol_traceroute_test": ["scapy_template"],
+        "traceroute": ["scapy_template"],
 
-        "parasitic_traceroute_test": null,
+        "parasitic_traceroute_test": "null",
 
-        "tls-handshake": null,
+        "tls-handshake": "null",
 
-        "dns_injection": null,
+        "dns_injection": "null",
 
-        "captivep": captive_portal,
-        "captiveportal": captive_portal,
+        "captivep": "captive_portal",
+        "captiveportal": "captive_portal",
 
         # These are ignored as we don't yet have analytics for them
         "HTTPFilteringBypass": False,
@@ -77,95 +143,31 @@ def get_sanitisers(test_name):
         "test_post_random_capitalization": False,
         "test_random_invalid_field_count": False,
         "keyword_filtering_detection_based_on_rst_packets": False,
-        "default": default
+        "default": "default"
     }
     return sanitise_mapping.get(test_name)
 
 
-def http_template(entry):
-    return entry
+def run(test_name, entry, bridge_db=None):
+    if bridge_db is None:
+        try:
+            from pipeline.helpers.settings import bridge_db_mapping
+            bridge_db = bridge_db_mapping
+        except ImportError:
+            raise ValueError(
+                "You must either pass bridge_db or copy"
+                " pipeline/helpers/settings.example.py to"
+                " pipeline/helpers/settings.py and configure it"
+            )
 
-
-def http_requests(entry):
-    return entry
-
-
-def scapy_template(entry):
-    return entry
-
-
-def dns_template(entry):
-    return entry
-
-
-def dns_consistency(entry):
-    return entry
-
-
-def captive_portal(entry):
-    return entry
-
-
-def null(entry):
-    return entry
-
-
-def bridge_reachability_tcp_connect(entry):
-    if entry['input'] and entry['input'].strip() in bridge_db_mapping.keys():
-        b = bridge_db_mapping[entry['input'].strip()]
-        fingerprint = b['fingerprint'].decode('hex')
-        hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-        entry['bridge_hashed_fingerprint'] = hashed_fingerprint
-        entry['input'] = hashed_fingerprint
+    sanitisers = Sanitisers(bridge_db)
+    test_sanitisers = get_sanitisers(test_name)
+    if test_sanitisers is False:
         return entry
-    return entry
-
-
-def bridge_reachability(entry):
-    if not entry.get('bridge_address'):
-        entry['bridge_address'] = entry['input']
-
-    if entry['bridge_address'] and \
-            entry['bridge_address'].strip() in bridge_db_mapping:
-        b = bridge_db_mapping[entry['bridge_address'].strip()]
-        entry['distributor'] = b['distributor']
-        entry['transport'] = b['transport']
-        fingerprint = b['fingerprint'].decode('hex')
-        hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-        entry['input'] = hashed_fingerprint
-        entry['bridge_address'] = None
-        regexp = ("(Learned fingerprint ([A-Z0-9]+)"
-                  "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
-                  "((new bridge descriptor .+?\s+"
-                  "at (([0-9]+\.){3}[0-9]+)))")
-        if entry.get('tor_log'):
-            entry['tor_log'] = re.sub(regexp, "[REDACTED]", entry['tor_log'])
-        else:
-            entry['tor_log'] = None
-    else:
-        entry['distributor'] = None
-        hashed_fingerprint = None
-
-    entry['bridge_hashed_fingerprint'] = hashed_fingerprint
-
-    return entry
-
-
-def tcp_connect(entry):
-    entry = bridge_reachability_tcp_connect(entry)
-    return entry
-
-
-def default(entry):
-    return entry
-
-
-def run(test_name, entry):
-    sanitisers = get_sanitisers(test_name)
-    if not sanitisers:
-        return entry
-    if not isinstance(sanitisers, list):
-        return sanitisers(entry)
-    for sanitiser in sanitisers:
-        entry = sanitiser(entry)
+    if not isinstance(test_sanitisers, list):
+        sanitise = getattr(sanitisers, test_sanitisers)
+        return sanitise(entry)
+    for test_sanitiser in test_sanitisers:
+        sanitise = getattr(sanitisers, test_sanitiser)
+        entry = sanitise(entry)
     return entry

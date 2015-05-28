@@ -11,7 +11,8 @@ from pipeline.helpers import sanitise
 
 
 class Report(object):
-    def __init__(self, in_file):
+    def __init__(self, in_file, bridge_db):
+        self.bridge_db = bridge_db
         self._start_time = time.time()
         self._end_time = None
         self._skipped_line = 0
@@ -56,7 +57,7 @@ class Report(object):
         if not self._sanitised_header.get('test_name'):
             print("MISSING TEST_NAME", "sanitise_entry")
             return entry
-        return sanitise.run(self._raw_header['test_name'], entry)
+        return sanitise.run(self._raw_header['test_name'], entry, self.bridge_db)
 
     def process_entry(self, entry):
         raw_entry = entry.copy()
