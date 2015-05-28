@@ -1,5 +1,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import os
+
 from invoke.config import Config
 from invoke import Collection, ctask as task
 from pipeline.helpers.util import setup_pipeline_logging, Timer
@@ -66,4 +68,22 @@ def list_reports(ctx):
         print(f)
     logger.info("list_reports runtime: %s" % timer.stop())
 
-ns = Collection(upload_reports, generate_streams, list_reports)
+
+@task
+def clean_streams(ctx, dst_private="s3n://ooni-private/",
+                  dst_public="s3n://ooni-public/"):
+    from pipeline.helpers.util import get_luigi_target
+    public_yaml = get_luigi_target(os.path.join(
+        dst_public,
+        "reports-sanitised",
+        "yaml"
+    ))
+    streams = get_luigi_target(os.path.join(
+        dst_private,
+        "reports-raw",
+        "streams"
+    ))
+    public_yaml.remove()
+    streams.remove()
+
+ns = Collection(upload_reports, generate_streams, list_reports, clean_streams)
