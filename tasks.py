@@ -24,13 +24,17 @@ def realtime(ctx):
 
 
 @task
-def generate_streams(ctx, src, start_date, end_date,
-                     dst="s3://ooni-private/reports-raw/streams/"):
-    pass
+def generate_streams(ctx, src, date_interval,
+                     dst_private="s3n://ooni-private/",
+                     dst_public="s3n://ooni-public/"):
+    from pipeline.batch import sanitise
+    _create_luigi_cfg()
+    sanitise.run(dst_private=dst_private, dst_public=dst_public, src=src,
+                 date_interval=date_interval)
 
 
 @task
-def upload_reports(ctx, src, dst="s3://ooni-private/reports-raw/yaml/",
+def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
                    workers=16, limit=None):
     if limit is not None:
         limit = int(limit)

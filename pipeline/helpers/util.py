@@ -6,6 +6,8 @@ import base64
 import json
 import os
 
+import yaml
+
 
 def encode_basestring_ascii(o):
     try:
@@ -31,6 +33,10 @@ def json_dump(data, fh):
 def json_dumps(data):
     encoder = json.JSONEncoder(ensure_ascii=True, default=json_default)
     return encoder.encode(data)
+
+
+def yaml_dump(data, fh):
+    yaml.safe_dump(data, fh, explicit_start=True, explicit_end=True)
 
 
 def _walk_local_directory(directory):
