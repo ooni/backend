@@ -3,3 +3,6 @@ aws:
   secret_access_key: ""
 kafka:
   hosts: "127.0.0.1:9092"
+logging:
+  filename: "ooni-pipeline.log"
+  level: "INFO"

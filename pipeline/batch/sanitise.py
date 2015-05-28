@@ -62,6 +62,7 @@ class AggregateYAMLReports(ExternalTask):
                 raw_streams.write(json_dumps(raw_entry))
                 raw_streams.write("\n")
                 yaml_dump(sanitised_entry, sanitised_yaml)
+        sanitised_yaml.close()
 
     def run(self):
         config = get_config()
