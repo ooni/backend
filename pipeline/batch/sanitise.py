@@ -58,7 +58,7 @@ class AggregateYAMLReports(ExternalTask):
         )).open('w')
         logger.info("Sanitising %s" % filename)
         with target.open('r') as in_file:
-            report = Report(in_file, self.bridge_db)
+            report = Report(in_file, self.bridge_db, target.path)
             for sanitised_entry, raw_entry in report.entries():
                 try:
                     logger.debug("writing sanitised entry to stream")

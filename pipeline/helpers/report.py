@@ -14,13 +14,14 @@ from pipeline.helpers import sanitise
 logger = logging.getLogger('ooni-pipeline')
 
 class Report(object):
-    def __init__(self, in_file, bridge_db):
+    def __init__(self, in_file, bridge_db, path):
         self.bridge_db = bridge_db
         self._start_time = time.time()
         self._end_time = None
         self._skipped_line = 0
 
         self.in_file = in_file
+        self.filename = os.path.basename(path)
         self._report = yaml.safe_load_all(self.in_file)
         self.process_header(self._report)
 
@@ -43,7 +44,7 @@ class Report(object):
     def process_header(self, report):
         self._raw_header = report.next()
         self._raw_header["record_type"] = "header"
-        self._raw_header["report_filename"] = os.path.basename(self.in_file.path)
+        self._raw_header["report_filename"] = self.filename
 
         date = datetime.fromtimestamp(self._raw_header["start_time"])
         date = date.strftime("%Y-%m-%d")
@@ -123,7 +124,7 @@ class Report(object):
                 if hasattr(exc, 'problem_mark'):
                     self._restart_from_line(exc.problem_mark.line)
                 else:
-                    logger.error("failed to process the entry for %s" % self.in_file.path)
+                    logger.error("failed to process the entry for %s" % self.filename)
                     logger.error(traceback.format_exc())
                     raise exc
                 continue
