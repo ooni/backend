@@ -21,6 +21,8 @@ def json_default(o):
 def json_dumps(data):
     return simplejson.dumps(data, ensure_ascii=True, default=json_default)
 
+def json_loads(data):
+    return simplejson.loads(data)
 
 def yaml_dump(data, fh):
     yaml.safe_dump(data, fh, explicit_start=True, explicit_end=True)
@@ -118,3 +120,13 @@ class Timer(object):
     def stop(self):
         self.end_time = time.time()
         return self.runtime
+
+
+def get_date_interval(date_interval):
+    from luigi import date_interval as d
+    interval = None
+    for c in [d.Year, d.Month, d.Week, d.Date, d.Custom]:
+        interval = c.parse(date_interval)
+        if interval:
+            return interval
+    raise ValueError("Invalid date interval")

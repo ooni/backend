@@ -10,7 +10,7 @@ from luigi.task import ExternalTask
 from luigi.configuration import get_config
 
 from pipeline.helpers.report import Report
-from pipeline.helpers.util import json_dumps, yaml_dump
+from pipeline.helpers.util import json_dumps, yaml_dump, get_date_interval
 from pipeline.helpers.util import list_report_files, get_luigi_target
 
 logger = logging.getLogger('ooni-pipeline')
@@ -122,15 +122,7 @@ def run(src, dst_private, dst_public, date_interval, bridge_db_path,
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
 
-    from luigi import date_interval as d
-    interval = None
-    for c in [d.Year, d.Month, d.Week, d.Date, d.Custom]:
-        interval = c.parse(date_interval)
-        if interval:
-            break
-    if interval is None:
-        raise ValueError("Invalid date interval")
-
+    interval = get_date_interval(date_interval)
     for date in interval:
         logger.debug("working on %s" % date)
         task = AggregateYAMLReports(dst_private=dst_private,

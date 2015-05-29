@@ -82,6 +82,29 @@ mappings = {
 }
 
 
+header_avro = {
+    "type": "record",
+    "name": "ReportHeader",
+    "fields": [
+        {"name": "backend_version", "type": "string"},
+        {"name": "input_hashes", "type": "array", "items": "string"},
+        {"name": "options", "type": "string"},
+        {"name": "probe_asn", "type": "string"},
+        {"name": "probe_cc", "type": "string"},
+        {"name": "probe_ip", "type": "string"},
+        {"name": "record_type", "type": "string"},
+        {"name": "report_filename", "type": "string"},
+        {"name": "report_id", "type": "string"},
+        {"name": "software_name", "type": "string"},
+        {"name": "software_version", "type": "string"},
+        {"name": "start_time", "type": "float"},
+        {"name": "test_name", "type": "string"},
+        {"name": "test_version", "type": "string"},
+        {"name": "data_format_version", "type": "string"},
+        {"name": "test_helpers", "type": "string"}
+    ]
+}
+
 class Report(object):
     def __init__(self, in_file, bridge_db, path):
         self.bridge_db = bridge_db

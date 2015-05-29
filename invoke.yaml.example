@@ -6,3 +6,9 @@ kafka:
 logging:
   filename: "ooni-pipeline.log"
   level: "INFO"
+postgres:
+  host: "localhost"
+  database: "report"
+  username: "ooni"
+  password: ""
+  table: "headers"

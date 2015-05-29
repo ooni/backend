@@ -123,16 +123,28 @@ def list_reports(ctx):
 def clean_streams(ctx, dst_private="s3n://ooni-private/",
                   dst_public="s3n://ooni-public/"):
     from pipeline.helpers.util import get_luigi_target
+    paths_to_delete = (
+        os.path.join(dst_private, "reports-raw", "streams"),
+        os.path.join(dst_public, "reports-sanitised", "yaml"),
+        os.path.join(dst_public, "reports-sanitised", "streams")
+    )
+    for path in paths_to_delete:
+        target = get_luigi_target(path)
+        logger.info("deleting %s" % path)
+        target.remove()
 
-    streams_path = os.path.join(dst_private, "reports-raw", "streams")
-    streams = get_luigi_target(streams_path)
-    logger.info("deleting %s" % streams_path)
-    streams.remove()
+@task
+def add_headers_to_db(ctx, date_interval, workers=16,
+                      src="s3n://ooni-private/reports-raw/yaml/",
+                      dst_private="s3n://ooni-private/",
+                      dst_public="s3n://ooni-public/",
+                      bridge_db_path="s3n://ooni-private/bridge_reachability/bridge_db.json"):
+    timer = Timer()
+    timer.start()
+    from pipeline.batch import add_headers_to_db
+    add_headers_to_db.run(src=src, date_interval=date_interval,
+                          worker_processes=workers, dst_private=dst_private,
+                          dst_public=dst_public, bridge_db_path=bridge_db_path)
+    logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
-    public_yaml_path = os.path.join(dst_public, "reports-sanitised", "yaml")
-    public_yaml = get_luigi_target(public_yaml_path)
-    logger.info("deleting %s" % public_yaml_path)
-    public_yaml.remove()
-
-
-ns = Collection(upload_reports, generate_streams, list_reports, clean_streams)
+ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db)
