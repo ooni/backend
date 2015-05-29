@@ -70,7 +70,7 @@ class AggregateYAMLReports(ExternalTask):
                     logger.debug("writing sanitised yaml file")
                     yaml_dump(sanitised_entry, sanitised_yaml)
                 except Exception:
-                    logger.error("error in processing %s" % filename)
+                    logger.error("error in dumping %s" % filename)
                     logger.error(traceback.format_exc())
         sanitised_yaml.close()
 
@@ -87,7 +87,11 @@ class AggregateYAMLReports(ExternalTask):
                                           config.get("s3", "aws_access_key_id"),
                                           config.get("s3", "aws_secret_access_key")):
             logger.debug("got filename %s" % filename)
-            self.process_report(filename, sanitised_streams, raw_streams)
+            try:
+                self.process_report(filename, sanitised_streams, raw_streams)
+            except Exception:
+                logger.error("error in processing %s" % filename)
+                logger.error(traceback.format_exc())
         raw_streams.close()
         sanitised_streams.close()
 
