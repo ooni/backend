@@ -3,8 +3,7 @@ boto
 PyYAML
 streamparse
 filechunkio
-#luigi
-https://github.com/hellais/luigi/archive/feature/tmp_directory.zip
+luigi
 invoke
 simplejson
 ansible
