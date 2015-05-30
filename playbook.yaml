@@ -50,7 +50,7 @@
     virtualenv_name: pipeline
   tasks:
     - name: Mount ephemeral to tmp
-      mount: name=/tmp src=/dev/sdc state=mounted options=rw
+      mount: name=/tmp src=/dev/sdc state=mounted fstype=ext3
       sudo: yes
 
     - name: Set permissions on /tmp
