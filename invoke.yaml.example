@@ -1,3 +1,5 @@
+core:
+  tmp_dir: "/tmp"
 aws:
   access_key_id: ""
   secret_access_key: ""

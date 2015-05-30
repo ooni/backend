@@ -217,11 +217,8 @@ class Report(object):
             except StopIteration:
                 break
             except Exception as exc:
-                if hasattr(exc, 'problem_mark') and hasattr(self.in_file, 'seek'):
-                    self._restart_from_line(exc.problem_mark.line)
-                else:
-                    logger.error("failed to process the entry for %s" % self.filename)
-                    logger.error(traceback.format_exc())
-                    raise exc
-                continue
+                self._end_time = time.time()
+                logger.error("failed to process the entry for %s" % self.filename)
+                logger.error(traceback.format_exc())
+                raise exc
         self._end_time = time.time()

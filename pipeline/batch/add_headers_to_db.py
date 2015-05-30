@@ -8,6 +8,7 @@ import luigi.postgres
 from invoke.config import Config
 
 from pipeline.helpers.util import json_loads, get_date_interval, get_luigi_target
+from pipeline.helpers.util import get_imported_dates
 from pipeline.helpers.report import header_avro
 
 from pipeline.batch.sanitise import AggregateYAMLReports
@@ -76,8 +77,13 @@ def run(src, dst_private, dst_public, date_interval, bridge_db_path,
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
 
+    imported_dates = get_imported_dates(src,
+                                        aws_access_key_id=config.aws.access_key_id,
+                                        aws_secret_access_key=config.aws.secret_access_key)
     interval = get_date_interval(date_interval)
     for date in interval:
+        if str(date) not in imported_dates:
+            continue
         logging.info("adding headers for date: %s" % date)
         task = ReportHeadersToDatabase(dst_private=dst_private,
                                        dst_public=dst_public,

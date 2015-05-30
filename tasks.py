@@ -12,14 +12,23 @@ logger = setup_pipeline_logging(config)
 
 def _create_cfg_files():
     with open("client.cfg", "w") as fw:
-        fw.write("[aws]\n")
-        fw.write("access-key-id: %s\n" % config.aws.access_key_id)
-        fw.write("secret-access-key: %s\n" % config.aws.secret_access_key)
-        fw.write("[s3]\n")
-        fw.write("aws_access_key_id: %s\n" % config.aws.access_key_id)
-        fw.write("aws_secret_access_key: %s\n" % config.aws.secret_access_key)
-        fw.write("[kafka]\n")
-        fw.write("hosts: %s\n" % config.kafka.hosts)
+        fw.write("""[core]
+hdfs-tmp-dir: {tmp_dir}
+local-tmp-dir: {tmp_dir}
+[aws]
+access-key-id: {aws_access_key_id}
+secret-access-key: {aws_secret_access_key}
+[s3]
+aws_access_key_id: {aws_access_key_id}
+aws_secret_access_key: {aws_secret_access_key}
+[kafka]
+hosts: {kafka_hosts}
+[postgres]
+local-tmp-dir: {tmp_dir}
+""".format(tmp_dir=config.core.tmp_dir,
+           aws_access_key_id=config.aws.access_key_id,
+           aws_secret_access_key=config.aws.secret_access_key,
+           kafka_hosts=config.kafka.hosts))
     with open("logging.cfg", "w") as fw:
         fw.write("""[loggers]
 keys=root,ooni-pipeline,luigi-interface
@@ -147,4 +156,11 @@ def add_headers_to_db(ctx, date_interval, workers=16,
                           dst_public=dst_public, bridge_db_path=bridge_db_path)
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
-ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db)
+@task
+def start_computer(ctx, private_key):
+    os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"
+    os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
+    os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
+    ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml" % private_key, pty=True)
+
+ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db, start_computer)

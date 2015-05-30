@@ -28,13 +28,19 @@ def yaml_dump(data, fh):
     yaml.safe_dump(data, fh, explicit_start=True, explicit_end=True)
 
 
-def _walk_local_directory(directory):
-    for root, dirs, files in os.walk(directory):
-        for filename in files:
-            yield os.path.join(root, filename)
+def _local_walker(recursive=True):
+    def _walk_local_directory(directory):
+        if recursive:
+            for root, dirs, files in os.walk(directory):
+                for filename in files:
+                    yield os.path.join(root, filename)
+        else:
+            for path in os.listdir(directory):
+                yield os.path.join(directory, filename)
+    return _walk_local_directory
 
 
-def _s3_walker(aws_access_key_id, aws_secret_access_key):
+def _s3_walker(aws_access_key_id, aws_secret_access_key, recursive=True):
     from boto.s3.connection import S3Connection
     con = S3Connection(aws_access_key_id, aws_secret_access_key)
 
@@ -42,14 +48,17 @@ def _s3_walker(aws_access_key_id, aws_secret_access_key):
         p = urlparse(directory)
         bucket_name = p.netloc
         bucket = con.get_bucket(bucket_name)
-        keys = bucket.list(p.path[1:])
+        if recursive:
+            keys = bucket.list(p.path[1:])
+        else:
+            keys = bucket.list(p.path[1:], "/")
         for key in keys:
             yield "s3n://" + os.path.join(bucket_name, key.name)
     return _walk_s3_directory
 
 
 def list_report_files(directory, aws_access_key_id=None,
-                      aws_secret_access_key=None):
+                      aws_secret_access_key=None, recursive=True):
     def is_report_file(filename):
         possible_extensions = (".yamloo", ".yamloo.gz", ".yaml", "yaml.gz")
         if any(filename.endswith(ext) for ext in possible_extensions):
@@ -59,13 +68,25 @@ def list_report_files(directory, aws_access_key_id=None,
     if directory.startswith("s3n://"):
         assert aws_access_key_id is not None
         assert aws_secret_access_key is not None
-        walker = _s3_walker(aws_access_key_id, aws_secret_access_key)
+        walker = _s3_walker(aws_access_key_id=aws_access_key_id,
+                            aws_secret_access_key=aws_secret_access_key,
+                            recursive=recursive)
     else:
         walker = _walk_local_directory
     for path in walker(directory):
         if is_report_file(path):
             yield path
 
+def get_imported_dates(directory,aws_access_key_id=None,
+                       aws_secret_access_key=None):
+
+    walker = _s3_walker(aws_access_key_id=aws_access_key_id,
+                        aws_secret_access_key=aws_secret_access_key,
+                        recursive=False)
+    dates = []
+    for date_directory in walker(directory):
+        dates.append(date_directory.split("/")[-2])
+    return dates
 
 def get_luigi_target(path):
     from luigi.s3 import S3Target
