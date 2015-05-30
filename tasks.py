@@ -81,8 +81,7 @@ def realtime(ctx):
 @task
 def generate_streams(ctx, src, date_interval, workers=16,
                      dst_private="s3n://ooni-private/",
-                     dst_public="s3n://ooni-public/",
-                     bridge_db_path="s3n://ooni-private/bridge_reachability/bridge_db.json"):
+                     dst_public="s3n://ooni-public/"):
     timer = Timer()
     timer.start()
     logger.info("generating streams from {src} for"
@@ -98,8 +97,7 @@ def generate_streams(ctx, src, date_interval, workers=16,
 
     from pipeline.batch import sanitise
     sanitise.run(dst_private=dst_private, dst_public=dst_public, src=src,
-                 date_interval=date_interval, bridge_db_path=bridge_db_path,
-                 worker_processes=workers)
+                 date_interval=date_interval, worker_processes=workers)
     logger.info("generate_streams runtime: %s" % timer.stop())
 
 
@@ -146,14 +144,13 @@ def clean_streams(ctx, dst_private="s3n://ooni-private/",
 def add_headers_to_db(ctx, date_interval, workers=16,
                       src="s3n://ooni-private/reports-raw/yaml/",
                       dst_private="s3n://ooni-private/",
-                      dst_public="s3n://ooni-public/",
-                      bridge_db_path="s3n://ooni-private/bridge_reachability/bridge_db.json"):
+                      dst_public="s3n://ooni-public/"):
     timer = Timer()
     timer.start()
     from pipeline.batch import add_headers_to_db
     add_headers_to_db.run(src=src, date_interval=date_interval,
                           worker_processes=workers, dst_private=dst_private,
-                          dst_public=dst_public, bridge_db_path=bridge_db_path)
+                          dst_public=dst_public)
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
 @task

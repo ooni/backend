@@ -14,3 +14,5 @@ postgres:
   username: "ooni"
   password: ""
   table: "headers"
+ooni:
+  bridge_db_path: "s3n://ooni-private/bridge_reachability/bridge_db.json"

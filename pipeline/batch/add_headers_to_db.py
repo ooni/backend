@@ -29,7 +29,6 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
     src = luigi.Parameter()
     dst_private = luigi.Parameter()
     dst_public = luigi.Parameter()
-    bridge_db_path = luigi.Parameter()
 
     date = luigi.DateParameter()
 
@@ -42,13 +41,10 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
     columns = columns
 
     def requires(self):
-        with get_luigi_target(self.bridge_db_path).open('r') as f:
-            bridge_db = json.load(f)
         return AggregateYAMLReports(dst_private=self.dst_private,
                                     dst_public=self.dst_public,
                                     src=self.src,
-                                    date=self.date,
-                                    bridge_db=bridge_db)
+                                    date=self.date)
 
     def format_record(self, record):
         fields = []
@@ -71,8 +67,7 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
                     logger.info("Found header")
                     yield self.format_record(record)
 
-def run(src, dst_private, dst_public, date_interval, bridge_db_path,
-        worker_processes=16):
+def run(src, dst_private, dst_public, date_interval, worker_processes=16):
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
@@ -87,8 +82,7 @@ def run(src, dst_private, dst_public, date_interval, bridge_db_path,
         logging.info("adding headers for date: %s" % date)
         task = ReportHeadersToDatabase(dst_private=dst_private,
                                        dst_public=dst_public,
-                                       src=src, date=date,
-                                       bridge_db_path=bridge_db_path)
+                                       src=src, date=date)
         w.add(task)
     w.run()
     w.stop()

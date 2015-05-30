@@ -7,24 +7,21 @@ import luigi
 import luigi.worker
 import luigi.hdfs
 from luigi.task import ExternalTask
-from luigi.configuration import get_config
 
 from pipeline.helpers.report import Report
 from pipeline.helpers.util import json_dumps, yaml_dump, get_date_interval
 from pipeline.helpers.util import list_report_files, get_luigi_target
 
+config = Config(runtime_path="invoke.yaml")
 logger = logging.getLogger('ooni-pipeline')
 
 class AggregateYAMLReports(ExternalTask):
     src = luigi.Parameter()
     dst_private = luigi.Parameter()
     dst_public = luigi.Parameter()
-    bridge_db = luigi.Parameter()
 
     date = luigi.DateParameter()
-
-    def __str__(self):
-        return "AggregateYAMLReports()"
+    bridge_db = {}
 
     def output(self):
         sanitised_streams = get_luigi_target(os.path.join(
@@ -75,7 +72,9 @@ class AggregateYAMLReports(ExternalTask):
         sanitised_yaml.close()
 
     def run(self):
-        config = get_config()
+        with get_luigi_target(config.ooni.bridge_db_path).open('r') as f:
+            self.bridge_db = json.load(f)
+
         output = self.output()
         raw_streams = output["raw_streams"].open('w')
         sanitised_streams = output["sanitised_streams"].open('w')
@@ -84,8 +83,8 @@ class AggregateYAMLReports(ExternalTask):
                                     self.date.strftime("%Y-%m-%d"))
         logger.debug("listing path %s" % reports_path)
         for filename in list_report_files(reports_path,
-                                          config.get("s3", "aws_access_key_id"),
-                                          config.get("s3", "aws_secret_access_key")):
+                                          config.aws.access_key_id,
+                                          config.aws.secret_access_key):
             logger.debug("got filename %s" % filename)
             try:
                 self.process_report(filename, sanitised_streams, raw_streams)
@@ -112,11 +111,7 @@ class RawReportsSanitiser(luigi.Task):
         ]
 
 
-def run(src, dst_private, dst_public, date_interval, bridge_db_path,
-        worker_processes=16):
-
-    with get_luigi_target(bridge_db_path).open('r') as f:
-        bridge_db = json.load(f)
+def run(src, dst_private, dst_public, date_interval, worker_processes=16):
 
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
@@ -126,8 +121,7 @@ def run(src, dst_private, dst_public, date_interval, bridge_db_path,
     for date in interval:
         logger.debug("working on %s" % date)
         task = AggregateYAMLReports(dst_private=dst_private,
-                                    dst_public=dst_public, src=src, date=date,
-                                    bridge_db=bridge_db)
+                                    dst_public=dst_public, src=src, date=date)
         w.add(task)
     w.run()
     w.stop()

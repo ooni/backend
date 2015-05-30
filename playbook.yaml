@@ -107,6 +107,18 @@
         src: "invoke.yaml"
         dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/invoke.yaml"
 
+    - name: Copy the run script over
+      copy: 
+        src: "run.sh"
+        dest: "{{ ansible_env.HOME }}/run.sh"
+        mode: 0777
+
+    - name: "Running the command run.sh"
+      command: "{{ ansible_env.HOME }}/run.sh"
+      args:
+        chhdir: "{{ ansible_env.HOME}}/ooni-pipeline-ng/"
+        executable: "/bin/bash"
+
 # - name: Terminate instances
 #   hosts: localhost
 #   connection: local
