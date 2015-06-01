@@ -161,7 +161,7 @@ def sync_reports(ctx,
     timer.start()
     from pipeline.batch import sync_reports
 
-    sync_reports.run(srcs=src, worker_processes=workers, dst_private=dst_private)
+    sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
     logger.info("sync_reports runtime: %s" % timer.stop())
 
 

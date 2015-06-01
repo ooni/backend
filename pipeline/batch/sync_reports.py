@@ -48,7 +48,7 @@ def run(srcs, dst_private, worker_processes=16):
     # imported_dates = get_imported_dates(src)
     for src in srcs:
         logging.info("adding headers for src: %s" % src)
-        report_files = list_report_files(src, key_file=config.core.ssh_private_key_file)
+        report_files = list_report_files(src, key_file=config.core.ssh_private_key_file, no_host_key_check=True)
         task = MoveReportFiles(report_files=report_files,
                                dst_private=dst_private)
         w.add(task)
