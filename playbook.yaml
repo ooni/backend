@@ -109,9 +109,16 @@
 
     - name: Copy the run script over
       copy: 
-        src: "run.sh"
+        src: "private/run.sh"
         dest: "{{ ansible_env.HOME }}/run.sh"
         mode: 0777
+
+    - name: Copy the run script over
+      copy: 
+        src: "private/private.key"
+        dest: "{{ ansible_env.HOME }}/private.key"
+        mode: 0777
+
 
     - name: "Running the command run.sh"
       command: "{{ ansible_env.HOME }}/run.sh"

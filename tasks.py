@@ -154,10 +154,22 @@ def add_headers_to_db(ctx, date_interval, workers=16,
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
 @task
+def sync_reports(ctx,
+                 srcs=["ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive"],
+                 dst_private="s3://ooni-private/", workers=16):
+    timer = Timer()
+    timer.start()
+    from pipeline.batch import sync_reports
+
+    sync_reports.run(srcs=src, worker_processes=workers, dst_private=dst_private)
+    logger.info("sync_reports runtime: %s" % timer.stop())
+
+
+@task
 def start_computer(ctx, private_key):
     os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"
     os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
     os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
     ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml" % private_key, pty=True)
 
-ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db, start_computer)
+ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db, start_computer, sync_reports)

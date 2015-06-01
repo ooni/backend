@@ -56,9 +56,21 @@ def _s3_walker(aws_access_key_id, aws_secret_access_key, recursive=True):
             yield "s3n://" + os.path.join(bucket_name, key.name)
     return _walk_s3_directory
 
+def _ssh_walker(directory, key_file=None, recursive=True):
+    t = get_luigi_target(directory, key_file=key_file)
+    def _walk_ssh_directory(directory):
+        p = urlparse(directory)
+        if recursive:
+            listing = t.fs.remote_context.check_output("find %s" % p.path)
+        else:
+            listing = t.fs.remote_context.check_output("ls -1 %s" % p.path)
+        for line in listing.split("\n"):
+            yield os.path.join(directory.replace(p.path, ""), line.strip())
+    return _walk_ssh_directory
 
 def list_report_files(directory, aws_access_key_id=None,
-                      aws_secret_access_key=None, recursive=True):
+                      aws_secret_access_key=None, key_file=None,
+                      recursive=True):
     def is_report_file(filename):
         possible_extensions = (".yamloo", ".yamloo.gz", ".yaml", "yaml.gz")
         if any(filename.endswith(ext) for ext in possible_extensions):
@@ -71,13 +83,15 @@ def list_report_files(directory, aws_access_key_id=None,
         walker = _s3_walker(aws_access_key_id=aws_access_key_id,
                             aws_secret_access_key=aws_secret_access_key,
                             recursive=recursive)
+    elif directory.startswith("ssh://"):
+        walker = _ssh_walker(directory, key_file=key_file)
     else:
         walker = _walk_local_directory
     for path in walker(directory):
         if is_report_file(path):
             yield path
 
-def get_imported_dates(directory,aws_access_key_id=None,
+def get_imported_dates(directory, aws_access_key_id=None,
                        aws_secret_access_key=None):
 
     walker = _s3_walker(aws_access_key_id=aws_access_key_id,
@@ -88,8 +102,10 @@ def get_imported_dates(directory,aws_access_key_id=None,
         dates.append(date_directory.split("/")[-2])
     return dates
 
-def get_luigi_target(path):
+
+def get_luigi_target(path, ssh_key_file=None):
     from luigi.s3 import S3Target
+    from luigi.contrib.ssh import RemoteTarget
     from luigi.file import LocalTarget
     from luigi.format import GzipFormat
 
@@ -98,6 +114,10 @@ def get_luigi_target(path):
         file_format = GzipFormat()
     if path.startswith("s3n://"):
         return S3Target(path, format=file_format)
+    elif path.startswith("ssh://"):
+        p = urlparse(path)
+        return RemoteTarget(p.path, p.host, username=p.username,
+                            key_file=ssh_key_file, sshpass=p.password)
     return LocalTarget(path, format=file_format)
 
 def setup_pipeline_logging(config, conf_file="logging.cfg"):
