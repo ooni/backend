@@ -2,7 +2,7 @@ client.cfg
 .DS_Store
 _build
 _resources
-logs
+*.log
 *.pyc
 invoke.yaml
 pipeline/helpers/settings.py
