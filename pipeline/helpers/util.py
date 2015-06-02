@@ -66,7 +66,7 @@ def _ssh_walker(directory, key_file=None, no_host_key_check=False, recursive=Tru
         else:
             listing = t.fs.remote_context.check_output(["ls -1", p.path])
         for line in listing.split("\n"):
-            yield os.path.join(directory.replace(p.path, ""), line.strip())
+            yield os.path.join(directory.replace(p.path, ""), line.strip()[1:])
     return _walk_ssh_directory
 
 def list_report_files(directory, aws_access_key_id=None,

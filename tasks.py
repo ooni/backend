@@ -156,7 +156,7 @@ def add_headers_to_db(ctx, date_interval, workers=16,
 @task
 def sync_reports(ctx,
                  srcs=["ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive"],
-                 dst_private="s3://ooni-private/", workers=16):
+                 dst_private="s3n://ooni-incoming/", workers=16):
     timer = Timer()
     timer.start()
     from pipeline.batch import sync_reports
