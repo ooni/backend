@@ -16,6 +16,7 @@ from luigi.file import LocalTarget
 
 from pipeline.helpers.util import list_report_files
 
+config = Config(runtime_path="invoke.yaml")
 logger = logging.getLogger('ooni-pipeline')
 
 class ReportSource(ExternalTask):
@@ -89,7 +90,9 @@ def run(src_directory, dst, worker_processes, limit=None, move=False):
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
 
-    for filename in list_report_files(src_directory):
+    for filename in list_report_files(src_directory,
+                                      aws_access_key_id=config.aws.access_key_id,
+                                      aws_secret_access_key=config.aws.secret_access_key):
         if limit is not None and idx >= limit:
             break
         idx += 1
