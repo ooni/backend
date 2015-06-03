@@ -54,7 +54,7 @@
     service_name: oonipipeline
     papertrail_hostname: "logs2.papertrailapp.com"
     papertrail_port: "57492"
-    invoke_command: "add_headers_to_db 2012"
+    invoke_command: "add_headers_to_db 2015 --workers=32 --halt=true"
   tasks:
     - name: Mount ephemeral to tmp
       mount: name=/tmp src=/dev/sdc state=mounted fstype=ext3

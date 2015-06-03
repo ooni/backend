@@ -84,7 +84,7 @@ def generate_streams(ctx, date_interval,
                      src="s3n://ooni-private/reports-raw/yaml/",
                      workers=16,
                      dst_private="s3n://ooni-private/",
-                     dst_public="s3n://ooni-public/"):
+                     dst_public="s3n://ooni-public/", halt=False):
     timer = Timer()
     timer.start()
     logger.info("generating streams from {src} for"
@@ -102,11 +102,13 @@ def generate_streams(ctx, date_interval,
     sanitise.run(dst_private=dst_private, dst_public=dst_public, src=src,
                  date_interval=date_interval, worker_processes=workers)
     logger.info("generate_streams runtime: %s" % timer.stop())
+    if halt:
+        ctx.run("sudo halt")
 
 
 @task
 def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
-                   workers=16, limit=None, move=False):
+                   workers=16, limit=None, move=False, halt=False):
     timer = Timer()
     timer.start()
     if limit is not None:
@@ -115,6 +117,9 @@ def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
     upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
                        limit=limit, move=move)
     logger.info("upload_reports runtime: %s" % timer.stop())
+    if halt:
+        ctx.run("sudo halt")
+
 
 
 @task
@@ -147,7 +152,7 @@ def clean_streams(ctx, dst_private="s3n://ooni-private/",
 def add_headers_to_db(ctx, date_interval, workers=16,
                       src="s3n://ooni-private/reports-raw/yaml/",
                       dst_private="s3n://ooni-private/",
-                      dst_public="s3n://ooni-public/"):
+                      dst_public="s3n://ooni-public/", halt=False):
     timer = Timer()
     timer.start()
     from pipeline.batch import add_headers_to_db
@@ -155,11 +160,14 @@ def add_headers_to_db(ctx, date_interval, workers=16,
                           worker_processes=workers, dst_private=dst_private,
                           dst_public=dst_public)
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
+    if halt:
+        ctx.run("sudo halt")
+
 
 @task
 def sync_reports(ctx,
                  srcs=["ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive"],
-                 dst_private="s3n://ooni-incoming/", workers=16):
+                 dst_private="s3n://ooni-incoming/", workers=16, halt=False):
     timer = Timer()
     timer.start()
     from pipeline.batch import sync_reports
@@ -167,6 +175,9 @@ def sync_reports(ctx,
     sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
     upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers)
     logger.info("sync_reports runtime: %s" % timer.stop())
+    if halt:
+        ctx.run("sudo halt")
+
 
 
 @task
