@@ -103,14 +103,14 @@ def generate_streams(ctx, src, date_interval, workers=16,
 
 @task
 def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
-                   workers=16, limit=None):
+                   workers=16, limit=None, move=False):
     timer = Timer()
     timer.start()
     if limit is not None:
         limit = int(limit)
     from pipeline.batch import upload_reports
     upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
-                       limit=limit)
+                       limit=limit, move=move)
     logger.info("upload_reports runtime: %s" % timer.stop())
 
 
@@ -162,14 +162,15 @@ def sync_reports(ctx,
     from pipeline.batch import sync_reports
 
     sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
+    upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers)
     logger.info("sync_reports runtime: %s" % timer.stop())
 
 
 @task
-def start_computer(ctx, private_key):
+def start_computer(ctx, private_key, instance_type="c3.8xlarge"):
     os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"
     os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
     os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
-    ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml" % private_key, pty=True)
+    ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml --extra-vars instance_type=%s" % (private_key, instance_type), pty=True)
 
 ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db, start_computer, sync_reports)

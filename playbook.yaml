@@ -10,7 +10,7 @@
     image: ami-1ecae776
     region: us-east-1
   tasks:
-    - name: Launch instance 
+    - name: Launch instance {{ instance_type }}
       ec2: 
         keypair: "{{ keypair }}"
         group: "{{ security_group }}"
@@ -22,8 +22,6 @@
         volumes: 
           - device_name: /dev/sdc
             ephemeral: ephemeral0
-          - device_name: /dev/sdd
-            ephemeral: ephemeral1
       register: ec2
 
     - name: Add new instances to host group

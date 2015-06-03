@@ -33,6 +33,7 @@ class ReportSource(ExternalTask):
 class S3CopyRawReport(luigi.Task):
     src = luigi.Parameter()
     dst = luigi.Parameter()
+    move = luigi.Parameter()
 
     def requires(self):
         return ReportSource(self.src)
@@ -74,12 +75,15 @@ class S3CopyRawReport(luigi.Task):
                                          os.path.basename(self.src)))
 
     def run(self):
-        with self.input().open('r') as in_file:
-            with self.output().open('w') as out_file:
+        input = self.input()
+        output = self.output()
+        with output.open('w') as out_file:
+            with input.open('r') as in_file:
                 shutil.copyfileobj(in_file, out_file)
+        if self.move:
+            self.output.remove()
 
-
-def run(src_directory, dst, worker_processes, limit=None):
+def run(src_directory, dst, worker_processes, limit=None, move=False):
     sch = luigi.scheduler.CentralPlannerScheduler()
     idx = 0
     w = luigi.worker.Worker(scheduler=sch,
@@ -90,7 +94,7 @@ def run(src_directory, dst, worker_processes, limit=None):
             break
         idx += 1
         logging.info("uploading %s" % filename)
-        task = S3CopyRawReport(src=filename, dst=dst)
+        task = S3CopyRawReport(src=filename, dst=dst, move=False)
         w.add(task)
     w.run()
     w.stop()
