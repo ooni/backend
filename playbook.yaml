@@ -134,11 +134,12 @@
         mode: 0700
 
     - name: Install the pipeline service
-      action: template src=templates/init.d-template.j2 dest=/etc/init.d/oonipipeline mode=0751
+      action: template src=templates/init.d-template.j2 dest=/etc/init.d/oonipipeline mode=0754
       sudo: yes
     
     - name: Ensure the pipeline service is running
       action: service name=oonipipeline state=started
+      sudo: yes
 
 # - name: Terminate instances
 #   hosts: localhost

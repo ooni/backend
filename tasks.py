@@ -80,7 +80,9 @@ def realtime(ctx):
 
 
 @task
-def generate_streams(ctx, src, date_interval, workers=16,
+def generate_streams(ctx, date_interval,
+                     src="s3n://ooni-private/reports-raw/yaml/",
+                     workers=16,
                      dst_private="s3n://ooni-private/",
                      dst_public="s3n://ooni-public/"):
     timer = Timer()

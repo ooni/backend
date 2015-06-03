@@ -12,7 +12,7 @@ fi
 
 start_service() {
   echo -n " * Starting $SERVICE_NAME... "
-  start-stop-daemon -Sq -p $PIDFILE -x $DAEMON -- $DAEMON_OPTS
+  daeomon --pidfile $PIDFILE $DAEMON $DAEMON_OPTS
   e=$?
   if [ $e -eq 1 ]; then
     echo "already running"
@@ -29,7 +29,7 @@ start_service() {
 
 stop_service() {
   echo -n " * Stopping $SERVICE_NAME... "
-  start-stop-daemon -Kq -R 10 -p $PIDFILE
+  killproc $PIDFILE
   e=$?
   if [ $e -eq 1 ]; then
     echo "not running"
