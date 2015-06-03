@@ -37,7 +37,7 @@ class MoveReportFiles(luigi.Task):
                 out_file = output[report_file].open('w')
                 shutil.copyfileobj(in_file, out_file)
                 out_file.close()
-            # t.fs.remove(t.path)
+            t.fs.remove(t.path)
 
 
 def run(srcs, dst_private, worker_processes=16):
