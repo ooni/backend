@@ -8,12 +8,15 @@ import luigi.worker
 import luigi.hdfs
 from luigi.task import ExternalTask
 
+from invoke.config import Config
+
 from pipeline.helpers.report import Report
 from pipeline.helpers.util import json_dumps, yaml_dump, get_date_interval
 from pipeline.helpers.util import list_report_files, get_luigi_target
 
 config = Config(runtime_path="invoke.yaml")
 logger = logging.getLogger('ooni-pipeline')
+
 
 class AggregateYAMLReports(ExternalTask):
     src = luigi.Parameter()

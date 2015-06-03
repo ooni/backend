@@ -46,6 +46,12 @@
   user: ec2-user
   vars:
     virtualenv_name: pipeline
+    user: ec2-user
+    remote_syslog_version: "v0.13"
+    pidfile: /var/run/oonipipeline.pid
+    daemon: /home/ec2-user/virtualenvs/pipeline/bin/invoke
+    daemon_opts: "add_reports_to_db 2016"
+    service_name: oonipipeline
   tasks:
     - name: Mount ephemeral to tmp
       mount: name=/tmp src=/dev/sdc state=mounted fstype=ext3
@@ -105,24 +111,34 @@
         src: "invoke.yaml"
         dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/invoke.yaml"
 
-    - name: Copy the run script over
-      copy: 
-        src: "private/run.sh"
-        dest: "{{ ansible_env.HOME }}/run.sh"
-        mode: 0777
+    - name: Download remote_syslog
+      get_url:
+        url: "https://github.com/papertrail/remote_syslog2/releases/download/{{remote_syslog_version}}/remote_syslog_linux_amd64.tar.gz"
+        dest: /tmp/
+      register: remote_syslog_archive
 
+    - name: Unarchive remote_syslog
+      unarchive:
+        src: "/tmp/remote_syslog_linux_amd64.tar.gz"z
+        dest: "/tmp/"
+        copy: no
+
+    - name: Install remote_syslog
+      command: "cp /tmp/remote_syslog/remote_syslog /usr/loca/bin"
+      sudo: yes 
+      
     - name: Copy the run script over
       copy: 
         src: "private/private.key"
         dest: "{{ ansible_env.HOME }}/private.key"
         mode: 0700
 
-
-    - name: "Running the command run.sh"
-      command: "{{ ansible_env.HOME }}/run.sh"
-      args:
-        chhdir: "{{ ansible_env.HOME}}/ooni-pipeline-ng/"
-        executable: "/bin/bash"
+    - name: Install the pipeline service
+      action: template src=templates/init.d-tempalte.j2 dst=/etc/init.d/oonipipeline mode=0751
+      sudo: yes
+    
+    - name: Ensure the pipeline service is running
+      action: service name=oonipipeline state=started
 
 # - name: Terminate instances
 #   hosts: localhost

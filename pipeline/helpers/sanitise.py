@@ -161,8 +161,8 @@ def run(test_name, entry, bridge_db=None):
             )
 
     sanitisers = Sanitisers(bridge_db)
-    test_sanitisers = get_sanitisers(test_name, None)
-    if test_sanitisers is in (False, None):
+    test_sanitisers = get_sanitisers(test_name)
+    if test_sanitisers in (False, None):
         return entry
     if not isinstance(test_sanitisers, list):
         sanitise = getattr(sanitisers, test_sanitisers)
