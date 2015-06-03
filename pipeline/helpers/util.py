@@ -1,12 +1,10 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
-import zlib
 import time
 import logging
 import logging.config
 # XXX add support for python 3
 from urlparse import urlparse
-from base64 import b64encode
 import os
 
 import yaml
@@ -87,9 +85,10 @@ def list_report_files(directory, aws_access_key_id=None,
                             recursive=recursive)
     elif directory.startswith("ssh://"):
         walker = _ssh_walker(directory, key_file=key_file,
-                             no_host_key_check=no_host_key_check)
+                             no_host_key_check=no_host_key_check,
+                             recursive=recursive)
     else:
-        walker = _walk_local_directory
+        walker = _local_walker(recursive=recursive)
     for path in walker(directory):
         if is_report_file(path):
             yield path
