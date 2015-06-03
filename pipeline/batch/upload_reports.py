@@ -14,6 +14,8 @@ from luigi.format import GzipFormat
 from luigi.s3 import S3Target
 from luigi.file import LocalTarget
 
+from invoke.config import Config
+
 from pipeline.helpers.util import list_report_files
 
 config = Config(runtime_path="invoke.yaml")
