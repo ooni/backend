@@ -1,2 +1,2 @@
 web: python run.py
-worker: invoke start_computer private/ooni-pipeline.pem
+worker: sh private/run.sh

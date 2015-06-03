@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+import traceback
 import os
 
 from invoke.config import Config
@@ -168,9 +169,17 @@ def sync_reports(ctx,
 
 @task
 def start_computer(ctx, private_key, instance_type="c3.8xlarge"):
+    timer = Timer()
+    timer.start()
     os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"
     os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
     os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
-    ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml --extra-vars instance_type=%s" % (private_key, instance_type), pty=True)
+    try:
+        result = ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml --extra-vars instance_type=%s" % (private_key, instance_type), pty=True)
+        logger.info(str(result))
+    except Exception:
+        logger.error("Failed to run ansible playbook")
+        logger.error(traceback.format_exc())
+    logger.info("start_computer runtime: %s" % timer.stop())
 
 ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db, start_computer, sync_reports)
