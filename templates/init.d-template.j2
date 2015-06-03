@@ -1,5 +1,5 @@
 #!/bin/sh
-
+source /etc/rc.d/init.d/functions
 SERVICE_NAME={{service_name}}
 DAEMON={{daemon}}
 DAEMON_OPTS="{{daemon_opts}}"
@@ -12,7 +12,7 @@ fi
 
 start_service() {
   echo -n " * Starting $SERVICE_NAME... "
-  daeomon --pidfile $PIDFILE $DAEMON $DAEMON_OPTS
+  daemon --pidfile $PIDFILE $DAEMON $DAEMON_OPTS
   e=$?
   if [ $e -eq 1 ]; then
     echo "already running"
