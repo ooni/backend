@@ -4,3 +4,9 @@ invoke
 flask
 honcho
 celery
+simplejson
+luigi
+streamparse
+filechunkio
+PyYaml
+awscli
