@@ -50,7 +50,7 @@
     remote_syslog_version: "v0.13"
     pidfile: /var/run/oonipipeline.pid
     daemon: /home/ec2-user/virtualenvs/pipeline/bin/invoke
-    daemon_opts: "add_reports_to_db 2015"
+    daemon_opts: "generate_streams 2012 --workers=32"
     service_name: oonipipeline
   tasks:
     - name: Mount ephemeral to tmp
@@ -134,7 +134,7 @@
         mode: 0700
 
     - name: Install the pipeline service
-      action: template src=templates/init.d-tempalte.j2 dst=/etc/init.d/oonipipeline mode=0751
+      action: template src=templates/init.d-template.j2 dest=/etc/init.d/oonipipeline mode=0751
       sudo: yes
     
     - name: Ensure the pipeline service is running
