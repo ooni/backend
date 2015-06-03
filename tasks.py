@@ -168,7 +168,7 @@ def sync_reports(ctx,
 
 
 @task
-def start_computer(ctx, private_key, instance_type="c3.8xlarge"):
+def start_computer(ctx, private_key="private/ooni-pipeline.pem", instance_type="c3.8xlarge"):
     timer = Timer()
     timer.start()
     os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"

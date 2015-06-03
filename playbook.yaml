@@ -119,7 +119,7 @@
 
     - name: Unarchive remote_syslog
       unarchive:
-        src: "/tmp/remote_syslog_linux_amd64.tar.gz"z
+        src: "/tmp/remote_syslog_linux_amd64.tar.gz"
         dest: "/tmp/"
         copy: no
 
