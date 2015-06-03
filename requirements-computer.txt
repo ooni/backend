@@ -1,0 +1,10 @@
+awscli
+boto
+PyYAML
+streamparse
+filechunkio
+luigi
+invoke
+simplejson
+ansible
+psycopg2

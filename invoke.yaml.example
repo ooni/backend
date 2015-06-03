@@ -15,5 +15,8 @@ postgres:
   username: "ooni"
   password: ""
   table: "headers"
+celery:
+  broker_url: ""
+  result_backend: ""
 ooni:
   bridge_db_path: "s3n://ooni-private/bridge_reachability/bridge_db.json"
