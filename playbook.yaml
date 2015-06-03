@@ -50,7 +50,7 @@
     remote_syslog_version: "v0.13"
     pidfile: /var/run/oonipipeline.pid
     daemon: /home/ec2-user/virtualenvs/pipeline/bin/invoke
-    daemon_opts: "add_reports_to_db 2016"
+    daemon_opts: "add_reports_to_db 2015"
     service_name: oonipipeline
   tasks:
     - name: Mount ephemeral to tmp
