@@ -50,8 +50,11 @@
     remote_syslog_version: "v0.13"
     pidfile: /var/run/oonipipeline.pid
     daemon: /bin/bash
-    daemon_opts: "$HOME/ooni-pipeline-ng/private/run.sh"
+    daemon_opts: "/home/ec2-user/ooni-pipeline-ng/private/run.sh"
     service_name: oonipipeline
+    papertrail_hostname: "logs2.papertrailapp.com"
+    papertrail_port: "57492"
+    invoke_command: "add_headers_to_db 2012"
   tasks:
     - name: Mount ephemeral to tmp
       mount: name=/tmp src=/dev/sdc state=mounted fstype=ext3
@@ -133,12 +136,9 @@
         dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/private/private.key"
         mode: 0700
 
-    - name: Copy the run.sh over
-      copy: 
-        src: "private/run.sh"
-        dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/private/run.sh"
-        mode: 0700
-
+    - name: Write the run.sh script
+      action: template src=templates/run.sh-template.j2 dest="{{ ansible_env.HOME }}/ooni-pipeline-ng/private/run.sh" mode=0754
+ 
     - name: Install the pipeline service
       action: template src=templates/init.d-template.j2 dest=/etc/init.d/oonipipeline mode=0754
       sudo: yes

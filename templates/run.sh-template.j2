@@ -1,0 +1,6 @@
+#!/bin/bash
+source /home/{{ ansible_env.HOME }}/virtualenvs/{{virtualenv_name}}/bin/activate
+cd /home/{{ ansible_env.HOME }}/ooni-pipeline-ng/
+echo "Started heroku" > ooni-pipeline.log
+/usr/local/bin/remote_syslog -d papertrail_hostname -p papertrail_port ooni-pipeline.log
+nohup invoke {{ invoke_command }} &
