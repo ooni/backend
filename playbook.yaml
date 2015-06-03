@@ -49,8 +49,8 @@
     user: ec2-user
     remote_syslog_version: "v0.13"
     pidfile: /var/run/oonipipeline.pid
-    daemon: /home/ec2-user/virtualenvs/pipeline/bin/invoke
-    daemon_opts: "generate_streams 2012 --workers=32"
+    daemon: /bin/bash
+    daemon_opts: "$HOME/ooni-pipeline-ng/private/run.sh"
     service_name: oonipipeline
   tasks:
     - name: Mount ephemeral to tmp
@@ -127,10 +127,16 @@
       command: "cp /tmp/remote_syslog/remote_syslog /usr/local/bin"
       sudo: yes 
       
-    - name: Copy the run script over
+    - name: Copy the private key
       copy: 
         src: "private/private.key"
-        dest: "{{ ansible_env.HOME }}/private.key"
+        dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/private/private.key"
+        mode: 0700
+
+    - name: Copy the run.sh over
+      copy: 
+        src: "private/run.sh"
+        dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/private/run.sh"
         mode: 0700
 
     - name: Install the pipeline service
