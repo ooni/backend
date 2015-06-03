@@ -124,7 +124,7 @@
         copy: no
 
     - name: Install remote_syslog
-      command: "cp /tmp/remote_syslog/remote_syslog /usr/loca/bin"
+      command: "cp /tmp/remote_syslog/remote_syslog /usr/local/bin"
       sudo: yes 
       
     - name: Copy the run script over
