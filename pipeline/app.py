@@ -10,7 +10,7 @@ class App(object):
         )
         self.celery = self.make_celery(self._flask_app)
 
-    def make_celery(app):
+    def make_celery(self, app):
         from celery import Celery
         celery = Celery(app.import_name,
                         broker=app.config['CELERY_BROKER_URL'])

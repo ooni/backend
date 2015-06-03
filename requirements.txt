@@ -2,3 +2,5 @@ ansible
 boto
 invoke
 flask
+honcho
+celery

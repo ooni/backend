@@ -102,7 +102,7 @@
       git: repo=https://github.com/thetorproject/ooni-pipeline-ng.git dest={{ ansible_env.HOME }}/ooni-pipeline-ng
     
     - name: Install ooni-pipeline pip requirements
-      pip: requirements={{ ansible_env.HOME }}/ooni-pipeline-ng/requirements.txt
+      pip: requirements={{ ansible_env.HOME }}/ooni-pipeline-ng/requirements-computer.txt
            virtualenv={{ ansible_env.HOME }}/virtualenvs/{{ virtualenv_name }}
            virtualenv_site_packages=yes
 

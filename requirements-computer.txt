@@ -8,3 +8,4 @@ invoke
 simplejson
 ansible
 psycopg2
+honcho

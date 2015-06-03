@@ -4,6 +4,7 @@ core:
 aws:
   access_key_id: ""
   secret_access_key: ""
+  ssh_private_key_file: "private/ooni-pipeline.pem"
 kafka:
   hosts: "127.0.0.1:9092"
 logging:
