@@ -57,7 +57,8 @@ def run(files="2013-12-25", src="s3n://ooni-public/", worker_processes=16):
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
-    task = CountInterestingReports(src=src, files=files)
+    task = CountInterestingReports(src=src, files=files,
+                                   py_packages="pipeline")
     w.add(task)
     w.run()
     w.stop()
