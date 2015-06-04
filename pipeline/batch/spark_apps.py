@@ -69,7 +69,8 @@ class FindInterestingReports(PySparkTask):
         df = sqlContext.jsonFile(self.input().path, schema)
         df.registerTempTable("reports")
         entries = df.filter("test_name = '{test_name}' AND"
-                            " record_type = 'entry'")
+                            " record_type = 'entry'".format(
+                                test_name=self.test_name))
         interestings = self.find_interesting(entries)
 
         out_file = self.output().open('w')
