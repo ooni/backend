@@ -26,10 +26,15 @@ aws_secret_access_key: {aws_secret_access_key}
 hosts: {kafka_hosts}
 [postgres]
 local-tmp-dir: {tmp_dir}
+[spark]
+spark-submit: {spark_submit}
+master: {spark_master}
 """.format(tmp_dir=config.core.tmp_dir,
            aws_access_key_id=config.aws.access_key_id,
            aws_secret_access_key=config.aws.secret_access_key,
-           kafka_hosts=config.kafka.hosts))
+           kafka_hosts=config.kafka.hosts,
+           spark_master=config.spark.master,
+           spark_submit=config.spark.spark_submit))
     with open("logging.cfg", "w") as fw:
         fw.write("""[loggers]
 keys=root,ooni-pipeline,luigi-interface
@@ -189,11 +194,38 @@ def start_computer(ctx, private_key="private/ooni-pipeline.pem", instance_type="
     os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
     os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
     try:
-        result = ctx.run("ansible-playbook --private-key %s -i inventory playbook.yaml --extra-vars instance_type=%s" % (private_key, instance_type), pty=True)
+        result = ctx.run("ansible-playbook --private-key %s"
+                         " -i inventory playbook.yaml"
+                         " --extra-vars instance_type=%s" % (
+                             private_key, instance_type),
+                         pty=True)
         logger.info(str(result))
     except Exception:
         logger.error("Failed to run ansible playbook")
         logger.error(traceback.format_exc())
     logger.info("start_computer runtime: %s" % timer.stop())
 
-ns = Collection(upload_reports, generate_streams, list_reports, clean_streams, add_headers_to_db, start_computer, sync_reports)
+
+@task
+def spark_submit(ctx, script,
+                 spark_submit="/home/hadoop/spark/bin/spark-submit"):
+    timer = Timer()
+    timer.start()
+    ctx.run("{spark_submit} {script}".format(
+        spark_submit=spark_submit,
+        script=script
+    ))
+    logger.info("spark_submit runtime: %s" % timer.stop())
+
+
+@task
+def spark_apps(ctx, files="2013-12-25.json", src="s3n://ooni-public/", workers=16):
+    timer = Timer()
+    timer.start()
+    from pipeline.batch import run_spark_apps
+    run_spark_apps.run(files=files, src=src, worker_processes=workers)
+    logger.info("spark_submit runtime: %s" % timer.stop())
+
+
+ns = Collection(upload_reports, generate_streams, list_reports, clean_streams,
+                add_headers_to_db, start_computer, sync_reports, spark_apps, spark_submit)

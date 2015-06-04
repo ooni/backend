@@ -10,6 +10,9 @@ kafka:
 logging:
   filename: "ooni-pipeline.log"
   level: "INFO"
+spark:
+  spark-submit: "/home/hadoop/spark/bin/spark-submit"
+  master: "yarn-client"
 postgres:
   host: "localhost"
   database: "report"
