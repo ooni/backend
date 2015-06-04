@@ -23,10 +23,14 @@ class CountInterestingReports(PySparkTask):
     src = luigi.Parameter()
 
     def input(self):
-        return get_luigi_target("s3n://%s/reports-sanitised/streams/%s" % (self.src, self.files))
+        input_path = os.path.join(self.src, "reports-sanitised", "streams", self.files)
+        return get_luigi_target(input_path)
 
     def output(self):
-        return get_luigi_target("s3n://%s/analysis/http_requests_test-interesting-%s-done" % (self.src, self.files))
+        output_path = os.path.join(self.src,
+                                   "analysis",
+                                   "http_requests_test-interesting-%s-done" % self.files)
+        return get_luigi_target(output_path)
 
     def main(self, sc, *args):
         df = sc.jsonFile(self.input().path)
@@ -49,6 +53,7 @@ class CountInterestingReports(PySparkTask):
 
 
 def run(files="2013-12-25", src="s3n://ooni-public/", worker_processes=16):
+    logger.info("Running CountInterestingReports for %s on %s" % (files, src))
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)

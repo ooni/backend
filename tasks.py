@@ -222,8 +222,9 @@ def spark_submit(ctx, script,
 def spark_apps(ctx, files="2013-12-25.json", src="s3n://ooni-public/", workers=16):
     timer = Timer()
     timer.start()
-    from pipeline.batch import run_spark_apps
-    run_spark_apps.run(files=files, src=src, worker_processes=workers)
+    from pipeline.batch import spark_apps
+    logger.info("Running spark apps")
+    spark_apps.run(files=files, src=src, worker_processes=workers)
     logger.info("spark_submit runtime: %s" % timer.stop())
 
 
