@@ -97,7 +97,7 @@ header_avro = {
         {"name": "report_id", "type": "string"},
         {"name": "software_name", "type": "string"},
         {"name": "software_version", "type": "string"},
-        {"name": "start_time", "type": "float"},
+        {"name": "start_time", "type": "string"},
         {"name": "test_name", "type": "string"},
         {"name": "test_version", "type": "string"},
         {"name": "data_format_version", "type": "string"},

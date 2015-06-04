@@ -14,7 +14,7 @@ from invoke.config import Config
 from pipeline.helpers.util import json_loads, get_date_interval
 from pipeline.helpers.util import get_luigi_target
 from pipeline.helpers.util import get_imported_dates
-from pipeline.report import header_avro
+from pipeline.helpers.report import header_avro
 
 
 config = Config(runtime_path="invoke.yaml")
@@ -32,7 +32,9 @@ class FindInterestingReports(PySparkTask):
 
     test_name = "http_requests_test"
     software_name = "ooniprobe"
-    extra_fields = []
+    extra_fields = [
+        {"name": "input", "type": "string"}
+    ]
 
     def input(self):
         return get_luigi_target(os.path.join(self.src, "%s.json" % self.date))
@@ -55,7 +57,7 @@ class FindInterestingReports(PySparkTask):
         for field in header_avro["fields"] + self.extra_fields:
             if field["type"] == "float":
                 field_type = FloatType()
-            elif field["type"] == "float":
+            elif field["type"] == "bool":
                 field_type = BooleanType()
             else:
                 field_type = StringType()
@@ -64,15 +66,11 @@ class FindInterestingReports(PySparkTask):
 
         sqlContext = SQLContext(sc)
         logger.info("Reading %s from %s" % (self.test_name, self.input().path))
-        df = sqlContext.jsonFile(self.input().path)
-        report_entries = df.filter("test_name = '{test_name}'"
-                                   " AND record_type = 'entry'".format(
-                                       test_name=self.test_name))
-
-        schema_entries = sqlContext.createDataFrame(report_entries, schema)
-        schema_entries.registerTempTable("reports")
-
-        interestings = self.find_interesting(sqlContext)
+        df = sqlContext.jsonFile(self.input().path, schema)
+        df.registerTempTable("reports")
+        entries = df.filter("test_name = '{test_name}' AND"
+                            " record_type = 'entry'")
+        interestings = self.find_interesting(entries)
 
         out_file = self.output().open('w')
         for interesting in interestings.toJSON().collect():
@@ -89,11 +87,11 @@ class HTTPRequestsInterestingFind(FindInterestingReports):
     extra_fields = [
         {"name": "body_length_match", "type": "bool"},
         {"name": "headers_match", "type": "bool"},
+        {"name": "input", "type": "string"}
     ]
 
-    def find_interesting(self, sqlContext):
-        return sqlContext.sql("SELECT * from reports WHERE "
-                              " body_length_match = false"
+    def find_interesting(self, entries):
+        return entries.filter("body_length_match = false"
                               " OR headers_match = false")
 
 
@@ -112,6 +110,9 @@ class InterestingToDB(luigi.postgres.CopyToTable):
         ("report_id", "TEXT"),
         ("report_filename", "TEXT"),
         ("input", "TEXT"),
+        ("probe_cc", "TEXT"),
+        ("probe_asn", "TEXT"),
+        ("start_time", "FLOAT")
     ]
 
     finder = FindInterestingReports
@@ -129,22 +130,15 @@ class InterestingToDB(luigi.postgres.CopyToTable):
                 yield self.serialize(record)
 
     def serialize(self, record):
-        return [record.report_id, record.report_filename, record.input]
+        return [record.get("report_id"), record.get("report_filename"),
+                record.get("input"), record.get("probe_cc"),
+                record.get("probe_asn"), record.get("start_time")]
 
 
 class HTTPRequestsToDB(InterestingToDB):
     table = 'http_requests_interesting'
 
-    columns = [
-        ("report_id", "TEXT"),
-        ("report_filename", "TEXT"),
-        ("input", "TEXT")
-    ]
     finder = HTTPRequestsInterestingFind
-
-    def serialize(self, record):
-        return [record["report_id"], record["report_filename"],
-                record["input"]]
 
 
 class SparkResultsToDatabase(ExternalTask):
