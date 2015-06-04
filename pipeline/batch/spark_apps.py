@@ -30,7 +30,7 @@ class FindInterestingReports(PySparkTask):
     src = luigi.Parameter()
     dst = luigi.Parameter()
 
-    test_name = "http_requests_test"
+    test_name = ["this_test_is_nameless"]
     software_name = "ooniprobe"
     extra_fields = [
         {"name": "input", "type": "string"}
@@ -68,9 +68,11 @@ class FindInterestingReports(PySparkTask):
         logger.info("Reading %s from %s" % (self.test_name, self.input().path))
         df = sqlContext.jsonFile(self.input().path, schema)
         df.registerTempTable("reports")
-        entries = df.filter("test_name = '{test_name}' AND"
+
+        entries = df.filter("({test_names}) AND"
                             " record_type = 'entry'".format(
-                                test_name=self.test_name))
+                                test_names=' OR '.join([
+                                    "test_name = '%s'" % tn for tn in self.test_names])))
         interestings = self.find_interesting(entries)
 
         out_file = self.output().open('w')
@@ -84,7 +86,7 @@ class FindInterestingReports(PySparkTask):
 
 
 class HTTPRequestsInterestingFind(FindInterestingReports):
-    test_name = "http_requests_test"
+    test_names = ["http_requests_test", "http_requests", "HTTP Requests Test"]
     extra_fields = [
         {"name": "body_length_match", "type": "bool"},
         {"name": "headers_match", "type": "bool"},
