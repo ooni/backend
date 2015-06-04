@@ -10,6 +10,7 @@ from pipeline.helpers.util import setup_pipeline_logging, Timer
 config = Config(runtime_path="invoke.yaml")
 logger = setup_pipeline_logging(config)
 
+os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH") if os.environ.get("PYTHONPATH") else ""
 os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
 
 def _create_cfg_files():
@@ -220,12 +221,13 @@ def spark_submit(ctx, script,
 
 
 @task
-def spark_apps(ctx, files="2013-12-25.json", src="s3n://ooni-public/", workers=16):
+def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/streams/",
+               dst="s3n://ooni-public/processed/", workers=16):
     timer = Timer()
     timer.start()
     from pipeline.batch import spark_apps
     logger.info("Running spark apps")
-    spark_apps.run(files=files, src=src, worker_processes=workers)
+    spark_apps.run(date_interval=date_interval, src=src, dst=dst, worker_processes=workers)
     logger.info("spark_submit runtime: %s" % timer.stop())
 
 

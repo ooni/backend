@@ -100,8 +100,11 @@ def get_imported_dates(directory, aws_access_key_id=None,
                         aws_secret_access_key=aws_secret_access_key,
                         recursive=False)
     dates = []
-    for date_directory in walker(directory):
-        dates.append(date_directory.split("/")[-2])
+    for listing in walker(directory):
+        if listing.endswith(".json"):
+            dates.append(listing.split("/")[-1].replace(".json", ""))
+        else:
+            dates.append(listing.split("/")[-2])
     return dates
 
 
