@@ -18,6 +18,7 @@ logger = logging.getLogger('ooni-pipeline')
 class CountInterestingReports(PySparkTask):
     driver_memory = '2g'
     executor_memory = '3g'
+    py_packages = ["pipeline"]
 
     files = luigi.Parameter()
     src = luigi.Parameter()
@@ -57,8 +58,7 @@ def run(files="2013-12-25", src="s3n://ooni-public/", worker_processes=16):
     sch = luigi.scheduler.CentralPlannerScheduler()
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
-    task = CountInterestingReports(src=src, files=files,
-                                   py_packages="pipeline")
+    task = CountInterestingReports(src=src, files=files)
     w.add(task)
     w.run()
     w.stop()
