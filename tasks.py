@@ -10,6 +10,7 @@ from pipeline.helpers.util import setup_pipeline_logging, Timer
 config = Config(runtime_path="invoke.yaml")
 logger = setup_pipeline_logging(config)
 
+os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
 
 def _create_cfg_files():
     with open("client.cfg", "w") as fw:
