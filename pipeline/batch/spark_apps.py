@@ -30,7 +30,7 @@ class FindInterestingReports(PySparkTask):
     src = luigi.Parameter()
     dst = luigi.Parameter()
 
-    test_name = ["this_test_is_nameless"]
+    test_names = ["this_test_is_nameless"]
     software_name = "ooniprobe"
     extra_fields = [
         {"name": "input", "type": "string"}
@@ -72,7 +72,9 @@ class FindInterestingReports(PySparkTask):
         entries = df.filter("({test_names}) AND"
                             " record_type = 'entry'".format(
                                 test_names=' OR '.join([
-                                    "test_name = '%s'" % tn for tn in self.test_names])))
+                                    "test_name = '{test_name}'".format(
+                                        test_name=tn)
+                                    for tn in self.test_names])))
         interestings = self.find_interesting(entries)
 
         out_file = self.output().open('w')
