@@ -199,6 +199,7 @@ def add_headers_to_db(ctx, date_interval, workers=16,
     timer.start()
     from pipeline.batch import add_headers_to_db
     logger.info("Running add_headers_to_db for date %s" % date_interval)
+    upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
     add_headers_to_db.run(src=src, date_interval=date_interval,
                           worker_processes=workers, dst_private=dst_private,
                           dst_public=dst_public)
@@ -217,8 +218,7 @@ def sync_reports(ctx,
     date = datetime.now().strftime("%Y-%m")
     srcs = srcs.split(",")
     sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
-    upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
-    start_computer(instance_type="m3.xlarge",
+    start_computer(ctx, instance_type="m3.xlarge",
                    invoke_command="add_headers_to_db {date} --workers=4 --halt".format(date=date))
     logger.info("sync_reports runtime: %s" % timer.stop())
     if halt:
@@ -229,7 +229,7 @@ def sync_reports(ctx,
 @task(setup_remote_syslog)
 def start_computer(ctx, private_key="private/ooni-pipeline.pem",
                    instance_type="c3.8xlarge",
-                   invoke_commmand="add_headers_to_db 2015 --workers=32 --halt"):
+                   invoke_command="add_headers_to_db 2015 --workers=32 --halt"):
     timer = Timer()
     timer.start()
     logger.info("Starting a %s AWS instance"
