@@ -128,40 +128,44 @@ def generate_streams(ctx, date_interval,
                      workers=16,
                      dst_private="s3n://ooni-private/",
                      dst_public="s3n://ooni-public/", halt=False):
-    timer = Timer()
-    timer.start()
-    logger.info("generating streams from {src} for"
-                " date {date_interval}".format(
-                    src=src,
-                    date_interval=date_interval
-                ))
+    try:
+        timer = Timer()
+        timer.start()
+        logger.info("generating streams from {src} for"
+                    " date {date_interval}".format(
+                        src=src,
+                        date_interval=date_interval
+                    ))
 
-    logger.info("writing to public directory {dst_public} and "
-                " private directory {dst_private}".format(
-                    dst_public=dst_public, dst_private=dst_private
-                ))
+        logger.info("writing to public directory {dst_public} and "
+                    " private directory {dst_private}".format(
+                        dst_public=dst_public, dst_private=dst_private
+                    ))
 
-    from pipeline.batch import sanitise
-    sanitise.run(dst_private=dst_private, dst_public=dst_public, src=src,
-                 date_interval=date_interval, worker_processes=workers)
-    logger.info("generate_streams runtime: %s" % timer.stop())
-    if halt:
-        ctx.run("sudo halt")
+        from pipeline.batch import sanitise
+        sanitise.run(dst_private=dst_private, dst_public=dst_public, src=src,
+                    date_interval=date_interval, worker_processes=workers)
+        logger.info("generate_streams runtime: %s" % timer.stop())
+    finally:
+        if halt:
+            ctx.run("sudo halt")
 
 
 @task(setup_remote_syslog)
 def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
                    workers=16, limit=None, move=False, halt=False):
-    timer = Timer()
-    timer.start()
-    if limit is not None:
-        limit = int(limit)
-    from pipeline.batch import upload_reports
-    upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
-                       limit=limit, move=move)
-    logger.info("upload_reports runtime: %s" % timer.stop())
-    if halt:
-        ctx.run("sudo halt")
+    try:
+        timer = Timer()
+        timer.start()
+        if limit is not None:
+            limit = int(limit)
+        from pipeline.batch import upload_reports
+        upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
+                        limit=limit, move=move)
+        logger.info("upload_reports runtime: %s" % timer.stop())
+    finally:
+        if halt:
+            ctx.run("sudo halt")
 
 
 
@@ -196,35 +200,38 @@ def add_headers_to_db(ctx, date_interval, workers=16,
                       src="s3n://ooni-private/reports-raw/yaml/",
                       dst_private="s3n://ooni-private/",
                       dst_public="s3n://ooni-public/", halt=False):
-    timer = Timer()
-    timer.start()
-    from pipeline.batch import add_headers_to_db
-    logger.info("Running add_headers_to_db for date %s" % date_interval)
-    upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
-    add_headers_to_db.run(src=src, date_interval=date_interval,
-                          worker_processes=workers, dst_private=dst_private,
-                          dst_public=dst_public)
-    logger.info("add_headers_to_db runtime: %s" % timer.stop())
-    if halt:
-        ctx.run("sudo halt")
+    try:
+        timer = Timer()
+        timer.start()
+        from pipeline.batch import add_headers_to_db
+        logger.info("Running add_headers_to_db for date %s" % date_interval)
+        upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
+        add_headers_to_db.run(src=src, date_interval=date_interval,
+                            worker_processes=workers, dst_private=dst_private,
+                            dst_public=dst_public)
+        logger.info("add_headers_to_db runtime: %s" % timer.stop())
+    finally:
+        if halt:
+            ctx.run("sudo halt")
 
 
 @task(setup_remote_syslog)
 def sync_reports(ctx,
                  srcs="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
                  dst_private="s3n://ooni-incoming/", workers=16, halt=False):
-    timer = Timer()
-    timer.start()
-    from pipeline.batch import sync_reports
-    date = datetime.now().strftime("%Y-%m")
-    srcs = srcs.split(",")
-    sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
-    start_computer(ctx, instance_type="m3.xlarge",
-                   invoke_command="add_headers_to_db {date} --workers=4 --halt".format(date=date))
-    logger.info("sync_reports runtime: %s" % timer.stop())
-    if halt:
-        ctx.run("sudo halt")
-
+    try:
+        timer = Timer()
+        timer.start()
+        from pipeline.batch import sync_reports
+        date = datetime.now().strftime("%Y-%m")
+        srcs = srcs.split(",")
+        sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
+        start_computer(ctx, instance_type="m3.xlarge",
+                    invoke_command="add_headers_to_db {date} --workers=4 --halt".format(date=date))
+        logger.info("sync_reports runtime: %s" % timer.stop())
+    finally:
+        if halt:
+            ctx.run("sudo halt")
 
 
 @task(setup_remote_syslog)
