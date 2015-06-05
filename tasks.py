@@ -1,6 +1,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 from datetime import datetime
+import json
 import traceback
 import sys
 import os
@@ -239,14 +240,14 @@ def start_computer(ctx, private_key="private/ooni-pipeline.pem",
     os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
     os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
     try:
-        result = ctx.run("ansible-playbook --private-key {private_key}"
-                         " -i inventory playbook.yaml"
-                         " --extra-vars='{instance_type: \"{instance_type}\","
-                         " invoke_command: \"{invoke_command}\"}'".format(
-                             private_key=private_key,
-                             instance_type=instance_type,
-                             invoke_command=invoke_command),
-                         pty=True)
+        command = ("ansible-playbook --private-key {private_key}"
+                   " -i inventory playbook.yaml"
+                   " --extra-vars=".format(private_key=private_key))
+        command += "'%s'" % json.dumps({
+            "instance_type": instance_type,
+            "invoke_command": invoke_command
+        })
+        result = ctx.run(command, pty=True)
         logger.info(str(result))
     except Exception:
         logger.error("Failed to run ansible playbook")
