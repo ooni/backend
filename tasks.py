@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+from datetime import datetime
 import traceback
 import sys
 import os
@@ -197,6 +198,7 @@ def add_headers_to_db(ctx, date_interval, workers=16,
     timer = Timer()
     timer.start()
     from pipeline.batch import add_headers_to_db
+    logger.info("Running add_headers_to_db for date %s" % date_interval)
     add_headers_to_db.run(src=src, date_interval=date_interval,
                           worker_processes=workers, dst_private=dst_private,
                           dst_public=dst_public)
@@ -212,10 +214,12 @@ def sync_reports(ctx,
     timer = Timer()
     timer.start()
     from pipeline.batch import sync_reports
-
+    date = datetime.now().strftime("%Y-%m")
     srcs = srcs.split(",")
     sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
-    upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers)
+    upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
+    start_computer(instance_type="m3.xlarge",
+                   invoke_command="add_headers_to_db {date} --workers=4 --halt".format(date=date))
     logger.info("sync_reports runtime: %s" % timer.stop())
     if halt:
         ctx.run("sudo halt")
@@ -223,17 +227,25 @@ def sync_reports(ctx,
 
 
 @task(setup_remote_syslog)
-def start_computer(ctx, private_key="private/ooni-pipeline.pem", instance_type="c3.8xlarge"):
+def start_computer(ctx, private_key="private/ooni-pipeline.pem",
+                   instance_type="c3.8xlarge",
+                   invoke_commmand="add_headers_to_db 2015 --workers=32 --halt"):
     timer = Timer()
     timer.start()
+    logger.info("Starting a %s AWS instance"
+                " and running on it the command %s" % (instance_type, invoke_command))
+
     os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"
     os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
     os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
     try:
-        result = ctx.run("ansible-playbook --private-key %s"
+        result = ctx.run("ansible-playbook --private-key {private_key}"
                          " -i inventory playbook.yaml"
-                         " --extra-vars instance_type=%s" % (
-                             private_key, instance_type),
+                         " --extra-vars instance_type={instance_type}"
+                         " invoke_command='{invoke_command}'".format(
+                             private_key=private_key,
+                             instance_type=instance_type,
+                             invoke_command=invoke_command),
                          pty=True)
         logger.info(str(result))
     except Exception:
