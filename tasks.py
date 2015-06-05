@@ -106,16 +106,17 @@ def setup_remote_syslog(ctx):
         pid = int(pid)
         os.kill(pid, 0)
     except (OSError, IOError):
-        ctx.run("/usr/local/bin/remote_syslog"
-                " -d {papertrail_hostname}"
-                " -p {papertrail_port}"
-                " --pid-file={pid_file}"
-                " ooni-pipeline.log".format(
-                    papertrail_hostname=config.papertrail.hostname,
-                    papertrail_port=config.papertrail.port,
-                    pid_file=pid_file
-                )
-        )
+        command = ("/usr/local/bin/remote_syslog"
+                   " -d {papertrail_hostname}"
+                   " -p {papertrail_port}"
+                   " --pid-file={pid_file}"
+                   " ooni-pipeline.log".format(
+                       papertrail_hostname=config.papertrail.hostname,
+                       papertrail_port=config.papertrail.port,
+                       pid_file=pid_file
+                   ))
+        logger.info("Running %s" % command)
+        ctx.run(command, pty=True)
 
 @task
 def realtime(ctx):
