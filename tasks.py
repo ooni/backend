@@ -241,8 +241,8 @@ def start_computer(ctx, private_key="private/ooni-pipeline.pem",
     try:
         result = ctx.run("ansible-playbook --private-key {private_key}"
                          " -i inventory playbook.yaml"
-                         " --extra-vars instance_type={instance_type}"
-                         " invoke_command='{invoke_command}'".format(
+                         " --extra-vars='{instance_type: \"{instance_type}\","
+                         " invoke_command: \"{invoke_command}\"}'".format(
                              private_key=private_key,
                              instance_type=instance_type,
                              invoke_command=invoke_command),
