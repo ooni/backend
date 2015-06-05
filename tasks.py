@@ -1,6 +1,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import traceback
+import sys
 import os
 
 from invoke.config import Config
@@ -80,13 +81,47 @@ args=('{logfile}',)
 
 _create_cfg_files()
 
+@task
+def setup_remote_syslog(ctx):
+    if not os.path.exists("/usr/local/bin/remote_syslog"):
+        if sys.platform.startswith("darwin"):
+            filename = "remote_syslog_darwin_amd64.tar.gz"
+        elif sys.platform.startswith("linux"):
+            filename = "remote_syslog_linux_amd64.tar.gz"
+        else:
+            logger.error("This platform does not support remote_syslog")
+            return
+        ctx.run("cd /tmp/")
+        ctx.run("wget -O /tmp/{filename}"
+                " https://github.com/papertrail/remote_syslog2/releases/download/v0.13/{filename}".format(
+            filename=filename))
+        ctx.run("tar xvzf /tmp/{filename} -C /tmp/".format(filename=filename))
+        ctx.run("cp /tmp/remote_syslog/remote_syslog /usr/local/bin/remote_syslog")
+    pid_file = os.path.join(config.core.ooni_pipeline_path, "remote_syslog.pid")
+    try:
+        with open(pid_file) as f:
+            pid = f.read().strip()
+        pid = int(pid)
+        os.kill(pid, 0)
+    except (OSError, IOError):
+        ctx.run("/usr/local/bin/remote_syslog"
+                " -d {papertrail_hostname}"
+                " -p {papertrail_port}"
+                " --pid-file={pid_file}"
+                " {ooni_pipeline_path}/ooni-pipeline.log".format(
+                    papertrail_hostname=config.papertrail.hostname,
+                    papertrail_port=config.papertrail.port,
+                    ooni_pipeline_path=config.core.ooni_pipeline_path,
+                    pid_file=pid_file
+                )
+        )
 
 @task
 def realtime(ctx):
     print("Starting realtime stream processing")
 
 
-@task
+@task(setup_remote_syslog)
 def generate_streams(ctx, date_interval,
                      src="s3n://ooni-private/reports-raw/yaml/",
                      workers=16,
@@ -113,7 +148,7 @@ def generate_streams(ctx, date_interval,
         ctx.run("sudo halt")
 
 
-@task
+@task(setup_remote_syslog)
 def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
                    workers=16, limit=None, move=False, halt=False):
     timer = Timer()
@@ -129,19 +164,19 @@ def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
 
 
 
-@task
-def list_reports(ctx):
+@task(setup_remote_syslog)
+def list_reports(ctx, path="s3n://ooni-private/reports-raw/yaml/"):
     timer = Timer()
     timer.start()
     from pipeline.helpers.util import list_report_files
-    for f in list_report_files("s3n://ooni-private/reports-raw/yaml/2013-05-03",
+    for f in list_report_files(path,
                                config["aws"]["access_key_id"],
                                config["aws"]["secret_access_key"]):
         print(f)
     logger.info("list_reports runtime: %s" % timer.stop())
 
 
-@task
+@task(setup_remote_syslog)
 def clean_streams(ctx, dst_private="s3n://ooni-private/",
                   dst_public="s3n://ooni-public/"):
     from pipeline.helpers.util import get_luigi_target
@@ -155,7 +190,7 @@ def clean_streams(ctx, dst_private="s3n://ooni-private/",
         logger.info("deleting %s" % path)
         target.remove()
 
-@task
+@task(setup_remote_syslog)
 def add_headers_to_db(ctx, date_interval, workers=16,
                       src="s3n://ooni-private/reports-raw/yaml/",
                       dst_private="s3n://ooni-private/",
@@ -171,7 +206,7 @@ def add_headers_to_db(ctx, date_interval, workers=16,
         ctx.run("sudo halt")
 
 
-@task
+@task(setup_remote_syslog)
 def sync_reports(ctx,
                  srcs="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
                  dst_private="s3n://ooni-incoming/", workers=16, halt=False):
@@ -188,7 +223,7 @@ def sync_reports(ctx,
 
 
 
-@task
+@task(setup_remote_syslog)
 def start_computer(ctx, private_key="private/ooni-pipeline.pem", instance_type="c3.8xlarge"):
     timer = Timer()
     timer.start()
@@ -208,7 +243,7 @@ def start_computer(ctx, private_key="private/ooni-pipeline.pem", instance_type="
     logger.info("start_computer runtime: %s" % timer.stop())
 
 
-@task
+@task(setup_remote_syslog)
 def spark_submit(ctx, script,
                  spark_submit="/home/hadoop/spark/bin/spark-submit"):
     timer = Timer()
@@ -220,7 +255,7 @@ def spark_submit(ctx, script,
     logger.info("spark_submit runtime: %s" % timer.stop())
 
 
-@task
+@task(setup_remote_syslog)
 def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/streams/",
                dst="s3n://ooni-public/processed/", workers=3):
     timer = Timer()
