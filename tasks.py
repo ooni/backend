@@ -97,7 +97,7 @@ def setup_remote_syslog(ctx):
             filename=filename))
         ctx.run("tar xvzf /tmp/{filename} -C /tmp/".format(filename=filename))
         ctx.run("cp /tmp/remote_syslog/remote_syslog /usr/local/bin/remote_syslog")
-    pid_file = os.path.join(config.core.ooni_pipeline_path, "remote_syslog.pid")
+    pid_file = "remote_syslog.pid"
     try:
         with open(pid_file) as f:
             pid = f.read().strip()
@@ -108,10 +108,9 @@ def setup_remote_syslog(ctx):
                 " -d {papertrail_hostname}"
                 " -p {papertrail_port}"
                 " --pid-file={pid_file}"
-                " {ooni_pipeline_path}/ooni-pipeline.log".format(
+                " ooni-pipeline.log".format(
                     papertrail_hostname=config.papertrail.hostname,
                     papertrail_port=config.papertrail.port,
-                    ooni_pipeline_path=config.core.ooni_pipeline_path,
                     pid_file=pid_file
                 )
         )
