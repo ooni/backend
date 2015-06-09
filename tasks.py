@@ -224,7 +224,7 @@ def sync_reports(ctx,
         timer = Timer()
         timer.start()
         from pipeline.batch import sync_reports
-        date = datetime.now().strftime("%Y-%m")
+        date = datetime.now().strftime("%Y-%m-%d")
         srcs = srcs.split(",")
         sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
         start_computer(ctx, instance_type="m3.xlarge",
