@@ -99,7 +99,7 @@ def run(src_directory, dst, worker_processes, limit=None, move=False):
             break
         idx += 1
         logging.info("uploading %s" % filename)
-        task = S3CopyRawReport(src=filename, dst=dst, move=False)
+        task = S3CopyRawReport(src=filename, dst=dst, move=move)
         w.add(task)
     w.run()
     w.stop()
