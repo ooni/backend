@@ -84,7 +84,7 @@ class S3CopyRawReport(luigi.Task):
             with input.open('r') as in_file:
                 shutil.copyfileobj(in_file, out_file)
         if self.move:
-            self.output.remove()
+            input.remove()
 
 def run(src_directory, dst, worker_processes, limit=None, move=False):
     sch = luigi.scheduler.CentralPlannerScheduler()

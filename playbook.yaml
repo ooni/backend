@@ -161,7 +161,7 @@
     - name: Run the run.sh command
       shell: private/run.sh
       args:
-        chdir: "{{ ansible_env.home }}/ooni-pipeline-ng/"
+        chdir: "{{ ansible_env.HOME }}/ooni-pipeline-ng/"
 
 # - name: Terminate instances
 #   hosts: localhost
