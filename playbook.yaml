@@ -138,14 +138,11 @@
 
     - name: Write the run.sh script
       action: template src=templates/run.sh-template.j2 dest="{{ ansible_env.HOME }}/ooni-pipeline-ng/private/run.sh" mode=0754
- 
-    - name: Install the pipeline service
-      action: template src=templates/init.d-template.j2 dest=/etc/init.d/oonipipeline mode=0754
-      sudo: yes
-    
-    - name: Ensure the pipeline service is running
-      action: service name=oonipipeline state=started
-      sudo: yes
+  
+    - name: Run the run.sh command
+      shell: private/run.sh
+      args:
+        chdir: "{{ ansible_env.home }}/ooni-pipeline-ng/"
 
 # - name: Terminate instances
 #   hosts: localhost
