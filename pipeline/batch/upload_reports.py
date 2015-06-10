@@ -109,7 +109,7 @@ def run(src_directory, dst, worker_processes, limit=None, move=False):
     w.stop()
     uploaded_dates = []
     for uploaded_file in uploaded_files:
-        uploaded_date = os.path.dirname(uploaded_files)
+        uploaded_date = os.path.basename(os.path.dirname(uploaded_files))
         if uploaded_date not in uploaded_dates:
             uploaded_dates.append(uploaded_date)
     return uploaded_dates
