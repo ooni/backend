@@ -129,6 +129,21 @@
     - name: Install remote_syslog
       command: "cp /tmp/remote_syslog/remote_syslog /usr/local/bin"
       sudo: yes 
+
+    - name: Download remote_syslog init.d
+      get_url:
+        url: "https://raw.githubusercontent.com/papertrail/remote_syslog2/master/examples/remote_syslog.init.d"
+        dest: "/etc/init.d/remote_syslog"
+        force: no
+
+    - name: Set permissions on init.d script
+      file: path=/etc/init.d/remote_syslog state=file mode=0755
+
+    - name: Write the log_files.yml config file
+      action: template src=templates/log_files.yml-template.j2 dest=/etc/log_files.yml mode=0644
+    
+    - name: Restart remote_syslog service
+      service: name=remote_syslog state=restarted
       
     - name: Copy the private key
       copy: 
