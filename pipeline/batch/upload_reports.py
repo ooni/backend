@@ -21,6 +21,7 @@ from pipeline.helpers.util import list_report_files
 config = Config(runtime_path="invoke.yaml")
 logger = logging.getLogger('ooni-pipeline')
 
+
 class ReportSource(ExternalTask):
     src = luigi.Parameter()
 
@@ -86,20 +87,29 @@ class S3CopyRawReport(luigi.Task):
         if self.move:
             input.remove()
 
+
 def run(src_directory, dst, worker_processes, limit=None, move=False):
     sch = luigi.scheduler.CentralPlannerScheduler()
     idx = 0
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
 
-    for filename in list_report_files(src_directory,
-                                      aws_access_key_id=config.aws.access_key_id,
-                                      aws_secret_access_key=config.aws.secret_access_key):
+    uploaded_files = []
+    for filename in list_report_files(
+        src_directory, aws_access_key_id=config.aws.access_key_id,
+            aws_secret_access_key=config.aws.secret_access_key):
         if limit is not None and idx >= limit:
             break
         idx += 1
         logging.info("uploading %s" % filename)
         task = S3CopyRawReport(src=filename, dst=dst, move=move)
+        uploaded_files.append(task.output().path)
         w.add(task)
     w.run()
     w.stop()
+    uploaded_dates = []
+    for uploaded_file in uploaded_files:
+        uploaded_date = os.path.dirname(uploaded_files)
+        if uploaded_date not in uploaded_dates:
+            uploaded_dates.append(uploaded_date)
+    return uploaded_dates

@@ -107,7 +107,6 @@ def get_imported_dates(directory, aws_access_key_id=None,
             dates.append(listing.split("/")[-2])
     return dates
 
-
 def get_luigi_target(path, ssh_key_file=None, no_host_key_check=False):
     from luigi.s3 import S3Target
     from luigi.contrib.ssh import RemoteTarget

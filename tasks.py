@@ -197,7 +197,7 @@ def clean_streams(ctx, dst_private="s3n://ooni-private/",
         target.remove()
 
 @task(setup_remote_syslog)
-def add_headers_to_db(ctx, date_interval, workers=16,
+def add_headers_to_db(ctx, date_interval=None, workers=16,
                       src="s3n://ooni-private/reports-raw/yaml/",
                       dst_private="s3n://ooni-private/",
                       dst_public="s3n://ooni-public/", halt=False):
@@ -205,11 +205,18 @@ def add_headers_to_db(ctx, date_interval, workers=16,
         timer = Timer()
         timer.start()
         from pipeline.batch import add_headers_to_db
-        logger.info("Running add_headers_to_db for date %s" % date_interval)
-        upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
-        add_headers_to_db.run(src=src, date_interval=date_interval,
-                            worker_processes=workers, dst_private=dst_private,
-                            dst_public=dst_public)
+        uploaded_dates = upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
+        if not date_interval:
+            for uploaded_date in uploaded_dates:
+                logger.info("Running add_headers_to_db for date %s" % uploaded_date)
+                add_headers_to_db.run(src=src, date_interval=uploaded_date,
+                                    worker_processes=workers, dst_private=dst_private,
+                                    dst_public=dst_public)
+        else:
+            logger.info("Running add_headers_to_db for date %s" % date_interval)
+            add_headers_to_db.run(src=src, date_interval=date_interval,
+                                worker_processes=workers, dst_private=dst_private,
+                                dst_public=dst_public)
         logger.info("add_headers_to_db runtime: %s" % timer.stop())
     finally:
         if halt:
@@ -226,9 +233,12 @@ def sync_reports(ctx,
         from pipeline.batch import sync_reports
         date = datetime.now().strftime("%Y-%m-%d")
         srcs = srcs.split(",")
-        sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
+        report_files = sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
+        logger.info("Uploaded the following reports:")
+        for report_file in report_files:
+            logger.info("* %s" % report_file)
         start_computer(ctx, instance_type="m3.xlarge",
-                    invoke_command="add_headers_to_db {date} --workers=4 --halt".format(date=date))
+                    invoke_command="add_headers_to_db --workers=4 --halt".format(date=date))
         logger.info("sync_reports runtime: %s" % timer.stop())
     finally:
         if halt:
@@ -238,7 +248,7 @@ def sync_reports(ctx,
 @task(setup_remote_syslog)
 def start_computer(ctx, private_key="private/ooni-pipeline.pem",
                    instance_type="c3.8xlarge",
-                   invoke_command="add_headers_to_db 2015 --workers=32 --halt"):
+                   invoke_command="add_headers_to_db --workers=32 --halt"):
     timer = Timer()
     timer.start()
     logger.info("Starting a %s AWS instance"
