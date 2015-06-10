@@ -135,15 +135,19 @@
         url: "https://raw.githubusercontent.com/papertrail/remote_syslog2/master/examples/remote_syslog.init.d"
         dest: "/etc/init.d/remote_syslog"
         force: no
+      sudo: yes
 
     - name: Set permissions on init.d script
       file: path=/etc/init.d/remote_syslog state=file mode=0755
+      sudo: yes
 
     - name: Write the log_files.yml config file
       action: template src=templates/log_files.yml-template.j2 dest=/etc/log_files.yml mode=0644
+      sudo: yes
     
     - name: Restart remote_syslog service
       service: name=remote_syslog state=restarted
+      sudo: yes
       
     - name: Copy the private key
       copy: 
