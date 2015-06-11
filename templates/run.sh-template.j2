@@ -1,5 +1,4 @@
 #!/bin/bash
 source {{ ansible_env.HOME }}/virtualenvs/{{virtualenv_name}}/bin/activate
-cd {{ ansible_env.HOME }}/ooni-pipeline-ng/
 echo "Started heroku" > ooni-pipeline.log
-nohup invoke {{ invoke_command }} &
+invoke {{ invoke_command }}

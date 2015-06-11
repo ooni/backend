@@ -157,7 +157,7 @@
 
     - name: Write the run.sh script
       action: template src=templates/run.sh-template.j2 dest="{{ ansible_env.HOME }}/ooni-pipeline-ng/private/run.sh" mode=0754
-  
+ 
     - name: Run the run.sh command
       shell: private/run.sh
       args:
