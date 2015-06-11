@@ -161,13 +161,14 @@ def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
         if limit is not None:
             limit = int(limit)
         from pipeline.batch import upload_reports
-        upload_reports.run(src_directory=src, dst=dst, worker_processes=workers,
-                        limit=limit, move=move)
+        uploaded_reports = upload_reports.run(src_directory=src, dst=dst,
+                                              worker_processes=workers,
+                                              limit=limit, move=move)
         logger.info("upload_reports runtime: %s" % timer.stop())
     finally:
         if halt:
             ctx.run("sudo halt")
-
+    return uploaded_reports
 
 
 @task(setup_remote_syslog)
