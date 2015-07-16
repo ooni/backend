@@ -47,22 +47,24 @@ you'll want to make sure to get our keyring package in Debian::
     sudo apt-get update
     sudo apt-get install deb.torproject.org-keyring tor tor-geoipdb
 
-Pip (>=1.3.0)
+Pip (>=7.0.0)
 .............
 
-We recommend using the Pip>=1.3.0 because it included several important
+We recommend using the Pip>=7.0.0 because it included several important
 security and privacy related patches:
 
  * It forces the use of HTTPS for [PyPI](pypi.python.org).
  * and checks package hash sums before installation, with support for hashes
    more collision-resistant than MD5.
+ * It does not fetch insecure metadata from external sourced by default.
+ * It does not support an insecure index without explicit opt in.
 
 The least painful way (that we know of) to install a newer Pip is to use Pip's
 get-pip script::
 
     # Grab the get-pip installer to make sure we have pip>=1.3.0
-    curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
-    sudo python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
+    curl -O https://bootstrap.pypa.io/get-pip.py
+    sudo python ./get-pip.py  ## pip (>=7.0.0) is recommended for security reasons
     # And make sure we're actually using the newer one:
     sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
 
