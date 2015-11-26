@@ -27,7 +27,73 @@ postgres database you should run (after having installed the requirements in
 invoke add_headers_to_db
 ```
 
+## Configuration
+
+Before running the pipeline you should configure it by editing the
+`invoke.yaml` file. An example configuration file is provided inside of
+`invoke.yaml.example`.
+
+The files you should probably be editing are the following:
+
+### core
+
+* **tmp_dir** What directory should be used to store temporary files.
+
+* **ssh_private_key_file** What ssh private key shall be used by luigi for sshing into ssh:// machines.
+
+* **ooni_pipeline_path** The location on the ec2 instance where to look for the ooni-pipeline repository.
+
+### aws
+
+* **access_key_id** This is your AWS access key ID for spinning up EC2 instances.
+
+* **secret_access_key** This is your AWS secret token.
+
+* **ssh_private_key_file** This is a private key that will be used for sshing into the started machines.
+
+### postgres
+
+* **host** The hostname of your postgres instance.
+
+* **database** The database name.
+
+* **username** The username to use when logging in.
+
+* **password** The password to use when logging in.
+
+* **table** The database table to use for writing report headers to.
+
+### ooni
+
+* **bridge_db_path** A path to where you have a bridge_db.json file that
+    contains mappings between bridge IPs, their hashes and the ring they were
+    taken for (this is required for the sanitisation of bridge_reachability
+    reports).
+
+### spark
+
+* **spark_submit** Path to where the spark-submit command can be found.
+
+* **master** The name of the yarn master node.
+
+### papertrail
+
+* **hostname** The hostname of the papertrail logging backend
+
+* **port** The port of the papertrail logging backend
+
+### kafka
+
+This is currently not used
+
+### spark
+
+This is currently not used
+
 ## List of tasks
+
+Tasks are run by using [pyinvoke](http://pyinvoke.org/) and are defined inside
+of `tasks.py`.
 
 ### Generate streams
 
@@ -318,17 +384,3 @@ The number of CPU workers to use when running the operations.
 
 This task is work in progress and is not throughly tested, it's for running
 spark scripts on a hadoop cluster.
-
-## More sauce
-
-There is more, but the source is your friend, luke :)
-
-Relevant information can be found inside of:
-
-* `invoke.yaml` - configuration file for invoke
-
-* `tasks.py` - all the tasks run by [invoke](http://www.pyinvoke.org/)
-
-* `playbook.yaml` - the ansible playbook used by invoke
-
-There is more to explore, but for the moment this is all folks.
