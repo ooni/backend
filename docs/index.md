@@ -27,6 +27,30 @@ postgres database you should run (after having installed the requirements in
 invoke add_headers_to_db
 ```
 
+To re-run the data pipeline from scratch you shall first clean all the streams
+by running:
+
+```
+invoke clean_streams
+```
+
+Then for every date you wish to import streams on you shall run:
+
+```
+invoke add_headers_to_db --workers=NUMBER_OF_CORES $YEAR
+```
+
+When doing this AWS it's ideal to have 1 machine per year running.
+
+This can be achieved by running the start_computer task like so:
+
+```
+invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2012"
+invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2013"
+invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2014"
+invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2015"
+```
+
 ## Configuration
 
 Before running the pipeline you should configure it by editing the
@@ -326,7 +350,8 @@ machine when done.
 This task can be run via:
 
 ```
-invoke [--private-key=PATH instance-type=INSTANCE_TYPE --invoke_command=INVOKE_COMMAND]
+invoke start_computer [--private-key=PATH --instance-type=INSTANCE_TYPE ]
+                      [--invoke_command=INVOKE_COMMAND]
 ```
 
 * **private-key**: default: `private/ooni-pipeline.pem`
