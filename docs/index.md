@@ -373,7 +373,7 @@ be important to also run the --halt to avoid extra costs.
 This task can be run via:
 
 ```
-invoke [--private-key=PATH instance-type=INSTANCE_TYPE --invoke_command=INVOKE_COMMAND]
+invoke spark_apps [--private-key=PATH instance-type=INSTANCE_TYPE --invoke_command=INVOKE_COMMAND]
 ```
 
 
@@ -385,9 +385,6 @@ date has been processed.
 
 * **date-interval**
 
-The date range that should be taken into consideration when running the
-`generate_streams` task. If no date range is specified it will run against all
-the dates.
 The format for the date range is that of the [luigi DateInterval
 module](http://luigi.readthedocs.org/en/stable/api/luigi.date_interval.html).
 For example: `2019-10` will be the full month of October 2019 or
