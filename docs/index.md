@@ -45,10 +45,10 @@ When doing this AWS it's ideal to have 1 machine per year running.
 This can be achieved by running the start_computer task like so:
 
 ```
-invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2012"
-invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2013"
-invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2014"
-invoke start_computer --invoke_command="add_headers_to_db --workers=32 --halt 2015"
+invoke start_computer --invoke-command="add_headers_to_db --workers=32 --halt 2012"
+invoke start_computer --invoke-command="add_headers_to_db --workers=32 --halt 2013"
+invoke start_computer --invoke-command="add_headers_to_db --workers=32 --halt 2014"
+invoke start_computer --invoke-command="add_headers_to_db --workers=32 --halt 2015"
 ```
 
 ## Configuration
