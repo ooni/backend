@@ -2,7 +2,7 @@
 
 This is the Open Observatory data processing pipeline
 
-![ooni-pipeline-ng architecture diagram](https://raw.githubusercontent.com/TheTorProject/ooni-pipeline-ng/master/docs/ooni-pipeline-ng-architecture.png)
+![ooni-pipeline architecture diagram](https://raw.githubusercontent.com/TheTorProject/ooni-pipeline/master/docs/ooni-pipeline-architecture.png)
 
 ## Setup
 

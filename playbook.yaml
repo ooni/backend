@@ -103,7 +103,7 @@
     - name: Create ~/virtualenvs/
       file: path="{{ ansible_env.HOME }}/virtualenvs" state=directory
 
-    - name: Clone the ooni-pipline-ng repository to the home
+    - name: Clone the ooni-pipline repository to the home
       git: repo=https://github.com/thetorproject/ooni-pipeline.git dest={{ ansible_env.HOME }}/ooni-pipeline
     
     - name: Install ooni-pipeline pip requirements
