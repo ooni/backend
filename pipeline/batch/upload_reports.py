@@ -104,7 +104,7 @@ def run(src_directory, dst, worker_processes, limit=None, move=False):
         logging.info("uploading %s" % filename)
         task = S3CopyRawReport(src=filename, dst=dst, move=move)
         uploaded_files.append(task.output().path)
-        w.add(task)
+        w.add(task, multiprocess=True)
     w.run()
     w.stop()
     uploaded_dates = []

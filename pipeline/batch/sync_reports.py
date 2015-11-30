@@ -58,7 +58,7 @@ def run(srcs, dst_private, worker_processes=16):
         )
         task = MoveReportFiles(report_files=list(report_files),
                                dst_private=dst_private)
-        w.add(task)
+        w.add(task, multiprocess=True)
     w.run()
     w.stop()
     return report_files
