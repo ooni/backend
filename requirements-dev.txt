@@ -10,3 +10,4 @@ streamparse
 filechunkio
 PyYaml
 awscli
+mkdocs

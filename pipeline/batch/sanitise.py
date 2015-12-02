@@ -125,6 +125,6 @@ def run(src, dst_private, dst_public, date_interval, worker_processes=16):
         logger.debug("working on %s" % date)
         task = AggregateYAMLReports(dst_private=dst_private,
                                     dst_public=dst_public, src=src, date=date)
-        w.add(task)
+        w.add(task, multiprocess=True)
     w.run()
     w.stop()

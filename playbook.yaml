@@ -50,7 +50,7 @@
     remote_syslog_version: "v0.13"
     pidfile: /var/run/oonipipeline.pid
     daemon: /bin/bash
-    daemon_opts: "/home/ec2-user/ooni-pipeline-ng/private/run.sh"
+    daemon_opts: "/home/ec2-user/ooni-pipeline/private/run.sh"
     service_name: oonipipeline
     papertrail_hostname: "logs2.papertrailapp.com"
     papertrail_port: "57492"
@@ -85,6 +85,8 @@
         - postgresql93-devel
         - libyaml-devel
         - htop
+        - gcc
+        - python-devel
 
     - name: Install ooni-pipeline pip requirements
       pip: name="virtualenvwrapper" state=present
@@ -101,18 +103,18 @@
     - name: Create ~/virtualenvs/
       file: path="{{ ansible_env.HOME }}/virtualenvs" state=directory
 
-    - name: Clone the ooni-pipline-ng repository to the home
-      git: repo=https://github.com/thetorproject/ooni-pipeline-ng.git dest={{ ansible_env.HOME }}/ooni-pipeline-ng
+    - name: Clone the ooni-pipline repository to the home
+      git: repo=https://github.com/thetorproject/ooni-pipeline.git dest={{ ansible_env.HOME }}/ooni-pipeline
     
     - name: Install ooni-pipeline pip requirements
-      pip: requirements={{ ansible_env.HOME }}/ooni-pipeline-ng/requirements-computer.txt
+      pip: requirements={{ ansible_env.HOME }}/ooni-pipeline/requirements-computer.txt
            virtualenv={{ ansible_env.HOME }}/virtualenvs/{{ virtualenv_name }}
            virtualenv_site_packages=yes
 
     - name: Configure ooni-pipeline invoke
       copy: 
         src: "invoke.yaml"
-        dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/invoke.yaml"
+        dest: "{{ ansible_env.HOME }}/ooni-pipeline/invoke.yaml"
 
     - name: Download remote_syslog
       get_url:
@@ -152,16 +154,16 @@
     - name: Copy the private key
       copy: 
         src: "private/private.key"
-        dest: "{{ ansible_env.HOME }}/ooni-pipeline-ng/private/private.key"
+        dest: "{{ ansible_env.HOME }}/ooni-pipeline/private/private.key"
         mode: 0700
 
     - name: Write the run.sh script
-      action: template src=templates/run.sh-template.j2 dest="{{ ansible_env.HOME }}/ooni-pipeline-ng/private/run.sh" mode=0754
+      action: template src=templates/run.sh-template.j2 dest="{{ ansible_env.HOME }}/ooni-pipeline/private/run.sh" mode=0754
  
     - name: Run the run.sh command
       shell: private/run.sh
       args:
-        chdir: "{{ ansible_env.HOME }}/ooni-pipeline-ng/"
+        chdir: "{{ ansible_env.HOME }}/ooni-pipeline/"
 
 - name: Terminate instances
   hosts: localhost

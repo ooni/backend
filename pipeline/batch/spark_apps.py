@@ -180,7 +180,7 @@ def run(date_interval, src="s3n://ooni-public/reports-sanitised/streams/",
         logger.info("Running CountInterestingReports for %s on %s to %s" %
                     (date, src, dst))
         task = SparkResultsToDatabase(src=src, date=date, dst=dst)
-        w.add(task)
+        w.add(task, multiprocess=True)
 
     w.run()
     w.stop()
