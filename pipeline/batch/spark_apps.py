@@ -30,6 +30,7 @@ class FindInterestingReports(PySparkTask):
     src = luigi.Parameter()
     dst = luigi.Parameter()
 
+    test_name = "this_test_is_nameless"
     test_names = ["this_test_is_nameless"]
     software_name = "ooniprobe"
     extra_fields = [
@@ -88,7 +89,9 @@ class FindInterestingReports(PySparkTask):
 
 
 class HTTPRequestsInterestingFind(FindInterestingReports):
+    test_name = "http_requests"
     test_names = ["http_requests_test", "http_requests", "HTTP Requests Test"]
+
     extra_fields = [
         {"name": "body_length_match", "type": "bool"},
         {"name": "headers_match", "type": "bool"},
