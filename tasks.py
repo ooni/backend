@@ -235,12 +235,14 @@ def sync_reports(ctx,
         from pipeline.batch import sync_reports
         date = datetime.now().strftime("%Y-%m-%d")
         srcs = srcs.split(",")
-        report_files = sync_reports.run(srcs=srcs, worker_processes=workers, dst_private=dst_private)
+        report_files = sync_reports.run(srcs=srcs,
+                                        worker_processes=workers,
+                                        dst_private=dst_private)
         logger.info("Uploaded the following reports:")
         for report_file in report_files:
             logger.info("* %s" % report_file)
         start_computer(ctx, instance_type="m3.xlarge",
-                    invoke_command="add_headers_to_db --workers=4 --halt".format(date=date))
+                       invoke_command="add_headers_to_db --workers=4 --halt".format(date=date))
         logger.info("sync_reports runtime: %s" % timer.stop())
     finally:
         if halt:
