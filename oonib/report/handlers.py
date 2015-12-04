@@ -18,6 +18,11 @@ from oonib.config import config
 
 def report_file_name(archive_dir, report_details):
     timestamp = datetime.fromtimestamp(report_details['start_time'])
+    ext = report_details.get("format")
+    if ext == "json":
+        ext = "json"
+    else:
+        ext = "yamloo"
     keys = dict(
         report_details.items(),
         iso8601_timestamp=otime.timestamp(timestamp),
@@ -26,9 +31,10 @@ def report_file_name(archive_dir, report_details):
         day=timestamp.strftime("%d"),
         hour=timestamp.strftime("%H"),
         minute=timestamp.strftime("%M"),
-        second=timestamp.strftime("%S")
+        second=timestamp.strftime("%S"),
+        ext=ext
     )
-    report_file_template = "{probe_cc}/{test_name}-{iso8601_timestamp}-{probe_asn}-probe.yamloo"
+    report_file_template = "{probe_cc}/{test_name}-{iso8601_timestamp}-{probe_asn}-probe.{ext}"
     if config.main.report_file_template:
         report_file_template = config.main.report_file_template
     dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
@@ -45,13 +51,14 @@ class Report(object):
                  stale_time,
                  report_dir,
                  archive_dir,
-                 reports):
+                 reports, file_format="yaml"):
         self.report_id = report_id
 
         self.stale_time = stale_time
         self.report_dir = report_dir
         self.archive_dir = archive_dir
         self.reports = reports
+        self.file_format = file_format
 
         self.refresh()
 
@@ -76,13 +83,23 @@ class Report(object):
         report_filename = get_report_path(self.report_id)
         try:
             with open(report_filename) as fd:
-                g = yaml.safe_load_all(fd)
-                report_details = g.next()
+                if self.file_format == "json":
+                    line = fd.readline()
+                    json.loads(line)
+                else:
+                    g = yaml.safe_load_all(fd)
+                    report_details = g.next()
         except IOError:
             raise e.ReportNotFound
 
         dst_filename = report_file_name(self.archive_dir, report_details)
         shutil.move(report_filename, dst_filename)
+
+        if self.file_format == "json":
+            report_details["record_type"] = "footer"
+            with open(dst_filename, "a+") as fd:
+                json.dump(report_details, dst_filename)
+                fd.write("\n")
 
         if not self.delayed_call.called:
             self.delayed_call.cancel()
