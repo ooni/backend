@@ -15,7 +15,7 @@ assert config._runtime_found, "you probably need to 'cp invoke.yaml.example invo
 logger = setup_pipeline_logging(config)
 
 os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH") if os.environ.get("PYTHONPATH") else ""
-os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
+#os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
 
 def _create_cfg_files():
     with open("client.cfg", "w") as fw:
@@ -86,38 +86,7 @@ _create_cfg_files()
 
 @task
 def setup_remote_syslog(ctx):
-    if not os.path.exists("/usr/local/bin/remote_syslog"):
-        if sys.platform.startswith("darwin"):
-            filename = "remote_syslog_darwin_amd64.tar.gz"
-        elif sys.platform.startswith("linux"):
-            filename = "remote_syslog_linux_amd64.tar.gz"
-        else:
-            logger.error("This platform does not support remote_syslog")
-            return
-        ctx.run("cd /tmp/")
-        ctx.run("wget -O /tmp/{filename}"
-                " https://github.com/papertrail/remote_syslog2/releases/download/v0.13/{filename}".format(
-            filename=filename))
-        ctx.run("tar xvzf /tmp/{filename} -C /tmp/".format(filename=filename))
-        ctx.run("cp /tmp/remote_syslog/remote_syslog /usr/local/bin/remote_syslog")
-    pid_file = "remote_syslog.pid"
-    try:
-        with open(pid_file) as f:
-            pid = f.read().strip()
-        pid = int(pid)
-        os.kill(pid, 0)
-    except (OSError, IOError):
-        command = ("/usr/local/bin/remote_syslog"
-                   " -d {papertrail_hostname}"
-                   " -p {papertrail_port}"
-                   " --pid-file={pid_file}"
-                   " ooni-pipeline.log".format(
-                       papertrail_hostname=config.papertrail.hostname,
-                       papertrail_port=config.papertrail.port,
-                       pid_file=pid_file
-                   ))
-        logger.info("Running %s" % command)
-        ctx.run(command, pty=True)
+    pass
 
 @task
 def realtime(ctx):
@@ -207,8 +176,8 @@ def add_headers_to_db(ctx, date_interval=None, workers=16,
         timer = Timer()
         timer.start()
         from pipeline.batch import add_headers_to_db
-        uploaded_dates = upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
         if not date_interval:
+            uploaded_dates = upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
             for uploaded_date in uploaded_dates:
                 logger.info("Running add_headers_to_db for date %s" % uploaded_date)
                 add_headers_to_db.run(src=src, date_interval=uploaded_date,

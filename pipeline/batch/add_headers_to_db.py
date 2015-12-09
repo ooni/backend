@@ -8,22 +8,13 @@ import luigi.postgres
 from invoke.config import Config
 
 from pipeline.helpers.util import json_loads, get_date_interval, get_luigi_target
-from pipeline.helpers.util import get_imported_dates
+from pipeline.helpers.util import get_imported_dates, json_dumps
 from pipeline.helpers.report import header_avro
 
 from pipeline.batch.sanitise import AggregateYAMLReports
 
 config = Config(runtime_path="invoke.yaml")
 logger = logging.getLogger('ooni-pipeline')
-
-columns = []
-for field in header_avro["fields"]:
-    if field["type"] == "string":
-        columns.append((field["name"], "TEXT"))
-    elif field["type"] == "array":
-        columns.append((field["name"], "TEXT"))
-    elif field["type"] == "float":
-        columns.append((field["name"], "FLOAT"))
 
 class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
     src = luigi.Parameter()
@@ -38,7 +29,21 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
     password = str(config.postgres.password)
     table = str(config.postgres.table)
 
-    columns = columns
+    columns = [
+        ('input', 'TEXT'),
+        ('report_id', 'TEXT'),
+        ('report_filename', 'TEXT'),
+        ('options', 'TEXT'),
+        ('probe_cc', 'TEXT'),
+        ('probe_asn', 'TEXT'),
+        ('probe_ip', 'TEXT'),
+        ('data_format_version', 'TEXT'),
+        ('test_name', 'TEXT'),
+        ('test_start_time', 'TEXT'),
+        ('test_runtime', 'TEXT'),
+        ('test_helpers', 'TEXT'),
+        ('test_keys', 'JSON')
+    ]
 
     def requires(self):
         return AggregateYAMLReports(dst_private=self.dst_private,
@@ -46,16 +51,28 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
                                     src=self.src,
                                     date=self.date)
 
-    def format_record(self, record):
-        fields = []
-        for field in header_avro["fields"]:
-            if field["type"] == "string":
-                fields.append(str(record.get(field["name"], "")))
-            elif field["type"] == "array":
-                fields.append(str(record.get(field["name"], "")))
-            elif field["type"] == "float":
-                fields.append(float(record.get(field["name"], 0)))
-        return fields
+    def format_record(self, entry):
+        base_keys = [
+            'input',
+            'report_id',
+            'report_filename',
+            'options',
+            'probe_cc',
+            'probe_asn',
+            'probe_ip',
+            'data_format_version',
+            'test_name',
+            'test_start_time',
+            'test_runtime',
+            'test_helpers'
+        ]
+
+        keys = [k for k in base_keys]
+        record = []
+        for k in keys:
+            record.append(entry.pop(k, None))
+        record.append(json_dumps(entry))
+        return record
 
     def rows(self):
         sanitised_streams = self.input()["sanitised_streams"]
@@ -63,8 +80,8 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
             for line in in_file:
                 record = json_loads(line.strip('\n'))
                 logger.info("Looking at %s with id %s" % (record["record_type"], record["report_id"]))
-                if record["record_type"] == "header":
-                    logger.info("Found header")
+                if record["record_type"] == "entry":
+                    logger.info("Found entry")
                     yield self.format_record(record)
 
 def run(src, dst_private, dst_public, date_interval, worker_processes=16):
@@ -72,17 +89,16 @@ def run(src, dst_private, dst_public, date_interval, worker_processes=16):
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
 
-    imported_dates = get_imported_dates(src,
-                                        aws_access_key_id=config.aws.access_key_id,
-                                        aws_secret_access_key=config.aws.secret_access_key)
+#    imported_dates = get_imported_dates(src,
+#                                        aws_access_key_id=config.aws.access_key_id,
+#                                        aws_secret_access_key=config.aws.secret_access_key)
     interval = get_date_interval(date_interval)
     for date in interval:
-        if str(date) not in imported_dates:
-            continue
+#        if str(date) not in imported_dates:
+#            continue
         logging.info("adding headers for date: %s" % date)
         task = ReportHeadersToDatabase(dst_private=dst_private,
                                        dst_public=dst_public,
                                        src=src, date=date)
         w.add(task, multiprocess=True)
     w.run()
-    w.stop()
