@@ -106,7 +106,7 @@ def run(src_directory, dst, worker_processes, limit=None, move=False):
         uploaded_files.append(task.output().path)
         w.add(task, multiprocess=True)
     w.run()
-    w.stop()
+    #w.stop()
     uploaded_dates = []
     for uploaded_file in uploaded_files:
         uploaded_date = os.path.basename(os.path.dirname(uploaded_file))

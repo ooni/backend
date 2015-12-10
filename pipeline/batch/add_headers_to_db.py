@@ -33,16 +33,16 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
         ('input', 'TEXT'),
         ('report_id', 'TEXT'),
         ('report_filename', 'TEXT'),
-        ('options', 'TEXT'),
+        ('options', 'JSONB'),
         ('probe_cc', 'TEXT'),
         ('probe_asn', 'TEXT'),
         ('probe_ip', 'TEXT'),
         ('data_format_version', 'TEXT'),
         ('test_name', 'TEXT'),
-        ('test_start_time', 'TEXT'),
-        ('test_runtime', 'TEXT'),
-        ('test_helpers', 'TEXT'),
-        ('test_keys', 'JSON')
+        ('test_start_time', 'INTEGER'),
+        ('test_runtime', 'REAL'),
+        ('test_helpers', 'JSONB'),
+        ('test_keys', 'JSONB')
     ]
 
     def requires(self):
@@ -52,25 +52,19 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
                                     date=self.date)
 
     def format_record(self, entry):
-        base_keys = [
-            'input',
-            'report_id',
-            'report_filename',
-            'options',
-            'probe_cc',
-            'probe_asn',
-            'probe_ip',
-            'data_format_version',
-            'test_name',
-            'test_start_time',
-            'test_runtime',
-            'test_helpers'
-        ]
-
-        keys = [k for k in base_keys]
         record = []
-        for k in keys:
-            record.append(entry.pop(k, None))
+        for (col_name, col_type) in self.columns:
+            if col_name == 'test_keys': # this column gets a json_dump of whatever's left
+                continue
+            elif col_type == 'JSONB':
+                record.append(json_dumps(entry.pop(col_name, None)))
+            elif col_type == 'INTEGER':
+                try:
+                    record.append(int(entry.pop(col_name)))
+                except KeyError:
+                    record.append(None)
+            else:
+                record.append(entry.pop(col_name, None))
         record.append(json_dumps(entry))
         return record
 
@@ -89,13 +83,13 @@ def run(src, dst_private, dst_public, date_interval, worker_processes=16):
     w = luigi.worker.Worker(scheduler=sch,
                             worker_processes=worker_processes)
 
-#    imported_dates = get_imported_dates(src,
-#                                        aws_access_key_id=config.aws.access_key_id,
-#                                        aws_secret_access_key=config.aws.secret_access_key)
+    imported_dates = get_imported_dates(src,
+                                        aws_access_key_id=config.aws.access_key_id,
+                                        aws_secret_access_key=config.aws.secret_access_key)
     interval = get_date_interval(date_interval)
     for date in interval:
-#        if str(date) not in imported_dates:
-#            continue
+        if str(date) not in imported_dates:
+            continue
         logging.info("adding headers for date: %s" % date)
         task = ReportHeadersToDatabase(dst_private=dst_private,
                                        dst_public=dst_public,
