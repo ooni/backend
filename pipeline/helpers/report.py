@@ -161,6 +161,8 @@ class Report(object):
         return entry
 
     def process_entry(self, entry):
+        if 'report' in entry:
+            entry.update(entry.pop('report'))
         raw_entry = entry.copy()
         sanitised_entry = entry.copy()
 

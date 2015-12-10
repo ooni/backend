@@ -12,6 +12,7 @@ class Sanitisers(object):
         return entry
 
     def http_requests(self, entry):
+        entry['test_name'] = 'http_requests'
         return entry
 
     def scapy_template(self, entry):
@@ -21,9 +22,17 @@ class Sanitisers(object):
         return entry
 
     def dns_consistency(self, entry):
+        entry['test_name'] = 'dns_consistency'
+        tampered_resolvers = []
+        for k, v in entry['tampering'].items():
+            if v == True:
+                tampered_resolvers.append(k)
+        entry['tampered_resolvers'] = tampered_resolvers
+        entry['tampering_detected'] = len(tampered_resolvers) > 0
         return entry
 
     def captive_portal(self, entry):
+        entry['test_name'] = 'captive_portal'
         return entry
 
     def null(self, entry):
@@ -40,6 +49,7 @@ class Sanitisers(object):
         return entry
 
     def bridge_reachability(self, entry):
+        entry['test_name'] = 'bridge_reachability'
         if not entry.get('bridge_address'):
             entry['bridge_address'] = entry['input']
 
@@ -70,6 +80,7 @@ class Sanitisers(object):
 
     def tcp_connect(self, entry):
         entry = self.bridge_reachability_tcp_connect(entry)
+        entry['test_name'] = 'tcp_connect'
         return entry
 
     def default(self, entry):
