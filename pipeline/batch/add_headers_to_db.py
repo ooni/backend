@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 import luigi
 import luigi.worker
@@ -37,7 +38,7 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
         ('probe_ip', 'TEXT'),
         ('data_format_version', 'TEXT'),
         ('test_name', 'TEXT'),
-        ('test_start_time', 'INTEGER'),
+        ('test_start_time', 'TIMESTAMP'),
         ('test_runtime', 'REAL'),
         ('test_helpers', 'JSONB'),
         ('test_keys', 'JSONB')
@@ -55,7 +56,9 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
             if col_name == 'test_keys': # this column gets a json_dump of whatever's left
                 continue
             elif col_name == 'test_start_time': # Entry is actually called start_time
-                record.append(int(entry.pop('start_time')))
+                start_time = entry.pop('start_time')
+                test_start_time = datetime.fromtimestamp(start_time).strftime("%Y-%m-%d %H:%M:%S")
+                record.append(test_start_time)
             elif col_type == 'JSONB':
                 record.append(json_dumps(entry.pop(col_name, None)))
             elif col_type == 'INTEGER':
