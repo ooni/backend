@@ -1,5 +1,4 @@
 import logging
-import json
 
 import luigi
 import luigi.worker
@@ -7,9 +6,8 @@ import luigi.postgres
 
 from invoke.config import Config
 
-from pipeline.helpers.util import json_loads, get_date_interval, get_luigi_target
+from pipeline.helpers.util import json_loads, get_date_interval
 from pipeline.helpers.util import get_imported_dates, json_dumps
-from pipeline.helpers.report import header_avro
 
 from pipeline.batch.sanitise import AggregateYAMLReports
 
@@ -56,6 +54,8 @@ class ReportHeadersToDatabase(luigi.postgres.CopyToTable):
         for (col_name, col_type) in self.columns:
             if col_name == 'test_keys': # this column gets a json_dump of whatever's left
                 continue
+            elif col_name == 'test_start_time': # Entry is actually called start_time
+                record.append(int(entry.pop('start_time')))
             elif col_type == 'JSONB':
                 record.append(json_dumps(entry.pop(col_name, None)))
             elif col_type == 'INTEGER':
