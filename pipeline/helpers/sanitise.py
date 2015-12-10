@@ -83,14 +83,26 @@ class Sanitisers(object):
         entry['test_name'] = 'tcp_connect'
         return entry
 
+    def http_header_field_manipulation(self, entry):
+        entry['test_name'] = 'http_header_field_manipulation'
+        return entry
+
+    def http_invalid_request_line(self, entry):
+        entry['test_name'] = 'http_invalid_request_line'
+        return entry
+
+    def http_host(self, entry):
+        entry['test_name'] = 'http_host'
+        return entry
+
     def default(self, entry):
         return entry
 
 
 def get_sanitisers(test_name):
     sanitise_mapping = {
-        "http_host": "http_template",
-        "HTTP Host": "http_template",
+        "http_host": ["http_template", "http_host"],
+        "HTTP Host": ["http_template", "http_host"],
 
         "http_requests_test": ["http_template",
                                "http_requests"],
@@ -107,11 +119,11 @@ def get_sanitisers(test_name):
         "DNS tamper": ["dns_template", "dns_consistency"],
         "dns_consistency": ["dns_template", "dns_consistency"],
 
-        "HTTP Invalid Request Line": "null",
-        "http_invalid_request_line": "null",
+        "HTTP Invalid Request Line": ["http_invalid_request_line"],
+        "http_invalid_request_line": ["http_invalid_request_line"],
 
-        "http_header_field_manipulation": "null",
-        "HTTP Header Field Manipulation": "null",
+        "http_header_field_manipulation": ["http_header_field_manipulation"],
+        "HTTP Header Field Manipulation": ["http_header_field_manipulation"],
 
         "Multi Protocol Traceroute Test": ["scapy_template"],
         "multi_protocol_traceroute_test": ["scapy_template"],
