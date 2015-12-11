@@ -8,3 +8,5 @@ _resources
 invoke.yaml
 pipeline/helpers/settings.py
 remote_syslog.pid
+*.swp
+*.env
