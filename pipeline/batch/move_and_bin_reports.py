@@ -34,7 +34,7 @@ class ReportSource(ExternalTask):
         return LocalTarget(self.src, format=file_format)
 
 
-class S3CopyRawReport(luigi.Task):
+class MoveAndBinReport(luigi.Task):
     src = luigi.Parameter()
     dst = luigi.Parameter()
     move = luigi.Parameter()
@@ -95,6 +95,6 @@ def run(src_directory, dst):
         src_directory, aws_access_key_id=config.aws.access_key_id,
             aws_secret_access_key=config.aws.secret_access_key):
         logging.info("moving %s to %s" % filename, dst)
-        task = S3CopyRawReport(src=filename, dst=dst)
+        task = MoveAndBinReport(src=filename, dst=dst)
         w.add(task, multiprocess=True)
     w.run()

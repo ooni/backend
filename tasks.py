@@ -123,12 +123,12 @@ def generate_streams(ctx, date_interval,
 
 
 @task(setup_remote_syslog)
-def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/")
+def move_and_bin_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/")
     timer = Timer()
     timer.start()
-    from pipeline.batch import upload_reports
-    uploaded_reports = upload_reports.run(src_directory=src, dst=dst)
-    logger.info("upload_reports runtime: %s" % timer.stop())
+    from pipeline.batch import move_and_bin_reports
+    move_and_bin_reports.run(src_directory=src, dst=dst)
+    logger.info("move_and_bin_reports runtime: %s" % timer.stop())
 
 
 @task(setup_remote_syslog)
@@ -247,5 +247,5 @@ def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/stre
     logger.info("spark_submit runtime: %s" % timer.stop())
 
 
-ns = Collection(upload_reports, generate_streams, list_reports, clean_streams,
+ns = Collection(move_and_bin_reports, generate_streams, list_reports, clean_streams,
                 add_headers_to_db, start_computer, sync_reports, spark_apps, spark_submit)
