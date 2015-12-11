@@ -186,34 +186,6 @@ def move_reports(ctx, src="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive
 
 
 @task
-def start_computer(ctx, private_key="private/ooni-pipeline.pem",
-                   instance_type="c3.8xlarge",
-                   invoke_command="add_headers_to_db --workers=32 --halt"):
-    timer = Timer()
-    timer.start()
-    logger.info("Starting a %s AWS instance"
-                " and running on it the command %s" % (instance_type, invoke_command))
-
-    os.environ["ANSIBLE_HOST_KEY_CHECKING"] = "false"
-    os.environ["AWS_ACCESS_KEY_ID"] = config.aws.access_key_id
-    os.environ["AWS_SECRET_ACCESS_KEY"] = config.aws.secret_access_key
-    try:
-        command = ("ansible-playbook --private-key {private_key}"
-                   " -i inventory playbook.yaml"
-                   " --extra-vars=".format(private_key=private_key))
-        command += "'%s'" % json.dumps({
-            "instance_type": instance_type,
-            "invoke_command": invoke_command
-        })
-        result = ctx.run(command, pty=True)
-        logger.info(str(result))
-    except Exception:
-        logger.error("Failed to run ansible playbook")
-        logger.error(traceback.format_exc())
-    logger.info("start_computer runtime: %s" % timer.stop())
-
-
-@task
 def spark_submit(ctx, script,
                  spark_submit="/home/hadoop/spark/bin/spark-submit"):
     timer = Timer()
@@ -237,4 +209,4 @@ def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/stre
 
 
 ns = Collection(move_and_bin_reports, generate_streams, list_reports, clean_streams,
-                add_headers_to_db, start_computer, move_reports, spark_apps, spark_submit)
+                add_headers_to_db, move_reports, spark_apps, spark_submit)
