@@ -37,7 +37,6 @@ class ReportSource(ExternalTask):
 class MoveAndBinReport(luigi.Task):
     src = luigi.Parameter()
     dst = luigi.Parameter()
-    move = luigi.Parameter()
 
     def requires(self):
         return ReportSource(self.src)
@@ -73,10 +72,13 @@ class MoveAndBinReport(luigi.Task):
                 ext=ext.replace(".gz", "").replace(".yamloo", ".yaml")
             )
             uri = os.path.join(self.dst, date.strftime("%Y-%m-%d"), filename)
-            return S3Target(uri)
         except Exception:
-            return S3Target(os.path.join(self.dst, "failed",
-                                         os.path.basename(self.src)))
+            uri = os.path.join(self.dst, "failed", os.path.basename(self.src))
+        finally:
+            if uri.startswith("s3n://"):
+                return S3Target(uri)
+            else:
+                return LocalTarget(uri)
 
     def run(self):
         input = self.input()
@@ -92,9 +94,9 @@ def run(src_directory, dst):
     w = luigi.worker.Worker(scheduler=sch)
 
     for filename in list_report_files(
-        src_directory, aws_access_key_id=config.aws.access_key_id,
+            src_directory, aws_access_key_id=config.aws.access_key_id,
             aws_secret_access_key=config.aws.secret_access_key):
-        logging.info("moving %s to %s" % filename, dst)
+        logging.info("moving %s to %s" % (filename, dst))
         task = MoveAndBinReport(src=filename, dst=dst)
         w.add(task, multiprocess=True)
     w.run()

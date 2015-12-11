@@ -123,7 +123,7 @@ def generate_streams(ctx, date_interval,
 
 
 @task(setup_remote_syslog)
-def move_and_bin_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/")
+def move_and_bin_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/"):
     timer = Timer()
     timer.start()
     from pipeline.batch import move_and_bin_reports
