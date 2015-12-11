@@ -173,14 +173,13 @@ def add_headers_to_db(ctx, date_interval, workers=16,
 
 
 @task(setup_remote_syslog)
-def sync_reports(ctx,
-                 src="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
+def move_reports(ctx, src="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
                  dst="s3n://ooni-incoming/"):
     timer = Timer()
     timer.start()
-    from pipeline.batch import sync_reports
-    sync_reports.run(src_dir=src, dst_dir=dst)
-    logger.info("sync_reports runtime: %s" % timer.stop())
+    from pipeline.batch import move_reports
+    move_reports.run(src_dir=src, dst_dir=dst)
+    logger.info("move_reports runtime: %s" % timer.stop())
 
 
 @task(setup_remote_syslog)
@@ -235,4 +234,4 @@ def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/stre
 
 
 ns = Collection(move_and_bin_reports, generate_streams, list_reports, clean_streams,
-                add_headers_to_db, start_computer, sync_reports, spark_apps, spark_submit)
+                add_headers_to_db, start_computer, move_reports, spark_apps, spark_submit)

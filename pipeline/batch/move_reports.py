@@ -13,7 +13,7 @@ config = Config(runtime_path="invoke.yaml")
 logger = logging.getLogger('ooni-pipeline')
 
 
-class MoveReportFiles(luigi.Task):
+class MoveReport(luigi.Task):
     report_file = luigi.Parameter()
     dst_dir = luigi.Parameter()
 
@@ -48,6 +48,6 @@ def run(src_dir, dst_dir):
             src_dir, key_file=config.core.ssh_private_key_file,
             no_host_key_check=True):
         logging.info("moving %s to %s" % (filename, dst_dir))
-        task = MoveReportFiles(report_file=filename, dst_dir=dst_dir)
+        task = MoveReport(report_file=filename, dst_dir=dst_dir)
         w.add(task, multiprocess=True)
     w.run()
