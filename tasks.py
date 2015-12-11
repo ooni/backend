@@ -124,16 +124,14 @@ def generate_streams(ctx, date_interval,
 
 @task(setup_remote_syslog)
 def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
-                   workers=16, limit=None, move=False, halt=False):
+                   workers=16, move=False, halt=False):
     try:
         timer = Timer()
         timer.start()
-        if limit is not None:
-            limit = int(limit)
         from pipeline.batch import upload_reports
         uploaded_reports = upload_reports.run(src_directory=src, dst=dst,
                                               worker_processes=workers,
-                                              limit=limit, move=move)
+                                              move=move)
         logger.info("upload_reports runtime: %s" % timer.stop())
     finally:
         if halt:
