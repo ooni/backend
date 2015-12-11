@@ -84,28 +84,17 @@ class S3CopyRawReport(luigi.Task):
         with output.open('w') as out_file:
             with input.open('r') as in_file:
                 shutil.copyfileobj(in_file, out_file)
-        if self.move:
-            input.remove()
+        input.remove()
 
 
-def run(src_directory, dst, worker_processes, move=False):
+def run(src_directory, dst):
     sch = luigi.scheduler.CentralPlannerScheduler()
-    w = luigi.worker.Worker(scheduler=sch,
-                            worker_processes=worker_processes)
+    w = luigi.worker.Worker(scheduler=sch)
 
-    uploaded_files = []
     for filename in list_report_files(
         src_directory, aws_access_key_id=config.aws.access_key_id,
             aws_secret_access_key=config.aws.secret_access_key):
-        logging.info("uploading %s" % filename)
-        task = S3CopyRawReport(src=filename, dst=dst, move=move)
-        uploaded_files.append(task.output().path)
+        logging.info("moving %s to %s" % filename, dst)
+        task = S3CopyRawReport(src=filename, dst=dst)
         w.add(task, multiprocess=True)
     w.run()
-    #w.stop()
-    uploaded_dates = []
-    for uploaded_file in uploaded_files:
-        uploaded_date = os.path.basename(os.path.dirname(uploaded_file))
-        if uploaded_date not in uploaded_dates:
-            uploaded_dates.append(uploaded_date)
-    return uploaded_dates

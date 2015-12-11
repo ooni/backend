@@ -123,20 +123,12 @@ def generate_streams(ctx, date_interval,
 
 
 @task(setup_remote_syslog)
-def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/",
-                   workers=16, move=False, halt=False):
-    try:
-        timer = Timer()
-        timer.start()
-        from pipeline.batch import upload_reports
-        uploaded_reports = upload_reports.run(src_directory=src, dst=dst,
-                                              worker_processes=workers,
-                                              move=move)
-        logger.info("upload_reports runtime: %s" % timer.stop())
-    finally:
-        if halt:
-            ctx.run("sudo halt")
-    return uploaded_reports
+def upload_reports(ctx, src, dst="s3n://ooni-private/reports-raw/yaml/")
+    timer = Timer()
+    timer.start()
+    from pipeline.batch import upload_reports
+    uploaded_reports = upload_reports.run(src_directory=src, dst=dst)
+    logger.info("upload_reports runtime: %s" % timer.stop())
 
 
 @task(setup_remote_syslog)
@@ -166,30 +158,18 @@ def clean_streams(ctx, dst_private="s3n://ooni-private/",
         target.remove()
 
 @task(setup_remote_syslog)
-def add_headers_to_db(ctx, date_interval=None, workers=16,
+def add_headers_to_db(ctx, date_interval, workers=16,
                       src="s3n://ooni-private/reports-raw/yaml/",
                       dst_private="s3n://ooni-private/",
-                      dst_public="s3n://ooni-public/", halt=False):
-    try:
-        timer = Timer()
-        timer.start()
-        from pipeline.batch import add_headers_to_db
-        if not date_interval:
-            uploaded_dates = upload_reports(ctx, src="s3n://ooni-incoming/", workers=workers, move=True)
-            for uploaded_date in uploaded_dates:
-                logger.info("Running add_headers_to_db for date %s" % uploaded_date)
-                add_headers_to_db.run(src=src, date_interval=uploaded_date,
-                                    worker_processes=workers, dst_private=dst_private,
-                                    dst_public=dst_public)
-        else:
-            logger.info("Running add_headers_to_db for date %s" % date_interval)
-            add_headers_to_db.run(src=src, date_interval=date_interval,
-                                worker_processes=workers, dst_private=dst_private,
-                                dst_public=dst_public)
-        logger.info("add_headers_to_db runtime: %s" % timer.stop())
-    finally:
-        if halt:
-            ctx.run("sudo halt")
+                      dst_public="s3n://ooni-public/"):
+    timer = Timer()
+    timer.start()
+    from pipeline.batch import add_headers_to_db
+    logger.info("Running add_headers_to_db for date %s" % date_interval)
+    add_headers_to_db.run(src=src, date_interval=date_interval,
+                        worker_processes=workers, dst_private=dst_private,
+                        dst_public=dst_public)
+    logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
 
 @task(setup_remote_syslog)
