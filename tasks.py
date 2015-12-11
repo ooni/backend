@@ -5,6 +5,7 @@ import json
 import traceback
 import sys
 import os
+#from functools import wraps
 
 from invoke.config import Config
 from invoke import Collection, ctask as task
@@ -16,6 +17,16 @@ logger = setup_pipeline_logging(config)
 
 os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH") if os.environ.get("PYTHONPATH") else ""
 #os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
+
+#def with_timer(func_to_wrap):
+#    @wraps(func_to_wrap)
+#    def func_wrapper(*args, **kwargs):
+#        logger.info("Starting task %s" % self.__name__)
+#        timer = Timer()
+#        timer.start()
+#        func_to_wrap(*args, **kwargs)
+#        logger.info("Finished task at %s" % timer.stop())
+#    return func_wrapper
 
 def _create_cfg_files():
     with open("client.cfg", "w") as fw:
@@ -172,6 +183,7 @@ def add_headers_to_db(ctx, date_interval, workers=16,
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
 
+#@with_timer
 @task(setup_remote_syslog)
 def move_reports(ctx, src="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
                  dst="s3n://ooni-incoming/"):
