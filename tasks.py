@@ -174,26 +174,13 @@ def add_headers_to_db(ctx, date_interval, workers=16,
 
 @task(setup_remote_syslog)
 def sync_reports(ctx,
-                 srcs="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
-                 dst_private="s3n://ooni-incoming/", workers=16, halt=False):
-    try:
-        timer = Timer()
-        timer.start()
-        from pipeline.batch import sync_reports
-        date = datetime.now().strftime("%Y-%m-%d")
-        srcs = srcs.split(",")
-        report_files = sync_reports.run(srcs=srcs,
-                                        worker_processes=workers,
-                                        dst_private=dst_private)
-        logger.info("Uploaded the following reports:")
-        for report_file in report_files:
-            logger.info("* %s" % report_file)
-        start_computer(ctx, instance_type="m3.xlarge",
-                       invoke_command="add_headers_to_db --workers=4 --halt".format(date=date))
-        logger.info("sync_reports runtime: %s" % timer.stop())
-    finally:
-        if halt:
-            ctx.run("sudo halt")
+                 src="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
+                 dst="s3n://ooni-incoming/"):
+    timer = Timer()
+    timer.start()
+    from pipeline.batch import sync_reports
+    sync_reports.run(src_dir=src, dst_dir=dst)
+    logger.info("sync_reports runtime: %s" % timer.stop())
 
 
 @task(setup_remote_syslog)
