@@ -16,7 +16,7 @@ assert config._runtime_found, "you probably need to 'cp invoke.yaml.example invo
 logger = setup_pipeline_logging(config)
 
 os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH") if os.environ.get("PYTHONPATH") else ""
-#os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
+os.environ["PYTHONPATH"] = ":".join(os.environ["PYTHONPATH"].split(":") + [config.core.ooni_pipeline_path])
 
 #def with_timer(func_to_wrap):
 #    @wraps(func_to_wrap)

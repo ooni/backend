@@ -5,6 +5,7 @@ import shutil
 import logging
 
 from dateutil.parser import parse as date_parse
+import datetime
 
 import luigi
 import luigi.worker
@@ -71,7 +72,7 @@ class MoveAndBinReport(luigi.Task):
                 df_version="v1",
                 ext=ext.replace(".gz", "").replace(".yamloo", ".yaml")
             )
-            uri = os.path.join(self.dst, date.strftime("%Y-%m-%d"), filename)
+            uri = os.path.join(self.dst, datetime.date.today().isoformat(), filename)
         except Exception:
             uri = os.path.join(self.dst, "failed", os.path.basename(self.src))
         finally:
