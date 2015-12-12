@@ -34,7 +34,7 @@ def _local_walker(recursive=True):
                     yield os.path.join(root, filename)
         else:
             for path in os.listdir(directory):
-                yield os.path.join(directory, filename)
+                yield os.path.join(directory, path)
     return _walk_local_directory
 
 
@@ -96,9 +96,17 @@ def list_report_files(directory, aws_access_key_id=None,
 def get_imported_dates(directory, aws_access_key_id=None,
                        aws_secret_access_key=None):
 
-    walker = _s3_walker(aws_access_key_id=aws_access_key_id,
-                        aws_secret_access_key=aws_secret_access_key,
-                        recursive=False)
+    if directory.startswith("s3n://"):
+        walker = _s3_walker(aws_access_key_id=aws_access_key_id,
+                            aws_secret_access_key=aws_secret_access_key,
+                            recursive=False)
+    elif directory.startswith("ssh://"):
+        walker = _ssh_walker(directory, key_file=key_file,
+                             no_host_key_check=no_host_key_check,
+                             recursive=False)
+    else:
+        walker = _local_walker(recursive=False)
+
     dates = []
     for listing in walker(directory):
         if listing.endswith(".json"):
