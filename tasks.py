@@ -135,6 +135,15 @@ def add_headers_to_db(ctx, date_interval, workers=16,
 
 
 @task
+def bins_to_sanitised_streams(ctx, unsanitised_dir, sanitised_dir,
+                              date_interval, workers):
+    from pipeline.batch import bins_to_sanitised_streams
+    bins_to_sanitised_streams.run(unsanitised_dir=unsanitised_dir,
+                                  sanitised_dir=sanitised_dir,
+                                  date_interval=date_interval,
+                                  workers=workers)
+
+@task
 def spark_submit(ctx, script,
                  spark_submit="/home/hadoop/spark/bin/spark-submit"):
     timer = Timer()
@@ -158,4 +167,4 @@ def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/stre
 
 
 ns = Collection(move_and_bin_reports, generate_streams, list_reports, clean_streams,
-                add_headers_to_db, spark_apps, spark_submit)
+                spark_apps, spark_submit, bins_to_sanitised_streams)
