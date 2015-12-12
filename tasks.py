@@ -52,46 +52,6 @@ master: {spark_master}
            kafka_hosts=config.kafka.hosts,
            spark_master=config.spark.master,
            spark_submit=config.spark.spark_submit))
-    with open("logging.cfg", "w") as fw:
-        fw.write("""[loggers]
-keys=root,ooni-pipeline,luigi-interface
-
-[handlers]
-keys=stream_handler,file_handler
-
-[formatters]
-keys=formatter
-
-[logger_root]
-level={loglevel}
-handlers=
-
-[logger_luigi-interface]
-level=WARNING
-handlers=stream_handler,file_handler
-qualname=luigi-interface
-
-[logger_ooni-pipeline]
-level={loglevel}
-handlers=stream_handler,file_handler
-qualname=ooni-pipeline
-
-[handler_stream_handler]
-class=StreamHandler
-level={loglevel}
-formatter=formatter
-args=(sys.stdout,)
-
-[handler_file_handler]
-class=FileHandler
-level={loglevel}
-formatter=formatter
-args=('{logfile}',)
-
-[formatter_formatter]
-""".format(loglevel=config.logging.level, logfile=config.logging.filename))
-        fw.write("format=%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        fw.write("\n")
 
 _create_cfg_files()
 
