@@ -174,17 +174,6 @@ def add_headers_to_db(ctx, date_interval, workers=16,
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
 
-#@with_timer
-@task
-def move_reports(ctx, src="ssh://root@bouncer.infra.ooni.nu/data/bouncer/archive",
-                 dst="s3n://ooni-incoming/"):
-    timer = Timer()
-    timer.start()
-    from pipeline.batch import move_reports
-    move_reports.run(src_dir=src, dst_dir=dst)
-    logger.info("move_reports runtime: %s" % timer.stop())
-
-
 @task
 def spark_submit(ctx, script,
                  spark_submit="/home/hadoop/spark/bin/spark-submit"):
@@ -209,4 +198,4 @@ def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/stre
 
 
 ns = Collection(move_and_bin_reports, generate_streams, list_reports, clean_streams,
-                add_headers_to_db, move_reports, spark_apps, spark_submit)
+                add_headers_to_db, spark_apps, spark_submit)
