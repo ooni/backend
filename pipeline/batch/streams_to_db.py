@@ -35,8 +35,8 @@ class StreamToDb:
     #  %(test_keys)s);'
     # then we can pass that template string to psycopg2 along with a dict
     # and it will do the interpolation/conversion.
-    def __init__(self, stream_path):
-        self.stream_path = stream_path
+    def __init__(self, stream):
+        self.stream = stream
 	self.insert_template = "INSERT INTO %s (" % str(config.postgres.table)
 	self.insert_template += ", ".join([col[0] for col in self.columns]) + ") "
 	self.insert_template += "VALUES ("
@@ -67,19 +67,17 @@ class StreamToDb:
         return record
 
     def run(self):
-        stream = get_luigi_target(self.stream_path)
         conn = psycopg2.connect(host = str(config.postgres.host),
                               database = str(config.postgres.database),
                               user = str(config.postgres.username),
                               password = str(config.postgres.password))
         cursor = conn.cursor()
         try:
-            with stream.open('r') as stream:
-                for line in stream:
-                    record = json_loads(line.strip('\n'))
-                    if record["record_type"] == "entry":
-                        cursor.execute(self.insert_template,
-                                        self.format_record(record))
+            for line in self.stream:
+                record = json_loads(line.strip('\n'))
+                if record["record_type"] == "entry":
+                    cursor.execute(self.insert_template,
+                                    self.format_record(record))
             conn.commit() # commit changes if no exception
         finally:
             cursor.close()
@@ -90,9 +88,12 @@ def run(streams_dir, date_interval):
     interval = get_date_interval(date_interval)
     for date in interval:
 	stream_path = os.path.join(streams_dir, date.isoformat() + ".json")
-	print "opening stream '%s'" % stream_path
         try:
-            StreamToDb(stream_path).run()
+            stream_target = get_luigi_target(stream_path)
+            with stream_target.open('r') as stream:
+                StreamToDb(stream).run()
+        except IOError:
+            continue
         except Exception:
             print "failed: '%s'" % stream_path
             print traceback.format_exc()
