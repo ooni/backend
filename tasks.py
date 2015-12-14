@@ -133,6 +133,10 @@ def add_headers_to_db(ctx, date_interval, workers=16,
                         dst_public=dst_public)
     logger.info("add_headers_to_db runtime: %s" % timer.stop())
 
+@task
+def streams_to_db(ctx, streams_dir, date_interval):
+    from pipeline.batch import streams_to_db
+    streams_to_db.run(streams_dir=streams_dir, date_interval=date_interval)
 
 @task
 def bins_to_sanitised_streams(ctx, unsanitised_dir, sanitised_dir,
@@ -167,4 +171,4 @@ def spark_apps(ctx, date_interval, src="s3n://ooni-public/reports-sanitised/stre
 
 
 ns = Collection(move_and_bin_reports, generate_streams, list_reports, clean_streams,
-                spark_apps, spark_submit, bins_to_sanitised_streams)
+                spark_apps, spark_submit, bins_to_sanitised_streams, streams_to_db)

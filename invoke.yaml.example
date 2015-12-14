@@ -19,7 +19,7 @@ postgres:
   database: "report"
   username: "ooni"
   password: ""
-  table: "headers"
+  table: "metrics"
 celery:
   broker_url: ""
   result_backend: ""
