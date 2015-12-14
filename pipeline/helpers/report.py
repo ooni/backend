@@ -9,6 +9,12 @@ import traceback
 from datetime import datetime
 
 import yaml
+# dns_consistency tests use [8.8.8.8, 53] as key in a dict
+def construct_yaml_map(loader, node):
+    pairs = [(str(key) if isinstance(key, list) else key, value)
+            for (key, value) in loader.construct_pairs(node, deep=True)]
+    return dict(pairs)
+yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:map', construct_yaml_map)
 from pipeline.helpers import sanitise
 
 logger = logging.getLogger('ooni-pipeline')
