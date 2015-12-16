@@ -16,20 +16,14 @@ class Sanitisers(object):
         return entry
 
     def scapy_template(self, entry):
-        if 'answered_packets' in entry:
-            for packet_entry in entry['answered_packets']:
-                try:
-                    packet_entry[0]['raw_packet'] = \
-                        packet_entry[0]['raw_packet'].encode('hex')
-                except IndexError:
-                    continue
-        if 'sent_packets' in entry:
-            for packet_entry in entry['sent_packets']:
-                try:
-                    packet_entry[0]['raw_packet'] = \
-                        packet_entry[0]['raw_packet'].encode('hex')
-                except IndexError:
-                    continue
+        for packets_type in ['answered_packets', 'sent_packets']:
+            if packets_type in entry:
+                for packet_entry in entry['answered_packets']:
+                    try:
+                        packet_entry[0]['raw_packet'] = \
+                            packet_entry[0]['raw_packet'].encode('hex')
+                    except IndexError:
+                        continue
         return entry
 
     def dns_template(self, entry):
