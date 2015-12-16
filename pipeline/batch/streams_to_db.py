@@ -71,15 +71,25 @@ class StreamToDb:
                               database = str(config.postgres.database),
                               user = str(config.postgres.username),
                               password = str(config.postgres.password))
+        conn.autocommit = True
         cursor = conn.cursor()
         try:
+            good_entry_no = 0
+            bad_entry_no = 0
             for line in self.stream:
                 record = json_loads(line.strip('\n'))
                 if record["record_type"] == "entry":
-                    cursor.execute(self.insert_template,
-                                    self.format_record(record))
-            conn.commit() # commit changes if no exception
+                    try:
+                        cursor.execute(self.insert_template,
+                                        self.format_record(record))
+                        good_entry_no += 1
+                    except Exception:
+                        bad_entry_no += 1
+                        print "FAILED"
+                        print traceback.format_exc()
         finally:
+            print "successful entries: %s" % str(good_entry_no)
+            print "failed entries: %s" % str(bad_entry_no)
             cursor.close()
             conn.close()
 	

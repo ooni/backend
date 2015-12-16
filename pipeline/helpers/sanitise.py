@@ -13,6 +13,19 @@ class Sanitisers(object):
 
     def http_requests(self, entry):
         entry['test_name'] = 'http_requests'
+        for request in entry['requests']:
+            try:
+                print("type")
+                print(type(request['response']['body']))
+                request['response']['body'] = \
+                    request['response']['body'].decode('ascii', 'ignore')
+            except UnicodeEncodeError:
+                request['response']['body'] = \
+                    request['response']['body'].encode('ascii', 'ignore')
+            except KeyError:
+                continue
+            except AttributeError:
+                continue
         return entry
 
     def scapy_template(self, entry):
