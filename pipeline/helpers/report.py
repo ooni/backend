@@ -140,7 +140,10 @@ class Report(object):
         }
 
     def process_header(self, report):
-        self._raw_header = report.next()
+        try:
+            self._raw_header = report.next()
+        except StopIteration:
+            return
         self._raw_header["record_type"] = "header"
         self._raw_header["report_filename"] = self.filename
 
