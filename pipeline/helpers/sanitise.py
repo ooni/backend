@@ -15,16 +15,20 @@ class Sanitisers(object):
         entry['test_name'] = 'http_requests'
         for request in entry['requests']:
             try:
-                print("type")
-                print(type(request['response']['body']))
                 request['response']['body'] = \
                     request['response']['body'].decode('ascii', 'ignore')
+                content_length = filter(lambda (first, _): \
+                    first == 'Content-Length',
+                    request['response']['headers'] )[0][1][0]
+                request['response_length'] = content_length
             except UnicodeEncodeError:
                 request['response']['body'] = \
                     request['response']['body'].encode('ascii', 'ignore')
             except KeyError:
                 continue
             except AttributeError:
+                continue
+            except IndexError:
                 continue
         return entry
 
