@@ -22,7 +22,10 @@ class StreamToDb:
         ('test_start_time', 'TIMESTAMP'),
         ('test_runtime', 'REAL'),
         ('test_helpers', 'JSONB'),
-        ('test_keys', 'JSONB')
+        ('test_keys', 'JSONB'),
+        ('software_name', 'TEXT'),
+        ('software_version', 'TEXT'),
+        ('test_version', 'TEXT')
     ]
     # there's got to be a better way to insert a row from a dictionary
     # keyed by the column names... insert_template should look like:
