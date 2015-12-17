@@ -135,8 +135,11 @@ def add_headers_to_db(ctx, date_interval, workers=16,
 
 @task
 def streams_to_db(ctx, streams_dir, date_interval):
+    timer = Timer()
+    timer.start()
     from pipeline.batch import streams_to_db
     streams_to_db.run(streams_dir=streams_dir, date_interval=date_interval)
+    print("streams_to_db runtime: %s" % timer.stop())
 
 @task
 def bins_to_sanitised_streams(ctx, unsanitised_dir, sanitised_dir,

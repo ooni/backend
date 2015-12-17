@@ -48,6 +48,7 @@ class StreamToDb:
 
 	self.create_table_string = "CREATE TABLE %s (" % str(config.postgres.table)
 	self.create_table_string += ", ".join("%s %s" % ct for ct in self.columns)
+	self.create_table_string += ", PRIMARY KEY (report_id, input)"
 	self.create_table_string += ");"
 
     def format_record(self, entry):
@@ -82,13 +83,31 @@ class StreamToDb:
             for line in self.stream:
                 record = json_loads(line.strip('\n'))
                 if record["record_type"] == "entry":
+                    formatted_record = self.format_record(record)
                     try:
                         cursor.execute(self.insert_template,
-                                        self.format_record(record))
+                                       formatted_record)
                         good_entry_no += 1
+                    except psycopg2.DataError:
+                        try:
+                            for request in formatted_record['requests']:
+                                formatted_request['response'].pop('body')
+                            cursor.execute(self.insert_template,
+                                            formatted_record)
+                            good_entry_no += 1
+                        except KeyError:
+                            pass
+                        except Exception:
+                            bad_entry_no += 1
+                            print "FAILED"
+                            print self.format_record(record)
+                            print record
+                            print traceback.format_exc()
                     except Exception:
                         bad_entry_no += 1
                         print "FAILED"
+                        print "successful entries: %s" % str(good_entry_no)
+                        print "failed entries: %s" % str(bad_entry_no)
                         print traceback.format_exc()
         finally:
             print "successful entries: %s" % str(good_entry_no)
