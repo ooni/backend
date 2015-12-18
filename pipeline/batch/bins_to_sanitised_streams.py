@@ -16,9 +16,10 @@ config = Config(runtime_path="invoke.yaml")
 
 
 class SanitiseAndAggregateBin():
-    def __init__(self, bin_dir, sanitised_stream_path):
+    def __init__(self, bin_dir, sanitised_stream_path, bridge_db):
         self.bin_dir = bin_dir
         self.sanitised_stream_path = sanitised_stream_path
+        self.bridge_db = bridge_db
 
     def run(self):
         sanitised_stream = get_luigi_target(self.sanitised_stream_path)
@@ -29,15 +30,15 @@ class SanitiseAndAggregateBin():
                                             config.aws.secret_access_key):
                 input_file = get_luigi_target(filename)
                 with input_file.open('r') as in_file:
-                    report = Report(in_file, bridge_db, input_file.path)
+                    report = Report(in_file, self.bridge_db, input_file.path)
                     for sanitised_entry, _ in report.entries():
                         sanitised_stream.write(json_dumps(sanitised_entry))
                         sanitised_stream.write("\n")
 
-def wrapAggregator(bin_dir, sanitised_dir):
+def wrapAggregator(bin_dir, sanitised_dir, bridge_db):
     try:
         print "starting '%s' -> '%s'" % (bin_dir, sanitised_dir)
-        SanitiseAndAggregateBin(bin_dir, sanitised_dir).run()
+        SanitiseAndAggregateBin(bin_dir, sanitised_dir, bridge_db).run()
     except Exception:
         print "failed '%s' -> '%s'" % (bin_dir, sanitised_dir)
         print traceback.format_exc()
@@ -56,8 +57,6 @@ def wrapAggregator(bin_dir, sanitised_dir):
 #         |-- 2012-01-01.json
 #         `-- 2012-01-02.json
 
-bridge_db = {}
-
 def run(unsanitised_dir, sanitised_dir, date_interval, workers):
     p = Pool(processes=int(workers))
 
@@ -70,7 +69,7 @@ def run(unsanitised_dir, sanitised_dir, date_interval, workers):
 	sanitised_stream_path = os.path.join(sanitised_dir,
 		'json', "%s.json" % date.isoformat())
 	print "queueing '%s' -> '%s'" % (bin_dir, sanitised_stream_path)
-        p.apply_async(wrapAggregator, args=(bin_dir, sanitised_stream_path))
+        p.apply_async(wrapAggregator, args=(bin_dir, sanitised_stream_path, bridge_db))
     p.close()
     p.join()
 
