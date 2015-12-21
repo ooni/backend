@@ -10,6 +10,7 @@ config = Config(runtime_path="invoke.yaml")
 
 class StreamToDb:
     columns = [
+        ('id', 'UUID PRIMARY KEY DEFAULT gen_random_uuid()'),
         ('input', 'TEXT'),
         ('report_id', 'TEXT'),
         ('report_filename', 'TEXT'),
@@ -48,7 +49,7 @@ class StreamToDb:
 
         self.create_table_string = "CREATE TABLE %s (" % str(config.postgres.table)
         self.create_table_string += ", ".join("%s %s" % ct for ct in self.columns)
-        self.create_table_string += ", PRIMARY KEY (report_id, input)"
+        self.create_table_string += ", PRIMARY KEY (id)"
         self.create_table_string += ");"
 
     def format_record(self, entry):
