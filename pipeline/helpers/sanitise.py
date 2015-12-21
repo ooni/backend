@@ -3,6 +3,11 @@ from __future__ import absolute_import, print_function, unicode_literals
 import re
 import hashlib
 
+def fix_body(body):
+    try:
+        return body.decode('ascii', 'ignore')
+    except UnicodeEncodeError:
+        return body.encode('ascii', 'ignore')
 
 class Sanitisers(object):
     def __init__(self, bridge_db):
@@ -13,23 +18,39 @@ class Sanitisers(object):
 
     def http_requests(self, entry):
         entry['test_name'] = 'http_requests'
+        experiment_requests = []
+        control_requests = []
+
         for request in entry['requests']:
             try:
-                request['response']['body'] = \
-                    request['response']['body'].decode('ascii', 'ignore')
+                request['response']['body'] = fix_body(request['response']['body'])
+                if request['url'].startswith('shttp'):
+                    request['tor'] = {'is_tor': True}
+                if request['tor']['is_tor'] == True:
+                    control_requests.append(request)
+                else:
+                    experiment_requests.append(request)
                 content_length = filter(lambda (first, _): \
                     first == 'Content-Length',
-                    request['response']['headers'] )[0][1][0]
+                    request['response']['headers'])[0][1][0]
                 request['response_length'] = content_length
-            except UnicodeEncodeError:
-                request['response']['body'] = \
-                    request['response']['body'].encode('ascii', 'ignore')
             except KeyError:
                 continue
             except AttributeError:
                 continue
             except IndexError:
                 continue
+        entry['requests'] = []
+        try:
+            entry['requests'].append(experiment_requests.pop(0))
+        except IndexError:
+            pass
+        try:
+            entry['requests'].append(control_requests.pop(0))
+        except IndexError:
+            pass
+        entry['requests'] += experiment_requests
+        entry['requests'] += control_requests
         return entry
 
     def scapy_template(self, entry):
