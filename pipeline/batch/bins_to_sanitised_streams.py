@@ -1,7 +1,5 @@
 import os
-import time
 import json
-import logging
 import traceback
 
 from multiprocessing import Pool
@@ -9,7 +7,7 @@ from multiprocessing import Pool
 from invoke.config import Config
 
 from pipeline.helpers.report import Report
-from pipeline.helpers.util import json_dumps, yaml_dump, get_date_interval
+from pipeline.helpers.util import json_dumps, get_date_interval
 from pipeline.helpers.util import list_report_files, get_luigi_target
 
 config = Config(runtime_path="invoke.yaml")
@@ -65,10 +63,10 @@ def run(unsanitised_dir, sanitised_dir, date_interval, workers):
 
     interval = get_date_interval(date_interval)
     for date in interval:
-	bin_dir = os.path.join(unsanitised_dir, 'yaml', date.isoformat())
-	sanitised_stream_path = os.path.join(sanitised_dir,
-		'json', "%s.json" % date.isoformat())
-	print "queueing '%s' -> '%s'" % (bin_dir, sanitised_stream_path)
+        bin_dir = os.path.join(unsanitised_dir, 'yaml', date.isoformat())
+        sanitised_stream_path = os.path.join(sanitised_dir,
+                                             'json', "%s.json" % date.isoformat())
+        print "queueing '%s' -> '%s'" % (bin_dir, sanitised_stream_path)
         p.apply_async(wrapAggregator, args=(bin_dir, sanitised_stream_path, bridge_db))
     p.close()
     p.join()

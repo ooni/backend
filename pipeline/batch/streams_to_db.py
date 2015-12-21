@@ -40,16 +40,16 @@ class StreamToDb:
     # and it will do the interpolation/conversion.
     def __init__(self, stream):
         self.stream = stream
-	self.insert_template = "INSERT INTO %s (" % str(config.postgres.table)
-	self.insert_template += ", ".join([col[0] for col in self.columns]) + ") "
-	self.insert_template += "VALUES ("
-	self.insert_template += ", ".join(["%%(%s)s" % col[0] for col in self.columns])
-	self.insert_template += ");"
+        self.insert_template = "INSERT INTO %s (" % str(config.postgres.table)
+        self.insert_template += ", ".join([col[0] for col in self.columns]) + ") "
+        self.insert_template += "VALUES ("
+        self.insert_template += ", ".join(["%%(%s)s" % col[0] for col in self.columns])
+        self.insert_template += ");"
 
-	self.create_table_string = "CREATE TABLE %s (" % str(config.postgres.table)
-	self.create_table_string += ", ".join("%s %s" % ct for ct in self.columns)
-	self.create_table_string += ", PRIMARY KEY (report_id, input)"
-	self.create_table_string += ");"
+        self.create_table_string = "CREATE TABLE %s (" % str(config.postgres.table)
+        self.create_table_string += ", ".join("%s %s" % ct for ct in self.columns)
+        self.create_table_string += ", PRIMARY KEY (report_id, input)"
+        self.create_table_string += ");"
 
     def format_record(self, entry):
         record = {}
@@ -64,10 +64,10 @@ class StreamToDb:
                     test_start_time = None
                 record[col_name] = test_start_time
             elif col_type == 'JSONB':
-		record[col_name] = json_dumps(entry.pop(col_name, None))
+                record[col_name] = json_dumps(entry.pop(col_name, None))
             else:
-		record[col_name] = entry.pop(col_name, None)
-	record['test_keys'] = json_dumps(entry)
+                record[col_name] = entry.pop(col_name, None)
+        record['test_keys'] = json_dumps(entry)
         return record
 
     def run(self):
@@ -90,8 +90,8 @@ class StreamToDb:
                         good_entry_no += 1
                     except psycopg2.DataError:
                         try:
-                            for request in formatted_record['requests']:
-                                formatted_request['response'].pop('body')
+                            for idx, request in enumerate(formatted_record['requests']):
+                                formatted_record['requests'][idx]['response'].pop('body')
                             cursor.execute(self.insert_template,
                                             formatted_record)
                             good_entry_no += 1
@@ -114,12 +114,12 @@ class StreamToDb:
             print "failed entries: %s" % str(bad_entry_no)
             cursor.close()
             conn.close()
-	
+
 
 def run(streams_dir, date_interval):
     interval = get_date_interval(date_interval)
     for date in interval:
-	stream_path = os.path.join(streams_dir, date.isoformat() + ".json")
+        stream_path = os.path.join(streams_dir, date.isoformat() + ".json")
         try:
             stream_target = get_luigi_target(stream_path)
             with stream_target.open('r') as stream:
