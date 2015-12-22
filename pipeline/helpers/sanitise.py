@@ -10,10 +10,10 @@ def fix_body(body):
         return body.encode('ascii', 'ignore')
 
 def fix_headers(headers):
-    fixed_headers = []
+    fixed_headers = {}
     for name, values in headers:
         for v in values:
-            fixed_headers.append([name, v])
+            fixed_headers[name] = v
     return fixed_headers
 
 class Sanitisers(object):
