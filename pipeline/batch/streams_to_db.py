@@ -66,6 +66,8 @@ class StreamToDb:
                 except KeyError:
                     test_start_time = None
                 record[col_name] = test_start_time
+            elif col_name == 'id':
+                record[col_name] = "DEFAULT"
             elif col_type == 'JSONB':
                 record[col_name] = json_dumps(entry.pop(col_name, None))
             else:
