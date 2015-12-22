@@ -46,8 +46,8 @@ class StreamToDb:
         self.stream = stream
         self.insert_entry_template = "INSERT INTO %s (" % str(config.postgres.table)
         self.insert_entry_template += ", ".join([col[0] for col in self.columns]) + ") "
-        self.insert_entry_template += "VALUES ("
-        self.insert_entry_template += ", ".join(["%%(%s)s" % col[0] for col in self.columns])
+        self.insert_entry_template += "VALUES (DEFAULT, "
+        self.insert_entry_template += ", ".join(["%%(%s)s" % col[0] for col in self.columns[1:]])
         self.insert_entry_template += ");"
 
         self.create_table_string = "CREATE TABLE %s (" % str(config.postgres.table)
@@ -67,7 +67,7 @@ class StreamToDb:
                     test_start_time = None
                 record[col_name] = test_start_time
             elif col_name == 'id':
-                record[col_name] = "DEFAULT"
+                continue
             elif col_type == 'JSONB':
                 record[col_name] = json_dumps(entry.pop(col_name, None))
             else:
