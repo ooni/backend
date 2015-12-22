@@ -90,13 +90,13 @@ class StreamToDb:
     def insert_entry(self, record):
         formatted_record = self.format_record(record)
         try:
-            self.conn.cursor().execute(self.insert_template, formatted_record)
+            self.conn.cursor().execute(self.insert_entry_template, formatted_record)
             self.good_entries += 1
         except psycopg2.DataError:
             try:
                 for idx, request in enumerate(formatted_record['requests']):
                     formatted_record['requests'][idx]['response'].pop('body')
-                    self.conn.cursor().execute(self.insert_template,
+                    self.conn.cursor().execute(self.insert_entry_template,
                                                formatted_record)
                     self.good_entries += 1
             except KeyError:
@@ -117,9 +117,9 @@ class StreamToDb:
         for idx in indexes:
             try:
                 # Tests for existence of the index: http://dba.stackexchange.com/a/35626
-                self.conn.cursor().execute("SELECT 'public.%{idx}_idx'::regclass".format(idx=idx))
+                self.conn.cursor().execute("SELECT 'public.{idx}_idx'::regclass".format(idx=idx))
             except psycopg2.ProgrammingError:
-                self.conn.cursor().execute("CREATE INDEX %{idx}_idx ON metrics (%{idx})".format(idx=idx))
+                self.conn.cursor().execute("CREATE INDEX {idx}_idx ON metrics ({idx})".format(idx=idx))
 
     def update_views(self):
         try:
