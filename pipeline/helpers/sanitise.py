@@ -26,6 +26,8 @@ class Sanitisers(object):
                 request['response']['body'] = fix_body(request['response']['body'])
                 if request['url'].startswith('shttp'):
                     request['tor'] = {'is_tor': True}
+                else:
+                    request['tor'] = {'is_tor': False}
                 if request['tor']['is_tor'] == True:
                     control_requests.append(request)
                 else:

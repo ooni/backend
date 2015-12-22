@@ -72,6 +72,7 @@ class StreamToDb:
                 record[col_name] = json_dumps(entry.pop(col_name, None))
             else:
                 record[col_name] = entry.pop(col_name, None)
+        record.pop('entry_type', None)
         record['test_keys'] = json_dumps(entry)
         return record
 
@@ -98,9 +99,8 @@ class StreamToDb:
             try:
                 for idx, request in enumerate(formatted_record['requests']):
                     formatted_record['requests'][idx]['response'].pop('body')
-                    self.conn.cursor().execute(self.insert_entry_template,
-                                               formatted_record)
-                    self.good_entries += 1
+                self.conn.cursor().execute(self.insert_entry_template, formatted_record)
+                self.good_entries += 1
             except KeyError:
                 pass
             except Exception:
