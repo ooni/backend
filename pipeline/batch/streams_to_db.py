@@ -108,7 +108,26 @@ class StreamToDb:
             self.failed_entry(record)
 
     def create_table(self):
-        self.conn.cursor().execute(self.create_table_string)
+        cur = self.conn.cursor()
+        cur.execute("SELECT relname FROM pg_class WHERE relname='metrics';")
+        if cur.rowcount == 0:
+            self.conn.cursor().execute(self.create_table_string)
+
+    def create_indexes(self):
+        indexes = ["probe_cc", "input", "test_name"]
+        for idx in indexes:
+            try:
+                # Tests for existence of the index: http://dba.stackexchange.com/a/35626
+                self.conn.cursor().execute("SELECT 'public.%{idx}_idx'::regclass".format(idx=idx))
+            except psycopg2.ProgrammingError:
+                self.conn.cursor().execute("CREATE INDEX %{idx}_idx ON metrics (%{idx})".format(idx=idx))
+
+    def update_views(self):
+        try:
+            self.conn.cursor().execute("SELECT 'public.country_counts_view'::regclass")
+            self.conn.cursor().execute("REFRESH MATERIALIZED VIEW country_counts_view")
+        except psycopg2.ProgrammingError:
+            self.conn.cursor().execute('CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc, count(probe_cc) FROM metrics GROUP BY probe_cc;')
 
     def run(self):
         self.connect()
@@ -121,6 +140,8 @@ class StreamToDb:
         finally:
             print "successful entries: %s" % self.good_entries
             print "failed entries: %s" % self.bad_entries
+            self.create_indexes()
+            self.update_views()
             self.conn.close()
 
 def run(streams_dir, date_interval):
