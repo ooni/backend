@@ -112,7 +112,8 @@ def clean_streams(ctx, dst_private="s3n://ooni-private/",
     paths_to_delete = (
         os.path.join(dst_private, "reports-raw", "streams"),
         os.path.join(dst_public, "reports-sanitised", "yaml"),
-        os.path.join(dst_public, "reports-sanitised", "streams")
+        os.path.join(dst_public, "reports-sanitised", "streams"),
+        os.path.join(dst_public, "json")
     )
     for path in paths_to_delete:
         target = get_luigi_target(path)
