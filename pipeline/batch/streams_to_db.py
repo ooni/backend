@@ -40,12 +40,15 @@ class StreamToDb:
     # then we can pass that template string to psycopg2 along with a dict
     # and it will do the interpolation/conversion.
     def __init__(self, stream):
+        self.good_entries = 0
+        self.bad_entries = 0
+
         self.stream = stream
-        self.insert_template = "INSERT INTO %s (" % str(config.postgres.table)
-        self.insert_template += ", ".join([col[0] for col in self.columns]) + ") "
-        self.insert_template += "VALUES ("
-        self.insert_template += ", ".join(["%%(%s)s" % col[0] for col in self.columns])
-        self.insert_template += ");"
+        self.insert_entry_template = "INSERT INTO %s (" % str(config.postgres.table)
+        self.insert_entry_template += ", ".join([col[0] for col in self.columns]) + ") "
+        self.insert_entry_template += "VALUES ("
+        self.insert_entry_template += ", ".join(["%%(%s)s" % col[0] for col in self.columns])
+        self.insert_entry_template += ");"
 
         self.create_table_string = "CREATE TABLE %s (" % str(config.postgres.table)
         self.create_table_string += ", ".join("%s %s" % ct for ct in self.columns)
@@ -71,51 +74,54 @@ class StreamToDb:
         record['test_keys'] = json_dumps(entry)
         return record
 
-    def run(self):
-        conn = psycopg2.connect(host = str(config.postgres.host),
-                              database = str(config.postgres.database),
-                              user = str(config.postgres.username),
-                              password = str(config.postgres.password))
-        conn.autocommit = True
-        cursor = conn.cursor()
+    def failed_entry(self, record):
+        self.bad_entries += 1
+        print "FAILED"
+        print self.format_record(record)
+        print record
+        print traceback.format_exc()
+
+    def connect(self):
+        self.conn = psycopg2.connect(host=str(config.postgres.host),
+                                database=str(config.postgres.database),
+                                user=str(config.postgres.username),
+                                password=str(config.postgres.password))
+        self.conn.autocommit = True
+
+    def insert_entry(self, record):
+        formatted_record = self.format_record(record)
         try:
-            good_entry_no = 0
-            bad_entry_no = 0
+            self.conn.cursor().execute(self.insert_template, formatted_record)
+            self.good_entries += 1
+        except psycopg2.DataError:
+            try:
+                for idx, request in enumerate(formatted_record['requests']):
+                    formatted_record['requests'][idx]['response'].pop('body')
+                    self.conn.cursor().execute(self.insert_template,
+                                               formatted_record)
+                    self.good_entries += 1
+            except KeyError:
+                pass
+            except Exception:
+                self.failed_entry(record)
+        except Exception:
+            self.failed_entry(record)
+
+    def create_table(self):
+        self.conn.cursor().execute(self.create_table_string)
+
+    def run(self):
+        self.connect()
+        self.create_table()
+        try:
             for line in self.stream:
                 record = json_loads(line.strip('\n'))
                 if record["record_type"] == "entry":
-                    formatted_record = self.format_record(record)
-                    try:
-                        cursor.execute(self.insert_template,
-                                       formatted_record)
-                        good_entry_no += 1
-                    except psycopg2.DataError:
-                        try:
-                            for idx, request in enumerate(formatted_record['requests']):
-                                formatted_record['requests'][idx]['response'].pop('body')
-                            cursor.execute(self.insert_template,
-                                            formatted_record)
-                            good_entry_no += 1
-                        except KeyError:
-                            pass
-                        except Exception:
-                            bad_entry_no += 1
-                            print "FAILED"
-                            print self.format_record(record)
-                            print record
-                            print traceback.format_exc()
-                    except Exception:
-                        bad_entry_no += 1
-                        print "FAILED"
-                        print "successful entries: %s" % str(good_entry_no)
-                        print "failed entries: %s" % str(bad_entry_no)
-                        print traceback.format_exc()
+                    self.insert_entry(record)
         finally:
-            print "successful entries: %s" % str(good_entry_no)
-            print "failed entries: %s" % str(bad_entry_no)
-            cursor.close()
-            conn.close()
-
+            print "successful entries: %s" % self.good_entries
+            print "failed entries: %s" % self.bad_entries
+            self.conn.close()
 
 def run(streams_dir, date_interval):
     interval = get_date_interval(date_interval)
