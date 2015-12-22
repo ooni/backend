@@ -9,6 +9,13 @@ def fix_body(body):
     except UnicodeEncodeError:
         return body.encode('ascii', 'ignore')
 
+def fix_headers(headers):
+    fixed_headers = []
+    for name, values in headers:
+        for v in values:
+            fixed_headers.append([name, v])
+    return fixed_headers
+
 class Sanitisers(object):
     def __init__(self, bridge_db):
         self.bridge_db = bridge_db
@@ -22,26 +29,19 @@ class Sanitisers(object):
         control_requests = []
 
         for request in entry['requests']:
-            try:
-                request['response']['body'] = fix_body(request['response']['body'])
-                if request['url'].startswith('shttp'):
-                    request['tor'] = {'is_tor': True}
-                else:
-                    request['tor'] = {'is_tor': False}
-                if request['tor']['is_tor'] == True:
-                    control_requests.append(request)
-                else:
-                    experiment_requests.append(request)
-                content_length = filter(lambda (first, _): \
-                    first == 'Content-Length',
-                    request['response']['headers'])[0][1][0]
-                request['response_length'] = content_length
-            except KeyError:
-                continue
-            except AttributeError:
-                continue
-            except IndexError:
-                continue
+            request['response']['body'] = fix_body(request['response']['body'])
+            request['response']['headers'] = fix_headers(request['response']['headers'])
+            if request['url'].startswith('shttp'):
+                request['tor'] = {'is_tor': True}
+            else:
+                request['tor'] = {'is_tor': False}
+            for k, v in request['response']['headers']:
+                if k.lower() == 'content-length':
+                    request['response_length'] = v
+            if request['tor']['is_tor'] == True:
+                control_requests.append(request)
+            else:
+                experiment_requests.append(request)
         entry['requests'] = []
         try:
             entry['requests'].append(experiment_requests.pop(0))
