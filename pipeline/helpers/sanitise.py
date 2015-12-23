@@ -31,7 +31,10 @@ class Sanitisers(object):
         for request in entry['requests']:
             request['response']['body'] = fix_body(request['response']['body'])
             request['response']['headers'] = fix_headers(request['response']['headers'])
-            if request['request']['url'].startswith('shttp') or request['request'].get('tor') in [True, {'is_tor': True}]:
+            if request['request']['url'].startswith('shttp') or \
+                    request['request'].get('tor') == True or \
+                    (request['request'].get('tor') is not None
+                        and request['request']['tor'].get('is_tor') == True):
                 request['tor'] = {'is_tor': True}
             elif request['request'].get('tor') in [False, None, {'is_tor': False}]:
                 request['request']['tor'] = {'is_tor': False}
