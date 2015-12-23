@@ -31,8 +31,11 @@ class Sanitisers(object):
         control_requests = []
 
         for request in entry['requests']:
-            request['response']['body'] = fix_body(request['response']['body'])
-            request['response']['headers'] = fix_headers(request['response']['headers'])
+            if request.get('response') is not None:
+                request['response']['body'] = fix_body(request['response']['body'])
+                request['response']['headers'] = fix_headers(request['response']['headers'])
+            else:
+                request['response'] = {'body': None, 'headers': {}}
             if request['request']['url'].startswith('shttp') or \
                     request['request'].get('tor') == True or \
                     (request['request'].get('tor') not in [None, False]
