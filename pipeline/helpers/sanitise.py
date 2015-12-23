@@ -4,6 +4,8 @@ import re
 import hashlib
 
 def fix_body(body):
+    if body is None:
+        return None
     try:
         return body.decode('ascii', 'ignore')
     except UnicodeEncodeError:
@@ -33,7 +35,7 @@ class Sanitisers(object):
             request['response']['headers'] = fix_headers(request['response']['headers'])
             if request['request']['url'].startswith('shttp') or \
                     request['request'].get('tor') == True or \
-                    (request['request'].get('tor') is not None
+                    (request['request'].get('tor') not in [None, False]
                         and request['request']['tor'].get('is_tor') == True):
                 request['tor'] = {'is_tor': True}
             elif request['request'].get('tor') in [False, None, {'is_tor': False}]:
@@ -42,7 +44,7 @@ class Sanitisers(object):
                 print("Unable to detect if the request was done over tor or not")
                 print(request)
                 request['request']['tor'] = {'is_tor': False}
-            for k, v in request['response']['headers']:
+            for k, v in request['response']['headers'].items():
                 if k.lower() == 'content-length':
                     request['response_length'] = v
             if request['request']['tor']['is_tor'] == True:
