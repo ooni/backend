@@ -143,8 +143,10 @@ def streams_to_db(ctx, streams_dir, date_interval):
     print("streams_to_db runtime: %s" % timer.stop())
 
 @task
-def bins_to_sanitised_streams(ctx, unsanitised_dir, sanitised_dir,
-                              date_interval, workers):
+def bins_to_sanitised_streams(ctx, date_interval,
+                              unsanitised_dir="s3n://ooni-private/reports-raw/",
+                              sanitised_dir="s3n://ooni-public/",
+                              workers=36):
     from pipeline.batch import bins_to_sanitised_streams
     bins_to_sanitised_streams.run(unsanitised_dir=unsanitised_dir,
                                   sanitised_dir=sanitised_dir,
