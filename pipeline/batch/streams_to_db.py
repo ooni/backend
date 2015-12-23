@@ -8,6 +8,14 @@ from pipeline.helpers.util import json_dumps, get_date_interval
 from invoke.config import Config
 config = Config(runtime_path="invoke.yaml")
 
+def create_postgres_connection():
+    conn = psycopg2.connect(host=str(config.postgres.host),
+                            database=str(config.postgres.database),
+                            user=str(config.postgres.username),
+                            password=str(config.postgres.password))
+    conn.autocommit = True
+    return conn
+
 class StreamToDb:
     columns = [
         ('id', 'UUID PRIMARY KEY DEFAULT gen_random_uuid()'),
@@ -84,11 +92,7 @@ class StreamToDb:
         print traceback.format_exc()
 
     def connect(self):
-        self.conn = psycopg2.connect(host=str(config.postgres.host),
-                                database=str(config.postgres.database),
-                                user=str(config.postgres.username),
-                                password=str(config.postgres.password))
-        self.conn.autocommit = True
+        self.conn = create_postgres_connection()
 
     def insert_entry(self, record):
         formatted_record = self.format_record(record)
@@ -114,22 +118,6 @@ class StreamToDb:
         if cur.rowcount == 0:
             self.conn.cursor().execute(self.create_table_string)
 
-    def create_indexes(self):
-        indexes = ["probe_cc", "input", "test_name"]
-        for idx in indexes:
-            try:
-                # Tests for existence of the index: http://dba.stackexchange.com/a/35626
-                self.conn.cursor().execute("SELECT 'public.{idx}_idx'::regclass".format(idx=idx))
-            except psycopg2.ProgrammingError:
-                self.conn.cursor().execute("CREATE INDEX {idx}_idx ON metrics ({idx})".format(idx=idx))
-
-    def update_views(self):
-        try:
-            self.conn.cursor().execute("SELECT 'public.country_counts_view'::regclass")
-            self.conn.cursor().execute("REFRESH MATERIALIZED VIEW country_counts_view")
-        except psycopg2.ProgrammingError:
-            self.conn.cursor().execute('CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc, count(probe_cc) FROM metrics GROUP BY probe_cc;')
-
     def run(self):
         self.connect()
         self.create_table()
@@ -141,9 +129,23 @@ class StreamToDb:
         finally:
             print "successful entries: %s" % self.good_entries
             print "failed entries: %s" % self.bad_entries
-            self.create_indexes()
-            self.update_views()
             self.conn.close()
+
+def create_indexes(conn):
+    indexes = ["probe_cc", "input", "test_name"]
+    for idx in indexes:
+        try:
+            # Tests for existence of the index: http://dba.stackexchange.com/a/35626
+            conn.cursor().execute("SELECT 'public.{idx}_idx'::regclass".format(idx=idx))
+        except psycopg2.ProgrammingError:
+            conn.cursor().execute("CREATE INDEX {idx}_idx ON metrics ({idx})".format(idx=idx))
+
+def update_views(conn):
+    try:
+        conn.cursor().execute("SELECT 'public.country_counts_view'::regclass")
+        conn.cursor().execute("REFRESH MATERIALIZED VIEW country_counts_view")
+    except psycopg2.ProgrammingError:
+        conn.cursor().execute('CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc, count(probe_cc) FROM metrics GROUP BY probe_cc;')
 
 def run(streams_dir, date_interval):
     interval = get_date_interval(date_interval)
@@ -160,4 +162,8 @@ def run(streams_dir, date_interval):
             print traceback.format_exc()
         else:
             print "succeeded: '%s'" % stream_path
+    conn = create_postgres_connection()
+    create_indexes(conn)
+    update_views(conn)
+    conn.close()
     print "done"

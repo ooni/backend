@@ -229,7 +229,7 @@ class Report(object):
                 break
             except Exception as exc:
                 self._end_time = time.time()
-                logger.error("failed to process the entry for %s" % self.filename)
-                logger.error(traceback.format_exc())
+                print("failed to process the entry for %s" % self.filename)
+                print(traceback.format_exc())
                 raise exc
         self._end_time = time.time()
