@@ -40,7 +40,7 @@ class Sanitisers(object):
                     request['request'].get('tor') == True or \
                     (request['request'].get('tor') not in [None, False]
                         and request['request']['tor'].get('is_tor') == True):
-                request['tor'] = {'is_tor': True}
+                request['request']['tor'] = {'is_tor': True}
             elif request['request'].get('tor') in [False, None, {'is_tor': False}]:
                 request['request']['tor'] = {'is_tor': False}
             else:
