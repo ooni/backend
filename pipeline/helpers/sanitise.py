@@ -31,9 +31,13 @@ class Sanitisers(object):
         for request in entry['requests']:
             request['response']['body'] = fix_body(request['response']['body'])
             request['response']['headers'] = fix_headers(request['response']['headers'])
-            if request['url'].startswith('shttp'):
+            if request['url'].startswith('shttp') or request.get('tor') in [True, {'is_tor': True}]:
                 request['tor'] = {'is_tor': True}
+            elif request.get('tor') in [False, None, {'is_tor': False}]:
+                request['tor'] = {'is_tor': False}
             else:
+                print("Unable to detect if the request was done over tor or not")
+                print(request)
                 request['tor'] = {'is_tor': False}
             for k, v in request['response']['headers']:
                 if k.lower() == 'content-length':
