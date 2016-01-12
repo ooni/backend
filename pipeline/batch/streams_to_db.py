@@ -132,7 +132,7 @@ class StreamToDb:
             self.conn.close()
 
 def create_indexes(conn):
-    indexes = ["probe_cc", "input", "test_name"]
+    indexes = ["probe_cc", "input", "test_name", "test_start_time"]
     for idx in indexes:
         try:
             # Tests for existence of the index: http://dba.stackexchange.com/a/35626
@@ -144,6 +144,9 @@ def update_views(conn):
     try:
         conn.cursor().execute("SELECT 'public.country_counts_view'::regclass")
         conn.cursor().execute("REFRESH MATERIALIZED VIEW country_counts_view")
+        conn.cursor().execute("REFRESH MATERIALIZED VIEW blockpage_count")
+        conn.cursor().execute("REFRESH MATERIALIZED VIEW blockpage_urls")
+        conn.cursor().execute("REFRESH MATERIALIZED VIEW identified_vendors")
     except psycopg2.ProgrammingError:
         conn.cursor().execute('CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc, count(probe_cc) FROM metrics GROUP BY probe_cc;')
 
