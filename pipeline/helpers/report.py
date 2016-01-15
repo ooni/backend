@@ -237,5 +237,6 @@ class Report(object):
                 self._end_time = time.time()
                 print("failed to process the entry for %s" % self.filename)
                 print(traceback.format_exc())
+                print(entry)
                 break
         self._end_time = time.time()
