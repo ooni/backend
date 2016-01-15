@@ -9,6 +9,12 @@ import traceback
 from datetime import datetime
 
 import yaml
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    print("To have performance gains you should install libyaml and build pyyaml"
+          " with the --with-libyaml option")
+    from yaml import Loader
 # dns_consistency tests use [8.8.8.8, 53] as key in a dict
 def construct_yaml_map(loader, node):
     pairs = [(str(key) if isinstance(key, list) else key, value)
@@ -120,7 +126,7 @@ class Report(object):
 
         self.in_file = in_file
         self.filename = os.path.basename(path)
-        self._report = yaml.safe_load_all(self.in_file)
+        self._report = yaml.load_all(self.in_file, Loader=Loader)
         self.process_header(self._report)
 
     def entries(self):
@@ -216,7 +222,7 @@ class Report(object):
         self.in_file.seek(0)
         for _ in xrange(self._skipped_line):
             self.in_file.readline()
-        self._report = yaml.safe_load_all(self.in_file)
+        self._report = yaml.load_all(self.in_file, Loader=Loader)
 
     def process(self):
         while True:
