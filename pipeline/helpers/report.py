@@ -228,7 +228,7 @@ class Report(object):
         while True:
             try:
                 entry = self._report.next()
-                if not entry:
+                if not entry or not isinstance(entry, dict):
                     continue
                 yield self.process_entry(entry)
             except StopIteration:
