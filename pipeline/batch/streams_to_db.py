@@ -34,7 +34,8 @@ class StreamToDb:
         ('test_keys', 'JSONB'),
         ('software_name', 'TEXT'),
         ('software_version', 'TEXT'),
-        ('test_version', 'TEXT')
+        ('test_version', 'TEXT'),
+        ('bucket_date', 'DATE')
     ]
     # there's got to be a better way to insert a row from a dictionary
     # keyed by the column names... insert_template should look like:
@@ -47,9 +48,10 @@ class StreamToDb:
     #  %(test_keys)s);'
     # then we can pass that template string to psycopg2 along with a dict
     # and it will do the interpolation/conversion.
-    def __init__(self, stream):
+    def __init__(self, stream, date):
         self.good_entries = 0
         self.bad_entries = 0
+        self.bucket_date = date
 
         self.stream = stream
         self.insert_entry_template = "INSERT INTO %s (" % str(config.postgres.table)
@@ -82,6 +84,7 @@ class StreamToDb:
                 record[col_name] = entry.pop(col_name, None)
         record.pop('entry_type', None)
         record['test_keys'] = json_dumps(entry)
+        record['bucket_date'] = self.bucket_date
         return record
 
     def failed_entry(self, record):
@@ -164,7 +167,7 @@ def run(streams_dir, date_interval):
         try:
             stream_target = get_luigi_target(stream_path)
             with stream_target.open('r') as stream:
-                StreamToDb(stream).run()
+                StreamToDb(stream, date.isoformat()).run()
         except IOError:
             continue
         except Exception:

@@ -1,12 +1,21 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
+from base64 import b64encode
 import re
 import hashlib
 
 def fix_body(body):
     if body is None:
         return None
-    return body.strip("\0")
+    body = body.strip("\0")
+    try:
+        body = unicode(body)
+    except:
+        body = {
+            "data": b64encode(body),
+            "format": "base64"
+        }
+    return body
 
 def fix_headers(headers):
     fixed_headers = {}
