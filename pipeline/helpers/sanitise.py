@@ -6,10 +6,7 @@ import hashlib
 def fix_body(body):
     if body is None:
         return None
-    try:
-        return body.decode('ascii', 'ignore')
-    except UnicodeEncodeError:
-        return body.encode('ascii', 'ignore')
+    return body.strip("\0")
 
 def fix_headers(headers):
     fixed_headers = {}

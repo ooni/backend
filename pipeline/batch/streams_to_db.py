@@ -18,7 +18,7 @@ def create_postgres_connection():
 
 class StreamToDb:
     columns = [
-        ('id', 'UUID PRIMARY KEY DEFAULT gen_random_uuid()'),
+        ('id', 'UUID PRIMARY KEY DEFAULT uuid_generate_v4()'),
         ('input', 'TEXT'),
         ('report_id', 'TEXT'),
         ('report_filename', 'TEXT'),
@@ -101,12 +101,14 @@ class StreamToDb:
             self.good_entries += 1
         except psycopg2.DataError:
             try:
-                for idx, request in enumerate(formatted_record['requests']):
-                    formatted_record['requests'][idx]['response'].pop('body')
+                test_keys = json_loads(formatted_record['test_keys'])
+                if not test_keys.get('requests'):
+                    raise Exception("Failed to insert")
+                for idx, _ in enumerate(test_keys['requests']):
+                    test_keys['requests'][idx]['response']['body'] = "[STRIPPED DUE TO ERROR]"
+                formatted_record['test_keys'] = json_dumps(test_keys)
                 self.conn.cursor().execute(self.insert_entry_template, formatted_record)
                 self.good_entries += 1
-            except KeyError:
-                pass
             except Exception:
                 self.failed_entry(record)
         except Exception:
@@ -126,6 +128,8 @@ class StreamToDb:
                 record = json_loads(line.strip('\n'))
                 if record["record_type"] == "entry":
                     self.insert_entry(record)
+        except Exception as exc:
+            print exc
         finally:
             print "successful entries: %s" % self.good_entries
             print "failed entries: %s" % self.bad_entries
@@ -143,12 +147,15 @@ def create_indexes(conn):
 def update_views(conn):
     try:
         conn.cursor().execute("SELECT 'public.country_counts_view'::regclass")
+    except psycopg2.ProgrammingError:
+        conn.cursor().execute('CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc, count(probe_cc) FROM metrics GROUP BY probe_cc;')
+    try:
         conn.cursor().execute("REFRESH MATERIALIZED VIEW country_counts_view")
         conn.cursor().execute("REFRESH MATERIALIZED VIEW blockpage_count")
         conn.cursor().execute("REFRESH MATERIALIZED VIEW blockpage_urls")
         conn.cursor().execute("REFRESH MATERIALIZED VIEW identified_vendors")
     except psycopg2.ProgrammingError:
-        conn.cursor().execute('CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc, count(probe_cc) FROM metrics GROUP BY probe_cc;')
+        pass
 
 def run(streams_dir, date_interval):
     interval = get_date_interval(date_interval)
