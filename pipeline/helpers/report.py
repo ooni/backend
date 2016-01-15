@@ -233,9 +233,9 @@ class Report(object):
                 yield self.process_entry(entry)
             except StopIteration:
                 break
-            except Exception as exc:
+            except Exception:
                 self._end_time = time.time()
                 print("failed to process the entry for %s" % self.filename)
                 print(traceback.format_exc())
-                raise exc
+                break
         self._end_time = time.time()
