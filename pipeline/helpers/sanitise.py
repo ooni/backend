@@ -7,10 +7,10 @@ import hashlib
 def fix_body(body):
     if body is None:
         return None
-    body = body.strip("\0")
     try:
+        body = body.strip("\0")
         body = unicode(body)
-    except:
+    except UnicodeDecodeError:
         body = {
             "data": b64encode(body),
             "format": "base64"
