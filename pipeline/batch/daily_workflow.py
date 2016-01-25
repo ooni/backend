@@ -397,7 +397,7 @@ class NormaliseReport(luigi.Task):
         out_file.close()
 
     def _get_dst_path(self):
-        ooni_private_dir = config.get("ooni", "ooni-private-dir")
+        ooni_private_dir = config.get("ooni", "private-dir")
         bucket_date = os.path.dirname(self.report_path)
         filename = os.path.splitext(os.path.basename(self.report_path)[0] + ".json")
         return os.path.join(ooni_private_dir, "reports-raw",
@@ -413,7 +413,7 @@ class SanitiseReport(luigi.Task):
         return NormaliseReport(self.report_path)
 
     def _get_dst_path(self):
-        ooni_public_dir = config.get("ooni", "ooni-public-dir")
+        ooni_public_dir = config.get("ooni", "public-dir")
         bucket_date = os.path.dirname(self.report_path)
         filename = os.path.basename(self.report_path)
         return os.path.join(ooni_public_dir,
@@ -497,7 +497,7 @@ class ListReportsAndRun(luigi.Task):
 
     @staticmethod
     def _list_reports_in_bucket(date):
-        ooni_private_dir = config.get("ooni", "ooni-raw-reports-dir")
+        ooni_private_dir = config.get("ooni", "raw-reports-dir")
         target_dir = get_luigi_target(os.path.join(ooni_private_dir,
                                                    date.strftime("%Y-%M-%d")))
         target_dir.fs.listdir()
