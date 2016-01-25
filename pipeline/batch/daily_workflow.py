@@ -1,6 +1,11 @@
+import traceback
+import hashlib
 import logging
+import string
 import random
 import uuid
+import re
+import os
 
 from base64 import b64encode
 from datetime import datetime
@@ -250,7 +255,7 @@ class NormaliseReport(luigi.Task):
                 is_tor = True
             elif session['request'].get('tor') in [False, None, {'is_tor': False}]:
                 is_tor = True
-            elif session.session['request'].get('tor', {}).get('is_tor') is True:
+            elif session['request'].get('tor', {}).get('is_tor') is True:
                 is_tor = True
             else:
                 logger.error("Could not detect tor or not tor status")
@@ -318,7 +323,7 @@ class NormaliseReport(luigi.Task):
         return entry
 
     def _normalise_entry(self, entry):
-        bucket_date = os.path.dirname(self.report_path)
+        bucket_date = os.path.basename(os.path.dirname(self.report_path))
 
         if isinstance(entry.get('report'), dict):
             entry.update(entry.pop('report'))
@@ -339,7 +344,9 @@ class NormaliseReport(luigi.Task):
 
         for key in schema:
             entry[key] = entry.get(key, None)
-        entry['test_keys'] = {}
+
+        if entry['test_keys'] is None:
+            entry['test_keys'] = {}
         for test_key in set(entry.keys()) - set(schema):
             entry['test_keys'][test_key] = entry.pop(test_key)
 
@@ -359,12 +366,13 @@ class NormaliseReport(luigi.Task):
         report = yaml.load_all(fobj, Loader=Loader)
         header = report.next()
         start_time = datetime.fromtimestamp(header.get('start_time', 0))
-        report_id = start_time.strftime("%Y%m%dT%H%M%SZ")
+        report_id = start_time.strftime("%Y%m%dT%H%M%SZ_")
         report_id += ''.join(random.choice(string.ascii_letters)
                              for x in range(50))
         header['report_id'] = header.get('report_id', report_id)
         for entry in report:
-            yield entry.update(header)
+            entry.update(header)
+            yield entry
 
     def _json_report_iterator(self, fobj):
         for line in fobj:
@@ -382,7 +390,7 @@ class NormaliseReport(luigi.Task):
         with self.input().open('r') as fobj:
             for entry in self._report_iterator(fobj):
                 try:
-                    normalised_entry = self.normalise_entry(entry)
+                    normalised_entry = self._normalise_entry(entry)
                 except Exception:
                     logger.error("%s: error in normalising entry" % self.report_path)
                     logger.error(traceback.format_exc())
@@ -398,8 +406,8 @@ class NormaliseReport(luigi.Task):
 
     def _get_dst_path(self):
         ooni_private_dir = config.get("ooni", "private-dir")
-        bucket_date = os.path.dirname(self.report_path)
-        filename = os.path.splitext(os.path.basename(self.report_path)[0] + ".json")
+        bucket_date = os.path.basename(os.path.dirname(self.report_path))
+        filename = os.path.splitext(os.path.basename(self.report_path))[0] + ".json"
         return os.path.join(ooni_private_dir, "reports-raw",
                             "normalised", bucket_date, filename)
 
@@ -414,8 +422,8 @@ class SanitiseReport(luigi.Task):
 
     def _get_dst_path(self):
         ooni_public_dir = config.get("ooni", "public-dir")
-        bucket_date = os.path.dirname(self.report_path)
-        filename = os.path.basename(self.report_path)
+        bucket_date = os.path.basename(os.path.dirname(self.report_path))
+        filename = os.path.splitext(os.path.basename(self.report_path))[0] + ".json"
         return os.path.join(ooni_public_dir,
                             "sanitised", bucket_date, filename)
 
@@ -423,16 +431,57 @@ class SanitiseReport(luigi.Task):
         return get_luigi_target(self._get_dst_path())
 
     @staticmethod
-    def _sanitise_bridge_reachability(entry):
-        pass
+    def _sanitise_bridge_reachability(entry, bridge_db):
+        entry['test_name'] = 'bridge_reachability'
+        if not entry.get('bridge_address'):
+            entry['bridge_address'] = entry['input']
+
+        if entry['bridge_address'] and \
+                entry['bridge_address'].strip() in bridge_db:
+            b = bridge_db[entry['bridge_address'].strip()]
+            entry['distributor'] = b['distributor']
+            entry['transport'] = b['transport']
+            fingerprint = b['fingerprint'].decode('hex')
+            hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
+            entry['input'] = hashed_fingerprint
+            entry['bridge_address'] = None
+            regexp = ("(Learned fingerprint ([A-Z0-9]+)"
+                    "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
+                    "((new bridge descriptor .+?\s+"
+                    "at (([0-9]+\.){3}[0-9]+)))")
+            if entry.get('tor_log'):
+                entry['tor_log'] = re.sub(regexp, "[REDACTED]", entry['tor_log'])
+            else:
+                entry['tor_log'] = None
+        else:
+            entry['distributor'] = None
+            hashed_fingerprint = None
+        entry['bridge_hashed_fingerprint'] = hashed_fingerprint
+        return entry
+
+    @staticmethod
+    def _sanitise_tcp_connect(entry, bridge_db):
+        if entry['input'] and entry['input'].strip() in bridge_db.keys():
+            b = bridge_db[entry['input'].strip()]
+            fingerprint = b['fingerprint'].decode('hex')
+            hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
+            entry['bridge_hashed_fingerprint'] = hashed_fingerprint
+            entry['input'] = hashed_fingerprint
+            return entry
+        return entry
 
     def run(self):
+        bridge_db_path = config.get("ooni", "bridge-db-path")
+        bridge_db = json_loads(open(bridge_db_path).read())
         out_file = self.output().open('w')
         with self.input().open('r') as fobj:
             for line in fobj:
                 entry = json_loads(line.strip())
-                if entry['test_name'] in ['tcp_connect', 'bridge_reachability']:
-                    self._sanitise_bridge_reachability(entry)
+                if entry['test_name']  == 'tcp_connect':
+                    entry = self._sanitise_tcp_connect(entry, bridge_db)
+                elif entry['test_name'] == 'bridge_reachability':
+                    entry = self._sanitise_bridge_reachability(entry, bridge_db)
+                out_file.write(json_dumps(entry))
         out_file.close()
 
 class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
@@ -491,17 +540,15 @@ class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
             for idx, line in enumerate(fobj):
                 yield self._format_record(line.strip(), idx)
 
-class ListReportsAndRun(luigi.Task):
+class ListReportsAndRun(luigi.WrapperTask):
     date_interval = luigi.DateIntervalParameter()
     task = luigi.Parameter(default="InsertMeasurementsIntoPostgres")
 
     @staticmethod
     def _list_reports_in_bucket(date):
         ooni_private_dir = config.get("ooni", "raw-reports-dir")
-        target_dir = get_luigi_target(os.path.join(ooni_private_dir,
-                                                   date.strftime("%Y-%M-%d")))
-        target_dir.fs.listdir()
-
+        bucket_path = os.path.join(ooni_private_dir, date.strftime("%Y-%m-%d"))
+        return get_luigi_target(bucket_path).fs.listdir(bucket_path)
 
     def requires(self):
         try:

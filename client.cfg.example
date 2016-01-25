@@ -1,0 +1,15 @@
+[s3]
+aws_access_key_id: XXX
+aws_secret_access_key: XXX
+[ooni]
+raw-reports-dir: /data/ooni/private/raw-reports/yaml/
+private-dir: /data/ooni/private/
+public-dir: /data/ooni/public/
+bridge-db-path: /data/ooni/private/bridge_reachability/bridge_db.json
+[postgres]
+local-tmp-dir: /tmp
+host: 127.0.0.1
+database: ooni_pipeline
+user: ooni
+password: changeme
+metrics-table: metrics
