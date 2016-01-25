@@ -226,9 +226,12 @@ class NormaliseReport(luigi.Task):
                 return body
             try:
                 body = body.replace("\0", "")
-                body = unicode(body)
+                body = unicode(body, 'ascii')
             except UnicodeDecodeError:
-                body = binary_to_base64_dict(body)
+                try:
+                    body = unicode(body, 'utf-8')
+                except UnicodeDecodeError:
+                    body = binary_to_base64_dict(body)
             return body
 
         def _normalise_headers(headers):
@@ -432,31 +435,32 @@ class SanitiseReport(luigi.Task):
 
     @staticmethod
     def _sanitise_bridge_reachability(entry, bridge_db):
-        entry['test_name'] = 'bridge_reachability'
-        if not entry.get('bridge_address'):
-            entry['bridge_address'] = entry['input']
+        test_keys = entry['test_keys']
+        if not test_keys.get('bridge_address'):
+            test_keys['bridge_address'] = entry['input']
 
-        if entry['bridge_address'] and \
-                entry['bridge_address'].strip() in bridge_db:
-            b = bridge_db[entry['bridge_address'].strip()]
-            entry['distributor'] = b['distributor']
-            entry['transport'] = b['transport']
+        if test_keys['bridge_address'] and \
+                test_keys['bridge_address'].strip() in bridge_db:
+            b = bridge_db[test_keys['bridge_address'].strip()]
+            test_keys['distributor'] = b['distributor']
+            test_keys['transport'] = b['transport']
             fingerprint = b['fingerprint'].decode('hex')
             hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-            entry['input'] = hashed_fingerprint
-            entry['bridge_address'] = None
+            test_keys['input'] = hashed_fingerprint
+            test_keys['bridge_address'] = None
             regexp = ("(Learned fingerprint ([A-Z0-9]+)"
                     "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
                     "((new bridge descriptor .+?\s+"
                     "at (([0-9]+\.){3}[0-9]+)))")
-            if entry.get('tor_log'):
-                entry['tor_log'] = re.sub(regexp, "[REDACTED]", entry['tor_log'])
+            if test_keys.get('tor_log'):
+                test_keys['tor_log'] = re.sub(regexp, "[REDACTED]", test_keys['tor_log'])
             else:
-                entry['tor_log'] = None
+                test_keys['tor_log'] = None
         else:
-            entry['distributor'] = None
+            test_keys['distributor'] = None
             hashed_fingerprint = None
-        entry['bridge_hashed_fingerprint'] = hashed_fingerprint
+        test_keys['bridge_hashed_fingerprint'] = hashed_fingerprint
+        entry['test_keys'] = test_keys
         return entry
 
     @staticmethod
@@ -465,7 +469,7 @@ class SanitiseReport(luigi.Task):
             b = bridge_db[entry['input'].strip()]
             fingerprint = b['fingerprint'].decode('hex')
             hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-            entry['bridge_hashed_fingerprint'] = hashed_fingerprint
+            entry['test_keys']['bridge_hashed_fingerprint'] = hashed_fingerprint
             entry['input'] = hashed_fingerprint
             return entry
         return entry
