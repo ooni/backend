@@ -465,6 +465,7 @@ class NormaliseReport(luigi.Task):
                     continue
                 try:
                     out_file.write(json_dumps(normalised_entry))
+                    out_file.write("\n")
                 except Exception:
                     logger.error("%s: error in serialising entry" % self.report_path)
                     logger.error(traceback.format_exc())
@@ -550,6 +551,7 @@ class SanitiseReport(luigi.Task):
                 elif entry['test_name'] == 'bridge_reachability':
                     entry = self._sanitise_bridge_reachability(entry, bridge_db)
                 out_file.write(json_dumps(entry))
+                out_file.write("\n")
         out_file.close()
 
 class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
