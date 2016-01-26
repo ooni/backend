@@ -464,18 +464,19 @@ class NormaliseReport(luigi.Task):
             for entry in self._report_iterator(fobj):
                 try:
                     normalised_entry = self._normalise_entry(entry)
-                except Exception:
+                except Exception as exc:
                     logger.error("%s: error in normalising entry" % self.report_path)
                     logger.error(traceback.format_exc())
                     logger.debug(entry)
-                    continue
+                    raise exc
                 try:
                     out_file.write(json_dumps(normalised_entry))
                     out_file.write("\n")
-                except Exception:
+                except Exception as exc:
                     logger.error("%s: error in serialising entry" % self.report_path)
                     logger.error(traceback.format_exc())
                     logger.debug(entry)
+                    raise exc
         out_file.close()
 
     def _get_dst_path(self):
