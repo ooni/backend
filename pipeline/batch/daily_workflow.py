@@ -149,7 +149,7 @@ test_categories = {
         'chinatrigger',
         'keyword_filtering',
         'parasitic_traceroute',
-        'traceroute',
+        'multi_protocol_traceroute',
         'dns_spoof',
     },
     'tcpt': {
@@ -488,7 +488,7 @@ class NormaliseReport(luigi.Task):
                 except Exception as exc:
                     logger.error("%s: error in serialising entry" % self.report_path)
                     logger.error(traceback.format_exc())
-                    logger.debug(entry)
+                    logger.debug(normalised_entry)
                     raise exc
         out_file.close()
 
