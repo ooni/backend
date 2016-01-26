@@ -249,7 +249,8 @@ class NormaliseReport(luigi.Task):
                 return body
             try:
                 body = body.replace('\0', '')
-                body = unicode(body, 'ascii')
+                if not isinstance(body, unicode):
+                    body = unicode(body, 'ascii')
             except UnicodeDecodeError:
                 try:
                     body = unicode(body, 'utf-8')
