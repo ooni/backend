@@ -159,6 +159,11 @@ test_categories = {
     }
 }
 
+regexps = {
+    'ipv4': '(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})',
+    'hostname': '([a-zA-Z0-9](?:(?:[a-zA-Z0-9-]*|(?<!-)\.(?![-.]))*[a-zA-Z0-9]+)?)'
+}
+
 def binary_to_base64_dict(data):
     return {
         "data": b64encode(data),
@@ -191,6 +196,24 @@ def get_luigi_target(path):
                             key_file=ssh_key_file,
                             no_host_key_check=no_host_key_check)
     return LocalTarget(path, format=file_format)
+
+def parse_path(path):
+    """
+    Parses the path to a report file into it's various components.
+    """
+    test_start_time, probe_cc, probe_asn, \
+        test_name, report_id, \
+        data_format_version, \
+        vantage_point = os.path.basename(path).split("-")
+    return dict(
+        test_start_time=test_start_time,
+        probe_cc=probe_cc,
+        probe_asn=probe_asn,
+        test_name=test_name,
+        report_id=report_id,
+        data_format_version=data_format_version,
+        vantage_point=vantage_point
+    )
 
 class ReadReport(luigi.ExternalTask):
     report_path = luigi.Parameter()
@@ -225,7 +248,7 @@ class NormaliseReport(luigi.Task):
             if body is None:
                 return body
             try:
-                body = body.replace("\0", "")
+                body = body.replace('\0', '')
                 body = unicode(body, 'ascii')
             except UnicodeDecodeError:
                 try:
@@ -287,6 +310,46 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_dnst(entry):
+        entry['test_keys'].pop('test_resolvers')
+
+        errors = entry['test_keys'].pop('tampering')
+        if errors:
+            entry['test_keys']['errors'] = errors
+            entry['test_keys']['successful'] = map(lambda e: e[0], filter(lambda e: e[1] is False, errors.items()))
+            entry['test_keys']['failed'] = map(lambda e: e[0], filter(lambda e: e[1], errors.items()))
+        else:
+            entry['test_keys']['errors'] = None
+            entry['test_keys']['successful'] = None
+            entry['test_keys']['failed'] = None
+
+        queries = []
+        for query in entry['test_keys'].pop('queries'):
+            query['failure'] = query.get('failure', None)
+            try:
+                query['hostname'] = re.search("\[Query\('(.+)'", query.pop('query')).group(1)
+            except:
+                query['hostname'] = None
+            query['resolver_hostname'],  query['resolver_port'] = query.pop('resolver')
+
+            answers = []
+            for answer in query.pop('answers', []):
+                try:
+                    ttl = re.search("ttl=(\d+)", answer[0])
+                except Exception:
+                    logger.error("Failed to parse ttl in %s" % answer[0])
+                    ttl = None
+                normalised_answer = dict(
+                    ttl=ttl
+                )
+                if query['query_type'] == 'A':
+                    normalised_answer['ipv4'] = re.search("address=(" + regexps['ipv4'] + ")", answer[1]).group(1)
+                elif query['query_type'] == 'PTR':
+                    normalised_answer['hostname'] = re.search("name=(" + regexps['hostname'] + ")", answer[1]).group(1)
+                answers.append(normalised_answer)
+            query['answers'] = answers
+
+            queries.append(query)
+        entry['test_keys']['queries'] = queries
         return entry
 
     @staticmethod
@@ -544,9 +607,17 @@ class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
             for idx, line in enumerate(fobj):
                 yield self._format_record(line.strip(), idx)
 
+class ListParameter(luigi.Parameter):
+    def parse(self, s):
+        return s.split(' ')
+
+    def serialize(self, e):
+        return ' '.join(e)
+
 class ListReportsAndRun(luigi.WrapperTask):
     date_interval = luigi.DateIntervalParameter()
     task = luigi.Parameter(default="InsertMeasurementsIntoPostgres")
+    test_names = ListParameter(default=[])
 
     @staticmethod
     def _list_reports_in_bucket(date):
@@ -562,5 +633,8 @@ class ListReportsAndRun(luigi.WrapperTask):
         task_list = []
         for date in self.date_interval:
             for report_path in self._list_reports_in_bucket(date):
-                task_list.append(task_factory(report_path))
+                if len(self.test_names) == 0:
+                    task_list.append(task_factory(report_path))
+                elif parse_path(report_path)['test_name'] in self.test_names:
+                    task_list.append(task_factory(report_path))
         return task_list
