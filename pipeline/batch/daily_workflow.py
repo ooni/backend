@@ -113,6 +113,7 @@ schema = [
     'probe_ip',
     'data_format_version',
     'test_name',
+    'test_version',
     'test_start_time',
     'test_runtime',
     'test_helpers',
@@ -268,12 +269,19 @@ class NormaliseReport(luigi.Task):
         experiment_requests = []
         control_requests = []
 
-        for session in entry['test_keys']['requests']:
+        for session in entry['test_keys'].get('requests', []):
             if isinstance(session.get('response'), dict):
                 session['response']['body'] = _normalise_str(session['response']['body'])
                 session['response']['headers'] = _normalise_headers(session['response']['headers'])
             else:
                 session['response'] = {'body': None, 'headers': {}}
+
+            if isinstance(session.get('request'), dict):
+                session['request']['body'] = _normalise_str(session['request']['body'])
+                session['request']['headers'] = _normalise_headers(session['request']['headers'])
+            else:
+                session['request'] = {'body': None, 'headers': {}}
+
             is_tor = False
             if session['request']['url'].startswith('shttp'):
                 session['request']['url'] = session['request']['url'].replace('shttp://', 'http://')
@@ -287,10 +295,18 @@ class NormaliseReport(luigi.Task):
             else:
                 logger.error("Could not detect tor or not tor status")
                 logger.debug(session)
+
+            try:
+                exit_ip = session['request'].get('tor', {}).get('exit_ip', None)
+                exit_name = session['request'].get('tor', {}).get('exit_name', None)
+            except AttributeError:
+                exit_ip = None
+                exit_name = None
+
             session['request']['tor'] = {
                 'is_tor': is_tor,
-                'exit_ip': session['request'].get('tor', {}).get('exit_ip', None),
-                'exit_name': session['request'].get('tor', {}).get('exit_name', None)
+                'exit_ip': exit_ip,
+                'exit_name': exit_name
             }
             session['response_length'] = None
             for k, v in session['response']['headers'].items():
@@ -317,7 +333,7 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_dnst(entry):
-        entry['test_keys'].pop('test_resolvers')
+        entry['test_keys'].pop('test_resolvers', None)
 
         errors = entry['test_keys'].pop('tampering')
         if errors:
@@ -618,8 +634,10 @@ class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
         for key, data_type in self.columns:
             try:
                 value = record[key]
+                if data_type == 'JSONB':
+                    value = json_dumps(value)
             except KeyError:
-                logger.error("%s:%s could not find key" % (self.report_path, idx, key))
+                logger.error("%s:%s could not find key %s" % (self.report_path, idx, key))
                 logger.debug(record)
                 raise Exception("Could not find key in report")
             row.append(value)
