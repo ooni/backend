@@ -341,17 +341,22 @@ class NormaliseReport(luigi.Task):
             answers = []
             for answer in query.pop('answers', []):
                 try:
-                    ttl = re.search("ttl=(\d+)", answer[0])
+                    ttl = re.search("ttl=(\d+)", answer[0]).group(1)
                 except Exception:
                     logger.error("Failed to parse ttl in %s" % answer[0])
                     ttl = None
+
+                answer_type = re.search("type=([A-Z]+)", answer[0]).group(1)
+
                 normalised_answer = dict(
-                    ttl=ttl
+                    ttl=ttl,
+                    answer_type=answer_type
                 )
-                if query['query_type'] == 'A':
-                    normalised_answer['ipv4'] = re.search("address=(" + regexps['ipv4'] + ")", answer[1]).group(1)
-                elif query['query_type'] == 'PTR':
-                    normalised_answer['hostname'] = re.search("name=(" + regexps['hostname'] + ")", answer[1]).group(1)
+
+                if answer_type == 'A':
+                    normalised_answer['ipv4'] = re.search("address=" + regexps['ipv4'], answer[1]).group(1)
+                elif answer_type in ['PTR', 'CNAME', 'SOA']:
+                    normalised_answer['hostname'] = re.search("name=" + regexps['hostname'], answer[1]).group(1)
                 answers.append(normalised_answer)
             query['answers'] = answers
 
