@@ -244,7 +244,7 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_httpt(entry):
-        def _normalise_body(body):
+        def _normalise_str(body):
             if body is None:
                 return body
             try:
@@ -262,7 +262,7 @@ class NormaliseReport(luigi.Task):
             normalised_headers = {}
             for name, values in headers:
                 for v in values:
-                    normalised_headers[name] = v
+                    normalised_headers[name] = _normalise_str(v)
             return normalised_headers
 
         experiment_requests = []
@@ -270,7 +270,7 @@ class NormaliseReport(luigi.Task):
 
         for session in entry['test_keys']['requests']:
             if isinstance(session.get('response'), dict):
-                session['response']['body'] = _normalise_body(session['response']['body'])
+                session['response']['body'] = _normalise_str(session['response']['body'])
                 session['response']['headers'] = _normalise_headers(session['response']['headers'])
             else:
                 session['response'] = {'body': None, 'headers': {}}
