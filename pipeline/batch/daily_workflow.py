@@ -331,12 +331,13 @@ class NormaliseReport(luigi.Task):
 
         queries = []
         for query in entry['test_keys'].pop('queries'):
-            query['failure'] = query.get('failure', None)
             try:
                 query['hostname'] = re.search("\[Query\('(.+)'", query.pop('query')).group(1)
             except:
                 query['hostname'] = None
             query['resolver_hostname'],  query['resolver_port'] = query.pop('resolver')
+
+            query.pop('addrs', None)
 
             answers = []
             for answer in query.pop('answers', []):
@@ -359,6 +360,11 @@ class NormaliseReport(luigi.Task):
                     normalised_answer['hostname'] = re.search("name=" + regexps['hostname'], answer[1]).group(1)
                 answers.append(normalised_answer)
             query['answers'] = answers
+
+            failure = query.get('failure', None)
+            if not failure and len(answers) == 0:
+                failure = 'no_answer'
+            query['failure'] = failure
 
             queries.append(query)
         entry['test_keys']['queries'] = queries
