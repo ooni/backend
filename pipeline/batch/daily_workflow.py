@@ -269,6 +269,17 @@ class NormaliseReport(luigi.Task):
         experiment_requests = []
         control_requests = []
 
+        url_option_idx = None
+        url_option_names = ['--url', '-u']
+        for url_option in url_option_names:
+            try:
+                url_option_idx = entry.get('options').index(url_option) + 1
+            except ValueError, AttributeError:
+                continue
+
+        if url_option_idx is not None and entry['input'] is None:
+            entry['input'] = entry['options'][url_option_idx]
+
         for session in entry['test_keys'].get('requests', []):
             if isinstance(session.get('response'), dict):
                 session['response']['body'] = _normalise_str(session['response']['body'])
