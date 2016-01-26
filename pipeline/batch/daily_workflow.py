@@ -287,7 +287,11 @@ class NormaliseReport(luigi.Task):
             else:
                 logger.error("Could not detect tor or not tor status")
                 logger.debug(session)
-            session['request']['tor'] = {'is_tor': is_tor}
+            session['request']['tor'] = {
+                'is_tor': is_tor,
+                'exit_ip': session['request'].get('tor', {}).get('exit_ip', None),
+                'exit_name': session['request'].get('tor', {}).get('exit_name', None)
+            }
             session['response_length'] = None
             for k, v in session['response']['headers'].items():
                 if k.lower() == 'content-length':
@@ -307,6 +311,10 @@ class NormaliseReport(luigi.Task):
             pass
         entry['test_keys']['requests'] += experiment_requests
         entry['test_keys']['requests'] += control_requests
+        try:
+            entry['test_keys']['headers_diff'] = list(entry['test_keys']['headers_diff'])
+        except KeyError:
+            pass
         return entry
 
     @staticmethod
