@@ -294,6 +294,8 @@ class NormaliseReport(luigi.Task):
                 session['request'] = {'body': None, 'headers': {}}
 
             is_tor = False
+            exit_ip = False
+            exit_name = False
             if session['request']['url'].startswith('shttp'):
                 session['request']['url'] = session['request']['url'].replace('shttp://', 'http://')
                 is_tor = True
@@ -303,16 +305,11 @@ class NormaliseReport(luigi.Task):
                 is_tor = False
             elif session['request'].get('tor', {}).get('is_tor') is True:
                 is_tor = True
+                exit_ip = session['request'].get('tor', {}).get('exit_ip', None)
+                exit_name = session['request'].get('tor', {}).get('exit_name', None)
             else:
                 logger.error("Could not detect tor or not tor status")
                 logger.debug(session)
-
-            try:
-                exit_ip = session['request'].get('tor', {}).get('exit_ip', None)
-                exit_name = session['request'].get('tor', {}).get('exit_name', None)
-            except AttributeError:
-                exit_ip = None
-                exit_name = None
 
             session['request']['tor'] = {
                 'is_tor': is_tor,
