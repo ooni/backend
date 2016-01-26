@@ -281,7 +281,7 @@ class NormaliseReport(luigi.Task):
             elif session['request'].get('tor') is True:
                 is_tor = True
             elif session['request'].get('tor') in [False, None, {'is_tor': False}]:
-                is_tor = True
+                is_tor = False
             elif session['request'].get('tor', {}).get('is_tor') is True:
                 is_tor = True
             else:
