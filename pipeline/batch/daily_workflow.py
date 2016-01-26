@@ -311,10 +311,8 @@ class NormaliseReport(luigi.Task):
             pass
         entry['test_keys']['requests'] += experiment_requests
         entry['test_keys']['requests'] += control_requests
-        try:
+        if entry['test_keys'].get('headers_diff', None) is not None:
             entry['test_keys']['headers_diff'] = list(entry['test_keys']['headers_diff'])
-        except KeyError:
-            pass
         return entry
 
     @staticmethod
