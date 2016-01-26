@@ -468,6 +468,8 @@ class NormaliseReport(luigi.Task):
             return self._yaml_report_iterator(fobj)
         elif self.report_path.endswith(".json"):
             return self._json_report_iterator(fobj)
+        else:
+            raise Exception("unknown report type: '%s'" % self.report_path)
 
     def run(self):
         out_file = self.output().open('w')
