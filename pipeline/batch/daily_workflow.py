@@ -531,6 +531,8 @@ class NormaliseReport(luigi.Task):
                              for x in range(50))
         header['report_id'] = header.get('report_id', report_id)
         for entry in report:
+            if not entry:
+                continue
             entry.update(header)
             yield entry
 
