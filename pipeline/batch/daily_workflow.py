@@ -499,8 +499,31 @@ class NormaliseReport(luigi.Task):
             entry = self._normalise_captive_portal(entry)
         return entry
 
+    def _yaml_loader(self, fobj):
+        document = ""
+        _entered = False
+        for line in fobj:
+            if line.startswith("---"):
+                _entered = True
+                continue
+
+            if line.startswith("..."):
+                _entered = False
+                try:
+                    yield yaml.load(document, Loader=Loader)
+                except:
+                    try:
+                        yield yaml.load(document)
+                    except:
+                        logger.error("Failed to parse %s" % document)
+                document = ""
+                continue
+
+            if _entered:
+                document += line
+
     def _yaml_report_iterator(self, fobj):
-        report = yaml.load_all(fobj, Loader=Loader)
+        report = self._yaml_loader(fobj)
         header = report.next()
         start_time = datetime.fromtimestamp(header.get('start_time', 0))
         report_id = start_time.strftime("%Y%m%dT%H%M%SZ_")
