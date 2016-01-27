@@ -507,18 +507,9 @@ class NormaliseReport(luigi.Task):
         report_id += ''.join(random.choice(string.ascii_letters)
                              for x in range(50))
         header['report_id'] = header.get('report_id', report_id)
-        while(True):
-            try:
-                entry = next(report)
-            except StopIteration:
-                raise
-            except Exception as exc:
-                logger.error("%s: error in _yaml_report_iterator" % self.report_path)
-                logger.error(traceback.format_exc())
-                raise exc
-            else:
-                entry.update(header)
-                yield entry
+        for entry in report:
+            entry.update(header)
+            yield entry
 
     def _json_report_iterator(self, fobj):
         for line in fobj:
