@@ -456,7 +456,7 @@ class NormaliseReport(luigi.Task):
 
         entry['bucket_date'] = bucket_date
 
-        entry['test_start_time'] = datetime.fromtimestamp(entry.get('start_time',
+        entry['test_start_time'] = datetime.fromtimestamp(entry.pop('start_time',
                                         0)).strftime("%Y-%m-%d %H:%M:%S")
 
         entry['id'] = entry.get('id', str(uuid.uuid4()))
