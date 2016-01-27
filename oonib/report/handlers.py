@@ -18,6 +18,13 @@ from oonib.config import config
 
 def report_file_name(archive_dir, report_details):
     timestamp = datetime.fromtimestamp(report_details['start_time'])
+    if report_details['format'] == 'json':
+        ext = 'json'
+    elif report_details['format'] == 'yaml':
+        ext = 'yaml'
+    else:
+        ext = 'invalid'
+
     keys = dict(
         report_details.items(),
         iso8601_timestamp=otime.timestamp(timestamp),
@@ -26,9 +33,10 @@ def report_file_name(archive_dir, report_details):
         day=timestamp.strftime("%d"),
         hour=timestamp.strftime("%H"),
         minute=timestamp.strftime("%M"),
-        second=timestamp.strftime("%S")
+        second=timestamp.strftime("%S"),
+        ext=ext
     )
-    report_file_template = "{iso8601_timestamp}-{test_name}-{probe_asn}-{probe_cc}-probe-0.2.0.json"
+    report_file_template = "{iso8601_timestamp}-{test_name}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}"
     if config.main.report_file_template:
         report_file_template = config.main.report_file_template
     dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
@@ -45,8 +53,11 @@ class Report(object):
                  stale_time,
                  report_dir,
                  archive_dir,
-                 reports):
+                 reports,
+                 report_details):
         self.report_id = report_id
+
+        self.report_details = report_details
 
         self.stale_time = stale_time
         self.report_dir = report_dir
@@ -75,13 +86,12 @@ class Report(object):
 
         report_filename = get_report_path(self.report_id)
         try:
-            with open(report_filename) as fd:
-                line = fd.readline()
-                report_details = json.loads(line.strip())
+            open(report_filename).close()
         except IOError:
             raise e.ReportNotFound
 
-        dst_filename = report_file_name(self.archive_dir, report_details)
+        dst_filename = report_file_name(self.archive_dir,
+                                        self.report_details)
         shutil.move(report_filename, dst_filename)
 
         if not self.delayed_call.called:
@@ -119,6 +129,7 @@ def parseNewReportRequest(request):
     version_string = re.compile("[0-9A-Za-z_\-\.]+$")
     name = re.compile("[a-zA-Z0-9_\- ]+$")
     probe_asn = re.compile("AS[0-9]+$")
+    probe_cc = re.compile("[A-Z]{2}$")
     test_helper = re.compile("[A-Za-z0-9_\-]+$")
 
     expected_request = {
@@ -139,7 +150,7 @@ def parseNewReportRequest(request):
         except KeyError:
             raise e.MissingField(k)
 
-        print "Matching %s with %s | %s" % (regexp, value_to_check, k)
+        log.debug("Matching %s with %s | %s" % (regexp, value_to_check, k))
         if re.match(regexp, str(value_to_check)):
             continue
         else:
@@ -152,39 +163,34 @@ def parseNewReportRequest(request):
     except KeyError:
         pass
 
+
+    if 'start_time' not in parsed_request:
+        try:
+            header = yaml.safe_load(parsed_request['content'])
+            parsed_request['start_time'] = header['start_time']
+        except Exception as exc:
+            log.exception(exc)
+            raise e.InvalidRequestField("start_time")
+
+    try:
+        parsed_request['start_time'] = float(header['start_time'])
+    except ValueError as exc:
+        log.exception(exc)
+        raise e.InvalidRequestField("start_time")
+
+    if 'probe_cc' not in parsed_request:
+        try:
+            header = yaml.safe_load(parsed_request['content'])
+            parsed_request['probe_cc'] = header['probe_cc']
+            if not re.match(probe_cc, parsed_request['probe_cc']):
+                raise Exception("Does not match the regexp")
+        except Exception as exc:
+            log.exception(exc)
+            raise e.InvalidRequestField("probe_cc")
+
     parsed_request['format'] = parsed_request.get('format', 'yaml')
 
     return parsed_request
-
-
-def validate_report_header(report_header):
-    required_keys = ['probe_asn', 'probe_cc', 'probe_ip', 'software_name',
-                     'software_version', 'test_name', 'test_version']
-    for key in required_keys:
-        if key not in report_header:
-            raise e.MissingReportHeaderKey(key)
-
-    if report_header['probe_asn'] is None:
-        report_header['probe_asn'] = 'AS0'
-
-    if not re.match('AS[0-9]+$', report_header['probe_asn']):
-        raise e.InvalidReportHeader('probe_asn')
-
-    # If no country is known, set it to be ZZ (user assigned value in ISO 3166)
-    if report_header['probe_cc'] is None:
-        report_header['probe_cc'] = 'ZZ'
-
-    if not re.match('[a-zA-Z]{2}$', report_header['probe_cc']):
-        raise e.InvalidReportHeader('probe_cc')
-
-    if not re.match('[a-z_\-]+$', report_header['test_name']):
-        raise e.InvalidReportHeader('test_name')
-
-    if not re.match('([0-9]+\.)+[0-9]+$', report_header['test_version']):
-        raise e.InvalidReportHeader('test_version')
-
-    return report_header
-
 
 class ReportHandler(OONIBHandler):
 
@@ -211,21 +217,14 @@ class UpdateReportMixin(object):
         content_format = parsed_request.get('format', 'yaml')
         if content_format == 'json':
             data = json_dumps(parsed_request['content'])
+            data += "\n"
         elif content_format == 'yaml':
-            try:
-                entry = yaml.safe_load_all(parsed_request['content']).next()
-                data = json_dumps(entry)
-            except Exception as exc:
-                log.error("Received an invalid entry")
-                log.msg(parsed_request['content'])
-                log.exception(exc)
-                raise e.OONIBError(400, "Invalid report entry")
+            data = parsed_request['content']
         else:
             raise e.InvalidFormatField
         try:
             with open(report_filename, 'a+') as fd:
                 fd.write(data)
-                fd.write("\n")
         except IOError:
             raise e.OONIBError(404, "Report not found")
         self.write({'status': 'success'})
@@ -288,12 +287,6 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
 
         log.debug("Parsed this data %s" % report_data)
 
-        software_name = str(report_data['software_name'])
-        software_version = str(report_data['software_version'])
-
-        probe_asn = str(report_data['probe_asn'])
-        probe_cc = str(report_data.get('probe_cc', 'ZZ'))
-
         self.testName = str(report_data['test_name'])
         self.testVersion = str(report_data['test_version'])
 
@@ -304,22 +297,21 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
                 raise e.InputHashNotProvided
             self.checkPolicy()
 
+        data = None
         if 'content' in report_data:
             if report_data['format'] == 'json':
                 content = report_data['content']
+                content['backend_version'] = config.backend_version
+                data = json_dumps(content)
             elif report_data['format'] == 'yaml':
-                content = None
+                content = yaml.safe_load(report_data['content'])
+                content['backend_version'] = config.backend_version
+                data = "---\n" + yaml.dump(content) + "...\n"
             else:
                 raise e.InvalidFormatField
-            content['backend_version'] = config.backend_version
-        else:
-            content = None
-
-        if not probe_asn:
-            probe_asn = "AS0"
 
         report_id = otime.timestamp() + '_' \
-            + probe_asn + '_' \
+            + report_data.get('probe_asn', 'AS0') + '_' \
             + randomStr(50)
 
         # The report filename contains the timestamp of the report plus a
@@ -340,15 +332,15 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             except KeyError:
                 raise e.TestHelperNotFound
 
-        self.reports[report_id] = Report(report_id,
-                                         self.stale_time,
-                                         self.report_dir,
-                                         self.archive_dir,
-                                         self.reports)
-        if content:
-            # XXX make sure to validate the cotent to ensure it's possible to
-            # encode as JSON
-            data = json_dumps(content) + "\n"
+        self.reports[report_id] = Report(report_id=report_id,
+            stale_time=self.stale_time,
+            report_dir=self.report_dir,
+            archive_dir=self.archive_dir,
+            reports=self.reports,
+            report_details=report_data
+        )
+
+        if data is not None:
             self.writeToReport(report_filename, data)
         else:
             open(report_filename, 'w+').close()

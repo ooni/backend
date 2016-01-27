@@ -61,25 +61,5 @@ def randomStr(length, num=True):
         chars += string.digits
     return ''.join(random.choice(chars) for x in range(length))
 
-def binary_to_base64_dict(data):
-    from base64 import b64encode
-    return {
-        "data": b64encode(data),
-        "format": "base64"
-    }
-
 def json_dumps(obj):
-    def _default(o):
-        if isinstance(o, set):
-            return list(o)
-        elif isinstance(o, str):
-            try:
-                o = unicode(o, 'ascii')
-            except UnicodeDecodeError:
-                try:
-                    o = unicode(o, 'utf-8')
-                except UnicodeDecodeError:
-                    o = binary_to_base64_dict(o)
-            return o
-
-    return json.dumps(obj, default=_default)
+    return json.dumps(obj)
