@@ -440,10 +440,21 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_tcpt(entry):
+        entry['sent'] = entry.get('sent', [])
+        entry['received'] = entry.get('sent', [])
         return entry
 
     @staticmethod
     def _normalise_process(entry):
+        return entry
+
+    @staticmethod
+    def _normalise_captive_portal(entry):
+        if isinstance(entry.get('google_dns_cp', None), set):
+            entry['google_dns_cp'] = list(entry['google_dns_cp'])
+        elif isinstance(entry.get('google_dns_cp', {}).get('addresses', None), set):
+            entry['google_dns_cp']['addresses'] = \
+                list(entry['google_dns_cp']['addresses'])
         return entry
 
     def _normalise_entry(self, entry):
@@ -484,6 +495,8 @@ class NormaliseReport(luigi.Task):
             entry = self._normalise_processt(entry)
         if test_name in test_categories['scapyt']:
             entry = self._normalise_scapyt(entry)
+        if test_name == 'captive_portal':
+            entry = self._normalise_captive_portal(entry)
         return entry
 
     def _yaml_report_iterator(self, fobj):
