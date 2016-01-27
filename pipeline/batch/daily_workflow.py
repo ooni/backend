@@ -297,8 +297,8 @@ class NormaliseReport(luigi.Task):
                 session['request'] = {'body': None, 'headers': {}}
 
             is_tor = False
-            exit_ip = False
-            exit_name = False
+            exit_ip = None
+            exit_name = None
             if session['request']['url'].startswith('shttp'):
                 session['request']['url'] = session['request']['url'].replace('shttp://', 'http://')
                 is_tor = True
