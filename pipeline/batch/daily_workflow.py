@@ -350,11 +350,13 @@ class NormaliseReport(luigi.Task):
         if errors:
             entry['test_keys']['errors'] = errors
             entry['test_keys']['successful'] = map(lambda e: e[0], filter(lambda e: e[1] is False, errors.items()))
-            entry['test_keys']['failed'] = map(lambda e: e[0], filter(lambda e: e[1], errors.items()))
-        else:
-            entry['test_keys']['errors'] = None
-            entry['test_keys']['successful'] = None
-            entry['test_keys']['failed'] = None
+            entry['test_keys']['failed'] = map(lambda e: e[0], filter(lambda e: e[1] is not True, errors.items()))
+            entry['test_keys']['inconsistent'] = map(lambda e: e[0], filter(lambda e: e[1] is True, errors.items()))
+        elif entry['test_name'] == 'dns_consistency':
+            entry['test_keys']['errors'] = {}
+            entry['test_keys']['successful'] = []
+            entry['test_keys']['failed'] = []
+            entry['test_keys']['inconsistent'] = []
 
         queries = []
         for query in entry['test_keys'].pop('queries'):
