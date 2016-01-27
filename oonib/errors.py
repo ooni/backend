@@ -111,6 +111,10 @@ class TestHelperNotFound(OONIBError):
     log_message = "test-helper-not-found"
 
 
+class InvalidFormatField(OONIBError):
+    status_code = 400
+    log_message = "invalid-format-field"
+
 class ConfigFileNotSpecified(Exception):
     pass
 

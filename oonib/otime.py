@@ -95,5 +95,5 @@ def timestamp(t=None):
     """
     if t is None:
         t = datetime.utcnow()
-    ISO8601 = "%Y-%m-%dT%H%M%SZ"
+    ISO8601 = "%Y%m%dT%H%M%SZ"
     return t.strftime(ISO8601)

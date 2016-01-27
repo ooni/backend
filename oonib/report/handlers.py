@@ -12,17 +12,12 @@ from oonib.handlers import OONIBHandler
 from oonib.policy.handlers import Policy
 
 from datetime import datetime
-from oonib import randomStr, otime, log
+from oonib import randomStr, otime, log, json_dumps
 from oonib.config import config
 
 
 def report_file_name(archive_dir, report_details):
     timestamp = datetime.fromtimestamp(report_details['start_time'])
-    ext = report_details.get("format")
-    if ext == "json":
-        ext = "json"
-    else:
-        ext = "yamloo"
     keys = dict(
         report_details.items(),
         iso8601_timestamp=otime.timestamp(timestamp),
@@ -31,10 +26,9 @@ def report_file_name(archive_dir, report_details):
         day=timestamp.strftime("%d"),
         hour=timestamp.strftime("%H"),
         minute=timestamp.strftime("%M"),
-        second=timestamp.strftime("%S"),
-        ext=ext
+        second=timestamp.strftime("%S")
     )
-    report_file_template = "{probe_cc}/{test_name}-{iso8601_timestamp}-{probe_asn}-probe.{ext}"
+    report_file_template = "{iso8601_timestamp}-{test_name}-{probe_asn}-{probe_cc}-probe-0.2.0.json"
     if config.main.report_file_template:
         report_file_template = config.main.report_file_template
     dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
@@ -51,14 +45,13 @@ class Report(object):
                  stale_time,
                  report_dir,
                  archive_dir,
-                 reports, file_format="yaml"):
+                 reports):
         self.report_id = report_id
 
         self.stale_time = stale_time
         self.report_dir = report_dir
         self.archive_dir = archive_dir
         self.reports = reports
-        self.file_format = file_format
 
         self.refresh()
 
@@ -83,23 +76,13 @@ class Report(object):
         report_filename = get_report_path(self.report_id)
         try:
             with open(report_filename) as fd:
-                if self.file_format == "json":
-                    line = fd.readline()
-                    json.loads(line)
-                else:
-                    g = yaml.safe_load_all(fd)
-                    report_details = g.next()
+                line = fd.readline()
+                report_details = json.loads(line.strip())
         except IOError:
             raise e.ReportNotFound
 
         dst_filename = report_file_name(self.archive_dir, report_details)
         shutil.move(report_filename, dst_filename)
-
-        if self.file_format == "json":
-            report_details["record_type"] = "footer"
-            with open(dst_filename, "a+") as fd:
-                json.dump(report_details, dst_filename)
-                fd.write("\n")
 
         if not self.delayed_call.called:
             self.delayed_call.cancel()
@@ -169,6 +152,8 @@ def parseNewReportRequest(request):
     except KeyError:
         pass
 
+    parsed_request['format'] = parsed_request.get('format', 'yaml')
+
     return parsed_request
 
 
@@ -213,7 +198,6 @@ class ReportHandler(OONIBHandler):
 
 
 class UpdateReportMixin(object):
-
     def updateReport(self, report_id, parsed_request):
 
         log.debug("Got this request %s" % parsed_request)
@@ -224,9 +208,24 @@ class UpdateReportMixin(object):
         except KeyError:
             raise e.OONIBError(404, "Report not found")
 
+        content_format = parsed_request.get('format', 'yaml')
+        if content_format == 'json':
+            data = json_dumps(parsed_request['content'])
+        elif content_format == 'yaml':
+            try:
+                entry = yaml.safe_load_all(parsed_request['content']).next()
+                data = json_dumps(entry)
+            except Exception as exc:
+                log.error("Received an invalid entry")
+                log.msg(parsed_request['content'])
+                log.exception(exc)
+                raise e.OONIBError(400, "Invalid report entry")
+        else:
+            raise e.InvalidFormatField
         try:
             with open(report_filename, 'a+') as fd:
-                fd.write(parsed_request['content'])
+                fd.write(data)
+                fd.write("\n")
         except IOError:
             raise e.OONIBError(404, "Report not found")
         self.write({'status': 'success'})
@@ -306,25 +305,15 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             self.checkPolicy()
 
         if 'content' in report_data:
-            content = yaml.safe_load(report_data['content'])
-            report_header = validate_report_header(content)
-
+            if report_data['format'] == 'json':
+                content = report_data['content']
+            elif report_data['format'] == 'yaml':
+                content = None
+            else:
+                raise e.InvalidFormatField
+            content['backend_version'] = config.backend_version
         else:
-            content = {
-                'software_name': software_name,
-                'software_version': software_version,
-                'probe_asn': probe_asn,
-                'probe_cc': probe_cc,
-                'test_name': self.testName,
-                'test_version': self.testVersion,
-                'input_hashes': self.inputHashes,
-                'start_time': time.time()
-            }
-
-        content['backend_version'] = config.backend_version
-
-        report_header = yaml.dump(content)
-        content = "---\n" + report_header + '...\n'
+            content = None
 
         if not probe_asn:
             probe_asn = "AS0"
@@ -356,8 +345,13 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
                                          self.report_dir,
                                          self.archive_dir,
                                          self.reports)
-
-        self.writeToReport(report_filename, content)
+        if content:
+            # XXX make sure to validate the cotent to ensure it's possible to
+            # encode as JSON
+            data = json_dumps(content) + "\n"
+            self.writeToReport(report_filename, data)
+        else:
+            open(report_filename, 'w+').close()
 
         self.write(response)
 
