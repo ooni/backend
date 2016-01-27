@@ -343,7 +343,7 @@ class NormaliseReport(luigi.Task):
     def _normalise_dnst(entry):
         entry['test_keys'].pop('test_resolvers', None)
 
-        errors = entry['test_keys'].pop('tampering')
+        errors = entry['test_keys'].pop('tampering', None)
         if errors:
             entry['test_keys']['errors'] = errors
             entry['test_keys']['successful'] = map(lambda e: e[0], filter(lambda e: e[1] is False, errors.items()))
@@ -380,8 +380,19 @@ class NormaliseReport(luigi.Task):
 
                 if answer_type == 'A':
                     normalised_answer['ipv4'] = re.search("address=" + regexps['ipv4'], answer[1]).group(1)
-                elif answer_type in ['PTR', 'CNAME', 'SOA']:
+                elif answer_type == 'MX':
+                    normalised_answer['hostname'] = re.search("address=" + regexps['ipv4'], answer[1]).group(1)
+                    normalised_answer['preference'] = re.search("preference=(\d+)", answer[1]).group(1)
+                elif answer_type in ['PTR', 'CNAME']:
                     normalised_answer['hostname'] = re.search("name=" + regexps['hostname'], answer[1]).group(1)
+                elif answer_type == 'SOA':
+                    normalised_answer['responsible_name'] = re.search("rname=" + regexps['hostname'], answer[1]).group(1)
+                    normalised_answer['hostname'] = re.search("mname=" + regexps['hostname'], answer[1]).group(1)
+                    normalised_answer['serial_number'] = re.search("serial=(\d+)", answer[1]).group(1)
+                    normalised_answer['refresh_interval'] = re.search("refresh=(\d+)", answer[1]).group(1)
+                    normalised_answer['retry_interval'] = re.search("retry=(\d+)", answer[1]).group(1)
+                    normalised_answer['minimum_ttl'] = re.search("minimum=(\d+)", answer[1]).group(1)
+                    normalised_answer['expiration_limit'] = re.search("expire=(\d+)", answer[1]).group(1)
                 answers.append(normalised_answer)
             query['answers'] = answers
 
