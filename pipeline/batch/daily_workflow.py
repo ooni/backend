@@ -516,6 +516,7 @@ class NormaliseReport(luigi.Task):
                 try:
                     yield yaml.load(document, Loader=Loader)
                 except:
+                    logger.info("Trying fallback yaml loader for %s" % document)
                     try:
                         yield yaml.load(document)
                     except:
