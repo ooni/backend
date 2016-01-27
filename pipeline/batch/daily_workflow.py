@@ -111,6 +111,8 @@ schema = [
     'probe_cc',
     'probe_asn',
     'probe_ip',
+    'probe_city',
+    'backend_version',
     'data_format_version',
     'test_name',
     'test_version',
