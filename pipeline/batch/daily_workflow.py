@@ -105,6 +105,7 @@ test_name_mappings = {
 schema = [
     'id',
     'input',
+    'input_hashes',
     'report_id',
     'report_filename',
     'options',
