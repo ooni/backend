@@ -364,7 +364,11 @@ class NormaliseReport(luigi.Task):
                 query['hostname'] = re.search("\[Query\('(.+)'", query.pop('query')).group(1)
             except:
                 query['hostname'] = None
-            query['resolver_hostname'],  query['resolver_port'] = query.pop('resolver')
+
+            try:
+                query['resolver_hostname'],  query['resolver_port'] = query.pop('resolver')
+            except:
+                query['resolver_hostname'],  query['resolver_port'] = [None, None]
 
             query.pop('addrs', None)
 
