@@ -394,20 +394,20 @@ class NormaliseReport(luigi.Task):
                 )
 
                 if answer_type == 'A':
-                    normalised_answer['ipv4'] = regex_or_empty_string("address=" + regexps['ipv4'], answer[1])
+                    normalised_answer['ipv4'] =             regex_or_empty_string("address=" + regexps['ipv4'],   answer[1])
                 elif answer_type == 'MX':
-                    normalised_answer['hostname'] = regex_or_empty_string("address=" + regexps['ipv4'], answer[1])
-                    normalised_answer['preference'] = regex_or_empty_string("preference=(\d+)", answer[1])
+                    normalised_answer['hostname'] =         regex_or_empty_string("address=" + regexps['ipv4'],   answer[1])
+                    normalised_answer['preference'] =       regex_or_empty_string("preference=(\d+)",             answer[1])
                 elif answer_type in ['PTR', 'CNAME']:
-                    normalised_answer['hostname'] = regex_or_empty_string("name=" + regexps['hostname'], answer[1])
+                    normalised_answer['hostname'] =         regex_or_empty_string("name=" + regexps['hostname'],  answer[1])
                 elif answer_type == 'SOA':
                     normalised_answer['responsible_name'] = regex_or_empty_string("rname=" + regexps['hostname'], answer[1])
-                    normalised_answer['hostname'] = regex_or_empty_string("mname=" + regexps['hostname'], answer[1])
-                    normalised_answer['serial_number'] = regex_or_empty_string("serial=(\d+)", answer[1])
-                    normalised_answer['refresh_interval'] = regex_or_empty_string("refresh=(\d+)", answer[1])
-                    normalised_answer['retry_interval'] = regex_or_empty_string("retry=(\d+)", answer[1])
-                    normalised_answer['minimum_ttl'] = regex_or_empty_string("minimum=(\d+)", answer[1])
-                    normalised_answer['expiration_limit'] = regex_or_empty_string("expire=(\d+)", answer[1])
+                    normalised_answer['hostname'] =         regex_or_empty_string("mname=" + regexps['hostname'], answer[1])
+                    normalised_answer['serial_number'] =    regex_or_empty_string("serial=(\d+)",                 answer[1])
+                    normalised_answer['refresh_interval'] = regex_or_empty_string("refresh=(\d+)",                answer[1])
+                    normalised_answer['retry_interval'] =   regex_or_empty_string("retry=(\d+)",                  answer[1])
+                    normalised_answer['minimum_ttl'] =      regex_or_empty_string("minimum=(\d+)",                answer[1])
+                    normalised_answer['expiration_limit'] = regex_or_empty_string("expire=(\d+)",                 answer[1])
                 answers.append(normalised_answer)
             query['answers'] = answers
 
