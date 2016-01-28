@@ -219,6 +219,12 @@ def parse_path(path):
         vantage_point=vantage_point
     )
 
+def regex_or_empty_string(pattern, source):
+    found = re.search(pattern, source)
+    if found:
+        return found.group(1)
+    return ''
+
 class ReadReport(luigi.ExternalTask):
     report_path = luigi.Parameter()
     def output(self):
@@ -361,7 +367,7 @@ class NormaliseReport(luigi.Task):
         queries = []
         for query in entry['test_keys'].pop('queries'):
             try:
-                query['hostname'] = re.search("\[Query\('(.+)'", query.pop('query')).group(1)
+                query['hostname'] = regex_or_empty_string("\[Query\('(.+)'", query.pop('query'))
             except:
                 query['hostname'] = None
 
@@ -375,12 +381,12 @@ class NormaliseReport(luigi.Task):
             answers = []
             for answer in query.pop('answers', []):
                 try:
-                    ttl = re.search("ttl=(\d+)", answer[0]).group(1)
+                    ttl = regex_or_empty_string("ttl=(\d+)", answer[0])
                 except Exception:
                     logger.error("Failed to parse ttl in %s" % answer[0])
                     ttl = None
 
-                answer_type = re.search("type=([A-Z]+)", answer[0]).group(1)
+                answer_type = regex_or_empty_string("type=([A-Z]+)", answer[0])
 
                 normalised_answer = dict(
                     ttl=ttl,
@@ -388,20 +394,20 @@ class NormaliseReport(luigi.Task):
                 )
 
                 if answer_type == 'A':
-                    normalised_answer['ipv4'] = re.search("address=" + regexps['ipv4'], answer[1]).group(1)
+                    normalised_answer['ipv4'] = regex_or_empty_string("address=" + regexps['ipv4'], answer[1])
                 elif answer_type == 'MX':
-                    normalised_answer['hostname'] = re.search("address=" + regexps['ipv4'], answer[1]).group(1)
-                    normalised_answer['preference'] = re.search("preference=(\d+)", answer[1]).group(1)
+                    normalised_answer['hostname'] = regex_or_empty_string("address=" + regexps['ipv4'], answer[1])
+                    normalised_answer['preference'] = regex_or_empty_string("preference=(\d+)", answer[1])
                 elif answer_type in ['PTR', 'CNAME']:
-                    normalised_answer['hostname'] = re.search("name=" + regexps['hostname'], answer[1]).group(1)
+                    normalised_answer['hostname'] = regex_or_empty_string("name=" + regexps['hostname'], answer[1])
                 elif answer_type == 'SOA':
-                    normalised_answer['responsible_name'] = re.search("rname=" + regexps['hostname'], answer[1]).group(1)
-                    normalised_answer['hostname'] = re.search("mname=" + regexps['hostname'], answer[1]).group(1)
-                    normalised_answer['serial_number'] = re.search("serial=(\d+)", answer[1]).group(1)
-                    normalised_answer['refresh_interval'] = re.search("refresh=(\d+)", answer[1]).group(1)
-                    normalised_answer['retry_interval'] = re.search("retry=(\d+)", answer[1]).group(1)
-                    normalised_answer['minimum_ttl'] = re.search("minimum=(\d+)", answer[1]).group(1)
-                    normalised_answer['expiration_limit'] = re.search("expire=(\d+)", answer[1]).group(1)
+                    normalised_answer['responsible_name'] = regex_or_empty_string("rname=" + regexps['hostname'], answer[1])
+                    normalised_answer['hostname'] = regex_or_empty_string("mname=" + regexps['hostname'], answer[1])
+                    normalised_answer['serial_number'] = regex_or_empty_string("serial=(\d+)", answer[1])
+                    normalised_answer['refresh_interval'] = regex_or_empty_string("refresh=(\d+)", answer[1])
+                    normalised_answer['retry_interval'] = regex_or_empty_string("retry=(\d+)", answer[1])
+                    normalised_answer['minimum_ttl'] = regex_or_empty_string("minimum=(\d+)", answer[1])
+                    normalised_answer['expiration_limit'] = regex_or_empty_string("expire=(\d+)", answer[1])
                 answers.append(normalised_answer)
             query['answers'] = answers
 
