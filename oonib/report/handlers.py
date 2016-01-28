@@ -99,7 +99,7 @@ class Report(object):
         del self.reports[self.report_id]
 
 
-def parseUpdateReportRequest(request):
+def parseUpdateReportRequest(request, report_id=None):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
 
     # this is the regexp for the reports that include the timestamp
@@ -111,14 +111,15 @@ def parseUpdateReportRequest(request):
     # We are also keeping in memory multiple copies of the same object. A lot
     # of optimization can be done.
     parsed_request = json.loads(request)
-    try:
-        report_id = parsed_request['report_id']
-    except KeyError:
+
+    report_id = parsed_request.get('report_id', report_id)
+    if not report_id:
         raise e.MissingField('report_id')
 
     if not re.match(report_id_regexp, report_id):
         raise e.InvalidRequestField('report_id')
 
+    parsed_request['report_id'] = report_id
     return parsed_request
 
 
@@ -173,7 +174,7 @@ def parseNewReportRequest(request):
             raise e.InvalidRequestField("start_time")
 
     try:
-        parsed_request['start_time'] = float(header['start_time'])
+        parsed_request['start_time'] = float(parsed_request['start_time'])
     except ValueError as exc:
         log.exception(exc)
         raise e.InvalidRequestField("start_time")
@@ -183,7 +184,7 @@ def parseNewReportRequest(request):
             header = yaml.safe_load(parsed_request['content'])
             parsed_request['probe_cc'] = header['probe_cc']
             if not re.match(probe_cc, parsed_request['probe_cc']):
-                raise Exception("Does not match the regexp")
+                raise e.InvalidRequestField("probe_cc")
         except Exception as exc:
             log.exception(exc)
             raise e.InvalidRequestField("probe_cc")
@@ -206,7 +207,7 @@ class ReportHandler(OONIBHandler):
 class UpdateReportMixin(object):
     def updateReport(self, report_id, parsed_request):
 
-        log.debug("Got this request %s" % parsed_request)
+        log.msg("Got this request %s" % parsed_request)
         report_filename = os.path.join(self.report_dir,
                                        report_id)
         try:
@@ -279,7 +280,11 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
 
         * Response
 
-          {'backend_version': 'XXX', 'report_id': 'XXX'}
+          {
+              'backend_version': 'XXX',
+              'report_id': 'XXX',
+              'supported_formats': ['yaml', 'json']
+          }
 
         """
         # Note: the request is being validated inside of parseNewReportRequest.
@@ -320,7 +325,8 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
 
         response = {
             'backend_version': config.backend_version,
-            'report_id': report_id
+            'report_id': report_id,
+            'supported_formats': ['yaml', 'json']
         }
 
         requested_helper = report_data.get('test_helper')
@@ -363,17 +369,13 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
         """
         parsed_request = parseUpdateReportRequest(self.request.body)
         report_id = parsed_request['report_id']
-
         self.updateReport(report_id, parsed_request)
 
 
 class UpdateReportHandlerFile(ReportHandler, UpdateReportMixin):
-
     def post(self, report_id):
-        try:
-            parsed_request = json.loads(self.request.body)
-        except ValueError:
-            raise e.InvalidRequest
+        parsed_request = parseUpdateReportRequest(self.request.body, report_id)
+        report_id = parsed_request['report_id']
         self.updateReport(report_id, parsed_request)
 
 
