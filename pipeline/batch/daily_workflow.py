@@ -378,7 +378,7 @@ class NormaliseReport(luigi.Task):
             entry['test_keys']['inconsistent'] = []
 
         queries = []
-        for query in entry['test_keys'].pop('queries'):
+        for query in entry['test_keys'].pop('queries', []):
             try:
                 query['hostname'] = regex_or_empty_string("\[Query\('(.+)'", query.pop('query'))
             except:
@@ -473,7 +473,7 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_tls_handshake(entry):
-        entry['session_key'] = binary_to_base64_dict(entry['session_key'])
+        entry['test_keys']['session_key'] = binary_to_base64_dict(entry['test_keys'].get('session_key', ''))
         return entry
 
     @staticmethod
