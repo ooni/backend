@@ -274,8 +274,10 @@ class NormaliseReport(luigi.Task):
         def _normalise_headers(headers):
             normalised_headers = {}
             for name, values in headers:
-                for v in values:
-                    normalised_headers[name] = _normalise_str(v)
+                value = values[0]
+                if isinstance(value, list):
+                    value = value[0]
+                normalised_headers[name] = _normalise_str(value)
             return normalised_headers
 
         experiment_requests = []
