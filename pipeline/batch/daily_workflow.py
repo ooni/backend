@@ -579,6 +579,9 @@ class NormaliseReport(luigi.Task):
         report_id += ''.join(random.choice(string.ascii_letters)
                              for x in range(50))
         header['report_id'] = header.get('report_id', report_id)
+        if header['report_id'] is None:
+            header['report_id'] = report_id
+
         for entry in report:
             if not entry:
                 continue
