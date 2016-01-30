@@ -651,8 +651,17 @@ class SanitiseReport(luigi.Task):
     @staticmethod
     def _sanitise_bridge_reachability(entry, bridge_db):
         test_keys = entry['test_keys']
-        if not test_keys.get('bridge_address'):
+        if not test_keys.get('bridge_address', None):
             test_keys['bridge_address'] = entry['input']
+
+        regexp = ("(Learned fingerprint ([A-Z0-9]+)"
+                "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
+                "((new bridge descriptor .+?\s+"
+                "at (([0-9]+\.){3}[0-9]+)))")
+        if test_keys.get('tor_log'):
+            test_keys['tor_log'] = re.sub(regexp, "[REDACTED]", test_keys['tor_log'])
+        else:
+            test_keys['tor_log'] = ''
 
         if test_keys['bridge_address'] and \
                 test_keys['bridge_address'].strip() in bridge_db:
@@ -663,17 +672,20 @@ class SanitiseReport(luigi.Task):
             hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
             test_keys['input'] = hashed_fingerprint
             test_keys['bridge_address'] = None
-            regexp = ("(Learned fingerprint ([A-Z0-9]+)"
-                    "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
-                    "((new bridge descriptor .+?\s+"
-                    "at (([0-9]+\.){3}[0-9]+)))")
-            if test_keys.get('tor_log'):
-                test_keys['tor_log'] = re.sub(regexp, "[REDACTED]", test_keys['tor_log'])
-            else:
-                test_keys['tor_log'] = None
         else:
+            bridge_line = test_keys['bridge_address'].split(' ')
+            fingerprint = None
+            if len(bridge_line) > 2 and len(bridge_line[2]) == 40:
+                fingerprint = bridge_line[2].decode('hex')
+            elif len(bridge_line) > 1 and len(bridge_line[1]) == 40:
+                fingerprint = bridge_line[1].decode('hex')
+
             test_keys['distributor'] = None
-            hashed_fingerprint = None
+            if fingerprint:
+                hashed_fingerprint  = hashlib.sha1(fingerprint).hexdigest()
+            else:
+                hashed_fingerprint = None
+
         test_keys['bridge_hashed_fingerprint'] = hashed_fingerprint
         entry['test_keys'] = test_keys
         return entry
