@@ -472,6 +472,11 @@ class NormaliseReport(luigi.Task):
         return entry
 
     @staticmethod
+    def _normalise_tls_handshake(entry):
+        entry['session_key'] = binary_to_base64_dict(entry['session_key'])
+        return entry
+
+    @staticmethod
     def _normalise_captive_portal(entry):
         if isinstance(entry.get('google_dns_cp', None), set):
             entry['google_dns_cp'] = list(entry['google_dns_cp'])
@@ -520,6 +525,8 @@ class NormaliseReport(luigi.Task):
             entry = self._normalise_scapyt(entry)
         if test_name == 'captive_portal':
             entry = self._normalise_captive_portal(entry)
+        if test_name == 'tls_handshake':
+            entry = self._normalise_tls_handshake(entry)
         return entry
 
     def _yaml_loader(self, fobj):
