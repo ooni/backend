@@ -148,6 +148,7 @@ test_categories = {
         'squid',
         'captive_portal',
         'psiphon',
+        'tor_http_requests_test'
     },
     'scapyt': {
         'chinatrigger',
@@ -297,8 +298,8 @@ class NormaliseReport(luigi.Task):
                 entry['test_keys'].get('response', None):
             entry['test_keys']['requests'] = entry['test_keys'].get('requests', [])
             entry['test_keys']['requests'].append({
-                'response': entry['test_keys']['response'],
-                'request': entry['test_keys']['request']
+                'response': entry['test_keys'].pop('response'),
+                'request': entry['test_keys'].pop('request')
             })
 
         for session in entry['test_keys'].get('requests', []):
