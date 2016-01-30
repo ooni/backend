@@ -177,6 +177,21 @@ def binary_to_base64_dict(data):
         "format": "base64"
     }
 
+def normalise_str(body):
+    if body is None:
+        return body
+    try:
+        body = body.replace('\0', '')
+        if not isinstance(body, unicode):
+            body = unicode(body, 'ascii')
+    except UnicodeDecodeError:
+        try:
+            body = unicode(body, 'utf-8')
+        except UnicodeDecodeError:
+            body = binary_to_base64_dict(body)
+            return body
+
+
 def get_luigi_target(path):
     try:
         from urlparse import urlparse
@@ -257,27 +272,13 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_httpt(entry):
-        def _normalise_str(body):
-            if body is None:
-                return body
-            try:
-                body = body.replace('\0', '')
-                if not isinstance(body, unicode):
-                    body = unicode(body, 'ascii')
-            except UnicodeDecodeError:
-                try:
-                    body = unicode(body, 'utf-8')
-                except UnicodeDecodeError:
-                    body = binary_to_base64_dict(body)
-            return body
-
         def _normalise_headers(headers):
             normalised_headers = {}
             for name, values in headers:
                 value = values[0]
                 if isinstance(value, list):
                     value = value[0]
-                normalised_headers[name] = _normalise_str(value)
+                normalised_headers[name] = normalise_str(value)
             return normalised_headers
 
         experiment_requests = []
@@ -306,13 +307,13 @@ class NormaliseReport(luigi.Task):
 
         for session in entry['test_keys'].get('requests', []):
             if isinstance(session.get('response'), dict):
-                session['response']['body'] = _normalise_str(session['response']['body'])
+                session['response']['body'] = normalise_str(session['response']['body'])
                 session['response']['headers'] = _normalise_headers(session['response']['headers'])
             else:
                 session['response'] = {'body': None, 'headers': {}}
 
             if isinstance(session.get('request'), dict):
-                session['request']['body'] = _normalise_str(session['request']['body'])
+                session['request']['body'] = normalise_str(session['request']['body'])
                 session['request']['headers'] = _normalise_headers(session['request']['headers'])
             else:
                 session['request'] = {'body': None, 'headers': {}}
@@ -477,6 +478,17 @@ class NormaliseReport(luigi.Task):
     def _normalise_tls_handshake(entry):
         entry['test_keys']['cert_serial_no'] = hex(entry['test_keys'].get('cert_serial_no', 0))
         entry['test_keys']['session_key'] = binary_to_base64_dict(entry['test_keys'].get('session_key', ''))
+
+        normalised_subjects = []
+        for name, value in entry['test_keys'].get('cert_subject', []):
+            value = normalise_str(value)
+        entry['test_keys']['cert_subject'] = normalised_subjects
+
+        normalised_issuer = []
+        for name, value in entry['test_keys'].get('cert_issuer', []):
+            value = normalise_str(value)
+        entry['test_keys']['cert_issuer'] = normalised_issuer
+
         return entry
 
     @staticmethod
