@@ -475,7 +475,7 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_tls_handshake(entry):
-        entry['test_keys']['cert_serial_no'] = hex(entry['test_keys']['cert_serial_no'])
+        entry['test_keys']['cert_serial_no'] = hex(entry['test_keys'].get('cert_serial_no', 0))
         entry['test_keys']['session_key'] = binary_to_base64_dict(entry['test_keys'].get('session_key', ''))
         return entry
 
