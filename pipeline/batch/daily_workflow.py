@@ -169,6 +169,8 @@ regexps = {
 }
 
 def binary_to_base64_dict(data):
+    if isinstance(data, unicode):
+        data = data.encode('utf-8', 'ignore')
     return {
         "data": b64encode(data),
         "format": "base64"
