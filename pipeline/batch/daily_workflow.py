@@ -291,6 +291,16 @@ class NormaliseReport(luigi.Task):
         if url_option_idx is not None and entry['input'] is None:
             entry['input'] = entry['options'][url_option_idx]
 
+        # This is needed to fix the requests and responses in the
+        # tor_http_requests test.
+        if entry['test_keys'].get('request', None) and \
+                entry['test_keys'].get('response', None):
+            entry['test_keys']['requests'] = entry['test_keys'].get('requests', [])
+            entry['test_keys']['requests'].append({
+                'response': entry['test_keys']['response'],
+                'request': entry['test_keys']['request']
+            })
+
         for session in entry['test_keys'].get('requests', []):
             if isinstance(session.get('response'), dict):
                 session['response']['body'] = _normalise_str(session['response']['body'])
