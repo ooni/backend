@@ -505,6 +505,9 @@ class NormaliseReport(luigi.Task):
                                     os.path.basename(self.output().path))
         entry['data_format_version'] = '0.2.0'
 
+        if isinstance(entry.get('options', []), dict):
+            entry['options'] = entry['options'].get('subargs', [])
+
         for key in schema:
             entry[key] = entry.get(key, None)
 
