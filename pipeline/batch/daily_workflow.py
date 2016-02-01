@@ -663,6 +663,7 @@ class SanitiseReport(luigi.Task):
         else:
             test_keys['tor_log'] = ''
 
+        hashed_fingerprint = None
         if test_keys['bridge_address'] and \
                 test_keys['bridge_address'].strip() in bridge_db:
             b = bridge_db[test_keys['bridge_address'].strip()]
@@ -670,7 +671,6 @@ class SanitiseReport(luigi.Task):
             test_keys['transport'] = b['transport']
             fingerprint = b['fingerprint'].decode('hex')
             hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-            test_keys['input'] = hashed_fingerprint
             test_keys['bridge_address'] = None
         else:
             bridge_line = test_keys['bridge_address'].split(' ')
@@ -683,9 +683,9 @@ class SanitiseReport(luigi.Task):
             test_keys['distributor'] = None
             if fingerprint:
                 hashed_fingerprint  = hashlib.sha1(fingerprint).hexdigest()
-            else:
-                hashed_fingerprint = None
 
+        if hashed_fingerprint is not None:
+            entry['input'] = hashed_fingerprint
         test_keys['bridge_hashed_fingerprint'] = hashed_fingerprint
         entry['test_keys'] = test_keys
         return entry
