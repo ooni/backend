@@ -25,7 +25,7 @@ Distro dependencies (Debian)
 There are a few dependencies which we recommend you get from your
 distribution's archives::
 
-    sudo apt-get install build-essential python-dev python-setuptools openssl libsqlite3-dev libffi-dev
+    sudo apt-get install build-essential python-dev python-setuptools openssl libsqlite3-dev libffi-dev git curl
 
 Tor
 ...
@@ -83,7 +83,7 @@ setting up this up and installing are::
     # Create the virtualenv for ooni-backend...
     mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
     # ...and install ooni-backend (sudo is not necessary since we're in a virtualenv):
-    pip install -r requirements.txt --use-mirrors
+    pip install -r requirements.txt
     # Note: it is important that you install the requirements before you run
     # the setup.py script. If you fail to do so they will be downloaded over
     # plaintext.
