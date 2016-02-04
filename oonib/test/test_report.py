@@ -1,6 +1,8 @@
-import os
+import time
 import json
 import yaml
+
+from copy import deepcopy
 
 from twisted.internet import defer
 
@@ -72,6 +74,16 @@ test_version: 0.1.0
 ...
 """
 
+dummy_data = {
+    'software_name': 'ooni-test',
+    'software_version': '0.1',
+    'test_name': 'some-test',
+    'test_version': '0.1',
+    'probe_asn': 'AS0',
+    'probe_cc': 'ZZ',
+    'start_time': time.time()
+}
+
 for _, handler in reportAPI:
     handler.initialize = mock_initialize
 
@@ -92,14 +104,7 @@ class TestReport(HandlerTestCase):
 
     @defer.inlineCallbacks
     def test_create_valid_report(self):
-        data = {
-            'software_name': 'ooni-test',
-            'software_version': '0.1',
-            'test_name': 'some-test',
-            'test_version': '0.1',
-            'probe_asn': 'AS0'
-        }
-        response = yield self.request('/report', "POST", data)
+        response = yield self.request('/report', "POST", dummy_data)
         response_body = json.loads(response.body)
         self.assertIn('backend_version', response_body)
         self.assertIn('report_id', response_body)
@@ -107,14 +112,8 @@ class TestReport(HandlerTestCase):
 
     @defer.inlineCallbacks
     def test_create_valid_report_with_content(self):
-        data = {
-            'software_name': 'ooni-test',
-            'software_version': '0.1',
-            'test_name': 'some-test',
-            'test_version': '0.1',
-            'probe_asn': 'AS0',
-            'content': sample_report_header
-        }
+        data = deepcopy(dummy_data)
+        data['content'] = sample_report_header
         response = yield self.request('/report', "POST", data)
         response_body = json.loads(response.body)
         self.assertIn('backend_version', response_body)
@@ -123,13 +122,8 @@ class TestReport(HandlerTestCase):
 
     @defer.inlineCallbacks
     def test_create_invalid_report(self):
-        data = {
-            'software_name': 'ooni-test',
-            'software_version': '0.1',
-            'test_name': 'some-test',
-            'test_version': '0.1',
-            'probe_asn': 'XXX'
-        }
+        data = deepcopy(dummy_data)
+        data['probe_asn'] = 'XXXINVALID'
         response = yield self.request('/report', "POST", data)
         response_body = json.loads(response.body)
         self.assertIn('error', response_body)
@@ -138,14 +132,7 @@ class TestReport(HandlerTestCase):
 
     @defer.inlineCallbacks
     def test_create_and_update_report(self):
-        report_header = {
-            'software_name': 'ooni-test',
-            'software_version': '0.1',
-            'test_name': 'some-test',
-            'test_version': '0.1',
-            'probe_asn': 'AS0'
-        }
-        response = yield self.request('/report', "POST", report_header)
+        response = yield self.request('/report', "POST", dummy_data)
         response_body = json.loads(response.body)
         self.assertIn('backend_version', response_body)
         self.assertIn('report_id', response_body)
@@ -159,21 +146,14 @@ class TestReport(HandlerTestCase):
             written_report = yaml.safe_load_all(f)
 
             written_report_header = written_report.next()
-            for key in report_header.keys():
-                self.assertEqual(written_report_header[key], report_header[key])
+            for key in dummy_data.keys():
+                self.assertEqual(written_report_header[key], dummy_data[key])
             self.assertEqual(yaml.safe_load(sample_report_entry),
                              written_report.next())
 
     @defer.inlineCallbacks
     def test_create_update_and_close_report(self):
-        report_header = {
-            'software_name': 'ooni-test',
-            'software_version': '0.1',
-            'test_name': 'some-test',
-            'test_version': '0.1',
-            'probe_asn': 'AS0'
-        }
-        response = yield self.request('/report', "POST", report_header)
+        response = yield self.request('/report', "POST", dummy_data)
         response_body = json.loads(response.body)
         self.assertIn('backend_version', response_body)
         self.assertIn('report_id', response_body)
@@ -188,15 +168,16 @@ class TestReport(HandlerTestCase):
             written_report = yaml.safe_load_all(f)
 
             written_report_header = written_report.next()
-            for key in report_header.keys():
+            for key in dummy_data.keys():
                 self.assertEqual(written_report_header[key],
-                                 report_header[key])
+                                 dummy_data[key])
 
             self.assertEqual(yaml.safe_load(sample_report_entry),
                              written_report.next())
 
         response = yield self.request('/report/%s/close' % report_id, "POST")
 
+        written_report_header['format'] = 'yaml'
         written_report_path = report_file_name(".", written_report_header)
         with open(written_report_path) as f:
             self.filenames.add(written_report_path)
@@ -206,5 +187,3 @@ class TestReport(HandlerTestCase):
             for i in range(report_entry_count):
                 self.assertEqual(yaml.safe_load(sample_report_entry),
                                  written_report.next())
-
-        self.directories.add('ZZ')

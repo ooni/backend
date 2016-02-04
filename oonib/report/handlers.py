@@ -303,17 +303,22 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             self.checkPolicy()
 
         data = None
-        if 'content' in report_data:
-            if report_data['format'] == 'json':
-                content = report_data['content']
-                content['backend_version'] = config.backend_version
-                data = json_dumps(content)
-            elif report_data['format'] == 'yaml':
-                content = yaml.safe_load(report_data['content'])
-                content['backend_version'] = config.backend_version
-                data = "---\n" + yaml.dump(content) + "...\n"
-            else:
-                raise e.InvalidFormatField
+        if 'content' in report_data and report_data['format'] == 'json':
+            content = report_data['content']
+            content['backend_version'] = config.backend_version
+            data = json_dumps(content)
+        elif report_data['format'] == 'yaml':
+            content = {
+                'software_name': str(report_data['software_name']),
+                'software_version': str(report_data['software_version']),
+                'probe_asn': str(report_data['probe_asn']),
+                'probe_cc': str(report_data['probe_cc']),
+                'test_name': self.testName,
+                'test_version': self.testVersion,
+                'input_hashes': self.inputHashes,
+                'start_time': report_data.get('start_time', time.time())
+            }
+            data = "---\n" + yaml.dump(content) + "...\n"
 
         report_id = otime.timestamp() + '_' \
             + report_data.get('probe_asn', 'AS0') + '_' \
