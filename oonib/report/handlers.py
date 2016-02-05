@@ -16,7 +16,8 @@ from oonib import randomStr, otime, log, json_dumps
 from oonib.config import config
 
 
-def report_file_name(archive_dir, report_details):
+def report_file_name(archive_dir, report_details,
+                     report_id='no_report_id'):
     timestamp = datetime.fromtimestamp(report_details['start_time'])
     if report_details['format'] == 'json':
         ext = 'json'
@@ -34,9 +35,10 @@ def report_file_name(archive_dir, report_details):
         hour=timestamp.strftime("%H"),
         minute=timestamp.strftime("%M"),
         second=timestamp.strftime("%S"),
-        ext=ext
+        ext=ext,
+        report_id=report_id
     )
-    report_file_template = "{iso8601_timestamp}-{test_name}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}"
+    report_file_template = "{iso8601_timestamp}-{test_name}-{report_id}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}"
     if config.main.report_file_template:
         report_file_template = config.main.report_file_template
     dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
@@ -90,8 +92,9 @@ class Report(object):
         except IOError:
             raise e.ReportNotFound
 
-        dst_filename = report_file_name(self.archive_dir,
-                                        self.report_details)
+        dst_filename = report_file_name(archive_dir=self.archive_dir,
+                                        report_details=self.report_details,
+                                        report_id=self.report_id)
         shutil.move(report_filename, dst_filename)
 
         if not self.delayed_call.called:
