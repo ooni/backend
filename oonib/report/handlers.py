@@ -123,10 +123,7 @@ def parseUpdateReportRequest(request, report_id=None):
     return parsed_request
 
 
-def parseNewReportRequest(request):
-    """
-    Here we parse a new report request.
-    """
+def validateHeader(header):
     version_string = re.compile("[0-9A-Za-z_\-\.]+$")
     name = re.compile("[a-zA-Z0-9_\- ]+$")
     probe_asn = re.compile("AS[0-9]+$")
@@ -138,16 +135,29 @@ def parseNewReportRequest(request):
         'software_version': version_string,
         'test_name': name,
         'test_version': version_string,
-        'probe_asn': probe_asn
+        'probe_asn': probe_asn,
+        'probe_cc': probe_cc,
+        'data_format_version': version_string
     }
 
-    parsed_request = json.loads(request)
-    if 'probe_asn' not in parsed_request or not parsed_request['probe_asn']:
-        parsed_request['probe_asn'] = 'AS0'
+    if not header.get('probe_asn'):
+        header['probe_asn'] = 'AS0'
+
+    if not header.get('probe_cc'):
+        header['probe_cc'] = 'ZZ'
+
+    if not header.get('start_time'):
+        header['start_time'] = time.time()
+
+    if not header.get('start_time'):
+        header['start_time'] = time.time()
+
+    if not header.get('data_format_version'):
+        header['data_format_version'] = '0.1.0'
 
     for k, regexp in expected_request.items():
         try:
-            value_to_check = parsed_request[k]
+            value_to_check = header[k]
         except KeyError:
             raise e.MissingField(k)
 
@@ -158,38 +168,23 @@ def parseNewReportRequest(request):
             raise e.InvalidRequestField(k)
 
     try:
-        requested_test_helper = parsed_request['test_helper']
+        requested_test_helper = header['test_helper']
         if not re.match(test_helper, str(requested_test_helper)):
             raise e.InvalidRequestField('test_helper')
     except KeyError:
         pass
 
+    return header
 
-    if 'start_time' not in parsed_request:
-        try:
-            header = yaml.safe_load(parsed_request['content'])
-            parsed_request['start_time'] = header['start_time']
-        except Exception as exc:
-            log.exception(exc)
-            raise e.InvalidRequestField("start_time")
 
-    try:
-        parsed_request['start_time'] = float(parsed_request['start_time'])
-    except ValueError as exc:
-        log.exception(exc)
-        raise e.InvalidRequestField("start_time")
-
-    if 'probe_cc' not in parsed_request:
-        try:
-            header = yaml.safe_load(parsed_request['content'])
-            parsed_request['probe_cc'] = header['probe_cc']
-            if not re.match(probe_cc, parsed_request['probe_cc']):
-                raise e.InvalidRequestField("probe_cc")
-        except Exception as exc:
-            log.exception(exc)
-            raise e.InvalidRequestField("probe_cc")
-
+def parseNewReportRequest(request):
+    """
+    Here we parse a new report request.
+    """
+    parsed_request = json.loads(request)
     parsed_request['format'] = parsed_request.get('format', 'yaml')
+
+    parsed_request = validateHeader(parsed_request)
 
     return parsed_request
 
@@ -303,11 +298,7 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             self.checkPolicy()
 
         data = None
-        if 'content' in report_data and report_data['format'] == 'json':
-            content = report_data['content']
-            content['backend_version'] = config.backend_version
-            data = json_dumps(content)
-        elif report_data['format'] == 'yaml':
+        if report_data['format'] == 'yaml' and 'content' not in report_data:
             content = {
                 'software_name': str(report_data['software_name']),
                 'software_version': str(report_data['software_version']),
@@ -315,10 +306,14 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
                 'probe_cc': str(report_data['probe_cc']),
                 'test_name': self.testName,
                 'test_version': self.testVersion,
-                'input_hashes': self.inputHashes,
-                'start_time': report_data.get('start_time', time.time())
+                'input_hashes': report_data.get('input_hashes', []),
+                'start_time': report_data['start_time'],
+                'data_format_version': str(report_data['data_format_version'])
             }
             data = "---\n" + yaml.dump(content) + "...\n"
+        elif report_data['format'] == 'yaml' and 'content' in report_data:
+            header = yaml.safe_load(report_data['content'])
+            data = "---\n" + yaml.dump(validateHeader(header)) + "...\n"
 
         report_id = otime.timestamp() + '_' \
             + report_data.get('probe_asn', 'AS0') + '_' \
