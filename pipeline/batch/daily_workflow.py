@@ -1,6 +1,7 @@
 import traceback
 import hashlib
 import logging
+import shutil
 import string
 import random
 import uuid
@@ -716,6 +717,28 @@ class SanitiseReport(luigi.Task):
                     entry = self._sanitise_bridge_reachability(entry, bridge_db)
                 out_file.write(json_dumps(entry))
                 out_file.write("\n")
+        out_file.close()
+
+class CompressReports(luigi.Task):
+    report_path = luigi.Parameter()
+
+    def requires(self):
+        return NormaliseReport(self.report_path)
+
+    def _get_dst_path(self):
+        ooni_public_dir = config.get("ooni", "public-dir")
+        bucket_date = os.path.basename(os.path.dirname(self.report_path))
+        filename = os.path.splitext(os.path.basename(self.report_path))[0] + ".json.gz"
+        return os.path.join(ooni_public_dir,
+                            "compressed", bucket_date, filename)
+
+    def output(self):
+        return get_luigi_target(self._get_dst_path())
+
+    def run(self):
+        out_file = self.output().open('w')
+        with self.input().open('r') as in_file:
+            shutil.copyfileobj(in_file, out_file)
         out_file.close()
 
 class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
