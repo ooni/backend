@@ -1,0 +1,6 @@
+boto
+ujson
+luigi
+PyYaml
+awscli
+mkdocs
