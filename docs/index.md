@@ -21,7 +21,7 @@ ooni-pipeline is copied to.
 
 ### Daily workflow
 
-This workflow is the main workflow that consists of the following steps:
+This `daily_workflow` is the main workflow that consists of the following steps:
 
 * Performs normalisation of the reports to adhere to the 0.2.0 data format and
   converts them to JSON (`NormaliseReport`).
@@ -46,10 +46,34 @@ that takes as arguments:
 * `test_names` a space separated list of test names that the task should
   operate on.
 
+It is possible to specify an optional boolean parameter with the
+`--update-views true` command line argument to indicate that the materialised
+views should also be updated. To learn how to generate the materialised views
+see below.
+
 Here is an example of how to run the daily workflow:
 
 ```
 luigi --module pipeline.batch.daily_workflow ListReportsAndRun --task NoramliseReport --test-names 'http_requests dns_consistency' --date-interval 2016-01-01-2016-02-01 --workers 10
+```
+
+To generate the materialised views the `sql_tasks` module shall be used. In here there are two main tasks:
+
+* `CreateMaterialisedViews` is used to create the materialised views used to
+  count the number of blockpages detected and the number of identified vendors.
+
+* `CreateIndexes` is used to create database indexes on certain keys.
+
+To create indexes run:
+
+```
+luigi --module pipeline.batch.sql_tasks CreateIndexes
+```
+
+To create the materialised views run:
+
+```
+luigi --module pipeline.batch.sql_tasks CreateMaterialisedViews
 ```
 
 ## Configuration

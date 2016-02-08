@@ -33,6 +33,8 @@ except ImportError:
                    "performance will be seriously degraded.")
     from yaml import Loader as Loader
 
+from .sql_tasks import RunQuery
+
 config = luigi.configuration.get_config()
 
 test_name_mappings = {
@@ -197,7 +199,7 @@ def get_luigi_target(path):
         from urlparse import urlparse
     # Python3 compatibility
     except ImportError:
-        from urllib.parse import urlpase
+        from urllib.parse import urlparse
     from luigi.s3 import S3Target
     from luigi.contrib.ssh import RemoteTarget
     from luigi.file import LocalTarget
@@ -289,7 +291,7 @@ class NormaliseReport(luigi.Task):
         for url_option in url_option_names:
             try:
                 url_option_idx = entry.get('options').index(url_option) + 1
-            except ValueError, AttributeError:
+            except (ValueError, AttributeError):
                 continue
 
         if url_option_idx is not None and entry['input'] is None:
@@ -774,6 +776,26 @@ class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
             for idx, line in enumerate(fobj):
                 yield self._format_record(line.strip(), idx)
 
+
+class UpdateViews(RunQuery):
+    # This is needed so that it gets re-run on new intervals
+    date_interval = luigi.DateIntervalParameter()
+
+    table = 'metrics-materialised-views-update'
+
+    materialised_views = (
+        'country_counts_view',
+        'blockpage_count',
+        'blockpage_urls',
+        'identified_vendors'
+    )
+
+    def query(self):
+        sql = ''
+        for view in self.materialised_views:
+            sql += 'REFRESH MATERIALIZED VIEW {view};\n'.format(view=view)
+        return sql
+
 class ListParameter(luigi.Parameter):
     def parse(self, s):
         return s.split(' ')
@@ -785,6 +807,8 @@ class ListReportsAndRun(luigi.WrapperTask):
     date_interval = luigi.DateIntervalParameter()
     task = luigi.Parameter(default="InsertMeasurementsIntoPostgres")
     test_names = ListParameter(default=[])
+
+    update_views = luigi.BoolParameter(default=False)
 
     @staticmethod
     def _list_reports_in_bucket(date):
@@ -804,4 +828,8 @@ class ListReportsAndRun(luigi.WrapperTask):
                     task_list.append(task_factory(report_path))
                 elif parse_path(report_path)['test_name'] in self.test_names:
                     task_list.append(task_factory(report_path))
+
+        if self.update_views is True:
+            task_list.append(UpdateViews(date_interval=self.date_interval))
+
         return task_list
