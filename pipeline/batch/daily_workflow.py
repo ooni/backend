@@ -719,7 +719,7 @@ class SanitiseReport(luigi.Task):
                 out_file.write("\n")
         out_file.close()
 
-class CompressReports(luigi.Task):
+class CompressReport(luigi.Task):
     report_path = luigi.Parameter()
 
     def requires(self):
