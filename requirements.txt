@@ -1,12 +1,6 @@
-ansible
 boto
-invoke
-flask
-honcho
-celery
-simplejson
+ujson
 luigi
-streamparse
-filechunkio
 PyYaml
 awscli
+mkdocs

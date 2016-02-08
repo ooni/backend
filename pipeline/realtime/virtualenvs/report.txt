@@ -1,7 +1,0 @@
-awscli
-boto
-kafka-python==0.9.3
-PyYAML
-#streamparse
-https://github.com/Parsely/streamparse/archive/master.zip
-filechunkio

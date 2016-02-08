@@ -1,4 +1,0 @@
-#!/bin/bash
-source {{ ansible_env.HOME }}/virtualenvs/{{virtualenv_name}}/bin/activate
-export PYTHONPATH="{{ ansible_env.HOME }}/virtualenvs/{{virtualenv_name}}/lib64/python2.7/dist-packages/"
-invoke {{ invoke_command }}
