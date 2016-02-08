@@ -2,7 +2,6 @@
 
 import luigi
 from luigi.postgres import PostgresTarget
-from luigi.contrib import rdbms
 
 config = luigi.configuration.get_config()
 
@@ -153,7 +152,7 @@ def country_counts(metrics_table):
     return """CREATE MATERIALIZED VIEW "country_counts_view" AS SELECT probe_cc,
     count(probe_cc) FROM metrics GROUP BY probe_cc;""".format(metrics_table=metrics_table)
 
-class RunQuery(rdbms.Query):
+class RunQuery(luigi.Task):
     host = config.get("postgres", "host")
     database = config.get("postgres", "database")
     user = config.get("postgres", "user")
