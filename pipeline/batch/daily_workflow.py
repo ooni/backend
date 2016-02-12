@@ -723,7 +723,7 @@ class CompressReport(luigi.Task):
     report_path = luigi.Parameter()
 
     def requires(self):
-        return NormaliseReport(self.report_path)
+        return SanitiseReport(self.report_path)
 
     def _get_dst_path(self):
         ooni_public_dir = config.get("ooni", "public-dir")
