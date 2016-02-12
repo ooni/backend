@@ -85,7 +85,8 @@ def create_blockpage_view(query_function, view_name, metrics_table):
     select_queries = []
 
     for probe_cc, body_filter in blockpage_body_fingerprints.items():
-        where = where_body_template.format(body_filter=body_filter)
+        where = where_body_template.format(body_filter=body_filter,
+                                           metrics_table=metrics_table)
         select_queries.append(query_function(probe_cc=probe_cc,
                                              where=where,
                                              metrics_table=metrics_table))
@@ -93,7 +94,8 @@ def create_blockpage_view(query_function, view_name, metrics_table):
     for probe_cc, headers in blockpage_header_fingerprints.items():
         header_name, header_value = headers
         where = where_header_template.format(header_name=header_name,
-                                             header_value=header_value)
+                                             header_value=header_value,
+                                             metrics_table=metrics_table)
         select_queries.append(query_function(probe_cc=probe_cc,
                                              where=where,
                                              metrics_table=metrics_table))
