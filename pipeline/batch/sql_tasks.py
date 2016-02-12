@@ -158,6 +158,10 @@ class RunQuery(luigi.Task):
     user = config.get("postgres", "user")
     password = config.get("postgres", "password")
 
+    @property
+    def update_id(self):
+        return self.task_id
+
     def run(self):
         connection = self.output().connect()
         cursor = connection.cursor()
