@@ -178,7 +178,7 @@ class TestReport(HandlerTestCase):
         response = yield self.request('/report/%s/close' % report_id, "POST")
 
         written_report_header['format'] = 'yaml'
-        written_report_path = report_file_name(".", written_report_header)
+        written_report_path = report_file_name(".", written_report_header, report_id)
         with open(written_report_path) as f:
             self.filenames.add(written_report_path)
             written_report = yaml.safe_load_all(f)

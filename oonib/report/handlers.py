@@ -39,8 +39,8 @@ def report_file_name(archive_dir, report_details,
         report_id=report_id
     )
     report_file_template = "{iso8601_timestamp}-{test_name}-{report_id}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}"
-    if config.main.report_file_template:
-        report_file_template = config.main.report_file_template
+    if config.main.get('report_file_template'):
+        report_file_template = config.main['report_file_template']
     dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
     dst_dir = os.path.dirname(dst_filename)
     if not os.path.exists(dst_dir):
