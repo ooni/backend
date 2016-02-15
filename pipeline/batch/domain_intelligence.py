@@ -9,6 +9,7 @@ from six.moves.urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import requests
 import luigi
+from luigi.postgres import PostgresTarget
 
 from .sql_tasks import RunQuery
 
@@ -73,8 +74,50 @@ class UpdatePostgres(luigi.postgres.CopyToTable):
     user = config.get("postgres", "user")
     password = config.get("postgres", "password")
 
-class ListDomainsInPostgres(RunQuery):
+class DumpPostgresQuery(RunQuery):
     table = config.get("postgres", "metrics-table")
+
+    def run(self):
+        dst_target = self.output()['dst'].open('w')
+        connection = self.output()['src'].connect()
+        cursor = connection.cursor()
+        sql = self.query()
+
+        cursor.execute(sql)
+        while True:
+            row = cursor.fetchone()
+            if row is None:
+                break
+            out_file.write(self.format_row(row))
+
+        self.output().touch(connection)
+
+        connection.commit()
+        connection.close()
+        dst_target.close()
+
+    def format_row(self, row):
+        raise NotImplemented("You must implement this with a method that returns the string to be written to the target")
+
+    @property
+    def dst_target(self):
+        raise NotImplemented("You must implement this with a custom target")
+
+    def output(self):
+        return {
+            'src': PostgresTarget(
+                host=self.host,
+                database=self.database,
+                user=self.user,
+                password=self.password,
+                table=self.table,
+                update_id=self.update_id
+                ),
+            'dst': self.dst_target
+        }
+
+class ListDomainsInPostgres(DumpPostgresQuery):
+    update_date =
 
     def query(self):
         return """SELECT DISTINCT input FROM {metrics_table}
@@ -83,6 +126,16 @@ class ListDomainsInPostgres(RunQuery):
         OR test_name='http_host'
 """.format(metrics_table=self.table)
 
+    def format_row(self, row):
+        url = row[0]
+        if not url.startswith("http"):
+            url = "http://{}".format(url)
+        return "{}\n".format(url)
+
+    @property
+    def dst_target(self):
+        return luigi.LocalTarget("domains.txt")
+
 class ListASNSInPostgres(RunQuery):
     table = config.get("postgres", "metrics-table")
 
@@ -90,8 +143,28 @@ class ListASNSInPostgres(RunQuery):
         return """SELECT DISTINCT probe_asn FROM
     {metrics_table}""".format(metrics_table=self.table)
 
+    def run(self):
+        connection = self.output().connect()
+        cursor = connection.cursor()
+        sql = self.query()
+
+        cursor.execute(sql)
+
+        self.output().touch(connection)
+
+        connection.commit()
+        connection.close()
+
 class UpdateDomainsPostgres(UpdatePostgres):
     table = config.get("postgres", "domain-table", "domains")
+
+    columns = [
+        ('id', 'UUID PRIMARY KEY'),
+        ('url', 'TEXT'),
+        ('category_code', 'TEXT'),
+        ('category_description', 'TEXT'),
+        ('update_time', 'TIMESTAMP')
+    ]
 
     def requires(self):
         pass
