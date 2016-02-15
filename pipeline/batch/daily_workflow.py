@@ -192,7 +192,7 @@ def normalise_str(body):
             body = unicode(body, 'utf-8')
         except UnicodeDecodeError:
             body = binary_to_base64_dict(body)
-            return body
+    return body
 
 
 def get_luigi_target(path):
