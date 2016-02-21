@@ -88,6 +88,9 @@ test_name_mappings = {
     "dns_spoof": "dns_spoof",
     "netalyzrwrapper": "netalyzr_wrapper",
 
+    "meek_fronted_requests_test": "meek_fronted_requests_test",
+    "lantern_circumvention_tool_test": "lantern_circumvention_tool_test",
+    "psiphon_test": "psiphon_test",
 
     "this_test_is_nameless": "this_test_is_nameless",
 
@@ -510,7 +513,7 @@ class NormaliseReport(luigi.Task):
             entry.update(entry.pop('report'))
 
         test_name = entry.get('test_name', 'invalid')
-        test_name = test_name_mappings.get(test_name, 'invalid')
+        test_name = test_name_mappings.get(test_name, test_name.lower())
         entry['test_name'] = test_name
 
         entry['bucket_date'] = bucket_date
