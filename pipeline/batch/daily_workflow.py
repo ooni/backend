@@ -825,6 +825,18 @@ class UpdateBlockpageUrls(UpdateView):
 class UpdateIdentifiedVendors(UpdateView):
     view = 'identified_vendors'
 
+class UpdateViews(luigi.WrapperTask):
+    date_interval = luigi.DateIntervalParameter()
+    def requires(self):
+        return [
+            UpdateCountryCount(date_interval=self.date_interval),
+            UpdateBlockpageCount(date_interval=self.date_interval),
+            UpdateIdentifiedVendors(date_interval=self.date_interval),
+            UpdateBlockpageUrls(date_interval=self.date_interval)
+        ]
+
+
+
 class ListParameter(luigi.Parameter):
     def parse(self, s):
         return s.split(' ')
@@ -859,9 +871,6 @@ class ListReportsAndRun(luigi.WrapperTask):
                     task_list.append(task_factory(report_path))
 
         if self.update_views is True:
-            task_list.append(UpdateCountryCount(date_interval=self.date_interval))
-            task_list.append(UpdateBlockpageCount(date_interval=self.date_interval))
-            task_list.append(UpdateIdentifiedVendors(date_interval=self.date_interval))
-            task_list.append(UpdateBlockpageUrls(date_interval=self.date_interval))
+            task_list.append(UpdateViews(date_interval=self.date_interval))
 
         return task_list
