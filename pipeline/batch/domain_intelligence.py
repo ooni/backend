@@ -307,6 +307,8 @@ class GetASNInformation(luigi.Task):
                 except ASNNotFound:
                     logger.error("Could not find {}".format(asn))
                     continue
+                if source_updated == "":
+                    source_updated = "1970-01-01"
                 out_file.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
                     asn, country_code, registry,
                     source_updated, name, self.update_date
