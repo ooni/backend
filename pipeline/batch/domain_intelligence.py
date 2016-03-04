@@ -3,8 +3,10 @@ import os
 import csv
 import time
 import zipfile
+import logging
 import datetime
 import tempfile
+import subprocess
 
 from six.moves.urllib.parse import urlparse
 
@@ -17,6 +19,9 @@ from luigi.postgres import PostgresTarget
 from .sql_tasks import RunQuery
 
 config = luigi.configuration.get_config()
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('ooni-pipeline')
 
 
 def download_citizen_lab_test_list():
@@ -68,7 +73,7 @@ def get_url_alexa_ranking(url):
     ranking = ranking.replace(",", "").replace(".", "")
     if ranking == '-':
         ranking = 0
-    print("This is the ranking {}: {}".format(hostname, ranking))
+    logger.debug("This is the ranking {}: {}".format(hostname, ranking))
     return int(ranking)
 
 
@@ -83,7 +88,7 @@ def get_number_of_google_results(url):
     if soup.find("form", {"action": "CaptchaRedirect"}) is not None:
         raise GoogleCAPTCHAError
     result_stats = soup.find("div", {"id": "resultStats"}).text
-    print("Results stats: {}".format(result_stats))
+    logger.debug("Results stats: {}".format(result_stats))
     results = re.search("[A-Za-z]*\s*((\d+[\.,]?)+\d+) [a-z]+", result_stats).group(1)
     return int(results.replace(".", ""))
 
@@ -162,50 +167,6 @@ class ListDomainsInPostgres(DumpPostgresQuery):
     def dst_target(self):
         return luigi.LocalTarget(self.update_date.strftime("/tmp/domains-%Y-%m-%d.txt"))
 
-class ListASNSInPostgres(DumpPostgresQuery):
-    update_date = luigi.DateParameter(default=datetime.date.today())
-
-    def query(self):
-        return """SELECT DISTINCT probe_asn FROM
-    {metrics_table}""".format(metrics_table=self.table)
-
-    def format_row(self, row):
-        asn = row[0]
-        if not asn:
-            return asn
-        return "{}\n".format(asn)
-
-    @property
-    def dst_target(self):
-        return luigi.LocalTarget(self.update_date.strftime("/tmp/asns-%Y-%m-%d.txt"))
-
-
-class CategoriseDomains(luigi.Task):
-    update_date = luigi.DateParameter(default=datetime.date.today())
-
-    def requires(self):
-        return ListDomainsInPostgres(update_date=self.update_date)
-
-    def output(self):
-        return luigi.LocalTarget(self.update_date.strftime("/tmp/domains-categorised-%Y-%m-%d.tsv"))
-
-    def run(self):
-        test_lists_directory = download_citizen_lab_test_list()
-        in_file = self.input()['dst'].open('r')
-        out_file = self.output().open('w')
-
-        urls = set()
-        for url in in_file:
-            url = url.strip()
-            if url in urls:
-                continue
-            urls.add(url)
-            categories = get_url_category(url, test_lists_directory)
-            for category in categories:
-                out_file.write("{}\t{}\t{}\n".format(url, category, self.update_date))
-
-        in_file.close()
-        out_file.close()
 
 class ListCitizenLabURLS(luigi.ExternalTask):
     update_date = luigi.DateParameter(default=datetime.date.today())
@@ -218,7 +179,7 @@ class ListCitizenLabURLS(luigi.ExternalTask):
         if url in self.google_results.keys():
             return self.google_results[url]
         if (time.time() - self._last_request_google < self.cooldown):
-            print("Cooling down with google")
+            logger.debug("Cooling down with google")
             time.sleep(self.cooldown)
         self._last_request_google = time.time()
         self.google_results[url] = get_number_of_google_results(url)
@@ -229,7 +190,7 @@ class ListCitizenLabURLS(luigi.ExternalTask):
         if hostname in self.alexa_ranks.keys():
             return self.alexa_ranks[hostname]
         if (time.time() - self._last_request_alexa < self.cooldown):
-            print("Cooling down with alexa")
+            logger.debug("Cooling down with alexa")
             time.sleep(self.cooldown)
         self._last_request_alexa = time.time()
         self.alexa_ranks[hostname] = get_url_alexa_ranking(url)
@@ -248,22 +209,24 @@ class ListCitizenLabURLS(luigi.ExternalTask):
         for row in list_urls(test_lists_directory):
             url, category_code, category_description, \
                 date_added, source, notes, country_code = row
-            try:
-                alexa_ranking = self.get_alexa_ranking(url)
-            except Exception as exc:
-                print("Failed to lookup {} on alexa".format(url))
-                print(exc)
-                alexa_ranking = -1
+            alexa_ranking = -1
+            # XXX we temporarily disable alexa and google since we were triggering
+            # anti-crawler banning
+            # try:
+            #     alexa_ranking = self.get_alexa_ranking(url)
+            # except Exception as exc:
+            #     logger.error("Failed to lookup {} on alexa".format(url))
+            #     logger.error(exc)
+            google_results = -1
             # try:
             #     google_results = self.get_google_results(url)
             # except Exception as exc:
-            #     print("Failed to lookup {} on google".format(url))
-            #     print(exc)
-            google_results = -1
-            out_file.write("{}\t{}\t{}\t{}\n".format(
+            #     logger.error("Failed to lookup {} on google".format(url))
+            #     logger.error(exc)
+            out_file.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                 url, category_code, category_description,
-                date_added, source, alexa_ranking, google_results,
-                country_code
+                date_added, source, country_code, alexa_ranking,
+                google_results, self.update_date
             ))
         out_file.close()
 
@@ -283,17 +246,72 @@ class InsertCitizenLabURLS(UpdatePostgres):
         ('update_date', 'DATE')
     ]
 
+    def init_copy(self, connection):
+        query = "TRUNCATE TABLE {table};".format(table=self.table)
+        connection.cursor().execute(query)
+
     def requires(self):
         return ListCitizenLabURLS(update_date=self.update_date)
 
 
-class UpdateDomainsPostgres(UpdatePostgres):
-    table = config.get("postgres", "domain-table", "domains")
+class ListASNSInPostgres(DumpPostgresQuery):
+    update_date = luigi.DateParameter(default=datetime.date.today())
+
+    def query(self):
+        return """SELECT DISTINCT probe_asn FROM
+    {metrics_table}""".format(metrics_table=self.table)
+
+    def format_row(self, row):
+        asn = row[0]
+        if not asn:
+            return asn
+        return "{}\n".format(asn)
+
+    @property
+    def dst_target(self):
+        return luigi.LocalTarget(self.update_date.strftime("/tmp/asns-%Y-%m-%d.txt"))
+
+
+class ASNNotFound(Exception):
+    pass
+
+class GetASNInformation(luigi.Task):
     update_date = luigi.DateParameter(default=datetime.date.today())
 
     def requires(self):
-        return CategoriseDomains(update_date=self.update_date)
+        return ListASNSInPostgres(update_date=self.update_date)
 
+    def output(self):
+        return luigi.LocalTarget(self.update_date.strftime("/tmp/asn-information-%Y-%m-%d.tsv"))
+
+    def get_asn_information(self, asn):
+        domain = "{}.asn.cymru.com".format(asn)
+        args = ['dig', '+short', domain, 'TXT']
+        proc = subprocess.Popen(
+                        args,
+                        stdout=subprocess.PIPE)
+        results = proc.communicate()[0]
+        if results == '':
+            raise ASNNotFound()
+        results = results.replace('"', '')
+        return map(lambda x: x.strip(), results.split("|"))[1:]
+
+    def run(self):
+        out_file = self.output().open('w')
+        with self.input()['dst'].open('r') as in_file:
+            for asn in in_file:
+                asn = asn.strip()
+                try:
+                    country_code, registry, \
+                        source_updated, name = self.get_asn_information(asn)
+                except ASNNotFound:
+                    logger.error("Could not find {}".format(asn))
+                    continue
+                out_file.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                    asn, country_code, registry,
+                    source_updated, name, self.update_date
+                ))
+        out_file.close()
 
 class UpdateASNPostgres(UpdatePostgres):
     table = config.get("postgres", "asn-table", "asns")
@@ -302,9 +320,16 @@ class UpdateASNPostgres(UpdatePostgres):
 
     columns = [
         ('asn', 'TEXT'),
-        ('provider_name', 'TEXT'),
-        ('provider_alt_name', 'TEXT'),
-        ('provider_website', 'TEXT'),
-        ('provider_type', 'TEXT'),
-        ('update_time', 'TIMESTAMP')
+        ('country_code', 'TEXT'),
+        ('registry', 'TEXT'),
+        ('source_update_date', 'TIMESTAMP'), # When it was updated according to team cymru
+        ('name', 'TEXT'),
+        ('update_date', 'TIMESTAMP') # When we updated this record last
     ]
+
+    def init_copy(self, connection):
+        query = "TRUNCATE TABLE {table};".format(table=self.table)
+        connection.cursor().execute(query)
+
+    def requires(self):
+        return GetASNInformation(self.update_date)
