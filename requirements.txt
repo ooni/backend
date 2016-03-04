@@ -4,3 +4,4 @@ luigi
 PyYaml
 awscli
 mkdocs
+bs4
