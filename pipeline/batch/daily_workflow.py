@@ -803,24 +803,39 @@ class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
                 yield self._format_record(line.strip(), idx)
 
 
-class UpdateViews(RunQuery):
+class UpdateView(RunQuery):
     # This is needed so that it gets re-run on new intervals
     date_interval = luigi.DateIntervalParameter()
 
     table = 'metrics-materialised-views-update'
 
-    materialised_views = (
-        'country_counts_view',
-        'blockpage_count',
-        'blockpage_urls',
-        'identified_vendors'
-    )
-
+    view = ''
     def query(self):
-        sql = ''
-        for view in self.materialised_views:
-            sql += 'REFRESH MATERIALIZED VIEW {view};\n'.format(view=view)
-        return sql
+        return 'REFRESH MATERIALIZED VIEW {view};\n'.format(view=self.view)
+
+class UpdateCountryCount(UpdateView):
+    view = 'country_counts_view'
+
+class UpdateBlockpageCount(UpdateView):
+    view = 'blockpage_count'
+
+class UpdateBlockpageUrls(UpdateView):
+    view = 'blockpage_urls'
+
+class UpdateIdentifiedVendors(UpdateView):
+    view = 'identified_vendors'
+
+class UpdateViews(luigi.WrapperTask):
+    date_interval = luigi.DateIntervalParameter()
+    def requires(self):
+        return [
+            UpdateCountryCount(date_interval=self.date_interval),
+            UpdateBlockpageCount(date_interval=self.date_interval),
+            UpdateIdentifiedVendors(date_interval=self.date_interval),
+            UpdateBlockpageUrls(date_interval=self.date_interval)
+        ]
+
+
 
 class ListParameter(luigi.Parameter):
     def parse(self, s):
