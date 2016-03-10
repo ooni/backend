@@ -152,9 +152,6 @@ def validateHeader(header):
     if not header.get('start_time'):
         header['start_time'] = time.time()
 
-    if not header.get('start_time'):
-        header['start_time'] = time.time()
-
     if not header.get('data_format_version'):
         header['data_format_version'] = '0.1.0'
 
@@ -167,8 +164,7 @@ def validateHeader(header):
         log.debug("Matching %s with %s | %s" % (regexp, value_to_check, k))
         if re.match(regexp, str(value_to_check)):
             continue
-        else:
-            raise e.InvalidRequestField(k)
+        raise e.InvalidRequestField(k)
 
     try:
         requested_test_helper = header['test_helper']

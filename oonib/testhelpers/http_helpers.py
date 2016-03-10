@@ -2,10 +2,6 @@ import json
 import random
 import string
 
-from twisted.internet.protocol import Factory, Protocol
-
-from twisted.internet.endpoints import TCP4ClientEndpoint
-
 from twisted.internet import protocol, defer
 
 from cyclone.web import RequestHandler, Application
@@ -171,14 +167,6 @@ class HTTPRandomPage(HTTPTrapAll):
         if length > 100000:
             length = 100000
         self.write(self.genRandomPage(length, keyword))
-
-class TCPConnectProtocol(Protocol):
-    def connectionMade(self):
-        self.transport.loseConnection()
-
-class TCPConnectFactory(Factory):
-    def buildProtocol(self, addr):
-        return TCPConnectProtocol()
 
 HTTPRandomPageHelper = Application([
     # XXX add regexps here
