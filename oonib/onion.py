@@ -73,7 +73,7 @@ def startTor(torconfig):
         if os.path.exists(config.main.tor_datadir):
             torconfig.DataDirectory = os.path.abspath(config.main.tor_datadir)
         else:
-            raise Exception
+            raise Exception("Could not find tor datadir")
 
     tor_log_file = os.path.join(torconfig.DataDirectory, "tor.log")
     torconfig.Log = ["notice stdout", "notice file %s" % tor_log_file]

@@ -102,7 +102,6 @@ if config.helpers['http-return-json-headers'].port:
     multiService.addService(http_return_request_helper)
     http_return_request_helper.startService()
 
-
 # add the tor collector service here
 if config.main.tor_hidden_service:
     torconfig = TorConfig()

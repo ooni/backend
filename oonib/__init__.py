@@ -7,6 +7,7 @@ __version__ = '1.1.4'
 
 __all__ = ['Storage', 'randomStr']
 
+import json
 import string
 from random import SystemRandom
 random = SystemRandom()
@@ -59,3 +60,6 @@ def randomStr(length, num=True):
     if num:
         chars += string.digits
     return ''.join(random.choice(chars) for x in range(length))
+
+def json_dumps(obj):
+    return json.dumps(obj)
