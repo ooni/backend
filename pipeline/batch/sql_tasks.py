@@ -19,7 +19,8 @@ blockpage_body_fingerprints = {
 # header values.
 blockpage_header_fingerprints = {
     'SA': ('Server', 'Protected by WireFilter%'),
-    'ID': ('Location', 'http://internet-positif.org%')
+    'ID': ('Location', 'http://internet-positif.org%'),
+    'SD': ('Location', 'http://196.1.211.6:8080/alert/')
 }
 
 # These are countries for which blocking is identified by checking if the
@@ -205,16 +206,41 @@ class RunQuery(luigi.Task):
             update_id=self.update_id
         )
 
-class CreateMaterialisedViews(RunQuery):
-    # This value is actually only used as a token to update the marker table.
+class CreateBlockpageCountView(RunQuery):
     table = 'metrics-materialised-views'
-
     def query(self):
         metrics_table = config.get("postgres", "metrics-table")
-        return blockpage_count(metrics_table) + \
-            blockpage_urls(metrics_table) + \
-            identified_vendors(metrics_table) + \
-            country_counts(metrics_table)
+        return blockpage_count(metrics_table)
+
+class CreateBlockpageUrlsView(RunQuery):
+    table = 'metrics-materialised-views'
+    def query(self):
+        metrics_table = config.get("postgres", "metrics-table")
+        return blockpage_urls(metrics_table)
+
+class CreateIdentifiedVendorsView(RunQuery):
+    table = 'metrics-materialised-views'
+    def query(self):
+        metrics_table = config.get("postgres", "metrics-table")
+        return identified_vendors(metrics_table)
+
+class CreateCountryCountsView(RunQuery):
+    table = 'metrics-materialised-views'
+    def query(self):
+        metrics_table = config.get("postgres", "metrics-table")
+        return country_counts(metrics_table)
+
+class CreateMaterialisedViews(luigi.WrapperTask):
+    def complete(self):
+        return False
+
+    def requires(self):
+        return [
+            CreateBlockpageCountView(),
+            CreateBlockpageUrlsView(),
+            CreateIdentifiedVendorsView(),
+            CreateCountryCountsView()
+        ]
 
 class CreateIndexes(RunQuery):
     # This value is actually only used as a token to update the marker table.
