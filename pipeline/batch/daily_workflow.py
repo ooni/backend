@@ -518,6 +518,11 @@ class NormaliseReport(luigi.Task):
 
         entry['bucket_date'] = bucket_date
 
+        entry['measurement_start_time'] = datetime.fromtimestamp(entry.pop('test_start_time',
+                                                0)).strftime("%Y-%m-%d %H:%M:%S")
+        entry['test_start_time'] = datetime.fromtimestamp(entry.pop('start_time',
+                                        0)).strftime("%Y-%m-%d %H:%M:%S")
+
         entry['id'] = entry.get('id', str(uuid.uuid4()))
         entry['report_filename'] = os.path.join(bucket_date,
                                     os.path.basename(self.output().path))
@@ -768,6 +773,7 @@ class InsertMeasurementsIntoPostgres(luigi.postgres.CopyToTable):
         ('data_format_version', 'TEXT'),
         ('test_name', 'TEXT'),
         ('test_start_time', 'TIMESTAMP'),
+        ('measurement_start_time', 'TIMESTAMP'),
         ('test_runtime', 'REAL'),
         ('test_helpers', 'JSONB'),
         ('test_keys', 'JSONB'),
