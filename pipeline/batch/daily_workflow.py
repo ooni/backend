@@ -518,10 +518,15 @@ class NormaliseReport(luigi.Task):
 
         entry['bucket_date'] = bucket_date
 
-        entry['measurement_start_time'] = datetime.fromtimestamp(entry.pop('test_start_time',
-                                                0)).strftime("%Y-%m-%d %H:%M:%S")
-        entry['test_start_time'] = datetime.fromtimestamp(entry.pop('start_time',
-                                        0)).strftime("%Y-%m-%d %H:%M:%S")
+        test_start_time = entry.pop('start_time', 0)
+        try:
+            measurement_start_time = entry.pop('test_start_time')
+        except KeyError:
+            # Failback to using the start_time
+            measurement_start_time = test_start_time
+
+        entry['measurement_start_time'] = datetime.fromtimestamp(measurement_start_time).strftime("%Y-%m-%d %H:%M:%S")
+        entry['test_start_time'] = datetime.fromtimestamp(test_start_time).strftime("%Y-%m-%d %H:%M:%S")
 
         entry['id'] = entry.get('id', str(uuid.uuid4()))
         entry['report_filename'] = os.path.join(bucket_date,
