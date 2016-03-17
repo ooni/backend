@@ -18,7 +18,12 @@ from oonib.config import config
 
 def report_file_name(archive_dir, report_details,
                      report_id='no_report_id'):
-    timestamp = datetime.fromtimestamp(report_details['start_time'])
+    if report_details.get("start_time"):
+        timestamp = datetime.fromtimestamp(report_details['start_time'])
+    elif report_details.get("test_start_time"):
+        timestamp = datetime.strptime(report_details['test_start_time'], "%Y-%m-%d %H:%M:%S")
+    else:
+        raise Exception("Could not find valid timestamp")
     if report_details['format'] == 'json':
         ext = 'json'
     elif report_details['format'] == 'yaml':
@@ -149,8 +154,8 @@ def validateHeader(header):
     if not header.get('probe_cc'):
         header['probe_cc'] = 'ZZ'
 
-    if not header.get('start_time'):
-        header['start_time'] = time.time()
+    if not header.get('test_start_time'):
+        header['test_start_time'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     if not header.get('data_format_version'):
         header['data_format_version'] = '0.1.0'
@@ -306,8 +311,8 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
                 'test_name': self.testName,
                 'test_version': self.testVersion,
                 'input_hashes': report_data.get('input_hashes', []),
-                'start_time': report_data['start_time'],
-                'data_format_version': str(report_data['data_format_version'])
+                'test_start_time': report_data['test_start_time'],
+                'data_format_version': str(report_data.get('data_format_version', '0.1.0'))
             }
             data = "---\n" + yaml.dump(content) + "...\n"
         elif report_data['format'] == 'yaml' and 'content' in report_data:
