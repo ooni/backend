@@ -311,7 +311,7 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
                 'test_name': self.testName,
                 'test_version': self.testVersion,
                 'input_hashes': report_data.get('input_hashes', []),
-                'test_start_time': report_data['test_start_time'],
+                'test_start_time': str(report_data['test_start_time']),
                 'data_format_version': str(report_data.get('data_format_version', '0.1.0'))
             }
             data = "---\n" + yaml.dump(content) + "...\n"

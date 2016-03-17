@@ -41,7 +41,7 @@ sample_report_entry = {
     'probe_ip': '127.0.0.1',
     'software_name': 'ooniprobe',
     'software_version': '1.1.0',
-    'start_time': 0,
+    'test_start_time': '2016-01-01 12:34:56',
     'test_name': 'fake_test',
     'test_version': '0.1.0'
 }
@@ -59,7 +59,7 @@ probe_city: null
 probe_ip: 127.0.0.1
 software_name: ooniprobe
 software_version: 1.1.0
-start_time: 0
+test_start_time: '2016-01-01 12:34:56'
 test_name: fake_test
 test_version: 0.1.0
 ...
@@ -72,7 +72,7 @@ dummy_data = {
     'test_version': '0.1',
     'probe_asn': 'AS0',
     'probe_cc': 'ZZ',
-    'start_time': time.time()
+    'test_start_time': '2016-01-01 12:34:56'
 }
 
 for _, handler in reportAPI:
