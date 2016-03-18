@@ -599,7 +599,7 @@ class NormaliseReport(luigi.Task):
         value_to_hash += header.get('probe_asn', 'AS0')
         value_to_hash += header.get('test_name', 'invalid')
         value_to_hash += header.get('software_version', '0.0.0')
-        value_to_hash += header.get('probe_city', 'none')
+        value_to_hash += str(header.get('probe_city', 'None'))
         report_id += ''.join(string.ascii_letters[ord(x) % len(string.ascii_letters)]
                              for x in hashlib.sha512(value_to_hash).digest())[:50]
         header['report_id'] = header.get('report_id', report_id)
