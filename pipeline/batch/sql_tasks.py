@@ -12,6 +12,7 @@ blockpage_body_fingerprints = {
     'TR': '%uyarınca yapılan teknik inceleme ve hukuki değerlendirme sonucunda bu internet%',
     'GR': '%www.gamingcommission.gov.gr/index.php/forbidden-access-black-list/%',
     'RU': '%http://eais.rkn.gov.ru/%',
+    'IN': '%The page you have requested has been blocked%'
 }
 
 # These are countries for which we detect blocking by looking for certain
@@ -147,6 +148,24 @@ UNION
                 LIKE '%squid%'
             OR {metrics_table}.test_keys -> 'received' ->> 3
                 LIKE '%squid%')
+UNION
+ SELECT {metrics_table}.test_start_time,
+    {metrics_table}.probe_cc,
+    {metrics_table}.probe_asn,
+    {metrics_table}.report_id,
+    'privoxy' AS vendor
+   FROM {metrics_table}
+  WHERE {metrics_table}.test_name = 'http_invalid_request_line'
+        AND {metrics_table}.test_keys -> 'tampering' = 'true'
+        AND ({metrics_table}.test_keys -> 'received' ->> 0
+                LIKE '%Privoxy%'::text
+            OR {metrics_table}.test_keys -> 'received' ->> 1
+                LIKE '%Privoxy%'
+            OR {metrics_table}.test_keys -> 'received' ->> 2
+                LIKE '%Privoxy%'
+            OR {metrics_table}.test_keys -> 'received' ->> 3
+                LIKE '%Privoxy%')
+
 ;
 """.format(metrics_table=metrics_table)
 
