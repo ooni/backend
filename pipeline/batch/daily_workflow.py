@@ -124,6 +124,7 @@ schema = [
     'test_name',
     'test_version',
     'test_start_time',
+    'measurement_start_time',
     'test_runtime',
     'test_helpers',
     'software_name',
