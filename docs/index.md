@@ -76,6 +76,24 @@ To create the materialised views run:
 luigi --module pipeline.batch.sql_tasks CreateMaterialisedViews
 ```
 
+## Domain intelligence
+
+These tasks are used to update the tables related to the categories of domains being tested. Currently we support extracting the categories for the urls in the citizenlab repository.
+
+Moreover there are also tasks in here related to updating information pertaining to ASNs.
+
+To update the citizen-lab categories of URLs you shall run:
+
+```
+luigi --module pipeline.batch.domain_intelligence InsertCitizenLabURLS
+```
+
+To update the ASN information run:
+
+```
+luigi --module pipeline.batch.domain_intelligence UpdateASNPostgres
+```
+
 ## Configuration
 
 Before running the pipeline you should configure it by editing the

@@ -15,7 +15,7 @@ import luigi
 import luigi.postgres
 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('ooni-pipeline')
 
 try:
     from ujson import loads as json_loads

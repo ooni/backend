@@ -13,3 +13,5 @@ database: ooni_pipeline
 user: ooni
 password: changeme
 metrics-table: metrics
+domain-table: domains
+asn-table: asns
