@@ -111,25 +111,19 @@ Vagrant.configure("2") do |config|
 end
 
 $setup_script = <<SCRIPT
+set -e
 apt-get update
 apt-get -y install curl python-setuptools python-dev libsqlite3-dev libffi-dev
 
 echo "Updating to the latest version of PIP"
 cd /tmp/
 
-curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
+curl --fail -O https://bootstrap.pypa.io/get-pip.py
 python ./get-pip.py  ## pip (>=1.3.0) is recommended for security reasons
 
 sudo update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 0
 
 echo "Installing virtualenv and virtualenvwrapper..."
-
-pip install --upgrade virtualenv virtualenvwrapper
-export WORKON_HOME=~/.virtualenvs && mkdir -p $WORKON_HOME
-
-source /usr/local/bin/virtualenvwrapper.sh
-
-mkvirtualenv -a $PWD --unzip-setuptools --setuptools --no-site-packages oonib
 
 echo "Installing Tor..."
 
@@ -152,12 +146,14 @@ openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate
 
 cp oonib.conf.example oonib.conf
 
-echo "Installing oonib depedencies"
-pip install -r requirements.txt --use-mirrors
+echo "Installing oonib dependencies"
+pip install -r requirements.txt
 
-echo "Installing oonib"
-python setup.py install
-
+echo "Now:"
+echo "1. vagrant ssh"
+echo "2. cd /data/oonib"
+echo "3. vi oonib.conf  # possibly"
+echo "4. sudo ./bin/oonib"
 SCRIPT
 
 Vagrant.configure("2") do |config|
