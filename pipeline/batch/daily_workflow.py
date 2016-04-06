@@ -535,8 +535,6 @@ class NormaliseReport(luigi.Task):
         if entry.get('data_format_version', '0.1.0') == '0.2.0':
             return entry
 
-        entry['test_start_time'] = datetime.fromtimestamp(entry.pop('start_time',
-                                        0)).strftime("%Y-%m-%d %H:%M:%S")
         entry['data_format_version'] = '0.2.0'
 
         if isinstance(entry.get('options', []), dict):
