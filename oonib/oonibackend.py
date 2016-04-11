@@ -102,6 +102,21 @@ if config.helpers['http-return-json-headers'].port:
     multiService.addService(http_return_request_helper)
     http_return_request_helper.startService()
 
+if config.helpers['web-connectivity'].port:
+    if config.helpers['web-connectivity'].address:
+        address = config.helpers['web-connectivity'].address
+    else:
+        address = '0.0.0.0'
+    print("Starting Web Connectivity helper on {}:{}".format(
+          address,
+          config.helpers['web-connectivity'].port))
+    web_connectivity_helper = internet.TCPServer(
+        int(config.helpers['web-connectivity'].port),
+        http_helpers.WebConnectivityHelper,
+        interface=address)
+    multiService.addService(web_connectivity_helper)
+    web_connectivity_helper.startService()
+
 def getHSEndpoint(endpoint_config):
     hsdir = endpoint_config['hsdir']
     hsdir = os.path.expanduser(hsdir)

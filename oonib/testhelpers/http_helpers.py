@@ -2,9 +2,24 @@ import json
 import random
 import string
 
-from twisted.internet import protocol, defer
+from urlparse import urlparse
 
-from cyclone.web import RequestHandler, Application
+from twisted.internet.protocol import Factory, Protocol
+from twisted.internet.endpoints import TCP4ClientEndpoint
+
+from twisted.internet.error import DNSLookupError, TimeoutError
+from twisted.internet.error import ConnectionRefusedError
+from twisted.internet import protocol, defer, reactor
+
+from twisted.names.error import DNSNameError, DNSServerError
+from twisted.names import client as dns_client
+from twisted.names import dns
+
+from twisted.web.client import Agent, readBody
+from twisted.web.http_headers import Headers
+
+from cyclone.web import RequestHandler, Application, HTTPError
+from cyclone.web import asynchronous
 
 from twisted.protocols import policies, basic
 from twisted.web.http import Request
@@ -168,7 +183,215 @@ class HTTPRandomPage(HTTPTrapAll):
             length = 100000
         self.write(self.genRandomPage(length, keyword))
 
+class TCPConnectProtocol(Protocol):
+    def connectionMade(self):
+        self.transport.loseConnection()
+
+class TCPConnectFactory(Factory):
+    def buildProtocol(self, addr):
+        return TCPConnectProtocol()
+
+USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'
+
+class WebConnectivityCache(object):
+    expiration_time = 200
+    enable_caching = True
+
+    def __init__(self):
+        self._cache = {
+            'http_request': {
+            },
+            'tcp_connect': {
+            },
+            'dns_consistency': {
+            }
+        }
+
+    def cache_value(self, response_type, key, value):
+        if self.enable_caching:
+            self._cache[response_type][key] = {
+                'value': value,
+                'expiration': reactor.callLater(self.expiration_time,
+                                                self.expire, response_type, key)
+            }
+
+    def expire(self, response_type, key):
+        if self._cache[response_type][key]['expiration'].active():
+            self._cache[response_type][key]['expiration'].cancel()
+        del self._cache[response_type][key]
+
+    def lookup(self, response_type, key):
+        if not self.enable_caching:
+            return None
+
+        try:
+            hit = self._cache[response_type][key]
+            hit['expiration'].reset(self.expiration_time)
+            return hit['value']
+        except KeyError:
+            return None
+
+    def http_request(self, url):
+        cached_value = self.lookup('http_request', url)
+        if cached_value is not None:
+            return defer.succeed(cached_value)
+
+        result = defer.Deferred()
+        agent = Agent(reactor)
+        d = agent.request('GET', url, Headers({'User-Agent': [USER_AGENT]}))
+
+        @d.addCallback
+        @defer.inlineCallbacks
+        def cb(response):
+            headers = {}
+            for name, value in response.headers.getAllRawHeaders():
+                headers[name] = value[0]
+            body = yield readBody(response)
+            value = {
+                'body_length': len(body),
+                'headers': headers,
+                'failure': None
+            }
+            self.cache_value('http_request', url, value)
+            result.callback(value)
+
+        @d.addErrback
+        def eb(failure):
+            if failure.check(DNSLookupError):
+                failure_string = 'dns_lookup_error'
+            elif failure.check(TimeoutError):
+                failure_string = 'generic_timeout_error'
+            elif failure.check(ConnectionRefusedError):
+                failure_string = 'connection_refused_error'
+            else:
+                failure_string = 'unknown_error'
+            value = {
+                'body_length': None,
+                'headers': {},
+                'failure': failure_string
+            }
+            self.cache_value('http_request', url, value)
+            result.callback(value)
+
+        return result
+
+    def tcp_connect(self, socket):
+        cached_value = self.lookup('tcp_connect', socket)
+        if cached_value is not None:
+            return defer.succeed(cached_value)
+
+        result = defer.Deferred()
+
+        ip_address, port = socket.split(":")
+        point = TCP4ClientEndpoint(reactor, ip_address, int(port))
+        d = point.connect(TCPConnectFactory())
+        @d.addCallback
+        def cb(p):
+            value = {
+                'status': True,
+                'failure': None
+            }
+            self.cache_value('tcp_connect', socket, value)
+            result.callback(value)
+
+        @d.addErrback
+        def eb(failure):
+            if failure.check(TimeoutError):
+                failure_string = 'generic_timeout_error'
+            elif failure.check(ConnectionRefusedError):
+                failure_string = 'connection_refused_error'
+            else:
+                failure_string = 'unknown_error'
+            value = {
+                'status': False,
+                'failure': failure_string
+            }
+            self.cache_value('tcp_connect', socket, value)
+            result.callback(value)
+
+        return result
+
+    def dns_consistency(self, hostname):
+        cached_value = self.lookup('dns_consistency', hostname)
+        if cached_value is not None:
+            return defer.succeed(cached_value)
+
+        result = defer.Deferred()
+        d = dns_client.lookupAddress(hostname)
+
+        @d.addCallback
+        def cb(records):
+            ip_addresses = []
+            answers = records[0]
+            for answer in answers:
+                if answer.type is dns.A:
+                    ip_addresses.append(answer.payload.dottedQuad())
+            value = {
+                'ips': ip_addresses,
+                'failure': None
+            }
+            self.cache_value('dns_consistency', hostname, value)
+            result.callback(value)
+
+        @d.addErrback
+        def eb(failure):
+            if failure.check(DNSNameError):
+                failure_string = 'dns_name_error'
+            elif failure.check(DNSServerError):
+                failure_string = 'dns_server_failure'
+            else:
+                failure_string = 'unknown_error'
+            value = {
+                'ips': [],
+                'failure': failure_string
+            }
+            self.cache_value('dns_consistency', hostname, value)
+            result.callback(value)
+
+        return result
+
+web_connectivity_cache = WebConnectivityCache()
+
+class WebConnectivity(RequestHandler):
+    @defer.inlineCallbacks
+    def control_measurement(self, http_url, socket_list):
+        hostname = urlparse(http_url).netloc
+        dl = [
+            web_connectivity_cache.http_request(http_url),
+            web_connectivity_cache.dns_consistency(hostname)
+        ]
+        for socket in socket_list:
+            dl.append(web_connectivity_cache.tcp_connect(socket))
+        responses = yield defer.DeferredList(dl)
+        http_request = responses[0][1]
+        dns = responses[1][1]
+        tcp_connect = {}
+        for idx, response in enumerate(responses[2:]):
+            tcp_connect[socket_list[idx]] = response[1]
+        self.finish({
+            'http_request': http_request,
+            'tcp_connect': tcp_connect,
+            'dns': dns
+        })
+
+    @asynchronous
+    def post(self):
+        try:
+            request = json.loads(self.request.body)
+            self.control_measurement(
+                str(request['http_request']),
+                request['tcp_connect']
+            )
+        except Exception as exc:
+            log.msg("Got invalid request")
+            log.exception(exc)
+            raise HTTPError(400, 'invalid request')
+
 HTTPRandomPageHelper = Application([
     # XXX add regexps here
     (r"/(.*)/(.*)", HTTPRandomPage)
+])
+
+WebConnectivityHelper = Application([
+    (r"/", WebConnectivity)
 ])

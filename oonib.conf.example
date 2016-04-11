@@ -71,3 +71,7 @@ helpers:
         private_key: 'private.key'
         certificate: 'certificate.crt'
         port: 57006
+
+    web-connectivity:
+        port: 57007
+        address: null
