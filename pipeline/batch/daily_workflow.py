@@ -535,8 +535,6 @@ class NormaliseReport(luigi.Task):
         if entry.get('data_format_version', '0.1.0') == '0.2.0':
             return entry
 
-        entry['test_start_time'] = datetime.fromtimestamp(entry.pop('start_time',
-                                        0)).strftime("%Y-%m-%d %H:%M:%S")
         entry['data_format_version'] = '0.2.0'
 
         if isinstance(entry.get('options', []), dict):
@@ -867,6 +865,7 @@ class ListReportsAndRun(luigi.WrapperTask):
     date_interval = luigi.DateIntervalParameter()
     task = luigi.Parameter(default="InsertMeasurementsIntoPostgres")
     test_names = ListParameter(default=[])
+    ignore_cc = ListParameter(default=[])
 
     update_views = luigi.BoolParameter(default=False)
 
@@ -876,6 +875,28 @@ class ListReportsAndRun(luigi.WrapperTask):
         bucket_path = os.path.join(ooni_private_dir, date.strftime("%Y-%m-%d"))
         return get_luigi_target(bucket_path).fs.listdir(bucket_path)
 
+    def is_runnable_report_path(self, report_path):
+        include_filters = {}
+        ignore_filters = {}
+
+        if len(self.test_names) > 0:
+            include_filters['test_name'] = self.test_names
+        if len(self.ignore_cc) > 0:
+            ignore_filters['probe_cc'] = self.ignore_cc
+
+        if (len(ignore_filters) + len(include_filters)) == 0:
+            return True
+
+        report_data = parse_path(report_path)
+        for key, value in include_filters.items():
+            if report_data[key] not in value:
+                return False
+        for key, value in ignore_filters.items():
+            if report_data[key] in value:
+                return False
+
+        return True
+
     def requires(self):
         try:
             task_factory = globals()[self.task]
@@ -884,9 +905,7 @@ class ListReportsAndRun(luigi.WrapperTask):
         task_list = []
         for date in self.date_interval:
             for report_path in self._list_reports_in_bucket(date):
-                if len(self.test_names) == 0:
-                    task_list.append(task_factory(report_path))
-                elif parse_path(report_path)['test_name'] in self.test_names:
+                if self.is_runnable_report_path(report_path):
                     task_list.append(task_factory(report_path))
 
         if self.update_views is True:
