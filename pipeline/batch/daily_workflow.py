@@ -472,8 +472,6 @@ class NormaliseReport(luigi.Task):
 
     @staticmethod
     def _normalise_tcpt(entry):
-        entry['sent'] = entry.get('sent', [])
-        entry['received'] = entry.get('sent', [])
         return entry
 
     @staticmethod
