@@ -191,7 +191,13 @@ class TCPConnectFactory(Factory):
     def buildProtocol(self, addr):
         return TCPConnectProtocol()
 
-USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'
+REQUEST_HEADERS = {
+    'User-Agent': ['Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, '
+                   'like Gecko) Chrome/47.0.2526.106 Safari/537.36'],
+    'Accept-Language': ['en-US;q=0.8,en;q=0.5'],
+    'Accept': ['text/html,application/xhtml+xml,application/xml;q=0.9,'
+               '*/*;q=0.8']
+}
 
 class WebConnectivityCache(object):
     expiration_time = 200
@@ -238,7 +244,7 @@ class WebConnectivityCache(object):
 
         result = defer.Deferred()
         agent = Agent(reactor)
-        d = agent.request('GET', url, Headers({'User-Agent': [USER_AGENT]}))
+        d = agent.request('GET', url, Headers(REQUEST_HEADERS))
 
         @d.addCallback
         @defer.inlineCallbacks
