@@ -4,6 +4,8 @@ import string
 
 from urlparse import urlparse
 
+from twisted.python.failure import Failure
+
 from twisted.internet.protocol import Factory, Protocol
 from twisted.internet.endpoints import TCP4ClientEndpoint
 
@@ -15,8 +17,11 @@ from twisted.names.error import DNSNameError, DNSServerError
 from twisted.names import client as dns_client
 from twisted.names import dns
 
-from twisted.web.client import Agent, readBody
+from twisted.web.client import Agent, BrowserLikeRedirectAgent, readBody
 from twisted.web.http_headers import Headers
+from twisted.web import error
+
+from twisted.web._newclient import ResponseFailed
 
 from cyclone.web import RequestHandler, Application, HTTPError
 from cyclone.web import asynchronous
@@ -26,6 +31,40 @@ from twisted.web.http import Request
 
 from oonib import log, randomStr
 
+class FixedRedirectAgent(BrowserLikeRedirectAgent):
+    """
+    This is a redirect agent with this patch manually applied:
+    https://twistedmatrix.com/trac/ticket/8265
+    """
+    def _handleRedirect(self, response, method, uri, headers, redirectCount):
+        """
+        Handle a redirect response, checking the number of redirects already
+        followed, and extracting the location header fields.
+
+        This is pathed to fix a bug in infinite redirect loop.
+        """
+        if redirectCount >= self._redirectLimit:
+            err = error.InfiniteRedirection(
+                response.code,
+                b'Infinite redirection detected',
+                location=uri)
+            raise ResponseFailed([Failure(err)], response)
+        locationHeaders = response.headers.getRawHeaders(b'location', [])
+        if not locationHeaders:
+            err = error.RedirectWithNoLocation(
+                response.code, b'No location header field', uri)
+            raise ResponseFailed([Failure(err)], response)
+        location = self._resolveLocation(response.request.absoluteURI, locationHeaders[0])
+        deferred = self._agent.request(method, location, headers)
+
+        def _chainResponse(newResponse):
+            newResponse.setPreviousResponse(response)
+            return newResponse
+
+        deferred.addCallback(_chainResponse)
+        # This is the fix to properly handle redirects
+        return deferred.addCallback(
+            self._handleResponse, method, uri, headers, redirectCount + 1)
 
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
     """
@@ -243,7 +282,7 @@ class WebConnectivityCache(object):
             return defer.succeed(cached_value)
 
         result = defer.Deferred()
-        agent = Agent(reactor)
+        agent = FixedRedirectAgent(Agent(reactor))
         d = agent.request('GET', url, Headers(REQUEST_HEADERS))
 
         @d.addCallback
