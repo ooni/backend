@@ -504,6 +504,14 @@ class NormaliseReport(luigi.Task):
                 list(entry['google_dns_cp']['addresses'])
         return entry
 
+    def _nest_test_keys(self, entry):
+        if entry['test_keys'] is None:
+            entry['test_keys'] = {}
+        for test_key in set(entry.keys()) - set(schema):
+            entry['test_keys'][test_key] = entry.pop(test_key)
+
+        return entry
+
     def _normalise_entry(self, entry):
         bucket_date = os.path.basename(os.path.dirname(self.report_path))
 
@@ -516,6 +524,19 @@ class NormaliseReport(luigi.Task):
 
         entry['bucket_date'] = bucket_date
 
+        entry['id'] = entry.get('id', str(uuid.uuid4()))
+        entry['report_filename'] = os.path.join(bucket_date,
+                                    os.path.basename(self.output().path))
+
+        # Ensure all the keys in the schema are present
+        for key in schema:
+            entry[key] = entry.get(key, None)
+
+        if entry.get('data_format_version', '0.1.0') == '0.2.0':
+            if entry['test_keys'] is None:
+                entry = self._nest_test_keys(entry)
+            return entry
+
         test_start_time = entry.pop('start_time', 0)
         try:
             measurement_start_time = entry.pop('test_start_time')
@@ -526,25 +547,12 @@ class NormaliseReport(luigi.Task):
         entry['measurement_start_time'] = datetime.fromtimestamp(measurement_start_time).strftime("%Y-%m-%d %H:%M:%S")
         entry['test_start_time'] = datetime.fromtimestamp(test_start_time).strftime("%Y-%m-%d %H:%M:%S")
 
-        entry['id'] = entry.get('id', str(uuid.uuid4()))
-        entry['report_filename'] = os.path.join(bucket_date,
-                                    os.path.basename(self.output().path))
-
-        if entry.get('data_format_version', '0.1.0') == '0.2.0':
-            return entry
-
         entry['data_format_version'] = '0.2.0'
 
         if isinstance(entry.get('options', []), dict):
             entry['options'] = entry['options'].get('subargs', [])
 
-        for key in schema:
-            entry[key] = entry.get(key, None)
-
-        if entry['test_keys'] is None:
-            entry['test_keys'] = {}
-        for test_key in set(entry.keys()) - set(schema):
-            entry['test_keys'][test_key] = entry.pop(test_key)
+        entry = self._nest_test_keys(entry)
 
         if test_name in test_categories['httpt']:
             entry = self._normalise_httpt(entry)
