@@ -1,5 +1,11 @@
 ChangeLog
 =========
+
+1.2.0 (XXX, XXX Apr 2016)
+-------------------------
+
+* Add support for receiving JSON based reports
+
 1.1.4 (Wed, 1 Oct 2014)
 -----------------------
 
