@@ -206,7 +206,7 @@ class ReportHandler(OONIBHandler):
 class UpdateReportMixin(object):
     def updateReport(self, report_id, parsed_request):
 
-        log.msg("Got this request %s" % parsed_request)
+        log.debug("Got this request %s" % parsed_request)
         report_filename = os.path.join(self.report_dir,
                                        report_id)
         try:
