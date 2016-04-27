@@ -1,18 +1,18 @@
 #!/bin/bash
 
 # Versions of libraries that we need to build a static Tor
-OPENSSL_VERSION=1.0.1e
+OPENSSL_VERSION=1.0.1s
 LIBEVENT_VERSION=2.0.21-stable
 ZLIB_VERSION=1.2.8
-TOR_VERSION=0.2.4.22
+TOR_VERSION=0.2.7.6
 ZLIB_SHA256=36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d
 
 SCRIPT_ROOT=`pwd`
 
 # Package URLS
 URLS="\
-https://www.torproject.org/dist/tor-$TOR_VERSION.tar.gz
-https://www.torproject.org/dist/tor-$TOR_VERSION.tar.gz.asc
+https://dist.torproject.org/tor-$TOR_VERSION.tar.gz
+https://dist.torproject.org/tor-$TOR_VERSION.tar.gz.asc
 http://zlib.net/zlib-$ZLIB_VERSION.tar.gz
 https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz.asc
 https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz
@@ -32,23 +32,23 @@ fi
 
 # get key for nickm (libevent)
 gpg --fingerprint 0xb35bf85bf19489d04e28c33c21194ebb165733ea
-if [ $? -ne 0 ]; then 
+if [ $? -ne 0 ]; then
   gpg --keyserver pgp.mit.edu --recv-keys 0xb35bf85bf19489d04e28c33c21194ebb165733ea
   gpg --fingerprint 0xb35bf85bf19489d04e28c33c21194ebb165733ea
   if [ $? -ne 0 ]; then exit ;fi
 fi
 
-# get key for Dr Stephen Henson (openssl)
-gpg --fingerprint 0xd05d8c616e27e66041ecb1b8d57ee597
-if [ $? -ne 0 ]; then 
-  gpg --keyserver pgp.mit.edu --recv-keys 0xF295C759
-  gpg --fingerprint 0xd05d8c616e27e66041ecb1b8d57ee597
+# get key for Matt Caswell <matt@openssl.org> (openssl)
+gpg --fingerprint 0x8657abb260f056b1e5190839d9c4d26d0e604491
+if [ $? -ne 0 ]; then
+  gpg --keyserver pgp.mit.edu --recv-keys 0x8657abb260f056b1e5190839d9c4d26d0e604491
+  gpg --fingerprint 0x8657abb260f056b1e5190839d9c4d26d0e604491
   if [ $? -ne 0 ]; then exit ;fi
 fi
 
 # get key for arma (tor) tor
 gpg --fingerprint 0xf65ce37f04ba5b360ae6ee17c218525819f78451
-if [ $? -ne 0 ]; then 
+if [ $? -ne 0 ]; then
   gpg --keyserver pgp.mit.edu --recv-keys 0xf65ce37f04ba5b360ae6ee17c218525819f78451
   gpg --fingerprint 0xf65ce37f04ba5b360ae6ee17c218525819f78451
   if [ $? -ne 0 ]; then exit ;fi
