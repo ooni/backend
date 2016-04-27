@@ -1,30 +1,14 @@
+# These are sub-dependencies that we need to pin to avoid version conflicts
+pyasn1>=0.1.8
+# These are dependencies of oonibackend specifically
 PyYaml
-Twisted>=12.2.0
-#https://pypi.python.org/packages/source/T/Twisted/Twisted-13.0.0.tar.bz2#md5=68afff4e1efd3757d934e39f70c99f57#egg=Twisted
+Twisted>=13.2.0
 cyclone>=1.1
-#https://pypi.python.org/packages/source/c/cyclone/cyclone-1.1.tar.gz#md5=477c5ef9cf8902e37105fe450c4d8c5d#egg=cyclone
 ipaddr>=2.1.10
-#https://ipaddr-py.googlecode.com/files/ipaddr-2.1.10.tar.gz#sha1=c608450b077b19773d4f1b5f1ef88b26f6650ce0#egg=ipaddr
 pygeoip>=0.2.6
-#https://pypi.python.org/packages/source/p/pygeoip/pygeoip-0.2.6.zip#md5=b3ac1bfcd535782bc59af78e722cf5c1#egg=pygeoip
-##
-## Originally fetched from the hg repo on secdev.org:
-##   https://hg.secdev.org/scapy/archive/tip.zip#egg=scapy
-## This is a Tor Project mirror with valid SSL/TLS certs that is stable and fast:
-##
-transaction>=1.4.1
-#https://pypi.python.org/packages/source/s/storm/storm-0.19.tar.gz#md5=61d1ee4cd2a08639ab917e43fa2c9265#egg=storm
 txtorcon>=0.7
 pyOpenSSL>=0.13
 zope.component>=4.0.0
 zope.event>=4.0.0
 zope.interface>=4.0.1
-##
-## pysqlite2 is required for sqlite support in Storm, see
-## https://storm.canonical.com/Manual#Dependencies-2
-##
-## If not installed, Storm and ooni-backend will still work, but will keep an
-## in-memory database, which in some cases may slow the server.
-##
-pysqlite>=2.6.0
 service-identity
