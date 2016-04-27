@@ -55,7 +55,7 @@ if [ $? -ne 0 ]; then
 fi
 
 for URL in $URLS; do
-  curl -LO $URL
+  wget $URL
 done
 
 BUILD=$SCRIPT_ROOT/build
