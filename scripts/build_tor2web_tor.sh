@@ -10,14 +10,16 @@ ZLIB_SHA256=36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d
 SCRIPT_ROOT=`pwd`
 
 # Package URLS
-URLS="\
-https://dist.torproject.org/tor-$TOR_VERSION.tar.gz
-https://dist.torproject.org/tor-$TOR_VERSION.tar.gz.asc
+CURL_URLS="\
 http://zlib.net/zlib-$ZLIB_VERSION.tar.gz
 https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz.asc
 https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz.asc
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz"
+
+WGET_URLS="\
+https://dist.torproject.org/tor-$TOR_VERSION.tar.gz
+https://dist.torproject.org/tor-$TOR_VERSION.tar.gz.asc"
 
 if [ `command -v shasum` ]; then
   SHA256SUM='shasum -a 256'
@@ -54,9 +56,14 @@ if [ $? -ne 0 ]; then
   if [ $? -ne 0 ]; then exit ;fi
 fi
 
-for URL in $URLS; do
+for URL in $WGET_URLS; do
   wget $URL
 done
+
+for URL in $CURL_URLS; do
+  curl -LO $URL
+done
+
 
 BUILD=$SCRIPT_ROOT/build
 if [ ! -e $BUILD ]; then
