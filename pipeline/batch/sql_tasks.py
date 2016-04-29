@@ -20,7 +20,8 @@ blockpage_body_fingerprints = {
 blockpage_header_fingerprints = {
     'SA': ('Server', 'Protected by WireFilter%'),
     'ID': ('Location', 'http://internet-positif.org%'),
-    'SD': ('Location', 'http://196.1.211.6:8080/alert/')
+    'SD': ('Location', 'http://196.1.211.6:8080/alert/'),
+    'QA': ('Location', 'http://www.vodafone.qa/alu.cfm')
 }
 
 # These are countries for which blocking is identified by checking if the
