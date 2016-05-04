@@ -53,7 +53,7 @@ def txSetupFailed(failure):
     log.err("Setup failed")
     log.exception(failure)
 
-def startTor(torconfig):
+def configTor(torconfig):
     def updates(prog, tag, summary):
         print("%d%%: %s" % (prog, summary))
 
@@ -89,11 +89,3 @@ def startTor(torconfig):
         config.main.socks_port = socks_port
 
     torconfig.save()
-
-    if config.main.tor_binary is not None:
-        d = launch_tor(torconfig, reactor,
-                       tor_binary=config.main.tor_binary,
-                       progress_updates=updates)
-    else:
-        d = launch_tor(torconfig, reactor, progress_updates=updates)
-    return d

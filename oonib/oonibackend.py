@@ -11,14 +11,14 @@ from distutils.version import LooseVersion
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
-from oonib.onion import startTor
+from oonib.onion import configTor
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
 import os
 
 from twisted.application import internet, service
-from twisted.internet import reactor
+from twisted.internet import reactor, endpoints, defer, ssl, protocol
 from twisted.names import dns
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
@@ -102,60 +102,71 @@ if config.helpers['http-return-json-headers'].port:
     multiService.addService(http_return_request_helper)
     http_return_request_helper.startService()
 
-# add the tor collector service here
+def getHSEndpoint(endpoint_config):
+    hsdir = os.path.join(torconfig.DataDirectory, endpoint_config['hsdir'])
+    if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
+        return TCPHiddenServiceEndpoint.global_tor(reactor,
+                                        80,
+                                        hidden_service_dir=hsdir)
+    else:
+        return TCPHiddenServiceEndpoint.global_tor(reactor,
+                                        80,
+                                        data_dir=hsdir)
+
+def getTCPEndpoint(endpoint_config):
+    return endpoints.TCP4ServerEndpoint(reactor, endpoint_config['port'])
+
+def getTLSEndpoint(endpoint_config):
+    with open(endpoint_config['cert'], 'r') as f:
+        cert_data = f.read()
+    certificate = ssl.PrivateCertificate.loadPEM(cert_data)
+    print certificate.inspect()
+    return endpoints.SSL4ServerEndpoint(reactor,
+                                        endpoint_config['port'],
+                                        certificate.options())
+
+def getEndpoint(endpoint_config):
+    if endpoint_config['type'] == 'onion':
+        return getHSEndpoint(endpoint_config)
+    elif endpoint_config['type'] == 'tcp':
+        return getTCPEndpoint(endpoint_config)
+    elif endpoint_config['type'] == 'tls':
+        return getTLSEndpoint(endpoint_config)
+    else:
+        raise Exception("unknown endpoint type")
+
+class Echo(protocol.Protocol):
+    def dataReceived(self, data):
+        self.transport.write('server echoes ' + data)
+
+def createService(endpoint, role, endpoint_config):
+    if role == 'bouncer':
+        factory = ooniBouncer
+    elif role == 'collector':
+        factory = ooniBackend
+    else:
+        raise Exception("unknown service type")
+
+    service = internet.StreamServerEndpointService(
+        endpoint, factory
+    )
+    service.setName("-".join([endpoint_config['type'], role]))
+    multiService.addService(service)
+    service.startService()
+
 if config.main.tor_hidden_service:
     torconfig = TorConfig()
-    d = startTor(torconfig)
+    configTor(torconfig)
 
-    def getHSEndpoint(data_dir):
-        if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
-            return TCPHiddenServiceEndpoint(reactor,
-                                            torconfig,
-                                            80,
-                                            hidden_service_dir=data_dir)
-        else:
-            return TCPHiddenServiceEndpoint(reactor,
-                                            torconfig,
-                                            80,
-                                            data_dir=data_dir)
+if config.main.bouncer_endpoints:
+    for endpoint_config in config.main.bouncer_endpoints:
+        print "Starting bouncer with config %s" % endpoint_config
+        endpoint = getEndpoint(endpoint_config)
+        createService(endpoint, 'bouncer', endpoint_config)
 
-    def printOnionEndpoint(endpointService):
-        print ("Exposed %s Tor hidden service on httpo://%s" %
-               (endpointService.name, endpointService.endpoint.onion_uri))
+if config.main.bouncer_endpoints:
+    for endpoint_config in config.main.collector_endpoints:
+        print "Starting collector with config %s" % endpoint_config
+        endpoint = getEndpoint(endpoint_config)
+        createService(endpoint, 'collector', endpoint_config)
 
-    def addCollector(torControlProtocol):
-        data_dir = os.path.join(torconfig.DataDirectory, 'collector')
-        collector_service = internet.StreamServerEndpointService(
-            getHSEndpoint(data_dir), ooniBackend
-        )
-        collector_service.setName('collector')
-        multiService.addService(collector_service)
-        collector_service.startService()
-        return collector_service
-
-    d.addCallback(addCollector)
-    d.addCallback(printOnionEndpoint)
-
-    if ooniBouncer:
-        def addBouncer(torControlProtocol):
-            data_dir = os.path.join(torconfig.DataDirectory, 'bouncer')
-            bouncer_service = internet.StreamServerEndpointService(
-                getHSEndpoint(data_dir), ooniBouncer
-            )
-            bouncer_service.setName('bouncer')
-            multiService.addService(bouncer_service)
-            bouncer_service.startService()
-            return bouncer_service
-
-        d.addCallback(addBouncer)
-        d.addCallback(printOnionEndpoint)
-else:
-    if ooniBouncer:
-        bouncer_service = internet.TCPServer(8888, ooniBouncer,
-                                             interface="127.0.0.1")
-        multiService.addService(bouncer_service)
-        bouncer_service.startService()
-    collector_service = internet.TCPServer(8889, ooniBackend,
-                                           interface="127.0.0.1")
-    multiService.addService(collector_service)
-    collector_service.startService()
