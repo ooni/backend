@@ -120,7 +120,6 @@ def getTLSEndpoint(endpoint_config):
     with open(endpoint_config['cert'], 'r') as f:
         cert_data = f.read()
     certificate = ssl.PrivateCertificate.loadPEM(cert_data)
-    print certificate.inspect()
     return endpoints.SSL4ServerEndpoint(reactor,
                                         endpoint_config['port'],
                                         certificate.options())
