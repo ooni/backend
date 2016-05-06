@@ -135,10 +135,6 @@ def getEndpoint(endpoint_config):
     else:
         raise Exception("unknown endpoint type")
 
-class Echo(protocol.Protocol):
-    def dataReceived(self, data):
-        self.transport.write('server echoes ' + data)
-
 def createService(endpoint, role, endpoint_config):
     if role == 'bouncer':
         factory = ooniBouncer
