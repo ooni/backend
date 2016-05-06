@@ -154,15 +154,20 @@ if config.main.tor_hidden_service:
     torconfig = TorConfig()
     configTor(torconfig)
 
-if config.main.bouncer_endpoints:
-    for endpoint_config in config.main.bouncer_endpoints:
-        print "Starting bouncer with config %s" % endpoint_config
-        endpoint = getEndpoint(endpoint_config)
-        createService(endpoint, 'bouncer', endpoint_config)
+# this is to ensure same behaviour with an old config file
+if config.main.bouncer_endpoints is None:
+    config.main.bouncer_endpoints = [ {'type': 'onion', 'hsdir': 'bouncer'} ]
 
-if config.main.bouncer_endpoints:
-    for endpoint_config in config.main.collector_endpoints:
-        print "Starting collector with config %s" % endpoint_config
-        endpoint = getEndpoint(endpoint_config)
-        createService(endpoint, 'collector', endpoint_config)
+if config.main.collector_endpoints is None:
+    config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': 'collector'} ]
+
+for endpoint_config in config.main.bouncer_endpoints:
+    print "Starting bouncer with config %s" % endpoint_config
+    endpoint = getEndpoint(endpoint_config)
+    createService(endpoint, 'bouncer', endpoint_config)
+
+for endpoint_config in config.main.collector_endpoints:
+    print "Starting collector with config %s" % endpoint_config
+    endpoint = getEndpoint(endpoint_config)
+    createService(endpoint, 'collector', endpoint_config)
 
