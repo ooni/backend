@@ -17,6 +17,7 @@ from twisted.names.error import DNSNameError, DNSServerError
 from twisted.names import client as dns_client
 from twisted.names import dns
 
+from twisted.web._newclient import HTTPClientParser, ParseError
 from twisted.web.client import Agent, BrowserLikeRedirectAgent, readBody
 from twisted.web.http_headers import Headers
 from twisted.web import error
@@ -30,6 +31,18 @@ from twisted.protocols import policies, basic
 from twisted.web.http import Request
 
 from oonib import log, randomStr
+
+# Monkey patch to overcome issue in parsing of HTTP responses that don't
+# contain 3 parts in the HTTP response line
+old_status_received = HTTPClientParser.statusReceived
+def statusReceivedPatched(self, status):
+    try:
+        return old_status_received(self, status)
+    except ParseError as exc:
+        if exc.args[0] == 'wrong number of parts':
+            return old_status_received(self, status + " XXX")
+        raise
+HTTPClientParser.statusReceived = statusReceivedPatched
 
 class FixedRedirectAgent(BrowserLikeRedirectAgent):
     """
