@@ -251,6 +251,33 @@ REQUEST_HEADERS = {
                '*/*;q=0.8']
 }
 
+class TrueHeaders(Headers):
+    def __init__(self, rawHeaders=None):
+        self._rawHeaders = dict()
+        if rawHeaders is not None:
+            for name, values in rawHeaders.iteritems():
+                if type(values) is list:
+                    self.setRawHeaders(name, values[:])
+                elif type(values) is dict:
+                    self._rawHeaders[name.lower()] = values
+                elif type(values) is str:
+                    self.setRawHeaders(name, values)
+
+    def setRawHeaders(self, name, values):
+        if name.lower() not in self._rawHeaders:
+            self._rawHeaders[name.lower()] = dict()
+        self._rawHeaders[name.lower()]['name'] = name
+        self._rawHeaders[name.lower()]['values'] = values
+
+    def getAllRawHeaders(self):
+        for k, v in self._rawHeaders.iteritems():
+            yield v['name'], v['values']
+
+    def getRawHeaders(self, name, default=None):
+        if name.lower() in self._rawHeaders:
+            return self._rawHeaders[name.lower()]['values']
+        return default
+
 class WebConnectivityCache(object):
     expiration_time = 200
     enable_caching = True
@@ -296,7 +323,7 @@ class WebConnectivityCache(object):
 
         result = defer.Deferred()
         agent = FixedRedirectAgent(Agent(reactor))
-        d = agent.request('GET', url, Headers(REQUEST_HEADERS))
+        d = agent.request('GET', url, TrueHeaders(REQUEST_HEADERS))
 
         @d.addCallback
         @defer.inlineCallbacks
