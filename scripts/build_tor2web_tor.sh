@@ -12,12 +12,12 @@ SCRIPT_ROOT=`pwd`
 # Package URLS
 CURL_URLS="\
 http://zlib.net/zlib-$ZLIB_VERSION.tar.gz
-https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz.asc
-https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz.asc
 https://github.com/downloads/libevent/libevent/libevent-$LIBEVENT_VERSION.tar.gz"
 
 WGET_URLS="\
+https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz.asc
+https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz
 https://dist.torproject.org/tor-$TOR_VERSION.tar.gz
 https://dist.torproject.org/tor-$TOR_VERSION.tar.gz.asc"
 
