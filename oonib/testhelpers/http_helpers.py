@@ -472,11 +472,18 @@ class WebConnectivity(RequestHandler):
             log.exception(exc)
             raise HTTPError(400, 'invalid request')
 
+
+class WebConnectivityStatus(RequestHandler):
+    def get(self):
+        self.write({"status": "ok"})
+
+
 HTTPRandomPageHelper = Application([
     # XXX add regexps here
     (r"/(.*)/(.*)", HTTPRandomPage)
 ])
 
 WebConnectivityHelper = Application([
+    (r"/status", WebConnectivityStatus),
     (r"/", WebConnectivity)
 ])

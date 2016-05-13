@@ -102,21 +102,6 @@ if config.helpers['http-return-json-headers'].port:
     multiService.addService(http_return_request_helper)
     http_return_request_helper.startService()
 
-if config.helpers['web-connectivity'].port:
-    if config.helpers['web-connectivity'].address:
-        address = config.helpers['web-connectivity'].address
-    else:
-        address = '0.0.0.0'
-    print("Starting Web Connectivity helper on {}:{}".format(
-          address,
-          config.helpers['web-connectivity'].port))
-    web_connectivity_helper = internet.TCPServer(
-        int(config.helpers['web-connectivity'].port),
-        http_helpers.WebConnectivityHelper,
-        interface=address)
-    multiService.addService(web_connectivity_helper)
-    web_connectivity_helper.startService()
-
 def getHSEndpoint(endpoint_config):
     hsdir = endpoint_config['hsdir']
     hsdir = os.path.expanduser(hsdir)
@@ -133,15 +118,22 @@ def getHSEndpoint(endpoint_config):
                                         data_dir=hsdir)
 
 def getTCPEndpoint(endpoint_config):
-    return endpoints.TCP4ServerEndpoint(reactor, endpoint_config['port'])
+    return endpoints.TCP4ServerEndpoint(
+                reactor=reactor,
+                port=endpoint_config['port'],
+                interface=endpoint_config.get('address', '')
+    )
 
 def getTLSEndpoint(endpoint_config):
     with open(endpoint_config['cert'], 'r') as f:
         cert_data = f.read()
     certificate = ssl.PrivateCertificate.loadPEM(cert_data)
-    return endpoints.SSL4ServerEndpoint(reactor,
-                                        endpoint_config['port'],
-                                        certificate.options())
+    return endpoints.SSL4ServerEndpoint(
+        reactor=reactor,
+        port=endpoint_config['port'],
+        sslContextFactory=certificate.options(),
+        interface=endpoint_config.get('address', '')
+    )
 
 def getEndpoint(endpoint_config):
     if endpoint_config['type'] == 'onion':
@@ -158,6 +150,8 @@ def createService(endpoint, role, endpoint_config):
         factory = ooniBouncer
     elif role == 'collector':
         factory = ooniBackend
+    elif role == 'web_connectivity':
+        factory = http_helpers.WebConnectivityHelper
     else:
         raise Exception("unknown service type")
 
@@ -189,3 +183,8 @@ for endpoint_config in config.main.get('collector_endpoints', []):
     print "Starting collector with config %s" % endpoint_config
     endpoint = getEndpoint(endpoint_config)
     createService(endpoint, 'collector', endpoint_config)
+
+for endpoint_config in config.helpers.web_connectivity.get('endpoints', []):
+    print "Starting web_connectivity helper with config %s" % endpoint_config
+    endpoint = getEndpoint(endpoint_config)
+    createService(endpoint, 'web_connectivity', endpoint_config)

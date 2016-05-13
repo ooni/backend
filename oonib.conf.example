@@ -73,5 +73,5 @@ helpers:
         port: 57006
 
     web-connectivity:
-        port: 57007
-        address: null
+        endpoints:
+        - {type: tcp, port: 57007}
