@@ -103,6 +103,8 @@ if config.helpers['http-return-json-headers'].port:
     http_return_request_helper.startService()
 
 def getHSEndpoint(endpoint_config):
+    if torconfig is None:
+        raise Exception("you probably need to set tor_hidden_service: true")
     hsdir = os.path.join(torconfig.DataDirectory, endpoint_config['hsdir'])
     if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
         return TCPHiddenServiceEndpoint.global_tor(reactor,
@@ -149,15 +151,16 @@ def createService(endpoint, role, endpoint_config):
     multiService.addService(service)
     service.startService()
 
+torconfig = None
 if config.main.tor_hidden_service:
     torconfig = TorConfig()
     configTor(torconfig)
 
 # this is to ensure same behaviour with an old config file
-if config.main.bouncer_endpoints is None:
+if config.main.bouncer_endpoints is None and config.main.tor_hidden_service:
     config.main.bouncer_endpoints = [ {'type': 'onion', 'hsdir': 'bouncer'} ]
 
-if config.main.collector_endpoints is None:
+if config.main.collector_endpoints is None and config.main.tor_hidden_service:
     config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': 'collector'} ]
 
 for endpoint_config in config.main.bouncer_endpoints:
