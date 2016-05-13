@@ -72,6 +72,6 @@ helpers:
         certificate: 'certificate.crt'
         port: 57006
 
-    web-connectivity:
+    web_connectivity:
         endpoints:
         - {type: tcp, port: 57007}

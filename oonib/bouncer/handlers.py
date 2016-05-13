@@ -159,9 +159,12 @@ class Bouncer(object):
                 requested_nettest['input-hashes'],
                 requested_nettest['test-helpers'])
             test_helpers = {}
+            test_helpers_alternate = {}
             for test_helper in requested_nettest['test-helpers']:
+                collector_info = self.bouncerFile['collector'][collector]
                 try:
-                    test_helpers[test_helper] = self.bouncerFile['collector'][collector]['test-helper'][test_helper]
+                    test_helpers[test_helper] = \
+                        collector_info['test-helper'][test_helper]
                 except KeyError:
                     helpers = self.knownHelpers.get(test_helper)
                     if not helpers:
@@ -169,12 +172,19 @@ class Bouncer(object):
                     helper = random.choice(helpers)
                     test_helpers[test_helper] = helper['helper-address']
 
+                try:
+                    test_helpers_alternate[test_helper] = \
+                        collector_info['test-helper-alternate'][test_helper]
+                except KeyError:
+                    pass
+
             nettest = {
                 'name': requested_nettest['name'],
                 'version': requested_nettest['version'],
                 'input-hashes': requested_nettest['input-hashes'],
                 'test-helpers': test_helpers,
-                'collector': collector,
+                'test-helpers-alternate': test_helpers_alternate,
+                'collector': collector
             }
             nettests.append(nettest)
         return {'net-tests': nettests}
