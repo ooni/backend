@@ -7,7 +7,6 @@ main:
     bouncer_file: data/bouncer.yaml
 
     logfile: null
-    tor_datadir: null
     database_uri: 'sqlite://oonib_test_db.db'
     db_threadpool_size: 10
     tor_binary: null
@@ -28,7 +27,17 @@ main:
     debug: false
     stale_time: 3600
 
-    tor_hidden_service: true
+    tor_hidden_service: false
+    tor_datadir: test_datadir
+
+    bouncer_endpoints:
+    - {type: tls, port: 10443, cert: "private/ssl-key-and-cert.pem"}
+    - {type: tcp, port: 10080}
+    - {type: onion, hsdir: bouncer}
+
+    collector_endpoints:
+    - {type: tls, port: 11443, cert: "private/ssl-key-and-cert.pem"}
+
     report_file_template: '{iso8601_timestamp}-{test_name}-{report_id}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}'
 helpers:
     http-return-json-headers:
