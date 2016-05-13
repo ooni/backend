@@ -157,10 +157,10 @@ if config.main.tor_hidden_service:
     configTor(torconfig)
 
 # this is to ensure same behaviour with an old config file
-if config.main.bouncer_endpoints is None:
+if config.main.bouncer_endpoints is None and config.main.tor_hidden_service:
     config.main.bouncer_endpoints = [ {'type': 'onion', 'hsdir': 'bouncer'} ]
 
-if config.main.collector_endpoints is None:
+if config.main.collector_endpoints is None and config.main.tor_hidden_service:
     config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': 'collector'} ]
 
 for endpoint_config in config.main.bouncer_endpoints:
