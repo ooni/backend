@@ -18,7 +18,7 @@ from oonib.testhelpers import http_helpers, tcp_helpers
 import os
 
 from twisted.application import internet, service
-from twisted.internet import reactor, endpoints, defer, ssl, protocol
+from twisted.internet import reactor, endpoints, ssl
 from twisted.names import dns
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
