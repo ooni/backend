@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from datetime import datetime
 import luigi
 from luigi.postgres import PostgresTarget
 
@@ -185,7 +186,10 @@ class RunQuery(luigi.Task):
 
     @property
     def update_id(self):
-        return self.task_id
+        return '{}(nonce={})'.format(
+            self.task_family,
+            datetime.now().strftime("%Y%m%d%H%m%s")
+        )
 
     def run(self):
         connection = self.output().connect()
@@ -211,15 +215,28 @@ class RunQuery(luigi.Task):
 
 class CreateBlockpageCountView(RunQuery):
     table = 'metrics-materialised-views'
+    drop = luigi.BoolParameter()
+
     def query(self):
         metrics_table = config.get("postgres", "metrics-table")
-        return blockpage_count(metrics_table)
+        query = ""
+        if self.drop == True:
+            query += "DROP MATERIALIZED VIEW IF EXISTS blockpage_count;"
+        query += blockpage_count(metrics_table)
+        return query
+
 
 class CreateBlockpageUrlsView(RunQuery):
     table = 'metrics-materialised-views'
+    drop = luigi.BoolParameter()
+
     def query(self):
         metrics_table = config.get("postgres", "metrics-table")
-        return blockpage_urls(metrics_table)
+        query = ""
+        if self.drop == True:
+            query += "DROP MATERIALIZED VIEW IF EXISTS blockpage_urls;"
+        query += blockpage_urls(metrics_table)
+        return query
 
 class CreateIdentifiedVendorsView(RunQuery):
     table = 'metrics-materialised-views'
@@ -232,6 +249,13 @@ class CreateCountryCountsView(RunQuery):
     def query(self):
         metrics_table = config.get("postgres", "metrics-table")
         return country_counts(metrics_table)
+
+class UpdateBlockpageFingerprints(luigi.WrapperTask):
+    def requires(self):
+        return [
+            CreateBlockpageCountView(drop=True),
+            CreateBlockpageUrlsView(drop=True)
+        ]
 
 class CreateMaterialisedViews(luigi.WrapperTask):
     def complete(self):
