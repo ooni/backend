@@ -12,7 +12,8 @@ blockpage_body_fingerprints = {
     'TR': '%uyarınca yapılan teknik inceleme ve hukuki değerlendirme sonucunda bu internet%',
     'GR': '%www.gamingcommission.gov.gr/index.php/forbidden-access-black-list/%',
     'RU': '%http://eais.rkn.gov.ru/%',
-    'IN': '%The page you have requested has been blocked%'
+    'IN': '%The page you have requested has been blocked%',
+    'BE': '%that is considered illegal according to Belgian legislation%'
 }
 
 # These are countries for which we detect blocking by looking for certain
