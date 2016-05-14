@@ -537,9 +537,17 @@ class NormaliseReport(luigi.Task):
                 entry = self._nest_test_keys(entry)
             return entry
 
-        test_start_time = entry.pop('start_time', 0)
+        test_start_time = datetime.fromtimestamp(entry.pop('start_time', 0))
         try:
-            measurement_start_time = entry.pop('test_start_time')
+            tst = entry.pop('test_start_time')
+            # This is the old test_start_time key that now is called
+            # "measurement_start_time"
+            if isinstance(tst, float):
+                measurement_start_time = datetime.fromtimestamp(tst)
+            else:
+                test_start_time = datetime.strptime(tst, "%Y-%m-%d %H:%M:%S")
+                measurement_start_time = datetime.strptime(entry.get('measurement_start_time'),
+                                                           "%Y-%m-%d %H:%M:%S")
         except KeyError:
             # Failback to using the start_time
             measurement_start_time = test_start_time
