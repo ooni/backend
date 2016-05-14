@@ -11,7 +11,6 @@ from distutils.version import LooseVersion
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
-from oonib.onion import configTor
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
@@ -21,7 +20,7 @@ from twisted.application import internet, service
 from twisted.internet import reactor, endpoints, ssl
 from twisted.names import dns
 
-from txtorcon import TCPHiddenServiceEndpoint, TorConfig
+from txtorcon import TCPHiddenServiceEndpoint
 from txtorcon import __version__ as txtorcon_version
 
 if config.main.uid and config.main.gid:
@@ -103,9 +102,9 @@ if config.helpers['http-return-json-headers'].port:
     http_return_request_helper.startService()
 
 def getHSEndpoint(endpoint_config):
-    if torconfig is None:
-        raise Exception("you probably need to set tor_hidden_service: true")
-    hsdir = os.path.join(torconfig.DataDirectory, endpoint_config['hsdir'])
+    hsdir = endpoint_config['hsdir']
+    hsdir = os.path.expanduser(hsdir)
+    hsdir = os.path.realpath(hsdir)
     if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
         return TCPHiddenServiceEndpoint.global_tor(reactor,
                                         80,
@@ -151,17 +150,15 @@ def createService(endpoint, role, endpoint_config):
     multiService.addService(service)
     service.startService()
 
-torconfig = None
-if config.main.tor_hidden_service:
-    torconfig = TorConfig()
-    configTor(torconfig)
-
 # this is to ensure same behaviour with an old config file
+# the tor we start will actually use a tempdir for the DataDirectory
 if config.main.bouncer_endpoints is None and config.main.tor_hidden_service:
-    config.main.bouncer_endpoints = [ {'type': 'onion', 'hsdir': 'bouncer'} ]
+    hsdir = os.path.join(torconfig.DataDirectory, 'bouncer')
+    config.main.bouncer_endpoints = [ {'type': 'onion', 'hsdir': hsdir} ]
 
 if config.main.collector_endpoints is None and config.main.tor_hidden_service:
-    config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': 'collector'} ]
+    hsdir = os.path.join(torconfig.DataDirectory, 'collector')
+    config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': hsdir} ]
 
 config.main.bouncer_endpoints = config.main.get('bouncer_endpoints', [])
 config.main.collector_endpoints = config.main.get('collector_endpoints', [])
