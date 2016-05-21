@@ -162,12 +162,12 @@ if config.main.tor_hidden_service and \
     config.main.bouncer_endpoints   = [ {'type': 'onion', 'hsdir':   bouncer_hsdir} ]
     config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': collector_hsdir} ]
 
-for endpoint_config in config.main.get('bouncer_endpoints'):
+for endpoint_config in config.main.get('bouncer_endpoints', []):
     print "Starting bouncer with config %s" % endpoint_config
     endpoint = getEndpoint(endpoint_config)
     createService(endpoint, 'bouncer', endpoint_config)
 
-for endpoint_config in config.main.get('collector_endpoints'):
+for endpoint_config in config.main.get('collector_endpoints', []):
     print "Starting collector with config %s" % endpoint_config
     endpoint = getEndpoint(endpoint_config)
     createService(endpoint, 'collector', endpoint_config)

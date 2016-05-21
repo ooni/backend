@@ -28,7 +28,7 @@ main:
     stale_time: 3600
 
     tor_hidden_service: false
-    tor_datadir: test_datadir
+    tor_datadir: null
 
     bouncer_endpoints:
     - {type: tls, port: 10443, cert: "private/ssl-key-and-cert.pem"}
