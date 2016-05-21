@@ -11,14 +11,14 @@ from distutils.version import LooseVersion
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
-from oonib.onion import configTor
+from oonib.onion import get_global_tor
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
 import os
 
 from twisted.application import internet, service
-from twisted.internet import reactor, endpoints, ssl
+from twisted.internet import reactor, endpoints, ssl, defer
 from twisted.names import dns
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
@@ -103,15 +103,17 @@ if config.helpers['http-return-json-headers'].port:
     http_return_request_helper.startService()
 
 def getHSEndpoint(endpoint_config):
-    if torconfig is None:
-        raise Exception("you probably need to set tor_hidden_service: true")
-    hsdir = os.path.join(torconfig.DataDirectory, endpoint_config['hsdir'])
+    hsdir = endpoint_config['hsdir']
+    hsdir = os.path.expanduser(hsdir)
+    hsdir = os.path.realpath(hsdir)
     if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
-        return TCPHiddenServiceEndpoint.global_tor(reactor,
+        return TCPHiddenServiceEndpoint(reactor,
+                                        get_global_tor(reactor),
                                         80,
                                         hidden_service_dir=hsdir)
     else:
-        return TCPHiddenServiceEndpoint.global_tor(reactor,
+        return TCPHiddenServiceEndpoint(reactor,
+                                        get_global_tor(reactor),
                                         80,
                                         data_dir=hsdir)
 
@@ -151,27 +153,21 @@ def createService(endpoint, role, endpoint_config):
     multiService.addService(service)
     service.startService()
 
-torconfig = None
-if config.main.tor_hidden_service:
-    torconfig = TorConfig()
-    configTor(torconfig)
-
 # this is to ensure same behaviour with an old config file
-if config.main.bouncer_endpoints is None and config.main.tor_hidden_service:
-    config.main.bouncer_endpoints = [ {'type': 'onion', 'hsdir': 'bouncer'} ]
+if config.main.tor_hidden_service and \
+        config.main.bouncer_endpoints is None and \
+        config.main.collector_endpoints is None:
+    bouncer_hsdir   = os.path.join(config.main.tor_datadir, 'bouncer')
+    collector_hsdir = os.path.join(config.main.tor_datadir, 'collector')
+    config.main.bouncer_endpoints   = [ {'type': 'onion', 'hsdir':   bouncer_hsdir} ]
+    config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': collector_hsdir} ]
 
-if config.main.collector_endpoints is None and config.main.tor_hidden_service:
-    config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': 'collector'} ]
-
-config.main.bouncer_endpoints = config.main.get('bouncer_endpoints', [])
-config.main.collector_endpoints = config.main.get('collector_endpoints', [])
-
-for endpoint_config in config.main.bouncer_endpoints:
+for endpoint_config in config.main.get('bouncer_endpoints'):
     print "Starting bouncer with config %s" % endpoint_config
     endpoint = getEndpoint(endpoint_config)
     createService(endpoint, 'bouncer', endpoint_config)
 
-for endpoint_config in config.main.collector_endpoints:
+for endpoint_config in config.main.get('collector_endpoints'):
     print "Starting collector with config %s" % endpoint_config
     endpoint = getEndpoint(endpoint_config)
     createService(endpoint, 'collector', endpoint_config)

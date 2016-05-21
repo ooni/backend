@@ -1,7 +1,7 @@
 import tempfile
 from oonib import log
 from oonib.config import config
-from twisted.internet import reactor, endpoints
+from twisted.internet import reactor, endpoints, defer
 import os
 
 from random import randint
@@ -9,6 +9,7 @@ import socket
 
 from txtorcon import TCPHiddenServiceEndpoint, TorConfig
 from txtorcon import launch_tor
+from txtorcon.util import available_tcp_port
 
 from txtorcon import __version__ as txtorcon_version
 if tuple(map(int, txtorcon_version.split('.'))) < (0, 9, 0):
@@ -53,9 +54,8 @@ def txSetupFailed(failure):
     log.err("Setup failed")
     log.exception(failure)
 
-def configTor(torconfig):
-    def updates(prog, tag, summary):
-        print("%d%%: %s" % (prog, summary))
+def _configTor():
+    torconfig = TorConfig()
 
     if config.main.socks_port:
         torconfig.SocksPort = config.main.socks_port
@@ -89,3 +89,32 @@ def configTor(torconfig):
         config.main.socks_port = socks_port
 
     torconfig.save()
+    return torconfig
+
+# get_global_tor is a near-rip of that from txtorcon (so you can have some
+# confidence in the logic of it), but we use our own _configTor() while
+# the txtorcon function hardcodes some default values we don't want.
+_global_tor_config = None
+_global_tor_lock = defer.DeferredLock()
+# we need the lock because we (potentially) yield several times while
+# "creating" the TorConfig instance
+
+@defer.inlineCallbacks
+def get_global_tor(reactor):
+    global _global_tor_config
+    global _global_tor_lock
+    yield _global_tor_lock.acquire()
+
+    try:
+        if _global_tor_config is None:
+            _global_tor_config = config = _configTor()
+
+            # start Tor launching
+            def updates(prog, tag, summary):
+                print("%d%%: %s" % (prog, summary))
+            yield launch_tor(config, reactor, progress_updates=updates)
+            yield config.post_bootstrap
+
+        defer.returnValue(_global_tor_config)
+    finally:
+        _global_tor_lock.release()
