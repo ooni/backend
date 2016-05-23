@@ -27,7 +27,6 @@ main:
     debug: false
     stale_time: 3600
 
-    tor_hidden_service: false
     tor_datadir: null
 
     bouncer_endpoints:
