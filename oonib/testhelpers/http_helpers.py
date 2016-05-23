@@ -1,6 +1,10 @@
+import os
 import json
 import random
 import string
+import tempfile
+import itertools
+from hashlib import sha256
 
 from urlparse import urlparse
 
@@ -283,157 +287,183 @@ class WebConnectivityCache(object):
     enable_caching = True
 
     def __init__(self):
-        self._cache = {
-            'http_request': {
-            },
-            'tcp_connect': {
-            },
-            'dns_consistency': {
-            }
-        }
+        self._response_types = (
+            'http_request',
+            'tcp_connect',
+            'dns_consistency'
+        )
+        self._cache_lifecycle = {}
+        self._cache_dir = tempfile.mkdtemp()
+        for response_type in self._response_types:
+            os.mkdir(os.path.join(self._cache_dir, response_type))
+            self._cache_lifecycle[response_type] = {}
 
+    @defer.inlineCallbacks
+    def expire_all(self):
+        for response_type in self._cache_lifecycle.keys():
+            for key_hash in self._cache_lifecycle[response_type].keys():
+                yield self.expire(response_type, key_hash)
+
+    @defer.inlineCallbacks
     def cache_value(self, response_type, key, value):
+        if response_type not in self._response_types:
+            raise Exception("Invalid response type")
         if self.enable_caching:
-            self._cache[response_type][key] = {
-                'value': value,
+            key_hash = sha256(key).hexdigest()
+            cache_file = os.path.join(self._cache_dir, response_type, key_hash)
+
+            if key_hash in self._cache_lifecycle[response_type]:
+                yield self.expire(response_type, key_hash)
+
+            self._cache_lifecycle[response_type][key_hash] = {
                 'expiration': reactor.callLater(self.expiration_time,
-                                                self.expire, response_type, key)
+                                                self.expire,
+                                                response_type, key_hash),
+                'lock': defer.DeferredLock()
             }
+            lock = self._cache_lifecycle[response_type][key_hash]['lock']
+            yield lock.acquire()
+            with open(cache_file, 'w+') as fw:
+                json.dump(value, fw)
+            lock.release()
 
-    def expire(self, response_type, key):
-        if self._cache[response_type][key]['expiration'].active():
-            self._cache[response_type][key]['expiration'].cancel()
-        del self._cache[response_type][key]
+    @defer.inlineCallbacks
+    def expire(self, response_type, key_hash):
+        if response_type not in self._response_types:
+            raise Exception("Invalid response type")
+        lifecycle = self._cache_lifecycle[response_type][key_hash]
+        if lifecycle['expiration'].active():
+            lifecycle['expiration'].cancel()
 
+        yield lifecycle['lock'].acquire()
+        try:
+            os.remove(os.path.join(self._cache_dir, response_type, key_hash))
+        except OSError:
+            pass
+        lifecycle['lock'].release()
+        del self._cache_lifecycle[response_type][key_hash]
+
+    @defer.inlineCallbacks
     def lookup(self, response_type, key):
         if not self.enable_caching:
-            return None
+            defer.returnValue(None)
 
-        try:
-            hit = self._cache[response_type][key]
-            hit['expiration'].reset(self.expiration_time)
-            return hit['value']
-        except KeyError:
-            return None
+        key_hash = sha256(key).hexdigest()
+        cache_file = os.path.join(self._cache_dir, response_type, key_hash)
 
+        if key_hash not in self._cache_lifecycle[response_type]:
+            defer.returnValue(None)
+
+        lock = self._cache_lifecycle[response_type][key_hash]['lock']
+        expiration = \
+            self._cache_lifecycle[response_type][key_hash]['expiration']
+
+        yield lock.acquire()
+
+        if not os.path.exists(cache_file):
+            lock.release()
+            defer.returnValue(None)
+
+        with open(cache_file, 'r') as fh:
+            value = json.load(fh)
+
+        expiration.reset(self.expiration_time)
+        lock.release()
+        defer.returnValue(value)
+
+    @defer.inlineCallbacks
     def http_request(self, url):
-        cached_value = self.lookup('http_request', url)
+        cached_value = yield self.lookup('http_request', url)
         if cached_value is not None:
-            return defer.succeed(cached_value)
+            defer.returnValue(cached_value)
 
-        result = defer.Deferred()
+        page_info = {
+            'body_length': -1,
+            'status_code': -1,
+            'headers': {},
+            'failure': None
+        }
+
         agent = FixedRedirectAgent(Agent(reactor))
-        d = agent.request('GET', url, TrueHeaders(REQUEST_HEADERS))
-
-        @d.addCallback
-        @defer.inlineCallbacks
-        def cb(response):
+        try:
+            response = yield agent.request('GET', url,
+                                           TrueHeaders(REQUEST_HEADERS))
             headers = {}
             for name, value in response.headers.getAllRawHeaders():
                 headers[name] = value[0]
             body = yield readBody(response)
-            value = {
-                'body_length': len(body),
-                'headers': headers,
-                'failure': None
-            }
-            self.cache_value('http_request', url, value)
-            result.callback(value)
+            page_info['body_length'] = len(body)
+            page_info['status_code'] = response.code
+            page_info['headers'] = headers
 
-        @d.addErrback
-        def eb(failure):
-            if failure.check(DNSLookupError):
-                failure_string = 'dns_lookup_error'
-            elif failure.check(TimeoutError):
-                failure_string = 'generic_timeout_error'
-            elif failure.check(ConnectionRefusedError):
-                failure_string = 'connection_refused_error'
-            else:
-                failure_string = 'unknown_error'
-            value = {
-                'body_length': None,
-                'headers': {},
-                'failure': failure_string
-            }
-            self.cache_value('http_request', url, value)
-            result.callback(value)
+        except DNSLookupError:
+            page_info['failure'] = 'dns_lookup_error'
+        except TimeoutError:
+            page_info['failure'] = 'generic_timeout_error'
+        except ConnectionRefusedError:
+            page_info['failure'] = 'connection_refused_error'
+        except:
+            # XXX map more failures
+            page_info['failure'] = 'unknown_error'
 
-        return result
+        yield self.cache_value('http_request', url, page_info)
+        defer.returnValue(page_info)
 
+    @defer.inlineCallbacks
     def tcp_connect(self, socket):
-        cached_value = self.lookup('tcp_connect', socket)
+        cached_value = yield self.lookup('tcp_connect', socket)
         if cached_value is not None:
-            return defer.succeed(cached_value)
+            defer.returnValue(cached_value)
 
-        result = defer.Deferred()
+        socket_info = {
+            'status': None,
+            'failure': None
+        }
 
         ip_address, port = socket.split(":")
-        point = TCP4ClientEndpoint(reactor, ip_address, int(port))
-        d = point.connect(TCPConnectFactory())
-        @d.addCallback
-        def cb(p):
-            value = {
-                'status': True,
-                'failure': None
-            }
-            self.cache_value('tcp_connect', socket, value)
-            result.callback(value)
+        try:
+            point = TCP4ClientEndpoint(reactor, ip_address, int(port))
+            yield point.connect(TCPConnectFactory())
+            socket_info['status'] = True
+        except TimeoutError:
+            socket_info['status'] = False
+            socket_info['failure'] = 'generic_timeout_error'
+        except ConnectionRefusedError:
+            socket_info['status'] = False
+            socket_info['failure'] = 'connection_refused_error'
+        except:
+            socket_info['status'] = False
+            socket_info['failure'] = 'unknown_error'
+        yield self.cache_value('tcp_connect', socket, socket_info)
+        defer.returnValue(socket_info)
 
-        @d.addErrback
-        def eb(failure):
-            if failure.check(TimeoutError):
-                failure_string = 'generic_timeout_error'
-            elif failure.check(ConnectionRefusedError):
-                failure_string = 'connection_refused_error'
-            else:
-                failure_string = 'unknown_error'
-            value = {
-                'status': False,
-                'failure': failure_string
-            }
-            self.cache_value('tcp_connect', socket, value)
-            result.callback(value)
-
-        return result
-
+    @defer.inlineCallbacks
     def dns_consistency(self, hostname):
-        cached_value = self.lookup('dns_consistency', hostname)
+        cached_value = yield self.lookup('dns_consistency', hostname)
         if cached_value is not None:
-            return defer.succeed(cached_value)
+            defer.returnValue(cached_value)
 
-        result = defer.Deferred()
-        d = dns_client.lookupAddress(hostname)
+        dns_info = {
+            'ips': [],
+            'failure': None
+        }
 
-        @d.addCallback
-        def cb(records):
-            ip_addresses = []
+        try:
+            records = yield dns_client.lookupAddress(hostname)
             answers = records[0]
             for answer in answers:
                 if answer.type is dns.A:
-                    ip_addresses.append(answer.payload.dottedQuad())
-            value = {
-                'ips': ip_addresses,
-                'failure': None
-            }
-            self.cache_value('dns_consistency', hostname, value)
-            result.callback(value)
+                    dns_info['ips'].append(answer.payload.dottedQuad())
+        except DNSNameError:
+            dns_info['failure'] = 'dns_name_error'
+        except DNSServerError:
+            dns_info['failure'] = 'dns_server_failure'
+        except:
+            dns_info['failure'] = 'unknown_error'
 
-        @d.addErrback
-        def eb(failure):
-            if failure.check(DNSNameError):
-                failure_string = 'dns_name_error'
-            elif failure.check(DNSServerError):
-                failure_string = 'dns_server_failure'
-            else:
-                failure_string = 'unknown_error'
-            value = {
-                'ips': [],
-                'failure': failure_string
-            }
-            self.cache_value('dns_consistency', hostname, value)
-            result.callback(value)
+        yield self.cache_value('dns_consistency', hostname, dns_info)
+        defer.returnValue(dns_info)
 
-        return result
 
 web_connectivity_cache = WebConnectivityCache()
 
