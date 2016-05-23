@@ -3,7 +3,6 @@ import json
 import random
 import string
 import tempfile
-import itertools
 from hashlib import sha256
 
 from urlparse import urlparse
@@ -23,6 +22,7 @@ from twisted.names import dns
 
 from twisted.web._newclient import HTTPClientParser, ParseError
 from twisted.web.client import Agent, BrowserLikeRedirectAgent, readBody
+from twisted.web.client import ContentDecoderAgent, GzipDecoder
 from twisted.web.http_headers import Headers
 from twisted.web import error
 
@@ -384,7 +384,8 @@ class WebConnectivityCache(object):
             'failure': None
         }
 
-        agent = FixedRedirectAgent(Agent(reactor))
+        agent = ContentDecoderAgent(FixedRedirectAgent(Agent(reactor)),
+                                    [('gzip', GzipDecoder)])
         try:
             response = yield agent.request('GET', url,
                                            TrueHeaders(REQUEST_HEADERS))
