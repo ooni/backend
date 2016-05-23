@@ -106,13 +106,15 @@ def get_global_tor(reactor):
 
     try:
         if _global_tor_config is None:
-            _global_tor_config = config = _configTor()
+            _global_tor_config = _configTor()
 
             # start Tor launching
             def updates(prog, tag, summary):
                 print("%d%%: %s" % (prog, summary))
-            yield launch_tor(config, reactor, progress_updates=updates)
-            yield config.post_bootstrap
+            yield launch_tor(_global_tor_config, reactor,
+                    progress_updates=updates,
+                    tor_binary=config.main.tor_binary)
+            yield _global_tor_config.post_bootstrap
 
         defer.returnValue(_global_tor_config)
     finally:
