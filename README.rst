@@ -107,6 +107,23 @@ this would simply be ``'report'``) and ``tor_datadir`` (where you would
 like the spawned Tor process to keep its data). If you compiled Tor yourself,
 you'll likely want to specify it for the ``tor_binary`` option.
 
+Configure bouncer and collector endpoints
+.........................................
+
+The bouncer and collector are HTTP applications ("protocols" in twisted terminology) that can be configured to run on top of plain TCP, TLS, or onion service endpoints.
+Here is an example of the relevant part of the configuration::
+    bouncer_endpoints:
+    - {type: tls, port: 10443, cert: "private/ssl-key-and-cert.pem"}
+    - {type: tcp, port: 10080}
+    - {type: onion, hsdir: "/some/private/bouncer"}
+
+    collector_endpoints:
+    - {type: tls, port: 11443, cert: "private/ssl-key-and-cert.pem"}
+    - {type: onion, hsdir: "/some/private/collector"}
+
+`scripts/gen-ssl-key-cert.sh` in this repo contains the openssl command to generate a self-signed certificate which you can use for the tls endpoint.
+txtorcon will use the hostname/private_key from the configured hsdir to start an onion service, or generate a new key if hsdir is empty.
+
 Generate self signed certs for OONIB
 ....................................
 If you want to use the HTTPS test helper, you will need to create a
