@@ -285,6 +285,7 @@ class TrueHeaders(Headers):
 class WebConnectivityCache(object):
     expiration_time = 200
     enable_caching = True
+    http_retries = 2
 
     def __init__(self):
         self._response_types = (
@@ -387,16 +388,23 @@ class WebConnectivityCache(object):
         agent = ContentDecoderAgent(FixedRedirectAgent(Agent(reactor)),
                                     [('gzip', GzipDecoder)])
         try:
-            response = yield agent.request('GET', url,
-                                           TrueHeaders(REQUEST_HEADERS))
-            headers = {}
-            for name, value in response.headers.getAllRawHeaders():
-                headers[name] = value[0]
-            body = yield readBody(response)
-            page_info['body_length'] = len(body)
-            page_info['status_code'] = response.code
-            page_info['headers'] = headers
-
+            retries = 0
+            while True:
+                try:
+                    response = yield agent.request('GET', url,
+                                                   TrueHeaders(REQUEST_HEADERS))
+                    headers = {}
+                    for name, value in response.headers.getAllRawHeaders():
+                        headers[name] = value[0]
+                    body = yield readBody(response)
+                    page_info['body_length'] = len(body)
+                    page_info['status_code'] = response.code
+                    page_info['headers'] = headers
+                    break
+                except:
+                    if retries > self.http_retries:
+                        raise
+                    retries += 1
         except DNSLookupError:
             page_info['failure'] = 'dns_lookup_error'
         except TimeoutError:
