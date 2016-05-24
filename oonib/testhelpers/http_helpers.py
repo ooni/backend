@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import random
 import string
@@ -58,7 +59,7 @@ class FixedRedirectAgent(BrowserLikeRedirectAgent):
         Handle a redirect response, checking the number of redirects already
         followed, and extracting the location header fields.
 
-        This is pathed to fix a bug in infinite redirect loop.
+        This is patched to fix a bug in infinite redirect loop.
         """
         if redirectCount >= self._redirectLimit:
             err = error.InfiniteRedirection(
@@ -239,6 +240,39 @@ class HTTPRandomPage(HTTPTrapAll):
             length = 100000
         self.write(self.genRandomPage(length, keyword))
 
+
+def encodeResponse(response):
+    body = None
+    body_length = 0
+    if getattr(response, 'body', None):
+        body = response.body
+        body_length = len(response.body)
+    return {
+        'headers':
+            {k.lower(): v for k, v in response.headers.getAllRawHeaders()},
+        'code': response.code,
+        'body_length': body_length,
+        'body': body
+    }
+
+
+def encodeResponses(response):
+    responses = []
+    responses += [encodeResponse(response)]
+    if response.previousResponse:
+        responses += encodeResponses(response.previousResponse)
+    return responses
+
+
+TITLE_REGEXP = re.compile("<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+
+def extractTitle(body):
+    m = TITLE_REGEXP.search(body, re.IGNORECASE | re.DOTALL)
+    if m:
+        return m.group(1)
+    return ''
+
+
 class TCPConnectProtocol(Protocol):
     def connectionMade(self):
         self.transport.loseConnection()
@@ -286,6 +320,7 @@ class WebConnectivityCache(object):
     expiration_time = 200
     enable_caching = True
     http_retries = 2
+    enable_debug = False
 
     def __init__(self):
         self._response_types = (
@@ -400,6 +435,10 @@ class WebConnectivityCache(object):
                     page_info['body_length'] = len(body)
                     page_info['status_code'] = response.code
                     page_info['headers'] = headers
+                    page_info['title'] = extractTitle(body)
+                    if self.enable_debug:
+                        response.body = body
+                        page_info['responses'] = encodeResponses(response)
                     break
                 except:
                     if retries > self.http_retries:
