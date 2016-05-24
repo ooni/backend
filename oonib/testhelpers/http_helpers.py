@@ -445,7 +445,7 @@ class WebConnectivityCache(object):
             defer.returnValue(cached_value)
 
         dns_info = {
-            'ips': [],
+            'addrs': [],
             'failure': None
         }
 
@@ -454,7 +454,9 @@ class WebConnectivityCache(object):
             answers = records[0]
             for answer in answers:
                 if answer.type is dns.A:
-                    dns_info['ips'].append(answer.payload.dottedQuad())
+                    dns_info['addrs'].append(answer.payload.dottedQuad())
+                elif answer.type is dns.CNAME:
+                    dns_info['addrs'].append(answer.payload.name.name)
         except DNSNameError:
             dns_info['failure'] = 'dns_name_error'
         except DNSServerError:
