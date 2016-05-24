@@ -24,6 +24,7 @@ from twisted.names import dns
 from twisted.web._newclient import HTTPClientParser, ParseError
 from twisted.web.client import Agent, BrowserLikeRedirectAgent, readBody
 from twisted.web.client import ContentDecoderAgent, GzipDecoder
+from twisted.web.client import PartialDownloadError
 from twisted.web.http_headers import Headers
 from twisted.web import error
 
@@ -431,8 +432,14 @@ class WebConnectivityCache(object):
                     headers = {}
                     for name, value in response.headers.getAllRawHeaders():
                         headers[name] = value[0]
-                    body = yield readBody(response)
-                    page_info['body_length'] = len(body)
+                    body_length = -1
+                    try:
+                        body = yield readBody(response)
+                        body_length = len(body)
+                    except PartialDownloadError as pde:
+                        if pde.response:
+                            body_length = len(pde.response)
+                    page_info['body_length'] = body_length
                     page_info['status_code'] = response.code
                     page_info['headers'] = headers
                     page_info['title'] = extractTitle(body)
