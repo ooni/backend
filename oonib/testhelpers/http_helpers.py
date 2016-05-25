@@ -431,7 +431,7 @@ class WebConnectivityCache(object):
                                                    TrueHeaders(REQUEST_HEADERS))
                     headers = {}
                     for name, value in response.headers.getAllRawHeaders():
-                        headers[name] = value[0]
+                        headers[name] = unicode(value[0], errors='ignore')
                     body_length = -1
                     try:
                         body = yield readBody(response)
