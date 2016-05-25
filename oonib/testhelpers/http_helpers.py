@@ -270,7 +270,7 @@ TITLE_REGEXP = re.compile("<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 def extractTitle(body):
     m = TITLE_REGEXP.search(body, re.IGNORECASE | re.DOTALL)
     if m:
-        return m.group(1)
+        return unicode(m.group(1), errors='ignore')
     return ''
 
 
