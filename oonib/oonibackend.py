@@ -163,9 +163,12 @@ if config.main.tor_hidden_service and \
     config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': collector_hsdir} ]
 
 for endpoint_config in config.main.get('bouncer_endpoints', []):
-    print "Starting bouncer with config %s" % endpoint_config
-    endpoint = getEndpoint(endpoint_config)
-    createService(endpoint, 'bouncer', endpoint_config)
+    if config.main.bouncer_file:
+        print "Starting bouncer with config %s" % endpoint_config
+        endpoint = getEndpoint(endpoint_config)
+        createService(endpoint, 'bouncer', endpoint_config)
+    else:
+        print "No bouncer configured"
 
 for endpoint_config in config.main.get('collector_endpoints', []):
     print "Starting collector with config %s" % endpoint_config
