@@ -2,55 +2,35 @@
 
 import sys
 import os
-from twisted.python import log, usage
-from twisted.internet import reactor
-from twisted.application import app
 
 # Hack to set the proper sys.path. Overcomes the export PYTHONPATH pain.
 sys.path[:] = map(os.path.abspath, sys.path)
 sys.path.insert(0, os.path.abspath(os.getcwd()))
 
-from oonib import errors as e
+from oonib import errors
 from oonib.config import config
-from oonib.log import LoggerFactory
-
 try:
     config.load()
-except e.ConfigFileNotSpecified:
+except errors.ConfigFileNotSpecified:
     print "Config file not specified!"
     print "Use -c to specify one!"
     config.usageOptions()
     sys.exit(1)
-except e.ConfigFileDoesNotExist, path:
+except errors.ConfigFileDoesNotExist, path:
     print "Config file \"%s\" does not exist!" % path
     sys.exit(2)
-except e.InvalidReportDirectory, path:
+except errors.InvalidReportDirectory, path:
     print "Invalid report directory: %s!" % path
     sys.exit(3)
-except e.InvalidArchiveDirectory, path:
+except errors.InvalidArchiveDirectory, path:
     print "Invalid archive directory: %s!" % path
     sys.exit(4)
-except e.InvalidInputDirectory, path:
+except errors.InvalidInputDirectory, path:
     print "Invalid input directory: %s" % path
     sys.exit(5)
-except e.InvalidDeckDirectory, path:
+except errors.InvalidDeckDirectory, path:
     print "Invalid deck directory: %s" % path
     sys.exit(6)
 
-if config.main.chroot:
-    sys.argv.append('--chroot')
-    sys.argv.append(config.chroot)
-
-if not config.main.nodaemon:
-    sys.argv.append('-y')
-
-from oonib.oonibackend import application
-
-from twisted.scripts._twistd_unix import UnixApplicationRunner
-class OBaseRunner(UnixApplicationRunner):
-    temporary_data_dir = None
-    def createOrGetApplication(self):
-        return application
-
-OBaseRunner.loggerFactory = LoggerFactory
-OBaseRunner(config.main).run()
+from oonib import oonibackend
+oonibackend.start()

@@ -7,115 +7,29 @@
 # In here we start all the test helpers that are required by ooniprobe and
 # start the report collector
 
-from distutils.version import LooseVersion
+import os
+import sys
+
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
-from oonib.onion import get_global_tor
+from oonib.onion import DelayedTCPHiddenServiceEndpoint
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
-import os
-
+from twisted.scripts import twistd
+from twisted.python import usage
 from twisted.application import internet, service
-from twisted.internet import reactor, endpoints, ssl, defer
+from twisted.internet import reactor, endpoints, ssl
 from twisted.names import dns
 
-from txtorcon import TCPHiddenServiceEndpoint, TorConfig
-from txtorcon import __version__ as txtorcon_version
-
-if config.main.uid and config.main.gid:
-    application = service.Application('oonibackend', uid=config.main.uid,
-                                      gid=config.main.gid)
-else:
-    application = service.Application('oonibackend')
-
-multiService = service.MultiService()
-
-if config.helpers['ssl'].port:
-    print "Starting SSL helper on %s" % config.helpers['ssl'].port
-    ssl_helper = internet.SSLServer(int(config.helpers['ssl'].port),
-                                    http_helpers.HTTPReturnJSONHeadersHelper(),
-                                    ssl_helpers.SSLContext(config))
-    multiService.addService(ssl_helper)
-    ssl_helper.startService()
-
-# Start the DNS Server related services
-if config.helpers['dns'].tcp_port:
-    print "Starting TCP DNS Helper on %s" % config.helpers['dns'].tcp_port
-    tcp_dns_helper = internet.TCPServer(int(config.helpers['dns'].tcp_port),
-                                        dns_helpers.DNSTestHelper())
-    multiService.addService(tcp_dns_helper)
-    tcp_dns_helper.startService()
-
-if config.helpers['dns'].udp_port:
-    print "Starting UDP DNS Helper on %s" % config.helpers['dns'].udp_port
-    udp_dns_factory = dns.DNSDatagramProtocol(dns_helpers.DNSTestHelper())
-    udp_dns_helper = internet.UDPServer(int(config.helpers['dns'].udp_port),
-                                        udp_dns_factory)
-    multiService.addService(udp_dns_helper)
-    udp_dns_helper.startService()
-
-if config.helpers['dns_discovery'].udp_port:
-    print ("Starting UDP DNS Discovery Helper on %s" %
-           config.helpers['dns_discovery'].udp_port)
-    udp_dns_discovery = internet.UDPServer(
-        int(config.helpers['dns_discovery'].udp_port),
-        dns.DNSDatagramProtocol(dns_helpers.DNSResolverDiscovery())
-    )
-    multiService.addService(udp_dns_discovery)
-
-if config.helpers['dns_discovery'].tcp_port:
-    print ("Starting TCP DNS Discovery Helper on %s" %
-           config.helpers['dns_discovery'].tcp_port)
-    tcp_dns_discovery = internet.TCPServer(
-        int(config.helpers['dns_discovery'].tcp_port),
-        dns_helpers.DNSResolverDiscovery()
-    )
-    multiService.addService(tcp_dns_discovery)
-    tcp_dns_discovery.startService()
-
-
-# XXX this needs to be ported
-# Start the OONI daphn3 backend
-if config.helpers['daphn3'].port:
-    print "Starting Daphn3 helper on %s" % config.helpers['daphn3'].port
-    daphn3_helper = internet.TCPServer(int(config.helpers['daphn3'].port),
-                                       tcp_helpers.Daphn3Server())
-    multiService.addService(daphn3_helper)
-    daphn3_helper.startService()
-
-
-if config.helpers['tcp-echo'].port:
-    print "Starting TCP echo helper on %s" % config.helpers['tcp-echo'].port
-    tcp_echo_helper = internet.TCPServer(int(config.helpers['tcp-echo'].port),
-                                         tcp_helpers.TCPEchoHelper())
-    multiService.addService(tcp_echo_helper)
-    tcp_echo_helper.startService()
-
-if config.helpers['http-return-json-headers'].port:
-    print ("Starting HTTP return request helper on %s" %
-           config.helpers['http-return-json-headers'].port)
-    http_return_request_helper = internet.TCPServer(
-        int(config.helpers['http-return-json-headers'].port),
-        http_helpers.HTTPReturnJSONHeadersHelper())
-    multiService.addService(http_return_request_helper)
-    http_return_request_helper.startService()
 
 def getHSEndpoint(endpoint_config):
     hsdir = endpoint_config['hsdir']
     hsdir = os.path.expanduser(hsdir)
     hsdir = os.path.realpath(hsdir)
-    if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
-        return TCPHiddenServiceEndpoint(reactor,
-                                        get_global_tor(reactor),
-                                        80,
-                                        hidden_service_dir=hsdir)
-    else:
-        return TCPHiddenServiceEndpoint(reactor,
-                                        get_global_tor(reactor),
-                                        80,
-                                        data_dir=hsdir)
+    return DelayedTCPHiddenServiceEndpoint(reactor, 80,
+                                           hidden_service_dir=hsdir)
 
 def getTCPEndpoint(endpoint_config):
     return endpoints.TCP4ServerEndpoint(
@@ -159,35 +73,146 @@ def createService(endpoint, role, endpoint_config):
         endpoint, factory
     )
     service.setName("-".join([endpoint_config['type'], role]))
-    multiService.addService(service)
-    service.startService()
+    return service
 
-# this is to ensure same behaviour with an old config file
-if config.main.tor_hidden_service and \
-        config.main.bouncer_endpoints is None and \
-        config.main.collector_endpoints is None:
-    base_dir = '.'
-    if config.main.tor_datadir is not None:
-        base_dir = config.main.tor_datadir
-    bouncer_hsdir   = os.path.join(base_dir, 'bouncer')
-    collector_hsdir = os.path.join(base_dir, 'collector')
-    config.main.bouncer_endpoints   = [ {'type': 'onion', 'hsdir':   bouncer_hsdir} ]
-    config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': collector_hsdir} ]
+class StartOONIBackendPlugin:
+    tapname = "oonibackend"
+    def makeService(self, so):
+        ooniBackendService = service.MultiService()
 
-for endpoint_config in config.main.get('bouncer_endpoints', []):
-    if config.main.bouncer_file:
-        print "Starting bouncer with config %s" % endpoint_config
-        endpoint = getEndpoint(endpoint_config)
-        createService(endpoint, 'bouncer', endpoint_config)
-    else:
-        print "No bouncer configured"
+        if config.helpers['ssl'].port:
+            print "Starting SSL helper on %s" % config.helpers['ssl'].port
+            ssl_helper = internet.SSLServer(int(config.helpers['ssl'].port),
+                                            http_helpers.HTTPReturnJSONHeadersHelper(),
+                                            ssl_helpers.SSLContext(config))
+            ooniBackendService.addService(ssl_helper)
 
-for endpoint_config in config.main.get('collector_endpoints', []):
-    print "Starting collector with config %s" % endpoint_config
-    endpoint = getEndpoint(endpoint_config)
-    createService(endpoint, 'collector', endpoint_config)
+        # Start the DNS Server related services
+        if config.helpers['dns'].tcp_port:
+            print "Starting TCP DNS Helper on %s" % config.helpers['dns'].tcp_port
+            tcp_dns_helper = internet.TCPServer(int(config.helpers['dns'].tcp_port),
+                                                dns_helpers.DNSTestHelper())
+            ooniBackendService.addService(tcp_dns_helper)
 
-for endpoint_config in config.helpers.web_connectivity.get('endpoints', []):
-    print "Starting web_connectivity helper with config %s" % endpoint_config
-    endpoint = getEndpoint(endpoint_config)
-    createService(endpoint, 'web_connectivity', endpoint_config)
+        if config.helpers['dns'].udp_port:
+            print "Starting UDP DNS Helper on %s" % config.helpers['dns'].udp_port
+            udp_dns_factory = dns.DNSDatagramProtocol(dns_helpers.DNSTestHelper())
+            udp_dns_helper = internet.UDPServer(int(config.helpers['dns'].udp_port),
+                                                udp_dns_factory)
+            ooniBackendService.addService(udp_dns_helper)
+
+        if config.helpers['dns_discovery'].udp_port:
+            print ("Starting UDP DNS Discovery Helper on %s" %
+                   config.helpers['dns_discovery'].udp_port)
+            udp_dns_discovery = internet.UDPServer(
+                int(config.helpers['dns_discovery'].udp_port),
+                dns.DNSDatagramProtocol(dns_helpers.DNSResolverDiscovery())
+            )
+            ooniBackendService.addService(udp_dns_discovery)
+
+        if config.helpers['dns_discovery'].tcp_port:
+            print ("Starting TCP DNS Discovery Helper on %s" %
+                   config.helpers['dns_discovery'].tcp_port)
+            tcp_dns_discovery = internet.TCPServer(
+                int(config.helpers['dns_discovery'].tcp_port),
+                dns_helpers.DNSResolverDiscovery()
+            )
+            ooniBackendService.addService(tcp_dns_discovery)
+
+        # XXX this needs to be ported
+        # Start the OONI daphn3 backend
+        if config.helpers['daphn3'].port:
+            print "Starting Daphn3 helper on %s" % config.helpers['daphn3'].port
+            daphn3_helper = internet.TCPServer(int(config.helpers['daphn3'].port),
+                                               tcp_helpers.Daphn3Server())
+            ooniBackendService.addService(daphn3_helper)
+
+        if config.helpers['tcp-echo'].port:
+            print "Starting TCP echo helper on %s" % config.helpers['tcp-echo'].port
+            tcp_echo_helper = internet.TCPServer(int(config.helpers['tcp-echo'].port),
+                                                 tcp_helpers.TCPEchoHelper())
+            ooniBackendService.addService(tcp_echo_helper)
+
+        if config.helpers['http-return-json-headers'].port:
+            print ("Starting HTTP return request helper on %s" %
+                   config.helpers['http-return-json-headers'].port)
+            http_return_request_helper = internet.TCPServer(
+                int(config.helpers['http-return-json-headers'].port),
+                http_helpers.HTTPReturnJSONHeadersHelper())
+            ooniBackendService.addService(http_return_request_helper)
+
+        # this is to ensure same behaviour with an old config file
+        if config.main.tor_hidden_service and \
+                config.main.bouncer_endpoints is None and \
+                config.main.collector_endpoints is None:
+            bouncer_hsdir   = os.path.join(config.main.tor_datadir, 'bouncer')
+            collector_hsdir = os.path.join(config.main.tor_datadir, 'collector')
+            config.main.bouncer_endpoints   = [ {'type': 'onion', 'hsdir':   bouncer_hsdir} ]
+            config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': collector_hsdir} ]
+
+        for endpoint_config in config.main.get('bouncer_endpoints', []):
+            if config.main.bouncer_file:
+                print "Starting bouncer with config %s" % endpoint_config
+                endpoint = getEndpoint(endpoint_config)
+                bouncer_service = createService(endpoint, 'bouncer',
+                                                endpoint_config)
+                ooniBackendService.addService(bouncer_service)
+            else:
+                print "No bouncer configured"
+
+        for endpoint_config in config.main.get('collector_endpoints', []):
+            print "Starting collector with config %s" % endpoint_config
+            endpoint = getEndpoint(endpoint_config)
+            collector_service = createService(endpoint, 'collector',
+                                              endpoint_config)
+            ooniBackendService.addService(collector_service)
+
+        for endpoint_config in config.helpers.web_connectivity.get('endpoints', []):
+            print "Starting web_connectivity helper with config %s" % endpoint_config
+            endpoint = getEndpoint(endpoint_config)
+            web_connectivity_service = createService(endpoint,
+                                                     'web_connectivity',
+                                                     endpoint_config)
+            ooniBackendService.addService(web_connectivity_service)
+
+
+        return ooniBackendService
+
+class OONIBackendTwistdConfig(twistd.ServerOptions):
+    subCommands = [("StartOONIBackend", None, usage.Options, "node")]
+
+def start():
+    twistd_args = []
+
+    flags = [
+        'nodaemon',
+        'no_save'
+    ]
+    options = [
+        'pidfile',
+        'logfile',
+        'rundir',
+        'euid',
+        'gid',
+        'uid',
+        'umask'
+    ]
+    for option in options:
+        if config.main.get(option, None) is not None:
+            twistd_args.append('--%s' % option)
+            twistd_args.append(config.main.get(option))
+    for flag in flags:
+        if config.main.get(flag, None) is True:
+            twistd_args.append('--%s'% flag)
+
+    twistd_args.append('StartOONIBackend') # Point to our backend plugin
+    twistd_config = OONIBackendTwistdConfig()
+    try:
+        twistd_config.parseOptions(twistd_args)
+    except usage.error, ue:
+        print "Usage error from twistd"
+        sys.exit(7)
+
+    twistd_config.loadedPlugins = {'StartOONIBackend': StartOONIBackendPlugin()}
+    twistd.runApp(twistd_config)
+    return 0

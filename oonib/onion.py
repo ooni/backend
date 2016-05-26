@@ -1,4 +1,8 @@
+import pwd
 import tempfile
+
+from distutils.version import LooseVersion
+
 from oonib import log
 from oonib.config import config
 from twisted.internet import reactor, endpoints, defer
@@ -56,10 +60,14 @@ def txSetupFailed(failure):
 def _configTor():
     torconfig = TorConfig()
 
-    if config.main.socks_port:
-        torconfig.SocksPort = config.main.socks_port
-    if config.main.control_port:
-        torconfig.ControlPort = config.main.control_port
+    if config.main.socks_port is None:
+        config.main.socks_port = int(randomFreePort())
+    torconfig.SocksPort = config.main.socks_port
+
+    if config.main.control_port is None:
+        config.main.control_port = int(randomFreePort())
+    torconfig.ControlPort = config.main.control_port
+
     if config.main.tor2webmode:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
@@ -74,19 +82,15 @@ def _configTor():
         else:
             raise Exception("Could not find tor datadir")
 
+    if config.main.uid is not None:
+        try:
+            user = pwd.getpwuid(config.main.uid)[0]
+        except KeyError:
+            raise Exception("Invalid user ID")
+        torconfig.User = user
+
     tor_log_file = os.path.join(torconfig.DataDirectory, "tor.log")
     torconfig.Log = ["notice stdout", "notice file %s" % tor_log_file]
-    torconfig.save()
-    if not hasattr(torconfig, 'ControlPort'):
-        control_port = int(randomFreePort())
-        torconfig.ControlPort = control_port
-        config.main.control_port = control_port
-
-    if not hasattr(torconfig, 'SocksPort'):
-        socks_port = int(randomFreePort())
-        torconfig.SocksPort = socks_port
-        config.main.socks_port = socks_port
-
     torconfig.save()
     return torconfig
 
@@ -110,7 +114,7 @@ def get_global_tor(reactor):
 
             # start Tor launching
             def updates(prog, tag, summary):
-                print("%d%%: %s" % (prog, summary))
+                log.msg("%d%%: %s" % (prog, summary))
             yield launch_tor(_global_tor_config, reactor,
                     progress_updates=updates,
                     tor_binary=config.main.tor_binary)
@@ -119,3 +123,29 @@ def get_global_tor(reactor):
         defer.returnValue(_global_tor_config)
     finally:
         _global_tor_lock.release()
+
+class DelayedTCPHiddenServiceEndpoint(TCPHiddenServiceEndpoint):
+    """"
+    This is like a normal TCPHiddenService endpoint with 2 major differences:
+
+
+    * It delays the getting of the global_tor with the custom configuration
+    to when listen is called to allow priviledge shedding.
+
+    * It maintains backward compatibility with txtorcon <= 0.10.0
+    """
+    def __init__(self, reactor, public_port,
+                 hidden_service_dir=None, local_port=None):
+        if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
+            TCPHiddenServiceEndpoint.__init__(self, reactor, None,
+                                              public_port,
+                                              hidden_service_dir=hidden_service_dir,
+                                              local_port=local_port)
+        else:
+            TCPHiddenServiceEndpoint.__init__(self, reactor, public_port,
+                                              None,
+                                              data_dir=hidden_service_dir)
+    def listen(self, protocolfactory):
+        self.config = get_global_tor(reactor)
+        return TCPHiddenServiceEndpoint.listen(self,
+                                               protocolfactory=protocolfactory)
