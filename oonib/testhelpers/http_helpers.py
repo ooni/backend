@@ -4,11 +4,10 @@ import json
 import random
 import string
 import tempfile
+from base64 import b64encode
 from hashlib import sha256
 
 from urlparse import urlparse
-
-from twisted.python.failure import Failure
 
 from twisted.internet.protocol import Factory, Protocol
 from twisted.internet.endpoints import TCP4ClientEndpoint
@@ -21,14 +20,9 @@ from twisted.names.error import DNSNameError, DNSServerError
 from twisted.names import client as dns_client
 from twisted.names import dns
 
-from twisted.web._newclient import HTTPClientParser, ParseError
-from twisted.web.client import Agent, BrowserLikeRedirectAgent, readBody
+from twisted.web.client import Agent, readBody
 from twisted.web.client import ContentDecoderAgent, GzipDecoder
 from twisted.web.client import PartialDownloadError
-from twisted.web.http_headers import Headers
-from twisted.web import error
-
-from twisted.web._newclient import ResponseFailed
 
 from cyclone.web import RequestHandler, Application, HTTPError
 from cyclone.web import asynchronous
@@ -36,54 +30,9 @@ from cyclone.web import asynchronous
 from twisted.protocols import policies, basic
 from twisted.web.http import Request
 
+from oonib.handlers import OONIBHandler
+from oonib.txextra import FixedRedirectAgent, TrueHeaders
 from oonib import log, randomStr
-
-# Monkey patch to overcome issue in parsing of HTTP responses that don't
-# contain 3 parts in the HTTP response line
-old_status_received = HTTPClientParser.statusReceived
-def statusReceivedPatched(self, status):
-    try:
-        return old_status_received(self, status)
-    except ParseError as exc:
-        if exc.args[0] == 'wrong number of parts':
-            return old_status_received(self, status + " XXX")
-        raise
-HTTPClientParser.statusReceived = statusReceivedPatched
-
-class FixedRedirectAgent(BrowserLikeRedirectAgent):
-    """
-    This is a redirect agent with this patch manually applied:
-    https://twistedmatrix.com/trac/ticket/8265
-    """
-    def _handleRedirect(self, response, method, uri, headers, redirectCount):
-        """
-        Handle a redirect response, checking the number of redirects already
-        followed, and extracting the location header fields.
-
-        This is patched to fix a bug in infinite redirect loop.
-        """
-        if redirectCount >= self._redirectLimit:
-            err = error.InfiniteRedirection(
-                response.code,
-                b'Infinite redirection detected',
-                location=uri)
-            raise ResponseFailed([Failure(err)], response)
-        locationHeaders = response.headers.getRawHeaders(b'location', [])
-        if not locationHeaders:
-            err = error.RedirectWithNoLocation(
-                response.code, b'No location header field', uri)
-            raise ResponseFailed([Failure(err)], response)
-        location = self._resolveLocation(response.request.absoluteURI, locationHeaders[0])
-        deferred = self._agent.request(method, location, headers)
-
-        def _chainResponse(newResponse):
-            newResponse.setPreviousResponse(response)
-            return newResponse
-
-        deferred.addCallback(_chainResponse)
-        # This is the fix to properly handle redirects
-        return deferred.addCallback(
-            self._handleResponse, method, uri, headers, redirectCount + 1)
 
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
     """
@@ -242,20 +191,48 @@ class HTTPRandomPage(HTTPTrapAll):
         self.write(self.genRandomPage(length, keyword))
 
 
+META_CHARSET_REGEXP = re.compile('<meta(?!\s*(?:name|value)\s*=)[^>]*?charset\s*=[\s"\']*([^\s"\'/>]*)')
+
+def representBody(body):
+    # XXX perhaps add support for decoding gzip in the future.
+    body = body.replace('\0', '')
+    decoded = False
+    charsets = ['ascii', 'utf-8']
+
+    # If we are able to detect the charset of body from the meta tag
+    # try to decode using that one first
+    charset = META_CHARSET_REGEXP.search(body, re.IGNORECASE)
+    if charset:
+        charsets.insert(0, charset.group(1))
+    for encoding in charsets:
+        try:
+            body = unicode(body, encoding)
+            decoded = True
+            break
+        except UnicodeDecodeError:
+            pass
+    if not decoded:
+        body = {
+            'data': b64encode(body),
+            'format': 'base64'
+        }
+    return body
+
 def encodeResponse(response):
     body = None
     body_length = 0
-    if getattr(response, 'body', None):
+    if hasattr(response, 'body'):
         body = response.body
         body_length = len(response.body)
+    headers = {}
+    for k, v in response.headers.getAllRawHeaders():
+        headers[k.lower()] = unicode(v[0], errors='ignore')
     return {
-        'headers':
-            {k.lower(): v for k, v in response.headers.getAllRawHeaders()},
+        'headers': headers,
         'code': response.code,
         'body_length': body_length,
-        'body': body
+        'body': representBody(body)
     }
-
 
 def encodeResponses(response):
     responses = []
@@ -290,38 +267,10 @@ REQUEST_HEADERS = {
                '*/*;q=0.8']
 }
 
-class TrueHeaders(Headers):
-    def __init__(self, rawHeaders=None):
-        self._rawHeaders = dict()
-        if rawHeaders is not None:
-            for name, values in rawHeaders.iteritems():
-                if type(values) is list:
-                    self.setRawHeaders(name, values[:])
-                elif type(values) is dict:
-                    self._rawHeaders[name.lower()] = values
-                elif type(values) is str:
-                    self.setRawHeaders(name, values)
-
-    def setRawHeaders(self, name, values):
-        if name.lower() not in self._rawHeaders:
-            self._rawHeaders[name.lower()] = dict()
-        self._rawHeaders[name.lower()]['name'] = name
-        self._rawHeaders[name.lower()]['values'] = values
-
-    def getAllRawHeaders(self):
-        for k, v in self._rawHeaders.iteritems():
-            yield v['name'], v['values']
-
-    def getRawHeaders(self, name, default=None):
-        if name.lower() in self._rawHeaders:
-            return self._rawHeaders[name.lower()]['values']
-        return default
-
 class WebConnectivityCache(object):
     expiration_time = 200
     enable_caching = True
     http_retries = 2
-    enable_debug = False
 
     def __init__(self):
         self._response_types = (
@@ -409,9 +358,11 @@ class WebConnectivityCache(object):
         defer.returnValue(value)
 
     @defer.inlineCallbacks
-    def http_request(self, url):
+    def http_request(self, url, include_http_responses=False):
         cached_value = yield self.lookup('http_request', url)
         if cached_value is not None:
+            if include_http_responses is not True:
+                cached_value.pop('responses', None)
             defer.returnValue(cached_value)
 
         page_info = {
@@ -443,9 +394,8 @@ class WebConnectivityCache(object):
                     page_info['status_code'] = response.code
                     page_info['headers'] = headers
                     page_info['title'] = extractTitle(body)
-                    if self.enable_debug:
-                        response.body = body
-                        page_info['responses'] = encodeResponses(response)
+                    response.body = body
+                    page_info['responses'] = encodeResponses(response)
                     break
                 except:
                     if retries > self.http_retries:
@@ -462,6 +412,8 @@ class WebConnectivityCache(object):
             page_info['failure'] = 'unknown_error'
 
         yield self.cache_value('http_request', url, page_info)
+        if include_http_responses is not True:
+            page_info.pop('responses', None)
         defer.returnValue(page_info)
 
     @defer.inlineCallbacks
@@ -522,14 +474,26 @@ class WebConnectivityCache(object):
         defer.returnValue(dns_info)
 
 
+# Taken from
+# http://stackoverflow.com/questions/7160737/python-how-to-validate-a-url-in-python-malformed-or-not
+HTTP_REQUEST_REGEXP = re.compile(
+    r'^(?:http)s?://'  # http:// or https://
+    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+    r'(?::\d+)?'  # optional port
+    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+SOCKET_REGEXP = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$')
+
 web_connectivity_cache = WebConnectivityCache()
 
-class WebConnectivity(RequestHandler):
+class WebConnectivity(OONIBHandler):
     @defer.inlineCallbacks
-    def control_measurement(self, http_url, socket_list):
+    def control_measurement(self, http_url, socket_list,
+                            include_http_responses):
         hostname = urlparse(http_url).netloc
         dl = [
-            web_connectivity_cache.http_request(http_url),
+            web_connectivity_cache.http_request(http_url, include_http_responses),
             web_connectivity_cache.dns_consistency(hostname)
         ]
         for socket in socket_list:
@@ -546,19 +510,35 @@ class WebConnectivity(RequestHandler):
             'dns': dns
         })
 
+    def validate_request(self, request):
+        required_keys = ['http_request', 'tcp_connect']
+        for rk in required_keys:
+            if rk not in request.keys():
+                raise HTTPError(400, "Missing %s" % rk)
+        if not HTTP_REQUEST_REGEXP.match(request['http_request']):
+            raise HTTPError(400, "Invalid http_request URL")
+        if any([not SOCKET_REGEXP.match(socket)
+                for socket in request['tcp_connect']]):
+            raise HTTPError(400, "Invalid tcp_connect URL")
+
     @asynchronous
     def post(self):
         try:
             request = json.loads(self.request.body)
+            self.validate_request(request)
+            include_http_responses = request.get("include_http_responses",
+                                                 False)
             self.control_measurement(
                 str(request['http_request']),
-                request['tcp_connect']
+                request['tcp_connect'],
+                include_http_responses
             )
+        except HTTPError:
+            raise
         except Exception as exc:
             log.msg("Got invalid request")
             log.exception(exc)
             raise HTTPError(400, 'invalid request')
-
 
 class WebConnectivityStatus(RequestHandler):
     def get(self):
