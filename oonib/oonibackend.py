@@ -166,8 +166,11 @@ def createService(endpoint, role, endpoint_config):
 if config.main.tor_hidden_service and \
         config.main.bouncer_endpoints is None and \
         config.main.collector_endpoints is None:
-    bouncer_hsdir   = os.path.join(config.main.tor_datadir, 'bouncer')
-    collector_hsdir = os.path.join(config.main.tor_datadir, 'collector')
+    base_dir = '.'
+    if config.main.tor_datadir is not None:
+        base_dir = config.main.tor_datadir
+    bouncer_hsdir   = os.path.join(base_dir, 'bouncer')
+    collector_hsdir = os.path.join(base_dir, 'collector')
     config.main.bouncer_endpoints   = [ {'type': 'onion', 'hsdir':   bouncer_hsdir} ]
     config.main.collector_endpoints = [ {'type': 'onion', 'hsdir': collector_hsdir} ]
 
