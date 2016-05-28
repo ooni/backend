@@ -1,38 +1,37 @@
-import os
-import re
 import json
+import os
 import random
+import re
 import string
 import tempfile
-from base64 import b64encode
 from hashlib import sha256
-
 from urlparse import urlparse
-
-from twisted.internet.protocol import Factory, Protocol
-from twisted.internet.endpoints import TCP4ClientEndpoint
-
-from twisted.internet.error import DNSLookupError, TimeoutError
-from twisted.internet.error import ConnectionRefusedError
-from twisted.internet import protocol, defer, reactor
-
-from twisted.names.error import DNSNameError, DNSServerError
-from twisted.names import client as dns_client
-from twisted.names import dns
-
-from twisted.web.client import Agent, readBody
-from twisted.web.client import ContentDecoderAgent, GzipDecoder
-from twisted.web.client import PartialDownloadError
 
 from cyclone.web import RequestHandler, Application, HTTPError
 from cyclone.web import asynchronous
-
+from twisted.internet import protocol, defer, reactor
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.internet.error import ConnectionRefusedError
+from twisted.internet.error import DNSLookupError, TimeoutError
+from twisted.names import client as dns_client
+from twisted.names import dns
+from twisted.names.error import DNSNameError, DNSServerError
 from twisted.protocols import policies, basic
+from twisted.web.client import readBody
+from twisted.web.client import ContentDecoderAgent, GzipDecoder
+from twisted.web.client import PartialDownloadError
 from twisted.web.http import Request
 
-from oonib.handlers import OONIBHandler
-from oonib.txextra import FixedRedirectAgent, TrueHeaders
 from oonib import log, randomStr
+
+from oonib.common.txextra import FixedRedirectAgent, TrueHeaders
+from oonib.common.txextra import TrueHeadersAgent
+from oonib.common.http_utils import representBody, extractTitle
+from oonib.common.http_utils import REQUEST_HEADERS
+from oonib.common.tcp_utils import TCPConnectFactory
+
+from oonib.handlers import OONIBHandler
+
 
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
     """
@@ -191,37 +190,11 @@ class HTTPRandomPage(HTTPTrapAll):
         self.write(self.genRandomPage(length, keyword))
 
 
-META_CHARSET_REGEXP = re.compile('<meta(?!\s*(?:name|value)\s*=)[^>]*?charset\s*=[\s"\']*([^\s"\'/>]*)')
-
-def representBody(body):
-    # XXX perhaps add support for decoding gzip in the future.
-    body = body.replace('\0', '')
-    decoded = False
-    charsets = ['ascii', 'utf-8']
-
-    # If we are able to detect the charset of body from the meta tag
-    # try to decode using that one first
-    charset = META_CHARSET_REGEXP.search(body, re.IGNORECASE)
-    if charset:
-        charsets.insert(0, charset.group(1))
-    for encoding in charsets:
-        try:
-            body = unicode(body, encoding)
-            decoded = True
-            break
-        except UnicodeDecodeError:
-            pass
-    if not decoded:
-        body = {
-            'data': b64encode(body),
-            'format': 'base64'
-        }
-    return body
-
 def encodeResponse(response):
     body = None
     body_length = 0
-    if hasattr(response, 'body'):
+    if (hasattr(response, 'body') and
+                response.body is not None):
         body = response.body
         body_length = len(response.body)
     headers = {}
@@ -241,31 +214,6 @@ def encodeResponses(response):
         responses += encodeResponses(response.previousResponse)
     return responses
 
-
-TITLE_REGEXP = re.compile("<title>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-
-def extractTitle(body):
-    m = TITLE_REGEXP.search(body, re.IGNORECASE | re.DOTALL)
-    if m:
-        return unicode(m.group(1), errors='ignore')
-    return ''
-
-
-class TCPConnectProtocol(Protocol):
-    def connectionMade(self):
-        self.transport.loseConnection()
-
-class TCPConnectFactory(Factory):
-    def buildProtocol(self, addr):
-        return TCPConnectProtocol()
-
-REQUEST_HEADERS = {
-    'User-Agent': ['Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, '
-                   'like Gecko) Chrome/47.0.2526.106 Safari/537.36'],
-    'Accept-Language': ['en-US;q=0.8,en;q=0.5'],
-    'Accept': ['text/html,application/xhtml+xml,application/xml;q=0.9,'
-               '*/*;q=0.8']
-}
 
 class WebConnectivityCache(object):
     expiration_time = 200
@@ -372,8 +320,10 @@ class WebConnectivityCache(object):
             'failure': None
         }
 
-        agent = ContentDecoderAgent(FixedRedirectAgent(Agent(reactor)),
-                                    [('gzip', GzipDecoder)])
+        agent = ContentDecoderAgent(
+            FixedRedirectAgent(TrueHeadersAgent(reactor)),
+                               [('gzip', GzipDecoder)]
+        )
         try:
             retries = 0
             while True:
@@ -384,12 +334,14 @@ class WebConnectivityCache(object):
                     for name, value in response.headers.getAllRawHeaders():
                         headers[name] = unicode(value[0], errors='ignore')
                     body_length = -1
+                    body = None
                     try:
                         body = yield readBody(response)
                         body_length = len(body)
                     except PartialDownloadError as pde:
                         if pde.response:
                             body_length = len(pde.response)
+                            body = pde.response
                     page_info['body_length'] = body_length
                     page_info['status_code'] = response.code
                     page_info['headers'] = headers
