@@ -1,34 +1,16 @@
 import pwd
 import tempfile
 
-from distutils.version import LooseVersion
-
 from oonib import log
 from oonib.config import config
-from twisted.internet import reactor, endpoints, defer
+from twisted.internet import defer
 import os
 
 from random import randint
 import socket
 
-from txtorcon import TCPHiddenServiceEndpoint, TorConfig
+from txtorcon import TorConfig
 from txtorcon import launch_tor
-
-from txtorcon import __version__ as txtorcon_version
-if tuple(map(int, txtorcon_version.split('.'))) < (0, 9, 0):
-    """
-    Fix for bug in txtorcon versions < 0.9.0 where TCPHiddenServiceEndpoint
-    listens on all interfaces by default.
-    """
-    def create_listener(self, proto):
-        self._update_onion(self.hiddenservice.dir)
-        self.tcp_endpoint = endpoints.TCP4ServerEndpoint(self.reactor,
-                                                         self.listen_port,
-                                                         interface='127.0.0.1')
-        d = self.tcp_endpoint.listen(self.protocolfactory)
-        d.addCallback(self._add_attributes).addErrback(self._retry_local_port)
-        return d
-    TCPHiddenServiceEndpoint._create_listener =  create_listener
 
 def randomFreePort(addr="127.0.0.1"):
     """
@@ -68,7 +50,7 @@ def _configTor():
         config.main.control_port = int(randomFreePort())
     torconfig.ControlPort = config.main.control_port
 
-    if config.main.tor2webmode:
+    if config.main.tor2webmode is True:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
     if config.main.tor_datadir is None:
@@ -76,6 +58,13 @@ def _configTor():
         log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
         log.warn("Using %s" % temporary_data_dir)
         torconfig.DataDirectory = temporary_data_dir
+        uid = -1
+        gid = -1
+        if config.main.uid is not None:
+            uid = config.main.uid
+        if config.main.gid is not None:
+            gid = config.main.gid
+        os.chown(temporary_data_dir, uid, gid)
     else:
         if os.path.exists(config.main.tor_datadir):
             torconfig.DataDirectory = os.path.abspath(config.main.tor_datadir)
@@ -123,29 +112,3 @@ def get_global_tor(reactor):
         defer.returnValue(_global_tor_config)
     finally:
         _global_tor_lock.release()
-
-class DelayedTCPHiddenServiceEndpoint(TCPHiddenServiceEndpoint):
-    """"
-    This is like a normal TCPHiddenService endpoint with 2 major differences:
-
-
-    * It delays the getting of the global_tor with the custom configuration
-    to when listen is called to allow priviledge shedding.
-
-    * It maintains backward compatibility with txtorcon <= 0.10.0
-    """
-    def __init__(self, reactor, public_port,
-                 hidden_service_dir=None, local_port=None):
-        if LooseVersion(txtorcon_version) >= LooseVersion('0.10.0'):
-            TCPHiddenServiceEndpoint.__init__(self, reactor, None,
-                                              public_port,
-                                              hidden_service_dir=hidden_service_dir,
-                                              local_port=local_port)
-        else:
-            TCPHiddenServiceEndpoint.__init__(self, reactor, public_port,
-                                              None,
-                                              data_dir=hidden_service_dir)
-    def listen(self, protocolfactory):
-        self.config = get_global_tor(reactor)
-        return TCPHiddenServiceEndpoint.listen(self,
-                                               protocolfactory=protocolfactory)

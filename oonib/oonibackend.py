@@ -13,7 +13,7 @@ import sys
 
 from oonib.api import ooniBackend, ooniBouncer
 from oonib.config import config
-from oonib.onion import DelayedTCPHiddenServiceEndpoint
+from oonib.onion import get_global_tor
 from oonib.testhelpers import dns_helpers, ssl_helpers
 from oonib.testhelpers import http_helpers, tcp_helpers
 
@@ -25,11 +25,14 @@ from twisted.names import dns
 
 
 def getHSEndpoint(endpoint_config):
+    from txtorcon import TCPHiddenServiceEndpoint
     hsdir = endpoint_config['hsdir']
     hsdir = os.path.expanduser(hsdir)
     hsdir = os.path.realpath(hsdir)
-    return DelayedTCPHiddenServiceEndpoint(reactor, 80,
-                                           hidden_service_dir=hsdir)
+    return TCPHiddenServiceEndpoint(reactor,
+                                    config=get_global_tor(reactor),
+                                    public_port=80,
+                                    hidden_service_dir=hsdir)
 
 def getTCPEndpoint(endpoint_config):
     return endpoints.TCP4ServerEndpoint(
