@@ -1,15 +1,36 @@
 import json
+import os
 import random
+import re
 import string
+import tempfile
+from hashlib import sha256
+from urlparse import urlparse
 
-from twisted.internet import protocol, defer
-
-from cyclone.web import RequestHandler, Application
-
+from cyclone.web import RequestHandler, Application, HTTPError
+from cyclone.web import asynchronous
+from twisted.internet import protocol, defer, reactor
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.internet.error import ConnectionRefusedError
+from twisted.internet.error import DNSLookupError, TimeoutError
+from twisted.names import client as dns_client
+from twisted.names import dns
+from twisted.names.error import DNSNameError, DNSServerError
 from twisted.protocols import policies, basic
+from twisted.web.client import readBody
+from twisted.web.client import ContentDecoderAgent, GzipDecoder
+from twisted.web.client import PartialDownloadError
 from twisted.web.http import Request
 
 from oonib import log, randomStr
+
+from oonib.common.txextra import FixedRedirectAgent, TrueHeaders
+from oonib.common.txextra import TrueHeadersAgent
+from oonib.common.http_utils import representBody, extractTitle
+from oonib.common.http_utils import REQUEST_HEADERS
+from oonib.common.tcp_utils import TCPConnectFactory
+
+from oonib.handlers import OONIBHandler
 
 
 class SimpleHTTPChannel(basic.LineReceiver, policies.TimeoutMixin):
@@ -168,7 +189,320 @@ class HTTPRandomPage(HTTPTrapAll):
             length = 100000
         self.write(self.genRandomPage(length, keyword))
 
+
+def encodeResponse(response):
+    body = None
+    body_length = 0
+    if (hasattr(response, 'body') and
+                response.body is not None):
+        body = response.body
+        body_length = len(response.body)
+    headers = {}
+    for k, v in response.headers.getAllRawHeaders():
+        headers[k.lower()] = unicode(v[0], errors='ignore')
+    return {
+        'headers': headers,
+        'code': response.code,
+        'body_length': body_length,
+        'body': representBody(body)
+    }
+
+def encodeResponses(response):
+    responses = []
+    responses += [encodeResponse(response)]
+    if response.previousResponse:
+        responses += encodeResponses(response.previousResponse)
+    return responses
+
+
+class WebConnectivityCache(object):
+    expiration_time = 200
+    enable_caching = True
+    http_retries = 2
+
+    def __init__(self):
+        self._response_types = (
+            'http_request',
+            'tcp_connect',
+            'dns_consistency'
+        )
+        self._cache_lifecycle = {}
+        self._cache_dir = tempfile.mkdtemp()
+        for response_type in self._response_types:
+            os.mkdir(os.path.join(self._cache_dir, response_type))
+            self._cache_lifecycle[response_type] = {}
+
+    @defer.inlineCallbacks
+    def expire_all(self):
+        for response_type in self._cache_lifecycle.keys():
+            for key_hash in self._cache_lifecycle[response_type].keys():
+                yield self.expire(response_type, key_hash)
+
+    @defer.inlineCallbacks
+    def cache_value(self, response_type, key, value):
+        if response_type not in self._response_types:
+            raise Exception("Invalid response type")
+        if self.enable_caching:
+            key_hash = sha256(key).hexdigest()
+            cache_file = os.path.join(self._cache_dir, response_type, key_hash)
+
+            if key_hash in self._cache_lifecycle[response_type]:
+                yield self.expire(response_type, key_hash)
+
+            self._cache_lifecycle[response_type][key_hash] = {
+                'expiration': reactor.callLater(self.expiration_time,
+                                                self.expire,
+                                                response_type, key_hash),
+                'lock': defer.DeferredLock()
+            }
+            lock = self._cache_lifecycle[response_type][key_hash]['lock']
+            yield lock.acquire()
+            with open(cache_file, 'w+') as fw:
+                json.dump(value, fw)
+            lock.release()
+
+    @defer.inlineCallbacks
+    def expire(self, response_type, key_hash):
+        if response_type not in self._response_types:
+            raise Exception("Invalid response type")
+        lifecycle = self._cache_lifecycle[response_type][key_hash]
+        if lifecycle['expiration'].active():
+            lifecycle['expiration'].cancel()
+
+        yield lifecycle['lock'].acquire()
+        try:
+            os.remove(os.path.join(self._cache_dir, response_type, key_hash))
+        except OSError:
+            pass
+        lifecycle['lock'].release()
+        del self._cache_lifecycle[response_type][key_hash]
+
+    @defer.inlineCallbacks
+    def lookup(self, response_type, key):
+        if not self.enable_caching:
+            defer.returnValue(None)
+
+        key_hash = sha256(key).hexdigest()
+        cache_file = os.path.join(self._cache_dir, response_type, key_hash)
+
+        if key_hash not in self._cache_lifecycle[response_type]:
+            defer.returnValue(None)
+
+        lock = self._cache_lifecycle[response_type][key_hash]['lock']
+        expiration = \
+            self._cache_lifecycle[response_type][key_hash]['expiration']
+
+        yield lock.acquire()
+
+        if not os.path.exists(cache_file):
+            lock.release()
+            defer.returnValue(None)
+
+        with open(cache_file, 'r') as fh:
+            value = json.load(fh)
+
+        expiration.reset(self.expiration_time)
+        lock.release()
+        defer.returnValue(value)
+
+    @defer.inlineCallbacks
+    def http_request(self, url, include_http_responses=False):
+        cached_value = yield self.lookup('http_request', url)
+        if cached_value is not None:
+            if include_http_responses is not True:
+                cached_value.pop('responses', None)
+            defer.returnValue(cached_value)
+
+        page_info = {
+            'body_length': -1,
+            'status_code': -1,
+            'headers': {},
+            'failure': None
+        }
+
+        agent = ContentDecoderAgent(
+            FixedRedirectAgent(TrueHeadersAgent(reactor)),
+                               [('gzip', GzipDecoder)]
+        )
+        try:
+            retries = 0
+            while True:
+                try:
+                    response = yield agent.request('GET', url,
+                                                   TrueHeaders(REQUEST_HEADERS))
+                    headers = {}
+                    for name, value in response.headers.getAllRawHeaders():
+                        headers[name] = unicode(value[0], errors='ignore')
+                    body_length = -1
+                    body = None
+                    try:
+                        body = yield readBody(response)
+                        body_length = len(body)
+                    except PartialDownloadError as pde:
+                        if pde.response:
+                            body_length = len(pde.response)
+                            body = pde.response
+                    page_info['body_length'] = body_length
+                    page_info['status_code'] = response.code
+                    page_info['headers'] = headers
+                    page_info['title'] = extractTitle(body)
+                    response.body = body
+                    page_info['responses'] = encodeResponses(response)
+                    break
+                except:
+                    if retries > self.http_retries:
+                        raise
+                    retries += 1
+        except DNSLookupError:
+            page_info['failure'] = 'dns_lookup_error'
+        except TimeoutError:
+            page_info['failure'] = 'generic_timeout_error'
+        except ConnectionRefusedError:
+            page_info['failure'] = 'connection_refused_error'
+        except:
+            # XXX map more failures
+            page_info['failure'] = 'unknown_error'
+
+        yield self.cache_value('http_request', url, page_info)
+        if include_http_responses is not True:
+            page_info.pop('responses', None)
+        defer.returnValue(page_info)
+
+    @defer.inlineCallbacks
+    def tcp_connect(self, socket):
+        cached_value = yield self.lookup('tcp_connect', socket)
+        if cached_value is not None:
+            defer.returnValue(cached_value)
+
+        socket_info = {
+            'status': None,
+            'failure': None
+        }
+
+        ip_address, port = socket.split(":")
+        try:
+            point = TCP4ClientEndpoint(reactor, ip_address, int(port))
+            yield point.connect(TCPConnectFactory())
+            socket_info['status'] = True
+        except TimeoutError:
+            socket_info['status'] = False
+            socket_info['failure'] = 'generic_timeout_error'
+        except ConnectionRefusedError:
+            socket_info['status'] = False
+            socket_info['failure'] = 'connection_refused_error'
+        except:
+            socket_info['status'] = False
+            socket_info['failure'] = 'unknown_error'
+        yield self.cache_value('tcp_connect', socket, socket_info)
+        defer.returnValue(socket_info)
+
+    @defer.inlineCallbacks
+    def dns_consistency(self, hostname):
+        cached_value = yield self.lookup('dns_consistency', hostname)
+        if cached_value is not None:
+            defer.returnValue(cached_value)
+
+        dns_info = {
+            'addrs': [],
+            'failure': None
+        }
+
+        try:
+            records = yield dns_client.lookupAddress(hostname)
+            answers = records[0]
+            for answer in answers:
+                if answer.type is dns.A:
+                    dns_info['addrs'].append(answer.payload.dottedQuad())
+                elif answer.type is dns.CNAME:
+                    dns_info['addrs'].append(answer.payload.name.name)
+        except DNSNameError:
+            dns_info['failure'] = 'dns_name_error'
+        except DNSServerError:
+            dns_info['failure'] = 'dns_server_failure'
+        except:
+            dns_info['failure'] = 'unknown_error'
+
+        yield self.cache_value('dns_consistency', hostname, dns_info)
+        defer.returnValue(dns_info)
+
+
+# Taken from
+# http://stackoverflow.com/questions/7160737/python-how-to-validate-a-url-in-python-malformed-or-not
+HTTP_REQUEST_REGEXP = re.compile(
+    r'^(?:http)s?://'  # http:// or https://
+    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+    r'(?::\d+)?'  # optional port
+    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+SOCKET_REGEXP = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$')
+
+web_connectivity_cache = WebConnectivityCache()
+
+class WebConnectivity(OONIBHandler):
+    @defer.inlineCallbacks
+    def control_measurement(self, http_url, socket_list,
+                            include_http_responses):
+        hostname = urlparse(http_url).netloc
+        dl = [
+            web_connectivity_cache.http_request(http_url, include_http_responses),
+            web_connectivity_cache.dns_consistency(hostname)
+        ]
+        for socket in socket_list:
+            dl.append(web_connectivity_cache.tcp_connect(socket))
+        responses = yield defer.DeferredList(dl)
+        http_request = responses[0][1]
+        dns = responses[1][1]
+        tcp_connect = {}
+        for idx, response in enumerate(responses[2:]):
+            tcp_connect[socket_list[idx]] = response[1]
+        self.finish({
+            'http_request': http_request,
+            'tcp_connect': tcp_connect,
+            'dns': dns
+        })
+
+    def validate_request(self, request):
+        required_keys = ['http_request', 'tcp_connect']
+        for rk in required_keys:
+            if rk not in request.keys():
+                raise HTTPError(400, "Missing %s" % rk)
+        if not HTTP_REQUEST_REGEXP.match(request['http_request']):
+            raise HTTPError(400, "Invalid http_request URL")
+        if any([not SOCKET_REGEXP.match(socket)
+                for socket in request['tcp_connect']]):
+            raise HTTPError(400, "Invalid tcp_connect URL")
+
+    @asynchronous
+    def post(self):
+        try:
+            request = json.loads(self.request.body)
+            self.validate_request(request)
+            include_http_responses = request.get("include_http_responses",
+                                                 False)
+            self.control_measurement(
+                str(request['http_request']),
+                request['tcp_connect'],
+                include_http_responses
+            )
+        except HTTPError:
+            raise
+        except Exception as exc:
+            log.msg("Got invalid request")
+            log.exception(exc)
+            raise HTTPError(400, 'invalid request')
+
+class WebConnectivityStatus(RequestHandler):
+    def get(self):
+        self.write({"status": "ok"})
+
+
 HTTPRandomPageHelper = Application([
     # XXX add regexps here
     (r"/(.*)/(.*)", HTTPRandomPage)
+])
+
+WebConnectivityHelper = Application([
+    (r"/status", WebConnectivityStatus),
+    (r"/", WebConnectivity)
 ])
