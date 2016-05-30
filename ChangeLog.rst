@@ -1,6 +1,16 @@
 ChangeLog
 =========
 
+1.3.0 (Mon, 30 May 2016)
+-------------------------
+
+* Add web connectivity test helper
+
+* Add support for HTTPS collectors and bouncers
+
+* Fix problems with priviledge shedding and daemonisation
+  https://github.com/TheTorProject/ooni-backend/issues/65
+
 1.2.0 (Wed, 27 Apr 2016)
 -------------------------
 
