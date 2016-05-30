@@ -63,3 +63,6 @@ installed-files.txt
 oonib.conf
 
 oonib.pid
+
+# Local vagrant files
+/.vagrant/
