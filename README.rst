@@ -139,9 +139,8 @@ mlab nodes and joins them with the base bouncer information stored in
 
 To specify additional test helpers (for example when they change address or
 when a new test helper comes out) you will need to edit
-`/data/bouncer/bouncer-base.yaml`.
+`/data/bouncer/bouncer-base.yaml`.::
 
-::
     collector:
       httpo://ihiderha53f36lsd.onion:
           test-helper: {dns: '213.138.109.232:57004', ssl: 'https://213.138.109.232', tcp-echo: '213.138.109.232', traceroute: '213.138.109.232', web-connectivity: 'httpo://ckjj3ra6456muu7o.onion'}
