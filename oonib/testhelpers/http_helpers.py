@@ -11,8 +11,10 @@ from cyclone.web import RequestHandler, Application, HTTPError
 from cyclone.web import asynchronous
 from twisted.internet import protocol, defer, reactor
 from twisted.internet.endpoints import TCP4ClientEndpoint
-from twisted.internet.error import ConnectionRefusedError
+
+from twisted.internet.error import ConnectionRefusedError, ConnectError
 from twisted.internet.error import DNSLookupError, TimeoutError
+
 from twisted.names import client as dns_client
 from twisted.names import dns
 from twisted.names.error import DNSNameError, DNSServerError
@@ -359,6 +361,8 @@ class WebConnectivityCache(object):
             page_info['failure'] = 'generic_timeout_error'
         except ConnectionRefusedError:
             page_info['failure'] = 'connection_refused_error'
+        except ConnectError:
+            page_info['failure'] = 'connect_error'
         except:
             # XXX map more failures
             page_info['failure'] = 'unknown_error'
@@ -390,6 +394,9 @@ class WebConnectivityCache(object):
         except ConnectionRefusedError:
             socket_info['status'] = False
             socket_info['failure'] = 'connection_refused_error'
+        except ConnectError:
+            socket_info['status'] = False
+            socket_info['failure'] = 'connect_error'
         except:
             socket_info['status'] = False
             socket_info['failure'] = 'unknown_error'
