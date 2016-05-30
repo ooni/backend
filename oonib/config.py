@@ -28,6 +28,8 @@ class Config(object):
             raise e.ConfigFileDoesNotExist(config_file)
 
         self.main = Storage(configuration['main'].items())
+        if self.main.logfile is None:
+            self.main.logfile = 'oonib.log'
 
         self.helpers = Storage()
         for name, helper in configuration['helpers'].items():

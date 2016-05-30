@@ -7,8 +7,6 @@ main:
     bouncer_file: data/bouncer.yaml
 
     logfile: null
-    database_uri: 'sqlite://oonib_test_db.db'
-    db_threadpool_size: 10
     tor_binary: null
     socks_port: 9055
     tor2webmode: false
@@ -21,9 +19,7 @@ main:
     euid: null
     uid: null
     gid: null
-    uuid: null
     no_save: true
-    profile: null
     debug: false
     stale_time: 3600
 

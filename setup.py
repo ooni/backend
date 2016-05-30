@@ -67,9 +67,9 @@ data_files = [
     (data_dir, ['oonib.conf.example']),
     (os.path.join(data_dir, 'decks'), ['data/decks/README']),
     (os.path.join(data_dir, 'inputs'), ['data/inputs/Makefile']),
-    (os.path.join(spool_dir, 'reports'), ['data/reports/empty.txt']),
-    (os.path.join(spool_dir, 'archive'), ['data/archive/empty.txt']),
-    (os.path.join(var_dir, 'tor'), ['data/tor/empty.txt']),
+    (os.path.join(spool_dir, 'reports'), ['data/reports/.gitignore']),
+    (os.path.join(spool_dir, 'archive'), ['data/archive/.gitignore']),
+    (os.path.join(var_dir, 'tor'), ['data/tor/.gitignore']),
     (var_dir, ['data/bouncer.yaml', 'data/policy.yaml'])
 ]
 

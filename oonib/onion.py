@@ -1,30 +1,16 @@
+import pwd
 import tempfile
+
 from oonib import log
 from oonib.config import config
-from twisted.internet import reactor, endpoints, defer
+from twisted.internet import defer
 import os
 
 from random import randint
 import socket
 
-from txtorcon import TCPHiddenServiceEndpoint, TorConfig
+from txtorcon import TorConfig
 from txtorcon import launch_tor
-
-from txtorcon import __version__ as txtorcon_version
-if tuple(map(int, txtorcon_version.split('.'))) < (0, 9, 0):
-    """
-    Fix for bug in txtorcon versions < 0.9.0 where TCPHiddenServiceEndpoint
-    listens on all interfaces by default.
-    """
-    def create_listener(self, proto):
-        self._update_onion(self.hiddenservice.dir)
-        self.tcp_endpoint = endpoints.TCP4ServerEndpoint(self.reactor,
-                                                         self.listen_port,
-                                                         interface='127.0.0.1')
-        d = self.tcp_endpoint.listen(self.protocolfactory)
-        d.addCallback(self._add_attributes).addErrback(self._retry_local_port)
-        return d
-    TCPHiddenServiceEndpoint._create_listener =  create_listener
 
 def randomFreePort(addr="127.0.0.1"):
     """
@@ -56,11 +42,15 @@ def txSetupFailed(failure):
 def _configTor():
     torconfig = TorConfig()
 
-    if config.main.socks_port:
-        torconfig.SocksPort = config.main.socks_port
-    if config.main.control_port:
-        torconfig.ControlPort = config.main.control_port
-    if config.main.tor2webmode:
+    if config.main.socks_port is None:
+        config.main.socks_port = int(randomFreePort())
+    torconfig.SocksPort = config.main.socks_port
+
+    if config.main.control_port is None:
+        config.main.control_port = int(randomFreePort())
+    torconfig.ControlPort = config.main.control_port
+
+    if config.main.tor2webmode is True:
         torconfig.Tor2webMode = 1
         torconfig.CircuitBuildTimeout = 60
     if config.main.tor_datadir is None:
@@ -68,25 +58,28 @@ def _configTor():
         log.warn("Option 'tor_datadir' in oonib.conf is unspecified!")
         log.warn("Using %s" % temporary_data_dir)
         torconfig.DataDirectory = temporary_data_dir
+        uid = -1
+        gid = -1
+        if config.main.uid is not None:
+            uid = config.main.uid
+        if config.main.gid is not None:
+            gid = config.main.gid
+        os.chown(temporary_data_dir, uid, gid)
     else:
         if os.path.exists(config.main.tor_datadir):
             torconfig.DataDirectory = os.path.abspath(config.main.tor_datadir)
         else:
             raise Exception("Could not find tor datadir")
 
+    if config.main.uid is not None:
+        try:
+            user = pwd.getpwuid(config.main.uid)[0]
+        except KeyError:
+            raise Exception("Invalid user ID")
+        torconfig.User = user
+
     tor_log_file = os.path.join(torconfig.DataDirectory, "tor.log")
     torconfig.Log = ["notice stdout", "notice file %s" % tor_log_file]
-    torconfig.save()
-    if not hasattr(torconfig, 'ControlPort'):
-        control_port = int(randomFreePort())
-        torconfig.ControlPort = control_port
-        config.main.control_port = control_port
-
-    if not hasattr(torconfig, 'SocksPort'):
-        socks_port = int(randomFreePort())
-        torconfig.SocksPort = socks_port
-        config.main.socks_port = socks_port
-
     torconfig.save()
     return torconfig
 
@@ -110,7 +103,7 @@ def get_global_tor(reactor):
 
             # start Tor launching
             def updates(prog, tag, summary):
-                print("%d%%: %s" % (prog, summary))
+                log.msg("%d%%: %s" % (prog, summary))
             yield launch_tor(_global_tor_config, reactor,
                     progress_updates=updates,
                     tor_binary=config.main.tor_binary)
