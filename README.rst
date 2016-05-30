@@ -124,6 +124,62 @@ Here is an example of the relevant part of the configuration::
 `scripts/gen-ssl-key-cert.sh` in this repo contains the openssl command to generate a self-signed certificate which you can use for the tls endpoint.
 txtorcon will use the hostname/private_key from the configured hsdir to start an onion service, or generate a new key if hsdir is empty.
 
+
+Bouncer configuration
+.....................
+
+The bouncer.yaml file contains the list of collectors and test-helpers that are
+available to ooniprobe for receiving network measurement results.
+
+In our deployment of oonibackend the bouncer.yaml file is generated
+automatically every 24 hours via a cronjob that runs `update-bouncer.py`.
+What this script does is it fetches the collector addresses and IP address of
+mlab nodes and joins them with the base bouncer information stored in
+`/data/bouncer/bouncer-base.yaml`.
+
+To specify additional test helpers (for example when they change address or
+when a new test helper comes out) you will need to edit
+`/data/bouncer/bouncer-base.yaml`.
+
+::
+    collector:
+      httpo://ihiderha53f36lsd.onion:
+          test-helper: {dns: '213.138.109.232:57004', ssl: 'https://213.138.109.232', tcp-echo: '213.138.109.232', traceroute: '213.138.109.232', web-connectivity: 'httpo://ckjj3ra6456muu7o.onion'}
+
+You need to edit the content of the dictionary `test-helper`. The keys are the
+names of the test helpers.
+The value is the address of the test helper and this depends on the type of
+test helper.
+
+Here is a list of test helpers:
+
+* dns (value: xxx.xxx.xxx.xxx)
+
+* ssl (value: https://xxx.xxx.xxx.xxx)
+
+* tcp-echo (xxx.xxx.xxx.xxx)
+
+* traceroute (xxx.xxx.xxx.xxx)
+
+* web-connectivity (httpo://xxxxxxxxx.onion)
+
+Moreover it is possible to specify test-helper-alternate addresses that are
+used to determine alternative names for a given test helper.
+
+Currently only `web-connectivity` supports the test-helper-alternate field.
+
+This can be specified like follows::
+
+    collector:
+      httpo://ihiderha53f36lsd.onion:
+          test-helper: {dns: '213.138.109.232:57004', ssl: 'https://213.138.109.232', tcp-echo: '213.138.109.232', traceroute: '213.138.109.232', web-connectivity: 'httpo://ckjj3ra6456muu7o.onion'}
+          test-helper-alternate:
+            web-connectivity:
+            - {address: 'httpo://ckjj3ra6456muu7o.onion', type: 'onion'}
+            - {address: 'https://web-connectivity.ooni.io', type: 'https'}
+            - {address: 'http://web-connectivity.ooni.io', type: 'http'}
+
+
 Generate self signed certs for OONIB
 ....................................
 If you want to use the HTTPS test helper, you will need to create a
