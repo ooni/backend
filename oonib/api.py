@@ -1,29 +1,43 @@
 from cyclone import web
 
-from oonib.main.api import mainAPI
-from oonib.deck.api import deckAPI
-from oonib.report.api import reportAPI
-from oonib.input.api import inputAPI
-from oonib.policy.api import policyAPI
 from oonib.bouncer.api import bouncerAPI
 
 from oonib.config import config
 
-ooniBouncer = None
-ooniBackendAPI = []
-ooniBackendAPI += reportAPI
+class OONICollector(web.Application):
+    def __init__(self):
+        from oonib.main.api import mainAPI
+        from oonib.deck.api import deckAPI
+        from oonib.report.api import reportAPI
+        from oonib.input.api import inputAPI
+        from oonib.policy.api import policyAPI
+        from oonib.report.handlers import checkForStaleReports
 
-if config.main.input_dir:
-    ooniBackendAPI += inputAPI
+        handlers = []
+        handlers += reportAPI
 
-if config.main.deck_dir:
-    ooniBackendAPI += deckAPI
+        if config.main.input_dir:
+            handlers += inputAPI
 
-if config.main.policy_file:
-    ooniBackendAPI += policyAPI
+        if config.main.deck_dir:
+            handlers += deckAPI
 
-if config.main.bouncer_file:
-    ooniBouncer = web.Application(bouncerAPI, debug=True, name='bouncer')
+        if config.main.policy_file:
+            handlers += policyAPI
 
-ooniBackendAPI += mainAPI
-ooniBackend = web.Application(ooniBackendAPI, debug=True, name='collector')
+        handlers += mainAPI
+
+        checkForStaleReports()
+
+        web.Application.__init__(self, handlers, name='collector')
+
+
+class OONIBouncer(web.Application):
+    def __init__(self):
+        handlers = []
+        handlers += bouncerAPI
+
+        # Follows the same pattern as the above so we can put some
+        # initialisation logic for the bouncer as well in here perhaps in
+        # the future.
+        web.Application.__init__(self, handlers, name='bouncer')

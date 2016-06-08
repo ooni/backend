@@ -11,7 +11,7 @@ import os
 import sys
 
 
-from oonib.api import ooniBackend, ooniBouncer
+from oonib.api import OONICollector, OONIBouncer
 from oonib.config import config
 from oonib.onion import get_global_tor
 from oonib.testhelpers import dns_helpers, ssl_helpers
@@ -64,9 +64,9 @@ def getEndpoint(endpoint_config):
 
 def createService(endpoint, role, endpoint_config):
     if role == 'bouncer':
-        factory = ooniBouncer
+        factory = OONIBouncer()
     elif role == 'collector':
-        factory = ooniBackend
+        factory = OONICollector()
     elif role == 'web_connectivity':
         factory = http_helpers.WebConnectivityHelper
     else:
