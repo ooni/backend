@@ -4,11 +4,12 @@ import yaml
 
 from copy import deepcopy
 
+from twisted.python.filepath import FilePath
 from twisted.internet import defer
 
 from cyclone import web
 
-from oonib.report.handlers import report_file_name
+from oonib.report.handlers import report_file_path
 from oonib.report.api import reportAPI
 from oonib.test.handler_helpers import HandlerTestCase, mock_initialize
 
@@ -83,9 +84,11 @@ class TestReport(HandlerTestCase):
     app = web.Application(reportAPI, name='reportAPI')
 
     @defer.inlineCallbacks
-    def update_report(self, report_id, content=sample_report_entry_yaml):
+    def update_report(self, report_id, content=sample_report_entry_yaml,
+                      format="yaml"):
         data = {
-            'content': content
+            'content': content,
+            'format': format
         }
         response = yield self.request(
             '/report/%s' % report_id,
@@ -169,9 +172,11 @@ class TestReport(HandlerTestCase):
         response = yield self.request('/report/%s/close' % report_id, "POST")
 
         written_report_header['format'] = 'yaml'
-        written_report_path = report_file_name(".", written_report_header, report_id)
-        with open(written_report_path) as f:
-            self.filenames.add(written_report_path)
+        written_report_path = report_file_path(FilePath("."),
+                                               written_report_header,
+                                               report_id)
+        with written_report_path.open('r') as f:
+            self.filenames.add(written_report_path.path)
             written_report = yaml.safe_load_all(f)
             written_report.next()
 
@@ -192,13 +197,17 @@ class TestReport(HandlerTestCase):
 
         report_id = response_body['report_id']
         for i in range(report_entry_count):
-            yield self.update_report(report_id, content=sample_report_entry)
+            yield self.update_report(report_id,
+                                     content=sample_report_entry,
+                                     format="json")
 
         response = yield self.request('/report/%s/close' % report_id, "POST")
 
-        written_report_path = report_file_name(".", report_header, report_id)
-        with open(written_report_path) as f:
-            self.filenames.add(written_report_path)
+        written_report_path = report_file_path(FilePath("."),
+                                               report_header,
+                                               report_id)
+        with written_report_path.open('r') as f:
+            self.filenames.add(written_report_path.path)
             for line in f:
                 written_report = json.loads(line)
                 self.assertEqual(sample_report_entry, written_report)
