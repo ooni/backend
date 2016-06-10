@@ -1,6 +1,5 @@
 from cyclone import web
 
-from oonib.bouncer.api import bouncerAPI
 
 from oonib.config import config
 
@@ -34,6 +33,8 @@ class OONICollector(web.Application):
 
 class OONIBouncer(web.Application):
     def __init__(self):
+        from oonib.bouncer.api import bouncerAPI
+
         handlers = []
         handlers += bouncerAPI
 

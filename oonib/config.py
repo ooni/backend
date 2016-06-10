@@ -8,11 +8,13 @@ import os
 
 
 class Config(object):
-    main = {}
-    helpers = {}
-    reports = {}
     backend_version = __version__
     opts = OONIBOptions()
+
+    def __init__(self):
+        self.main = Storage()
+        self.helpers = Storage()
+        self.reports = Storage()
 
     def load(self):
         self.opts.parseOptions()

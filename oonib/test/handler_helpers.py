@@ -1,7 +1,8 @@
 import sys
 import os
-import socket
 import json
+import time
+import socket
 import shutil
 
 from twisted.python.filepath import FilePath
@@ -61,6 +62,7 @@ class HandlerTestCase(unittest.TestCase):
             self._listener = reactor.listenTCP(self.port, self.app)
         config.main.report_dir = "."
         config.main.archive_dir = "."
+        config.main.stale_time = 100
         return super(HandlerTestCase, self).setUp()
 
     def tearDown(self):
@@ -83,3 +85,13 @@ class HandlerTestCase(unittest.TestCase):
                                           postdata=postdata,
                                           headers=headers)
         defer.returnValue(response)
+
+class MockTime(object):
+    def __init__(self):
+        self._offset = 0
+
+    def advance(self, seconds):
+        self._offset += seconds
+
+    def time(self):
+        return time.time() + self._offset

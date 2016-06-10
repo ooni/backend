@@ -15,6 +15,7 @@ from datetime import datetime
 from oonib import randomStr, otime, log, json_dumps
 from oonib.config import config
 
+METADATA_EXT = "-metadata.json"
 
 def report_file_path(archive_dir, report_details,
                      report_id='no_report_id'):
@@ -144,16 +145,21 @@ def closeReport(report_id):
     report_dir = FilePath(config.main.report_dir)
     archive_dir = FilePath(config.main.archive_dir)
     report_path = report_dir.child(report_id)
-    report_metadata_path = report_dir.child(report_id +
-                                            "-metadata.json")
-    print "Checking if %s exists and %s exists" % (report_path,
-                                                   report_metadata_path)
+    report_metadata_path = report_dir.child(report_id + METADATA_EXT)
+
     if not report_path.exists() or \
             not report_metadata_path.exists():
         raise e.ReportNotFound
 
     with report_metadata_path.open('r') as f:
-        report_details = json.load(f)
+        try:
+            report_details = json.load(f)
+        except ValueError:
+            log.warn("Found corrupt metadata deleting %s and %s" %
+                     (report_path.path, report_metadata_path.path))
+            report_path.remove()
+            report_metadata_path.remove()
+            return
 
     dst_path = report_file_path(archive_dir,
                                 report_details,
@@ -164,20 +170,24 @@ def closeReport(report_id):
         # We currently just remove empty reports.
         # XXX Maybe in the future we want to keep track of how often this
         # happens.
+        log.warn("Removing empty report %s" % report_path.path)
         report_path.remove()
     report_metadata_path.remove()
 
-def checkForStaleReports():
+def checkForStaleReports( _time=time):
+    delayed_call = reactor.callLater(config.main.stale_time,
+                                     checkForStaleReports)
     report_dir = FilePath(config.main.report_dir)
     for report_metadata_path in \
-            report_dir.globChildren("*-metadata.json"):
-        last_updated = time.time() - report_metadata_path.getModificationTime()
+            report_dir.globChildren("*"+METADATA_EXT):
+        last_updated = _time.time() - \
+                       report_metadata_path.getModificationTime()
         if last_updated > config.main.stale_time:
             report_id = report_metadata_path.basename().replace(
-                '-metadata.json', '')
+                METADATA_EXT, '')
             closeReport(report_id)
-    reactor.callLater(config.main.stale_time,
-                      checkForStaleReports)
+    return delayed_call
+
 
 class ReportHandler(OONIBHandler):
     def initialize(self):
@@ -194,7 +204,7 @@ class UpdateReportMixin(object):
         try:
             report_path = self.report_dir.child(report_id)
             report_metadata_path = self.report_dir.child(report_id +
-                                                         '-metadata.json')
+                                                         METADATA_EXT)
         except InsecurePath:
             raise e.OONIBError(406, "Invalid report_id")
 
@@ -317,8 +327,7 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
         report_path = self.report_dir.child(report_id)
         # We use this file to store the metadata associated with the report
         # submission.
-        report_metadata_path = self.report_dir.child(report_id +
-                                                     "-metadata.json")
+        report_metadata_path = self.report_dir.child(report_id + METADATA_EXT)
 
         response = {
             'backend_version': config.backend_version,
