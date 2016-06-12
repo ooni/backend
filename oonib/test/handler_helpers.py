@@ -1,9 +1,11 @@
 import sys
 import os
-import socket
 import json
+import time
+import socket
 import shutil
 
+from twisted.python.filepath import FilePath
 from twisted.internet import reactor, defer
 from twisted.trial import unittest
 
@@ -19,13 +21,10 @@ def random_unused_port(bind_address='127.0.0.1'):
     s.close()
     return port
 
-reports = {}
-
 
 def mock_initialize(self):
-    self.report_dir = '.'
-    self.archive_dir = '.'
-    self.reports = reports
+    self.report_dir = FilePath('.')
+    self.archive_dir = FilePath('.')
     self.policy_file = None
     self.helpers = {}
     self.stale_time = 10
@@ -61,6 +60,9 @@ class HandlerTestCase(unittest.TestCase):
             config.load()
         if self.app:
             self._listener = reactor.listenTCP(self.port, self.app)
+        config.main.report_dir = "."
+        config.main.archive_dir = "."
+        config.main.stale_time = 100
         return super(HandlerTestCase, self).setUp()
 
     def tearDown(self):
@@ -71,11 +73,6 @@ class HandlerTestCase(unittest.TestCase):
         for dir in self.directories:
             shutil.rmtree(dir)
         if self._listener:
-            for report in reports.values():
-                try:
-                    report.delayed_call.cancel()
-                except:
-                    pass
             self._listener.stopListening()
 
     @defer.inlineCallbacks
@@ -88,3 +85,13 @@ class HandlerTestCase(unittest.TestCase):
                                           postdata=postdata,
                                           headers=headers)
         defer.returnValue(response)
+
+class MockTime(object):
+    def __init__(self):
+        self._offset = 0
+
+    def advance(self, seconds):
+        self._offset += seconds
+
+    def time(self):
+        return time.time() + self._offset

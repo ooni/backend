@@ -1,16 +1,18 @@
-import time
 import json
 import yaml
 
 from copy import deepcopy
 
+from twisted.python.filepath import FilePath
 from twisted.internet import defer
 
 from cyclone import web
 
-from oonib.report.handlers import report_file_name
+from oonib.config import config
+from oonib.report.handlers import report_file_path, checkForStaleReports
+from oonib.report.handlers import closeReport
 from oonib.report.api import reportAPI
-from oonib.test.handler_helpers import HandlerTestCase, mock_initialize
+from oonib.test.handler_helpers import HandlerTestCase, mock_initialize, MockTime
 
 sample_report_entry = {
     'agent': 'agent',
@@ -83,9 +85,11 @@ class TestReport(HandlerTestCase):
     app = web.Application(reportAPI, name='reportAPI')
 
     @defer.inlineCallbacks
-    def update_report(self, report_id, content=sample_report_entry_yaml):
+    def update_report(self, report_id, content=sample_report_entry_yaml,
+                      format="yaml"):
         data = {
-            'content': content
+            'content': content,
+            'format': format
         }
         response = yield self.request(
             '/report/%s' % report_id,
@@ -110,6 +114,8 @@ class TestReport(HandlerTestCase):
         self.assertIn('backend_version', response_body)
         self.assertIn('report_id', response_body)
         self.filenames.add(response_body['report_id'])
+
+        closeReport(response_body['report_id'])
 
     @defer.inlineCallbacks
     def test_create_invalid_report(self):
@@ -142,6 +148,8 @@ class TestReport(HandlerTestCase):
             self.assertEqual(yaml.safe_load(sample_report_entry_yaml),
                              written_report.next())
 
+        closeReport(report_id)
+
     @defer.inlineCallbacks
     def test_create_update_and_close_report(self):
         response = yield self.request('/report', "POST", dummy_data)
@@ -169,9 +177,11 @@ class TestReport(HandlerTestCase):
         response = yield self.request('/report/%s/close' % report_id, "POST")
 
         written_report_header['format'] = 'yaml'
-        written_report_path = report_file_name(".", written_report_header, report_id)
-        with open(written_report_path) as f:
-            self.filenames.add(written_report_path)
+        written_report_path = report_file_path(FilePath("."),
+                                               written_report_header,
+                                               report_id)
+        with written_report_path.open('r') as f:
+            self.filenames.add(written_report_path.path)
             written_report = yaml.safe_load_all(f)
             written_report.next()
 
@@ -192,13 +202,51 @@ class TestReport(HandlerTestCase):
 
         report_id = response_body['report_id']
         for i in range(report_entry_count):
-            yield self.update_report(report_id, content=sample_report_entry)
+            yield self.update_report(report_id,
+                                     content=sample_report_entry,
+                                     format="json")
 
         response = yield self.request('/report/%s/close' % report_id, "POST")
 
-        written_report_path = report_file_name(".", report_header, report_id)
-        with open(written_report_path) as f:
-            self.filenames.add(written_report_path)
+        written_report_path = report_file_path(FilePath("."),
+                                               report_header,
+                                               report_id)
+        with written_report_path.open('r') as f:
+            self.filenames.add(written_report_path.path)
+            for line in f:
+                written_report = json.loads(line)
+                self.assertEqual(sample_report_entry, written_report)
+
+
+    @defer.inlineCallbacks
+    def test_create_update_reap(self):
+        mock_time = MockTime()
+
+        report_header = dummy_data.copy()
+        report_header['format'] = 'json'
+        response = yield self.request('/report', "POST", report_header)
+        response_body = json.loads(response.body)
+        self.assertIn('backend_version', response_body)
+        self.assertIn('report_id', response_body)
+
+        report_entry_count = 100
+
+        report_id = response_body['report_id']
+        for i in range(report_entry_count):
+            yield self.update_report(report_id,
+                                     content=sample_report_entry,
+                                     format="json")
+
+        mock_time.advance(config.main.stale_time + 1)
+        delayed_call = checkForStaleReports(mock_time)
+        delayed_call.cancel()
+
+        written_report_path = report_file_path(FilePath("."),
+                                               report_header,
+                                               report_id)
+
+        with written_report_path.open('r') as f:
+            self.filenames.add(written_report_path.path)
             for line in f:
                 written_report = json.loads(line)
                 self.assertEqual(sample_report_entry, written_report)

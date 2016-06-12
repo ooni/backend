@@ -1,11 +1,11 @@
-import shutil
 import time
 import yaml
 import json
-import os
+import errno
 import re
 
-from twisted.internet import fdesc, reactor
+from twisted.python.filepath import FilePath, InsecurePath
+from twisted.internet import reactor
 
 from oonib import errors as e
 from oonib.handlers import OONIBHandler
@@ -15,8 +15,9 @@ from datetime import datetime
 from oonib import randomStr, otime, log, json_dumps
 from oonib.config import config
 
+METADATA_EXT = "-metadata.json"
 
-def report_file_name(archive_dir, report_details,
+def report_file_path(archive_dir, report_details,
                      report_id='no_report_id'):
     if report_details.get("start_time"):
         timestamp = datetime.fromtimestamp(report_details['start_time'])
@@ -46,66 +47,14 @@ def report_file_name(archive_dir, report_details,
     report_file_template = "{iso8601_timestamp}-{test_name}-{report_id}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}"
     if config.main.get('report_file_template'):
         report_file_template = config.main['report_file_template']
-    dst_filename = os.path.join(archive_dir, report_file_template.format(**keys))
-    dst_dir = os.path.dirname(dst_filename)
-    if not os.path.exists(dst_dir):
-        os.makedirs(dst_dir)
-    return dst_filename
 
-
-class Report(object):
-    delayed_call = None
-
-    def __init__(self, report_id,
-                 stale_time,
-                 report_dir,
-                 archive_dir,
-                 reports,
-                 report_details):
-        self.report_id = report_id
-
-        self.report_details = report_details
-
-        self.stale_time = stale_time
-        self.report_dir = report_dir
-        self.archive_dir = archive_dir
-        self.reports = reports
-
-        self.refresh()
-
-    def refresh(self):
-        self.last_updated = time.time()
-        if self.delayed_call:
-            self.delayed_call.cancel()
-        self.delayed_call = reactor.callLater(self.stale_time,
-                                              self.stale_check)
-
-    def stale_check(self):
-        if (time.time() - self.last_updated) > self.stale_time:
-            try:
-                self.close()
-            except e.ReportNotFound:
-                pass
-
-    def close(self):
-        def get_report_path(report_id):
-            return os.path.join(self.report_dir, report_id)
-
-        report_filename = get_report_path(self.report_id)
-        try:
-            open(report_filename).close()
-        except IOError:
-            raise e.ReportNotFound
-
-        dst_filename = report_file_name(archive_dir=self.archive_dir,
-                                        report_details=self.report_details,
-                                        report_id=self.report_id)
-        shutil.move(report_filename, dst_filename)
-
-        if not self.delayed_call.called:
-            self.delayed_call.cancel()
-        del self.reports[self.report_id]
-
+    dst_path = archive_dir.child(report_file_template.format(**keys))
+    try:
+        FilePath(dst_path.dirname()).makedirs()
+    except OSError as e:
+        if not e.errno == errno.EEXIST:
+            raise
+    return dst_path
 
 def parseUpdateReportRequest(request, report_id=None):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
@@ -192,27 +141,72 @@ def parseNewReportRequest(request):
 
     return parsed_request
 
-class ReportHandler(OONIBHandler):
+def closeReport(report_id):
+    report_dir = FilePath(config.main.report_dir)
+    archive_dir = FilePath(config.main.archive_dir)
+    report_path = report_dir.child(report_id)
+    report_metadata_path = report_dir.child(report_id + METADATA_EXT)
 
+    if not report_path.exists() or \
+            not report_metadata_path.exists():
+        raise e.ReportNotFound
+
+    with report_metadata_path.open('r') as f:
+        try:
+            report_details = json.load(f)
+        except ValueError:
+            log.warn("Found corrupt metadata deleting %s and %s" %
+                     (report_path.path, report_metadata_path.path))
+            report_path.remove()
+            report_metadata_path.remove()
+            return
+
+    dst_path = report_file_path(archive_dir,
+                                report_details,
+                                report_id)
+    if report_path.getsize() > 0:
+        report_path.moveTo(dst_path)
+    else:
+        # We currently just remove empty reports.
+        # XXX Maybe in the future we want to keep track of how often this
+        # happens.
+        log.warn("Removing empty report %s" % report_path.path)
+        report_path.remove()
+    report_metadata_path.remove()
+
+def checkForStaleReports( _time=time):
+    delayed_call = reactor.callLater(config.main.stale_time,
+                                     checkForStaleReports)
+    report_dir = FilePath(config.main.report_dir)
+    for report_metadata_path in \
+            report_dir.globChildren("*"+METADATA_EXT):
+        last_updated = _time.time() - \
+                       report_metadata_path.getModificationTime()
+        if last_updated > config.main.stale_time:
+            report_id = report_metadata_path.basename().replace(
+                METADATA_EXT, '')
+            closeReport(report_id)
+    return delayed_call
+
+
+class ReportHandler(OONIBHandler):
     def initialize(self):
-        self.archive_dir = config.main.archive_dir
-        self.report_dir = config.main.report_dir
-        self.reports = config.reports
+        self.archive_dir = FilePath(config.main.archive_dir)
+        self.report_dir = FilePath(config.main.report_dir)
+
         self.policy_file = config.main.policy_file
         self.helpers = config.helpers
-        self.stale_time = config.main.stale_time
-
 
 class UpdateReportMixin(object):
     def updateReport(self, report_id, parsed_request):
 
         log.debug("Got this request %s" % parsed_request)
-        report_filename = os.path.join(self.report_dir,
-                                       report_id)
         try:
-            self.reports[report_id].refresh()
-        except KeyError:
-            raise e.OONIBError(404, "Report not found")
+            report_path = self.report_dir.child(report_id)
+            report_metadata_path = self.report_dir.child(report_id +
+                                                         METADATA_EXT)
+        except InsecurePath:
+            raise e.OONIBError(406, "Invalid report_id")
 
         content_format = parsed_request.get('format', 'yaml')
         if content_format == 'json':
@@ -222,11 +216,16 @@ class UpdateReportMixin(object):
             data = parsed_request['content']
         else:
             raise e.InvalidFormatField
-        try:
-            with open(report_filename, 'a+') as fd:
-                fd.write(data)
-        except IOError:
+
+        if not report_path.exists() or \
+                not report_metadata_path.exists():
             raise e.OONIBError(404, "Report not found")
+
+        with report_path.open('a') as fd:
+            fd.write(data)
+
+        report_metadata_path.touch()
+
         self.write({'status': 'success'})
 
 
@@ -325,7 +324,10 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
 
         # The report filename contains the timestamp of the report plus a
         # random nonce
-        report_filename = os.path.join(self.report_dir, report_id)
+        report_path = self.report_dir.child(report_id)
+        # We use this file to store the metadata associated with the report
+        # submission.
+        report_metadata_path = self.report_dir.child(report_id + METADATA_EXT)
 
         response = {
             'backend_version': config.backend_version,
@@ -342,25 +344,16 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             except KeyError:
                 raise e.TestHelperNotFound
 
-        self.reports[report_id] = Report(report_id=report_id,
-            stale_time=self.stale_time,
-            report_dir=self.report_dir,
-            archive_dir=self.archive_dir,
-            reports=self.reports,
-            report_details=report_data
-        )
+        with report_metadata_path.open('w') as f:
+            f.write(json_dumps(report_data))
+            f.write("\n")
 
+        report_path.touch()
         if data is not None:
-            self.writeToReport(report_filename, data)
-        else:
-            open(report_filename, 'w+').close()
+            with report_path.open('w') as f:
+                f.write(data)
 
         self.write(response)
-
-    def writeToReport(self, report_filename, data):
-        with open(report_filename, 'w+') as fd:
-            fdesc.setNonBlocking(fd.fileno())
-            fdesc.writeToFD(fd.fileno(), data)
 
     def put(self):
         """
@@ -384,16 +377,11 @@ class UpdateReportHandlerFile(ReportHandler, UpdateReportMixin):
 
 
 class CloseReportHandlerFile(ReportHandler):
-
     def get(self):
         pass
 
     def post(self, report_id):
-        if report_id in self.reports:
-            self.reports[report_id].close()
-        else:
-            raise e.ReportNotFound
-
+        closeReport(report_id)
 
 class PCAPReportHandler(ReportHandler):
 
