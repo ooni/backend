@@ -29,7 +29,8 @@ blockpage_header_fingerprints = {
     'QA': ('Location', 'http://www.vodafone.qa/alu.cfm'),
     'KR': ('Location', 'http://www.warning.or.kr'),
     'PT': ('Location', 'http://mobilegen.vodafone.pt/denied/dn'),
-    'NO': ('Location', 'http://block-no.altibox.net/')
+    'NO': ('Location', 'http://block-no.altibox.net/'),
+    'UK': ('Location', 'http://blocked.nb.sky.com%')
 }
 
 # These are countries for which blocking is identified by checking if the
