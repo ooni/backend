@@ -160,8 +160,8 @@ class Bouncer(object):
                 requested_nettest['test-helpers'])
             test_helpers = {}
             test_helpers_alternate = {}
+            collector_info = self.bouncerFile['collector'][collector]
             for test_helper in requested_nettest['test-helpers']:
-                collector_info = self.bouncerFile['collector'][collector]
                 try:
                     test_helpers[test_helper] = \
                         collector_info['test-helper'][test_helper]
@@ -184,7 +184,8 @@ class Bouncer(object):
                 'input-hashes': requested_nettest['input-hashes'],
                 'test-helpers': test_helpers,
                 'test-helpers-alternate': test_helpers_alternate,
-                'collector': collector
+                'collector': collector,
+                'collector-alternate': collector_info.get('collector-alternate', [])
             }
             nettests.append(nettest)
         return {'net-tests': nettests}
