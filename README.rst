@@ -179,6 +179,18 @@ This can be specified like follows::
             - {address: 'http://web-connectivity.ooni.io', type: 'http'}
 
 
+Also collectors can have a set of alternate addresses. These can be
+specified inside of the `collector-alternate` key under the collector
+address like so::
+
+     collector:
+      httpo://thirteenchars123.onion:
+        collector-alternate:
+        - {address: 'https://a.collector.ooni.io', type: 'https'}
+        - {address: 'http://a.collector.ooni.io', type: 'http'}
+
+The currently supported types are 'https' and 'http'.
+
 Generate self signed certs for OONIB
 ....................................
 If you want to use the HTTPS test helper, you will need to create a

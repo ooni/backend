@@ -32,6 +32,9 @@ collector:
     test-helper: {fake_test_helper: 'fake_hostname'}
   default_collector:
     test-helper: {fake_test_helper: 'fake_hostname'}
+    collector-alternate:
+    - {address: 'https://a.collector.ooni.io', type: 'https'}
+    - {address: 'http://a.collector.ooni.io', type: 'http'}
 """
 
 fake_bouncer_file_multiple_collectors = """
@@ -373,6 +376,14 @@ class TestDefaultCollector(BaseTestBouncer):
         self.assertIn('collector', response_body['net-tests'][0])
         self.assertEqual(response_body['net-tests'][0]['collector'], 'default_collector')
 
+        self.assertIn('collector-alternate', response_body['net-tests'][0])
+        collector_alternate = response_body['net-tests'][0]['collector-alternate']
+        self.assertEqual(collector_alternate[0],
+                         {'type': 'https', 'address':
+                             'https://a.collector.ooni.io'})
+        self.assertEqual(collector_alternate[1],
+                         {'type': 'http', 'address':
+                             'http://a.collector.ooni.io'})
 
 class TestMultipleCollectors(BaseTestBouncer):
     app = web.Application(bouncerAPI, name='bouncerAPI')
