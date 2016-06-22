@@ -113,12 +113,12 @@ Configure bouncer and collector endpoints
 The bouncer and collector are HTTP applications ("protocols" in twisted terminology) that can be configured to run on top of plain TCP, TLS, or onion service endpoints.
 Here is an example of the relevant part of the configuration::
     bouncer_endpoints:
-    - {type: tls, port: 10443, cert: "private/ssl-key-and-cert.pem"}
+    - {type: tls, port: 10443, cert: "private/fullchain.pem", privkey: "private/privkey.pem"}
     - {type: tcp, port: 10080}
     - {type: onion, hsdir: "/some/private/bouncer"}
 
     collector_endpoints:
-    - {type: tls, port: 11443, cert: "private/ssl-key-and-cert.pem"}
+    - {type: tls, port: 11443, fullchain: "private/fullchain.pem", privkey: "private/privkey.pem"}
     - {type: onion, hsdir: "/some/private/collector"}
 
 `scripts/gen-ssl-key-cert.sh` in this repo contains the openssl command to generate a self-signed certificate which you can use for the tls endpoint.
