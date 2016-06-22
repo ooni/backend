@@ -22,7 +22,21 @@ from twisted.python import usage
 from twisted.application import internet, service
 from twisted.internet import reactor, endpoints, ssl
 from twisted.names import dns
+from OpenSSL import SSL
 
+class ChainedOpenSSLContext(ssl.DefaultOpenSSLContextFactory):
+    def __init__(self, private_key_path, certificate_chain_path,
+                 ssl_method=SSL.TLSv1_METHOD):
+        self.private_key_path = private_key_path
+        self.certificate_chain_path = certificate_chain_path
+        self.ssl_method = ssl_method
+        self.cacheContext()
+
+    def cacheContext(self):
+        ctx = SSL.Context(self.ssl_method)
+        ctx.use_certificate_chain_file(self.certificate_chain_path)
+        ctx.use_privatekey_file(self.private_key_path)
+        self._context = ctx
 
 def getHSEndpoint(endpoint_config):
     from txtorcon import TCPHiddenServiceEndpoint
@@ -42,13 +56,14 @@ def getTCPEndpoint(endpoint_config):
     )
 
 def getTLSEndpoint(endpoint_config):
-    with open(endpoint_config['cert'], 'r') as f:
-        cert_data = f.read()
-    certificate = ssl.PrivateCertificate.loadPEM(cert_data)
+    sslContextFactory = ChainedOpenSSLContext(
+        endpoint_config['privkey'],
+        endpoint_config['fullchain']
+    )
     return endpoints.SSL4ServerEndpoint(
         reactor=reactor,
         port=endpoint_config['port'],
-        sslContextFactory=certificate.options(),
+        sslContextFactory=sslContextFactory,
         interface=endpoint_config.get('address', '')
     )
 
@@ -212,7 +227,7 @@ def start():
     twistd_config = OONIBackendTwistdConfig()
     try:
         twistd_config.parseOptions(twistd_args)
-    except usage.error, ue:
+    except usage.error:
         print "Usage error from twistd"
         sys.exit(7)
 
