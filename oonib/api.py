@@ -1,7 +1,32 @@
 from cyclone import web
 
 
+from oonib import log
 from oonib.config import config
+
+class _LaxDict(dict):
+    """
+    This is like a dictionary, but when a key is missing it returns the
+    empty string.
+    """
+    def __missing__(self, _):
+        return ""
+
+def log_function(handler):
+    values = _LaxDict({
+        'request_time': 1000.0 * handler.request.request_time(),
+        'protocol': handler.request.protocol,
+        'status': str(handler.get_status()),
+        'request_method': handler.request.method,
+        'request_uri': handler.request.uri,
+        'remote_ip': handler.request.remote_ip
+    })
+    log_format = config.main.log_format
+    if not log_format:
+        log_format = ("[{protocol}] {status} {request_method} {request_uri} "
+                      "127.0.0.1 {request_time}ms")
+    log.msg(log_format.format(**values))
+
 
 class OONICollector(web.Application):
     def __init__(self):
@@ -28,7 +53,8 @@ class OONICollector(web.Application):
 
         checkForStaleReports()
 
-        web.Application.__init__(self, handlers, name='collector')
+        web.Application.__init__(self, handlers, name='collector',
+                                 log_function=log_function)
 
 
 class OONIBouncer(web.Application):
@@ -41,4 +67,5 @@ class OONIBouncer(web.Application):
         # Follows the same pattern as the above so we can put some
         # initialisation logic for the bouncer as well in here perhaps in
         # the future.
-        web.Application.__init__(self, handlers, name='bouncer')
+        web.Application.__init__(self, handlers, name='bouncer',
+                                 log_function=log_function)
