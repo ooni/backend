@@ -26,12 +26,13 @@ main:
     tor_datadir: null
 
     bouncer_endpoints:
-    #- {type: tls, port: 10443, cert: "private/ssl-key-and-cert.pem"}
-    - {type: tcp, port: 10080}
+    #- {type: tls, port: 10443, fullchain: "private/fullchain.pem", privkey: "private/ssl-key.pem"}
+    #- {type: tcp, port: 10080}
     - {type: onion, hsdir: /tmp/bouncer}
 
     collector_endpoints:
-    #- {type: tls, port: 11443, cert: "private/ssl-key-and-cert.pem"}
+    #- {type: tls, port: 11443, fullchain: "private/fullchain.pem", privkey: "private/ssl-key.pem"}
+    #- {type: tcp, port: 11080}
     - {type: onion, hsdir: /tmp/collector}
 
     report_file_template: '{iso8601_timestamp}-{test_name}-{report_id}-{probe_asn}-{probe_cc}-probe-0.2.0.{ext}'
@@ -72,4 +73,6 @@ helpers:
 
     web_connectivity:
         endpoints:
-        - {type: tcp, port: 57007}
+        - {type: onion, hsdir: "/tmp/web_connectivity"}
+        #- {type: tls, port: 12443, fullchain: "private/fullchain.pem", privkey: "private/ssl-key.pem"}
+        #- {type: tcp, port: 12080}
