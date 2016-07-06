@@ -177,8 +177,8 @@ This can be specified like follows::
             - {address: 'httpo://ckjj3ra6456muu7o.onion', type: 'onion'}
             - {address: 'https://web-connectivity.ooni.io', type: 'https'}
             - {address: 'http://web-connectivity.ooni.io', type: 'http'}
-
-
+            - {address: 'https://xxxxxxxxx.cloudfront.net', type: 'cloudfront', front: 'a0.awsstatic.com'}
+      
 Also collectors can have a set of alternate addresses. These can be
 specified inside of the `collector-alternate` key under the collector
 address like so::
@@ -188,6 +188,8 @@ address like so::
         collector-alternate:
         - {address: 'https://a.collector.ooni.io', type: 'https'}
         - {address: 'http://a.collector.ooni.io', type: 'http'}
+        - {address: 'https://xxxxxxxxx.cloudfront.net', type: 'cloudfront', front: 'a0.awsstatic.com'}
+
 
 The currently supported types are 'https' and 'http'.
 
