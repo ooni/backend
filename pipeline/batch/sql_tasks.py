@@ -31,21 +31,40 @@ blockpage_header_fingerprints = {
 # experiment measurement has failed while the control succeeds.
 blockpage_failures = ('CN',)
 
-where_body_template = """{metrics_table}.test_keys ->> 'body_length_match' = 'false'
-    AND ({metrics_table}.test_keys -> 'requests' -> 0 -> 'response' ->> 'body'
+where_body_template = {
+    "http_requests": """({metrics_table}.test_keys -> 'requests' -> 0 -> 'response' ->> 'body'
             LIKE '{body_filter}' OR
         {metrics_table}.test_keys -> 'requests' -> 1 -> 'response' ->> 'body'
             LIKE '{body_filter}')
+""",
+    "web_connectivity": """
+    array_length(
+        ARRAY(SELECT * FROM json_array_elements(
+                ({metrics_table}.test_keys->'requests')::json
+              ) WHERE
+                value->'response'->>'body' LIKE '{body_filter}'), 1) > 0
 """
+}
 
-where_header_template = """{metrics_table}.test_keys -> 'requests' -> 0 -> 'response'
+where_header_template = {
+    "http_requests": """{metrics_table}.test_keys -> 'requests' -> 0 -> 'response'
     -> 'headers' ->> '{header_name}' LIKE '{header_value}'
+""",
+    "web_connectivity": """ array_length(
+        ARRAY(SELECT * FROM json_array_elements(
+                ({metrics_table}.test_keys->'requests')::json
+              ) WHERE value -> 'response'
+                    -> 'headers'->> '{header_name}' LIKE '{header_value}'), 1) > 0
 """
+}
 
-where_failure_template = """test_keys->'experiment_failure'!='null'
+where_failure_template = {
+    "http_requests": """test_keys->'experiment_failure'!='null'
+AND test_keys->'control_failure'='null'""",
+    "web_connectivity": """test_keys->'experiment_failure'!='null'
 AND test_keys->'control_failure'='null'"""
-
-def select_block_count(probe_cc, where, metrics_table):
+}
+def select_block_count(probe_cc, where, metrics_table, **kwargs):
     query = """SELECT blocked.block_count,
     total.total_count,
     blocked.report_id,
@@ -59,51 +78,73 @@ def select_block_count(probe_cc, where, metrics_table):
             {metrics_table}.probe_asn
            FROM {metrics_table}
            WHERE {metrics_table}.probe_cc = '{probe_cc}'
-                 AND {metrics_table}.test_name = 'http_requests'
-                 AND """
+                 AND (
+"""
+    sub_queries = []
+    for test_name in ["http_requests", "web_connectivity"]:
+        sub_query = "{metrics_table}.test_name = '"
+        sub_query += test_name
+        sub_query += "' AND "
+        sub_query += where[test_name]
+        sub_queries.append(sub_query)
+    query += "OR ".join(sub_queries) + ")"
 
-    query += where
     query += """
           GROUP BY {metrics_table}.report_id, {metrics_table}.test_start_time,
                    {metrics_table}.probe_cc, {metrics_table}.probe_asn) blocked
      JOIN (SELECT count({metrics_table}.input) AS total_count,
             {metrics_table}.report_id
            FROM {metrics_table}
-          WHERE {metrics_table}.probe_cc = '{probe_cc}' AND {metrics_table}.test_name = 'http_requests'
-          GROUP BY {metrics_table}.report_id) total ON total.report_id = blocked.report_id
+          WHERE {metrics_table}.probe_cc = '{probe_cc}' AND
+                (
+                    {metrics_table}.test_name = 'http_requests' OR
+                    {metrics_table}.test_name = 'web_connectivity'
+                )
+          GROUP BY {metrics_table}.report_id) total ON
+                total.report_id = blocked.report_id
     """
     return query.format(probe_cc=probe_cc,
-                        metrics_table=metrics_table)
+                        metrics_table=metrics_table,
+                        **kwargs)
 
-def select_block_urls(probe_cc, where, metrics_table):
+def select_block_urls(probe_cc, where, metrics_table, **kwargs):
     query = """SELECT input, report_id,
         test_start_time,
         probe_cc,
         probe_asn
     FROM {metrics_table}
-    WHERE {metrics_table}.probe_cc = '{probe_cc}' AND {metrics_table}.test_name = 'http_requests'
-        AND """
-    query += where
+    WHERE {metrics_table}.probe_cc = '{probe_cc}'
+        AND (
+    """
+
+    sub_queries = []
+    for test_name in ["http_requests", "web_connectivity"]:
+        sub_query = "{metrics_table}.test_name = '"
+        sub_query += test_name
+        sub_query += "' AND "
+        sub_query += where[test_name]
+        sub_queries.append(sub_query)
+    query += "OR ".join(sub_queries) + ")"
+
     return query.format(probe_cc=probe_cc,
-                        metrics_table=metrics_table)
+                        metrics_table=metrics_table,
+                        **kwargs)
 
 def create_blockpage_view(query_function, view_name, metrics_table):
     select_queries = []
 
     for probe_cc, body_filter in blockpage_body_fingerprints.items():
-        where = where_body_template.format(body_filter=body_filter,
-                                           metrics_table=metrics_table)
         select_queries.append(query_function(probe_cc=probe_cc,
-                                             where=where,
+                                             where=where_body_template,
+                                             body_filter=body_filter,
                                              metrics_table=metrics_table))
 
     for probe_cc, headers in blockpage_header_fingerprints.items():
         header_name, header_value = headers
-        where = where_header_template.format(header_name=header_name,
-                                             header_value=header_value,
-                                             metrics_table=metrics_table)
         select_queries.append(query_function(probe_cc=probe_cc,
-                                             where=where,
+                                             where=where_header_template,
+                                             header_name=header_name,
+                                             header_value=header_value,
                                              metrics_table=metrics_table))
 
     for probe_cc in blockpage_failures:
@@ -283,3 +324,7 @@ class CreateIndexes(RunQuery):
                  index_key=index_key
             )
         return sql
+
+if __name__ == "__main__":
+    print blockpage_count("metrics")
+    print blockpage_urls("metrics")
