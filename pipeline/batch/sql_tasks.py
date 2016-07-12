@@ -10,7 +10,7 @@ config = luigi.configuration.get_config()
 # fingerprint in the HTTP response body.
 blockpage_body_fingerprints = {
     'IR': '%iframe src="http://10.10%',
-    'TR': '%uyarınca yapılan teknik inceleme ve hukuki değerlendirme sonucunda bu internet%',
+    'TR': '%<title>Telekomünikasyon İletişim Başkanlığı</title>%',
     'GR': '%www.gamingcommission.gov.gr/index.php/forbidden-access-black-list/%',
     'RU': '%http://eais.rkn.gov.ru/%',
     'IN': '%The page you have requested has been blocked%',
