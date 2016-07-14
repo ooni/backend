@@ -552,8 +552,8 @@ class NormaliseReport(luigi.Task):
             # Failback to using the start_time
             measurement_start_time = test_start_time
 
-        entry['measurement_start_time'] = datetime.fromtimestamp(measurement_start_time).strftime("%Y-%m-%d %H:%M:%S")
-        entry['test_start_time'] = datetime.fromtimestamp(test_start_time).strftime("%Y-%m-%d %H:%M:%S")
+        entry['measurement_start_time'] = measurement_start_time.strftime("%Y-%m-%d %H:%M:%S")
+        entry['test_start_time'] = test_start_time.strftime("%Y-%m-%d %H:%M:%S")
 
         entry['data_format_version'] = '0.2.0'
 
@@ -621,6 +621,8 @@ class NormaliseReport(luigi.Task):
         for entry in report:
             if not entry:
                 continue
+            if 'test_start_time' in entry and 'test_start_time' in header:
+                header.pop('test_start_time')
             entry.update(header)
             yield entry
 
