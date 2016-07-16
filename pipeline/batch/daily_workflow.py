@@ -882,6 +882,7 @@ class ListReportsAndRun(luigi.WrapperTask):
     task = luigi.Parameter(default="InsertMeasurementsIntoPostgres")
     test_names = ListParameter(default=[])
     ignore_cc = ListParameter(default=[])
+    ignore_asn = ListParameter(default=[])
 
     update_views = luigi.BoolParameter(default=False)
 
@@ -899,6 +900,8 @@ class ListReportsAndRun(luigi.WrapperTask):
             include_filters['test_name'] = self.test_names
         if len(self.ignore_cc) > 0:
             ignore_filters['probe_cc'] = self.ignore_cc
+        if len(self.ignore_asn) > 0:
+            ignore_filters['probe_asn'] = self.ignore_asn
 
         if (len(ignore_filters) + len(include_filters)) == 0:
             return True
