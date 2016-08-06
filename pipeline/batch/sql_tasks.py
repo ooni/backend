@@ -14,7 +14,11 @@ blockpage_body_fingerprints = {
     'GR': '%www.gamingcommission.gov.gr/index.php/forbidden-access-black-list/%',
     'RU': '%http://eais.rkn.gov.ru/%',
     'IN': '%The page you have requested has been blocked%',
-    'BE': '%that is considered illegal according to Belgian legislation%'
+    'BE': '%that is considered illegal according to Belgian legislation%',
+    'IT': '%GdF Stop Page%',
+    'CY': '%nba.com.cy/Eas/eas.nsf/All/6F7F17A7790A55C8C2257B130055C86F%',
+    'DK': '%lagt at blokere for adgang til siden.%',
+    'FR': '%xtpage = "page-blocage-terrorisme"%'
 }
 
 # These are countries for which we detect blocking by looking for certain
@@ -24,7 +28,10 @@ blockpage_header_fingerprints = {
     'ID': ('Location', 'http://internet-positif.org%'),
     'SD': ('Location', 'http://196.1.211.6:8080/alert/'),
     'QA': ('Location', 'http://www.vodafone.qa/alu.cfm'),
-    'KR': ('Location', 'http://www.warning.or.kr')
+    'KR': ('Location', 'http://www.warning.or.kr'),
+    'PT': ('Location', 'http://mobilegen.vodafone.pt/denied/dn'),
+    'NO': ('Location', 'http://block-no.altibox.net/'),
+    'UK': ('Location', 'http://blocked.nb.sky.com%')
 }
 
 # These are countries for which blocking is identified by checking if the
