@@ -32,7 +32,8 @@ blockpage_header_fingerprints = {
     'KR': ('Location', 'http://www.warning.or.kr'),
     'PT': ('Location', 'http://mobilegen.vodafone.pt/denied/dn'),
     'NO': ('Location', 'http://block-no.altibox.net/'),
-    'UK': ('Location', 'http://blocked.nb.sky.com%')
+    'UK': ('Location', 'http://blocked.nb.sky.com%'),
+    'RU': ('Location', 'http://warning.rt.ru%')
 }
 
 # These are countries for which blocking is identified by checking if the
