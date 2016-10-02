@@ -332,6 +332,7 @@ class CreateIndexes(RunQuery):
             sql += 'CREATE INDEX {index_key}_idx ON metrics ({index_key});\n'.format(
                  index_key=index_key
             )
+        sql += 'CREATE INDEX test_start_time_probe_cc_idx ON metrics (test_start_time DESC, probe_cc);'
         return sql
 
 if __name__ == "__main__":
