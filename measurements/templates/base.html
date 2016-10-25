@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OONI{% if self.title() %} - {% endif %}{% block title %}{% endblock %}</title>
+
+  {% block head_meta %}
+    <meta charset="UTF-8">
+  {% endblock %}
+
+  {% block head_css %}
+    <link href="{{ url_for('static',
+                   filename='vendor/bootstrap/css/bootstrap.min.css') }}"
+          rel="stylesheet">
+    <link href="{{ url_for('static',
+                   filename='styles/main.css') }}"
+          rel="stylesheet">
+  {% endblock %}
+
+  {% block head %}
+  {% endblock %}
+
+</head>
+<body>
+{% block body %}
+
+  {% block navbar %}
+    <header>
+      {% include 'navbar.html' %}
+    </header>
+  {% endblock %}
+
+  {% block uncontained %}
+  {% endblock %}
+
+  <div class="container-fluid">
+
+    {% block content_fluid %}
+    {% endblock %}
+
+  </div>
+
+  {% block footer %}
+    <footer>
+      <div class="img-rounded nav-fixed-bottom">
+        <div class="container-fluid">
+          {% include 'footer.html' %}
+        </div>
+      </div>
+    </footer>
+  {% endblock %}
+
+{% endblock %}
+</body>
+</html>

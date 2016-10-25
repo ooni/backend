@@ -1,0 +1,5 @@
+ooni_measurements.db
+*.pyc
+.idea/
+__pycache__
+data/

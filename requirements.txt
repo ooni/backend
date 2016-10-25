@@ -1,0 +1,9 @@
+Flask
+Flask-Misaka
+Flask-Script
+gunicorn
+python-dateutil
+SQLAlchemy
+six
+# Required only if you need postgres support
+psycopg2

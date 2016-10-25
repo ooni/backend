@@ -1,0 +1,1 @@
+ISO_TIMESTAMP_SHORT = "%Y%m%dT%H%M%SZ"

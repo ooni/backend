@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block uncontained %}
+<div class="container">
+{{ docs_text | markdown }}
+</div>
+{% endblock %}

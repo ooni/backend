@@ -1,0 +1,42 @@
+html {
+    color: #1c1c1c;
+    background-color: #fff;
+    min-height: 100%;
+    position: relative;
+}
+
+body {
+    /* This must match height of footer */
+    margin-bottom: 100px;
+}
+
+a {
+    text-decoration: none;
+    color: #0588cb;
+}
+
+footer {
+    color: #b4b4b4;
+    background-color: #26292c;
+    text-align: center;
+    padding-top: 20px;
+
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    /* This must match margin-bottom in body */
+    height: 100px;
+}
+
+
+footer a {
+    color: #b4b4b4;
+    display: block;
+    text-align: left;
+}
+
+footer a:hover {
+    color: #ebebeb;
+    text-decoration: underline;
+}
+
