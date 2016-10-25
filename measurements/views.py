@@ -140,13 +140,16 @@ def _report_file_generator(filepath):
 @pages_blueprint.route('/files/download/<filename>')
 def files_download(filename):
     try:
-        report_file = current_app.db_session(
-            ReportFile.filename == filename).one()
+        report_file = current_app.db_session.query(ReportFile) \
+                        .filter(ReportFile.filename == filename).first()
+        # XXX suriprisingly this actually fails in some cases.
+        # We have duplicate measurements :(
+        #   ReportFile.filename == filename).one()
     except NoResultFound:
         raise NotFound("No file with that filename found")
     except MultipleResultsFound:
         # This should never happen.
-        raise HTTPException("This is a serious bug please report it")
+        raise HTTPException("Duplicate measurement detected")
 
     filepath = os.path.join(
         current_app.config['REPORTS_DIRECTORY'],
