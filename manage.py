@@ -25,7 +25,7 @@ manager = Manager(app)
 @manager.option(
   '-w', '--workers', default=config.get("WORKERS"),
   help="Set the number of gunicorn worker threads")
-def runserver(debug, address, port):
+def runserver(debug, address, port, workers):
     debug = debug or config.get("DEBUG")
     if debug:
         app.run(

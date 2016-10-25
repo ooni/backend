@@ -97,3 +97,36 @@ It's recommended to run this in production using gunicorn.
 Check out the [gunicorn deployment
 docs](http://docs.gunicorn.org/en/stable/deploy.html) for using gunicorn in
 production.
+
+### Installation procedure on debian 8.5
+
+The following installation procedure has been tested on debian 8.5
+
+```
+sudo apt-get update
+sudo apt-get install python3 python3-pip git libpq-dev libffi-dev
+
+git clone https://github.com/hellais/ooni-measurements.git
+cd ooni-measurements/
+sudo pip3 install -r requirements.txt
+```
+
+Now edit a file in the users home called `production.cfg` to contain useful
+values such as:
+
+```
+SQLALCHEMY_DATABASE_URI = 'postgresql://USERNAME:PASSWORD@HOSTNAME/DATABASE'
+WEBSERVER_ADDRESS = "0.0.0.0"
+WEBSERVER_PORT = 3000
+BASE_URL = 'https://measurements.ooni.torproject.org/'
+REPORTS_DIRECTORY = '/data/ooni/public/sanitised/'
+```
+
+The you can run the service with:
+```
+gunicorn -D -w 4 --timeout 30 -b 0.0.0.0:3000 measurements:app
+```
+
+Probably it's best to use something like systemd or the like for real world deployments.
+
+See: http://docs.gunicorn.org/en/stable/deploy.html#monitoring
