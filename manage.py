@@ -22,6 +22,9 @@ manager = Manager(app)
 @manager.option(
   '-p', '--port', default=config.get("WEBSERVER_PORT"),
   help="Specify the port on which to run the web server")
+@manager.option(
+  '-w', '--workers', default=config.get("WORKERS"),
+  help="Set the number of gunicorn worker threads")
 def runserver(debug, address, port):
     debug = debug or config.get("DEBUG")
     if debug:
@@ -38,7 +41,7 @@ def runserver(debug, address, port):
             "-b {address}:{port} "
             "--limit-request-line 0 "
             "--limit-request-field_size 0 "
-            "explorer:app").format(**locals())
+            "measurements:app").format(**locals())
         print("Starting server with command: " + cmd)
         Popen(cmd, shell=True).wait()
 

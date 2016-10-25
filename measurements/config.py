@@ -14,3 +14,4 @@ WEBSERVER_PORT = 3001
 BASE_URL = 'https://measurements.ooni.torproject.org/'
 REPORTS_DIRECTORY = '/data/ooni/public/sanitised/'
 
+WORKERS = 4
