@@ -81,11 +81,11 @@ def parseUpdateReportRequest(request, report_id=None):
 
 
 def validateHeader(header):
-    version_string = re.compile("[0-9A-Za-z_\-\.]+$")
-    name = re.compile("[a-zA-Z0-9_\- ]+$")
-    probe_asn = re.compile("AS[0-9]+$")
-    probe_cc = re.compile("[A-Z]{2}$")
-    test_helper = re.compile("[A-Za-z0-9_\-]+$")
+    version_string = re.compile("^[0-9A-Za-z_\-\.]+$")
+    name = re.compile("^[a-zA-Z0-9_\- ]+$")
+    probe_asn = re.compile("^AS[0-9]+$")
+    probe_cc = re.compile("^[A-Z]{2}$")
+    test_helper = re.compile("^[A-Za-z0-9_\-]+$")
 
     expected_request = {
         'software_name': name,
