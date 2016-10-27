@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block head_css %}
+  {{ super() }}
+  <link href="{{ url_for('static',
+                   filename='vendor/metrics-graphics/metricsgraphics.css') }}"
+          rel="stylesheet">
+{% endblock %}
+
+
+{% block head %}
+  {{ super() }}
+
+<script src="{{ url_for('static', filename='vendor/d3/d3.min.js') }}">
+</script>
+<script src="{{ url_for('static', filename='vendor/metrics-graphics/metricsgraphics.min.js') }}">
+</script>
+
+{% endblock %}

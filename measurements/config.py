@@ -7,6 +7,9 @@ import os
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+CACHE_DEFAULT_TIMEOUT = None
+CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
+
 SQLALCHEMY_DATABASE_URI = 'sqlite:///ooni_measurements.db'
 WEBSERVER_ADDRESS = "0.0.0.0"
 WEBSERVER_PORT = 3001

@@ -23,6 +23,7 @@ from werkzeug.exceptions import NotFound, BadRequest, HTTPException
 
 from .config import BASE_DIR
 from .models import ReportFile
+from .app import cache
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
@@ -174,7 +175,8 @@ def backward_compatible_by_date(date):
     raise NotFound
 
 api_blueprint = Blueprint('api', 'measurements')
-api_docs_blueprint = Blueprint('apidocs', 'measurements')
+api_docs_blueprint = Blueprint('api_docs', 'measurements')
+api_private_blueprint = Blueprint('api_private', 'measurements')
 
 @api_blueprint.errorhandler(HTTPException)
 @api_blueprint.errorhandler(BadRequest)
@@ -279,7 +281,6 @@ def api_list_report_files():
         'metadata': metadata,
         'results': results
     })
-
 #@api_blueprint.route('/measurement', methods=["GET"])
 def api_list_measurement():
     probe_cc = request.args.get("probe_cc")
@@ -298,8 +299,80 @@ def api_list_measurement():
       mrange=mrange
     )
 
+@api_private_blueprint.route('/asn_by_month')
+@cache.cached(timeout=60*60)
+def api_private_asn_by_month():
+    result = []
+    r = current_app.db_session.query(
+            ReportFile.test_start_time,
+            ReportFile.probe_asn) \
+        .order_by(ReportFile.test_start_time)
+
+    # XXX this can be done in a SQL that is not sqlite
+    monthly_buckets = {}
+    for tst, asn in r:
+        bkt = tst.strftime("%Y-%m-01")
+        monthly_buckets[bkt] = monthly_buckets.get(bkt, [])
+        if asn not in monthly_buckets[bkt]:
+            monthly_buckets[bkt].append(asn)
+
+    for bkt in monthly_buckets.keys():
+        result.append({
+            'date': bkt,
+            'value': len(monthly_buckets[bkt])
+        })
+    return jsonify(result)
+
+@api_private_blueprint.route('/countries_by_month')
+@cache.cached(timeout=60*60)
+def api_private_counties_by_month():
+    result = []
+    r = current_app.db_session.query(
+            ReportFile.test_start_time,
+            ReportFile.probe_cc) \
+        .order_by(ReportFile.test_start_time)
+
+    # XXX this can be done in a SQL that is not sqlite
+    monthly_buckets = {}
+    for tst, country in r:
+        bkt = tst.strftime("%Y-%m-01")
+        monthly_buckets[bkt] = monthly_buckets.get(bkt, [])
+        if country not in monthly_buckets[bkt]:
+            monthly_buckets[bkt].append(country)
+
+    for bkt in monthly_buckets.keys():
+        result.append({
+            'date': bkt,
+            'value': len(monthly_buckets[bkt])
+        })
+    return jsonify(result)
+
+@api_private_blueprint.route('/runs_by_month')
+@cache.cached(timeout=60*60)
+def api_private_runs_by_month():
+    result = []
+    r = current_app.db_session.query(
+            ReportFile.test_start_time) \
+        .order_by(ReportFile.test_start_time)
+
+    # XXX this can be done in a SQL that is not sqlite
+    monthly_buckets = {}
+    for res in r:
+        tst = res.test_start_time
+        bkt = tst.strftime("%Y-%m-01")
+        monthly_buckets[bkt] = monthly_buckets.get(bkt, 0)
+        monthly_buckets[bkt] += 1
+
+    for bkt in monthly_buckets.keys():
+        result.append({
+            'date': bkt,
+            'value': monthly_buckets[bkt]
+        })
+
+    return jsonify(result)
 
 def register(app):
     app.register_blueprint(api_docs_blueprint, url_prefix='/api')
     app.register_blueprint(api_blueprint, url_prefix='/api/v1')
+    app.register_blueprint(api_private_blueprint, url_prefix='/api/_')
     app.register_blueprint(pages_blueprint, url_prefix='')

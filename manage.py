@@ -6,13 +6,18 @@ from __future__ import unicode_literals
 import os
 from subprocess import Popen
 
-from flask_script import Manager
+from flask_script import Manager, Shell
 
-from measurements import app
+from measurements import app, models
 
 config = app.config
 
+def _make_context():
+    return dict(app=app, db=app.db_session, models=models)
+
 manager = Manager(app)
+manager.add_command("shell", Shell(make_context=_make_context))
+
 @manager.option(
     '-d', '--debug', action='store_true',
     help="Start the web server in debug mode")
@@ -27,6 +32,7 @@ manager = Manager(app)
   help="Set the number of gunicorn worker threads")
 def runserver(debug, address, port, workers):
     debug = debug or config.get("DEBUG")
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
     if debug:
         app.run(
             host='0.0.0.0',
