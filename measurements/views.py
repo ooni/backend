@@ -157,6 +157,9 @@ def files_download(filename):
         report_file.bucket_date,
         report_file.filename
     )
+    if not os.path.exists(filepath):
+        raise NotFound("File does not exist")
+
     # XXX maybe have to do more to properly make it a download
     return Response(_report_file_generator(filepath),
                     mimetype='text/json')
