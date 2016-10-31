@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block head_css %}
+  {{ super() }}
+  <link href="{{ url_for('static', filename='styles/by_date.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block uncontained %}
+<div class="container">
+
+  <ol class="breadcrumb">
+    <li><a href="/">Home</a></li>
+    <li><a href="/files">Files</a></li>
+    <li class="active">By date</li>
+    <li class="switch-view simple-view pull-right">
+      <a href="/files/by_date?view=list">list view</a>
+    </li>
+  </ol>
+
+  {%  for month in calendar_count %}
+    {% if loop.index is divisibleby 2 %}
+    <div class="row">
+    {% endif %}
+
+    <div class="col-md-6">
+
+    <h3>{{ month[0][-1][0].strftime("%B") }}
+      {{ month[0][-1][0].year }}</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <td>Mon</td>
+          <td>Tue</td>
+          <td>Wed</td>
+          <td>Thu</td>
+          <td>Fri</td>
+          <td>Sat</td>
+          <td>Sun</td>
+        </tr>
+      </thead>
+    <tbody>
+    {%  for week in month %}
+      <tr>
+      {% for day, count in week %}
+        {% if count == -2 %}
+          <td class="padded-date">
+          </td>
+        {% elif count == -1 %}
+          <td class="no-data">
+            no data
+          </td>
+        {% else %}
+          <td>
+            <a href="/files/by_date/{{ day.strftime('%Y-%m-%d') }}">
+            <span class="count-bubble
+                        {% if count == 0 %} zero-count {% endif %}">
+              <span data-count="{{ count }}">{{ day.day }}</span>
+            </span>
+            </a>
+          </td>
+        {% endif %}
+      {% endfor %}
+      </tr>
+    {%  endfor %}
+    </tbody>
+    </table>
+
+    </div>
+
+    {% if loop.index is divisibleby 2 %}
+    </div>
+    {% endif %}
+  {%  endfor %}
+
+</div>
+{% endblock %}

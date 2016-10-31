@@ -4,6 +4,7 @@ Flask-Misaka
 Flask-Script
 gunicorn
 python-dateutil
+pycountry
 SQLAlchemy
 six
 # Required only if you need postgres support

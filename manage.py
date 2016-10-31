@@ -31,9 +31,10 @@ manager.add_command("shell", Shell(make_context=_make_context))
   '-w', '--workers', default=config.get("WORKERS"),
   help="Set the number of gunicorn worker threads")
 def runserver(debug, address, port, workers):
-    debug = debug or config.get("DEBUG")
-    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    debug = debug or config.get("DEBUG", False)
     if debug:
+        app.config['TEMPLATES_AUTO_RELOAD'] = True
+        app.jinja_env.auto_reload = True
         app.run(
             host='0.0.0.0',
             port=int(port),

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block head_css %}
+  {{ super() }}
+  <link href="{{ url_for('static', filename='dist/country_flag.css') }}"
+        rel="stylesheet">
+
+{% endblock %}
+
+{% block uncontained %}
+<div class="container">
+
+  <ol class="breadcrumb">
+    <li><a href="/">Home</a></li>
+    <li><a href="/files">Files</a></li>
+    <li class="active">By country</li>
+    <li class="switch-view simple-view pull-right">
+      <a href="/files/by_country?view=list">list view</a>
+    </li>
+  </ol>
+
+  <div class="row">
+
+    {% for report_country in report_countries %}
+      <div class="country-box-wrapper">
+
+        <a href="/files/by_country/{{ report_country['alpha2'] }}">
+          <div class="country-box"
+               data-countryname="{{ report_country['country'] }}"
+               data-reportcount="{{ report_country['count'] }}">
+            <span class="flag-icon
+                         flag-icon-{{ report_country['alpha2'] | lower }}"></span>
+            <div class="country-name">
+              <span>{{ report_country['country'] }}</span>
+            </div>
+            <div class="count-bubble">
+              <span>{{ report_country['count'] }}</span>
+            </div>
+          </div>
+        </a>
+
+      </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block tail_js %}
+  {{ super() }}
+  <script src="{{ url_for("static", filename="dist/country_flag.js") }}"></script>
+{% endblock %}

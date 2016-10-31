@@ -8,15 +8,14 @@
   {% endblock %}
 
   {% block head_css %}
-    <link href="{{ url_for('static',
-                   filename='vendor/bootstrap/css/bootstrap.min.css') }}"
-          rel="stylesheet">
-    <link href="{{ url_for('static',
-                   filename='styles/main.css') }}"
+    <link href="{{ url_for('static', filename='dist/main.css') }}"
           rel="stylesheet">
   {% endblock %}
 
   {% block head %}
+  {% endblock %}
+
+  {% block head_js %}
   {% endblock %}
 
 </head>
@@ -49,8 +48,7 @@
     </footer>
   {% endblock %}
 
-  {% block endbody %}
-
+  {% block tail_js %}
   {% endblock %}
 
 {% endblock %}

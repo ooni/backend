@@ -6,6 +6,9 @@ from __future__ import unicode_literals
 import os
 import re
 import math
+import operator
+
+from datetime import datetime, timedelta
 
 from six.moves.urllib.parse import urljoin, urlencode
 
@@ -21,6 +24,8 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from werkzeug.exceptions import NotFound, BadRequest, HTTPException
 
+from pycountry import countries
+
 from .config import BASE_DIR
 from .models import ReportFile
 from .app import cache
@@ -35,11 +40,72 @@ pages_blueprint = Blueprint('pages', 'measurements',
 def index():
     return render_template('index.html')
 
+@pages_blueprint.route('/stats')
+def stats():
+    return render_template('stats.html')
+
 @pages_blueprint.route('/files')
 def files_index():
     return render_template('files/index.html')
 
-def _files_by_date():
+def _calendarized_count():
+    DT_FRMT = '%Y-%m-%d'
+    one_day = timedelta(days=1)
+
+    results = []
+    q = current_app.db_session.query(
+        func.count(ReportFile.bucket_date),
+        ReportFile.bucket_date
+    ).group_by(ReportFile.bucket_date).order_by(
+        ReportFile.bucket_date
+    )
+    _, first_date = q.first()
+    first_date = datetime.strptime(first_date, DT_FRMT)
+    count_map = {}
+    for count, day in q:
+        count_map[day] = count
+    last_date = datetime.strptime(day, DT_FRMT)
+    start = first_date
+
+    # here we pad up the days to the first week
+    pad_from = first_date - timedelta(days=first_date.weekday())
+    current_month = pad_from.month
+    week = []
+    month = []
+    while pad_from <= first_date:
+        week.append([pad_from, -1])
+        pad_from += one_day
+
+    while start <= last_date:
+        if start.month != current_month:
+            current_month = start.month
+            month.append(week)
+            yield month
+            month = []
+            pad_from = start - timedelta(days=start.weekday())
+            week = []
+            while pad_from < start:
+                week.append([pad_from, -2])
+                pad_from += one_day
+
+        count = count_map.get(start.strftime(DT_FRMT), 0)
+        week.append([start, count])
+        if len(week) == 7:
+            month.append(week)
+            week = []
+
+        start += one_day
+
+    while len(week) < 7:
+        week.append([start, -1])
+        start += one_day
+
+    if len(week) > 0:
+        month.append(week)
+
+    yield month
+
+def _report_dates():
     results = []
     q = current_app.db_session.query(
         func.count(ReportFile.bucket_date),
@@ -55,9 +121,13 @@ def _files_by_date():
 
 @pages_blueprint.route('/files/by_date')
 def files_by_date():
-    return render_template('files/by_date.html',
-                           report_dates=_files_by_date())
-
+    view = request.args.get("view", "list")
+    if view == "calendar":
+        return render_template('files/by_date_calendar.html',
+                               calendar_count=_calendarized_count())
+    else:
+        return render_template('files/by_date_simple.html',
+                               report_dates=_report_dates())
 
 def _files_on_date(date, order_by, order):
     q = current_app.db_session.query(ReportFile) \
@@ -92,17 +162,27 @@ def _files_by_country():
     ).group_by(ReportFile.probe_cc).order_by(ReportFile.probe_cc)
     for row in q:
         count, alpha2 = row
+        country = "Unknown"
+        if alpha2 != "ZZ":
+            country = countries.get(alpha2=alpha2).name
         results.append({
             'count': count,
             'alpha2': alpha2,
-            'country': alpha2
+            'country': country
         })
+    results.sort(key=operator.itemgetter('country'))
     return results
 
 @pages_blueprint.route('/files/by_country')
 def files_by_country():
-    return render_template('files/by_country.html',
-                           report_countries=_files_by_country())
+    view = request.args.get("view", "list")
+    if view == "flag":
+        return render_template('files/by_country_flag.html',
+                               report_countries=_files_by_country())
+    else:
+        return render_template('files/by_country_list.html',
+                               report_countries=_files_by_country())
+
 
 def _files_in_country(country_code, order_by, order):
     q = current_app.db_session.query(ReportFile) \

@@ -3,3 +3,5 @@ ooni_measurements.db
 .idea/
 __pycache__
 data/
+node_modules/
+dist/
