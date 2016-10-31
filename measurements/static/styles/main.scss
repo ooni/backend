@@ -1,0 +1,107 @@
+// Dependencies
+@import "~bootstrap/dist/css/bootstrap.css";
+
+$fa-font-path: "~font-awesome/fonts/";
+@import "~font-awesome/scss/font-awesome";
+
+
+// Colors
+$color-ooni-blue: #0588CB;
+$color-dark-blue: #046799;
+$color-white: #fff;
+$color-off-white: #f2f2f2;
+$color-footer-background-color: #26292c;
+$color-footer-color: #b4b4b4;
+$color-blocked: #B83564;
+$color-unblocked: #4FD156;
+$color-red: #cc0000;
+
+$color-grey-light: #d9d9d9;
+$color-grey: #c1c1c1;
+
+$color-off-black: #777777;
+
+html {
+  color: #1c1c1c;
+  background-color: $color-white;
+  min-height: 100%;
+  position: relative;
+}
+
+body {
+  /* This must match height of footer */
+  margin-bottom: 100px;
+}
+
+a {
+  text-decoration: none;
+  color: $color-ooni-blue;
+}
+
+footer {
+  color: $color-footer-color;
+  background-color: $color-footer-background-color;
+  text-align: center;
+  padding-top: 20px;
+
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  /* This must match margin-bottom in body */
+  height: 100px;
+}
+
+
+footer a {
+  color: $color-footer-color;
+  display: block;
+  text-align: left;
+}
+
+footer a:hover {
+    color: #ebebeb;
+    text-decoration: underline;
+}
+
+header {
+  .navbar-wrapper {
+    background-color: $color-ooni-blue;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    .view-chooser {
+      a {
+        color: $color-white;
+        transition: .5s background-color,.5s color;
+      }
+
+      a:hover {
+        background-color: $color-dark-blue;
+      }
+    }
+  }
+}
+
+.breadcrumb .switch-view:before {
+  content: "  ";
+}
+
+.breadcrumb .switch-view:after {
+  font-family: FontAwesome;
+  color: $color-grey;
+  vertical-align: middle;
+}
+
+.breadcrumb .calendar-view:after {
+  margin-left: 5px;
+  content: "\f073";
+}
+
+.breadcrumb .simple-view:after {
+  margin-left: 5px;
+  content: "\f03a";
+}
+
+.breadcrumb .flag-view:after {
+  margin-left: 5px;
+  content: "\f024";
+}

@@ -14,6 +14,17 @@ pip install -r requirements.txt
 
 Note: psycopg2 is only a requirement if you plan on using postgres.
 
+In order to build the web assets you need to have webpack and npm.
+
+Then go into the `measurements/static/` and run:
+
+```
+npm install --dev
+webpack
+```
+
+You should now have built the web assets.
+
 ## Usage
 
 To start the development web server you can do:
