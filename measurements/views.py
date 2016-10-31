@@ -32,6 +32,8 @@ from .app import cache
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
+ISO8601_UTC_FRMT = "%Y-%m-%dT%H:%M:%SZ"
+
 pages_blueprint = Blueprint('pages', 'measurements',
                             static_folder='static',
                             static_url_path='/static/')
@@ -126,7 +128,7 @@ def files_by_date():
         return render_template('files/by_date_calendar.html',
                                calendar_count=_calendarized_count())
     else:
-        return render_template('files/by_date_simple.html',
+        return render_template('files/by_date_list.html',
                                report_dates=_report_dates())
 
 def _files_on_date(date, order_by, order):
@@ -332,21 +334,26 @@ def api_list_report_files():
     q = q.order_by('%s %s' % (order_by, order))
     count = q.count()
     pages = math.ceil(count / limit)
+    current_page = math.ceil(offset / limit) + 1
 
     q = q.limit(limit).offset(offset)
     next_args = request.args.to_dict()
     next_args['offset'] = "%s" % (offset + limit)
     next_args['limit'] = "%s" % limit
+    next_url = urljoin(
+        current_app.config['BASE_URL'],
+        '/api/v1/files?%s' % urlencode(next_args)
+    )
+    if current_page >= pages:
+        next_url = None
 
     metadata = {
         'offset': offset,
         'limit': limit,
         'count': count,
         'pages': pages,
-        'next_url': urljoin(
-            current_app.config['BASE_URL'],
-            '/files?%s' % urlencode(next_args)
-        )
+        'current_page': current_page,
+        'next_url': next_url
     }
     results = []
     for row in q:
@@ -358,7 +365,7 @@ def api_list_report_files():
             'url': url,
             'probe_cc': row.probe_cc,
             'probe_asn': row.probe_asn,
-            'test_start_time': row.test_start_time
+            'test_start_time': row.test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         })
     return jsonify({
         'metadata': metadata,

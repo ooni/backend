@@ -78,17 +78,18 @@ results per response.
 ```
 {
   "metadata": {
-    "count": "[integer]",
-    "limit": "[integer]",
-    "next_url": "[string] some url",
-    "offset": "[integer]",
-    "pages": "[integer]"
+    "count": "[integer] total number of rows",
+    "limit": "[integer] current limit to returned results",
+    "next_url": "[string] URL pointing to next page of results or none if no more pages are available",
+    "offset": "[integer] the current offset into the result set",
+    "pages": "[integer] total number of pages"
+    "current_page": "[integer] current page"
   },
   "results": [
     {
-      "probe_asn": "[string]",
-      "probe_cc": "[string]",
-      "test_start_time": "[string]",
+      "probe_asn": "[string] the Autonomous system number of the result",
+      "probe_cc": "[string] the country code of the result",
+      "test_start_time": "[string] start time for the measurement is ISO 8601 format",
       "url": "[string] url to the download"
     }
   ]
