@@ -1,7 +1,5 @@
-var d3 = require('d3');
-var MG = require('metrics-graphics');
-
-require('../styles/stats.scss');
+import d3 from "d3";
+import MG from "metrics-graphics";
 
 var markers = [{
   'date': new Date('2014-05-02T00:00:00.000Z'),
@@ -17,7 +15,7 @@ var markers = [{
   'label': 'ooniprobe 2.0.0 released'
 }];
 
-d3.json('/api/_/asn_by_month', function(data) {
+d3.json('/api/_/asn_by_month', (data) => {
     data = MG.convert.date(data, 'date');
     MG.data_graphic({
         title: "ASNs by month",
@@ -37,7 +35,7 @@ d3.json('/api/_/asn_by_month', function(data) {
     });
 });
 
-d3.json('/api/_/countries_by_month', function(data) {
+d3.json('/api/_/countries_by_month', (data) => {
     data = MG.convert.date(data, 'date');
     MG.data_graphic({
         title: "Countries by month",
@@ -57,7 +55,7 @@ d3.json('/api/_/countries_by_month', function(data) {
     });
 });
 
-d3.json('/api/_/runs_by_month', function(data) {
+d3.json('/api/_/runs_by_month', (data) => {
     data = MG.convert.date(data, 'date');
     MG.data_graphic({
         title: "Runs by month",

@@ -1,1 +1,1 @@
-require('styles/main');
+let foo = "bar";

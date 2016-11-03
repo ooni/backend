@@ -2,7 +2,7 @@
 
 {% block head_css %}
   {{ super() }}
-  <link href="{{ url_for('static', filename='dist/country_flag.css') }}"
+  <link href="{{ url_for('static', filename='dist/css/country_flag.css') }}"
         rel="stylesheet">
 
 {% endblock %}
@@ -48,5 +48,5 @@
 
 {% block tail_js %}
   {{ super() }}
-  <script src="{{ url_for("static", filename="dist/country_flag.js") }}"></script>
+  <script src="{{ url_for("static", filename="dist/js/country_flag.js") }}"></script>
 {% endblock %}
