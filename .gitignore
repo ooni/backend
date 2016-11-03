@@ -1,7 +1,12 @@
-ooni_measurements.db
-*.pyc
-.idea/
+*.py[co]
 __pycache__
-data/
+
+.idea/
+.state
+
+ooni_measurements.db
+./data/
+
 node_modules/
-dist/
+
+measurements/static/dist/

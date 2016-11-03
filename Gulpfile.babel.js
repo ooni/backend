@@ -56,7 +56,8 @@ let webpackConfig = {
   plugins: [
     new ProvidePlugin({
       $: 'jquery',
-      jQuery: 'jquery'
+      jQuery: 'jquery',
+      d3: 'd3'
     }),
     new DedupePlugin(),
     new ExtractTextPlugin('[name].css')
@@ -80,29 +81,30 @@ gulp.task("dist:js", () => {
     .pipe(webpackStream(webpackConfig, webpack))
     .pipe(gulpSourcemaps.init({ loadMaps: true }))
     .pipe(gulpSourcemaps.write("."))
-    .pipe(gulp.dest(distPath));
+    .pipe(gulp.dest(path.join(distPath, "js")));
 });
 
-
-gulp.task('dist:icons', () => { 
+gulp.task('dist:icons:font-awesome', () => {
   let faPath = path.dirname(require.resolve("font-awesome/package.json"));
   let faFontPath = path.resolve(faPath, "fonts", "*.*");
-
-  let bootstrapPath = path.dirname(require.resolve("bootstrap-sass/package.json"));
-  let bootstrapFontPath = path.resolve(bootstrapPath, "assets", "fonts", "*", "*");
   
-  let files = [
-    bootstrapFontPath,
-    faFontPath
-  ];
-  
-  return gulp.src(files)
-        .pipe(gulp.dest(path.join(distPath, "fonts"))); 
+  return gulp.src(faFontPath)
+            .pipe(gulp.dest(path.join(distPath, "fonts"))); 
 });
+
+gulp.task('dist:icons:bootstrap', () => { 
+  let bootstrapPath = path.dirname(require.resolve("bootstrap-sass/package.json"));
+  let bootstrapFontPath = path.resolve(bootstrapPath, "assets", "fonts", "**", "*");
+  
+  return gulp.src(bootstrapFontPath)
+            .pipe(gulp.dest(path.join(distPath, "fonts")));  
+});
+
+gulp.task('dist:icons', ['dist:icons:font-awesome', 'dist:icons:bootstrap']);
 
 gulp.task('dist:flags', () => {
   let flagPath = path.dirname(require.resolve("flag-icon-css/package.json"));
-  let flagSvgPath = path.resolve(flagPath, "flags", "*", "*");
+  let flagSvgPath = path.resolve(flagPath, "flags", "**", "*");
 
   return gulp.src(flagSvgPath)
     .pipe(gulp.dest(path.join(distPath, "flags")));
@@ -114,8 +116,9 @@ gulp.task("dist:css", () => {
     path.join(stylesPath, "by_date.scss"),
     path.join(stylesPath, "main.scss"),
     path.join(stylesPath, "stats.scss"),
-    path.join(stylesPath, "country_flag.scss")
-  ]
+    path.join(stylesPath, "country_flag.scss"),
+    path.join(modulesPath, "metrics-graphics", "dist", "metricsgraphics.css")
+  ];
 
   return gulp.src(files)
     .pipe(gulpSourcemaps.init())
@@ -134,7 +137,8 @@ gulp.task("dist:css", () => {
 gulp.task("dist", (cb) => {
   return gulpSequence(
     "clean",
-    "dist:icons", "dist:flags",
+    "dist:icons",
+    "dist:flags",
     ["dist:css", "dist:js"]
   )(cb);
 });
@@ -152,3 +156,5 @@ gulp.task("watch", ["dist"], () => {
 });
 
 gulp.task("clean", () => { del(distPath); });
+
+gulp.task("watch", () => )

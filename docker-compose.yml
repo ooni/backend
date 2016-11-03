@@ -1,0 +1,32 @@
+db:
+  image: postgres:9.5
+  ports:
+    # I have another postgres running on this port.
+    - "5433:5432"
+
+app:
+  build: .
+  environment:
+    APP_ENV: development
+    DATABASE_URL: postgresql://postgres@db/measurements
+  volumes:
+    # Only expose measurements to avoid including node_modules.
+    # :z fixes permissions
+    - ./measurements:/app/measurements:z
+
+web:
+  extends:
+    service: app
+  command: gunicorn -b 0.0.0.0:8000 --reload measurements:app
+  environment:
+    WEBSERVER_PORT: 8000
+  ports:
+    - "80:8000"
+  links:
+    - db
+
+
+static:
+  extends:
+    service: app
+  command: gulp watch

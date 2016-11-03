@@ -1,0 +1,9 @@
+Flask
+Flask-Cache
+Flask-Misaka
+Flask-Script
+python-dateutil
+pycountry
+SQLAlchemy
+sqlalchemy-utils
+six

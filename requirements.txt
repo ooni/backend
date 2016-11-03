@@ -1,11 +1,2 @@
-Flask
-Flask-Cache
-Flask-Misaka
-Flask-Script
-gunicorn
-python-dateutil
-pycountry
-SQLAlchemy
-six
-# Required only if you need postgres support
-psycopg2
+-r requirements/main.txt
+-r requirements/deploy.txt

@@ -17,11 +17,12 @@ APP_DIR = os.path.dirname(__file__)
 cache = Cache()
 
 def init_app(app):
+    # We load configurations first from the config file (where some options
+    # are overridable via environment variables) or from the config file
+    # pointed to by the MEASUREMENTS_CONFIG environment variable.
+    # The later overrides the former.
     app.config.from_object('measurements.config')
-
-    config_file = os.environ.get('MEASUREMENTS_CONFIG', None)
-    if config_file is not None:
-        app.config.from_pyfile(config_file, silent=True)
+    app.config.from_envvar('MEASUREMENTS_CONFIG', silent=True)
 
     if not app.debug:
         app.logger.addHandler(logging.StreamHandler())
@@ -31,7 +32,7 @@ def init_app(app):
 
     cache.init_app(app, config=app.config['CACHE_CONFIG'])
 
-def create_app():
+def create_app(*args, **kw):
     from . import views
     app = Flask(__name__)
 

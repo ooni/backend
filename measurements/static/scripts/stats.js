@@ -1,5 +1,5 @@
-import d3 from "d3";
-import MG from "metrics-graphics";
+import * as d3 from "d3";
+import * as MG from "metrics-graphics";
 
 var markers = [{
   'date': new Date('2014-05-02T00:00:00.000Z'),
