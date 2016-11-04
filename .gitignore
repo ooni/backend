@@ -10,3 +10,4 @@ ooni_measurements.db
 node_modules/
 
 measurements/static/dist/
+secrets/id_rsa_travis

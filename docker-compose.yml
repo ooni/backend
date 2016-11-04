@@ -13,11 +13,12 @@ app:
     # Only expose measurements to avoid including node_modules.
     # :z fixes permissions
     - ./measurements:/app/measurements:z
+    - ./dev:/app/dev:z
 
 web:
   extends:
     service: app
-  command: gunicorn -b 0.0.0.0:8000 --reload measurements:app
+  command: gunicorn -b 0.0.0.0:8000 --reload measurements.wsgi
   environment:
     WEBSERVER_PORT: 8000
   ports:

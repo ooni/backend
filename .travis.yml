@@ -1,0 +1,36 @@
+language: python
+python: 3.5.2
+env:
+  global:
+    - TRAVIS_NODE_VERSION=6.6.0
+sudo: required
+services:
+- postgresql
+- docker
+#cache:
+#  directories:
+#  - node_modules/
+before_install:
+- mkdir -p $HOME/.ssh/
+- 'openssl aes-256-cbc -K $encrypted_965b8cbf2a7d_key -iv $encrypted_965b8cbf2a7d_iv -in $TRAVIS_BUILD_DIR/secrets/id_rsa_travis.enc -out $HOME/.ssh/id_rsa_travis -d'
+install:
+- 'rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION'
+# Install docker-machine
+- 'curl -L https://github.com/docker/machine/releases/download/v0.8.2/docker-machine-`uname -s`-`uname -m` > docker-machine'
+- sudo mv docker-machine /usr/local/bin/docker-machine
+- sudo chmod +x /usr/local/bin/docker-machine
+# Install python dependencies
+- pip install -U pip setuptools wheel codecov
+- pip install -r requirements/main.txt
+- pip install -r requirements/tests.txt
+- npm install
+script:
+- node -v
+- npm -v
+- gulp dist
+- make test
+deploy:
+  provider: script
+  script: 'scripts/deploy.sh staging $HOME/.ssh/id_rsa_travis'
+  on:
+    branch: master

@@ -2,79 +2,76 @@
 
 Source for https://measurements.ooni.torproject.org/
 
-## Requirements
+## Local development
 
-This software is tested on python 3.5.
+To run this locally you need `docker`, `docker-compose` and `make`.
 
-To install the required dependencies run:
-
-```
-pip install -r requirements.txt
-```
-
-Note: psycopg2 is only a requirement if you plan on using postgres.
-
-In order to build the web assets you need to have webpack and npm.
-
-Then go into the `measurements/static/` and run:
+If those are installed you will then be able to run the following:
 
 ```
-npm install --dev
-webpack
+make serve
 ```
 
-You should now have built the web assets.
+This will start the docker containers needed to run the application locally,
+ building also all the required web assets.
 
-## Usage
+## Deployment
 
-To start the development web server you can do:
+Deployment to staging is managed automatically when something is merged into
+ the `master` branch.
+
+This means that `master` **must** always be buildable and working.
+
+Rollover to production is currently handled manually by running the same
+deploy script used for staging deployments.
+
+It requires `docker-machine`. Once that is installed to deploy to production
+ you can do:
 
 ```
-python manage.py runserver -d
-```
-
-To start it using gunicorn you can do:
-
-```
-python manager.py runserver
+DEPLOY_HOST="1.1.1.1" scripts/deploy.sh production path/to/id_rsa
 ```
 
 You can fill the database with some report files by creating a listing of
 report files and importing this listing from a text file with:
 
 ```
-python updatefiles -f listing.txt
+python -m measurements updatefiles -f listing.txt
 ```
 
-An example of `listing.txt` is:
+An example of `listing.txt` can be found in `dev/fixtures.txt`
 
-```
-/data/ooni/public/sanitised/2016-02-02/20160201T155514Z-US-AS16652-http_requests-37kq70ePFVqe1QM0MxpAv9X39JaQ8aytmGfYHc7a76jDEYrumzaXFxkSCtQPLBzF-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160201T054908Z-DE-AS31334-http_invalid_request_line-IlJzJoPd0P0PxpRY992v9poCauYe2eMM6vFH6RB5xlLtkOeJ5xECHK52uVtq3KIn-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160131T093413Z-FR-AS12322-http_requests-BEC2fZmaePcalA7Er5iFYtRUTkZquiHEW17lnyfORUmeYpdwYWmwlNxQ01GVLKJf-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160202T000520Z-US-AS7922-http_invalid_request_line-KJlUKWaOuumi1OpQIWw9VGF5ggOJsxgKsyMTttXQO87JVH5VfDT9zhYOqL9nJfhr-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160201T100539Z-PT-AS12353-http_requests-ShPyqdhPZpRRQoSdAkDG96UsmedciLxg4idz3dabMYLuBSPUL2gsplbu35C0oOZQ-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160201T214444Z-US-AS36351-http_requests-5kK0zb2PkfXBItsv8o7d3V46FM2hT760oFazAr3jxwJRGNntPwtjj02JSm4iLobb-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160201T060728Z-CH-AS41715-dns_consistency-Sql4iPUJpmO0t0Cs2pqJmVJUpFlI4ganPdBX67vqiMjMf0yoe5IEwuwvXaHiTaDk-0.1.0-probe.json
-/data/ooni/public/sanitised/2016-02-02/20160201T062514Z-GB-AS786-http_invalid_request_line-ohiV8fWGE6IAmJ5YSOpWR5wTrzqHLZMfByhyQXCzxrReOs5gDEOipw1BVQNlabJj-0.1.0-probe.json
-```
+## Environments
+
+This application is designed to be run inside of 4 possible environments:
+**development**, **testing**, **staging** and **production**.
+
+The meaning of these three environments is:
+
+* **development** this is the environment used when you are actively
+developing the application. When in this mode we favour ease of development
+over similarity of the environment when it's in production or staging.
+
+* **testing:** this is the environment used for running unit, functional and
+ integration tests automatically on our CI platform. This environment is as
+ close as possible to the real production or staging environment. When
+ running under testing we only expose it locally.
+
+* **staging** this is the environment used for triggering automatic
+redeployment of the application when merging into the master branch. When
+deploying on staging the application will be live on the staging endpoint
+and should functionally be equivalent to production.
+
+* **production** this is the environment used when it's ready to be deployed
+. Production deployments are currently triggerred manually, but some day may
+ be automatic based on tagging a certain git tag.
 
 ## Configuration
 
-You should create a configuration file called `measurements.cfg` and set
-the environment variable `MEASUREMENT_CONFIG` to point to it.
-
-In particular you will want to set the following values in it:
-
-```
-SQLALCHEMY_DATABASE_URI = 'postgresql://USERNAME:PASSWORD@HOSTNAME/DATABASE'
-WEBSERVER_ADDRESS = "0.0.0.0"
-WEBSERVER_PORT = 3001
-BASE_URL = 'https://measurements.ooni.torproject.org/'
-REPORTS_DIRECTORY = '/data/ooni/public/sanitised/'
-```
-
-Be careful that the configuration file is actually loaded as a python file.
+Configuration management is handled by overriding environment variables and
+other parameters inside of `config/production.yml`, `config/staging.yml`,
+`config/testing.yml`. Read the [Environments section](#Environments) to
+learn the meaning of these.
 
 ## Deployment notes
 
@@ -85,7 +82,7 @@ On first run you ensure the database is initialized with the correct
 report files.
 You can do so in the following way:
 ```
-python manage.py updatefiles -t TARGET_DIR
+python -m measurements updatefiles -t TARGET_DIR
 ```
 Where `TARGET_DIR` is generally going to be the same path as
 `REPORTS_DIRECTORY` in the configuration file.
@@ -96,48 +93,9 @@ measurements server you should generate a listing of all the new reports file
 run:
 
 ```
-python manage.py updatefiles -f update-file.txt
+python -m measurements updatefiles -f update-file.txt
 ```
 
 `updatefiles` will check to see if the files are already in the database, but
 it's much more performant to not run the update with files that are already in
 the database.
-
-It's recommended to run this in production using gunicorn.
-
-Check out the [gunicorn deployment
-docs](http://docs.gunicorn.org/en/stable/deploy.html) for using gunicorn in
-production.
-
-### Installation procedure on debian 8.5
-
-The following installation procedure has been tested on debian 8.5
-
-```
-sudo apt-get update
-sudo apt-get install python3 python3-pip git libpq-dev libffi-dev
-
-git clone https://github.com/hellais/ooni-measurements.git
-cd ooni-measurements/
-sudo pip3 install -r requirements.txt
-```
-
-Now edit a file in the users home called `production.cfg` to contain useful
-values such as:
-
-```
-SQLALCHEMY_DATABASE_URI = 'postgresql://USERNAME:PASSWORD@HOSTNAME/DATABASE'
-WEBSERVER_ADDRESS = "0.0.0.0"
-WEBSERVER_PORT = 3000
-BASE_URL = 'https://measurements.ooni.torproject.org/'
-REPORTS_DIRECTORY = '/data/ooni/public/sanitised/'
-```
-
-The you can run the service with:
-```
-gunicorn -D -w 4 --timeout 30 -b 0.0.0.0:3000 measurements:app
-```
-
-Probably it's best to use something like systemd or the like for real world deployments.
-
-See: http://docs.gunicorn.org/en/stable/deploy.html#monitoring

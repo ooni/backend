@@ -10,7 +10,7 @@ from flask import Flask
 from flask_misaka import Misaka
 from flask_cache import Cache
 
-from .database import init_db, create_tables
+from measurements.database import init_db, create_tables
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -33,12 +33,16 @@ def init_app(app):
     cache.init_app(app, config=app.config['CACHE_CONFIG'])
 
 def create_app(*args, **kw):
-    from . import views
+    from measurements import views
     app = Flask(__name__)
 
     init_app(app)
     init_db(app)
     create_tables(app)
     views.register(app)
+
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        app.db_session.remove()
 
     return app

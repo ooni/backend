@@ -1,5 +1,7 @@
 // Dependencies
 @import "bootstrap-sass/assets/stylesheets/bootstrap";
+
+$fa-font-path: "../fonts/font-awesome";
 @import "font-awesome/scss/font-awesome";
 
 // Colors
@@ -12,10 +14,8 @@ $color-footer-color: #b4b4b4;
 $color-blocked: #B83564;
 $color-unblocked: #4FD156;
 $color-red: #cc0000;
-
 $color-grey-light: #d9d9d9;
 $color-grey: #c1c1c1;
-
 $color-off-black: #777777;
 
 html {

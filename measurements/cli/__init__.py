@@ -3,14 +3,12 @@ import click
 from flask import current_app
 from flask.cli import FlaskGroup, with_appcontext
 
-from measurements.app import create_app
-
-cli = FlaskGroup(create_app=create_app)
-
-
-from measurements.models import ReportFile
 from sqlalchemy import exists
 
+from measurements.app import create_app
+from measurements.models import ReportFile
+
+cli = FlaskGroup(create_app=create_app)
 
 def add_if_exists(app, filepath):
     if not filepath.endswith(".json"):
@@ -37,7 +35,7 @@ def updatefiles(file=None, target=None):
         with open(file) as in_file:
             for idx, filepath in enumerate(in_file):
                 filepath = filepath.strip()
-                if not add_if_exists(filepath):
+                if not add_if_exists(current_app, filepath):
                     continue
                 if idx % 100 == 0:
                     click.echo("Inserted %s files" % idx)
@@ -46,7 +44,7 @@ def updatefiles(file=None, target=None):
         for dirname, _, filenames in os.walk(target):
             for filename in filenames:
                 filepath = os.path.join(dirname, filename)
-                if not add_if_exists(filepath):
+                if not add_if_exists(current_app, filepath):
                     continue
                 idx += 1
                 if idx % 100 == 0:

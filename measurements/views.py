@@ -26,9 +26,9 @@ from werkzeug.exceptions import NotFound, BadRequest, HTTPException
 
 from pycountry import countries
 
-from .config import BASE_DIR
-from .models import ReportFile
-from .app import cache
+from measurements.config import BASE_DIR
+from measurements.models import ReportFile
+from measurements.app import cache
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
@@ -235,7 +235,7 @@ def files_download(filename):
         raise HTTPException("Duplicate measurement detected")
 
     filepath = os.path.join(
-        current_app.config['REPORTS_DIRECTORY'],
+        current_app.config['REPORTS_DIR'],
         report_file.bucket_date,
         report_file.filename
     )

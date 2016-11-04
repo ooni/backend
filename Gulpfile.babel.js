@@ -86,18 +86,18 @@ gulp.task("dist:js", () => {
 
 gulp.task('dist:icons:font-awesome', () => {
   let faPath = path.dirname(require.resolve("font-awesome/package.json"));
-  let faFontPath = path.resolve(faPath, "fonts", "*.*");
+  let faFontPath = path.join(faPath, "fonts", "**.*");
   
   return gulp.src(faFontPath)
-            .pipe(gulp.dest(path.join(distPath, "fonts"))); 
+            .pipe(gulp.dest(path.join(distPath, "fonts", "font-awesome"))); 
 });
 
 gulp.task('dist:icons:bootstrap', () => { 
   let bootstrapPath = path.dirname(require.resolve("bootstrap-sass/package.json"));
-  let bootstrapFontPath = path.resolve(bootstrapPath, "assets", "fonts", "**", "*");
+  let bootstrapFontPath = path.join(bootstrapPath, "assets", "fonts", "bootstrap", "**.*");
   
   return gulp.src(bootstrapFontPath)
-            .pipe(gulp.dest(path.join(distPath, "fonts")));  
+            .pipe(gulp.dest(path.join(distPath, "fonts", "bootstrap")));  
 });
 
 gulp.task('dist:icons', ['dist:icons:font-awesome', 'dist:icons:bootstrap']);
@@ -148,13 +148,12 @@ gulp.task("watch", ["dist"], () => {
     path.join(staticPrefix, "**", "*"),
     path.join("!" + distPath, "**", "*"),
   ];
-
+  
   gulpWatch(
     watchPaths,
     gulpBatch((_, done) => { gulp.start("dist", done); })
   );
+
 });
 
-gulp.task("clean", () => { del(distPath); });
-
-gulp.task("watch", () => )
+gulp.task("clean", () => { return del(distPath); });
