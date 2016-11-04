@@ -28,7 +28,6 @@
     "gulp-watch": "^4.3.9",
     "jquery": "^2.2.1",
     "metrics-graphics": "2.10",
-    "node-sass": "^3.10.1",
     "sass-loader": "^4.0.2",
     "style-loader": "^0.13.1",
     "url-loader": "^0.5.7",

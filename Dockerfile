@@ -25,7 +25,7 @@ COPY package.json /tmp/package.json
 RUN set -x \
     && npm install -g gulp-cli \
     && cd /tmp \
-    && npm install \
+    && npm install --loglevel http \
     && mkdir /app \
     && cp -a /tmp/node_modules /app/
 

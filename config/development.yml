@@ -1,0 +1,10 @@
+web:
+  environment:
+    APP_ENV: development
+    REPORTS_DIR: /data/reports/
+    BASE_URL: http://localhost:3000/
+  command: python -m measurements run -p 3000 -h 0.0.0.0
+  environment:
+    WEBSERVER_PORT: 3000
+  ports:
+    - "3000:3000"
