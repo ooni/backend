@@ -46,6 +46,9 @@ RUN set -x \
     && pip install -r /tmp/requirements/deploy.txt \
                    -r /tmp/requirements/main.txt
 
+RUN set -x \
+    && gulp dist
+
 # Copy the directory into the container
 COPY . /app/
 

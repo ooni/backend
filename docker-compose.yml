@@ -20,9 +20,3 @@ web:
     - "80:8000"
   links:
     - db
-
-
-static:
-  extends:
-    service: app
-  command: gulp watch

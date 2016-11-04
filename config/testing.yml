@@ -5,4 +5,4 @@ web:
     BASE_URL: http://localhost/
   volumes:
     - ./measurements:/app/measurements:z
-    - ./dev:/app/dev:z
+    - ./dev:/app/dev

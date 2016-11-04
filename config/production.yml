@@ -4,4 +4,4 @@ web:
     REPORTS_DIR: /data/reports/
     BASE_URL: https://measurements.ooni.torproject.org/
   volumes:
-    - /data/reports:/data/reports:z
+    - /data/reports:/data/reports
