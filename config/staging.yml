@@ -1,8 +1,7 @@
-app:
-  volumes:
-    - /data/reports:/data/reports:z
 web:
   environment:
     APP_ENV: staging
     REPORTS_DIR: /data/reports/
     BASE_URL: http://staging.measurements.ooni.io/
+  volumes:
+    - /data/reports:/data/reports

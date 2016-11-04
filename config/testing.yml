@@ -1,9 +1,8 @@
-app:
-  volumes:
-    - ./measurements:/app/measurements:z
-    - ./dev:/app/dev:z
 web:
   environment:
     APP_ENV: testing
     REPORTS_DIR: /data/reports/
     BASE_URL: http://localhost/
+  volumes:
+    - ./measurements:/app/measurements:z
+    - ./dev:/app/dev:z
