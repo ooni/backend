@@ -46,11 +46,12 @@ RUN set -x \
     && pip install -r /tmp/requirements/deploy.txt \
                    -r /tmp/requirements/main.txt
 
-RUN set -x \
-    && gulp dist
-
 # Copy the directory into the container
 COPY . /app/
+
+RUN set -x \
+    && cd /app/
+    && gulp dist
 
 # Set our work directory to our app directory
 WORKDIR /app/
