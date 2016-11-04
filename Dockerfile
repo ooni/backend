@@ -23,7 +23,14 @@ COPY package.json /tmp/package.json
 
 # Install NPM dependencies
 RUN set -x \
-    && npm install -g gulp-cli \
+    && npm install -g gulp-cli
+
+# This depedency was creating issues so we install it separately
+RUN set -x \
+    && cd /tmp \
+    && npm install node-sass
+
+RUN set -x \
     && cd /tmp \
     && npm install --loglevel http \
     && mkdir /app \
