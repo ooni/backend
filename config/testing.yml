@@ -1,3 +1,7 @@
+app:
+  volumes:
+    - ./measurements:/app/measurements:z
+    - ./dev:/app/dev:z
 web:
   environment:
     APP_ENV: testing

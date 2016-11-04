@@ -1,3 +1,6 @@
+app:
+  volumes:
+    - /data/reports:/data/reports:z
 web:
   environment:
     APP_ENV: production

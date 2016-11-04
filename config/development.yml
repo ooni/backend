@@ -1,3 +1,10 @@
+app:
+  volumes:
+    # Only expose measurements to avoid including node_modules.
+    # :z fixes permissions
+    - ./measurements:/app/measurements:z
+    - ./dev:/app/dev:z
+
 web:
   environment:
     APP_ENV: development
