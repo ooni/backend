@@ -50,7 +50,7 @@ RUN set -x \
 COPY . /app/
 
 RUN set -x \
-    && cd /app/
+    && cd /app/ \
     && gulp dist
 
 # Set our work directory to our app directory
