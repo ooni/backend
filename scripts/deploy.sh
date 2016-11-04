@@ -1,8 +1,10 @@
 #!/bin/bash
 # This script deploys to a testing server
 
-set -e
+[ -f Makefile ] || (echo "Error: must be run from the root of this repo"
+                    && exit 1)
 
+set -e
 ENV=$1
 SSH_KEY=$2
 
@@ -25,5 +27,5 @@ echo "Using SSH Key $SSH_KEY"
 docker-machine ip measurements
 
 eval "$(docker-machine env measurements)"
-docker-compose -f docker-compose.yml -f config/${ENV}.yml build
-docker-compose -f docker-compose.yml -f config/${ENV}.yml up -d
+make build
+make serve-d
