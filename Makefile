@@ -52,4 +52,7 @@ dropdb:
 develop: APP_ENV=development
 develop: build serve
 
+staging: APP_ENV=staging
+staging: serve-d
+
 .PHONY: default build serve clean debug dropdb test

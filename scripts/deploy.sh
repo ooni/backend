@@ -27,5 +27,4 @@ echo "Using SSH Key $SSH_KEY"
 docker-machine ip measurements
 
 eval "$(docker-machine env measurements)"
-make build
-make serve-d
+make staging
