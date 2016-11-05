@@ -25,7 +25,6 @@ def add_if_exists(app, filepath):
     return True
 
 
-
 @cli.command()
 @click.option('--file', help="Read filenames from file listing")
 @click.option('--target', help="Get from directory listing")

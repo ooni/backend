@@ -4,15 +4,15 @@ web:
     REPORTS_DIR: /data/reports/
     BASE_URL: http://localhost:3000/
     WEBSERVER_PORT: 3000
-  command: python -m measurements run -p 3000 -h 0.0.0.0
+  command: python -m measurements run -p 3000 -h 0.0.0.0 --reload
   ports:
     - "3000:3000"
   volumes:
-    # Only expose measurements to avoid including node_modules.
-    # :z fixes permissions
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev:z
 static:
   extends:
     service: app
   command: gulp watch
+  volumes:
+    - ./measurements:/app/measurements:z

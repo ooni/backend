@@ -27,6 +27,12 @@ def init_app(app):
     if not app.debug:
         app.logger.addHandler(logging.StreamHandler())
         app.logger.setLevel(logging.INFO)
+
+    # Set the jinja templates to reload when in development
+    if app.config['APP_ENV'] == 'development':
+        app.jinja_env.auto_reload = True
+        app.config['TEMPLATES_AUTO_RELOAD']
+
     md = Misaka(fenced_code=True)
     md.init_app(app)
 
