@@ -10,46 +10,54 @@ from measurements.models import ReportFile
 
 cli = FlaskGroup(create_app=create_app)
 
-def add_if_exists(app, filepath):
+def add_to_db(app, filepath, no_check=False):
     if not filepath.endswith(".json"):
         return False
     report_file = ReportFile.from_filepath(filepath)
-    ret = app.db_session.query(
-        exists().where(ReportFile.filename == report_file.filename)
-    ).scalar()
-    if ret is True:
-        return False
+
+    if no_check is False:
+        ret = app.db_session.query(
+            exists().where(ReportFile.filename == report_file.filename)
+        ).scalar()
+        if ret is True:
+            return False
 
     app.db_session.add(report_file)
-    app.db_session.commit()
     return True
 
 
 @cli.command()
 @click.option('--file', help="Read filenames from file listing")
 @click.option('--target', help="Get from directory listing")
+@click.option('--no-check', is_flag=True,
+              help="Don't check if the file is in the DB already")
 @with_appcontext
-def updatefiles(file=None, target=None):
+def updatefiles(file=None, target=None, no_check=False):
+    click.echo("Skipping check")
     if file is not None:
         with open(file) as in_file:
             for idx, filepath in enumerate(in_file):
                 filepath = filepath.strip()
-                if not add_if_exists(current_app, filepath):
+                if not add_to_db(current_app, filepath, no_check):
                     continue
                 if idx % 100 == 0:
                     click.echo("Inserted %s files" % idx)
+                    current_app.db_session.commit()
     elif target is not None:
         idx = 0
         for dirname, _, filenames in os.walk(target):
             for filename in filenames:
                 filepath = os.path.join(dirname, filename)
-                if not add_if_exists(current_app, filepath):
+                if not add_to_db(current_app, filepath, no_check):
                     continue
                 idx += 1
                 if idx % 100 == 0:
                     click.echo("Inserted %s files" % idx)
+                    current_app.db_session.commit()
     else:
         raise click.UsageError("Must specify either --file or --target")
+
+    current_app.db_session.commit()
 
 @cli.command()
 @with_appcontext

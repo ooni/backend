@@ -28,6 +28,7 @@ script:
 - node -v
 - npm -v
 - gulp dist
+- make APP_ENV=testing build
 - make test
 deploy:
   provider: script
