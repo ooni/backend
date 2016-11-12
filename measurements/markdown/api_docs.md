@@ -51,10 +51,14 @@ results per response.
 
    `test_name=[string]` - the name of the test
 
-   `start_date=[string]` - the start date of when measurements were run (ex.
+   `since=[string]` - the start date of when measurements were run (ex.
     "2016-10-20T10:30:00")
 
-   `end_date=[string]` - the end date of when measurement were run (ex. "2016-10-20T10:30:00")
+   `until=[string]` - the end date of when measurement were run (ex.
+   "2016-10-20T10:30:00")
+
+   `since_index=[integer]` - return results only strictly greater than the
+   provided index.
 
    `order_by=[string]` - by which key the results should be ordered by (default: test_start_time)
 
@@ -89,6 +93,7 @@ results per response.
     {
       "probe_asn": "[string] the Autonomous system number of the result",
       "probe_cc": "[string] the country code of the result",
+      "index": "[integer] the index of this result (useful when using since_index)",
       "test_start_time": "[string] start time for the measurement is ISO 8601 format",
       "url": "[string] url to the download"
     }

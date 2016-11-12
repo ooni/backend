@@ -31,7 +31,7 @@ def init_app(app):
     # Set the jinja templates to reload when in development
     if app.config['APP_ENV'] == 'development':
         app.jinja_env.auto_reload = True
-        app.config['TEMPLATES_AUTO_RELOAD']
+        app.config['TEMPLATES_AUTO_RELOAD'] = True
 
     md = Misaka(fenced_code=True)
     md.init_app(app)

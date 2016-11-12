@@ -54,7 +54,6 @@ def _calendarized_count():
     DT_FRMT = '%Y-%m-%d'
     one_day = timedelta(days=1)
 
-    results = []
     q = current_app.db_session.query(
         func.count(ReportFile.bucket_date),
         ReportFile.bucket_date
@@ -266,8 +265,6 @@ api_private_blueprint = Blueprint('api_private', 'measurements')
 @api_blueprint.errorhandler(HTTPException)
 @api_blueprint.errorhandler(BadRequest)
 def api_error_handler(error):
-    print("Handling error")
-    print(dir(error))
     response = jsonify({
         'error_code': error.code,
         'error_message': error.description
@@ -286,9 +283,12 @@ def api_list_report_files():
     probe_cc = request.args.get("probe_cc")
     probe_asn = request.args.get("probe_asn")
     test_name = request.args.get("test_name")
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
-    order_by = request.args.get("order_by", 'test_start_time')
+
+    since = request.args.get("since")
+    until = request.args.get("until")
+    since_index = request.args.get("since_index")
+
+    order_by = request.args.get("order_by", "index")
     order = request.args.get("order", 'desc')
 
     try:
@@ -311,25 +311,28 @@ def api_list_report_files():
         q = q.filter(ReportFile.probe_asn == probe_asn)
     if test_name:
         q = q.filter(ReportFile.test_name == test_name)
-    if start_date:
+    if since:
         try:
-            start_date = parse_date(start_date)
+            since = parse_date(since)
         except ValueError:
-            raise BadRequest("Invalid start_date")
-        q = q.filter(ReportFile.test_start_time >= start_date)
-    if end_date:
+            raise BadRequest("Invalid since")
+        q = q.filter(ReportFile.test_start_time > since)
+    if until:
         try:
-            end_date = parse_date(end_date)
+            until = parse_date(until)
         except ValueError:
-            raise BadRequest("Invalid end_date")
-        q = q.filter(ReportFile.test_start_time <= end_date)
+            raise BadRequest("Invalid until")
+        q = q.filter(ReportFile.test_start_time <= until)
+
+    if since_index:
+        q = q.filter(ReportFile.index > since_index)
 
     # XXX these are duplicated above, refactor into function
     if order.lower() not in ('asc', 'desc'):
-        raise BadRequest()
+        raise BadRequest("Invalid order")
     if order_by not in ('test_start_time', 'probe_cc', 'report_id',
-                        'test_name', 'probe_asn'):
-        raise BadRequest()
+                        'test_name', 'probe_asn', 'index'):
+        raise BadRequest("Invalid order_by")
 
     q = q.order_by('%s %s' % (order_by, order))
     count = q.count()
@@ -365,29 +368,13 @@ def api_list_report_files():
             'url': url,
             'probe_cc': row.probe_cc,
             'probe_asn': row.probe_asn,
+            'index': row.idx,
             'test_start_time': row.test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         })
     return jsonify({
         'metadata': metadata,
         'results': results
     })
-#@api_blueprint.route('/measurement', methods=["GET"])
-def api_list_measurement():
-    probe_cc = request.args.get("probe_cc")
-    probe_asn = request.args.get("probe_asn")
-    test_name = request.args.get("test_name")
-    input = request.args.get("input")
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
-    order_by = request.args.get("order_by", 'test_start_time')
-    order = request.args.get("order", 'desc')
-    mrange = request.headers.get('Range', '0-100')
-
-    return jsonify(
-      probe_cc=probe_cc,
-      probe_asn=probe_asn,
-      mrange=mrange
-    )
 
 @api_private_blueprint.route('/asn_by_month')
 @cache.cached(timeout=60*60)
