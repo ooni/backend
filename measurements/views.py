@@ -289,6 +289,8 @@ def api_list_report_files():
     since_index = request.args.get("since_index")
 
     order_by = request.args.get("order_by", "index")
+    if order_by is "index":
+        order_by = "idx"
     order = request.args.get("order", 'desc')
 
     try:
@@ -301,7 +303,8 @@ def api_list_report_files():
         ReportFile.filename,
         ReportFile.test_start_time,
         ReportFile.probe_cc,
-        ReportFile.probe_asn
+        ReportFile.probe_asn,
+        ReportFile.idx
     )
 
     # XXX maybe all of this can go into some sort of function.
@@ -325,16 +328,16 @@ def api_list_report_files():
         q = q.filter(ReportFile.test_start_time <= until)
 
     if since_index:
-        q = q.filter(ReportFile.index > since_index)
+        q = q.filter(ReportFile.idx > since_index)
 
     # XXX these are duplicated above, refactor into function
     if order.lower() not in ('asc', 'desc'):
         raise BadRequest("Invalid order")
     if order_by not in ('test_start_time', 'probe_cc', 'report_id',
-                        'test_name', 'probe_asn', 'index'):
+                        'test_name', 'probe_asn', 'idx'):
         raise BadRequest("Invalid order_by")
 
-    q = q.order_by('%s %s' % (order_by, order))
+    q = q.order_by('{} {}'.format(order_by, order))
     count = q.count()
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
@@ -365,10 +368,11 @@ def api_list_report_files():
             '/files/download/%s' % row.filename
         )
         results.append({
-            'url': url,
+            'download_url': url,
             'probe_cc': row.probe_cc,
             'probe_asn': row.probe_asn,
-            'index': row.idx,
+            # Will we ever hit sys.maxint?
+            'index': int(row.idx),
             'test_start_time': row.test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         })
     return jsonify({

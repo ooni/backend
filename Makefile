@@ -46,12 +46,14 @@ test: test-unit dropdb .state/docker-build-$(APP_ENV) load-fixtures test-functio
 
 dropdb:
 	docker-compose run db psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
-	docker-compose run db psql -h db -d postgres -U postgres -c "CREATE DATABASE measurements ENCODING 'UTF8'"
 
 develop: APP_ENV=development
-develop: build serve
+develop: .state/docker-build-$(APP_ENV) serve
+
+develop-rebuild: APP_ENV=development
+develop-rebuild: build serve
 
 staging: APP_ENV=staging
 staging: serve-d
 
-.PHONY: default build serve clean debug dropdb test
+.PHONY: default build serve clean debug develop develop-rebuild dropdb test

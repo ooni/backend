@@ -47,7 +47,9 @@ results per response.
 
    `probe_cc=[string]` - the two letter country code.
 
-   `probe_asn=[string]` - the Authonomous system number in the format "ASXXX"
+   `probe_asn=[string]` - the
+   [Autonomous system](https://en.wikipedia.org/wiki/Autonomous_system_(Internet))
+   number in the format "ASXXX"
 
    `test_name=[string]` - the name of the test
 
@@ -95,7 +97,7 @@ results per response.
       "probe_cc": "[string] the country code of the result",
       "index": "[integer] the index of this result (useful when using since_index)",
       "test_start_time": "[string] start time for the measurement is ISO 8601 format",
-      "url": "[string] url to the download"
+      "download_url": "[string] url to the download"
     }
   ]
 }
