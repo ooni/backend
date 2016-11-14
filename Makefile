@@ -43,7 +43,7 @@ test-functional:
 	$(DOCKER_COMPOSE) run web pytest -m functional
 
 test: APP_ENV=testing
-test: test-unit dropdb .state/docker-build-$(APP_ENV) load-fixtures test-functional
+test: test-unit .state/docker-build-$(APP_ENV) test-functional
 
 dropdb:
 	$(DOCKER_COMPOSE) run db psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
