@@ -30,6 +30,8 @@ script:
 - gulp dist
 - make APP_ENV=testing build
 - make APP_ENV=testing serve-d
+# Wait for postgres database to be running
+- 'while ! echo exit | nc localhost 5433; do sleep 10; done'
 - make test
 deploy:
   provider: script

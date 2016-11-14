@@ -399,7 +399,7 @@ def api_private_asn_by_month():
             ReportFile.probe_asn) \
         .order_by(ReportFile.test_start_time)
 
-    # XXX this can be done in a SQL that is not sqlite
+    # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, asn in r:
         bkt = tst.strftime("%Y-%m-01")
@@ -423,7 +423,7 @@ def api_private_counties_by_month():
             ReportFile.probe_cc) \
         .order_by(ReportFile.test_start_time)
 
-    # XXX this can be done in a SQL that is not sqlite
+    # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, country in r:
         bkt = tst.strftime("%Y-%m-01")
@@ -446,7 +446,7 @@ def api_private_runs_by_month():
             ReportFile.test_start_time) \
         .order_by(ReportFile.test_start_time)
 
-    # XXX this can be done in a SQL that is not sqlite
+    # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for res in r:
         tst = res.test_start_time
