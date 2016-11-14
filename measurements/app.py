@@ -11,6 +11,7 @@ from flask_misaka import Misaka
 from flask_cache import Cache
 
 from measurements.database import init_db, create_tables
+from measurements.filestore import init_filestore
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -44,6 +45,7 @@ def create_app(*args, **kw):
 
     init_app(app)
     init_db(app)
+    init_filestore(app)
     create_tables(app)
     views.register(app)
 

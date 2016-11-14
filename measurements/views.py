@@ -29,6 +29,8 @@ from pycountry import countries
 from measurements.config import BASE_DIR
 from measurements.models import ReportFile
 from measurements.app import cache
+from measurements.filestore import FileNotFound, S3NotConfigured
+from measurements.filestore import gen_file_chunks
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
@@ -224,8 +226,10 @@ def files_download(filename):
     try:
         report_file = current_app.db_session.query(ReportFile) \
                         .filter(ReportFile.filename == filename).first()
-        # XXX suriprisingly this actually fails in some cases.
+        # XXX
         # We have duplicate measurements :(
+        # So the below exception actually happens. This should be resolved
+        # in the data processing pipeline.
         #   ReportFile.filename == filename).one()
     except NoResultFound:
         raise NotFound("No file with that filename found")
@@ -238,12 +242,18 @@ def files_download(filename):
         report_file.bucket_date,
         report_file.filename
     )
-    if not os.path.exists(filepath):
+
+    try:
+        print(filepath)
+        print(current_app.config['REPORTS_DIR'])
+        file_chunks = gen_file_chunks(current_app, filepath)
+    except FileNotFound:
         raise NotFound("File does not exist")
+    except S3NotConfigured:
+        raise HTTPException("S3 is not properly configured")
 
     # XXX maybe have to do more to properly make it a download
-    return Response(_report_file_generator(filepath),
-                    mimetype='text/json')
+    return Response(file_chunks, mimetype='text/json')
 
 # These two are needed to avoid breaking older URLs
 @pages_blueprint.route('/<date>/<report_file>')

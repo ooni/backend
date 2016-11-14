@@ -7,6 +7,7 @@ from sqlalchemy import exists, select
 
 from measurements.app import create_app
 from measurements.models import ReportFile
+from measurements.filestore import list_files
 
 cli = FlaskGroup(create_app=create_app)
 
@@ -36,6 +37,9 @@ def updatefiles(file=None, target=None, no_check=False):
     if no_check == True:
         click.echo("Skipping check")
 
+    if target is None:
+        target = current_app.config['REPORTS_DIR']
+
     most_recent_index = 0
     most_recent = current_app.db_session.query(ReportFile)\
                             .order_by(ReportFile.idx.desc())\
@@ -54,16 +58,14 @@ def updatefiles(file=None, target=None, no_check=False):
                     current_app.db_session.commit()
     elif target is not None:
         idx = 0
-        for dirname, _, filenames in os.walk(target):
-            for filename in filenames:
-                filepath = os.path.join(dirname, filename)
-                index = most_recent_index + idx
-                if not add_to_db(current_app, filepath, index, no_check):
-                    continue
-                idx += 1
-                if idx % 100 == 0:
-                    click.echo("Inserted %s files" % idx)
-                    current_app.db_session.commit()
+        for filepath in list_files(current_app, target):
+            index = most_recent_index + idx
+            if not add_to_db(current_app, filepath, index, no_check):
+                continue
+            idx += 1
+            if idx % 100 == 0:
+                click.echo("Inserted %s files" % idx)
+                current_app.db_session.commit()
     else:
         raise click.UsageError("Must specify either --file or --target")
 

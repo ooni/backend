@@ -17,7 +17,15 @@ WEBSERVER_PORT = int(os.environ.get("WEBSERVER_PORT", "3000"))
 
 BASE_URL = os.environ.get("BASE_URL",
                           "https://measurements.ooni.torproject.org/")
-REPORTS_DIR = os.environ.get("REPORTS_DIR",
-                             "/data/ooni/public/sanitised/")
+
+# This can either be a local directory (ex. /data/ooni/public/sanitised)
+# or an s3 endpoint (ex. s3://ooni-public/sanitised)
+REPORTS_DIR = os.environ.get("REPORTS_DIR", "s3://ooni-public/sanitised/")
 
 WORKERS = 4
+
+# S3 related configuration
+S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", None)
+S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", None)
+S3_SESSION_TOKEN = os.environ.get("S3_SESSION_TOKEN", None)
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
