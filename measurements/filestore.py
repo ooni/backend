@@ -32,10 +32,12 @@ def init_filestore(app):
     if app.config['S3_ACCESS_KEY_ID']:
         init_s3(app)
 
-def list_files_s3(app):
-    print("Listing files with prefix {}".format(app.s3_reports_prefix))
+def list_files_s3(app, target):
+    assert target.startswith(app.config['REPORTS_DIR']), (
+            "target must start with {}".format(app.config['REPORTS_DIR']))
+    prefix = urlparse(target).path[1:]
     objects = app.s3_reports_bucket.objects.filter(
-        Prefix=app.s3_reports_prefix
+        Prefix=prefix
     )
     for obj_summary in objects:
         yield "s3://{}/{}".format(
@@ -51,7 +53,7 @@ def list_files(app, target=None):
     if target is None:
         target = app.config['REPORTS_DIR']
     if app.s3_reports_bucket:
-        return list_files_s3(app)
+        return list_files_s3(app, target)
     return list_files_local(target)
 
 def gen_file_chunks_fp(in_file):
