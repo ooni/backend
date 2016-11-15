@@ -109,18 +109,16 @@ def _calendarized_count():
     yield month
 
 def _report_dates():
-    results = []
     q = current_app.db_session.query(
         func.count(ReportFile.bucket_date),
         ReportFile.bucket_date
     ).group_by(ReportFile.bucket_date).order_by(ReportFile.bucket_date)
     for row in q:
         count, day = row
-        results.append({
+        yield {
             'count': count,
             'date': day
-        })
-    return results
+        }
 
 @pages_blueprint.route('/files/by_date')
 def files_by_date():

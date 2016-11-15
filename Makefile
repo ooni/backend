@@ -1,5 +1,6 @@
 APP_ENV = development
-DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml
+DOCKER_EXTRA =
+DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
 
 default:
 	@echo "ERR: Did not specify a command"
