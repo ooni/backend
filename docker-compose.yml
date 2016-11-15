@@ -13,7 +13,7 @@ app:
 web:
   extends:
     service: app
-  command: gunicorn -b 0.0.0.0:8000 --reload measurements.wsgi
+  command: gunicorn -b 0.0.0.0:8000 --reload measurements.wsgi --workers 4
   environment:
     WEBSERVER_PORT: 8000
   ports:

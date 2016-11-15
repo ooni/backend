@@ -66,8 +66,12 @@ def gen_file_chunks_fp(in_file):
 
 def gen_file_chunks_local(filepath):
     try:
+        content_length = os.path.getsize()
         with open(filepath) as in_file:
-            return gen_file_chunks_fp(in_file)
+            return {
+                'content': gen_file_chunks_fp(in_file),
+                'content_length': content_length
+            }
     except EnvironmentError as exc:
         # For python 2-3 compat
         if exc.errno == errno.EEXIST:
@@ -82,7 +86,6 @@ def gen_file_chunks_s3(app, filepath):
     # The s3 key must not have the leading /
     s3_key = urlparse(filepath).path[1:]
     try:
-        print("Getting chunks from s3")
         resp = app.s3_reports_bucket.Object(s3_key).get()
     except botocore.exceptions.ClientError as exc:
         if exc.response['Error']['Code'] == "404":
@@ -90,8 +93,11 @@ def gen_file_chunks_s3(app, filepath):
             raise FileNotFound
         else:
             raise exc
-    print(dir(resp['Body']))
-    return gen_file_chunks_fp(resp['Body'])
+    return {
+        'content': gen_file_chunks_fp(resp['Body']),
+        'content_length': resp['ContentLength']
+    }
+
 
 def gen_file_chunks(app, filepath):
     if filepath.startswith("s3://"):

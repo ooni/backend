@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from six.moves.urllib.parse import urljoin, urlencode
 
 from flask import request, render_template, redirect
-from flask import current_app, Response
+from flask import current_app, Response, stream_with_context
 from flask.json import jsonify
 from flask.blueprints import Blueprint
 
@@ -210,15 +210,6 @@ def files_in_country(country_code):
                            order_by=order_by,
                            current_country=country_code)
 
-def _report_file_generator(filepath):
-    CHUNK_SIZE = 1024
-    with open(filepath) as in_file:
-        while True:
-            data = in_file.read(CHUNK_SIZE)
-            if not data:
-                break
-            yield data
-
 @pages_blueprint.route('/files/download/<filename>')
 def files_download(filename):
     try:
@@ -242,16 +233,19 @@ def files_download(filename):
     )
 
     try:
-        print(filepath)
-        print(current_app.config['REPORTS_DIR'])
         file_chunks = gen_file_chunks(current_app, filepath)
     except FileNotFound:
         raise NotFound("File does not exist")
     except S3NotConfigured:
         raise HTTPException("S3 is not properly configured")
 
-    # XXX maybe have to do more to properly make it a download
-    return Response(file_chunks, mimetype='text/json')
+    response = Response(
+        stream_with_context(file_chunks['content']),
+        mimetype='text/json'
+    )
+    response.headers.add('Content-Length',
+                         str(file_chunks['content_length']))
+    return response
 
 # These two are needed to avoid breaking older URLs
 @pages_blueprint.route('/<date>/<report_file>')
