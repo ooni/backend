@@ -1,6 +1,6 @@
 import os
 import errno
-from six.moves.urllib.parse import urlparse
+from six.moves.urllib.parse import urlparse, urljoin
 
 import boto3
 import botocore
@@ -101,6 +101,24 @@ def gen_file_chunks_s3(app, filepath):
 
 def gen_file_chunks(app, filepath):
     if filepath.startswith("s3://"):
+        # XXX this code path is actually never hit, because when using S3 we
+        #  don't want to proxy requests, but we just wish to redirect users
+        # to the s3 based endpoint and the download_url will always point to
+        #  s3 directly.
         return gen_file_chunks_s3(app, filepath)
     return gen_file_chunks_local(filepath)
 
+def get_download_url_s3(app, bucket_date, filename):
+    url = app.config['REPORTS_DIR'].replace(
+        "s3://",
+        "https://s3.amazonaws.com/"
+    )
+    return os.path.join(url, bucket_date, filename)
+
+def get_download_url(app, bucket_date, filename):
+    if app.config['REPORTS_DIR'].startswith("s3://"):
+        return get_download_url_s3(app, bucket_date, filename)
+    return urljoin(
+        app.config['BASE_URL'],
+        '/files/download/{}'.format(filename)
+    )

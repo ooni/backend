@@ -30,7 +30,7 @@ from measurements.config import BASE_DIR
 from measurements.models import ReportFile
 from measurements.app import cache
 from measurements.filestore import FileNotFound, S3NotConfigured
-from measurements.filestore import gen_file_chunks
+from measurements.filestore import gen_file_chunks, get_download_url
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
@@ -226,6 +226,15 @@ def files_download(filename):
         # This should never happen.
         raise HTTPException("Duplicate measurement detected")
 
+    if current_app.config['REPORTS_DIR'].startswith("s3://"):
+        return redirect(
+            get_download_url(
+                current_app,
+                report_file.bucket_date,
+                report_file.filename
+            )
+        )
+
     filepath = os.path.join(
         current_app.config['REPORTS_DIR'],
         report_file.bucket_date,
@@ -303,6 +312,7 @@ def api_list_report_files():
 
     q = current_app.db_session.query(
         ReportFile.filename,
+        ReportFile.bucket_date,
         ReportFile.test_start_time,
         ReportFile.probe_cc,
         ReportFile.probe_asn,
@@ -365,10 +375,7 @@ def api_list_report_files():
     }
     results = []
     for row in q:
-        url = urljoin(
-            current_app.config['BASE_URL'],
-            '/files/download/%s' % row.filename
-        )
+        url = get_download_url(current_app, row.bucket_date, row.filename)
         results.append({
             'download_url': url,
             'probe_cc': row.probe_cc,
