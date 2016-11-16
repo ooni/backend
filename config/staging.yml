@@ -2,4 +2,4 @@ web:
   env_file:
   - ./config/base.env
   - ./config/staging.env
-  - ./config/secrets.env
+  - /opt/secrets.env

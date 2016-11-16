@@ -2,7 +2,7 @@ web:
   env_file:
   - ./config/base.env
   - ./config/development.env
-  - ./config/secrets.env
+  - /opt/secrets.env
   command: python -m measurements run -p 3000 -h 0.0.0.0 --reload
   ports:
     - "3000:3000"

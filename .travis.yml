@@ -16,7 +16,8 @@ before_install:
 - tar xvf secrets/secrets.tar --directory secrets
 - mkdir -p $HOME/.ssh/
 - mv secrets/id_rsa_travis $HOME/.ssh/
-- mv secrets/secrets.env config/secrets.env
+- mkdir -p /opt/
+- mv secrets/secrets.env /opt/secrets.env
 install:
 - 'rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION'
 # Install docker-machine
