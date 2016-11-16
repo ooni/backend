@@ -12,7 +12,9 @@ services:
 #  - node_modules/
 before_install:
 - mkdir -p $HOME/.ssh/
+# Decrypt the travis secrets
 - 'openssl aes-256-cbc -K $encrypted_965b8cbf2a7d_key -iv $encrypted_965b8cbf2a7d_iv -in $TRAVIS_BUILD_DIR/secrets/id_rsa_travis.enc -out $HOME/.ssh/id_rsa_travis -d'
+- 'openssl aes-256-cbc -K $encrypted_965b8cbf2a7d_key -iv $encrypted_965b8cbf2a7d_iv -in secrets/secrets.env.enc -out config/secrets.env -d'
 install:
 - 'rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION'
 # Install docker-machine
