@@ -162,13 +162,13 @@ def _files_by_country():
         ReportFile.probe_cc
     ).group_by(ReportFile.probe_cc).order_by(ReportFile.probe_cc)
     for row in q:
-        count, alpha2 = row
+        count, alpha_2 = row
         country = "Unknown"
-        if alpha2 != "ZZ":
-            country = countries.get(alpha2=alpha2).name
+        if alpha_2 != "ZZ":
+            country = countries.get(alpha_2=alpha_2).name
         results.append({
             'count': count,
-            'alpha2': alpha2,
+            'alpha2': alpha_2,
             'country': country
         })
     results.sort(key=operator.itemgetter('country'))
