@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from six.moves.urllib.parse import urljoin, urlencode
 
 from flask import request, render_template, redirect
-from flask import current_app, Response
+from flask import current_app, Response, stream_with_context
 from flask.json import jsonify
 from flask.blueprints import Blueprint
 
@@ -29,6 +29,8 @@ from pycountry import countries
 from measurements.config import BASE_DIR
 from measurements.models import ReportFile
 from measurements.app import cache
+from measurements.filestore import FileNotFound, S3NotConfigured
+from measurements.filestore import gen_file_chunks, get_download_url
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
@@ -54,7 +56,6 @@ def _calendarized_count():
     DT_FRMT = '%Y-%m-%d'
     one_day = timedelta(days=1)
 
-    results = []
     q = current_app.db_session.query(
         func.count(ReportFile.bucket_date),
         ReportFile.bucket_date
@@ -108,18 +109,16 @@ def _calendarized_count():
     yield month
 
 def _report_dates():
-    results = []
     q = current_app.db_session.query(
         func.count(ReportFile.bucket_date),
         ReportFile.bucket_date
     ).group_by(ReportFile.bucket_date).order_by(ReportFile.bucket_date)
     for row in q:
         count, day = row
-        results.append({
+        yield {
             'count': count,
             'date': day
-        })
-    return results
+        }
 
 @pages_blueprint.route('/files/by_date')
 def files_by_date():
@@ -163,13 +162,13 @@ def _files_by_country():
         ReportFile.probe_cc
     ).group_by(ReportFile.probe_cc).order_by(ReportFile.probe_cc)
     for row in q:
-        count, alpha2 = row
+        count, alpha_2 = row
         country = "Unknown"
-        if alpha2 != "ZZ":
-            country = countries.get(alpha2=alpha2).name
+        if alpha_2 != "ZZ":
+            country = countries.get(alpha_2=alpha_2).name
         results.append({
             'count': count,
-            'alpha2': alpha2,
+            'alpha2': alpha_2,
             'country': country
         })
     results.sort(key=operator.itemgetter('country'))
@@ -211,22 +210,15 @@ def files_in_country(country_code):
                            order_by=order_by,
                            current_country=country_code)
 
-def _report_file_generator(filepath):
-    CHUNK_SIZE = 1024
-    with open(filepath) as in_file:
-        while True:
-            data = in_file.read(CHUNK_SIZE)
-            if not data:
-                break
-            yield data
-
 @pages_blueprint.route('/files/download/<filename>')
 def files_download(filename):
     try:
         report_file = current_app.db_session.query(ReportFile) \
                         .filter(ReportFile.filename == filename).first()
-        # XXX suriprisingly this actually fails in some cases.
+        # XXX
         # We have duplicate measurements :(
+        # So the below exception actually happens. This should be resolved
+        # in the data processing pipeline.
         #   ReportFile.filename == filename).one()
     except NoResultFound:
         raise NotFound("No file with that filename found")
@@ -234,17 +226,35 @@ def files_download(filename):
         # This should never happen.
         raise HTTPException("Duplicate measurement detected")
 
+    if current_app.config['REPORTS_DIR'].startswith("s3://"):
+        return redirect(
+            get_download_url(
+                current_app,
+                report_file.bucket_date,
+                report_file.filename
+            )
+        )
+
     filepath = os.path.join(
         current_app.config['REPORTS_DIR'],
         report_file.bucket_date,
         report_file.filename
     )
-    if not os.path.exists(filepath):
-        raise NotFound("File does not exist")
 
-    # XXX maybe have to do more to properly make it a download
-    return Response(_report_file_generator(filepath),
-                    mimetype='text/json')
+    try:
+        file_chunks = gen_file_chunks(current_app, filepath)
+    except FileNotFound:
+        raise NotFound("File does not exist")
+    except S3NotConfigured:
+        raise HTTPException("S3 is not properly configured")
+
+    response = Response(
+        stream_with_context(file_chunks['content']),
+        mimetype='text/json'
+    )
+    response.headers.add('Content-Length',
+                         str(file_chunks['content_length']))
+    return response
 
 # These two are needed to avoid breaking older URLs
 @pages_blueprint.route('/<date>/<report_file>')
@@ -266,8 +276,6 @@ api_private_blueprint = Blueprint('api_private', 'measurements')
 @api_blueprint.errorhandler(HTTPException)
 @api_blueprint.errorhandler(BadRequest)
 def api_error_handler(error):
-    print("Handling error")
-    print(dir(error))
     response = jsonify({
         'error_code': error.code,
         'error_message': error.description
@@ -286,9 +294,14 @@ def api_list_report_files():
     probe_cc = request.args.get("probe_cc")
     probe_asn = request.args.get("probe_asn")
     test_name = request.args.get("test_name")
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
-    order_by = request.args.get("order_by", 'test_start_time')
+
+    since = request.args.get("since")
+    until = request.args.get("until")
+    since_index = request.args.get("since_index")
+
+    order_by = request.args.get("order_by", "index")
+    if order_by is "index":
+        order_by = "idx"
     order = request.args.get("order", 'desc')
 
     try:
@@ -299,9 +312,11 @@ def api_list_report_files():
 
     q = current_app.db_session.query(
         ReportFile.filename,
+        ReportFile.bucket_date,
         ReportFile.test_start_time,
         ReportFile.probe_cc,
-        ReportFile.probe_asn
+        ReportFile.probe_asn,
+        ReportFile.idx
     )
 
     # XXX maybe all of this can go into some sort of function.
@@ -311,27 +326,30 @@ def api_list_report_files():
         q = q.filter(ReportFile.probe_asn == probe_asn)
     if test_name:
         q = q.filter(ReportFile.test_name == test_name)
-    if start_date:
+    if since:
         try:
-            start_date = parse_date(start_date)
+            since = parse_date(since)
         except ValueError:
-            raise BadRequest("Invalid start_date")
-        q = q.filter(ReportFile.test_start_time >= start_date)
-    if end_date:
+            raise BadRequest("Invalid since")
+        q = q.filter(ReportFile.test_start_time > since)
+    if until:
         try:
-            end_date = parse_date(end_date)
+            until = parse_date(until)
         except ValueError:
-            raise BadRequest("Invalid end_date")
-        q = q.filter(ReportFile.test_start_time <= end_date)
+            raise BadRequest("Invalid until")
+        q = q.filter(ReportFile.test_start_time <= until)
+
+    if since_index:
+        q = q.filter(ReportFile.idx > since_index)
 
     # XXX these are duplicated above, refactor into function
     if order.lower() not in ('asc', 'desc'):
-        raise BadRequest()
+        raise BadRequest("Invalid order")
     if order_by not in ('test_start_time', 'probe_cc', 'report_id',
-                        'test_name', 'probe_asn'):
-        raise BadRequest()
+                        'test_name', 'probe_asn', 'idx'):
+        raise BadRequest("Invalid order_by")
 
-    q = q.order_by('%s %s' % (order_by, order))
+    q = q.order_by('{} {}'.format(order_by, order))
     count = q.count()
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
@@ -357,37 +375,19 @@ def api_list_report_files():
     }
     results = []
     for row in q:
-        url = urljoin(
-            current_app.config['BASE_URL'],
-            '/files/download/%s' % row.filename
-        )
+        url = get_download_url(current_app, row.bucket_date, row.filename)
         results.append({
-            'url': url,
+            'download_url': url,
             'probe_cc': row.probe_cc,
             'probe_asn': row.probe_asn,
+            # Will we ever hit sys.maxint?
+            'index': int(row.idx),
             'test_start_time': row.test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         })
     return jsonify({
         'metadata': metadata,
         'results': results
     })
-#@api_blueprint.route('/measurement', methods=["GET"])
-def api_list_measurement():
-    probe_cc = request.args.get("probe_cc")
-    probe_asn = request.args.get("probe_asn")
-    test_name = request.args.get("test_name")
-    input = request.args.get("input")
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
-    order_by = request.args.get("order_by", 'test_start_time')
-    order = request.args.get("order", 'desc')
-    mrange = request.headers.get('Range', '0-100')
-
-    return jsonify(
-      probe_cc=probe_cc,
-      probe_asn=probe_asn,
-      mrange=mrange
-    )
 
 @api_private_blueprint.route('/asn_by_month')
 @cache.cached(timeout=60*60)
@@ -398,7 +398,7 @@ def api_private_asn_by_month():
             ReportFile.probe_asn) \
         .order_by(ReportFile.test_start_time)
 
-    # XXX this can be done in a SQL that is not sqlite
+    # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, asn in r:
         bkt = tst.strftime("%Y-%m-01")
@@ -422,7 +422,7 @@ def api_private_counties_by_month():
             ReportFile.probe_cc) \
         .order_by(ReportFile.test_start_time)
 
-    # XXX this can be done in a SQL that is not sqlite
+    # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, country in r:
         bkt = tst.strftime("%Y-%m-01")
@@ -445,7 +445,7 @@ def api_private_runs_by_month():
             ReportFile.test_start_time) \
         .order_by(ReportFile.test_start_time)
 
-    # XXX this can be done in a SQL that is not sqlite
+    # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for res in r:
         tst = res.test_start_time

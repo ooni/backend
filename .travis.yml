@@ -11,8 +11,12 @@ services:
 #  directories:
 #  - node_modules/
 before_install:
+# Decrypt the travis secrets
+- 'openssl aes-256-cbc -K $encrypted_965b8cbf2a7d_key -iv $encrypted_965b8cbf2a7d_iv -in secrets/secrets.tar.enc -out secrets/secrets.tar -d'
+- tar xvf secrets/secrets.tar --directory secrets
 - mkdir -p $HOME/.ssh/
-- 'openssl aes-256-cbc -K $encrypted_965b8cbf2a7d_key -iv $encrypted_965b8cbf2a7d_iv -in $TRAVIS_BUILD_DIR/secrets/id_rsa_travis.enc -out $HOME/.ssh/id_rsa_travis -d'
+- mv secrets/id_rsa_travis $HOME/.ssh/
+- mv secrets/secrets.env config/secrets.env
 install:
 - 'rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION'
 # Install docker-machine
@@ -30,6 +34,8 @@ script:
 - gulp dist
 - make APP_ENV=testing build
 - make APP_ENV=testing serve-d
+# Wait for postgres database to be running
+- 'while ! echo exit | nc localhost 5433; do sleep 10; done'
 - make test
 deploy:
   provider: script

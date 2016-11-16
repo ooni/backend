@@ -1,7 +1,5 @@
 web:
-  environment:
-    APP_ENV: production
-    REPORTS_DIR: /data/reports/
-    BASE_URL: https://measurements.ooni.torproject.org/
-  volumes:
-    - /data/reports:/data/reports
+  env_file:
+  - ./config/base.env
+  - ./config/production.env
+  - ./config/secrets.env

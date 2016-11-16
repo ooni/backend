@@ -11,6 +11,7 @@ from flask_misaka import Misaka
 from flask_cache import Cache
 
 from measurements.database import init_db, create_tables
+from measurements.filestore import init_filestore
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -31,7 +32,7 @@ def init_app(app):
     # Set the jinja templates to reload when in development
     if app.config['APP_ENV'] == 'development':
         app.jinja_env.auto_reload = True
-        app.config['TEMPLATES_AUTO_RELOAD']
+        app.config['TEMPLATES_AUTO_RELOAD'] = True
 
     md = Misaka(fenced_code=True)
     md.init_app(app)
@@ -44,6 +45,7 @@ def create_app(*args, **kw):
 
     init_app(app)
     init_db(app)
+    init_filestore(app)
     create_tables(app)
     views.register(app)
 

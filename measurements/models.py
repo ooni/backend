@@ -10,7 +10,7 @@ from .utils import ISO_TIMESTAMP_SHORT
 from .database import Base
 from sqlalchemy import (
     Column, Integer, String, Text,
-    DateTime, Float, JSON,
+    DateTime, Float, JSON, Numeric
 )
 
 # XXX rename to Base to create it in the database.
@@ -49,21 +49,28 @@ class ReportFile(Base):
     test_start_time = Column(DateTime)
     test_name = Column(String(2000))
 
+    # Idx is a unique identifier of a certain report_file. This allows
+    # retrieving only report files from a given offset.
+    idx = Column(Numeric)
     bucket_date = Column(String(200))
 
     filename = Column(String(2000))
 
     @staticmethod
-    def from_filepath(file_path):
+    def from_filepath(file_path, index):
         dirname = os.path.basename(os.path.dirname(file_path))
         filename = os.path.basename(file_path)
 
         (test_start_time, probe_cc, probe_asn,
          test_name, report_id, _, _) = filename.split('-')
+
         report_file = ReportFile()
         report_file.test_start_time = datetime.strptime(test_start_time,
                                                         ISO_TIMESTAMP_SHORT)
+
+        report_file.idx = index
         report_file.bucket_date = dirname
+
         report_file.probe_cc = probe_cc
         report_file.probe_asn = probe_asn
         report_file.test_name = test_name

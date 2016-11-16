@@ -1,11 +1,13 @@
 APP_ENV = development
+DOCKER_EXTRA =
+DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
 
 default:
 	@echo "ERR: Did not specify a command"
 	@exit 1
 
 .state/docker-build-$(APP_ENV):
-	docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml build
+	$(DOCKER_COMPOSE) build
 	#
 	# Set the state
 	mkdir -p .state
@@ -15,43 +17,49 @@ clean:
 	rm -rf measurements/static/dist
 
 build:
-	docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml build
+	$(DOCKER_COMPOSE) build
 	#
 	# Set the state
 	mkdir -p .state
 	touch .state/docker-build-$(APP_ENV)
 
 serve-d: .state/docker-build-$(APP_ENV)
-	docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml up -d
+	$(DOCKER_COMPOSE) up -d
 
 serve: .state/docker-build-$(APP_ENV)
-	docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml up
+	$(DOCKER_COMPOSE) up
 
 debug: .state/docker-build-$(APP_ENV)
-	docker-compose run --service-ports web python -m measurements shell
+	$(DOCKER_COMPOSE) run --service-ports web python -m measurements shell
 
 load-fixtures:
-	docker-compose run web python -m measurements updatefiles --file dev/fixtures.txt --no-check
+	$(DOCKER_COMPOSE) run web python -m measurements updatefiles --file dev/fixtures.txt --no-check
 
 test-unit:
 	echo "Running unittests"
-	docker-compose run web pytest -m unit
+	$(DOCKER_COMPOSE) run web pytest -m unit
 
 test-functional:
 	echo "Running functional tests"
-	docker-compose run web pytest -m functional
+	$(DOCKER_COMPOSE) run web pytest -m functional
 
 test: APP_ENV=testing
-test: test-unit dropdb .state/docker-build-$(APP_ENV) load-fixtures test-functional
+test: test-unit .state/docker-build-$(APP_ENV) test-functional
 
 dropdb:
-	docker-compose run db psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
-	docker-compose run db psql -h db -d postgres -U postgres -c "CREATE DATABASE measurements ENCODING 'UTF8'"
+	$(DOCKER_COMPOSE) run db psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
 
 develop: APP_ENV=development
-develop: build serve
+develop: .state/docker-build-$(APP_ENV) serve
+
+develop-rebuild: APP_ENV=development
+develop-rebuild: build serve
 
 staging: APP_ENV=staging
 staging: serve-d
 
-.PHONY: default build serve clean debug dropdb test
+push-staging:
+	make APP_ENV=staging build
+	docker-compose -f docker-compose.yml -f config/staging.yml up -d
+
+.PHONY: default build serve clean debug develop develop-rebuild dropdb test

@@ -1,7 +1,5 @@
 web:
-  environment:
-    APP_ENV: staging
-    REPORTS_DIR: /data/reports/
-    BASE_URL: http://staging.measurements.ooni.io/
-  volumes:
-    - /data/reports:/data/reports
+  env_file:
+  - ./config/base.env
+  - ./config/staging.env
+  - ./config/secrets.env

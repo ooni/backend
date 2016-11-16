@@ -6,16 +6,10 @@ db:
 
 app:
   build: .
-  environment:
-    APP_ENV: development
-    DATABASE_URL: postgresql://postgres@db/measurements
-
 web:
   extends:
     service: app
-  command: gunicorn -b 0.0.0.0:8000 --reload measurements.wsgi
-  environment:
-    WEBSERVER_PORT: 8000
+  command: gunicorn -b 0.0.0.0:8000 --reload measurements.wsgi --workers 4 --timeout 120
   ports:
     - "80:8000"
   links:

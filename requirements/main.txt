@@ -1,9 +1,10 @@
+boto3
 Flask
 Flask-Cache
 Flask-Misaka
 Flask-Script
 python-dateutil
-pycountry
+pycountry==16.11.8
 SQLAlchemy
 sqlalchemy-utils
 six
