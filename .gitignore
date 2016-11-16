@@ -11,5 +11,9 @@ ooni_measurements.db
 node_modules/
 
 measurements/static/dist/
+
+# Travis secrets
 secrets/id_rsa_travis
+secrets/secrets.env
+secrets/secrets.tar
 config/secrets.env
