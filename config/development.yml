@@ -1,9 +1,8 @@
 web:
-  environment:
-    APP_ENV: development
-    REPORTS_DIR: /data/reports/
-    BASE_URL: http://localhost:3000/
-    WEBSERVER_PORT: 3000
+  env_file:
+  - ./base.env
+  - ./development.env
+  - ./secrets.env
   command: python -m measurements run -p 3000 -h 0.0.0.0 --reload
   ports:
     - "3000:3000"

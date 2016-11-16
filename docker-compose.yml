@@ -6,10 +6,6 @@ db:
 
 app:
   build: .
-  environment:
-    APP_ENV: development
-    DATABASE_URL: postgresql://postgres@db/measurements
-
 web:
   extends:
     service: app

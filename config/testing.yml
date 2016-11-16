@@ -1,8 +1,8 @@
 web:
-  environment:
-    APP_ENV: testing
-    REPORTS_DIR: /data/reports/
-    BASE_URL: http://localhost/
+  env_file:
+  - ./base.env
+  - ./testing.env
+  - ./secrets.env
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev
