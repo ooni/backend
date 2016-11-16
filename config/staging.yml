@@ -1,5 +1,5 @@
 web:
   env_file:
-  - ./base.env
-  - ./staging.env
-  - ./secrets.env
+  - ./config/base.env
+  - ./config/staging.env
+  - ./config/secrets.env

@@ -1,8 +1,8 @@
 web:
   env_file:
-  - ./base.env
-  - ./testing.env
-  - ./secrets.env
+  - ./config/base.env
+  - ./config/testing.env
+  - ./config/secrets.env
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev
