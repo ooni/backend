@@ -7,7 +7,7 @@ from sqlalchemy import exists, select
 
 from measurements.app import create_app
 from measurements.models import ReportFile
-from measurements.filestore import list_files
+from measurements.filestore import list_files, update_file_metadata
 
 cli = FlaskGroup(create_app=create_app)
 
@@ -40,13 +40,13 @@ def updatefiles(file=None, target=None, no_check=False):
     if target is None:
         target = current_app.config['REPORTS_DIR']
 
-    most_recent_index = 0
-    most_recent = current_app.db_session.query(ReportFile)\
-                            .order_by(ReportFile.idx.desc())\
-                            .first()
-    if most_recent is not None:
-        most_recent_index = most_recent.index
     if file is not None:
+        most_recent_index = 0
+        most_recent = current_app.db_session.query(ReportFile) \
+            .order_by(ReportFile.idx.desc()) \
+            .first()
+        if most_recent is not None:
+            most_recent_index = most_recent.idx
         with open(file) as in_file:
             for idx, filepath in enumerate(in_file):
                 filepath = filepath.strip()
@@ -57,15 +57,7 @@ def updatefiles(file=None, target=None, no_check=False):
                     click.echo("Inserted %s files" % idx)
                     current_app.db_session.commit()
     elif target is not None:
-        idx = 0
-        for filepath in list_files(current_app, target):
-            index = most_recent_index + idx
-            if not add_to_db(current_app, filepath, index, no_check):
-                continue
-            idx += 1
-            if idx % 100 == 0:
-                click.echo("Inserted %s files" % idx)
-                current_app.db_session.commit()
+        update_file_metadata(current_app, target)
     else:
         raise click.UsageError("Must specify either --file or --target")
 

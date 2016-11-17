@@ -2,16 +2,32 @@ web:
   env_file:
   - ./config/base.env
   - ./config/development.env
-  - /opt/secrets.env
   command: python -m measurements run -p 3000 -h 0.0.0.0 --reload
   ports:
     - "3000:3000"
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev:z
+
 static:
   extends:
     service: app
   command: gulp watch
+  volumes:
+    - ./measurements:/app/measurements:z
+
+worker:
+  env_file:
+  - ./config/base.env
+  - ./config/development.env
+  - ./config/secrets.env
+  volumes:
+    - ./measurements:/app/measurements:z
+
+beat:
+  env_file:
+  - ./config/base.env
+  - ./config/development.env
+  - ./config/secrets.env
   volumes:
     - ./measurements:/app/measurements:z

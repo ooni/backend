@@ -14,3 +14,29 @@ web:
     - "80:8000"
   links:
     - db
+    - redis
+    - rabbitmq
+
+redis:
+  image: redis:latest
+
+rabbitmq:
+  image: rabbitmq:latest
+
+worker:
+  extends:
+    service: app
+  command: celery -A measurements.runcelery.celery worker -l info
+  links:
+    - db
+    - redis
+    - rabbitmq
+
+beat:
+  extends:
+    service: app
+  command: celery -A measurements.runcelery.celery beat -l info
+  links:
+    - db
+    - redis
+    - rabbitmq

@@ -10,6 +10,10 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 CACHE_DEFAULT_TIMEOUT = None
 CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
 
+CELERY_BACKEND = os.environ.get("CELERY_BACKEND", "redis://redis:6379/0")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL",
+                                   "amqp://guest@rabbitmq:5672//")
+
 APP_ENV = os.environ.get("APP_ENV", "development")
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///ooni_measurements.db")
 WEBSERVER_ADDRESS = os.environ.get("WEBSERVER_ADDRESS", "0.0.0.0")

@@ -3,3 +3,13 @@ web:
   - ./config/base.env
   - ./config/staging.env
   - /opt/secrets.env
+worker:
+  env_file:
+  - ./config/base.env
+  - ./config/staging.env
+  - /opt/secrets.env
+beat:
+  env_file:
+  - ./config/base.env
+  - ./config/staging.env
+  - /opt/secrets.env
