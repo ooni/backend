@@ -6,3 +6,19 @@ web:
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev
+worker:
+  env_file:
+  - ./config/base.env
+  - ./config/testing.env
+  - /opt/secrets.env
+  volumes:
+    - ./measurements:/app/measurements:z
+    - ./dev:/app/dev
+beat:
+  env_file:
+  - ./config/base.env
+  - ./config/testing.env
+  - /opt/secrets.env
+  volumes:
+    - ./measurements:/app/measurements:z
+    - ./dev:/app/dev

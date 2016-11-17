@@ -1,10 +1,13 @@
 boto3
+celery
 Flask
 Flask-Cache
 Flask-Misaka
 Flask-Script
+msgpack-python
 python-dateutil
 pycountry==16.11.8
+redis>=2.8.0
 SQLAlchemy
 sqlalchemy-utils
 six
