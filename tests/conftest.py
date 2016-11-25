@@ -11,16 +11,7 @@ def pytest_collection_modifyitems(items):
         elif module_dir.endswith("unit"):
             item.add_marker(pytest.mark.unit)
 
-@pytest.yield_fixture(scope='session')
+@pytest.fixture
 def app():
     app = create_app()
-    ctx = app.app_context()
-    ctx.push()
-
-    yield app
-
-    ctx.pop()
-
-@pytest.fixture(scope='session')
-def client(app):
-    return app.test_client()
+    return app

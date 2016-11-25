@@ -37,7 +37,7 @@ load-fixtures:
 
 test-unit:
 	echo "Running unittests"
-	$(DOCKER_COMPOSE) run web pytest -m unit
+	$(DOCKER_COMPOSE) run web /bin/bash -c 'python -m coverage run -m pytest --strict -m unit && python -m coverage report -m'
 
 test-functional:
 	echo "Running functional tests"
