@@ -44,6 +44,9 @@ def _calendarized_count():
     ).group_by(ReportFile.bucket_date).order_by(
         ReportFile.bucket_date
     )
+    if q.first() is None:
+        raise StopIteration
+
     _, first_date = q.first()
     first_date = datetime.strptime(first_date, DT_FRMT)
     count_map = {}

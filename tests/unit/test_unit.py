@@ -12,7 +12,10 @@ def test_api_list_reports_index(client):
     assert isinstance(resp.json['metadata']['offset'], int)
     assert isinstance(resp.json['metadata']['current_page'], int)
 
-    assert isinstance(resp.json['metadata']['next_url'], str)
+    assert any([
+        isinstance(resp.json['metadata']['next_url'], str),
+        resp.json['metadata']['next_url'] is None
+    ])
 
 def test_api_list_reports_error(client):
     resp = client.get(url_for('api.api_list_report_files', order="INVALID"))
