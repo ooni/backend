@@ -37,6 +37,7 @@ script:
 - make APP_ENV=testing serve-d
 # Wait for postgres database to be running
 - 'while ! echo exit | nc localhost 5433; do sleep 10; done'
+- sleep 10
 - make test
 deploy:
   provider: script

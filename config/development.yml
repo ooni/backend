@@ -8,6 +8,7 @@ web:
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev:z
+    - ./tests:/app/tests:z
 
 static:
   extends:
