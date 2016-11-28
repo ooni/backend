@@ -71,9 +71,10 @@ let webpackConfig = {
 gulp.task("dist:js", () => {
 
   let files = [
+    path.resolve(staticPrefix, 'scripts', 'by_date.js'),
+    path.resolve(staticPrefix, 'scripts', 'country_flag.js'),
     path.resolve(staticPrefix, 'scripts', 'main.js'),
-    path.resolve(staticPrefix, 'scripts', 'stats.js'),
-    path.resolve(staticPrefix, 'scripts', 'country_flag.js')
+    path.resolve(staticPrefix, 'scripts', 'stats.js')
   ];
 
   return gulp.src(files)
@@ -137,8 +138,7 @@ gulp.task("dist:css", () => {
 gulp.task("dist", (cb) => {
   return gulpSequence(
     "clean",
-    "dist:icons",
-    "dist:flags",
+    ["dist:icons", "dist:flags"],
     ["dist:css", "dist:js"]
   )(cb);
 });

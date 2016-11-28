@@ -45,8 +45,3 @@
 
 </div>
 {% endblock %}
-
-{% block tail_js %}
-  {{ super() }}
-  <script src="{{ url_for("static", filename="dist/js/country_flag.js") }}"></script>
-{% endblock %}
