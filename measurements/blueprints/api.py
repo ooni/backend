@@ -6,6 +6,8 @@ from flask import Blueprint, render_template, current_app, request
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
+from sqlalchemy import func
+
 from six.moves.urllib.parse import urljoin, urlencode
 
 from measurements.app import cache
@@ -110,6 +112,22 @@ def api_private_runs_by_month():
 
     return jsonify(result)
 
+@api_private_blueprint.route('/reports_per_day')
+@cache.cached(timeout=60*60)
+def api_private_reports_per_day():
+    q = current_app.db_session.query(
+        func.count(ReportFile.bucket_date),
+        ReportFile.bucket_date
+    ).group_by(ReportFile.bucket_date).order_by(
+        ReportFile.bucket_date
+    )
+    result = []
+    for count, date in q:
+        result.append({
+            'count': count,
+            'date': date
+        })
+    return jsonify(result)
 
 @api_blueprint.route('/files', methods=["GET"])
 def api_list_report_files():
