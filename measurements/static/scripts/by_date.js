@@ -5,7 +5,7 @@ import moment from "moment";
 function chart(element, chartData, fromDate, toDate) {
 
   let CHART_WIDTH = 550;
-  let CHART_HEIGHT = 100;
+  let CHART_HEIGHT = 80;
   let SQUARE_LENGTH = 8;
   let SQUARE_PADDING = 2;
 
@@ -134,6 +134,9 @@ d3.json('/api/_/reports_per_day', (chartData) => {
 
   d3.utcYears(ooniEpoch, now).forEach((fromDate) => {
     let toDate = moment(fromDate).endOf('year').toDate();
+    if (toDate > now){
+      toDate = now;
+    }
     let element = calendar.append('div')
       .attr('class', 'col-md-6');
     element.append('h2')
