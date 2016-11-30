@@ -15,8 +15,6 @@ function chart(element, chartData, fromDate, toDate) {
     return d.count
   });
 
-  //let fromDate = moment().startOf('year').toDate();
-
   let dateRange = d3.timeDays(fromDate, toDate);
   let firstDate = moment(dateRange[0]);
 
