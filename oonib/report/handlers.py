@@ -60,7 +60,7 @@ def parseUpdateReportRequest(request, report_id=None):
     #db_report_id_regexp = re.compile("[a-zA-Z0-9]+$")
 
     # this is the regexp for the reports that include the timestamp
-    report_id_regexp = re.compile("[a-zA-Z0-9_\-]+$")
+    report_id_regexp = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
     # XXX here we are actually parsing a json object that could be quite big.
     # If we want this to scale properly we only want to look at the test_id
@@ -81,11 +81,11 @@ def parseUpdateReportRequest(request, report_id=None):
 
 
 def validateHeader(header):
-    version_string = re.compile("[0-9A-Za-z_\-\.]+$")
-    name = re.compile("[a-zA-Z0-9_\- ]+$")
-    probe_asn = re.compile("AS[0-9]+$")
-    probe_cc = re.compile("[A-Z]{2}$")
-    test_helper = re.compile("[A-Za-z0-9_\-]+$")
+    version_string = re.compile(r"^[0-9A-Za-z_\-\.]+$")
+    name = re.compile(r"^[a-zA-Z0-9_\- ]+$")
+    probe_asn = re.compile(r"^AS[0-9]+$")
+    probe_cc = re.compile(r"^[A-Z]{2}$")
+    test_helper = re.compile(r"^[A-Za-z0-9_\-]+$")
 
     expected_request = {
         'software_name': name,
