@@ -28,15 +28,20 @@ There are several technological decisions to be made regarding airflow deploymen
   explorer visualisation, so it's familiar technology.
 - Airflow relies on either on `multiprocessing` or on Celery to submit tasks to
   workers to use several CPUs and/or nodes.  Both executors run a separate
-  short-lived subprocess for every task, so there is no good reason to use Celery
-  from the 1st day, it'll not give anything like code caching speedup, the only
-  difference is that LocalExecutor adds 1s delay after each task. On the other
-  hand, the Airflow was not designed with "tiny tasks" in mind, so this
-  difference is not practical.
-- Celery will be our choice when we will be ready to utilise more than
-  one box for data processing pipeline. Celery itself may have different queue
-  management solutions: RabbitMQ and Redis. We should probably use Redis as it's
-  trivial to manage and debug in contrast with RabbitMQ.
+  short-lived subprocess for every task, but there is a good reason to use Celery
+  from the 1st day: it allows to separate executor from scheduler, it matters
+  as Airflow 1.7.1.3 has a bug that leads to scheduler being dead-locked and/or
+  live-locked, so restarting scheduler is a valuable addition.
+- Celery itself may have different queue management solutions: RabbitMQ and Redis.
+  Redis is trivial to manage and debug in contrast with RabbitMQ, but RabbitMQ
+  is more widely-adopted and, moreover, we can quite safely follow the route of
+  "restarting from scratch" in case of catastrophic failure. We should store
+  enough metadata in the pipeline tasks to be able to drop persistent RabbitMQ
+  queue and Airflow Postgresql database and start from some known point in time.
+- Ability to "restart from scratch" without re-processing the data is required
+  due to possible database inconsistencies triggered by airflow bugs (at least
+  one XCom-related fatal inconsistency was observed in 1.7.1.3), DAG
+  configuration errors and "hard" restarts of stuck scheduler process.
 
 There are several tasks to be solved while migrating pipeline to Airflow:
 - Temporary file storage. We don't need intermediate files like normalised
@@ -86,3 +91,25 @@ There are also tasks that are not related to migrating to Airflow, but are relev
 - Raw data compression. It's also possible to achieve a bit better data compression using different
   algorithms for hot and cold storage, but given current data volume it does
   not provide significant gain.
+
+- Sanitized data storage. It should be compressed and both batch-friendly and
+  single-measurement-friendly to serve as a datastore for interactive
+  measurement webpage of OONI explorer. Storing each measurement as a separate S3
+  object may lower compression ratio and increase batch processing timings due to
+  latency penalty to fetch each single measurement.  Storing whole 100
+  MBytes-sized report as a single compressed blob induces significant network
+  transfer & CPU penalty on OONI explorer (~200 ms to transfer 25 Mbytes over
+  1Gbit/s link + ~60 ms to decompress that amount of data). So the data should be
+  split/merged into separate chunks for long-term storage. These chunks should be
+  either distinct compression blocks within a stream or separate files.
+  The size of the chunk should be determined based on the observable latency /
+  throughput of Greenhost network to fetch the blobs via S3-like API and via
+  read-only NFS.
+
+### Data dependencies
+
+This graph show some of data dependencies, it's incomplete, it's not strict DAG
+(look at blockpages to see the loop), but it describes the reasoning behind
+processing being split into transformation (per-measurement) and aggregation:
+
+![Data pipeline](pipeline-16.10.png)
