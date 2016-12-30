@@ -13,3 +13,6 @@ beat:
   - ./config/base.env
   - ./config/production.env
   - /opt/secrets.env
+https-portal:
+  env_file:
+  - ./config/production.env
