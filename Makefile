@@ -1,7 +1,6 @@
 APP_ENV = development
 DOCKER_EXTRA =
-DOCKER_COMPOSE_FILE = docker-compose.yml
-DOCKER_COMPOSE = docker-compose -f $(DOCKER_COMPOSE_FILE) -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
+DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
 
 default:
 	@echo "ERR: Did not specify a command"
@@ -64,7 +63,6 @@ push-staging:
 	docker-compose -f docker-compose.yml -f config/staging.yml up -d
 
 production: APP_ENV=production
-production: DOCKER_COMPOSE_FILE=docker-compose-production.yml
 production: serve-d
 
 .PHONY: default build serve clean debug develop develop-rebuild dropdb test production

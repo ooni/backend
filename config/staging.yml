@@ -1,15 +1,36 @@
+db:
+  image: postgres:9.5
+  ports:
+    - "5433:5432"
+
 web:
   env_file:
   - ./config/base.env
   - ./config/staging.env
   - /opt/secrets.env
+  ports:
+    - "80:8000"
+  links:
+    - db
+    - redis
+    - rabbitmq
+
 worker:
   env_file:
   - ./config/base.env
   - ./config/staging.env
   - /opt/secrets.env
+  links:
+    - db
+    - redis
+    - rabbitmq
+
 beat:
   env_file:
   - ./config/base.env
   - ./config/staging.env
   - /opt/secrets.env
+  links:
+    - db
+    - redis
+    - rabbitmq
