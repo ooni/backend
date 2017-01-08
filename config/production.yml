@@ -29,6 +29,8 @@ beat:
 
 https-portal:
   image: steveltn/https-portal:1.0.0
+  env_file:
+  - ./config/production.env
   ports:
     - "80:80"
     - "443:443"
