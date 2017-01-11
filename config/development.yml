@@ -16,8 +16,6 @@ web:
     - ./tests:/app/tests:z
   links:
     - db
-    - redis
-    - rabbitmq
 
 static:
   extends:
@@ -35,8 +33,6 @@ worker:
     - ./measurements:/app/measurements:z
   links:
     - db
-    - redis
-    - rabbitmq
 
 beat:
   env_file:
@@ -47,5 +43,3 @@ beat:
     - ./measurements:/app/measurements:z
   links:
     - db
-    - redis
-    - rabbitmq
