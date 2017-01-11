@@ -5,27 +5,18 @@ web:
   - /opt/secrets.env
   ports:
   - "8000"
-  links:
-  - redis
-  - rabbitmq
 
 worker:
   env_file:
   - ./config/base.env
   - ./config/production.env
   - /opt/secrets.env
-  links:
-    - redis
-    - rabbitmq
 
 beat:
   env_file:
   - ./config/base.env
   - ./config/production.env
   - /opt/secrets.env
-  links:
-    - redis
-    - rabbitmq
 
 https-portal:
   image: steveltn/https-portal:1.0.0

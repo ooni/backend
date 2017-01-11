@@ -4,6 +4,9 @@ web:
   extends:
     service: app
   command: gunicorn -b 0.0.0.0:8000 --reload measurements.wsgi --workers 4 --timeout 120
+  links:
+  - redis
+  - rabbitmq
 
 redis:
   image: redis:latest
@@ -15,8 +18,14 @@ worker:
   extends:
     service: app
   command: celery -A measurements.runcelery.celery worker -l info
+  links:
+    - redis
+    - rabbitmq
 
 beat:
   extends:
     service: app
   command: celery -A measurements.runcelery.celery beat -l info
+  links:
+    - redis
+    - rabbitmq

@@ -15,8 +15,6 @@ web:
     - "80:8000"
   links:
     - db
-    - redis
-    - rabbitmq
 
 worker:
   env_file:
@@ -28,8 +26,6 @@ worker:
     - ./dev:/app/dev
   links:
     - db
-    - redis
-    - rabbitmq
 
 beat:
   env_file:
@@ -41,5 +37,3 @@ beat:
     - ./dev:/app/dev
   links:
     - db
-    - redis
-    - rabbitmq

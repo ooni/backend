@@ -12,8 +12,6 @@ web:
     - "80:8000"
   links:
     - db
-    - redis
-    - rabbitmq
 
 worker:
   env_file:
@@ -22,8 +20,6 @@ worker:
   - /opt/secrets.env
   links:
     - db
-    - redis
-    - rabbitmq
 
 beat:
   env_file:
@@ -32,5 +28,3 @@ beat:
   - /opt/secrets.env
   links:
     - db
-    - redis
-    - rabbitmq
