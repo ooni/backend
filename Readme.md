@@ -70,7 +70,7 @@ and should functionally be equivalent to production.
 
 Configuration management is handled by overriding environment variables and
 other parameters inside of `config/production.yml`, `config/staging.yml`,
-`config/testing.yml`. Read the [Environments section](#Environments) to
+`config/testing.yml`. Read the [Environments section](#environments) to
 learn the meaning of these.
 
 ## Deployment notes

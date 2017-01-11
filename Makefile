@@ -62,4 +62,7 @@ push-staging:
 	make APP_ENV=staging build
 	docker-compose -f docker-compose.yml -f config/staging.yml up -d
 
-.PHONY: default build serve clean debug develop develop-rebuild dropdb test
+production: APP_ENV=production
+production: serve-d
+
+.PHONY: default build serve clean debug develop develop-rebuild dropdb test production

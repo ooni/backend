@@ -1,3 +1,8 @@
+db:
+  image: postgres:9.5
+  ports:
+    - "5433:5432"
+
 web:
   env_file:
   - ./config/base.env
@@ -6,6 +11,13 @@ web:
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev
+  ports:
+    - "80:8000"
+  links:
+    - db
+    - redis
+    - rabbitmq
+
 worker:
   env_file:
   - ./config/base.env
@@ -14,6 +26,11 @@ worker:
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev
+  links:
+    - db
+    - redis
+    - rabbitmq
+
 beat:
   env_file:
   - ./config/base.env
@@ -22,3 +39,7 @@ beat:
   volumes:
     - ./measurements:/app/measurements:z
     - ./dev:/app/dev
+  links:
+    - db
+    - redis
+    - rabbitmq
