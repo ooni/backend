@@ -5,3 +5,4 @@ PyYaml
 awscli
 mkdocs
 bs4
+psycopg2
