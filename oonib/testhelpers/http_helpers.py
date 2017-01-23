@@ -24,6 +24,7 @@ from twisted.web.client import ContentDecoderAgent, GzipDecoder
 from twisted.web.client import PartialDownloadError
 from twisted.web.http import Request
 
+from oonib.api import log_function
 from oonib import log, randomStr
 
 from oonib.common.txextra import FixedRedirectAgent, TrueHeaders
@@ -507,9 +508,9 @@ class WebConnectivityStatus(RequestHandler):
 HTTPRandomPageHelper = Application([
     # XXX add regexps here
     (r"/(.*)/(.*)", HTTPRandomPage)
-])
+], log_function=log_function)
 
 WebConnectivityHelper = Application([
     (r"/status", WebConnectivityStatus),
     (r"/", WebConnectivity)
-])
+], log_function=log_function)

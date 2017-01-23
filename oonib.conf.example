@@ -22,6 +22,9 @@ main:
     no_save: true
     debug: false
     stale_time: 3600
+    # The supported options are:
+    # protocol, status, request_method, request_uri, remote_ip, request_time
+    log_format: "[{protocol}] {status} {request_method} {request_uri}  127.0.0.1 {request_time}ms"
 
     tor_datadir: null
 

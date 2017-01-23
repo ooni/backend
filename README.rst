@@ -107,6 +107,16 @@ this would simply be ``'report'``) and ``tor_datadir`` (where you would
 like the spawned Tor process to keep its data). If you compiled Tor yourself,
 you'll likely want to specify it for the ``tor_binary`` option.
 
+To configure the format of the log for the bouncer, collector and the HTTP based
+test helpers you can specify the `log_format` option in the main section.
+
+By default this is the logging policy adopted::
+
+    [{protocol}] {status} {request_method} {request_uri}  127.0.0.1 {request_time}ms
+
+The supported keys are ``protocol``, ``status``, ``request_method``, ``remote_ip``,
+``request_uri``, ``request_time``.
+
 Configure bouncer and collector endpoints
 .........................................
 
