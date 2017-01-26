@@ -1,5 +1,15 @@
 ChangeLog
 =========
+1.3.1 (Thu, 26 Jan 2017)
+-------------------------
+
+* Add support for intermediate certificate (#95)
+
+* Add support for specifying collector-alternate field (#92)
+
+* Move state of reports to filesystem (#91)
+
+* Strip invalid tcp_connect fields in web_connectivity test helper
 
 1.3.0 (Mon, 30 May 2016)
 -------------------------
