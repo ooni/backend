@@ -4,7 +4,7 @@ from twisted.internet import defer
 
 from cyclone import web
 
-from oonib.test.handler_helpers import HandlerTestCase
+from oonib.tests.handler_helpers import HandlerTestCase
 from oonib.main.api import mainAPI
 
 
