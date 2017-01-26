@@ -12,7 +12,7 @@ from oonib.config import config
 from oonib.report.handlers import report_file_path, checkForStaleReports
 from oonib.report.handlers import closeReport
 from oonib.report.api import reportAPI
-from oonib.test.handler_helpers import HandlerTestCase, mock_initialize, MockTime
+from oonib.tests.handler_helpers import HandlerTestCase, mock_initialize, MockTime
 
 sample_report_entry = {
     'agent': 'agent',

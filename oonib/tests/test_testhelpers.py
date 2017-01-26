@@ -1,7 +1,7 @@
 import json
 from twisted.internet import defer
 
-from oonib.test.handler_helpers import HandlerTestCase
+from oonib.tests.handler_helpers import HandlerTestCase
 from oonib.testhelpers import http_helpers
 
 

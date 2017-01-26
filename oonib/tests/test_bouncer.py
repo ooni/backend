@@ -6,7 +6,7 @@ from twisted.internet import defer
 from cyclone import web
 
 from oonib.bouncer.api import bouncerAPI
-from oonib.test.handler_helpers import HandlerTestCase
+from oonib.tests.handler_helpers import HandlerTestCase
 
 fake_bouncer_file = """
 collector:
@@ -70,6 +70,22 @@ collector:
 
   fake_addressB:
     test-helper: {fake_test_helper: 'fake_hostname'}
+"""
+
+production_bouncer_file = """
+collector:
+  httpo://ihiderha53f36lsd.onion:
+    collector-alternate:
+    - {address: 'https://a.collector.ooni.io:4441', type: https}
+    - {address: 'https://das0y2z2ribx3.cloudfront.net', front: a0.awsstatic.com, type: cloudfront}
+    test-helper: {dns: '213.138.109.232:57004', http-return-json-headers: 'http://38.107.216.10:80',
+      ssl: 'https://213.138.109.232', tcp-echo: 213.138.109.232, traceroute: 213.138.109.232,
+      web-connectivity: 'httpo://7jne2rpg5lsaqs6b.onion'}
+    test-helper-alternate:
+      web-connectivity:
+      - {address: 'https://a.web-connectivity.th.ooni.io:4442', type: https}
+      - {address: 'https://d2vt18apel48hw.cloudfront.net', front: a0.awsstatic.com,
+        type: cloudfront}
 """
 
 reports_dir = 'data/reports'
@@ -498,3 +514,61 @@ class TestHelperTests(BaseTestBouncer):
         self.assertIn(response_body['fake_test_helper']['collector'], ['fake_addressA', 'fake_addressB'])
         self.assertEqual(response_body['exotic_test_helper']['collector'], 'fake_addressA')
         self.assertEqual('fake_addressB', response_body['default']['collector'])
+
+class TestProductionTests(BaseTestBouncer):
+    app = web.Application(bouncerAPI, name='bouncerAPI')
+
+    def setUp(self, *args, **kw):
+        with open(bouncer_filename, 'w') as bouncer_file:
+            bouncer_file.write(production_bouncer_file)
+        super(TestProductionTests, self).setUp()
+
+    @defer.inlineCallbacks
+    def test_default_deck(self):
+        data = {
+            'net-tests': [
+                {
+                    'test-helpers': ['tcp-echo'], 'version': '0.2',
+                    'name': 'http_invalid_request_line',
+                    'input-hashes': []
+                 },
+                {
+                    'test-helpers': ['http-return-json-headers'],
+                    'version': '0.1.5',
+                    'name': 'http_header_field_manipulation',
+                     'input-hashes': []
+                },
+                {
+                    'test-helpers': ['web-connectivity'],
+                    'version': '0.1.0',
+                    'name': 'web_connectivity',
+                    'input-hashes': ['b8c6c07b3bce38bd15e4253ee99b5193880881653153d9c065f06c29735a1be6']},
+                {
+                    'test-helpers': ['web-connectivity'],
+                    'version': '0.1.0',
+                    'name': 'web_connectivity',
+                    'input-hashes': ['86a8bb1d2eddb562388b8c040534284f7796976c3ef3984c9b10c8ac0e83853b']}
+            ]
+        }
+
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
+        response_body = json.loads(response.body)
+        self.assertEqual(len(response_body['net-tests']), 4)
+
+    @defer.inlineCallbacks
+    def test_traceroute(self):
+        data = {
+            'net-tests': [
+                {
+                    'test-helpers': ['traceroute'],
+                    'version': '0.2',
+                    'name': 'traceroute',
+                    'input-hashes': []
+                 },
+            ]
+        }
+        response = yield self.request('/bouncer/net-tests', 'POST', data)
+        response_body = json.loads(response.body)
+        print(response_body['net-tests'])
+
+
