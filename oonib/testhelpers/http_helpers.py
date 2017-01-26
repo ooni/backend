@@ -477,14 +477,25 @@ class WebConnectivity(OONIBHandler):
                 raise HTTPError(400, "Missing %s" % rk)
         if not HTTP_REQUEST_REGEXP.match(request['http_request']):
             raise HTTPError(400, "Invalid http_request URL")
-        if any([not SOCKET_REGEXP.match(socket)
-                for socket in request['tcp_connect']]):
-            raise HTTPError(400, "Invalid tcp_connect URL")
+        # We don't need to check the tcp_connect field because we strip it in
+        # the post already.
 
     @asynchronous
     def post(self):
         try:
             request = json.loads(self.request.body)
+
+            # Here we fix inconsistencies in the tcp_connect field.  Due to:
+            # https://github.com/TheTorProject/ooni-probe/issues/727 ooniprobe
+            # was sending hostnames as part of the tcp_connect key as well as
+            # IP addresses.
+            # If we find something that isn't a socket we just ignore it.
+            tcp_connect = []
+            for socket in request['tcp_connect']:
+                if SOCKET_REGEXP.match(socket):
+                    tcp_connect.append(socket)
+            request['tcp_connect'] = tcp_connect
+
             self.validate_request(request)
             include_http_responses = request.get("include_http_responses",
                                                  False)
