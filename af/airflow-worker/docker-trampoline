@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# Ability to execute arbituary docker commands equals to root-shell, so this
+# script does some whitelisting.  The script should be launched with:
+#
+#   sudo --non-interactive /foo/bar/trampoline.sh \
+#         do-something-awesome.py \
+#         "{{ ds }}" \
+#         "{{ execution_date.isoformat() }}" \
+#         "{{ (execution_date + dag.schedule_interval).isoformat() }}" \
+#         other CLI arguments to script
+
+# FIXME: 1000 = `id -u benchmark` at the datacollector dom0
+uidno=1000
+
+script="$1"
+bucket="$2"
+isofrom="$3" # execution_date
+isotill="$4" # execution_date + schedule_interval
+shift 4
+
+(
+shopt -s extglob
+for var in "$bucket" "$isofrom" "$isotill"; do
+    # NB: `.` (dot) delimits microseconds in isoformat() but they are not welcome here
+    if [ -z "$var" -o -n "${var/+([-0-9T:])/}" ]; then
+        echo "$0: bad arg <$var> -> <${var/+([-0-9T:])/}>" 1>&2
+        exit 1
+    fi
+done
+) || exit 1
+
+docksafe="--rm --interactive --read-only"
+
+volargs=""
+case "$script" in
+    canning.py)
+    dop=/data/ooni/private
+    docker run $docksafe --network none -v=${dop}/canned:${dop}/canned debian:jessie /bin/bash -c "mkdir -p ${dop}/canned/${bucket} && chown $uidno ${dop}/canned/${bucket}"
+    volargs="--volume=${dop}/reports-raw/${bucket}:${dop}/reports-raw/${bucket}:ro --volume=${dop}/canned/${bucket}:${dop}/canned/${bucket}:rw"
+    ;;
+
+    *)
+    echo "$0: unknown script <$script>" 1>&2
+    exit 1
+    ;;
+esac
+
+set -o xtrace
+
+# FIXME: hardcoded uid of the `benchmark` user at `datacollector`
+exec docker run $docksafe --user "$uidno" --network none ${volargs} ooni/shovel:latest "/usr/local/bin/$script" --start "$isofrom" --end "$isotill" "$@"

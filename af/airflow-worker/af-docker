@@ -1,0 +1,1 @@
+airflow ALL = (ALL:ALL) NOPASSWD: /usr/local/bin/docker-trampoline
