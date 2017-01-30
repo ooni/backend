@@ -450,7 +450,8 @@ web_connectivity_cache = WebConnectivityCache()
 class WebConnectivity(OONIBHandler):
     @defer.inlineCallbacks
     def control_measurement(self, http_url, socket_list,
-                            include_http_responses):
+                            include_http_responses,
+                            invalid_sockets):
         hostname = urlparse(http_url).netloc
         dl = [
             web_connectivity_cache.http_request(http_url, include_http_responses),
@@ -464,6 +465,11 @@ class WebConnectivity(OONIBHandler):
         tcp_connect = {}
         for idx, response in enumerate(responses[2:]):
             tcp_connect[socket_list[idx]] = response[1]
+        for invalid_socket in invalid_sockets:
+            tcp_connect[invalid_socket] = {
+                "status": None,
+                "failure": "invalid_socket"
+            }
         self.finish({
             'http_request': http_request,
             'tcp_connect': tcp_connect,
@@ -489,11 +495,16 @@ class WebConnectivity(OONIBHandler):
             # https://github.com/TheTorProject/ooni-probe/issues/727 ooniprobe
             # was sending hostnames as part of the tcp_connect key as well as
             # IP addresses.
-            # If we find something that isn't a socket we just ignore it.
+            # If we find something that isn't an IP address we return it with
+            # the key value None to support backward compatibility with older
+            # bugged clients.
             tcp_connect = []
+            invalid_sockets = []
             for socket in request['tcp_connect']:
                 if SOCKET_REGEXP.match(socket):
                     tcp_connect.append(socket)
+                else:
+                    invalid_sockets.append(socket)
             request['tcp_connect'] = tcp_connect
 
             self.validate_request(request)
@@ -502,7 +513,8 @@ class WebConnectivity(OONIBHandler):
             self.control_measurement(
                 str(request['http_request']),
                 request['tcp_connect'],
-                include_http_responses
+                include_http_responses,
+                invalid_sockets
             )
         except HTTPError:
             raise
