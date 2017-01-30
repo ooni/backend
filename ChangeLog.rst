@@ -1,5 +1,11 @@
 ChangeLog
 =========
+
+1.3.2 (Mon, 30 Jan 2017)
+-------------------------
+
+* Fix backward compatibility with legacy clients when stripping invalid tcp_connect fields
+
 1.3.1 (Thu, 26 Jan 2017)
 -------------------------
 
