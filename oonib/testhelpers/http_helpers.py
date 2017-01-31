@@ -309,8 +309,9 @@ class WebConnectivityCache(object):
         defer.returnValue(value)
 
     @defer.inlineCallbacks
-    def http_request(self, url, include_http_responses=False):
-        cached_value = yield self.lookup('http_request', url)
+    def http_request(self, url, http_request_headers, include_http_responses=False):
+        key = url + json.dumps(http_request_headers)
+        cached_value = yield self.lookup('http_request', key)
         if cached_value is not None:
             if include_http_responses is not True:
                 cached_value.pop('responses', None)
@@ -333,7 +334,7 @@ class WebConnectivityCache(object):
             while True:
                 try:
                     response = yield agent.request('GET', url,
-                                                   TrueHeaders(REQUEST_HEADERS))
+                                                   TrueHeaders(http_request_headers))
                     headers = {}
                     for name, value in response.headers.getAllRawHeaders():
                         headers[name] = unicode(value[0], errors='ignore')
@@ -369,7 +370,7 @@ class WebConnectivityCache(object):
             # XXX map more failures
             page_info['failure'] = 'unknown_error'
 
-        yield self.cache_value('http_request', url, page_info)
+        yield self.cache_value('http_request', key, page_info)
         if include_http_responses is not True:
             page_info.pop('responses', None)
         defer.returnValue(page_info)
@@ -452,10 +453,14 @@ class WebConnectivity(OONIBHandler):
     @defer.inlineCallbacks
     def control_measurement(self, http_url, socket_list,
                             include_http_responses,
-                            invalid_sockets):
+                            invalid_sockets,
+                            http_request_headers=None):
+        if http_request_headers is None:
+            http_request_headers = {}
+
         hostname = urlparse(http_url).netloc
         dl = [
-            web_connectivity_cache.http_request(http_url, include_http_responses),
+            web_connectivity_cache.http_request(http_url, http_request_headers, include_http_responses),
             web_connectivity_cache.dns_consistency(hostname)
         ]
         for socket in socket_list:
@@ -478,12 +483,20 @@ class WebConnectivity(OONIBHandler):
         })
 
     def validate_request(self, request):
+        allowed_headers = ['user-agent', 'accept', 'accept-language']
         required_keys = ['http_request', 'tcp_connect']
         for rk in required_keys:
             if rk not in request.keys():
                 raise HTTPError(400, "Missing %s" % rk)
         if not HTTP_REQUEST_REGEXP.match(request['http_request']):
             raise HTTPError(400, "Invalid http_request URL")
+
+        http_request_headers = request.get('http_request_headers', {})
+        for k, v in http_request_headers.iteritems():
+            if k.lower() not in allowed_headers:
+                raise HTTPError(400, "Invalid header %s" % k)
+            if not isinstance(v, list):
+                raise HTTPError(400, "Headers must be a list")
         # We don't need to check the tcp_connect field because we strip it in
         # the post already.
 
@@ -509,13 +522,17 @@ class WebConnectivity(OONIBHandler):
             request['tcp_connect'] = tcp_connect
 
             self.validate_request(request)
-            include_http_responses = request.get("include_http_responses",
-                                                 False)
+            include_http_responses = request.get(
+                    "include_http_responses",
+                    False
+            )
+            http_request_headers = request.get('http_request_headers', {})
             self.control_measurement(
-                str(request['http_request']),
-                request['tcp_connect'],
-                include_http_responses,
-                invalid_sockets
+                http_url=str(request['http_request']),
+                include_http_responses=include_http_responses,
+                http_request_headers=http_request_headers,
+                socket_list=request['tcp_connect'],
+                invalid_sockets=invalid_sockets
             )
         except HTTPError:
             raise
