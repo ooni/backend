@@ -366,9 +366,11 @@ class WebConnectivityCache(object):
             page_info['failure'] = 'connection_refused_error'
         except ConnectError:
             page_info['failure'] = 'connect_error'
-        except:
+        except Exception as exc:
             # XXX map more failures
             page_info['failure'] = 'unknown_error'
+            log.err("Unknown error occurred")
+            log.exception(exc)
 
         yield self.cache_value('http_request', key, page_info)
         if include_http_responses is not True:
@@ -526,7 +528,12 @@ class WebConnectivity(OONIBHandler):
                     "include_http_responses",
                     False
             )
-            http_request_headers = request.get('http_request_headers', {})
+
+            # We convert headers to str so twisted is happy (unicode triggers
+            # errors)
+            http_request_headers = {}
+            for k, v in request.get('http_request_headers', {}).iteritems():
+                http_request_headers[str(k)] = map(str, v)
             self.control_measurement(
                 http_url=str(request['http_request']),
                 include_http_responses=include_http_responses,
