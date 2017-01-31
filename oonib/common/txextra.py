@@ -19,6 +19,8 @@ from twisted.internet.defer import Deferred, fail, maybeDeferred, failure
 
 from twisted.python import log
 
+from .ip_utils import is_private_address
+
 class TrueHeaders(Headers):
     def __init__(self, rawHeaders=None):
         self._rawHeaders = dict()
@@ -34,6 +36,12 @@ class TrueHeaders(Headers):
             self._rawHeaders[name.lower()] = dict()
         self._rawHeaders[name.lower()]['name'] = name
         self._rawHeaders[name.lower()]['values'] = values
+
+    def copy(self):
+        rawHeaders = {}
+        for k, v in self.getAllRawHeaders():
+            rawHeaders[k] = v
+        return self.__class__(rawHeaders)
 
     def getAllRawHeaders(self):
         for _, v in self._rawHeaders.iteritems():
@@ -168,6 +176,10 @@ class FixedRedirectAgent(BrowserLikeRedirectAgent):
     This is a redirect agent with this patch manually applied:
     https://twistedmatrix.com/trac/ticket/8265
     """
+    def __init__(self, agent, redirectLimit=20, ignorePrivateRedirects=False):
+        self.ignorePrivateRedirects = ignorePrivateRedirects
+        BrowserLikeRedirectAgent.__init__(self, agent, redirectLimit)
+
     def _handleRedirect(self, response, method, uri, headers, redirectCount):
         """
         Handle a redirect response, checking the number of redirects already
@@ -191,12 +203,26 @@ class FixedRedirectAgent(BrowserLikeRedirectAgent):
             response.request.absoluteURI,
             locationHeaders[0]
         )
+        if getattr(client, 'URI', None):
+            uri = client.URI.fromBytes(location)
+        else:
+            # Backward compatibility with twisted 14.0.2
+            uri = client._URI.fromBytes(location)
+        if self.ignorePrivateRedirects and is_private_address(uri.host,
+                                                              only_loopback=True):
+            return response
+
         deferred = self._agent.request(method, location, headers)
 
         def _chainResponse(newResponse):
+            if isinstance(newResponse, Failure):
+                # This is needed to write the response even in case of failure
+                newResponse.previousResponse = response
+                newResponse.requestLocation = location
+                return newResponse
             newResponse.setPreviousResponse(response)
             return newResponse
 
-        deferred.addCallback(_chainResponse)
+        deferred.addBoth(_chainResponse)
         return deferred.addCallback(
             self._handleResponse, method, uri, headers, redirectCount + 1)
