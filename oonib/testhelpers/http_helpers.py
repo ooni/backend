@@ -325,7 +325,8 @@ class WebConnectivityCache(object):
 
         agent = ContentDecoderAgent(
             FixedRedirectAgent(TrueHeadersAgent(reactor)),
-                               [('gzip', GzipDecoder)]
+                               [('gzip', GzipDecoder)],
+                               ignorePrivateRedirects=True
         )
         try:
             retries = 0
