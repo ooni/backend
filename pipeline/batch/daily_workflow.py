@@ -524,7 +524,7 @@ class NormaliseReport(luigi.Task):
 
         entry['bucket_date'] = bucket_date
 
-        entry['id'] = entry.get('id', str(uuid.uuid4()))
+        entry['id'] = str(uuid.uuid4())
         entry['report_filename'] = os.path.join(bucket_date,
                                     os.path.basename(self.output().path))
 
