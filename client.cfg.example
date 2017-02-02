@@ -1,3 +1,12 @@
+[scheduler]
+state-path: luigi-state.pickle
+[core]
+logging_conf_file: logging.cfg
+parallel-scheduling: true
+rpc-connect-timeout: 100
+http+unix://luigid.sock
+[worker]
+ping_interval: 3
 [s3]
 aws_access_key_id: XXX
 aws_secret_access_key: XXX
@@ -5,6 +14,10 @@ aws_secret_access_key: XXX
 raw-reports-dir: /data/ooni/private/raw-reports/yaml/
 private-dir: /data/ooni/private/
 public-dir: /data/ooni/public/
+# s3 data paths
+#raw-reports-dir: s3n://ooni-private/reports-raw/yaml/
+#private-dir: s3n://ooni-private/
+#public-dir: s3n://ooni-public/sanitised
 bridge-db-path: /data/ooni/private/bridge_reachability/bridge_db.json
 [postgres]
 local-tmp-dir: /tmp
@@ -14,4 +27,5 @@ user: ooni
 password: changeme
 metrics-table: metrics
 domain-table: domains
+marker-table: table_updates
 asn-table: asns
