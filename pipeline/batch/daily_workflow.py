@@ -844,7 +844,7 @@ class UpdateView(RunQuery):
 
     view = ''
     def query(self):
-        return 'REFRESH MATERIALIZED VIEW {view};\n'.format(view=self.view)
+        return 'REFRESH MATERIALIZED VIEW CONCURRENTLY {view};\n'.format(view=self.view)
 
 class UpdateCountryCount(UpdateView):
     view = 'country_counts_view'
