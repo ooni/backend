@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+1.3.3 (Thu, 2 Feb 2017)
+-------------------------
+* Add support for allows clients to send HTTP request headers
+
+* Ignore redirects to localhost
+
 1.3.2 (Mon, 30 Jan 2017)
 -------------------------
 
