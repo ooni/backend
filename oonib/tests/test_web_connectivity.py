@@ -14,7 +14,7 @@ class WebConnectivityCacheTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_http_request(self):
         value = yield self.web_connectivity_cache.http_request(
-                    'https://www.google.com/humans.txt')
+                    'https://www.google.com/humans.txt', {})
         self.assertEqual(
             value['body_length'], 286
         )
