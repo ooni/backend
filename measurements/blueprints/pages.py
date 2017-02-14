@@ -155,7 +155,10 @@ def _files_by_country():
         count, alpha_2 = row
         country = "Unknown"
         if alpha_2 != "ZZ":
-            country = countries.get(alpha_2=alpha_2).name
+            try:
+                country = countries.get(alpha_2=alpha_2).name
+            except KeyError:
+                country = "Unknown (%s)" % alpha_2
         results.append({
             'count': count,
             'alpha2': alpha_2,
