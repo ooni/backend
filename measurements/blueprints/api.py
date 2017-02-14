@@ -1,6 +1,7 @@
 import math
 import os
 
+from datetime import datetime
 from dateutil.parser import parse as parse_date
 from flask import Blueprint, render_template, current_app, request
 from flask.json import jsonify
@@ -41,6 +42,7 @@ def api_docs():
 @api_private_blueprint.route('/asn_by_month')
 @cache.cached(timeout=60*60)
 def api_private_asn_by_month():
+    NOW = datetime.now()
     result = []
     r = current_app.db_session.query(
             ReportFile.test_start_time,
@@ -50,6 +52,9 @@ def api_private_asn_by_month():
     # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, asn in r:
+        if tst > NOW:
+            # We ignore measurements from time travelers
+            continue
         bkt = tst.strftime("%Y-%m-01")
         monthly_buckets[bkt] = monthly_buckets.get(bkt, [])
         if asn not in monthly_buckets[bkt]:
@@ -66,6 +71,7 @@ def api_private_asn_by_month():
 @api_private_blueprint.route('/countries_by_month')
 @cache.cached(timeout=60*60)
 def api_private_counties_by_month():
+    NOW = datetime.now()
     result = []
     r = current_app.db_session.query(
             ReportFile.test_start_time,
@@ -75,6 +81,9 @@ def api_private_counties_by_month():
     # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, country in r:
+        if tst > NOW:
+            # We ignore measurements from time travelers
+            continue
         bkt = tst.strftime("%Y-%m-01")
         monthly_buckets[bkt] = monthly_buckets.get(bkt, [])
         if country not in monthly_buckets[bkt]:
@@ -91,6 +100,7 @@ def api_private_counties_by_month():
 @api_private_blueprint.route('/runs_by_month')
 @cache.cached(timeout=60*60)
 def api_private_runs_by_month():
+    NOW = datetime.now()
     result = []
     r = current_app.db_session.query(
             ReportFile.test_start_time) \
@@ -100,6 +110,9 @@ def api_private_runs_by_month():
     monthly_buckets = {}
     for res in r:
         tst = res.test_start_time
+        if tst > NOW:
+            # We ignore measurements from time travelers
+            continue
         bkt = tst.strftime("%Y-%m-01")
         monthly_buckets[bkt] = monthly_buckets.get(bkt, 0)
         monthly_buckets[bkt] += 1
