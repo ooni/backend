@@ -341,9 +341,6 @@ def load_verified_index(output_dir, bucket):
     ndxsize = {_['filename']: _['file_size'] for _ in index}
     outsize = {os.path.join(bucket, f): sz for f, sz in listdir_filesize(output_dir) if f != INDEX_FNAME}
     if ndxsize != outsize:
-        import pprint
-        pprint.pprint(ndxsize)
-        pprint.pprint(outsize)
         raise CannerError('Mismatching set of output files', output_dir)
     return index
 
@@ -471,7 +468,7 @@ def main():
     # `datacollector` so the canning process is not much slower than disk write
     # speed.  TODO: write better text and/or code for quick re-benchmarking.
     #
-    # Default tar can size for the bucket (64 Mbytes) is chosend due to reasons
+    # Default tar can size for the bucket (64 Mbytes) is chosen due to reasons
     # described in `pack_bucket()` doc.  Tar files are merged using `test_name`
     # as the reason to reprocess the data is usually some new data mining code
     # and this code is usually test-specific.

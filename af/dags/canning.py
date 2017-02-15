@@ -7,7 +7,7 @@ dag = DAG(
     dag_id='hist_canning',
     schedule_interval=timedelta(days=1),
     start_date=datetime(2012, 12, 5),
-    end_date=datetime(2017, 1, 24), # NB: end_date is included
+    end_date=datetime(2017, 2, 10), # NB: end_date is included
     default_args={
         'email': 'leon+airflow@darkk.net.ru',
         'retries': 1,
