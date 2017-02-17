@@ -156,6 +156,4 @@ def update_file_metadata(app, target_dir, no_check=False):
         if not add_to_db(app, filepath, index, no_check):
             continue
         idx += 1
-        if idx % 100 == 0:
-            app.db_session.commit()
-    app.db_session.commit()
+        app.db_session.commit()
