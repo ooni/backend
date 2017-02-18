@@ -4,7 +4,7 @@ FROM ubuntu:16.04
 
 RUN set -ex \
     && apt-get update \
-    && apt-get install -y python2.7 liblz4-tool \
+    && apt-get install -y python2.7 liblz4-tool python-ujson python-yaml \
     && :
 
 # Whole python-lz4 repo is clonned as `git` can't do shallow clone of single
@@ -25,5 +25,6 @@ RUN set -ex \
     && :
 
 COPY canning.py /usr/local/bin/
+COPY daily_workflow.py autoclaving.py /usr/local/bin/
 
 USER daemon

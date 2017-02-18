@@ -32,12 +32,21 @@ done
 
 docksafe="--rm --interactive --read-only"
 
+priv=/data/ooni/private
+pub=/data/ooni/public
 volargs=""
 case "$script" in
     canning.py)
-    dop=/data/ooni/private
-    docker run $docksafe --network none -v=${dop}/canned:${dop}/canned debian:jessie /bin/bash -c "mkdir -p ${dop}/canned/${bucket} && chown $uidno ${dop}/canned/${bucket}"
-    volargs="--volume=${dop}/reports-raw/${bucket}:${dop}/reports-raw/${bucket}:ro --volume=${dop}/canned/${bucket}:${dop}/canned/${bucket}:rw"
+    docker run $docksafe --network none -v=${priv}/canned:${priv}/canned debian:jessie /bin/bash -c "mkdir -p ${priv}/canned/${bucket} && chown $uidno ${priv}/canned/${bucket}"
+    volargs="${volargs} --volume=${priv}/reports-raw/${bucket}:${priv}/reports-raw/${bucket}:ro"
+    volargs="${volargs} --volume=${priv}/canned/${bucket}:${priv}/canned/${bucket}:rw"
+    ;;
+
+    autoclaving.py)
+    docker run $docksafe --network none -v=${pub}/autoclaved:${pub}/autoclaved debian:jessie /bin/bash -c "mkdir -p ${pub}/autoclaved/${bucket} && chown $uidno ${pub}/autoclaved/${bucket}"
+    volargs="${volargs} --volume=${priv}/bridge_db:${priv}/bridge_db:ro"
+    volargs="${volargs} --volume=${priv}/canned/${bucket}:${priv}/canned/${bucket}:ro"
+    volargs="${volargs} --volume=${pub}/autoclaved/${bucket}:${pub}/autoclaved/${bucket}:rw"
     ;;
 
     *)

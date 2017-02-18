@@ -6,9 +6,6 @@ MAINTAINER Leonid Evdokimov <leon@darkk.net.ru>
 
 USER root
 
-COPY af-docker /etc/sudoers.d/
-COPY docker-trampoline /usr/local/bin/
-
 RUN set -ex \
     && apt-get update \
     && apt-get install -y curl apt-transport-https ca-certificates \
@@ -16,6 +13,7 @@ RUN set -ex \
     && apt-key fingerprint 58118E89F3A912897C070ADBF76221572C52609D | grep '^ *Key fingerprint = 5811 8E89 F3A9 1289 7C07  0ADB F762 2157 2C52 609D$' \
     && :
 
+COPY af-docker /etc/sudoers.d/
 COPY docker.list /etc/apt/sources.list.d/
 
 RUN set -ex \
@@ -28,6 +26,8 @@ RUN set -ex \
         /tmp/* \
         /var/tmp/* \
     && :
+
+COPY docker-trampoline /usr/local/bin/
 
 # switch it back
 USER airflow
