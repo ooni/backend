@@ -221,6 +221,7 @@ def stream_yaml_reports(fd): # NormaliseReport._yaml_report_iterator
     fd = stream_yaml_blobs(fd)
     off, header = fd.next()
     headsha = sha1(header)
+    # XXX: bad header kills whole bucket
     header = yaml.load(header, Loader=CLoader)
     if not header.get('report_id'):
         start_time = datetime.fromtimestamp(header.get('start_time', 0))
@@ -229,7 +230,9 @@ def stream_yaml_reports(fd): # NormaliseReport._yaml_report_iterator
         value_to_hash += header.get('probe_asn', 'AS0')
         value_to_hash += header.get('test_name', 'invalid')
         value_to_hash += header.get('software_version', '0.0.0')
-        value_to_hash += str(header.get('probe_city', 'None'))
+        probe_city = header.get('probe_city', 'None')
+        probe_city = probe_city.encode('utf-8') if isinstance(probe_city, unicode) else str(probe_city) # u'Reykjav\xedk' in bucket 2014-02-20
+        value_to_hash += probe_city
         report_id += ''.join(string.ascii_letters[ord(x) % len(string.ascii_letters)]
                              for x in hashlib.sha512(value_to_hash).digest())[:50]
         header['report_id'] = report_id
