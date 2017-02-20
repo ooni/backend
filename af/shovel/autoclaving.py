@@ -264,7 +264,7 @@ def stream_json_reports(fd): # NormaliseReport._json_report_iterator
 
 
 def autoclave_measurements(report_iter, perma_fname):
-    assert perma_fname.count('/') == 1 and perma_fname[:2] == '20' # XXI century
+    assert BRIDGE_DB is not None and perma_fname.count('/') == 1 and perma_fname[:2] == '20' # XXI century
     bucket = perma_fname.split('/', 1)[0]
     for off, entry_len, esha, entry, exc in report_iter:
         hashuuid = esha[:16] # sha1 is 20 bytes
@@ -450,6 +450,7 @@ def main():
     # tar read | split-reports | jsonize-normalize-sanitize | tar write | lz4
     opt = parse_args()
     with closing(opt.bridge_db) as fd:
+        global BRIDGE_DB
         BRIDGE_DB = ujson.load(fd)
     bucket = opt.start.strftime('%Y-%m-%d')
     autoclaving(opt.canned_root, opt.autoclaved_root, bucket)
