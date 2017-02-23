@@ -22,7 +22,7 @@ def setup_period_tasks(app):
         celery.conf.beat_schedule = {
             'update-files': {
                 'task': 'task.update_files',
-                'schedule': crontab(hour='*/6')
+                'schedule': crontab(minute='*/30')
             }
         }
 
