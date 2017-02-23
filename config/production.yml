@@ -20,6 +20,7 @@ beat:
 
 https-portal:
   image: steveltn/https-portal:1.0.0
+  restart: always
   env_file:
   - ./config/production.env
   ports:

@@ -10,14 +10,17 @@ web:
 
 redis:
   image: redis:3.2
+  restart: always
 
 rabbitmq:
   image: rabbitmq:3.6
+  restart: always
 
 worker:
   extends:
     service: app
   command: celery -A measurements.runcelery.celery worker -l info
+  restart: always
   links:
     - redis
     - rabbitmq
@@ -26,6 +29,7 @@ beat:
   extends:
     service: app
   command: celery -A measurements.runcelery.celery beat -l info
+  restart: always
   links:
     - redis
     - rabbitmq
