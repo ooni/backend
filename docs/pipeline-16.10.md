@@ -106,10 +106,90 @@ There are also tasks that are not related to migrating to Airflow, but are relev
   throughput of Greenhost network to fetch the blobs via S3-like API and via
   read-only NFS.
 
-### Data dependencies
+
+Data dependencies
+=================
 
 This graph show some of data dependencies, it's incomplete, it's not strict DAG
 (look at blockpages to see the loop), but it describes the reasoning behind
 processing being split into transformation (per-measurement) and aggregation:
 
 ![Data pipeline](pipeline-16.10.png)
+
+
+Infra
+=====
+
+Datastore is currently filesystem-based, but all code is written in streaming way to make migration to objectstore easier.
+
+Airflow is "smart cron" manager, airflow is deployed with docker. Exact recipe is based on [puckel/docker-airflow](https://github.com/puckel/docker-airflow/) and some crutches overlayed on top of that image.
+
+Data processing happens in separate container (*ooni/shovel*) to avoid bringing unstable dependencies to airflow container as mixing unstable software is scary.
+
+
+Data flow
+=========
+
+There are three major "daily" steps: 1. *canning*, 2. *autoclaving*, 3. *centrifugation*.
+
+**Canning** converts reports-raw to tar.lz4 files in following way:
+`canning-1.py | tar c 2000-13-42/foo.yaml 2000-13-42/bar.json | canning-2.py | lz4 -5 | canning-3.py`
+canning-1: group reports by `test_name`, slice tham into ~64 Mbytes groups of uncompressed data, send them to `tar`
+canning-2: read tar file, verify sizes of reports, calculate sha1 and crc32 of each report, calculate size of tar file, pipe it to `lz4`
+canning-3: read lz4 from the pipe, calculate it's size, sha1 and crc32, dump lz4 & all the checksums to disk
+
+All the sizes are recorded to be checked to avoid various sort of unexpected file truncations.
+
+**Autoclaving** replaces normalization and sanitization, it converts tar.lz4 files in 1:1 way.
+lz4 compression is a bit tricky at this stage: lz4 frames are independent,
+report offsets within the block are recorded in the separate index file, so the
+resulting file is both streamable (with ability to skip tar records without
+decoding), seekable (single lz4 frame is read to get a single report — that's
+~56kb of compressed data) and readable with ordinary `tar -I lz4 --extract` for
+whoever wanting to parse sanitized measurements.
+
+Indexes for the reports are stored as well, they include block offsets, sizes, and offsets within block required to seek() to exact measurement and to read the file in streaming way without parsing tarfile stream.
+
+**Centrifugation** is done to enrich the data.
+It reads data sanitized by autoclaving, extract the aggregatable essence and stores metadata into postgresql db for further processing.
+More on this step later.
+
+
+Highlights
+==========
+
+*Daily?* — I say *daily* as it daily bucket gives better compression ratio and more "sane" data chunks for HDD-based storage for later re-processing. Autoclaving and centrifugation may be done on incoming raw data more often, but end-of-the day wrap-up sounds reasonable.
+
+*tar?* — Each tiny report costs several IO operations. That produces measurable slowdown if the data is HDD-stored, so we need some "streaming" way to read and write reports.
+
+*${test_name}.42.tar.lz4* — re-centrifugation is likely triggered by some new code that can extract some new value from existing data and it usually depends on test type.
+
+
+Gotchas
+=======
+
+`liblz4-tool=0.0~r122-2` from debian:jessie can't handle *Content Size*
+in [LZ4 frame](https://github.com/lz4/lz4/wiki/lz4_Frame_format.md) and fails
+with `Error 64 : Does not support stream size` while decoding. This flag eases
+memory allocation for decompressor, so autoclaving enables it while calling
+python-lz4 code.  `liblz4-tool=0.0~r131*` from ubuntu:16.04 or debian:stretch
+handles alike stream without issues.
+
+Airflow-1.7.1.3 does **NOT** properly manage pools when re-filling process is
+started via UI using following steps:
+1. remove *Tasks Instances* that should be re-executed
+2. Set state of corresponding *DAG Runs* to *running*
+![Pool failure](airflow-pools.png)
+Better way is to enter airflow container and requst task runs via CLI:
+```
+root@host# docker exec  -ti dockerairflow_webserver_1 /bin/bash
+airflow@ws$ yyyymmdd_seq() { local start="$1"; local end="$2"; while [ "$start" != "$end" ]; do echo "$start"; start=$(date -d "${start} + 1 day" +%Y-%m-%d); done; echo "$end"; }
+airflow@ws$ for day in $(yyyymmdd_seq YYYY-MM-DD yyyy-mm-dd | tac); do airflow run --force --pool $pool --ship_dag $dag_id $task_id $day; done
+```
+
+References
+==========
+
+Using postgres *[Versioning](https://github.com/depesz/Versioning/)* by [Hubert "depesz" Lubaczewski](https://www.depesz.com/2010/08/22/versioning/).
+The easiest of the [alternatives](https://wiki.postgresql.org/wiki/Change_management_tools_and_techniques),
+[inspiring successors](https://docs.google.com/presentation/d/1TV0bExFwVy-_d6C7A8Z2JL9Z9tvtkuZv3D58fkC3GWQ/edit).
