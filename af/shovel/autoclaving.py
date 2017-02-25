@@ -56,7 +56,7 @@ class ReadStream(object):
         return blob
 
 
-class LZ4WriteStream(object):
+class LZ4WriteFramedStream(object):
     def __init__(self, lz4fd, metafd, file_metadata):
         # lz4fd gets LZ4 frames
         # metafd gets metainformation about frames
@@ -292,7 +292,7 @@ def autoclave_tar(inputfd, caninfo, metafd, outfd):
     text_sha1 = {_['textname']: _['text_sha1'] for _ in caninfo['canned']}
     stream_report = {'.json': stream_json_reports, '.yaml': stream_yaml_reports}
     with ScopedPopen(['lz4', '-d'], stdin=inputfd, stdout=PIPE) as proc_lz4, \
-         closing(LZ4WriteStream(outfd, metafd, {'filename': caninfo['filename']})) as tarsink, \
+         closing(LZ4WriteFramedStream(outfd, metafd, {'filename': caninfo['filename']})) as tarsink, \
          tarfile.open(mode='w', fileobj=tarsink) as tarout:
 
         tarfd = tarfile.open(mode='r:', fileobj=ReadStream(proc_lz4.stdout))
@@ -342,14 +342,14 @@ def autoclave_tar(inputfd, caninfo, metafd, outfd):
         # compare current offset with text_size of the file.
         if text_size:
             raise RuntimeError('Leftover files', text_size.keys())
-        # {'type': '/file'} is written by LZ4WriteStream.close
+        # {'type': '/file'} is written by LZ4WriteFramedStream.close
 
 
 def autoclave_blob(inputfd, caninfo, metafd, outfd):
     textname = caninfo['textname']
     stream_report = {'.json': stream_json_reports, '.yaml': stream_yaml_reports}
     with ScopedPopen(['lz4', '-d'], stdin=inputfd, stdout=PIPE) as proc_lz4, \
-         closing(LZ4WriteStream(outfd, metafd, {'filename': caninfo['filename']})) as sink:
+         closing(LZ4WriteFramedStream(outfd, metafd, {'filename': caninfo['filename']})) as sink:
 
         source = ReadStream(proc_lz4.stdout) # to account number of read bytes
         sink.write_both('', {'type': 'report', 'textname': textname, 'src_size': caninfo['text_size'], 'orig_sha1': caninfo['text_sha1']})
@@ -367,7 +367,7 @@ def autoclave_blob(inputfd, caninfo, metafd, outfd):
             sink.write_both('', {'type': '/report', 'src_cutoff': cutoff, 'info': str(type(exc))})
         if source.tell() != caninfo['text_size']:
             raise RuntimeError('Unexpected number of bytes from lz4 pipe', source.tell(), caninfo['text_size'])
-        # {'type': '/file'} is written by LZ4WriteStream.close
+        # {'type': '/file'} is written by LZ4WriteFramedStream.close
 
 
 def verify_index(index_fpath, bucket, in_dir, out_dir):

@@ -49,6 +49,12 @@ case "$script" in
     volargs="${volargs} --volume=${pub}/autoclaved/${bucket}:${pub}/autoclaved/${bucket}:rw"
     ;;
 
+    centrifugation.py)
+    docker run $docksafe --network none -v=${pub}/simhash:${pub}/simhash debian:jessie /bin/bash -c "chown $uidno ${pub}/simhash"
+    volargs="${volargs} --volume=${pub}/autoclaved/${bucket}:${pub}/autoclaved/${bucket}:ro"
+    volargs="${volargs} --volume=${pub}/simhash:${pub}/simhash:rw"
+    ;;
+
     *)
     echo "$0: unknown script <$script>" 1>&2
     exit 1

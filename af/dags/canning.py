@@ -8,7 +8,7 @@ dag = DAG(
     schedule_interval=timedelta(days=1),
     start_date=datetime(2012, 12, 5),
     #start_date=datetime(2016, 12, 1),
-    end_date=datetime(2017, 2, 10), # NB: end_date is included
+    end_date=datetime(2017, 2, 20), # NB: end_date is included
     default_args={
         'email': 'leon+airflow@darkk.net.ru',
         'retries': 1,
@@ -33,4 +33,14 @@ BashOperator(
         '--bridge-db /data/ooni/private/bridge_db/bridge_db.json'),
     dag=dag)
 
+BashOperator(
+    pool='datacollector_disk_io',
+    task_id='simhash_text',
+    bash_command=(
+        'sudo --non-interactive /usr/local/bin/docker-trampoline '
+        'centrifugation.py "{{ ds }}" "{{ execution_date.isoformat() }}" "{{ (execution_date + dag.schedule_interval).isoformat() }}" '
+        '--autoclaved-root /data/ooni/public/autoclaved --mode simhash-text --simhash-root /data/ooni/public/simhash'),
+    dag=dag)
+
 dag.set_dependency('canning', 'autoclaving')
+dag.set_dependency('autoclaving', 'simhash_text')
