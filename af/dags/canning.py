@@ -42,5 +42,15 @@ BashOperator(
         '--autoclaved-root /data/ooni/public/autoclaved --mode simhash-text --simhash-root /data/ooni/public/simhash'),
     dag=dag)
 
+BashOperator(
+    pool='datacollector_disk_io',
+    task_id='meta_pg',
+    bash_command=(
+        'sudo --non-interactive /usr/local/bin/docker-trampoline '
+        'centrifugation.py "{{ ds }}" "{{ execution_date.isoformat() }}" "{{ (execution_date + dag.schedule_interval).isoformat() }}" '
+        '--autoclaved-root /data/ooni/public/autoclaved --mode meta-pg --postgres "host=metadb user=oometa password=d88fOBNIBtVJyBf5ySOokV3J"'),
+    dag=dag)
+
 dag.set_dependency('canning', 'autoclaving')
 dag.set_dependency('autoclaving', 'simhash_text')
+dag.set_dependency('autoclaving', 'meta_pg')

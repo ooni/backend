@@ -31,6 +31,7 @@ done
 ) || exit 1
 
 docksafe="--rm --interactive --read-only"
+docknet="--network none"
 
 priv=/data/ooni/private
 pub=/data/ooni/public
@@ -53,6 +54,7 @@ case "$script" in
     docker run $docksafe --network none -v=${pub}/simhash:${pub}/simhash debian:jessie /bin/bash -c "chown $uidno ${pub}/simhash"
     volargs="${volargs} --volume=${pub}/autoclaved/${bucket}:${pub}/autoclaved/${bucket}:ro"
     volargs="${volargs} --volume=${pub}/simhash:${pub}/simhash:rw"
+    docknet="--net af_default --link af_oometa_1:metadb" # FIXME:too hardcoded
     ;;
 
     *)
@@ -64,4 +66,4 @@ esac
 set -o xtrace
 
 # FIXME: hardcoded uid of the `benchmark` user at `datacollector`
-exec docker run $docksafe --user "$uidno" --network none ${volargs} ooni/shovel:latest "/usr/local/bin/$script" --start "$isofrom" --end "$isotill" "$@"
+exec docker run $docksafe --user "$uidno" $docknet ${volargs} ooni/shovel:latest "/usr/local/bin/$script" --start "$isofrom" --end "$isotill" "$@"

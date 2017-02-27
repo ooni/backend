@@ -4,7 +4,7 @@ FROM ubuntu:16.04
 
 RUN set -ex \
     && apt-get update \
-    && apt-get install -y python2.7 liblz4-tool python-ujson python-yaml \
+    && apt-get install -y python2.7 liblz4-tool python-ujson python-yaml python-psycopg2 python-six \
     && :
 
 # Whole python-lz4 repo is clonned as `git` can't do shallow clone of single
@@ -20,7 +20,6 @@ RUN set -ex \
 
 # Cython simhash, tag: v0.3.0, python-six is dependency, not build-dep
 RUN set -ex \
-    && apt-get install -y python-six \
     && git clone https://github.com/seomoz/simhash-py.git /var/tmp/simhash-py \
     && cd /var/tmp/simhash-py \
     && git checkout -b build 79bd4044f046c5542aee8e72849932f9e5d65403 \
@@ -32,11 +31,11 @@ RUN set -ex \
 RUN set -ex \
     && apt-get install -y python-pip \
     && pip install --system mmh3==2.3.1 \
-    && apt-get remove --auto-remove -y python-pip \
     && :
 
 RUN set -ex \
     && apt-get remove --auto-remove -y python-pkg-resources build-essential python-setuptools python-setuptools-scm git-core python2.7-dev \
+    && apt-get remove --auto-remove -y python-pip \
     && rm -rf \
         /var/tmp/python-lz4 \
         /var/tmp/simhash-py \
