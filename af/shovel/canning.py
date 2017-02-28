@@ -239,6 +239,10 @@ def pack_bucket(listing, can_size=64*1048576):
 
 
 def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
+    # Size of argv array is limited, `getconf ARG_MAX` shows ~2 Mbytes on
+    # modern Linux, but it may vary across platforms & devices with different
+    # memory size. The code for pipeline-16.10 uses up to ~170 Kbytes of the
+    # limit while grouping files at 64 Mbytes boundary with pack_bucket().
     tar_argv = ['tar', '--create', '--directory', input_root] + ['--add-file='+bucket+'/'+_ for _ in slice_files]
     with tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdout, \
          open(os.devnull, 'rb') as devnull, \
