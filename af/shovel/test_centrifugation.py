@@ -3,7 +3,7 @@
 
 import unittest
 
-from centrifugation import httpt_body
+from centrifugation import httpt_body, PostgresSource
 
 def _httpt_body(body, te=None):
     d = {'body': body, 'headers': {}}
@@ -36,6 +36,16 @@ class TestChunked(unittest.TestCase):
         uni = raw.decode('ISO-8859-1')
         self.assertEqual(_httpt_body(uni, 'chunked'), uni.encode('utf-8'))
 
+class TestPGQuoting(unittest.TestCase):
+    def test_bool(self):
+        self.assertEqual(PostgresSource._quote(True), 'TRUE')
+        self.assertEqual(PostgresSource._quote(False), 'FALSE')
+    def test_bits(self):
+        blob = ''.join(map(chr, xrange(256)))
+        self.assertEqual(blob, PostgresSource._unquote(PostgresSource._quote(blob)))
+    def test_ugly(self):
+        blob = r'\\n'
+        self.assertEqual(blob, PostgresSource._unquote(PostgresSource._quote(blob)))
 
 if __name__ == '__main__':
     unittest.main()
