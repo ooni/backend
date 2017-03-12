@@ -1,6 +1,7 @@
 boto3
 celery
 Flask
+Flask-Cors
 Flask-Cache
 Flask-Misaka
 Flask-Script
