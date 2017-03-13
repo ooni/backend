@@ -43,6 +43,6 @@ RUN set -ex \
         /root/.cache \
     && :
 
-COPY canning.py daily_workflow.py autoclaving.py centrifugation.py /usr/local/bin/
+COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.py /usr/local/bin/
 
 USER daemon
