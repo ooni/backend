@@ -10,6 +10,7 @@ from celery import Celery
 
 from flask import Flask
 from flask_misaka import Misaka
+from flask_cors import CORS
 from flask_cache import Cache
 
 from measurements import config
@@ -52,6 +53,8 @@ def init_app(app):
 
     md = Misaka(fenced_code=True)
     md.init_app(app)
+
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     cache.init_app(app, config=app.config['CACHE_CONFIG'])
 
