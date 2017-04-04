@@ -158,11 +158,17 @@ More on this step later.
 Highlights
 ==========
 
-*Daily?* — I say *daily* as it daily bucket gives better compression ratio and more "sane" data chunks for HDD-based storage for later re-processing. Autoclaving and centrifugation may be done on incoming raw data more often, but end-of-the day wrap-up sounds reasonable.
+*Daily?* — daily bucket gives better compression ratio and more "sane" data chunks for HDD-based storage for later re-processing compared to individual compression of every report. Autoclaving and centrifugation may be done on incoming raw data more often, but end-of-the day wrap-up sounds reasonable.
 
 *tar?* — Each tiny report costs several IO operations. That produces measurable slowdown if the data is HDD-stored, so we need some "streaming" way to read and write reports.
 
 *${test_name}.42.tar.lz4* — re-centrifugation is likely triggered by some new code that can extract some new value from existing data and it usually depends on test type.
+
+*lz4* — `lz4 -5` gives ~21% compression ratio for canned data, `gzip -9` is 19%, but lz4 has blazingly fast decompressor and it's not even observable at [pyflame](https://github.com/uber/pyflame) flamechart while reading json from lz4 file.
+
+*LZ4 frames* — Using a block per measurements costs ~10…15% of datastore (~21% compression ratio becomes [~24%](https://gist.github.com/darkk/5736767b8bb1adbf4f5baec24d839d8e)), and having several measurements per block costs single memcpy() of uncompressed data while building string slice.
+
+*SHA1* — SHA1 is **not** used as a secure hash function, it's just a [speedy checksum](https://github.com/TheTorProject/ooni-pipeline/issues/40#issuecomment-275941676) that may be used to detect possible duplicates and for data scrubbing as LZ4 [does not currently implement](https://github.com/lz4/lz4/blob/v1.7.4.2/lib/lz4frame.c#L873) checksums for **compressed** data (aka *Block checksum*). OONI report storage is not tamper-evident as well.
 
 
 Gotchas
