@@ -1,0 +1,3 @@
+[submodule "contrib/Versioning"]
+	path = contrib/Versioning
+	url = git@github.com:depesz/Versioning.git
