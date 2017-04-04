@@ -699,8 +699,11 @@ def meta_pg(in_root, bucket, postgres):
                         datum = blob[intra_off:intra_off+intra_size]
                         assert len(datum) == intra_size
                         datum = ujson.loads(datum)
+                        datum = (report_no, msm_no, datum)
+                        # Batching tuples does not have measurable benefit although Queue.get()
+                        # is seen in every second pyflame stack.
                         for q in queues:
-                            q.put((report_no, msm_no, datum))
+                            q.put(datum)
         for q in queues:
             q.close()
         for f in futures:
