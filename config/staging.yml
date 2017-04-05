@@ -1,5 +1,6 @@
 db:
   image: postgres:9.6
+  restart: always
   ports:
     - "5433:5432"
 
