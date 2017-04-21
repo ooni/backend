@@ -1,5 +1,3 @@
-# BUILD: docker build --rm -t ooni/shovel .
-
 FROM ubuntu:16.04
 
 RUN set -ex \
