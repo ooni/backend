@@ -45,6 +45,7 @@ def check_sanitised(autoclaved_root, sanitised_root, bucket):
                 break
             assert ev is REPORT_START
             textname = doc['textname']
+            autoclaved_textname = textname # textname is also key for `known_sanitised`, this var is kept intact
             if textname.endswith('.yaml'):
                 textname = textname[:-5] + '.json'
             sanpath = os.path.join(sanitised_root, textname)
@@ -54,28 +55,41 @@ def check_sanitised(autoclaved_root, sanitised_root, bucket):
                     if ev is DATUM:
                         san = ujson.loads(next(saniter)[1])
                         auto = doc['datum']
+                        diff = {'metadata': {
+                            'sanitised': textname,
+                            'autoclaved': autoclaved_textname,
+                            'autoclaved_orig_sha1': doc['orig_sha1'],
+                        }, 'sanitised': {}, 'autoclaved': {}}
 
                         del san['id'], auto['id'] # it was random
 
                         # wrong TZ during sanitisation, autoclaved enforces UTC
                         if san['test_start_time'] != auto['test_start_time']:
                             if san['test_start_time'].startswith('1970-01-01 '): # something like 1970-01-01 01:00:00
-                                del san['test_start_time'], auto['test_start_time']
+                                diff['sanitised']['test_start_time'] = san.pop('test_start_time')
+                                diff['autoclaved']['test_start_time'] = auto.pop('test_start_time')
                             else:
                                 dt = parse_time(san['test_start_time']) - parse_time(auto['test_start_time'])
                                 if dt.days == 0 and (dt.seconds % 3600) == 0: # something like 2016-12-31 07:26:22 vs. 2016-12-31 06:26:22
-                                    del san['test_start_time'], auto['test_start_time']
+                                    diff['sanitised']['test_start_time'] = san.pop('test_start_time')
+                                    diff['autoclaved']['test_start_time'] = auto.pop('test_start_time')
                             # `report_id` may use test_start_time as prefix: 20161231T072622Z_MhNAwTSRMIyWmzudgbdteCPUNUpzaShRsfBvCfzLePvbeHGcWF
-                            if 'Z_' in san['report_id']:
+                            if san['report_id'] != auto['report_id'] and 'test_start_time' in diff['sanitised'] and 'Z_' in san['report_id']:
+                                diff['sanitised']['report_id'] = san['report_id']
+                                diff['autoclaved']['report_id'] = auto['report_id']
                                 san['report_id'] = san['report_id'].split('Z_', 1)[1]
                                 auto['report_id'] = auto['report_id'].split('Z_', 1)[1]
                         if san['measurement_start_time'] != auto['measurement_start_time']: # another wrong TZ
                             dt = parse_time(san['measurement_start_time']) - parse_time(auto['measurement_start_time'])
                             if dt.days == 0 and (dt.seconds % 3600) == 0:
-                                del san['measurement_start_time'], auto['measurement_start_time'] # something like 2016-12-31 07:26:34 vs 2016-12-31 06:26:34
+                                # something like 2016-12-31 07:26:34 vs 2016-12-31 06:26:34
+                                diff['sanitised']['measurement_start_time'] = san.pop('measurement_start_time')
+                                diff['autoclaved']['measurement_start_time'] = auto.pop('measurement_start_time')
 
                         # `autoclaved` preserves `.yaml` extention is `report_filename`, `sanitised` replaces with `.json`
                         if san['report_filename'] != auto['report_filename'] and auto['report_filename'][-5:] == '.yaml':
+                            diff['sanitised']['report_filename'] = san['report_filename']
+                            diff['autoclaved']['report_filename'] = auto['report_filename']
                             auto['report_filename'] = auto['report_filename'][:-5] + '.json'
 
                         # that's some useless(?) empty list in `sanitised`
@@ -86,6 +100,8 @@ def check_sanitised(autoclaved_root, sanitised_root, bucket):
                         for k in san.keys():
                             if san.get(k, san_obj) == auto.get(k, auto_obj):
                                 del san[k], auto[k]
+                        if diff['sanitised']:
+                            print 'OKAYISH-DIFF:', ujson.dumps(diff)
                         if san != doc['datum']:
                             raise RuntimeError(textname, 'mismatch', san, doc['datum'])
 
