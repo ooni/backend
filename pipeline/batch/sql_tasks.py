@@ -19,7 +19,8 @@ blockpage_body_fingerprints = {
     'CY': '%nba.com.cy/Eas/eas.nsf/All/6F7F17A7790A55C8C2257B130055C86F%',
     'DK': '%lagt at blokere for adgang til siden.%',
     'FR': '%xtpage = "page-blocage-terrorisme"%',
-    'KR': '%http://warning.or.kr%'
+    'KR': '%http://warning.or.kr%',
+    'RO': '%Accesul dumneavoastră către acest site a fost restricționat%'
 }
 
 # These are countries for which we detect blocking by looking for certain
