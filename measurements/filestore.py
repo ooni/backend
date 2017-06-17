@@ -7,8 +7,6 @@ import boto3
 import botocore
 from sqlalchemy import exists
 
-from measurements.models import ReportFile
-
 class S3NotConfigured(Exception):
     pass
 
@@ -126,34 +124,3 @@ def get_download_url(app, bucket_date, filename):
         app.config['BASE_URL'],
         '/files/download/{}'.format(filename)
     )
-
-def add_to_db(app, filepath, index, no_check=False):
-    if not filepath.endswith(".json"):
-        return False
-    report_file = ReportFile.from_filepath(filepath, index)
-
-    if no_check is False:
-        ret = app.db_session.query(
-            exists().where(ReportFile.filename == report_file.filename)
-        ).scalar()
-        if ret is True:
-            return False
-
-    app.db_session.add(report_file)
-    return True
-
-def update_file_metadata(app, target_dir, no_check=False):
-    most_recent_index = 0
-    most_recent = app.db_session.query(ReportFile) \
-        .order_by(ReportFile.idx.desc()) \
-        .first()
-    if most_recent is not None:
-        most_recent_index = most_recent.idx
-
-    idx = 0
-    for filepath in list_files(app, target_dir):
-        index = most_recent_index + idx
-        if not add_to_db(app, filepath, index, no_check):
-            continue
-        idx += 1
-        app.db_session.commit()
