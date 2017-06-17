@@ -15,6 +15,7 @@ from measurements.app import cache
 from measurements.config import BASE_DIR
 from measurements.filestore import get_download_url
 from measurements.models import ReportFile, Report
+from measurements.models import REPORT_INDEX_OFFSET
 
 api_blueprint = Blueprint('api', 'measurements')
 api_docs_blueprint = Blueprint('api_docs', 'measurements')
@@ -155,9 +156,8 @@ def api_list_report_files():
 
     order_by = request.args.get("order_by", "index")
 
-    # XXX need to figure out a pattern to fixup the index
-    if order_by is "index":
-        order_by = "idx"
+    if order_by in ("index", "idx"):
+        order_by = "report_no"
     order = request.args.get("order", 'desc')
 
     try:
@@ -167,42 +167,46 @@ def api_list_report_files():
         raise BadRequest("Invalid offset or limit")
 
     q = current_app.db_session.query(
-        ReportFile.filename,
-        ReportFile.bucket_date,
-        ReportFile.test_start_time,
-        ReportFile.probe_cc,
-        ReportFile.probe_asn,
-        ReportFile.idx
+        Report.textname,
+        Report.test_start_time,
+        Report.probe_cc,
+        Report.probe_asn,
+        Report.report_no,
+        Report.test_name
     )
 
     # XXX maybe all of this can go into some sort of function.
     if probe_cc:
-        q = q.filter(ReportFile.probe_cc == probe_cc)
+        q = q.filter(Report.probe_cc == probe_cc)
     if probe_asn:
-        q = q.filter(ReportFile.probe_asn == probe_asn)
+        if probe_asn.startswith('AS'):
+            probe_asn = probe_asn[2:]
+        probe_asn = int(probe_asn)
+        q = q.filter(Report.probe_asn == probe_asn)
     if test_name:
-        q = q.filter(ReportFile.test_name == test_name)
+        q = q.filter(Report.test_name == test_name)
     if since:
         try:
             since = parse_date(since)
         except ValueError:
             raise BadRequest("Invalid since")
-        q = q.filter(ReportFile.test_start_time > since)
+        q = q.filter(Report.test_start_time > since)
     if until:
         try:
             until = parse_date(until)
         except ValueError:
             raise BadRequest("Invalid until")
-        q = q.filter(ReportFile.test_start_time <= until)
+        q = q.filter(Report.test_start_time <= until)
 
     if since_index:
-        q = q.filter(ReportFile.idx > since_index)
+        report_no = max(0, since_index - REPORT_INDEX_OFFSET)
+        q = q.filter(Report.report_no > report_no)
 
     # XXX these are duplicated above, refactor into function
     if order.lower() not in ('asc', 'desc'):
         raise BadRequest("Invalid order")
     if order_by not in ('test_start_time', 'probe_cc', 'report_id',
-                        'test_name', 'probe_asn', 'idx'):
+                        'test_name', 'probe_asn', 'report_no'):
         raise BadRequest("Invalid order_by")
 
     q = q.order_by('{} {}'.format(order_by, order))
@@ -231,13 +235,15 @@ def api_list_report_files():
     }
     results = []
     for row in q:
-        url = get_download_url(current_app, row.bucket_date, row.filename)
+        bucket_date, filename = row.textname.split('/')
+        url = get_download_url(current_app, bucket_date, filename)
         results.append({
             'download_url': url,
             'probe_cc': row.probe_cc,
-            'probe_asn': row.probe_asn,
+            'probe_asn': "AS{}".format(row.probe_asn),
+            'test_name': row.test_name,
             # Will we ever hit sys.maxint?
-            'index': int(row.idx),
+            'index': int(row.report_no) + REPORT_INDEX_OFFSET,
             'test_start_time': row.test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         })
     return jsonify({
