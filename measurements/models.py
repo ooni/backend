@@ -13,31 +13,50 @@ from sqlalchemy import (
     DateTime, Float, JSON, Numeric
 )
 
+from sqlalchemy.dialects.postgresql import (
+    INET, ENUM, BYTEA
+)
+
+# create domain size4 as int4 check (value >= 0);
+SHA1 = BYTEA()
+
+# create domain sha1 as bytea check (octet_length(value) = 20);
+SIZE4 = Integer()
+
+OOTEST = ENUM(
+    'web_connectivity',
+    'http_requests',
+    'dns_consistency',
+    'http_invalid_request_line',
+    'bridge_reachability',
+    'tcp_connect',
+    'http_header_field_manipulation',
+    'http_host',
+    'multi_protocol_traceroute',
+    'meek_fronted_requests_test',
+    'whatsapp',
+    'vanilla_tor',
+    'facebook_messenger',
+    'ndt',
+    name='ootest'
+)
+
 # XXX rename to Base to create it in the database.
-class Measurement(object):
-    __tablename__ = 'measurements'
+class Report(Base):
+    __tablename__ = 'report'
 
-    id = Column(Text, primary_key=True)
-    input = Column(Text)
-    probe_asn = Column(String(200))
-    probe_cc = Column(String(2))
-    probe_ip = Column(String(200))
-    software_name = Column(String(2000))
-    software_version = Column(String(200))
-    report_filename = Column(String(2000))
-    report_id = Column(String(2000))
+    report_no = Column(Integer, primary_key=True)
+    autoclaved_no = Column(Integer) # Foreign key REFERENCES autoclaved (autoclaved_no)
     test_start_time = Column(DateTime)
-    test_runtime = Column(Float)
-    measurement_start_time = Column(DateTime)
-    test_name = Column(String(2000))
-    data_format_version = Column(String(200))
-
-    # These are commented out since we don't use this table and JSON is not
-    #  a type supported by sqlite.
-    # options = Column(JSON)
-    # test_helpers = Column(JSON)
-    # test_keys = Column(JSON)
-
+    probe_cc = Column(String(2))
+    probe_asn = Column(Integer)
+    probe_ip = Column(INET)
+    test_name = Column(OOTEST)
+    badtail = Column(SIZE4)
+    textname = Column(String)
+    orig_sha1 = Column(SHA1)
+    report_id = Column(String)
+    software_no = Column(Integer)
 
 class ReportFile(Base):
     __tablename__ = 'report_files'

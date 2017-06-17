@@ -12,7 +12,7 @@ from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
 from measurements.filestore import get_download_url, gen_file_chunks, \
     FileNotFound, S3NotConfigured
-from measurements.models import ReportFile
+from measurements.models import Report
 
 pages_blueprint = Blueprint('pages', 'measurements',
                             static_folder='static',
@@ -39,20 +39,19 @@ def _calendarized_count():
     one_day = timedelta(days=1)
 
     q = current_app.db_session.query(
-        func.count(ReportFile.bucket_date),
-        ReportFile.bucket_date
-    ).group_by(ReportFile.bucket_date).order_by(
-        ReportFile.bucket_date
+        func.count(func.date_trunc('day', Report.test_start_time)),
+        func.date_trunc('day', Report.test_start_time)
+    ).group_by(func.date_trunc('day', Report.test_start_time)).order_by(
+        Report.test_start_time
     )
     if q.first() is None:
         raise StopIteration
 
     _, first_date = q.first()
-    first_date = datetime.strptime(first_date, DT_FRMT)
     count_map = {}
     for count, day in q:
         count_map[day] = count
-    last_date = datetime.strptime(day, DT_FRMT)
+    last_date = day
     start = first_date
 
     # here we pad up the days to the first week
@@ -96,14 +95,14 @@ def _calendarized_count():
 
 def _report_dates():
     q = current_app.db_session.query(
-        func.count(ReportFile.bucket_date),
-        ReportFile.bucket_date
-    ).group_by(ReportFile.bucket_date).order_by(ReportFile.bucket_date)
+        func.count(func.date_trunc('day', Report.test_start_time)),
+        func.date_trunc('day', Report.test_start_time)
+    ).group_by(func.date_trunc('day', Report.test_start_time)).order_by(func.date_trunc('day', Report.test_start_time))
     for row in q:
         count, day = row
         yield {
             'count': count,
-            'date': day
+            'date': day.strftime("%Y-%m-%d")
         }
 
 
@@ -111,16 +110,17 @@ def _report_dates():
 def files_by_date():
     view = request.args.get("view", "list")
     if view == "calendar":
-        return render_template('files/by_date_calendar.html',
-                               calendar_count=_calendarized_count())
+        return render_template('files/by_date_calendar.html')
+        # XXX this is actually not used
+        # calendar_count=_calendarized_count())
     else:
         return render_template('files/by_date_list.html',
                                report_dates=_report_dates())
 
 
 def _files_on_date(date, order_by, order):
-    q = current_app.db_session.query(ReportFile) \
-            .filter(ReportFile.bucket_date == date) \
+    q = current_app.db_session.query(Report) \
+            .filter(func.date_trunc('day', Report.test_start_time) == date) \
             .order_by("%s %s" % (order_by, order))
     return q
 
@@ -148,9 +148,9 @@ def files_on_date(date):
 def _files_by_country():
     results = []
     q = current_app.db_session.query(
-        func.count(ReportFile.probe_cc),
-        ReportFile.probe_cc
-    ).group_by(ReportFile.probe_cc).order_by(ReportFile.probe_cc)
+        func.count(Report.probe_cc),
+        Report.probe_cc
+    ).group_by(Report.probe_cc).order_by(Report.probe_cc)
     for row in q:
         count, alpha_2 = row
         country = "Unknown"
@@ -180,8 +180,8 @@ def files_by_country():
 
 
 def _files_in_country(country_code, order_by, order):
-    q = current_app.db_session.query(ReportFile) \
-            .filter(ReportFile.probe_cc == country_code) \
+    q = current_app.db_session.query(Report) \
+            .filter(Report.probe_cc == country_code) \
             .order_by("%s %s" % (order_by, order))
     return q
 
@@ -209,35 +209,36 @@ def files_in_country(country_code):
 @pages_blueprint.route('/files/download/<filename>')
 def files_download(filename):
     try:
-        report_file = current_app.db_session.query(ReportFile) \
-                        .filter(ReportFile.filename == filename).first()
+        report = current_app.db_session.query(Report) \
+                        .filter(Report.textname.like("%" + filename)).first()
         # XXX
         # We have duplicate measurements :(
         # So the below exception actually happens. This should be resolved
         # in the data processing pipeline.
-        #   ReportFile.filename == filename).one()
+        #   Report.filename == filename).one()
     except NoResultFound:
         raise NotFound("No file with that filename found")
     except MultipleResultsFound:
         # This should never happen.
         raise HTTPException("Duplicate measurement detected")
 
-    if report_file is None:
+    if report is None:
         raise NotFound("No file with that filename found")
 
     if current_app.config['REPORTS_DIR'].startswith("s3://"):
+        bucket_date, filename = report.textname.split("/")
         return redirect(
             get_download_url(
                 current_app,
-                report_file.bucket_date,
-                report_file.filename
+                bucket_date,
+                filename
             )
         )
 
     filepath = os.path.join(
         current_app.config['REPORTS_DIR'],
-        report_file.bucket_date,
-        report_file.filename
+        bucket_date,
+        filename
     )
 
     try:

@@ -14,7 +14,7 @@ from six.moves.urllib.parse import urljoin, urlencode
 from measurements.app import cache
 from measurements.config import BASE_DIR
 from measurements.filestore import get_download_url
-from measurements.models import ReportFile
+from measurements.models import ReportFile, Report
 
 api_blueprint = Blueprint('api', 'measurements')
 api_docs_blueprint = Blueprint('api_docs', 'measurements')
@@ -45,13 +45,14 @@ def api_private_asn_by_month():
     NOW = datetime.now()
     result = []
     r = current_app.db_session.query(
-            ReportFile.test_start_time,
-            ReportFile.probe_asn) \
-        .order_by(ReportFile.test_start_time)
+            Report.test_start_time,
+            Report.probe_asn) \
+        .order_by(Report.test_start_time)
 
     # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
     for tst, asn in r:
+        asn = 'AS%d' % asn
         if tst > NOW:
             # We ignore measurements from time travelers
             continue
@@ -74,9 +75,9 @@ def api_private_counties_by_month():
     NOW = datetime.now()
     result = []
     r = current_app.db_session.query(
-            ReportFile.test_start_time,
-            ReportFile.probe_cc) \
-        .order_by(ReportFile.test_start_time)
+            Report.test_start_time,
+            Report.probe_cc) \
+        .order_by(Report.test_start_time)
 
     # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
@@ -103,8 +104,8 @@ def api_private_runs_by_month():
     NOW = datetime.now()
     result = []
     r = current_app.db_session.query(
-            ReportFile.test_start_time) \
-        .order_by(ReportFile.test_start_time)
+            Report.test_start_time) \
+        .order_by(Report.test_start_time)
 
     # XXX this can be done better in a SQL that is not sqlite
     monthly_buckets = {}
@@ -129,16 +130,16 @@ def api_private_runs_by_month():
 @cache.cached(timeout=60*60)
 def api_private_reports_per_day():
     q = current_app.db_session.query(
-        func.count(ReportFile.bucket_date),
-        ReportFile.bucket_date
-    ).group_by(ReportFile.bucket_date).order_by(
-        ReportFile.bucket_date
+        func.count(func.date_trunc('day', Report.test_start_time)),
+        func.date_trunc('day', Report.test_start_time)
+    ).group_by(func.date_trunc('day', Report.test_start_time)).order_by(
+        func.date_trunc('day', Report.test_start_time)
     )
     result = []
     for count, date in q:
         result.append({
             'count': count,
-            'date': date
+            'date': date.strftime("%Y-%m-%d")
         })
     return jsonify(result)
 
@@ -153,6 +154,8 @@ def api_list_report_files():
     since_index = request.args.get("since_index")
 
     order_by = request.args.get("order_by", "index")
+
+    # XXX need to figure out a pattern to fixup the index
     if order_by is "index":
         order_by = "idx"
     order = request.args.get("order", 'desc')
