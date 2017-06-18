@@ -8,13 +8,17 @@ from datetime import datetime
 
 from .utils import ISO_TIMESTAMP_SHORT
 from .database import Base
+
+from sqlalchemy.orm import relationship
+
 from sqlalchemy import (
     Column, Integer, String, Text,
-    DateTime, Float, JSON, Numeric
+    DateTime, Float, JSON, Numeric,
+    ForeignKey
 )
 
 from sqlalchemy.dialects.postgresql import (
-    INET, ENUM, BYTEA
+    INET, ENUM, BYTEA, UUID
 )
 
 # create domain size4 as int4 check (value >= 0);
@@ -48,7 +52,10 @@ class Report(Base):
     __tablename__ = 'report'
 
     report_no = Column(Integer, primary_key=True)
-    autoclaved_no = Column(Integer) # Foreign key REFERENCES autoclaved (autoclaved_no)
+
+    autoclaved_no = Column(Integer, ForeignKey('autoclaved.autoclaved_no'))
+    autoclaved = relationship("Autoclaved", back_populates="reports")
+
     test_start_time = Column(DateTime)
     probe_cc = Column(String(2))
     probe_asn = Column(Integer)
@@ -58,7 +65,61 @@ class Report(Base):
     textname = Column(String)
     orig_sha1 = Column(SHA1)
     report_id = Column(String)
-    software_no = Column(Integer)
+    software_no = Column(Integer,  ForeignKey('software.software_no'))
+    software  = relationship("Software", back_populates="reports")
+
+    measurements = relationship("Measurement", back_populates="report", lazy="dynamic")
+
+class Autoclaved(Base):
+    __tablename__ = 'autoclaved'
+
+    autoclaved_no = Column(Integer, primary_key=True)
+    reports = relationship("Report", back_populates="autoclaved")
+
+    filename = Column(String)
+    bucket_date = Column(DateTime)
+    code_ver = Column(Integer)
+    file_size = Column(SIZE4)
+    file_crc32 = Column(Integer)
+    file_sha1 = Column(SHA1)
+
+class Measurement(Base):
+    __tablename__ = 'measurement'
+
+    msm_no = Column(Integer, primary_key=True)
+
+    report_no = Column(Integer, ForeignKey("report.report_no"))
+    report = relationship("Report", back_populates="measurements")
+
+    frame_off = Column(SIZE4)
+    frame_size = Column(SIZE4)
+    intra_off = Column(SIZE4)
+    intra_size = Column(SIZE4)
+
+    measurement_start_time = Column(DateTime)
+    test_runtime = Column(Float)
+    orig_sha1 = Column(SHA1)
+    id = Column(UUID)
+
+    input_no = Column(Integer, ForeignKey("input.input_no"))
+    input = relationship("Input", back_populates="measurements")
+
+class Input(Base):
+    __tablename__ = 'input'
+    input_no = Column(Integer, primary_key=True)
+    input = Column(String)
+
+    measurements = relationship("Measurement", back_populates="input")
+
+class Software(Base):
+    __tablename__ = 'software'
+    software_no = Column(Integer, primary_key=True)
+    test_name = Column(String)
+    test_version = Column(String)
+    software_name = Column(String)
+    software_version = Column(String)
+
+    reports = relationship("Report", back_populates="software")
 
 class ReportFile(Base):
     __tablename__ = 'report_files'

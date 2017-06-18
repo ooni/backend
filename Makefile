@@ -52,6 +52,9 @@ dropdb:
 develop: APP_ENV=development
 develop: .state/docker-build-$(APP_ENV) serve
 
+develop-debug: APP_ENV=development
+develop-debug: .state/docker-build-$(APP_ENV) debug
+
 develop-rebuild: APP_ENV=development
 develop-rebuild: build serve
 

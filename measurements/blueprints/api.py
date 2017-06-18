@@ -1,4 +1,5 @@
 import math
+import time
 import os
 
 from datetime import datetime
@@ -14,7 +15,7 @@ from six.moves.urllib.parse import urljoin, urlencode
 from measurements.app import cache
 from measurements.config import BASE_DIR
 from measurements.filestore import get_download_url
-from measurements.models import ReportFile, Report
+from measurements.models import ReportFile, Report, Input, Measurement, Software
 from measurements.models import REPORT_INDEX_OFFSET
 
 api_blueprint = Blueprint('api', 'measurements')
@@ -144,20 +145,41 @@ def api_private_reports_per_day():
         })
     return jsonify(result)
 
+
 @api_blueprint.route('/files', methods=["GET"])
 def api_list_report_files():
     probe_cc = request.args.get("probe_cc")
+
     probe_asn = request.args.get("probe_asn")
+    if probe_asn:
+        if probe_asn.startswith('AS'):
+            probe_asn = probe_asn[2:]
+        probe_asn = int(probe_asn)
+
     test_name = request.args.get("test_name")
 
     since = request.args.get("since")
+    try:
+        if since:
+            since = parse_date(since)
+    except ValueError:
+        raise BadRequest("Invalid since")
+
     until = request.args.get("until")
+    try:
+        if until:
+            until = parse_date(until)
+    except ValueError:
+        raise BadRequest("Invalid until")
+
     since_index = request.args.get("since_index")
+    if since_index:
+        report_no = max(0, since_index - REPORT_INDEX_OFFSET)
 
     order_by = request.args.get("order_by", "index")
-
     if order_by in ("index", "idx"):
         order_by = "report_no"
+
     order = request.args.get("order", 'desc')
 
     try:
@@ -179,27 +201,14 @@ def api_list_report_files():
     if probe_cc:
         q = q.filter(Report.probe_cc == probe_cc)
     if probe_asn:
-        if probe_asn.startswith('AS'):
-            probe_asn = probe_asn[2:]
-        probe_asn = int(probe_asn)
         q = q.filter(Report.probe_asn == probe_asn)
     if test_name:
         q = q.filter(Report.test_name == test_name)
     if since:
-        try:
-            since = parse_date(since)
-        except ValueError:
-            raise BadRequest("Invalid since")
         q = q.filter(Report.test_start_time > since)
     if until:
-        try:
-            until = parse_date(until)
-        except ValueError:
-            raise BadRequest("Invalid until")
         q = q.filter(Report.test_start_time <= until)
-
     if since_index:
-        report_no = max(0, since_index - REPORT_INDEX_OFFSET)
         q = q.filter(Report.report_no > report_no)
 
     # XXX these are duplicated above, refactor into function
@@ -242,10 +251,157 @@ def api_list_report_files():
             'probe_cc': row.probe_cc,
             'probe_asn': "AS{}".format(row.probe_asn),
             'test_name': row.test_name,
-            # Will we ever hit sys.maxint?
             'index': int(row.report_no) + REPORT_INDEX_OFFSET,
             'test_start_time': row.test_start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         })
+    return jsonify({
+        'metadata': metadata,
+        'results': results
+    })
+
+
+@api_blueprint.route('/measurement/<measurement_id>', methods=["GET"])
+def api_get_measurement(measurement_id):
+    return jsonify({
+        'data_format_version': 'XXX',
+        'id': measurement_id,
+        'input': 'XXX',
+        'measurement_start_time': 'XXX',
+        'options': [],
+        'probe_asn': 'XXX',
+        'probe_cc': 'XXX',
+        'probe_ip': 'XXX',
+        'report_filename': 'XXX',
+        'software_name': 'XXX',
+        'software_version': 'XXX',
+        'test_helpers': {},
+        'test_keys': {},
+        'test_name': 'XXX',
+        'test_runtime': 0.1,
+        'test_start_time': 'XXX'
+    })
+
+@api_blueprint.route('/measurements', methods=["GET"])
+def api_list_measurements():
+    report_id = request.args.get("report_id")
+    input_ = request.args.get("input")
+
+    probe_cc = request.args.get("probe_cc")
+    probe_asn = request.args.get("probe_asn")
+    if probe_asn:
+        if probe_asn.startswith('AS'):
+            probe_asn = probe_asn[2:]
+        probe_asn = int(probe_asn)
+
+    test_name = request.args.get("test_name")
+
+    since = request.args.get("since")
+    try:
+        if since:
+            since = parse_date(since)
+    except ValueError:
+        raise BadRequest("Invalid since")
+
+    until = request.args.get("until")
+    try:
+        if until:
+            until = parse_date(until)
+    except ValueError:
+        raise BadRequest("Invalid until")
+
+    order_by = request.args.get("order_by")
+    if order_by and order_by not in ('measurement_start_time', 'probe_cc',
+                                     'report_id', 'test_name', 'probe_asn'):
+        raise BadRequest("Invalid order_by")
+
+    order = request.args.get("order", 'asc')
+    if order.lower() not in ('asc', 'desc'):
+        raise BadRequest("Invalid order")
+
+    try:
+        offset = int(request.args.get("offset", "0"))
+        limit = int(request.args.get("limit", "100"))
+    except ValueError:
+        raise BadRequest("Invalid offset or limit")
+
+    q = current_app.db_session.query(
+            Input.input_no.label('input_no'),
+            Input.input.label('input'),
+            Measurement.input_no.label('m_input_no'),
+            Measurement.measurement_start_time.label('measurement_start_time'),
+            Measurement.id.label('m_id'),
+            Measurement.report_no.label('m_report_no'),
+            Report.report_id.label('report_id'),
+            Report.probe_cc.label('probe_cc'),
+            Report.probe_asn.label('probe_asn'),
+            Report.test_name.label('test_name'),
+            Report.report_no.label('report_no')
+    ).join(Measurement, Measurement.input_no == Input.input_no)\
+     .join(Report, Report.report_no == Measurement.report_no)
+
+    if report_id:
+        q = q.filter(Report.report_id == report_id)
+    if input_:
+        q = q.filter(Input.input.like('%{}%'.format(input_)))
+    if probe_cc:
+        q = q.filter(Report.probe_cc == probe_cc)
+    if probe_asn:
+        q = q.filter(Report.probe_asn == probe_asn)
+    if test_name:
+        q = q.filter(Report.test_name == test_name)
+    if since:
+        q = q.filter(Measurement.measurement_start_time > since)
+    if until:
+        q = q.filter(Measurement.measurement_start_time <= until)
+
+    if order_by:
+        q = q.order_by('{} {}'.format(order_by, order))
+
+    # XXX this is too intensive. find a workaround
+    # count = q.count()
+    # pages = math.ceil(count / limit)
+    # if current_page >= pages:
+    #    next_url = None
+    count = -1
+    pages = -1
+    current_page = math.ceil(offset / limit) + 1
+
+    q = q.limit(limit).offset(offset)
+
+    next_args = request.args.to_dict()
+    next_args['offset'] = "%s" % (offset + limit)
+    next_args['limit'] = "%s" % limit
+    next_url = urljoin(
+        current_app.config['BASE_URL'],
+        '/api/v1/files?%s' % urlencode(next_args)
+    )
+
+    query_start_time = time.time()
+    results = []
+    for row in q:
+        url = 'MISSING'
+        results.append({
+            'measurement_url': url,
+            'measurement_id': row.m_id,
+            'report_id': row.report_id,
+            'probe_cc': row.probe_cc,
+            'probe_asn': "AS{}".format(row.probe_asn),
+            'test_name': row.test_name,
+            'index': int(row.report_no) + REPORT_INDEX_OFFSET,
+            'measurement_start_time': row.measurement_start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'input': row.input if row.m_input_no else None,
+        })
+    if len(results) < limit:
+        next_url = None
+    metadata = {
+        'offset': offset,
+        'limit': limit,
+        'count': count,
+        'pages': pages,
+        'current_page': current_page,
+        'next_url': next_url,
+        'query_time': time.time() - query_start_time
+    }
     return jsonify({
         'metadata': metadata,
         'results': results

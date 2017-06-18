@@ -15,7 +15,6 @@ from measurements.utils import OONI_EPOCH
 
 logger = get_task_logger(__name__)
 
-
 def setup_period_tasks(app):
     if app.config['APP_ENV'] in ['production', 'staging']:
         celery.conf.beat_schedule = {}

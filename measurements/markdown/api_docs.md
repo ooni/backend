@@ -150,9 +150,6 @@ criteria.
    `until=[string]` - the end date of when measurement were run (ex.
    "2016-10-20T10:30:00")
 
-   `since_index=[integer]` - return results only strictly greater than the
-   provided index.
-
    `order_by=[string]` - by which key the results should be ordered by (default: test_start_time)
 
    `order=[string] ("desc", "asc")` - if the order should be ascending or descending.
