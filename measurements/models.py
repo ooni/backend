@@ -21,6 +21,23 @@ from sqlalchemy.dialects.postgresql import (
     INET, ENUM, BYTEA, UUID
 )
 
+TEST_NAMES = {
+    'web_connectivity': 'Web Connectivity',
+    'http_requests': 'HTTP Requests',
+    'dns_consistency': 'DNS Consistency',
+    'http_invalid_request_line': 'HTTP Invalid Request Line',
+    'bridge_reachability': 'Bridge Reachability',
+    'tcp_connect': 'TCP Connect',
+    'http_header_field_manipulation': 'HTTP Header Field Manipulation',
+    'http_host': 'HTTP Host',
+    'multi_protocol_traceroute': 'Multi Protocol Traceroute',
+    'meek_fronted_requests_test': 'Meek Fronted Requests',
+    'whatsapp': 'WhatsApp',
+    'vanilla_tor': 'Vanilla Tor',
+    'facebook_messenger': 'Facebook Messenger',
+    'ndt': 'NDT'
+}
+
 # create domain size4 as int4 check (value >= 0);
 SHA1 = BYTEA()
 
@@ -28,20 +45,7 @@ SHA1 = BYTEA()
 SIZE4 = Integer()
 
 OOTEST = ENUM(
-    'web_connectivity',
-    'http_requests',
-    'dns_consistency',
-    'http_invalid_request_line',
-    'bridge_reachability',
-    'tcp_connect',
-    'http_header_field_manipulation',
-    'http_host',
-    'multi_protocol_traceroute',
-    'meek_fronted_requests_test',
-    'whatsapp',
-    'vanilla_tor',
-    'facebook_messenger',
-    'ndt',
+    *TEST_NAMES,
     name='ootest'
 )
 

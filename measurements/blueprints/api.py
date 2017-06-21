@@ -4,11 +4,15 @@ import os
 
 from datetime import datetime
 from dateutil.parser import parse as parse_date
+
+from pycountry import countries
+
 from flask import Blueprint, render_template, current_app, request
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy import func
+from sqlalchemy.orm import lazyload
 
 from six.moves.urllib.parse import urljoin, urlencode
 
@@ -16,10 +20,13 @@ from measurements.app import cache
 from measurements.config import BASE_DIR
 from measurements.filestore import get_download_url
 from measurements.models import ReportFile, Report, Input, Measurement, Software
-from measurements.models import REPORT_INDEX_OFFSET
+from measurements.models import REPORT_INDEX_OFFSET, TEST_NAMES
 
+# prefix: /api/v1
 api_blueprint = Blueprint('api', 'measurements')
+# prefix: /api
 api_docs_blueprint = Blueprint('api_docs', 'measurements')
+# prefix: /api/_
 api_private_blueprint = Blueprint('api_private', 'measurements')
 
 
@@ -145,6 +152,17 @@ def api_private_reports_per_day():
         })
     return jsonify(result)
 
+@api_private_blueprint.route('/test_names', methods=["GET"])
+def api_private_test_names():
+    return jsonify({
+        "test_names": [{ 'id': k, 'name': v } for k, v in TEST_NAMES.items()]
+    })
+
+@api_private_blueprint.route('/countries', methods=["GET"])
+def api_private_countries():
+    return jsonify({
+        "countries": [{ 'alpha_2': c.alpha_2, 'name': c.name } for c in countries]
+    })
 
 @api_blueprint.route('/files', methods=["GET"])
 def api_list_report_files():
@@ -357,26 +375,10 @@ def api_list_measurements():
     if order_by:
         q = q.order_by('{} {}'.format(order_by, order))
 
-    # XXX this is too intensive. find a workaround
-    # count = q.count()
-    # pages = math.ceil(count / limit)
-    # if current_page >= pages:
-    #    next_url = None
-    count = -1
-    pages = -1
-    current_page = math.ceil(offset / limit) + 1
-
+    query_time = 0
     q = q.limit(limit).offset(offset)
 
-    next_args = request.args.to_dict()
-    next_args['offset'] = "%s" % (offset + limit)
-    next_args['limit'] = "%s" % limit
-    next_url = urljoin(
-        current_app.config['BASE_URL'],
-        '/api/v1/files?%s' % urlencode(next_args)
-    )
-
-    query_start_time = time.time()
+    iter_start_time= time.time()
     results = []
     for row in q:
         url = 'MISSING'
@@ -391,8 +393,32 @@ def api_list_measurements():
             'measurement_start_time': row.measurement_start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
             'input': row.input if row.m_input_no else None,
         })
+
+    pages = -1
+    count = -1
+    current_page = math.ceil(offset / limit) + 1
+
+    # We got less results than what we expected, we know the count and that we are done
     if len(results) < limit:
+        count = offset + len(results)
+        pages = math.ceil(count / limit)
         next_url = None
+    else:
+        # XXX this is too intensive. find a workaround
+        #count_start_time = time.time()
+        #count = q.count()
+        #pages = math.ceil(count / limit)
+        #current_page = math.ceil(offset / limit) + 1
+        #query_time += time.time() - count_start_time
+        next_args = request.args.to_dict()
+        next_args['offset'] = "%s" % (offset + limit)
+        next_args['limit'] = "%s" % limit
+        next_url = urljoin(
+            current_app.config['BASE_URL'],
+            '/api/v1/measurements?%s' % urlencode(next_args)
+        )
+
+    query_time += time.time() - iter_start_time
     metadata = {
         'offset': offset,
         'limit': limit,
@@ -400,7 +426,7 @@ def api_list_measurements():
         'pages': pages,
         'current_page': current_page,
         'next_url': next_url,
-        'query_time': time.time() - query_start_time
+        'query_time': query_time
     }
     return jsonify({
         'metadata': metadata,
