@@ -22,6 +22,9 @@ WEBSERVER_PORT = int(os.environ.get("WEBSERVER_PORT", "3000"))
 BASE_URL = os.environ.get("BASE_URL",
                           "https://measurements.ooni.torproject.org/")
 
+AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASED_URL",
+                                      "http://datacollector.infra.ooni.io/ooni-public/autoclaved/")
+
 # This can either be a local directory (ex. /data/ooni/public/sanitised)
 # or an s3 endpoint (ex. s3://ooni-public/sanitised)
 REPORTS_DIR = os.environ.get("REPORTS_DIR", "s3://ooni-public/sanitised/")

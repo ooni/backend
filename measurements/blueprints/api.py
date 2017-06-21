@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 from dateutil.parser import parse as parse_date
 
+import requests
+import lz4framed
 from pycountry import countries
 
 from flask import Blueprint, render_template, current_app, request
@@ -19,7 +21,7 @@ from six.moves.urllib.parse import urljoin, urlencode
 from measurements.app import cache
 from measurements.config import BASE_DIR
 from measurements.filestore import get_download_url
-from measurements.models import ReportFile, Report, Input, Measurement, Software
+from measurements.models import ReportFile, Report, Input, Measurement, Software, Autoclaved
 from measurements.models import REPORT_INDEX_OFFSET, TEST_NAMES
 
 # prefix: /api/v1
@@ -277,27 +279,68 @@ def api_list_report_files():
         'results': results
     })
 
+@api_blueprint.route('/measurement_url', methods=["GET"])
+def api_get_measurement_url():
+    # XXX I initially created this as a fast path, but actually enabling indexes seems to be enough.
+    # postgres query planner is smart!
+    input_ = request.args.get("input")
+    report_id = request.args.get("report_id")
+    if not input_ or not report_id:
+        raise BadRequest("Missing input and/or report_id")
+
+    istmt = current_app.db_session.query(
+        Input.input_no
+    ).filter(Input.input == input_).subquery()
+
+    rstmt = current_app.db_session.query(
+        Report.report_no
+    ).filter(Report.report_id == report_id).subquery()
+
+    q = current_app.db_session.query(
+            Measurement.input_no,
+            Measurement.report_no,
+            Measurement.id.label('m_id'),
+            istmt,
+            rstmt
+    ).filter(Measurement.input_no == istmt.c.input_no) \
+     .filter(Measurement.report_no == rstmt.c.report_no)
+
+    r = q.one()
+    return jsonify({
+        'measurement_id': r.m_id,
+        'measurement_url': 'XXX'
+    })
+
 
 @api_blueprint.route('/measurement/<measurement_id>', methods=["GET"])
 def api_get_measurement(measurement_id):
-    return jsonify({
-        'data_format_version': 'XXX',
-        'id': measurement_id,
-        'input': 'XXX',
-        'measurement_start_time': 'XXX',
-        'options': [],
-        'probe_asn': 'XXX',
-        'probe_cc': 'XXX',
-        'probe_ip': 'XXX',
-        'report_filename': 'XXX',
-        'software_name': 'XXX',
-        'software_version': 'XXX',
-        'test_helpers': {},
-        'test_keys': {},
-        'test_name': 'XXX',
-        'test_runtime': 0.1,
-        'test_start_time': 'XXX'
-    })
+    msmt = current_app.db_session.query(
+            Measurement.id.label('m_id'),
+            Measurement.report_no.label('report_no'),
+            Measurement.frame_off.label('frame_off'),
+            Measurement.frame_size.label('frame_size'),
+            Measurement.intra_off.label('intra_off'),
+            Measurement.intra_size.label('intra_size'),
+            Report.report_no.label('r_report_no'),
+            Report.autoclaved_no.label('r_autoclaved_no'),
+            Autoclaved.filename.label('a_filename'),
+            Autoclaved.autoclaved_no.label('a_autoclaved_no'),
+
+    ).filter(Measurement.id == measurement_id)\
+        .join(Report, Report.report_no == Measurement.report_no)\
+        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)\
+        .one()
+
+    r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
+            headers={"Range": "bytes={}-{}".format(msmt.frame_off, msmt.frame_off+msmt.frame_size)}, stream=True)
+
+    # XXX use for streaming support lz4framed.Decompressor
+    # @darkk how big can these lz4 frames even become? Should this be a concern?
+    msmt_data = lz4framed.decompress(r.raw.read())[msmt.intra_off:msmt.intra_off+msmt.intra_size]
+    return current_app.response_class(
+        msmt_data,
+        mimetype=current_app.config['JSONIFY_MIMETYPE']
+    )
 
 @api_blueprint.route('/measurements', methods=["GET"])
 def api_list_measurements():
