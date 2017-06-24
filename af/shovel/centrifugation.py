@@ -2,22 +2,19 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import base64
 import collections
 import gzip
+import hashlib
 import itertools
 import numbers
 import os
 import re
 import sys
-import tempfile
 import traceback
-import threading
-import Queue
 from base64 import b64decode
-from contextlib import closing, contextmanager
+from contextlib import closing
+from cStringIO import StringIO
 from datetime import timedelta
-from functools import partial
 from itertools import groupby
 from operator import itemgetter
 
@@ -28,131 +25,59 @@ import simhash
 import ujson
 
 import autoclaving
-from canning import isomidnight, dirname, Future
+from canning import isomidnight, dirname
 
 CODE_VER = 2
 
-class LZ4WriteStream(object):
-    def __init__(self, fileobj):
-        self.__file = fileobj
-        self.__ctx = lz4frame.create_compression_context()
-        self.__file.write(lz4frame.compress_begin(self.__ctx,
-                    block_size=lz4frame.BLOCKSIZE_MAX4MB, # makes no harm for larger blobs
-                    block_mode=lz4frame.BLOCKMODE_LINKED,
-                    compression_level=5,
-                    content_checksum=lz4frame.CONTENTCHECKSUM_ENABLED,
-                    # sorry, no per-block checksums yet
-                    auto_flush=False))
+FLAG_TRUE_TEMP = True # keep temporary tables if the flag is false
+FLAG_DEBUG_CHAOS = False # random fault injection
+FLAG_FAIL_FAST = False
+FLAG_SKIP_SIMHASH = True # it takes 75% of time, disable it for a while 
+assert not (FLAG_DEBUG_CHAOS and FLAG_FAIL_FAST), 'Absurd!'
 
-    def write(self, blob):
-        self.__file.write(lz4frame.compress_update(self.__ctx, blob))
-
-    def close(self):
-        self.__file.write(lz4frame.compress_end(self.__ctx))
-        self.__file.flush()
-        del self.__ctx, self.__file
+if FLAG_DEBUG_CHAOS:
+    import random
 
 WORD_RE = re.compile('''[^\t\n\x0b\x0c\r !"#$%&\'()*+,-./:;<=>?@[\\\\\\]^_`{|}~']+''')
 
 def sim_shi4_mm3(text):
+    # NB: It makes quite little sense to use both 64bit numbers to compare
+    # hashes as pairwise Hamming distance using high 64bit is highly correlated
+    # with the distance computed using low 64bit. It's actually expected, but
+    # it means, that summing these distances is not linear and should be avoided.
+    # -- https://gist.github.com/darkk/e2b2762c4fe053a3cf8a299520f0490e
     i1, i2 = itertools.tee(WORD_RE.finditer(text))
     for _ in xrange(3): # 4 words per shingle
         next(i2, None)
+    # mmh3.hash64 produces pairs of signed i64
+    # simhash.compute expects list of unsigned ui64 and produces unsigned ui64
     mm = [mmh3.hash64(text[m1.start():m2.end()]) for m1, m2 in itertools.izip(i1, i2)]
     return (simhash.compute([_[0] & 0xffffffffffffffff for _ in mm]),
             simhash.compute([_[1] & 0xffffffffffffffff for _ in mm]))
 
-AUTOCLAVED_RE = re.compile(r'^\d{4}-[0-1][0-9]-[0-3][0-9]/(?:\d{4}[0-1][0-9][0-3][0-9]T[0-2][0-9][0-5][0-9][0-5][0-9]Z-[A-Z]{2}-AS\d+-(?P<test_name_1>[^-]+)-[^-]+-[.0-9]+-probe\.(?:yaml|json)|(?P<test_name_2>[^-]+)\.\d+\.tar)\.lz4$')
+# NB: 30% of simtext2pg.py is spent here
+def to_signed(integer):
+    '''Convert an unsigned integer into a signed integer with the same bits'''
+    return integer - 0x10000000000000000 if integer > 0x7fffffffffffffff else integer
 
-def autoclaved_test_name(x):
-    m = AUTOCLAVED_RE.match(x)
-    if m is None:
-        raise RuntimeError('Bad name for autoclaved file', x)
-    name1, name2 = m.groups()
-    return name1 or name2
+def from_signed(integer):
+    '''Convert an unsigned integer into a signed integer with the same bits'''
+    return integer & 0xffffffffffffffff if integer < 0 else integer
 
-FILE_START, FILE_END, REPORT_START, REPORT_END, BADBLOB, DATUM = object(), object(), object(), object(), object(), object()
-
-def stream_datum(atclv_root, bucket, take_file=None):
-    with gzip.GzipFile(os.path.join(atclv_root, bucket, autoclaving.INDEX_FNAME), 'r') as indexfd:
-        filefd = None
-        dociter = autoclaving.stream_json_blobs(indexfd)
-        for _, doc in dociter:
-            doc = ujson.loads(doc)
-            t = doc['type']
-            if t == 'datum':
-                # {"orig_sha1": "q7…I=", "text_off": 156846, "text_size": 58327, "type": "datum"}
-                intra_off = doc['text_off'] - text_off
-                datum = blob[intra_off:intra_off+doc['text_size']]
-                assert intra_off >= 0 and len(datum) == doc['text_size']
-                datum = ujson.loads(datum)
-                doc['frame_off'] = frame_off
-                doc['frame_size'] = frame_size
-                doc['intra_off'] = intra_off
-                doc['intra_size'] = doc['text_size']
-                doc['datum'] = datum
-                yield DATUM, doc
-                del intra_off, datum
-
-            elif t == 'frame':
-                # {"file_off": 0, "file_size": 162864, "text_off": 0, "text_size": 362462, … }
-                frame_off, frame_size = doc['file_off'], doc['file_size']
-                assert filefd.tell() == frame_off
-                blob = filefd.read(frame_size)
-                assert len(blob) == frame_size
-                blob = lz4frame.decompress(blob)
-                assert len(blob) == doc['text_size']
-                text_off = doc['text_off']
-
-            elif t == '/frame':
-                del frame_off, frame_size, text_off, blob
-
-            elif t == 'report':
-                # {"orig_sha1": "HO…U=",
-                #  "src_size": 104006450,
-                #  "textname": "2017-01-01/20161231T000030Z-US-AS…-0.2.0-probe.json", …}
-                yield REPORT_START, doc
-
-            elif t == '/report':
-                # {"info": "<class '__main__.TruncatedReportError'>",
-                #  "src_cutoff": 49484700, … }
-                yield REPORT_END, doc
-
-            elif t == 'file':
-                # {"filename": "2017-01-01/20161231T000030Z-US-AS…-0.2.0-probe.json.lz4", …}
-                filename = doc['filename']
-                assert filename.startswith(bucket)
-                if take_file is None or take_file(filename):
-                    filefd = open(os.path.join(atclv_root, filename), 'rb')
-                    del filename
-                    yield FILE_START, doc
-                else:
-                    for _, skipdoc in dociter:
-                        if '/file"' in skipdoc and ujson.loads(skipdoc)['type'] == '/file':
-                            break
-                    del filename, skipdoc
-
-            elif t == '/file':
-                # {"file_crc32": -156566611, "file_sha1": "q/…8=", "file_size": 18132131, …}
-                assert filefd.tell() == doc['file_size']
-                filefd.close()
-                filefd = None
-                yield FILE_END, doc
-
-            elif t == 'badblob':
-                # {"orig_sha1": "RXQFwOtpKtS0KicYi8JnWeQYYBw=",
-                #  "src_off": 99257, "src_size": 238,
-                #  "info": "<class 'yaml.constructor.ConstructorError'>", …}
-                yield BADBLOB, doc
-
-            else:
-                raise RuntimeError('Unknown record type', t)
-        if filefd is not None:
-            raise RuntimeError('Truncated autoclaved index', atclv_root, bucket)
+# Tiny error in code (e.g. if it's gets some optimisation) may screw database,
+# so the check is done on every launch.
+assert from_signed((-2)**63) == 2**63
+assert from_signed(-1) == 2**64-1
+for i in (0, 2**62, 2**63-1, 2**63, 2**63+1, 2**64-1):
+    assert from_signed(to_signed(i)) == i
+for i in (-2**63, -2**62, -1, 0, 1, 2**63-1):
+    assert to_signed(from_signed(i)) == i
 
 CHUNK_RE = re.compile('\x0d\x0a([0-9a-f]+)\x0d\x0a')
 
 def httpt_body(response):
+    if response is None:
+        return None
     body = response['body']
     if body is None:
         return None
@@ -168,9 +93,12 @@ def httpt_body(response):
         # - \0 bytes were stripped from binary body
         # - unicode was enforced using <meta/> charset encoding
         for k, v in response['headers'].iteritems():
-            if k.lower() == 'transfer-encoding' and v == 'chunked':
+            if k.lower() == 'transfer-encoding' and v.lower() == 'chunked':
                 break
         else:
+            # that's bad to throw:
+            # - control measurement from shows partial body https://explorer.ooni.torproject.org/measurement/xLa7pgssTf9GRA6b3KZqJNyXFHXvZeB7XwxH9iAsuLsq4hGD27vXtgqnRKIJXyWO?input=http:%2F%2Fwww.radioislam.org
+            # - that also happens "for real" https://explorer.ooni.torproject.org/measurement/20160715T020111Z_AS27775_kUa9SzwloGExQliV9qg8QHJBv20UTNgaVDb1mGG22XTH2N4J4y?input=http:%2F%2Fakwa.ru
             raise RuntimeError('Chunked body without `Transfer-Encoding: chunked`', response['headers'])
         out = []
         offset = body.index('\r')
@@ -191,327 +119,577 @@ def httpt_body(response):
         return ''.join(out)
     return body
 
-def simhash_text_to_fd(datum_iter, outfd):
-    for ev, doc in datum_iter:
-        assert ev is FILE_START
-        autoclaved = doc
-        for ev, doc in datum_iter:
-            if ev is FILE_END:
-                break
-            assert ev is REPORT_START
-            report = doc
-            for ev, doc in datum_iter:
-                if ev is DATUM:
-                    try:
-                        for req in doc['datum']['test_keys']['requests']:
-                            if not req['request']['tor']['is_tor'] and req['response'] and req['response']['body']:
-                                body = httpt_body(req['response'])
-                                if body:
-                                    h1, h2 = sim_shi4_mm3(body)
-                                    print >>outfd, report['orig_sha1'], doc['orig_sha1'], req['request']['url'], h1, h2
-                    except Exception:
-                        pass # req
-                elif ev is BADBLOB:
-                    pass
-                elif ev is REPORT_END:
-                    break
-                else:
-                    raise RuntimeError('Unexpected event type', doc['type'])
-            assert ev is REPORT_END
-        assert ev is FILE_END
-
-def simhash_text(in_root, out_root, bucket):
-    assert in_root[-1] != '/' and out_root[-1] != '/' and '/' not in bucket
-    in_dir = os.path.join(in_root, bucket)
-    assert os.path.isdir(in_dir) and os.path.isdir(out_root)
-
-    simhash_fpath = os.path.join(out_root, bucket + '.simhash.lz4')
-    if os.path.exists(simhash_fpath):
-        print 'The bucket {} has simhash already built'.format(bucket)
-        return
-
-    with tempfile.NamedTemporaryFile(prefix='tmpsim', dir=out_root) as rawfd:
-        with closing(LZ4WriteStream(rawfd)) as fd:
-            simhash_text_to_fd(
-                stream_datum(
-                    in_root,
-                    bucket,
-                    lambda x: autoclaved_test_name(x) in ('web_connectivity', 'http_requests')),
-                fd)
-        os.link(rawfd.name, simhash_fpath)
-    os.chmod(simhash_fpath, 0444)
-
 ########################################################################
 
-class PostgresSource(object):
-    # NB: Delimiter is always TAB!
-    def __init__(self, *args, **kwargs):
-        self.__buf = None
-        if args or kwargs:
-            self._tsv_iter = self._iter(*args, **kwargs)
+PG_ARRAY_SPECIAL_RE = re.compile('[\t\x0a\x0b\x0c\x0d {},"\\\\]')
+BAD_UTF8_RE = re.compile( # https://stackoverflow.com/questions/18673213/detect-remove-unpaired-surrogate-character-in-python-2-gtk
+    ur'''(?x)            # verbose expression (allows comments)
+    (                    # begin group
+    [\ud800-\udbff]      #   match leading surrogate
+    (?![\udc00-\udfff])  #   but only if not followed by trailing surrogate
+    )                    # end group
+    |                    #  OR
+    (                    # begin group
+    (?<![\ud800-\udbff]) #   if not preceded by leading surrogate
+    [\udc00-\udfff]      #   match trailing surrogate
+    )                    # end group
+    |                    #  OR
+    \u0000
+    ''')
 
-    def read(self, sz):
-        if self.__buf:
-            ret, self.__buf = self.__buf, None
+def pg_quote(s):
+    # The following characters must be preceded by a backslash if they
+    # appear as part of a column value: backslash itself, newline, carriage
+    # return, and the current delimiter character.
+    # -- https://www.postgresql.org/docs/9.6/static/sql-copy.html
+    if isinstance(s, basestring):
+        # postgres requires UTF8, it's also unhappy about
+        # - unpaired surrogates https://www.postgresql.org/message-id/20060526134833.GC27513%40svana.org
+        #   example at 2016-04-01/http_requests.06.tar.lz4 | grep myfiona.co.kr
+        # - \u0000 as in ``DETAIL:  \u0000 cannot be converted to text.``
+        #   example at https://github.com/TheTorProject/ooni-pipeline/issues/65
+        if isinstance(s, str):
+            s = unicode(s, 'utf-8')
+        s = BAD_UTF8_RE.sub(ur'\ufffd', s).encode('utf-8')
+        return s.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    elif s is None:
+        return '\\N'
+    elif isinstance(s, bool): # WTF: assert isinstance(True, numbers.Number)!
+        return 'TRUE' if s else 'FALSE'
+    elif isinstance(s, numbers.Number):
+        return s
+    elif isinstance(s, list):
+        if all(isinstance(el, basestring) for el in s):
+            escaped = []
+            for el in s:
+                if PG_ARRAY_SPECIAL_RE.search(el):
+                    escaped.append('"' + el.replace('\\', '\\\\').replace('"', '\\"') + '"') # 8-[ ~ ]
+                else:
+                    escaped.append(el)
+            return pg_quote('{' + ','.join(escaped) + '}') # yes, once more!
+        elif all(isinstance(el, numbers.Number) for el in s):
+            return '{' + ','.join(map(str, s)) + '}'
         else:
-            ret = ''
-        while len(ret) < sz:
-            chunk = self._readline()
-            if not chunk:
-                break
-            ret += chunk
-        if len(ret) > sz:
-            ret, self.__buf = ret[:sz], ret[sz:]
-        return ret
+            raise RuntimeError('Unable to quote list of unknown type', s)
+    else:
+        raise RuntimeError('Unable to quote unknown type', s)
 
-    def readline(self):
-        if self.__buf:
-            assert self.__buf[-1] == '\n'
-            ret, self.__buf = self.__buf, None
-            return ret
-        return self._readline()
+def pg_unquote(s):
+    if not isinstance(s, basestring):
+        raise RuntimeError('Unable to quote unknown type', s)
+    if s != '\\N':
+        return s.decode('string_escape') # XXX: gone in Python3
+    else:
+        return None
 
-    @staticmethod
-    def _quote(s):
-        # The following characters must be preceded by a backslash if they
-        # appear as part of a column value: backslash itself, newline, carriage
-        # return, and the current delimiter character.
-        # -- https://www.postgresql.org/docs/9.6/static/sql-copy.html
-        if isinstance(s, basestring):
-            return s.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-        elif s is None:
-            return '\\N'
-        elif isinstance(s, bool): # WTF: assert isinstance(True, numbers.Number)!
-            return 'TRUE' if s else 'FALSE'
-        elif isinstance(s, numbers.Number):
-            return s
-        else:
-            raise RuntimeError('Unable to quote unknown type', s)
+class PGCopyFrom(object):
+    # Write-through buffer for COPY command to be able to COPY to several
+    # output tables over single postgres session. Alternative is to use several
+    # sessions and pipe data across threads with significant CPU overhead and
+    # inability to process every OONI measurement using set of functions to
+    # have clean "residual" document after data extraction.
+    def __init__(self, pgconn, table, wbufsize=2097+152, **kwargs):
+        # default chunk size is taken as approx. cwnd between production VMs
+        self.__pgconn = pgconn
+        self.__table = table
+        self.__wbufsize = wbufsize
+        self.__kwargs = kwargs
+        self.__buf = StringIO()
+    def write(self, line):
+        assert len(line) == 0 or line[-1] == '\n'
+        pos = self.__buf.tell()
+        if pos > 0 and pos + len(line) > self.__wbufsize:
+            self.flush()
+        self.__buf.write(line)
+    def flush(self):
+        self.__buf.reset()
+        with self.__pgconn.cursor() as c:
+            try:
+                c.copy_from(self.__buf, self.__table, **self.__kwargs)
+            except Exception:
+                print >>sys.stderr, repr(self.__buf.getvalue())
+                raise
+        self.__buf.reset()
+        self.__buf.truncate()
+    def close(self):
+        self.flush()
+        self.__buf.close()
 
-    @staticmethod
-    def _unquote(s):
-        if not isinstance(s, basestring):
-            raise RuntimeError('Unable to quote unknown type', s)
-        if s != '\\N':
-            return s.decode('string_escape') # XXX: gone in Python3
-        else:
+def get_checked_code_ver(pgconn, autoclaved_index, bucket):
+    # Returns:
+    #   None -- the bucket was never loaded
+    #   int  -- code version stamped in `autoclaved` table for these files
+    #
+    # Check that postgresql and autoclaved/${bucket}/index.json.gz ...
+    # - have same list of data files, names and SHA1 are equal
+    # - have same count of reports (type: report) and measurements (type: datum)
+    #
+    # Number of distinct frames in PG and {type: frame} may differ as there are frames without measurements:
+    # $ zcat 2017-03-21/index.json.gz | awk '/"type": ?"frame"/ {a = 0; s = ""} {s = s $0} /"type": ?"datum"/ { a +=1 } (/"type": ?"\/frame"/ && a == 0) {print s; s = ""}' | shuf -n 5
+    # {"file_off": 14628392, "file_size": 15, "text_off": 60180480, "text_size": 0, "type": "frame"}{"type": "/frame"}
+    # {"file_off": 14508951, "file_size": 74, "text_off": 59792468, "text_size": 9132, "type": "frame"}{"type": "/report"}{"type": "/frame"}
+    # {"file_off": 11295485, "file_size": 60, "text_off": 43934392, "text_size": 5448, "type": "frame"}{"type": "/report"}{"type": "/frame"}
+    # {"file_off": 9654710, "file_size": 28, "text_off": 41709591, "text_size": 1, "type": "frame"}{"type": "/report"}{"type": "/frame"}
+    # {"file_off": 26744767, "file_size": 28, "text_off": 116908344, "text_size": 1, "type": "frame"}{"type": "/report"}{"type": "/frame"}
+    #
+    # TODO: {type: badblob} is not accounted as it's not currently imported during centrifugation stage.
+
+    files = set()
+    report_count, datum_count = 0, 0
+    with gzip.GzipFile(autoclaved_index, 'r') as indexfd:
+        for _, doc in autoclaving.stream_json_blobs(indexfd):
+            doc = ujson.loads(doc)
+            t = doc['type']
+            if t == 'file':
+                filename = doc['filename']
+            elif t == '/file':
+                files.add((b64decode(doc['file_sha1']), filename))
+            elif t == 'report':
+                report_count += 1
+            elif t == 'datum':
+                datum_count += 1
+
+    with pgconn.cursor() as c:
+        c.execute('SELECT file_sha1, filename FROM autoclaved WHERE bucket_date = %s', (bucket,))
+        files_db = {(str(_[0]), _[1]) for _ in c} # NB: file_sha1 is returned as buffer()
+        if files_db == files:
+            # that's just a safety check, these tables are commited within single transaction
+            c.execute('SELECT COUNT(*) FROM autoclaved JOIN report USING (autoclaved_no) WHERE bucket_date = %s', (bucket,))
+            report_db = list(c)[0][0]
+            if report_db != report_count:
+                raise RuntimeError('Unexpected DB mismatch in report count', bucket, report_count, report_db)
+            c.execute('SELECT COUNT(*) FROM autoclaved JOIN report USING (autoclaved_no) JOIN measurement USING (report_no) WHERE bucket_date = %s', (bucket,))
+            datum_db = list(c)[0][0]
+            if datum_db != datum_count:
+                raise RuntimeError('Unexpected DB mismatch in measurement count', bucket, datum_count, datum_db)
+            if len(files) != 0:
+                c.execute('SELECT MIN(code_ver), MAX(code_ver) FROM autoclaved WHERE bucket_date = %s', (bucket,))
+                vermin, vermax = list(c)[0]
+            else:
+                vermin, vermax = CODE_VER, CODE_VER # as DB will return NULL in this case
+            if vermin != vermax:
+                raise RuntimeError('Unexpected DB mismatch in code versions', bucket, vermin, vermax)
+            return vermin
+        elif len(files_db) == 0: # and len(files) > 0 as sets are not equal :)
             return None
+        else:
+            raise RuntimeError('Unexpected DB mismatch in autoclaved files set', bucket, list(files - files_db)[:5], list(files_db - files)[:5])
 
-    def _readline(self):
-        return next(self._tsv_iter, '')
-
-class AutoclavedMetadataStream(PostgresSource):
+def copy_files_from_index(pgconn, autoclaved_index, table, bucket):
+    # autoclaved/${bucket}/index.json.gz | filter "type=file" > autoclaved.table
     columns = ('filename', 'bucket_date', 'code_ver', 'file_size', 'file_crc32', 'file_sha1')
-    def __init__(self, atclv_index, bucket):
-        PostgresSource.__init__(self)
-        fmt = '{}\t' + bucket + '\t' + str(CODE_VER) + '\t{:d}\t{:d}\t\\\\x{}\n'
-        self._tsv_iter = self.__iter(atclv_index, fmt)
-    @staticmethod
-    def __iter(atclv_index, fmt):
-        with gzip.GzipFile(atclv_index, 'r') as indexfd:
-            filename = None
-            for _, doc in autoclaving.stream_json_blobs(indexfd):
-                if 'file"' in doc:
-                    doc = ujson.loads(doc)
-                    if doc['type'] == 'file':
-                        if filename is not None:
-                            raise RuntimeError('Corrupt index file', index_fpath, doc)
-                        filename = doc['filename']
-                    elif doc['type'] == '/file':
-                        if filename is None:
-                            raise RuntimeError('Corrupt index file', index_fpath, doc)
-                        doc['filename'], filename = filename, None
-                        yield fmt.format(PostgresSource._quote(doc['filename']), doc['file_size'],
-                                doc['file_crc32'], b64decode(doc['file_sha1']).encode('hex'))
+    fmt = '{}\t' + bucket + '\t' + str(CODE_VER) + '\t{:d}\t{:d}\t\\\\x{}\n'
+    with closing(PGCopyFrom(pgconn, table, columns=columns)) as wbuf, \
+        gzip.GzipFile(autoclaved_index, 'r') as indexfd:
+        filename = None
+        for _, doc in autoclaving.stream_json_blobs(indexfd):
+            if 'file"' in doc:
+                doc = ujson.loads(doc)
+                if doc['type'] == 'file':
+                    if filename is not None:
+                        raise RuntimeError('Corrupt index file', autoclaved_index, doc)
+                    filename = doc['filename']
+                elif doc['type'] == '/file':
+                    if filename is None:
+                        raise RuntimeError('Corrupt index file', autoclaved_index, doc)
+                    doc['filename'], filename = filename, None
+                    wbuf.write(fmt.format(pg_quote(doc['filename']), doc['file_size'],
+                            doc['file_crc32'], b64decode(doc['file_sha1']).encode('hex')))
 
-class ReportMetadataStream(PostgresSource):
+def copy_reports_from_index(pgconn, autoclaved_index, table, autoclaved_no):
+    # autoclaved/${bucket}/index.json.gz | filter "type=report" > report_meta.table
     columns = ('autoclaved_no', 'badtail', 'textname', 'orig_sha1')
-    @staticmethod
-    def _iter(atclv_index, autoclaved_no):
-        _quote = PostgresSource._quote
-        with gzip.GzipFile(atclv_index, 'r') as indexfd:
-            rowno = None
-            for _, doc in autoclaving.stream_json_blobs(indexfd):
-                if '"datum"' not in doc: # till someone submits report with {"textname":"datum"}...
-                    doc = ujson.loads(doc)
-                    t = doc['type']
-                    if t == 'file':
-                        rowno = autoclaved_no[doc['filename']]
-                    elif t == 'report':
-                        report = doc
-                    elif t == '/report':
-                        yield '{:d}\t{}\t{}\t\\\\x{}\n'.format(rowno, _quote(doc.get('src_cutoff')),
-                                _quote(report['textname']), b64decode(report['orig_sha1']).encode('hex'))
-
-class MeasurementMetadataStream(PostgresSource):
-    columns = ('report_no', 'frame_off', 'frame_size', 'intra_off', 'intra_size', 'orig_sha1')
-    @staticmethod
-    def _iter(atclv_index, report_no):
-        with gzip.GzipFile(atclv_index, 'r') as indexfd:
-            rowno = None
-            for _, doc in autoclaving.stream_json_blobs(indexfd):
+    with closing(PGCopyFrom(pgconn, table, columns=columns)) as wbuf, \
+        gzip.GzipFile(autoclaved_index, 'r') as indexfd:
+        rowno = None
+        for _, doc in autoclaving.stream_json_blobs(indexfd):
+            if '"datum"' not in doc: # till someone submits report with {"textname":"datum"}...
                 doc = ujson.loads(doc)
                 t = doc['type']
-                if t == 'report':
-                    rowno = report_no[doc['textname']]
-                elif t == 'frame':
-                    frame_off, frame_size, text_off = doc['file_off'], doc['file_size'], doc['text_off']
-                elif t == 'datum':
-                    intra_off = doc['text_off'] - text_off
-                    yield '{:d}\t{:d}\t{:d}\t{:d}\t{:d}\t\\\\x{}\n'.format(rowno,
-                        frame_off, frame_size, doc['text_off'] - text_off, doc['text_size'],
-                        b64decode(doc['orig_sha1']).encode('hex'))
-                elif t == 'blob':
-                    yield '{:d}\t\\N\t\\N\t\\N\t\\N\t\\\\x{}\n'.format(rowno,
-                        b64decode(doc['orig_sha1']).encode('hex'))
+                if t == 'file':
+                    rowno = autoclaved_no[doc['filename']]
+                elif t == 'report':
+                    report = doc
+                elif t == '/report':
+                    wbuf.write('{:d}\t{}\t{}\t\\\\x{}\n'.format(rowno, pg_quote(doc.get('src_cutoff')),
+                            pg_quote(report['textname']), b64decode(report['orig_sha1']).encode('hex')))
 
-class IterableQueue(object):
-    __END = object()
-    def __init__(self, *args, **kwargs):
-        self.__closed = False
-        self.__drained = False
-        self.__reader = None
-        self.__writer = None
-        self.__q = Queue.Queue(*args, **kwargs)
-        self.__broken = threading.Event() # instead of atomic bool
-    def __iter__(self):
-        assert self.__reader is None
-        self.__reader = threading.current_thread()
-        return self
-    def next(self): # __next__ in python3
-        assert self.__reader is threading.current_thread()
-        if self.__drained:
-            raise StopIteration # WTF: why is .next() called after StopIteration being thrown?
-        item = self.__q.get()
-        if item is not self.__END:
-            return item
-        self.__drained = True
-        raise StopIteration
-    def put(self, obj):
-        if self.__writer is None:
-            self.__writer = threading.current_thread()
-        assert self.__writer is threading.current_thread()
-        if self.__broken.is_set():
-            raise RuntimeError('Broken pipe IterableQueue')
-        self.__q.put(obj)
-    def drain(self):
-        self.__broken.set()
-        for _ in self:
-            pass
-    def close(self): # signal EOF
-        assert self.__writer is None or self.__writer is threading.current_thread()
-        if not self.__closed:
-            self.__closed = True
-            self.__q.put(self.__END)
+def copy_measurements_from_index(pgconn, autoclaved_index, table, report_no):
+    # autoclaved/${bucket}/index.json.gz | filter "type=datum" > measurement_meta.table
+    columns = ('report_no', 'frame_off', 'frame_size', 'intra_off', 'intra_size', 'orig_sha1')
+    with closing(PGCopyFrom(pgconn, table, columns=columns)) as wbuf, \
+        gzip.GzipFile(autoclaved_index, 'r') as indexfd:
+        rowno = None
+        for _, doc in autoclaving.stream_json_blobs(indexfd):
+            doc = ujson.loads(doc)
+            t = doc['type']
+            if t == 'report':
+                rowno = report_no[doc['textname']]
+            elif t == '/report':
+                rowno = None
+            elif t == 'frame':
+                frame_off, frame_size, text_off = doc['file_off'], doc['file_size'], doc['text_off']
+            elif t == 'datum':
+                intra_off = doc['text_off'] - text_off
+                wbuf.write('{:d}\t{:d}\t{:d}\t{:d}\t{:d}\t\\\\x{}\n'.format(rowno,
+                    frame_off, frame_size, doc['text_off'] - text_off, doc['text_size'],
+                    b64decode(doc['orig_sha1']).encode('hex')))
+            elif t == 'blob':
+                assert False # FIXME: that's some bug, there is no `blob` type AFAIK
+                #yield '{:d}\t\\N\t\\N\t\\N\t\\N\t\\\\x{}\n'.format(rowno,
+                #    b64decode(doc['orig_sha1']).encode('hex'))
 
-class MeasurementStream(PostgresSource):
-    columns = ('msm_no', 'measurement_start_time', 'test_runtime', 'id', 'input_no')
+def copy_meta_from_index(pgconn, autoclaved_index, bucket):
+    # Writing directly to `report` table is impossible as part of `report`
+    # table is parsed from data files, same is true for `measurement` table.
+    with pgconn.cursor() as c:
+        copy_files_from_index(pgconn, autoclaved_index, 'autoclaved', bucket)
+        c.execute('SELECT filename, autoclaved_no FROM autoclaved WHERE bucket_date = %s', [bucket])
+        autoclaved_no = dict(c)
+        c.execute('CREATE TEMPORARY TABLE report_meta_ (LIKE report_meta INCLUDING ALL) ON COMMIT DROP'
+                  if FLAG_TRUE_TEMP else
+                  'CREATE TABLE report_meta_ (LIKE report_meta INCLUDING ALL)')
+        copy_reports_from_index(pgconn, autoclaved_index, 'report_meta_', autoclaved_no)
+        c.execute('SELECT textname, report_no FROM report_meta_')
+        report_no = dict(c)
+        c.execute('CREATE TEMPORARY TABLE measurement_meta_ (LIKE measurement_meta INCLUDING ALL) ON COMMIT DROP'
+                  if FLAG_TRUE_TEMP else
+                  'CREATE TABLE measurement_meta_ (LIKE measurement_meta INCLUDING ALL)')
+        copy_measurements_from_index(pgconn, autoclaved_index, 'measurement_meta_', report_no)
+
+def none_if_len0(obj):
+    return obj if len(obj) else None
+
+def pop_values(obj):
+    if isinstance(obj, basestring):
+        return ''
+    elif obj is None:
+        return None
+    elif isinstance(obj, bool): # assert isinstance(True, numbers.Number)
+        return True
+    elif isinstance(obj, numbers.Number):
+        return 0
+    elif isinstance(obj, list):
+        for ndx in xrange(len(obj)):
+            obj[ndx] = pop_values(obj[ndx])
+        while len(obj) and isinstance(obj[-1], (list, dict)) and len(obj[-1]) == 0:
+            obj.pop()
+    elif isinstance(obj, dict):
+        for key in obj.keys():
+            obj[key] = pop_values(obj[key])
+            if isinstance(obj[key], (list, dict)) and len(obj[key]) == 0:
+                del obj[key]
+    return obj
+
+class MeasurementFeeder(object):
+    table = 'measurement_blob_'
+    columns = ('msm_no', 'measurement_start_time', 'test_runtime', 'id', 'input', 'exc', 'residual')
+    def __init__(self, pgconn):
+        with pgconn.cursor() as c:
+            c.execute(('CREATE TEMPORARY TABLE {} (LIKE measurement_blob INCLUDING ALL) ON COMMIT DROP'
+                       if FLAG_TRUE_TEMP else
+                       'CREATE TABLE {} (LIKE measurement_blob INCLUDING ALL)'
+                      ).format(self.table))
     @staticmethod
-    def _iter(dsn, queue):
-        _quote = PostgresSource._quote
-        with closing(psycopg2.connect(dsn)) as cacheconn:
-            input_no = PostgresDict(cacheconn, 'input', 'input_no', ('input',))
-            for report_no, msm_no, datum in queue:
-                input_txt = datum['input'] # may be `list`
-                if datum['test_name'] == 'meek_fronted_requests_test':
-                    input_txt = '{}:{}'.format(*input_txt)
-                elif datum['test_name'] == 'tls_handshake':
-                    input_txt = '{}:{:d}'.format(*input_txt)
-                assert isinstance(input_txt, (type(None), basestring)), 'Unexpected input {}'.format(repr(input_txt))
-                rowno = input_no[input_txt] if input_txt is not None else None
-                yield '{:d}\t{}\t{}\t{}\t{}\n'.format(msm_no,
-                            _quote(datum['measurement_start_time']), # nullable
-                            _quote(datum['test_runtime']), # nullable
-                            _quote(datum['id']),
-                            _quote(rowno))
+    def msm_rownpop(msm_no, datum, exc):
+        if FLAG_DEBUG_CHAOS and random.random() < 0.01:
+            raise RuntimeError('bad luck with measurement')
+        input_txt = datum.pop('input') # may be `list`
+        if input_txt is not None and not isinstance(input_txt, basestring):
+            input_txt = '{}:{}'.format(*input_txt)
+        measurement_start_time = datum.pop('measurement_start_time')
+        test_runtime = datum.pop('test_runtime')
+        id_ = datum.pop('id')
+        datum = pop_values(datum)
+        return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                    msm_no,
+                    pg_quote(measurement_start_time), # nullable
+                    pg_quote(test_runtime), # nullable
+                    pg_quote(id_),
+                    pg_quote(input_txt), # nullable
+                    pg_quote(none_if_len0(exc)),
+                    pg_quote(ujson.dumps(datum)))
 
-class ReportStream(PostgresSource):
+# Python WTF:
+# >>> '{}\t{}\t{}\t{}\t{}\t{}\n'.format(1,2,3,4,5,6,7)
+# '1\t2\t3\t4\t5\t6\n'
+# >>> '%s\t%s\t%s\t%s\t%s\t%s\n' % (1,2,3,4,5,6,7)
+# Traceback (most recent call last):
+#   File "<stdin>", line 1, in <module>
+# TypeError: not all arguments converted during string formatting
+
+class ReportFeeder(object):
+    table = 'report_blob_' # it's actually some temporary table
     columns = ('report_no', 'test_start_time', 'probe_cc', 'probe_asn', 'probe_ip', 'test_name',
                'report_id', 'software_no')
+    sw_key = ('test_name', 'test_version', 'software_name', 'software_version')
+    # common_keys must be same for every measurement in the report file
+    common_keys = ('test_start_time', 'probe_cc', 'probe_asn', 'probe_ip', 'report_filename',
+       'test_name', 'test_version', 'software_name', 'software_version', 'report_id')
+    def __init__(self, pgconn, stconn):
+        with pgconn.cursor() as c:
+            c.execute(('CREATE TEMPORARY TABLE {} (LIKE report_blob INCLUDING ALL) ON COMMIT DROP'
+                       if FLAG_TRUE_TEMP else
+                       'CREATE TABLE {} (LIKE report_blob INCLUDING ALL)'
+                      ).format(self.table))
+            c.execute('SELECT unnest(enum_range(NULL::ootest))')
+            self.ootest_enum = {_[0] for _ in c.fetchall()}
+        self.software_no = PostgresDict(stconn, 'software', 'software_no', self.sw_key)
+        self.prev_no = None
+        self.prev_keys = None # value is not actually used
+    def report_row(self, report_no, datum):
+        if self.prev_no == report_no:
+            for ndx, key in enumerate(self.common_keys):
+                if self.prev_keys[ndx] != datum[key]: # also enforces existence of common_keys
+                    raise RuntimeError('report key mismatch', key, self.prev_keys, datum[key])
+            return ''
+        else:
+            self.prev_keys = tuple(datum[key] for key in self.common_keys)
+            self.prev_no = report_no
+        if FLAG_DEBUG_CHAOS and random.random() < 0.01:
+            raise RuntimeError('bad luck with report row')
+        software_no = self.software_no[tuple(datum[key] for key in self.sw_key)]
+        if datum['probe_asn'][:2] != 'AS':
+            raise RuntimeError('Bad AS number', datum['probe_asn'])
+        probe_asn = int(datum['probe_asn'][2:])
+        if len(datum['probe_cc']) != 2:
+            raise RuntimeError('Bad probe_cc len', datum['probe_cc'])
+        probe_ip = datum['probe_ip']
+        if probe_ip == '127.0.0.1':
+            probe_ip = None
+        test_name = datum['test_name']
+        if test_name not in self.ootest_enum:
+            test_name = None # it's still saved in `software_no`
+        report_id = datum['report_id']
+        if not report_id: # null, empty string - anything
+            report_id = None
+        return '{:d}\t{}\t{}\t{:d}\t{}\t{}\t{}\t{:d}\n'.format(
+                report_no,
+                datum['test_start_time'],
+                datum['probe_cc'],
+                probe_asn,
+                pg_quote(probe_ip),
+                pg_quote(test_name),
+                pg_quote(report_id),
+                software_no)
+    @classmethod
+    def pop(cls, datum):
+        # TODO: strictly speaking, `report_filename` is not validated against
+        # data fetched with copy_reports_from_index()
+        for key in cls.common_keys:
+            datum.pop(key, None)
+
+TRACEBACK_LINENO_RE = re.compile(r' line \d+,')
+
+def exc_hash(exc_info):
+    # exc_hash ignores line numbers, but does not ignore other taceback values
+    type_, value_, traceback_ = exc_info
+    msg = ''.join(traceback.format_exception(type_, value_, traceback_))
+    msg = TRACEBACK_LINENO_RE.sub(' line N,', msg)
+    return mmh3.hash(msg) # signed int4
+
+class BadmetaFeeder(object):
+    table = 'badmeta_' # it's actually some temporary table
+    columns = ('autoclaved_no', 'report_no', 'textname', 'exc_report', 'exc_measurement')
+    def __init__(self, pgconn):
+        with pgconn.cursor() as c:
+            c.execute(('CREATE TEMPORARY TABLE {} (LIKE badmeta_tpl INCLUDING ALL) ON COMMIT DROP'
+                       if FLAG_TRUE_TEMP else
+                       'CREATE TABLE {} (LIKE badmeta_tpl INCLUDING ALL)'
+                      ).format(self.table))
     @staticmethod
-    def _iter(dsn, queue):
-        _quote = PostgresSource._quote
-        common_keys = ('test_start_time', 'probe_cc', 'probe_asn', 'probe_ip', 'report_filename',
-                       'test_name', 'test_version', 'software_name', 'software_version', 'report_id')
-        with closing(psycopg2.connect(dsn)) as cacheconn:
-            with cacheconn.cursor() as c:
-                c.execute('SELECT unnest(enum_range(NULL::ootest))')
-                ootest_enum = {_[0] for _ in c.fetchall()}
-            sw_key = ('test_name', 'test_version', 'software_name', 'software_version')
-            software_no = PostgresDict(cacheconn, 'software', 'software_no', sw_key)
-            for report_no, repit in itertools.groupby(queue, itemgetter(0)):
-                report_no, msm_no, datum = next(repit)
-                rr = {key: datum[key] for key in common_keys} # Report Record
-                for _, _, datum in repit:
-                    for key in common_keys:
-                        if datum[key] != rr[key]:
-                            raise RuntimeError('rr key mismatch', key, rr, datum[key])
-                rr['software_no'] = software_no[tuple(rr[_] for _ in sw_key)] # before touching `test_name`
-                if rr['probe_asn'][:2] != 'AS':
-                    raise RuntimeError('Bad AS number', rr['probe_asn'])
-                rr['probe_asn'] = int(rr['probe_asn'][2:])
-                if rr['probe_ip'] == '127.0.0.1':
-                    rr['probe_ip'] = None
-                if rr['test_name'] not in ootest_enum:
-                    rr['test_name'] = None
-                if not rr['report_id']:
-                    rr['report_id'] = None
-                yield '{:d}\t{}\t{}\t{:d}\t{}\t{}\t{}\t{:d}\n'.format(report_no, rr['test_start_time'],
-                        rr['probe_cc'], rr['probe_asn'], _quote(rr['probe_ip']), _quote(rr['test_name']),
-                        _quote(rr['report_id']), rr['software_no'])
+    def badmeta_row(autoclaved_no, report_no, textname, report=None, measurement=None):
+        return '{:d}\t{:d}\t{}\t{}\t{}\n'.format(
+                autoclaved_no,
+                report_no,
+                pg_quote(textname),
+                pg_quote(exc_hash(report) if report is not None else None),
+                pg_quote(exc_hash(measurement) if measurement is not None else None))
 
 IPV4_RE = re.compile(r'^\d+\.\d+\.\d+\.\d+$')
 
-class TcpStream(PostgresSource):
-    columns = ('msm_no', 'ip', 'port', 'control_failure', 'test_failure')
+class TcpFeeder(object):
+    table = 'tcp'
+    columns = ('msm_no', 'ip', 'port', 'control_failure', 'test_failure', 'control_api_failure')
+    # NB: control_api_failure is also recorded as `control_failure` in `http_verdict`
     @staticmethod
-    def _iter(dsn_unused, queue):
-        _quote = PostgresSource._quote
-        for _, msm_no, datum in queue:
-            try:
-                tcp = []
-                for el in datum['test_keys'].get('tcp_connect', ()):
-                    ip, port, test = el['ip'], el['port'], el['status']['failure']
-                    if IPV4_RE.match(ip): # domains?! why?!
-                        ipport = '{}:{:d}'.format(ip, port)
-                        control = datum['test_keys'].get('control', {}).get('tcp_connect', {}).get(ipport)
-                        if control:
-                            control = control['failure']
-                            tcp.append('{:d}\t{}\t{:d}\t{}\t{}\n'.format(msm_no, ip, port,
-                                                 _quote(control), _quote(test)))
-                for _ in tcp:
-                    yield _
-            except Exception:
-                pass
+    def row(msm_no, datum):
+        ret = ''
+        test_keys = datum['test_keys']
+        control = test_keys.get('control', {}).get('tcp_connect', {})
+        control_api_failure = test_keys.get('control_failure')
+        for el in test_keys.get('tcp_connect', ()):
+            ip, port, failure = el['ip'], el['port'], el['status']['failure']
+            assert failure is not None or (el['status']['success'] == True and el['status']['blocked'] == False)
+            if IPV4_RE.match(ip): # domains?! why?! # TODO: is not IPv6-ready :-(
+                elctrl = control.get('{}:{:d}'.format(ip, port))
+                if elctrl:
+                    assert control_api_failure is None
+                    assert isinstance(elctrl['status'], bool) and elctrl['status'] == (elctrl['failure'] is None)
+                    control_failure = elctrl['failure']
+                else:
+                    # FALSE: assert control_api_failure is not None
+                    # Shit happens: {... "control": {}, "control_failure": null, ...}
+                    # TODO: ^^ be smarter in this case
+                    control_failure = None # well, it's hard to state anything about `control_api_failure`
+                ret += '{:d}\t{}\t{:d}\t{}\t{}\t{}\n'.format(
+                        msm_no,
+                        ip,
+                        port,
+                        pg_quote(control_failure),
+                        pg_quote(failure),
+                        pg_quote(control_api_failure))
+        return ret
+    @staticmethod
+    def pop(datum):
+        test_keys = datum['test_keys']
+        control = test_keys.get('control', {}).get('tcp_connect', {})
+        test_keys.pop('control_failure', None)
 
-class DnsStream(PostgresSource):
-    columns = ('msm_no', 'domain_no', 'control_ip', 'test_ip')
+        for el in test_keys.get('tcp_connect', ()):
+            ip, port, _ = el.pop('ip'), el.pop('port'), el['status'].pop('failure')
+            el['status'].pop('success'), el['status'].pop('blocked')
+            elctrl = control.get('{}:{:d}'.format(ip, port))
+            if elctrl:
+                elctrl.pop('status')
+                elctrl.pop('failure')
+
+class DnsFeeder(object):
+    table = 'dns_a_'
+    columns = ('msm_no', 'domain', 'control_ip', 'test_ip', 'control_cname', 'test_cname',
+               'ttl', 'resolver_hostname', 'client_resolver', 'control_failure', 'test_failure')
+    # TTL of the first DNS RR of the answer is taken, it SHOULD be RR
+    # describing `hostname`, but there is no guarantee for that. :-(
+    # Different RRs may have different TTL in the answer, e.g.:
+    # cname-to-existing-dual.ya.darkk.net.ru. 14400 IN CNAME linode.com.
+    # linode.com.                               210 IN A     72.14.191.202
+    # linode.com.                               210 IN A     69.164.200.202
+    # linode.com.                               210 IN A     72.14.180.202
+    def __init__(self, pgconn):
+        with pgconn.cursor() as c:
+            c.execute(('CREATE TEMPORARY TABLE {} (LIKE dns_a_tpl INCLUDING ALL) ON COMMIT DROP'
+                       if FLAG_TRUE_TEMP else
+                       'CREATE TABLE {} (LIKE dns_a_tpl INCLUDING ALL)'
+                      ).format(self.table))
     @staticmethod
-    def _iter(dsn, queue):
-        _quote = PostgresSource._quote
-        with closing(psycopg2.connect(dsn)) as cacheconn:
-            domain_no = PostgresDict(cacheconn, 'domain', 'domain_no', ('domain',))
-            for _, msm_no, datum in queue:
-                try:
-                    test = {}
-                    for el in datum['test_keys'].get('queries', ()):
-                        if el['query_type'] == 'A':
-                            hostname = el['hostname']
-                            for ans in el['answers']:
-                                if ans['answer_type'] == 'A':
-                                    test.setdefault(hostname, set()).add(ans['ipv4'])
-                    if len(test) != 1:
-                        continue
-                    control = filter(IPV4_RE.match, datum['test_keys']['control']['dns']['addrs'])
-                    domain = test.keys()[0].rstrip('.')
-                    rowno = domain_no[domain]
-                    test = ','.join(sorted(test[domain]))
-                    control = ','.join(sorted(control))
-                    if test and control:
-                        # FIXME: test & control failures
-                        yield '{:d}\t{:d}\t{{{}}}\t{{{}}}\n'.format(msm_no, rowno, control, test)
-                except Exception:
-                    pass
+    def row(msm_no, datum):
+        test_keys = datum['test_keys']
+        client_resolver = test_keys.get('client_resolver')
+        dns = test_keys.get('control', {}).get('dns', {})
+        control_failure = dns.get('failure')
+        addrs = dns.get('addrs', ())
+        control_ip = none_if_len0(sorted(filter(IPV4_RE.match, addrs)))
+        control_cname = none_if_len0([_ for _ in addrs if _ not in control_ip]) # O(n^2), but list is tiny
+        queries = test_keys.get('queries', ())
+        if len({q['hostname'] for q in queries}) != 1:
+            control_ip, control_cname, control_failure = None, None, '[ambiguous]'
+        ret = ''
+        for q in queries:
+            if q['query_type'] == 'A': # almost always
+                ttl = next(iter(q['answers']), {}).get('ttl')
+                test_ip = none_if_len0(sorted([a['ipv4'] for a in q['answers'] if a['answer_type'] == 'A']))
+                test_cname = none_if_len0([a['hostname'] for a in q['answers'] if a['answer_type'] == 'CNAME'])
+                ret += '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                        msm_no,
+                        pg_quote(q['hostname']),
+                        pg_quote(control_ip),
+                        pg_quote(test_ip),
+                        pg_quote(control_cname),
+                        pg_quote(test_cname),
+                        pg_quote(ttl),
+                        pg_quote(q['resolver_hostname']),
+                        pg_quote(client_resolver),
+                        pg_quote(control_failure),
+                        pg_quote(q['failure']))
+        return ret
+    @staticmethod
+    def pop(datum):
+        test_keys = datum['test_keys']
+        test_keys.pop('client_resolver', None)
+        dns = test_keys.get('control', {}).get('dns', {})
+        dns.pop('failure', None)
+        dns.pop('addrs', None)
+        queries = test_keys.get('queries', ())
+        for q in queries:
+            if q['query_type'] == 'A': # almost always
+                if len(q['answers']):
+                    first_ttl = q['answers'][0].get('ttl', object())
+                    for a in q['answers']:
+                        if a.get('ttl') == first_ttl:
+                            a.pop('ttl')
+                        if a['answer_type'] == 'A':
+                            a.pop('ipv4')
+                            a.pop('answer_type')
+                        elif a['answer_type'] == 'CNAME':
+                            a.pop('hostname')
+                            a.pop('answer_type')
+                q.pop('hostname')
+                q.pop('resolver_hostname')
+                q.pop('failure')
+
+
+class BodySimhashSink(object):
+    # NB: this data goes to small-transaction connection (stconn) to be
+    # available to other nodes as soon as it's commited.
+    # Queue is buffered to avoid round-trip to database for every webpage.
+    # Computation is delayed till filling the database as it's rather
+    # expensive, throughput is ~7.5 Mbytes/s, so roundtrip to DB is done to
+    # exclude already parsed pages. It's unclear if extra roundtrip makes sense
+    # when known_sha256 cache is used.
+    # Average body size is 75kb and cross-report cachehit is ~18%.
+    def __init__(self, stconn):
+        self.stconn = stconn
+        self.known_sha256 = IsKnownL2(85000, 15000)
+        self.queue = {}
+        self.known = 0
+        self.size = 0
+    def put(self, body_sha256, body):
+        if FLAG_SKIP_SIMHASH:
+            return
+        assert isinstance(body_sha256, str) and isinstance(body, str)
+        if self.known_sha256.is_known(body_sha256): # either in DB or in queue
+            self.known += 1
+            return
+        self.queue[body_sha256] = body
+        self.size += len(body)
+    def maybe_flush(self):
+        if self.size > 16777216 or len(self.queue) > 2048:
+            self.flush()
+    def flush(self):
+        with self.stconn, self.stconn.cursor() as c:
+            # NB: https://www.datadoghq.com/blog/100x-faster-postgres-performance-by-changing-1-line/ when postgres < 9.3
+            c.execute('SELECT body_sha256 FROM http_body_simhash WHERE body_sha256 = ANY(%s)',
+                [map(psycopg2.Binary, self.queue.iterkeys())])
+            just_fetched = [str(_[0]) for _ in c]
+            for body_sha256 in just_fetched:
+                del self.queue[body_sha256]
+            args = []
+            for body_sha256, body in self.queue.iteritems():
+                hi, lo = sim_shi4_mm3(body)
+                hi, lo = to_signed(hi), to_signed(lo)
+                args.append(psycopg2.Binary(body_sha256)) # http://initd.org/psycopg/docs/usage.html#binary-adaptation
+                args.append(hi)
+                args.append(lo)
+            assert len(args) % 3 == 0
+            if len(args):
+                c.execute('INSERT INTO http_body_simhash (body_sha256, simhash_shi4mm3hi, simhash_shi4mm3lo) VALUES {} '
+                          'ON CONFLICT DO NOTHING RETURNING body_sha256'.format(
+                          ', '.join(['(%s, %s, %s)'] * (len(args) / 3))),
+                          args)
+                just_inserted = {_[0] for _ in c}
+            else:
+                just_inserted = {}
+            print 'BodySimhashSink: skipped {:d} queue {:d} pre-filter {:d} db-dup {:d}'.format(
+                    self.known,
+                    len(self.queue) + len(just_fetched),
+                    len(just_fetched),
+                    len(self.queue) - len(just_inserted))
+        self.queue.clear()
+        self.known = 0
+        self.size = 0
+    def close(self):
+        self.flush()
+        del self.stconn, self.queue, self.known_sha256
 
 TITLE_REGEXP = re.compile('<title>(.*?)</title>', re.IGNORECASE | re.DOTALL)
 
@@ -523,68 +701,182 @@ def get_title(body):
         title = title.group(1).decode('utf-8', 'replace').encode('utf-8')
     return title
 
-class HttpControlStream(PostgresSource):
-    columns = ('msm_no', 'is_tor', 'failure', 'status_code', 'body_length', 'title', 'headers')
-    @staticmethod
-    def _iter(dsn_unused, queue):
-        _quote = PostgresSource._quote
-        for _, msm_no, datum in queue:
-            try:
-                r = datum['test_keys']['control']['http_request']
-                yield '{:d}\tfalse\t{}\t{}\t{}\t{}\t{}\n'.format(msm_no, _quote(r['failure']),
-                        _quote(r['status_code']), _quote(r['body_length']), _quote(r['title']),
-                        _quote(ujson.dumps(r['headers'])))
-            except Exception:
-                pass
-            try:
-                for r in datum['test_keys']['requests']:
-                    if r['request']['tor']['is_tor']:
-                        rr = r['response']
-                        body = httpt_body(rr)
-                        yield '{:d}\ttrue\t{}\t{}\t{}\t{}\t{}\n'.format(msm_no, _quote(r['failure']),
-                                _quote(rr['code']),
-                                _quote(len(body) if body is not None else None),
-                                _quote(get_title(body)),
-                                _quote(ujson.dumps(rr['headers'])))
-            except Exception:
-                pass
+class BaseHttpFeeder(object):
+    def __init__(self, body_sink):
+        self.body_sink = body_sink
+    def body_sha256(self, body):
+        if body is not None:
+            body_sha256 = hashlib.sha256(body)
+            self.body_sink.put(body_sha256.digest(), body)
+            body_sha256 = '\\\\x' + body_sha256.hexdigest()
+        else:
+            body_sha256 = pg_quote(None)
+        return body_sha256
+    COMMON_HEADERS = {
+        "Accept-Language": "en-US;q=0.8,en;q=0.5",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+    }
+    @classmethod
+    def _pop_request(cls, datum, request): # .test_keys.requests[].request element
+        if 'url' in request and request['url'] == datum['input']: # may be already popped
+            del request['url']
+        if request['body'] in ('', None): # both happens
+            del request['body']
+        if request['headers'] == cls.COMMON_HEADERS:
+            del request['headers']
+        if request['method'] == 'GET':
+            del request['method']
+        tor = request.get('tor')
+        if tor is not None: # it should not be `null`, it's dict
+            tor.pop('is_tor')
+            if tor['exit_ip'] is None:
+                tor.pop('exit_ip')
+            if tor['exit_name'] is None:
+                tor.pop('exit_name')
 
-class HttpRequestStream(PostgresSource):
-    columns = ('msm_no', 'url', 'failure', 'status_code', 'body_length', 'title', 'headers')
-    @staticmethod
-    def _iter(dsn_unused, queue):
-        _quote = PostgresSource._quote
-        for _, msm_no, datum in queue:
-            try:
-                for r in datum['test_keys']['requests']:
-                    if not r['request']['tor']['is_tor']:
-                        rr = r['response']
-                        body = httpt_body(rr)
-                        yield '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(msm_no,
-                                _quote(r['request']['url']),
-                                _quote(r['failure']),
-                                _quote(rr['code']),
-                                _quote(len(body) if body is not None else None),
-                                _quote(get_title(body)),
-                                _quote(ujson.dumps(rr['headers'])))
-            except Exception:
-                pass
+class HttpControlFeeder(BaseHttpFeeder):
+    table = 'http_control'
+    columns = ('msm_no', 'is_tor', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
+    def row(self, msm_no, datum):
+        ret = ''
+        if datum['test_name'] == 'web_connectivity':
+            r = datum['test_keys']['control'].get('http_request')
+            if r:
+                # {"id":"8e21031a-6c52-4659-ba30-016d533c2451","report_id":"20170421T070023Z_AS131709_rKyNp02D3ZZAMYwaeElF7bWjUGusiVcTc4EEoPqAhw4uwlD0Dj"}
+                status_code = r.get('status_code')
+                if status_code == -1:
+                    status_code = None
+                body_length = r.get('body_length')
+                if body_length == -1:
+                    body_length = None
+                ret = '{:d}\tFALSE\t{}\t{}\t{}\t{}\t{}\t\\N\n'.format(
+                        msm_no,
+                        pg_quote(r['failure']),
+                        pg_quote(status_code),
+                        pg_quote(body_length),
+                        pg_quote(r.get('title')),
+                        pg_quote(ujson.dumps(r['headers']))) # seems, empty headers dict is still present it case of failure
+        elif datum['test_name'] == 'http_requests':
+            for r in datum['test_keys']['requests']:
+                if r['request']['tor']['is_tor']:
+                    response = r['response']
+                    body = httpt_body(response)
+                    body_sha256 = self.body_sha256(body)
+                    if response is None:
+                        response = {}
+                    headers = response.get('headers')
+                    if headers is not None:
+                        headers = ujson.dumps(headers)
+                    ret += '{:d}\tTRUE\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                        msm_no,
+                        pg_quote(r.get('failure')),
+                        pg_quote(response.get('code')),
+                        pg_quote(len(body) if body is not None else r.get('response_length')),
+                        pg_quote(get_title(body)),
+                        pg_quote(headers),
+                        body_sha256)
+        return ret
+    def pop(self, datum):
+        if datum['test_name'] == 'web_connectivity':
+            r = datum['test_keys']['control'].get('http_request')
+            if r:
+                r.pop('status_code', None)
+                r.pop('body_length', None)
+                r.pop('failure')
+                r.pop('title', None)
+                r.pop('headers')
+        elif datum['test_name'] == 'http_requests':
+            for r in datum['test_keys']['requests']:
+                if r['request']['tor'].get('is_tor') == True: # may be popped by HttpRequestFeeder
+                    response = r['response']
+                    if response is not None:
+                        response.pop('body')
+                        r.pop('failure', None)
+                        response.pop('code', None)
+                        r.pop('response_length', None)
+                        response.pop('headers')
+                    else:
+                        r.pop('response')
+                    self._pop_request(datum, r['request'])
 
-class HttpVerdictStream(PostgresSource):
+
+class HttpRequestFeeder(BaseHttpFeeder):
+    table = 'http_request'
+    columns = ('msm_no', 'url', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
+    def row(self, msm_no, datum):
+        ret = ''
+        if datum['test_name'] == 'web_connectivity':
+            for r in datum['test_keys']['requests']:
+                # ooniprobe-android does NOT set `tor` dict, it's also not set in case of DNS failure
+                assert 'tor' not in r['request'] or not r['request']['tor']['is_tor']
+                ret += self._row(msm_no, r)
+        elif datum['test_name'] == 'http_requests':
+            for r in datum['test_keys']['requests']:
+                if not r['request']['tor']['is_tor']:
+                    ret += self._row(msm_no, r)
+        return ret
+    def _row(self, msm_no, r):
+        response = r['response']
+        body = httpt_body(response)
+        body_sha256 = self.body_sha256(body)
+        if response is None: # may be `null` both for web_connectivity and http_requests
+            response = {}
+        headers = response.get('headers')
+        if headers is not None:
+            headers = ujson.dumps(headers)
+        return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+            msm_no,
+            pg_quote(r['request']['url']),
+            pg_quote(r.get('failure')),
+            pg_quote(response.get('code')),
+            pg_quote(len(body) if body is not None else r.get('response_length')),
+            pg_quote(get_title(body)),
+            pg_quote(headers),
+            body_sha256)
+    def pop(self, datum):
+        if datum['test_name'] == 'web_connectivity':
+            for r in datum['test_keys']['requests']:
+                self._pop(datum, r)
+        elif datum['test_name'] == 'http_requests':
+            for r in datum['test_keys']['requests']:
+                if r['request']['tor'].get('is_tor') == False: # may be popped by HttpControlFeeder
+                    self._pop(datum, r)
+    def _pop(self, datum, r):
+        response = r['response']
+        r['request'].pop('url') 
+        r.pop('failure', None)
+        if response is not None:
+            response.pop('body')
+            response.pop('code', None)
+            response.pop('headers')
+        else:
+            r.pop('response')
+        r.pop('response_length', None)
+        self._pop_request(datum, r['request'])
+
+class HttpVerdictFeeder(object):
+    table = 'http_verdict'
     columns = ('msm_no', 'accessible', 'control_failure', 'http_experiment_failure', 'title_match',
                'dns_consistency', 'dns_experiment_failure', 'body_proportion', 'blocking',
                'body_length_match', 'headers_match', 'status_code_match')
-    @staticmethod
-    def _iter(dsn_unused, queue):
-        _quote = PostgresSource._quote
-        keys = HttpVerdictStream.columns[1:]
-        blndx = keys.index('blocking') # may be BOTH bolean and text, needs some type convertion
-        fmt = '{:d}\t' + '\t'.join(['{}'] * len(keys)) + '\n'
-        for _, msm_no, datum in queue:
-            row = [datum['test_keys'].get(_) for _ in keys]
-            if isinstance(row[blndx], bool):
-                row[blndx] = 'true' if row[blndx] else 'false' # enfoce string type
-            yield fmt.format(msm_no, *map(_quote, row))
+    blndx = (columns.index('blocking') - 1) # may be BOTH bolean and text, needs some type convertion
+    fmt = '{:d}\t' + '\t'.join(['{}'] * (len(columns) - 1)) + '\n'
+    @classmethod
+    def row(cls, msm_no, datum):
+        it = iter(cls.columns)
+        next(it) # skip msm_no
+        row = [datum['test_keys'].get(_) for _ in it]
+        if isinstance(row[cls.blndx], bool):
+            row[cls.blndx] = 'true' if row[cls.blndx] else 'false' # enfoce string type
+        return cls.fmt.format(msm_no, *map(pg_quote, row))
+    @classmethod
+    def pop(cls, datum):
+        it = iter(cls.columns)
+        next(it)
+        test_keys = datum['test_keys']
+        for key in it:
+            test_keys.pop(key, None)
 
 def meta_pg_blobtable(stream_cls, dsn, queue, table, schema_table):
     with closing(psycopg2.connect(dsn=dsn)) as conn:
@@ -598,18 +890,33 @@ def meta_pg_blobtable(stream_cls, dsn, queue, table, schema_table):
 
 class PostgresDict(collections.defaultdict):
     # NB: `table`, `value` and `key` are trusted!
-    def __init__(self, conn, table, value, key):
+    # `maxsize` is used to avoid unlimited memory consumption by in-process cache
+    def __init__(self, conn, table, value, key, maxsize=4194304):
+        assert isinstance(key, tuple)
         collections.defaultdict.__init__(self)
         self.__conn = conn
         # Ouch, really ugly
         with self.__conn, conn.cursor() as c:
             c.execute('SELECT {}, {} FROM {}'.format(value, ', '.join(key), table))
-            for _ in c:
-                self[_[1:]] = _[0]
+            if len(key) == 1:
+                for _ in c:
+                    self[_[1]] = _[0]
+            else:
+                for _ in c:
+                    self[_[1:]] = _[0]
         self.__select = 'SELECT {} FROM {} WHERE '.format(value, table) + ' AND '.join(_+' = %s' for _ in key)
         self.__insert = 'INSERT INTO {} ({}) VALUES({}) ON CONFLICT DO NOTHING RETURNING {}'.format(table, ', '.join(key),
                             ', '.join(['%s']*len(key)), value)
+        size = self.getsizeof()
+        if size > maxsize:
+            raise RuntimeError('PostgresDict is huge, tune maxsize of refactor', size, maxsize, table, key, value)
+    def getsizeof(self):
+        if isinstance(next(self.iterkeys(), ()), tuple):
+            return sys.getsizeof(self) + sum(sys.getsizeof(_k) + sys.getsizeof(_v) + sum(sys.getsizeof(_) for _ in _k) for _k, _v in self.iteritems())
+        else:
+            return sys.getsizeof(self) + sum(sys.getsizeof(_k) + sys.getsizeof(_v) for _k, _v in self.iteritems())
     def __missing__(self, key):
+        assert isinstance(key, (tuple, basestring))
         with self.__conn, self.__conn.cursor() as c:
             dbkey = (key,) if isinstance(key, basestring) else key
             c.execute(self.__insert, dbkey)
@@ -620,31 +927,29 @@ class PostgresDict(collections.defaultdict):
             self[key] = row[0]
             return self[key]
 
-def meta_pg_metatable(c, bckt, in_root, bucket):
-    atclv_index = os.path.join(in_root, bucket, autoclaving.INDEX_FNAME)
-
-    # Well, autoclaved_YYYYMMDD table is not required, but it makes things more transactional.
-
-    c.execute('CREATE UNLOGGED TABLE IF NOT EXISTS autoclaved_meta{} (LIKE autoclaved INCLUDING ALL)'.format(bckt))
-    c.execute('CREATE UNLOGGED TABLE IF NOT EXISTS report_meta{} (LIKE report_meta INCLUDING ALL)'.format(bckt))
-    c.execute('CREATE UNLOGGED TABLE IF NOT EXISTS measurement_meta{} (LIKE measurement_meta INCLUDING ALL)'.format(bckt))
-    c.execute('TRUNCATE TABLE autoclaved_meta{}'.format(bckt))
-    c.execute('TRUNCATE TABLE report_meta{}'.format(bckt))
-    c.execute('TRUNCATE TABLE measurement_meta{}'.format(bckt))
-
-    source = AutoclavedMetadataStream(atclv_index, bucket)
-    c.copy_from(source, 'autoclaved_meta'+bckt, columns=source.columns)
-    c.execute('SELECT filename, autoclaved_no FROM autoclaved_meta{}'.format(bckt))
-    autoclaved_no = dict(c.fetchall())
-
-    source = ReportMetadataStream(atclv_index, autoclaved_no)
-    del autoclaved_no
-    c.copy_from(source, 'report_meta'+bckt, columns=source.columns)
-    c.execute('SELECT textname, report_no FROM report_meta{}'.format(bckt))
-    report_no = dict(c.fetchall())
-
-    source = MeasurementMetadataStream(atclv_index, report_no)
-    c.copy_from(source, 'measurement_meta'+bckt, columns=source.columns)
+class IsKnownL2(object):
+    # Fixed-size in-memory set to check if some object is "known".
+    # Two-layer Random-Replacement cache improves efficiency
+    # measurably compared to one-big Random-Replacement cache.
+    def __init__(self, l1, l2):
+        self.__l1 = set()
+        self.__l2 = set()
+        self.__l1len = l1
+        self.__l2len = l2
+    def is_known(self, key):
+        l1, l2 = self.__l1, self.__l2
+        if key in l2:
+            return True
+        if key in l1:
+            l1.remove(key)
+            l2.add(key)
+            if len(l2) > self.__l2len:
+                l2.pop() # FIXME: not quite random element
+            return True
+        l1.add(key)
+        if len(l1) > self.__l1len:
+            l1.pop() # not quite random element
+        return False
 
 def meta_pg(in_root, bucket, postgres):
     assert in_root[-1] != '/' and '/' not in bucket and os.path.isdir(os.path.join(in_root, bucket))
@@ -655,75 +960,173 @@ def meta_pg(in_root, bucket, postgres):
     # `TEMPORARY` as these tables may be shared across different sessions: DNS
     # metadata and TCP metadata are processed with COPY to different tables.
 
-    conn = psycopg2.connect(dsn=postgres)
-    bckt = bucket.translate(None, '-') # YYYY-MM-DD -> YYYYMMDD
+    pgconn = psycopg2.connect(dsn=postgres) # ordinary postgres connection
+    stconn = psycopg2.connect(dsn=postgres) # short-transaction connection
 
-    with conn, conn.cursor() as c, \
-         closing(IterableQueue(128)) as qreport, \
-         closing(IterableQueue(128)) as qmsm, \
-         closing(IterableQueue(128)) as qtcp, \
-         closing(IterableQueue(128)) as qdns, \
-         closing(IterableQueue(128)) as qhttpctrl, \
-         closing(IterableQueue(128)) as qhttpreq, \
-         closing(IterableQueue(128)) as qhttpjudge:
+    with pgconn: # main transaction
+        autoclaved_index = os.path.join(in_root, bucket, autoclaving.INDEX_FNAME)
+        code_ver = get_checked_code_ver(pgconn, autoclaved_index, bucket)
+        if code_ver is None:
+            copy_meta_from_index(pgconn, autoclaved_index, bucket)
+            meta_tables = 'report_meta_', 'measurement_meta_'
+        else:
+            meta_tables = 'report', 'measurement'
+            assert not FLAG_DEBUG_CHAOS
+        # TODO: check if table should be feeded with `row` or just skipped
 
-        meta_pg_metatable(c, bckt, in_root, bucket)
+        body_sink = BodySimhashSink(stconn)
+        report_feeder = ReportFeeder(pgconn, stconn)
+        report_sink = PGCopyFrom(pgconn, report_feeder.table, columns=report_feeder.columns)
+        msm_feeder = MeasurementFeeder(pgconn)
+        msm_sink = PGCopyFrom(pgconn, msm_feeder.table, columns=msm_feeder.columns)
+        badmeta_feeder = BadmetaFeeder(pgconn)
+        badmeta_sink = PGCopyFrom(pgconn, badmeta_feeder.table, columns=badmeta_feeder.columns)
+        row_handlers = [(feeder, PGCopyFrom(pgconn, feeder.table, columns=feeder.columns)) for feeder in (
+            TcpFeeder(),
+            DnsFeeder(pgconn),
+            HttpRequestFeeder(body_sink),
+            HttpControlFeeder(body_sink),
+            HttpVerdictFeeder(),
+        )]
+        pop_handlers = [_[0] for _ in row_handlers] + [report_feeder] # NB: report_feeder is last one!
+        sink_handlers = [_[1] for _ in row_handlers] + [body_sink, report_sink, msm_sink, badmeta_sink]
 
-        futures = (
-            Future(qreport.drain, meta_pg_blobtable,
-                   ReportStream, postgres, qreport, 'report_blob'+bckt, 'report_blob'),
-            Future(qreport.drain, meta_pg_blobtable,
-                   MeasurementStream, postgres, qmsm, 'measurement_blob'+bckt, 'measurement_blob'),
-            Future(qreport.drain, meta_pg_blobtable, TcpStream, postgres, qtcp, 'tcp'+bckt, 'tcp'),
-            Future(qreport.drain, meta_pg_blobtable, DnsStream, postgres, qdns, 'dns_a'+bckt, 'dns_a'),
-            Future(qreport.drain, meta_pg_blobtable,
-                   HttpControlStream, postgres, qhttpctrl, 'http_control'+bckt, 'http_control'),
-            Future(qreport.drain, meta_pg_blobtable,
-                   HttpRequestStream, postgres, qhttpreq, 'http_request'+bckt, 'http_request'),
-            Future(qreport.drain, meta_pg_blobtable,
-                   HttpVerdictStream, postgres, qhttpjudge, 'http_verdict'+bckt, 'http_verdict'),
-        )
-        queues = (qreport, qmsm, qtcp, qdns, qhttpctrl, qhttpreq, qhttpjudge)
+        TrappedException = None if FLAG_FAIL_FAST else Exception
 
-        c.execute('SELECT filename, frame_off, frame_size, intra_off, intra_size, report_no, msm_no '
-                  'FROM autoclaved_meta{} JOIN report_meta{} USING (autoclaved_no) JOIN measurement_meta{} USING (report_no) '
-                  'ORDER BY filename, frame_off, intra_off'.format(bckt, bckt, bckt))
-        for filename, itfile in groupby(c, itemgetter(0)):
-            with open(os.path.join(in_root, filename)) as fd:
-                for (frame_off, frame_size), itframe in groupby(itfile, itemgetter(1, 2)):
-                    assert fd.tell() == frame_off
-                    blob = fd.read(frame_size)
-                    assert len(blob) == frame_size
-                    blob = lz4frame.decompress(blob)
-                    for filename, frame_off, frame_size, intra_off, intra_size, report_no, msm_no in itframe:
-                        datum = blob[intra_off:intra_off+intra_size]
-                        assert len(datum) == intra_size
-                        datum = ujson.loads(datum)
-                        datum = (report_no, msm_no, datum)
-                        # Batching tuples does not have measurable benefit although Queue.get()
-                        # is seen in every second pyflame stack.
-                        for q in queues:
-                            q.put(datum)
-        for q in queues:
-            q.close()
-        for f in futures:
-            f.get()
-        c.execute('INSERT INTO autoclaved SELECT * FROM autoclaved_meta{}'.format(bckt))
-        c.execute('INSERT INTO report '
-            'SELECT report_no, autoclaved_no, test_start_time, probe_cc, probe_asn, probe_ip, '
-                    'test_name, badtail, textname, orig_sha1, '
-                    '''COALESCE(report_id, translate(encode(orig_sha1, 'base64'), '/+=', '_-')), software_no '''
-            'FROM report_meta{bckt} JOIN report_blob{bckt} USING (report_no)'.format(bckt=bckt))
-        c.execute('INSERT INTO measurement '
-            'SELECT msm_no, report_no, frame_off, frame_size, intra_off, intra_size, '
-                    'measurement_start_time, test_runtime, orig_sha1, id, input_no '
-            'FROM measurement_meta{bckt} JOIN measurement_blob{bckt} USING(msm_no)'.format(bckt=bckt))
-        for t in ('tcp', 'dns_a', 'http_control', 'http_request', 'http_verdict'):
-            c.execute('INSERT INTO {t} SELECT * FROM {t}{bckt}'.format(t=t, bckt=bckt))
-        tables = ('autoclaved_meta', 'report_meta', 'measurement_meta', 'report_blob', 'measurement_blob',
-                  'tcp', 'dns_a', 'http_control', 'http_request', 'http_verdict')
-        for t in tables:
-            c.execute('DROP TABLE {}{}'.format(t, bckt))
+        # The query to fetch LZ4 metadata for files takes ~256 bytes per row if all
+        # the data is fetched in the memory of this process, 2014-11-22 has ~1e6
+        # measurements so server-side cursor is used as a safety net against OOM.
+        with pgconn.cursor('lz4meta') as cmeta:
+            cmeta.itersize = 2*1024**2 / 256
+            cmeta.execute('SELECT filename, frame_off, frame_size, intra_off, intra_size, report_no, msm_no, autoclaved_no, textname '
+                          'FROM autoclaved JOIN {} USING (autoclaved_no) JOIN {} USING (report_no) '
+                          'WHERE bucket_date = %s '
+                          'ORDER BY md5(filename || \'2\'), frame_off, intra_off'.format(*meta_tables), [bucket]) # FIXME: ORDER BY md5 is dev-hack
+            for filename, itfile in groupby(cmeta, itemgetter(0)):
+                print filename
+                with open(os.path.join(in_root, filename)) as fd:
+                    for (frame_off, frame_size), itframe in groupby(itfile, itemgetter(1, 2)):
+                        assert fd.tell() == frame_off
+                        blob = fd.read(frame_size)
+                        assert len(blob) == frame_size
+                        blob = lz4frame.decompress(blob)
+                        for filename, frame_off, frame_size, intra_off, intra_size, report_no, msm_no, autoclaved_no, textname in itframe:
+                            datum = blob[intra_off:intra_off+intra_size]
+                            assert len(datum) == intra_size
+                            datum = ujson.loads(datum)
+
+                            queue, exc = [], []
+                            try:
+                                row = report_feeder.report_row(report_no, datum)
+                            except TrappedException:
+                                badmeta_sink.write(badmeta_feeder.badmeta_row(
+                                    autoclaved_no, report_no, textname, report=sys.exc_info()))
+                                continue # skip measurement with bad metadata
+                            else:
+                                queue.append((report_sink, row))
+
+                            for feeder, sink in row_handlers:
+                                try:
+                                    if FLAG_DEBUG_CHAOS and random.random() < 0.01:
+                                        raise RuntimeError('bad luck with ordinary feeder')
+                                    row = feeder.row(msm_no, datum)
+                                except TrappedException:
+                                    exc.append(exc_hash(sys.exc_info()))
+                                else:
+                                    queue.append((sink, row))
+
+                            for feeder in pop_handlers:
+                                try:
+                                    feeder.pop(datum)
+                                    # chaos is injected here to avoid `residual` table pollution
+                                    if FLAG_DEBUG_CHAOS and random.random() < 0.01:
+                                        raise RuntimeError('bad luck with feeder.pop')
+                                except TrappedException:
+                                    exc.append(exc_hash(sys.exc_info()))
+
+                            try:
+                                row = msm_feeder.msm_rownpop(msm_no, datum, exc)
+                            except TrappedException:
+                                badmeta_sink.write(badmeta_feeder.badmeta_row(
+                                    autoclaved_no, report_no, textname, measurement=sys.exc_info()))
+                                continue # skip measurement with bad metadata
+                            else:
+                                queue.append((msm_sink, row))
+
+                            for sink, row in queue:
+                                sink.write(row)
+                            body_sink.maybe_flush()
+        for sink in sink_handlers:
+            sink.close()
+        # Okay, server-side cursor feeding indexes is closed and the code is
+        # still alive, it's time to morph temporary tables!
+        c = pgconn.cursor()
+        if code_ver is None:
+            c.execute('''
+                INSERT INTO report
+                SELECT report_no, autoclaved_no, test_start_time, probe_cc, probe_asn, probe_ip,
+                       test_name, badtail, textname, orig_sha1,
+                       COALESCE(report_id, translate(encode(orig_sha1, 'base64'), '/+=', '_-')), software_no
+                FROM report_meta_
+                JOIN report_blob_ USING (report_no)
+            ''') # TODO: `LEFT JOIN report_blob_` to fail fast in case of errors
+        c.execute('''
+            INSERT INTO input (input)
+            SELECT DISTINCT input FROM measurement_blob_ WHERE input IS NOT NULL
+            ON CONFLICT DO NOTHING
+        ''')
+        c.execute('''
+            INSERT INTO residual (residual)
+            SELECT DISTINCT residual FROM measurement_blob_
+            ON CONFLICT DO NOTHING
+        ''')
+        if code_ver is None:
+            c.execute('''
+                INSERT INTO measurement
+                SELECT msm_no, report_no, frame_off, frame_size, intra_off, intra_size,
+                measurement_start_time, test_runtime, orig_sha1, id, input_no, exc, residual_no
+                FROM measurement_meta_
+                JOIN measurement_blob_ USING (msm_no)
+                LEFT JOIN input USING (input)
+                LEFT JOIN residual USING (residual)
+            ''') # TODO: `LEFT JOIN measurement_blob_` to fail fast
+        c.execute('''
+            INSERT INTO domain (domain)
+            SELECT DISTINCT domain FROM dns_a_
+            UNION
+            SELECT DISTINCT UNNEST(control_cname) FROM dns_a_
+            UNION
+            SELECT DISTINCT UNNEST(test_cname) FROM dns_a_
+            ON CONFLICT DO NOTHING
+        ''')
+        c.execute('''
+            INSERT INTO dns_a
+            SELECT
+                msm_no,
+                (SELECT domain_no FROM domain WHERE domain.domain = dns_a_.domain) AS domain_no,
+                control_ip, test_ip,
+                (SELECT array_agg(domain_no ORDER BY ndx)
+                 FROM unnest(control_cname) WITH ORDINALITY t2(domain, ndx)
+                 LEFT JOIN domain USING (domain)) AS control_cname,
+                (SELECT array_agg(domain_no ORDER BY ndx)
+                 FROM unnest(test_cname) WITH ORDINALITY t2(domain, ndx)
+                 LEFT JOIN domain USING (domain)) AS test_cname,
+                ttl, resolver_hostname, client_resolver, control_failure, test_failure
+            FROM dns_a_
+        ''')
+        c.execute('''
+            INSERT INTO badmeta
+            SELECT
+                badmeta_.autoclaved_no,
+                badmeta_.report_no,
+                CASE WHEN report.report_no IS NULL THEN badmeta_.textname ELSE NULL END,
+                COALESCE(array_agg(exc_report) FILTER (WHERE exc_report IS NOT NULL), ARRAY[]::int4[]),
+                COALESCE(array_agg(exc_measurement) FILTER (WHERE exc_measurement IS NOT NULL), ARRAY[]::int4[])
+            FROM badmeta_
+            LEFT JOIN report USING (report_no)
+            GROUP BY badmeta_.autoclaved_no, badmeta_.report_no, badmeta_.textname, report.report_no
+        ''')
+    return
 
 ########################################################################
 
@@ -732,28 +1135,17 @@ def parse_args():
     p.add_argument('--start', metavar='ISOTIME', type=isomidnight, help='Airflow execution date', required=True)
     p.add_argument('--end', metavar='ISOTIME', type=isomidnight, help='Airflow execution date + schedule interval', required=True)
     p.add_argument('--autoclaved-root', metavar='DIR', type=dirname, help='Path to .../public/autoclaved', required=True)
-    p.add_argument('--mode', choices=('simhash-text', 'meta-pg'), required=True)
-
-    dest = p.add_mutually_exclusive_group(required=True)
-    dest.add_argument('--simhash-root', metavar='DIR', type=dirname, help='Path to .../public/simhash')
-    dest.add_argument('--postgres', metavar='DSN', help='libpq data source name')
+    p.add_argument('--postgres', metavar='DSN', help='libpq data source name')
 
     opt = p.parse_args()
     if (opt.end - opt.start) != timedelta(days=1):
         p.error('The script processes 24h batches')
-    if opt.mode == 'simhash-text' and opt.simhash_root is None:
-        p.error('`--mode simhash-text` requires `--simhash-root`')
-    if opt.mode == 'meta-pg' and opt.postgres is None:
-        p.error('`--mode meta-pg` requires `--postgres`')
     return opt
 
 def main():
     opt = parse_args()
     bucket = opt.start.strftime('%Y-%m-%d')
-    if opt.mode == 'simhash-text':
-        simhash_text(opt.autoclaved_root, opt.simhash_root, bucket)
-    elif opt.mode == 'meta-pg':
-        meta_pg(opt.autoclaved_root, bucket, opt.postgres)
+    meta_pg(opt.autoclaved_root, bucket, opt.postgres)
 
 if __name__ == '__main__':
     main()

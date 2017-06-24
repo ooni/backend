@@ -1,0 +1,10 @@
+#!/bin/sh -ex
+
+id=$(docker run --rm --detach --name spbmeta -e POSTGRES_USER=oopguser postgres:9.6)
+until docker exec -i $id psql -U oopguser -c 'select 1' >/dev/null; do
+    sleep 0.5
+done
+
+./dump-schema | docker exec -i $id psql -U oopguser
+
+docker inspect $id | jq --raw-output '.[].NetworkSettings.Networks.bridge.IPAddress'
