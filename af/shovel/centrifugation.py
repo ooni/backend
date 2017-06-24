@@ -188,7 +188,7 @@ class PGCopyFrom(object):
     # sessions and pipe data across threads with significant CPU overhead and
     # inability to process every OONI measurement using set of functions to
     # have clean "residual" document after data extraction.
-    def __init__(self, pgconn, table, wbufsize=2097+152, **kwargs):
+    def __init__(self, pgconn, table, wbufsize=2097152, **kwargs):
         # default chunk size is taken as approx. cwnd between production VMs
         self.__pgconn = pgconn
         self.__table = table
