@@ -14,7 +14,7 @@ from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy import func
-from sqlalchemy.orm import lazyload
+from sqlalchemy.orm import lazyload, exc
 
 from six.moves.urllib.parse import urljoin, urlencode
 
@@ -161,9 +161,36 @@ def api_private_test_names():
     })
 
 @api_private_blueprint.route('/countries', methods=["GET"])
+@cache.cached(timeout=60*60)
 def api_private_countries():
+    with_counts = request.args.get("with_counts")
+    country_list = []
+    if not with_counts:
+        country_list = [{ 'alpha_2': c.alpha_2, 'name': c.name } for c in countries]
+    else:
+        # XXX we probably actually want to get this from redis or compute it
+        # periodically since it take 60 seconds to run.
+        q = current_app.db_session.query(
+                func.count(Measurement.id),
+                Report.probe_cc.label('probe_cc')
+        ).join(Report, Report.report_no == Measurement.report_no) \
+         .group_by(Report.probe_cc)
+        for count, probe_cc in q:
+            if probe_cc.upper() == 'ZZ':
+                continue
+
+            try:
+                c = countries.lookup(probe_cc)
+                country_list.append({
+                    'count': count,
+                    'alpha_2': c.alpha_2,
+                    'name': c.name,
+                })
+            except Exception as exc:
+                current_app.logger.warning("Failed to lookup: %s" % probe_cc)
+
     return jsonify({
-        "countries": [{ 'alpha_2': c.alpha_2, 'name': c.name } for c in countries]
+        "countries": country_list
     })
 
 @api_blueprint.route('/files', methods=["GET"])
@@ -279,42 +306,10 @@ def api_list_report_files():
         'results': results
     })
 
-@api_blueprint.route('/measurement_url', methods=["GET"])
-def api_get_measurement_url():
-    # XXX I initially created this as a fast path, but actually enabling indexes seems to be enough.
-    # postgres query planner is smart!
-    input_ = request.args.get("input")
-    report_id = request.args.get("report_id")
-    if not input_ or not report_id:
-        raise BadRequest("Missing input and/or report_id")
-
-    istmt = current_app.db_session.query(
-        Input.input_no
-    ).filter(Input.input == input_).subquery()
-
-    rstmt = current_app.db_session.query(
-        Report.report_no
-    ).filter(Report.report_id == report_id).subquery()
-
-    q = current_app.db_session.query(
-            Measurement.input_no,
-            Measurement.report_no,
-            Measurement.id.label('m_id'),
-            istmt,
-            rstmt
-    ).filter(Measurement.input_no == istmt.c.input_no) \
-     .filter(Measurement.report_no == rstmt.c.report_no)
-
-    r = q.one()
-    return jsonify({
-        'measurement_id': r.m_id,
-        'measurement_url': 'XXX'
-    })
-
-
 @api_blueprint.route('/measurement/<measurement_id>', methods=["GET"])
 def api_get_measurement(measurement_id):
-    msmt = current_app.db_session.query(
+    # XXX this query is SUPER slow
+    q = current_app.db_session.query(
             Measurement.id.label('m_id'),
             Measurement.report_no.label('report_no'),
             Measurement.frame_off.label('frame_off'),
@@ -328,8 +323,12 @@ def api_get_measurement(measurement_id):
 
     ).filter(Measurement.id == measurement_id)\
         .join(Report, Report.report_no == Measurement.report_no)\
-        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)\
-        .one()
+        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
+    try:
+        msmt = q.one()
+    except exc.MultipleResultsFound:
+        current_app.logger.warning("Duplicate rows for measurement_id: %s" % measurement_id)
+        msmt = q.first()
 
     r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
             headers={"Range": "bytes={}-{}".format(msmt.frame_off, msmt.frame_off+msmt.frame_size)}, stream=True)
@@ -424,7 +423,10 @@ def api_list_measurements():
     iter_start_time= time.time()
     results = []
     for row in q:
-        url = 'MISSING'
+        url = urljoin(
+            current_app.config['BASE_URL'],
+            '/api/v1/measurement/%s' % row.m_id
+        )
         results.append({
             'measurement_url': url,
             'measurement_id': row.m_id,
