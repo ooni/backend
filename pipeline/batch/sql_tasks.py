@@ -19,7 +19,9 @@ blockpage_body_fingerprints = {
     'CY': '%nba.com.cy/Eas/eas.nsf/All/6F7F17A7790A55C8C2257B130055C86F%',
     'DK': '%lagt at blokere for adgang til siden.%',
     'FR': '%xtpage = "page-blocage-terrorisme"%',
-    'KR': '%http://warning.or.kr%'
+    'MY': '%Makluman/Notification%',
+    'KR': '%http://warning.or.kr%',
+    'RO': '%Accesul dumneavoastră către acest site a fost restricționat%',
     'GF': '%xtpage = "page-blocage-terrorisme"%',
 }
 
@@ -34,7 +36,8 @@ blockpage_header_fingerprints = {
     'PT': ('Location', 'http://mobilegen.vodafone.pt/denied/dn'),
     'NO': ('Location', 'http://block-no.altibox.net/'),
     'UK': ('Location', 'http://blocked.nb.sky.com%'),
-    'RU': ('Location', 'http://warning.rt.ru%')
+    'RU': ('Location', 'http://warning.rt.ru%'),
+    'AE': ('Server', 'Protected by WireFilter%')
 }
 
 # These are countries for which blocking is identified by checking if the
