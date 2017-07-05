@@ -7,10 +7,18 @@ and supports s3 or filesystem targets or sources.
 
 ## Setup
 
-Edit the `client.cfg` based on `client.cfg.example`. See the configuration
-section for more information on how to configure the data processing pipeline.
+Edit the `client.cfg` based on `client.cfg.example`. See the
+[configuration](#configuration) section for more information on how to
+configure the data processing pipeline.
 
 Install also all the python requirements in `requirements.txt`.
+
+Install or build
+[PyYAML](http://pyyaml.org/wiki/PyYAML#DownloadandInstallation) with C
+bindings.
+
+*Note*: You should not use more than 1 worker (luigi `--workers` option) per core
+otherwise you could be wasting a bunch of CPU time in context switching.
 
 ## How to run the pipeline tasks
 
@@ -165,3 +173,43 @@ The files you should probably be editing are the following:
 * `private-dir` is the directory where the normalised and JSON converted report
   files will end up in.
 
+## (Re)build ooni-pipeline
+
+*Recommended*: Create a virtual Python instance:
+
+`virtualenv venv`
+
+### Start luigi server ([script](scripts/start-luigid.sh))
+
+```
+luigid --address 127.0.0.1 \
+       --port 8082 --pidfile luigid.pid \
+       --logdir luigid.log \
+       --state-path luigi-state.pickle \
+       --background
+```
+
+### Run the pipeline tasks
+
+- Run the main (`daily_workflow`) pipeline batch tasks since 2012 in weekly
+batches:
+
+```
+for year in `seq -w 12 $(date +%g)`; do
+    for week in `seq -w 1 52`; do
+        PYTHONPATH=${HOME}/ooni-pipeline/ luigi \
+                --module pipeline.batch.daily_workflow ListReportsAndRun \
+                --workers 16 \
+                --ignore-asn 'AS2856 AS20712 AS5607' \
+                --parallel-scheduling \
+                --date-interval 20${year}-W${week}
+        echo "[*] Finished processing 20${year}-W${week}"
+    done
+done
+```
+
+- Create the database indexes.
+
+- Create the materialised views.
+
+- Run the [Domain intelligence](#domain-intelligence) batch tasks.
