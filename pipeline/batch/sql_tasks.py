@@ -20,7 +20,8 @@ blockpage_body_fingerprints = {
     'DK': '%lagt at blokere for adgang til siden.%',
     'FR': '%xtpage = "page-blocage-terrorisme"%',
     'MY': '%Makluman/Notification%',
-    'KR': '%http://warning.or.kr%'
+    'KR': '%http://warning.or.kr%',
+    'RO': '%Accesul dumneavoastră către acest site a fost restricționat%',
 }
 
 # These are countries for which we detect blocking by looking for certain
