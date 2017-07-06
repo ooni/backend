@@ -27,7 +27,10 @@ import ujson
 import autoclaving
 from canning import isomidnight, dirname
 
-CODE_VER = 2
+# It does NOT take into account metadata tables right now:
+# - autoclaved: it's not obvious if anything can be updated there
+# - report & measurement: have significant amount of metadata and may be actually updated eventually
+CODE_VER = 3
 
 FLAG_TRUE_TEMP = True # keep temporary tables if the flag is false
 FLAG_DEBUG_CHAOS = False # random fault injection
@@ -63,6 +66,14 @@ def to_signed(integer):
 def from_signed(integer):
     '''Convert an unsigned integer into a signed integer with the same bits'''
     return integer & 0xffffffffffffffff if integer < 0 else integer
+
+def to_signed32(integer):
+    '''Convert an unsigned integer into a signed integer with the same bits'''
+    return integer - 0x100000000 if integer > 0x7fffffff else integer
+
+def from_signed32(integer):
+    '''Convert an unsigned integer into a signed integer with the same bits'''
+    return integer & 0xffffffff if integer < 0 else integer
 
 # Tiny error in code (e.g. if it's gets some optimisation) may screw database,
 # so the check is done on every launch.
@@ -118,6 +129,19 @@ def httpt_body(response):
             bloblen = int(m.group(1), 16)
         return ''.join(out)
     return body
+
+def http_status_code(code):
+    if code is None or 100 <= code <= 999:
+        return code
+    else:
+        raise RuntimeError('Invalid HTTP code', code)
+
+def dns_ttl(ttl):
+    # RFC1035 states: positive values of a signed 32 bit number
+    if ttl is None or 0 < ttl <= 0x7fffffff:
+        return ttl
+    else:
+        raise RuntimeError('Invalid DNS TTL', ttl)
 
 ########################################################################
 
@@ -356,6 +380,7 @@ def copy_meta_from_index(pgconn, autoclaved_index, bucket):
                   if FLAG_TRUE_TEMP else
                   'CREATE TABLE measurement_meta_ (LIKE measurement_meta INCLUDING ALL)')
         copy_measurements_from_index(pgconn, autoclaved_index, 'measurement_meta_', report_no)
+    return 'report_meta_', 'measurement_meta_'
 
 def none_if_len0(obj):
     return obj if len(obj) else None
@@ -409,6 +434,21 @@ class MeasurementFeeder(object):
                     pg_quote(input_txt), # nullable
                     pg_quote(none_if_len0(exc)),
                     pg_quote(ujson.dumps(datum)))
+
+class MeasurementExceptionFeeder(object):
+    table = 'measurement_exc_'
+    columns = ('msm_no', 'exc')
+    def __init__(self, pgconn):
+        with pgconn.cursor() as c:
+            c.execute(('CREATE TEMPORARY TABLE {} (LIKE measurement_exc INCLUDING ALL) ON COMMIT DROP'
+                       if FLAG_TRUE_TEMP else
+                       'CREATE TABLE {} (LIKE measurement_exc INCLUDING ALL)'
+                      ).format(self.table))
+    @staticmethod
+    def msm_rownpop(msm_no, _, exc):
+        if FLAG_DEBUG_CHAOS and random.random() < 0.01:
+            raise RuntimeError('bad luck with measurement')
+        return '{:d}\t{}\n'.format(msm_no, pg_quote(exc)) if len(exc) else ''
 
 # Python WTF:
 # >>> '{}\t{}\t{}\t{}\t{}\t{}\n'.format(1,2,3,4,5,6,7)
@@ -484,9 +524,14 @@ TRACEBACK_LINENO_RE = re.compile(r' line \d+,')
 def exc_hash(exc_info):
     # exc_hash ignores line numbers, but does not ignore other taceback values
     type_, value_, traceback_ = exc_info
-    msg = ''.join(traceback.format_exception(type_, value_, traceback_))
+    msg = ''.join(traceback.format_exception(type_, None, traceback_))
     msg = TRACEBACK_LINENO_RE.sub(' line N,', msg)
-    return mmh3.hash(msg) # signed int4
+    ret = mmh3.hash(msg) & 0xffff0000
+    msg = traceback.format_exception_only(type_, value_)
+    assert len(msg) == 1
+    msg = msg[0]
+    ret |= mmh3.hash(msg) & 0xffff
+    return to_signed32(ret)
 
 class BadmetaFeeder(object):
     table = 'badmeta_' # it's actually some temporary table
@@ -509,6 +554,7 @@ class BadmetaFeeder(object):
 IPV4_RE = re.compile(r'^\d+\.\d+\.\d+\.\d+$')
 
 class TcpFeeder(object):
+    compat_code_ver = (2, 3)
     table = 'tcp'
     columns = ('msm_no', 'ip', 'port', 'control_failure', 'test_failure', 'control_api_failure')
     # NB: control_api_failure is also recorded as `control_failure` in `http_verdict`
@@ -555,6 +601,7 @@ class TcpFeeder(object):
                 elctrl.pop('failure')
 
 class DnsFeeder(object):
+    compat_code_ver = (2, 3)
     table = 'dns_a_'
     columns = ('msm_no', 'domain', 'control_ip', 'test_ip', 'control_cname', 'test_cname',
                'ttl', 'resolver_hostname', 'client_resolver', 'control_failure', 'test_failure')
@@ -586,7 +633,7 @@ class DnsFeeder(object):
         ret = ''
         for q in queries:
             if q['query_type'] == 'A': # almost always
-                ttl = next(iter(q['answers']), {}).get('ttl')
+                ttl = dns_ttl(next(iter(q['answers']), {}).get('ttl'))
                 test_ip = none_if_len0(sorted([a['ipv4'] for a in q['answers'] if a['answer_type'] == 'A']))
                 test_cname = none_if_len0([a['hostname'] for a in q['answers'] if a['answer_type'] == 'CNAME'])
                 ret += '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
@@ -736,6 +783,7 @@ class BaseHttpFeeder(object):
                 tor.pop('exit_name')
 
 class HttpControlFeeder(BaseHttpFeeder):
+    compat_code_ver = (2, 3)
     table = 'http_control'
     columns = ('msm_no', 'is_tor', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
     def row(self, msm_no, datum):
@@ -753,7 +801,7 @@ class HttpControlFeeder(BaseHttpFeeder):
                 ret = '{:d}\tFALSE\t{}\t{}\t{}\t{}\t{}\t\\N\n'.format(
                         msm_no,
                         pg_quote(r['failure']),
-                        pg_quote(status_code),
+                        pg_quote(http_status_code(status_code)),
                         pg_quote(body_length),
                         pg_quote(r.get('title')),
                         pg_quote(ujson.dumps(r['headers']))) # seems, empty headers dict is still present it case of failure
@@ -771,7 +819,7 @@ class HttpControlFeeder(BaseHttpFeeder):
                     ret += '{:d}\tTRUE\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
                         msm_no,
                         pg_quote(r.get('failure')),
-                        pg_quote(response.get('code')),
+                        pg_quote(http_status_code(response.get('code'))),
                         pg_quote(len(body) if body is not None else r.get('response_length')),
                         pg_quote(get_title(body)),
                         pg_quote(headers),
@@ -802,6 +850,7 @@ class HttpControlFeeder(BaseHttpFeeder):
 
 
 class HttpRequestFeeder(BaseHttpFeeder):
+    compat_code_ver = (2, 3)
     table = 'http_request'
     columns = ('msm_no', 'url', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
     def row(self, msm_no, datum):
@@ -829,7 +878,7 @@ class HttpRequestFeeder(BaseHttpFeeder):
             msm_no,
             pg_quote(r['request']['url']),
             pg_quote(r.get('failure')),
-            pg_quote(response.get('code')),
+            pg_quote(http_status_code(response.get('code'))),
             pg_quote(len(body) if body is not None else r.get('response_length')),
             pg_quote(get_title(body)),
             pg_quote(headers),
@@ -855,7 +904,67 @@ class HttpRequestFeeder(BaseHttpFeeder):
         r.pop('response_length', None)
         self._pop_request(datum, r['request'])
 
+class HttpRequestFPFeeder(HttpRequestFeeder):
+    compat_code_ver = (3,)
+    table = 'http_request_fp'
+    columns = ('msm_no', 'fingerprint_no')
+    # It should probably become part of `http_request` and `http_control`
+    # tables, but I'm too lazy to alter 40 Gb of tables right now...
+    def __init__(self, pgconn):
+        # NB: no super(...).__init__() call!
+        self.header_prefix = {} # header -> [(prefix, no)]
+        self.header_value = {}  # header -> {value: no}
+        self.body_substr = []   # [(value, no)]
+        # These data structures are not fancy at all, one may want to say that
+        # something like Aho-Corasick search should be used to check bodies,
+        # but pyahocorasick==1.1.4 that claims to be quite efficient works worse
+        # than naive substring search loop for <=50 body_substr fingerprints.
+        with pgconn.cursor() as c:
+            c.execute('''
+                select md5(
+                    md5(array_agg(fingerprint_no    order by fingerprint_no)::text) ||
+                    md5(array_agg(origin_cc         order by fingerprint_no)::text) ||
+                    md5(array_agg(body_substr       order by fingerprint_no)::text) ||
+                    md5(array_agg(header            order by fingerprint_no)::text) ||
+                    md5(array_agg(header_prefix     order by fingerprint_no)::text) ||
+                    md5(array_agg(header_value      order by fingerprint_no)::text) ||
+                    ''
+                ) from fingerprint
+            ''')
+            assert '916446978a4a86741d0236d19ce7157e' == next(c)[0], 'fingerprint table does not match CODE_VER=%d'.format(CODE_VER)
+            c.execute('SELECT fingerprint_no, body_substr, header, header_prefix, header_value FROM fingerprint')
+            for fingerprint_no, body_substr, header, header_prefix, header_value in c:
+                if body_substr is not None:
+                    self.body_substr.append((body_substr, fingerprint_no))
+                elif header_prefix is not None:
+                    self.header_prefix.setdefault(header.lower(), []).append((header_prefix, fingerprint_no))
+                elif header_value is not None:
+                    self.header_value.setdefault(header.lower(), {})[header_value] = fingerprint_no
+    def _row(self, msm_no, r):
+        ret = ''
+        response = r['response']
+        body = httpt_body(response)
+        if body is not None:
+            for body_substr, fingerprint_no in self.body_substr:
+                if body_substr in body:
+                    ret += '{:d}\t{:d}\n'.format(msm_no, fingerprint_no)
+        headers = {h.lower(): value for h, value in ((response or {}).get('headers') or {}).iteritems()}
+        for h, header_value in self.header_value.iteritems():
+            fingerprint_no = header_value.get(headers.get(h))
+            if fingerprint_no is not None:
+                ret += '{:d}\t{:d}\n'.format(msm_no, fingerprint_no)
+        for h in self.header_prefix:
+            if h in headers:
+                value = headers[h]
+                for header_prefix, fingerprint_no in self.header_prefix[h]:
+                    if value.startswith(header_prefix):
+                        ret += '{:d}\t{:d}\n'.format(msm_no, fingerprint_no)
+        return ret
+    def pop(self, datum):
+        pass # done by HttpRequestFeeder
+
 class HttpVerdictFeeder(object):
+    compat_code_ver = (2, 3)
     table = 'http_verdict'
     columns = ('msm_no', 'accessible', 'control_failure', 'http_experiment_failure', 'title_match',
                'dns_consistency', 'dns_experiment_failure', 'body_proportion', 'blocking',
@@ -963,33 +1072,69 @@ def meta_pg(in_root, bucket, postgres):
     pgconn = psycopg2.connect(dsn=postgres) # ordinary postgres connection
     stconn = psycopg2.connect(dsn=postgres) # short-transaction connection
 
-    with pgconn: # main transaction
+    with pgconn, pgconn.cursor() as c: # main transaction
         autoclaved_index = os.path.join(in_root, bucket, autoclaving.INDEX_FNAME)
         code_ver = get_checked_code_ver(pgconn, autoclaved_index, bucket)
         if code_ver is None:
-            copy_meta_from_index(pgconn, autoclaved_index, bucket)
-            meta_tables = 'report_meta_', 'measurement_meta_'
+            meta_tables = copy_meta_from_index(pgconn, autoclaved_index, bucket)
+        elif CODE_VER == code_ver:
+            print 'public/autoclaved and postgres are in sync, bucket={}, code_ver={}'.format(bucket, code_ver)
+            return
+        elif CODE_VER < code_ver:
+            raise RuntimeError('Unable to run old centrifugation with new postgres', CODE_VER, code_ver)
         else:
+            assert code_ver < CODE_VER
+            #assert not FLAG_DEBUG_CHAOS # to avoid accidental chaotic update of production DB
             meta_tables = 'report', 'measurement'
-            assert not FLAG_DEBUG_CHAOS
         # TODO: check if table should be feeded with `row` or just skipped
 
         body_sink = BodySimhashSink(stconn)
-        report_feeder = ReportFeeder(pgconn, stconn)
-        report_sink = PGCopyFrom(pgconn, report_feeder.table, columns=report_feeder.columns)
-        msm_feeder = MeasurementFeeder(pgconn)
-        msm_sink = PGCopyFrom(pgconn, msm_feeder.table, columns=msm_feeder.columns)
         badmeta_feeder = BadmetaFeeder(pgconn)
         badmeta_sink = PGCopyFrom(pgconn, badmeta_feeder.table, columns=badmeta_feeder.columns)
-        row_handlers = [(feeder, PGCopyFrom(pgconn, feeder.table, columns=feeder.columns)) for feeder in (
-            TcpFeeder(),
-            DnsFeeder(pgconn),
-            HttpRequestFeeder(body_sink),
-            HttpControlFeeder(body_sink),
-            HttpVerdictFeeder(),
-        )]
-        pop_handlers = [_[0] for _ in row_handlers] + [report_feeder] # NB: report_feeder is last one!
-        sink_handlers = [_[1] for _ in row_handlers] + [body_sink, report_sink, msm_sink, badmeta_sink]
+        if code_ver is None:
+            report_feeder = ReportFeeder(pgconn, stconn)
+            report_sink = PGCopyFrom(pgconn, report_feeder.table, columns=report_feeder.columns)
+            msm_feeder = MeasurementFeeder(pgconn)
+        else:
+            msm_feeder = MeasurementExceptionFeeder(pgconn)
+        msm_sink = PGCopyFrom(pgconn, msm_feeder.table, columns=msm_feeder.columns)
+
+        data_tables = (
+            (TcpFeeder, ()),
+            (DnsFeeder, (pgconn,)),
+            (HttpRequestFeeder, (body_sink,)),
+            (HttpRequestFPFeeder, (pgconn,)),
+            (HttpControlFeeder, (body_sink,)),
+            (HttpVerdictFeeder, ()),
+        )
+        row_handlers = []
+        for cls, args in data_tables:
+            assert CODE_VER in cls.compat_code_ver, (CODE_VER, cls.compat_code_ver, cls.table)
+            if code_ver not in cls.compat_code_ver:
+                # this table should be updated
+                feeder = cls(*args)
+                sink = PGCopyFrom(pgconn, cls.table, columns=cls.columns)
+                row_handlers.append((feeder, sink))
+        assert len(row_handlers), "No tables should be updated"
+
+        if code_ver is not None: # that's update, not initial insert
+            c.execute('''
+                CREATE TEMPORARY TABLE bktmsm AS
+                SELECT msm_no
+                FROM autoclaved JOIN {} USING (autoclaved_no) JOIN {} USING (report_no)
+                WHERE bucket_date = %s
+            '''.format(*meta_tables), [bucket])
+            c.execute('ANALYSE bktmsm') # to improve plan a bit
+            for feeder, _ in row_handlers:
+                c.execute('DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM bktmsm)'.format(
+                    feeder.table))
+            c.execute('DROP TABLE bktmsm') # clean-up early
+
+        sink_handlers = [_[1] for _ in row_handlers] + [body_sink, badmeta_sink, msm_sink]
+        if code_ver is None:
+            # NB: report_feeder is last pop_handlers and there are no pop_handlers for `UPDATE` !
+            pop_handlers = [_[0] for _ in row_handlers] + [report_feeder]
+            sink_handlers.append(report_sink)
 
         TrappedException = None if FLAG_FAIL_FAST else Exception
 
@@ -998,10 +1143,13 @@ def meta_pg(in_root, bucket, postgres):
         # measurements so server-side cursor is used as a safety net against OOM.
         with pgconn.cursor('lz4meta') as cmeta:
             cmeta.itersize = 2*1024**2 / 256
-            cmeta.execute('SELECT filename, frame_off, frame_size, intra_off, intra_size, report_no, msm_no, autoclaved_no, textname '
-                          'FROM autoclaved JOIN {} USING (autoclaved_no) JOIN {} USING (report_no) '
-                          'WHERE bucket_date = %s '
-                          'ORDER BY md5(filename || \'2\'), frame_off, intra_off'.format(*meta_tables), [bucket]) # FIXME: ORDER BY md5 is dev-hack
+            cmeta.execute('''
+                SELECT filename, frame_off, frame_size, intra_off, intra_size,
+                       report_no, msm_no, autoclaved_no, textname
+                FROM autoclaved JOIN {} USING (autoclaved_no) JOIN {} USING (report_no)
+                WHERE bucket_date = %s
+                ORDER BY filename, frame_off, intra_off'''.format(*meta_tables),
+                [bucket])
             for filename, itfile in groupby(cmeta, itemgetter(0)):
                 print filename
                 with open(os.path.join(in_root, filename)) as fd:
@@ -1016,14 +1164,15 @@ def meta_pg(in_root, bucket, postgres):
                             datum = ujson.loads(datum)
 
                             queue, exc = [], []
-                            try:
-                                row = report_feeder.report_row(report_no, datum)
-                            except TrappedException:
-                                badmeta_sink.write(badmeta_feeder.badmeta_row(
-                                    autoclaved_no, report_no, textname, report=sys.exc_info()))
-                                continue # skip measurement with bad metadata
-                            else:
-                                queue.append((report_sink, row))
+                            if code_ver is None:
+                                try:
+                                    row = report_feeder.report_row(report_no, datum)
+                                except TrappedException:
+                                    badmeta_sink.write(badmeta_feeder.badmeta_row(
+                                        autoclaved_no, report_no, textname, report=sys.exc_info()))
+                                    continue # skip measurement with bad metadata
+                                else:
+                                    queue.append((report_sink, row))
 
                             for feeder, sink in row_handlers:
                                 try:
@@ -1035,14 +1184,15 @@ def meta_pg(in_root, bucket, postgres):
                                 else:
                                     queue.append((sink, row))
 
-                            for feeder in pop_handlers:
-                                try:
-                                    feeder.pop(datum)
-                                    # chaos is injected here to avoid `residual` table pollution
-                                    if FLAG_DEBUG_CHAOS and random.random() < 0.01:
-                                        raise RuntimeError('bad luck with feeder.pop')
-                                except TrappedException:
-                                    exc.append(exc_hash(sys.exc_info()))
+                            if code_ver is None:
+                                for feeder in pop_handlers:
+                                    try:
+                                        feeder.pop(datum)
+                                        # chaos is injected after pop() to avoid `residual` table pollution
+                                        if FLAG_DEBUG_CHAOS and random.random() < 0.01:
+                                            raise RuntimeError('bad luck with feeder.pop')
+                                    except TrappedException:
+                                        exc.append(exc_hash(sys.exc_info()))
 
                             try:
                                 row = msm_feeder.msm_rownpop(msm_no, datum, exc)
@@ -1060,7 +1210,6 @@ def meta_pg(in_root, bucket, postgres):
             sink.close()
         # Okay, server-side cursor feeding indexes is closed and the code is
         # still alive, it's time to morph temporary tables!
-        c = pgconn.cursor()
         if code_ver is None:
             c.execute('''
                 INSERT INTO report
@@ -1070,17 +1219,16 @@ def meta_pg(in_root, bucket, postgres):
                 FROM report_meta_
                 JOIN report_blob_ USING (report_no)
             ''') # TODO: `LEFT JOIN report_blob_` to fail fast in case of errors
-        c.execute('''
-            INSERT INTO input (input)
-            SELECT DISTINCT input FROM measurement_blob_ WHERE input IS NOT NULL
-            ON CONFLICT DO NOTHING
-        ''')
-        c.execute('''
-            INSERT INTO residual (residual)
-            SELECT DISTINCT residual FROM measurement_blob_
-            ON CONFLICT DO NOTHING
-        ''')
-        if code_ver is None:
+            c.execute('''
+                INSERT INTO input (input)
+                SELECT DISTINCT input FROM measurement_blob_ WHERE input IS NOT NULL
+                ON CONFLICT DO NOTHING
+            ''')
+            c.execute('''
+                INSERT INTO residual (residual)
+                SELECT DISTINCT residual FROM measurement_blob_
+                ON CONFLICT DO NOTHING
+            ''')
             c.execute('''
                 INSERT INTO measurement
                 SELECT msm_no, report_no, frame_off, frame_size, intra_off, intra_size,
@@ -1090,30 +1238,45 @@ def meta_pg(in_root, bucket, postgres):
                 LEFT JOIN input USING (input)
                 LEFT JOIN residual USING (residual)
             ''') # TODO: `LEFT JOIN measurement_blob_` to fail fast
-        c.execute('''
-            INSERT INTO domain (domain)
-            SELECT DISTINCT domain FROM dns_a_
-            UNION
-            SELECT DISTINCT UNNEST(control_cname) FROM dns_a_
-            UNION
-            SELECT DISTINCT UNNEST(test_cname) FROM dns_a_
-            ON CONFLICT DO NOTHING
-        ''')
-        c.execute('''
-            INSERT INTO dns_a
-            SELECT
-                msm_no,
-                (SELECT domain_no FROM domain WHERE domain.domain = dns_a_.domain) AS domain_no,
-                control_ip, test_ip,
-                (SELECT array_agg(domain_no ORDER BY ndx)
-                 FROM unnest(control_cname) WITH ORDINALITY t2(domain, ndx)
-                 LEFT JOIN domain USING (domain)) AS control_cname,
-                (SELECT array_agg(domain_no ORDER BY ndx)
-                 FROM unnest(test_cname) WITH ORDINALITY t2(domain, ndx)
-                 LEFT JOIN domain USING (domain)) AS test_cname,
-                ttl, resolver_hostname, client_resolver, control_failure, test_failure
-            FROM dns_a_
-        ''')
+        else:
+            c.execute('''
+                UPDATE measurement msm
+                SET exc = array_append(msm.exc, NULL) || mex.exc
+                FROM measurement_exc_ mex
+                WHERE mex.msm_no = msm.msm_no
+            ''', [CODE_VER])
+            c.execute('''
+                UPDATE autoclaved
+                SET code_ver = %s
+                WHERE bucket_date = %s
+            ''', [CODE_VER, bucket])
+        if any(_[0].table == 'dns_a_' for _ in row_handlers):
+            c.execute('''
+                INSERT INTO domain (domain)
+                SELECT DISTINCT domain FROM dns_a_
+                UNION
+                SELECT DISTINCT UNNEST(control_cname) FROM dns_a_
+                UNION
+                SELECT DISTINCT UNNEST(test_cname) FROM dns_a_
+                ON CONFLICT DO NOTHING
+            ''')
+            c.execute('''
+                INSERT INTO dns_a
+                SELECT
+                    msm_no,
+                    (SELECT domain_no FROM domain WHERE domain.domain = dns_a_.domain) AS domain_no,
+                    control_ip, test_ip,
+                    (SELECT array_agg(domain_no ORDER BY ndx)
+                     FROM unnest(control_cname) WITH ORDINALITY t2(domain, ndx)
+                     LEFT JOIN domain USING (domain)) AS control_cname,
+                    (SELECT array_agg(domain_no ORDER BY ndx)
+                     FROM unnest(test_cname) WITH ORDINALITY t2(domain, ndx)
+                     LEFT JOIN domain USING (domain)) AS test_cname,
+                    ttl, resolver_hostname, client_resolver, control_failure, test_failure
+                FROM dns_a_
+            ''')
+        else:
+            print "No updates for dns_a_ table"
         c.execute('''
             INSERT INTO badmeta
             SELECT
