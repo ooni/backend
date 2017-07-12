@@ -10,6 +10,7 @@ RUN set -x \
     && locale-gen en_US.UTF-8
 
 # Install measurements Dependencies
+# XXX verify fingerprint for nodesource bash script
 RUN set -x \
     && apt-get update \
     && apt-get install curl -y \

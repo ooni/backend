@@ -1,4 +1,6 @@
 APP_ENV = development
+VERSION = 1.0.0-beta
+
 DOCKER_EXTRA =
 DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
 
@@ -67,5 +69,9 @@ push-staging:
 
 production: APP_ENV=production
 production: serve-d
+
+docker-push:
+	docker build -t openobservatory/ooni-measurements:$(VERSION) .
+	#docker push openobservatory/ooni-measurements:$(VERSION)
 
 .PHONY: default build serve clean debug develop develop-rebuild dropdb test production
