@@ -95,6 +95,7 @@ results per response.
     {
       "probe_asn": "[string] the Autonomous system number of the result",
       "probe_cc": "[string] the country code of the result",
+      "test_name": "[string] the name of the test that was run",
       "index": "[integer] the index of this result (useful when using since_index)",
       "test_start_time": "[string] start time for the measurement is ISO 8601 format",
       "download_url": "[string] url to the download. Note: if the download URL ends with '.gz' it should be considered compressed with gzip."

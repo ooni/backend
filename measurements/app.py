@@ -6,8 +6,6 @@ from __future__ import unicode_literals
 import logging
 import os
 
-from celery import Celery
-
 from flask import Flask
 from flask_misaka import Misaka
 from flask_cors import CORS
@@ -20,10 +18,6 @@ from measurements.filestore import init_filestore
 APP_DIR = os.path.dirname(__file__)
 
 cache = Cache()
-celery = Celery(__name__,
-                backend=config.CELERY_BACKEND,
-                broker=config.CELERY_BROKER_URL)
-
 
 def init_app(app):
     # We load configurations first from the config file (where some options
@@ -60,8 +54,6 @@ def init_app(app):
 
 def create_app(*args, **kw):
     from measurements import views
-    from measurements.tasks import setup_period_tasks
-    from measurements.utils import init_celery
 
     app = Flask(__name__)
 
@@ -69,8 +61,6 @@ def create_app(*args, **kw):
     init_app(app)
     init_db(app)
     init_filestore(app)
-    init_celery(app, celery)
-    setup_period_tasks(app)
 
     create_tables(app)
     views.register(app)

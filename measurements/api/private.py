@@ -14,6 +14,8 @@ from flask.json import jsonify
 
 from sqlalchemy import func
 
+from werkzeug.exceptions import BadRequest
+
 from measurements.app import cache
 from measurements.models import Report, Measurement
 from measurements.models import TEST_NAMES
