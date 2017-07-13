@@ -23,23 +23,3 @@ static:
   command: gulp watch
   volumes:
     - ./measurements:/app/measurements:z
-
-worker:
-  env_file:
-  - ./config/base.env
-  - ./config/development.env
-  - ./config/secrets.env
-  volumes:
-    - ./measurements:/app/measurements:z
-  links:
-    - db
-
-beat:
-  env_file:
-  - ./config/base.env
-  - ./config/development.env
-  - ./config/secrets.env
-  volumes:
-    - ./measurements:/app/measurements:z
-  links:
-    - db
