@@ -15,9 +15,9 @@ from sqlalchemy.orm import lazyload, exc
 
 from six.moves.urllib.parse import urljoin, urlencode
 
+from measurements.config import REPORT_INDEX_OFFSET
 from measurements.filestore import get_download_url
 from measurements.models import Report, Input, Measurement, Autoclaved
-from measurements.models import REPORT_INDEX_OFFSET
 
 # prefix: /api/v1
 api_blueprint = Blueprint('api', 'measurements')

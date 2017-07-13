@@ -32,3 +32,6 @@ S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", None)
 S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", None)
 S3_SESSION_TOKEN = os.environ.get("S3_SESSION_TOKEN", None)
 S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
+
+# XXX changeme
+REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "1000"))

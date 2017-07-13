@@ -49,9 +49,6 @@ OOTEST = ENUM(
     name='ootest'
 )
 
-# XXX adjust the offset to be the maximum index in the database at migration time
-REPORT_INDEX_OFFSET = 1000
-
 class Report(Base):
     __tablename__ = 'report'
 
