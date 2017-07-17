@@ -60,7 +60,7 @@ def api_list_report_files():
     except ValueError:
         raise BadRequest("Invalid until")
 
-    since_index = request.args.get("since_index")
+    since_index = int(request.args.get("since_index"))
     if since_index:
         report_no = max(0, since_index - REPORT_INDEX_OFFSET)
 

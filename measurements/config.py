@@ -18,7 +18,7 @@ WEBSERVER_PORT = int(os.environ.get("WEBSERVER_PORT", "3000"))
 BASE_URL = os.environ.get("BASE_URL",
                           "https://measurements.ooni.torproject.org/")
 
-AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASED_URL",
+AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
                                       "http://datacollector.infra.ooni.io/ooni-public/autoclaved/")
 
 # This can either be a local directory (ex. /data/ooni/public/sanitised)
@@ -33,5 +33,5 @@ S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", None)
 S3_SESSION_TOKEN = os.environ.get("S3_SESSION_TOKEN", None)
 S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
 
-# XXX changeme
-REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "1000"))
+# As of 2017-07-18 635830 is the latest index in the database
+REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "635830"))
