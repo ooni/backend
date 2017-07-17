@@ -1,8 +1,8 @@
 APP_ENV = development
-VERSION = $(cat package.json \
+VERSION = $(shell cat package.json \
   | grep version \
   | head -1 \
-  | awk -F: '{ print $2 }' \
+  | awk -F: '{ print $$2 }' \
   | sed 's/[",]//g' \
   | tr -d '[[:space:]]')
 
@@ -76,7 +76,7 @@ production: APP_ENV=production
 production: serve-d
 
 docker-push:
-	@echo "Building version $(VERSION)"
+	echo "Building version $(VERSION)"
 	docker build -t openobservatory/ooni-measurements:$(VERSION) .
 	docker push openobservatory/ooni-measurements:$(VERSION)
 
