@@ -1,5 +1,10 @@
 APP_ENV = development
-VERSION = 1.0.0-beta.1
+VERSION = $(cat package.json \
+  | grep version \
+  | head -1 \
+  | awk -F: '{ print $2 }' \
+  | sed 's/[",]//g' \
+  | tr -d '[[:space:]]')
 
 DOCKER_EXTRA =
 DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
@@ -71,6 +76,7 @@ production: APP_ENV=production
 production: serve-d
 
 docker-push:
+	@echo "Building version $(VERSION)"
 	docker build -t openobservatory/ooni-measurements:$(VERSION) .
 	docker push openobservatory/ooni-measurements:$(VERSION)
 
