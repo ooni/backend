@@ -15,6 +15,7 @@ from sqlalchemy.orm import lazyload, exc
 
 from six.moves.urllib.parse import urljoin, urlencode
 
+from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET
 from measurements.filestore import get_download_url
 from measurements.models import Report, Input, Measurement, Autoclaved
@@ -32,6 +33,12 @@ def api_error_handler(error):
     response.status_code = 400
     return response
 
+
+@api_blueprint.route('/version', methods=["GET"])
+def api_get_version():
+    return jsonify({
+        "version": __version__
+    })
 
 
 @api_blueprint.route('/files', methods=["GET"])
@@ -60,8 +67,9 @@ def api_list_report_files():
     except ValueError:
         raise BadRequest("Invalid until")
 
-    since_index = int(request.args.get("since_index"))
-    if since_index:
+    since_index = request.args.get("since_index")
+    if since_index is not None:
+        since_index = int(since_index)
         report_no = max(0, since_index - REPORT_INDEX_OFFSET)
 
     order_by = request.args.get("order_by", "index")
