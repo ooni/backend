@@ -3,6 +3,11 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import time
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -24,3 +29,22 @@ def init_db(app):
         sessionmaker(autocommit=False, autoflush=False, bind=app.db_engine)
     )
     Base.query = app.db_session.query_property()
+    init_query_logging(app)
+
+QUERY_TIME_THRESHOLD = 2.0 # Time in seconds after which we will start logging warnings for too long queries
+
+def init_query_logging(app):
+    @event.listens_for(Engine, "before_cursor_execute")
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        conn.info.setdefault('query_start_time', []).append(time.time())
+        app.logger.debug("Start Query: %s", statement)
+
+    @event.listens_for(Engine, "after_cursor_execute")
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        total_time = time.time() - conn.info['query_start_time'].pop(-1)
+        app.logger.debug("Query Complete!")
+        app.logger.debug("Total Time: %f", total_time)
+
+        if total_time >= QUERY_TIME_THRESHOLD:
+            app.logger.warning("Query: %s", statement)
+            app.logger.warning("Took too much time: %f", total_time)

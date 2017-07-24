@@ -6,18 +6,6 @@ web:
   ports:
   - "8000"
 
-worker:
-  env_file:
-  - ./config/base.env
-  - ./config/production.env
-  - /opt/secrets.env
-
-beat:
-  env_file:
-  - ./config/base.env
-  - ./config/production.env
-  - /opt/secrets.env
-
 https-portal:
   image: steveltn/https-portal:1.0.0
   restart: always

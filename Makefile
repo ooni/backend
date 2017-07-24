@@ -1,4 +1,11 @@
 APP_ENV = development
+VERSION = $(shell cat package.json \
+  | grep version \
+  | head -1 \
+  | awk -F: '{ print $$2 }' \
+  | sed 's/[",]//g' \
+  | tr -d '[[:space:]]')
+
 DOCKER_EXTRA =
 DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
 
@@ -52,6 +59,9 @@ dropdb:
 develop: APP_ENV=development
 develop: .state/docker-build-$(APP_ENV) serve
 
+develop-debug: APP_ENV=development
+develop-debug: .state/docker-build-$(APP_ENV) debug
+
 develop-rebuild: APP_ENV=development
 develop-rebuild: build serve
 
@@ -64,5 +74,10 @@ push-staging:
 
 production: APP_ENV=production
 production: serve-d
+
+docker-push:
+	echo "Building version $(VERSION)"
+	docker build -t openobservatory/ooni-measurements:$(VERSION) .
+	docker push openobservatory/ooni-measurements:$(VERSION)
 
 .PHONY: default build serve clean debug develop develop-rebuild dropdb test production

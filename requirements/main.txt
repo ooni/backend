@@ -5,10 +5,12 @@ Flask-Cors
 Flask-Cache
 Flask-Misaka
 Flask-Script
+py-lz4framed
 msgpack-python
 python-dateutil
 pycountry==16.11.8
 redis>=2.8.0
+requests
 SQLAlchemy
 sqlalchemy-utils
 six
