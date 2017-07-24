@@ -13,19 +13,3 @@ web:
     - "80:8000"
   links:
     - db
-
-worker:
-  env_file:
-  - ./config/base.env
-  - ./config/staging.env
-  - /opt/secrets.env
-  links:
-    - db
-
-beat:
-  env_file:
-  - ./config/base.env
-  - ./config/staging.env
-  - /opt/secrets.env
-  links:
-    - db
