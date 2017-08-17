@@ -52,6 +52,10 @@ def init_app(app):
 
     cache.init_app(app, config=app.config['CACHE_CONFIG'])
 
+def check_config(config):
+    if not config['REPORTS_DIR'].startswith("s3://"):
+        raise Exception("REPORTS_DIR must start with s3://")
+
 def create_app(*args, **kw):
     from measurements import views
 
@@ -59,6 +63,8 @@ def create_app(*args, **kw):
 
     # Order matters
     init_app(app)
+    check_config(app.config)
+
     init_db(app)
     init_filestore(app)
 

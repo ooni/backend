@@ -10,8 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
-from measurements.filestore import get_download_url, gen_file_chunks, \
-    FileNotFound, S3NotConfigured
+from measurements.filestore import get_download_url
 from measurements.models import Report
 
 pages_blueprint = Blueprint('pages', 'measurements',
@@ -225,36 +224,14 @@ def files_download(filename):
     if report is None:
         raise NotFound("No file with that filename found")
 
-    if current_app.config['REPORTS_DIR'].startswith("s3://"):
-        bucket_date, filename = report.textname.split("/")
-        return redirect(
-            get_download_url(
-                current_app,
-                bucket_date,
-                filename
-            )
+    bucket_date, filename = report.textname.split("/")
+    return redirect(
+        get_download_url(
+            current_app,
+            bucket_date,
+            filename
         )
-
-    filepath = os.path.join(
-        current_app.config['REPORTS_DIR'],
-        bucket_date,
-        filename
     )
-
-    try:
-        file_chunks = gen_file_chunks(current_app, filepath)
-    except FileNotFound:
-        raise NotFound("File does not exist")
-    except S3NotConfigured:
-        raise HTTPException("S3 is not properly configured")
-
-    response = Response(
-        stream_with_context(file_chunks['content']),
-        mimetype='text/json'
-    )
-    response.headers.add('Content-Length',
-                         str(file_chunks['content_length']))
-    return response
 
 # These two are needed to avoid breaking older URLs
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
