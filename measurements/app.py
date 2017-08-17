@@ -12,8 +12,7 @@ from flask_cors import CORS
 from flask_cache import Cache
 
 from measurements import config
-from measurements.database import init_db, create_tables
-from measurements.filestore import init_filestore
+from measurements.database import init_db
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -66,9 +65,7 @@ def create_app(*args, **kw):
     check_config(app.config)
 
     init_db(app)
-    init_filestore(app)
 
-    create_tables(app)
     views.register(app)
 
     @app.teardown_appcontext
