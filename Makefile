@@ -36,8 +36,11 @@ serve-d: .state/docker-build-$(APP_ENV)
 serve: .state/docker-build-$(APP_ENV)
 	$(DOCKER_COMPOSE) up
 
-debug: .state/docker-build-$(APP_ENV)
+shell: .state/docker-build-$(APP_ENV)
 	$(DOCKER_COMPOSE) run --service-ports web python -m measurements shell
+
+create-tables: .state/docker-build-$(APP_ENV)
+	$(DOCKER_COMPOSE) run web python -m measurements create_tables
 
 load-fixtures:
 	$(DOCKER_COMPOSE) run web python -m measurements updatefiles --file dev/fixtures.txt --no-check
@@ -59,8 +62,8 @@ dropdb:
 develop: APP_ENV=development
 develop: .state/docker-build-$(APP_ENV) serve
 
-develop-debug: APP_ENV=development
-develop-debug: .state/docker-build-$(APP_ENV) debug
+develop-shell: APP_ENV=development
+develop-shell: .state/docker-build-$(APP_ENV) shell
 
 develop-rebuild: APP_ENV=development
 develop-rebuild: build serve
@@ -80,4 +83,4 @@ docker-push:
 	docker build -t openobservatory/ooni-measurements:$(VERSION) .
 	docker push openobservatory/ooni-measurements:$(VERSION)
 
-.PHONY: default build serve clean debug develop develop-rebuild dropdb test production
+.PHONY: default build serve clean shell develop develop-rebuild dropdb test production
