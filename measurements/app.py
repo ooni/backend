@@ -39,8 +39,9 @@ def init_app(app):
         app.config['DEBUG'] = True
 
     for key in app.config.keys():
-        # Do not log, even in debug, anything containing the work "SECRET"
-        if "SECRET" in key:
+        SECRET_SUBSTRINGS = ["_SECRET_", "DATABASE_URL"]
+        # Do not log, even in debug, anything containing the word "SECRET" or "DATABASE_URL"
+        if any([s in key for s in SECRET_SUBSTRINGS]):
             continue
         app.logger.debug("{}: {}".format(key, app.config[key]))
 
