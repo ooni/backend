@@ -33,11 +33,10 @@ def init_app(app):
         app.logger.setLevel(logging.WARNING)
     elif app.config['APP_ENV'] == 'development':
         app.logger.setLevel(logging.DEBUG)
-
-    # Set the jinja templates to reload when in development
-    if app.config['APP_ENV'] == 'development':
+        # Set the jinja templates to reload when in development
         app.jinja_env.auto_reload = True
         app.config['TEMPLATES_AUTO_RELOAD'] = True
+        app.config['DEBUG'] = True
 
     for key in app.config.keys():
         # Do not log, even in debug, anything containing the work "SECRET"
