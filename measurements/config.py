@@ -12,8 +12,6 @@ CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
 
 APP_ENV = os.environ.get("APP_ENV", "development")
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///ooni_measurements.db")
-WEBSERVER_ADDRESS = os.environ.get("WEBSERVER_ADDRESS", "0.0.0.0")
-WEBSERVER_PORT = int(os.environ.get("WEBSERVER_PORT", "3000"))
 
 BASE_URL = os.environ.get("BASE_URL",
                           "https://measurements.ooni.torproject.org/")
@@ -24,8 +22,6 @@ AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
 # This can either be a local directory (ex. /data/ooni/public/sanitised)
 # or an s3 endpoint (ex. s3://ooni-public/sanitised)
 REPORTS_DIR = os.environ.get("REPORTS_DIR", "s3://ooni-public/sanitised/")
-
-WORKERS = 4
 
 # S3 related configuration
 S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", None)
