@@ -17,7 +17,6 @@ from six.moves.urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET
-from measurements.filestore import get_download_url
 from measurements.models import Report, Input, Measurement, Autoclaved
 
 # prefix: /api/v1
@@ -140,10 +139,12 @@ def api_list_report_files():
     }
     results = []
     for row in q:
-        bucket_date, filename = row.textname.split('/')
-        url = get_download_url(current_app, bucket_date, filename)
+        download_url = urljoin(
+            current_app.config['BASE_URL'],
+            '/files/download/%s' % row.textname
+        )
         results.append({
-            'download_url': url,
+            'download_url': download_url,
             'probe_cc': row.probe_cc,
             'probe_asn': "AS{}".format(row.probe_asn),
             'test_name': row.test_name,
@@ -269,7 +270,7 @@ def api_list_measurements():
     query_time = 0
     q = q.limit(limit).offset(offset)
 
-    iter_start_time= time.time()
+    iter_start_time = time.time()
     results = []
     for row in q:
         url = urljoin(

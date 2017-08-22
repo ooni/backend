@@ -3,6 +3,11 @@ import os
 import re
 from datetime import timedelta, datetime
 
+from six.moves.urllib.parse import urljoin
+
+import requests
+import lz4framed
+
 from flask import Blueprint, render_template, current_app, request, redirect, \
     Response, stream_with_context
 from pycountry import countries
@@ -10,8 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
-from measurements.filestore import get_download_url
-from measurements.models import Report
+from measurements.models import Report, Measurement, Autoclaved
 
 pages_blueprint = Blueprint('pages', 'measurements',
                             static_folder='static',
@@ -204,34 +208,69 @@ def files_in_country(country_code):
                            order_by=order_by,
                            current_country=country_code)
 
+def decompress_autoclaved(autoclaved_filename, frames_off, frames_size, intra_off, intra_size):
+    def generator():
+        url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
 
-@pages_blueprint.route('/files/download/<filename>')
-def files_download(filename):
-    try:
-        report = current_app.db_session.query(Report) \
-                        .filter(Report.textname.like("%" + filename)).first()
-        # XXX
-        # We have duplicate measurements :(
-        # So the below exception actually happens. This should be resolved
-        # in the data processing pipeline.
-        #   Report.filename == filename).one()
-    except NoResultFound:
+        current_app.logger.debug("Fetching autoclaved from: %s" % url)
+        current_app.logger.debug("  frames_off: %d" % frames_off)
+        current_app.logger.debug("  frames_size: %d" % frames_size)
+        current_app.logger.debug("  intra_off: %d" % intra_off)
+        current_app.logger.debug("  intra_size: %d" % intra_size)
+        try:
+            r = requests.get(url, headers={"Range": "bytes={}-{}".format(frames_off, frames_off + frames_size)},
+                                stream=True)
+            streamed_data = 0
+            for chunk in lz4framed.Decompressor(r.raw):
+                current_app.logger.debug("chunking away 1")
+                d = chunk
+                current_app.logger.debug("chunking away 2")
+                if streamed_data == 0 and intra_off > 0:
+                    d = chunk[intra_off:]
+                if streamed_data > (intra_size + len(d)):
+                    d = chunk[:(streamed_data - intra_size)]
+                yield d
+                streamed_data += len(d)
+            current_app.logger.debug("sent: %d" % streamed_data)
+        except Exception as exc:
+            current_app.logger.error("failed to fetch streamed data: %s" % exc)
+            raise HTTPException("Failed to fetch data")
+    return generator
+
+@pages_blueprint.route('/files/download/<path:textname>')
+def files_download(textname):
+    q = current_app.db_session.query(
+            Measurement.id.label('m_id'),
+            Measurement.report_no.label('report_no'),
+            Measurement.frame_off.label('frame_off'),
+            Measurement.frame_size.label('frame_size'),
+            Measurement.intra_off.label('intra_off'),
+            Measurement.intra_size.label('intra_size'),
+            Report.report_no.label('r_report_no'),
+            Report.autoclaved_no.label('r_autoclaved_no'),
+            Autoclaved.filename.label('a_filename'),
+            Autoclaved.autoclaved_no.label('a_autoclaved_no'),
+    ).filter(Report.textname == textname) \
+        .join(Report, Report.report_no == Measurement.report_no) \
+        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no) \
+        .order_by(Measurement.frame_off.asc(), Measurement.intra_off.asc())
+
+    msmts = q.all()
+    if len(msmts) == 0:
+        current_app.logger.debug("Could not find %s" % textname)
         raise NotFound("No file with that filename found")
-    except MultipleResultsFound:
-        # This should never happen.
-        raise HTTPException("Duplicate measurement detected")
 
-    if report is None:
-        raise NotFound("No file with that filename found")
-
-    bucket_date, filename = report.textname.split("/")
-    return redirect(
-        get_download_url(
-            current_app,
-            bucket_date,
-            filename
-        )
-    )
+    autoclaved_filename = msmts[0].a_filename
+    intra_off = msmts[0].intra_off
+    intra_size = 0
+    for msmt in msmts:
+        if autoclaved_filename != msmt.a_filename:
+            raise HTTPException("Autoclaved file is spanned across multiple files")
+        intra_size += msmt.intra_size
+    frames_off = msmts[0].frame_off
+    frames_size = msmts[-1].frame_off - frames_off + msmts[-1].frame_size
+    resp_generator = decompress_autoclaved(autoclaved_filename, frames_off, frames_size, intra_off, intra_size)
+    return Response(stream_with_context(resp_generator()), mimetype='text/json')
 
 # These two are needed to avoid breaking older URLs
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
