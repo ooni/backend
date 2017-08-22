@@ -81,5 +81,5 @@ def test_pages_files_in_country(client):
 
 def test_pages_download_file_404(client):
     resp = client.get(url_for('pages.files_download',
-                              filename="DOES_NOT_EXIST"))
+                              textname="DOES_NOT_EXIST"))
     assert resp.status_code == 404
