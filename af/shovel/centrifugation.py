@@ -760,9 +760,9 @@ class BaseHttpFeeder(object):
             body_sha256 = pg_quote(None)
         return body_sha256
     COMMON_HEADERS = {
-        "Accept-Language": "en-US;q=0.8,en;q=0.5",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+        'Accept-Language': 'en-US;q=0.8,en;q=0.5',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'
     }
     @classmethod
     def _pop_request(cls, datum, request): # .test_keys.requests[].request element
@@ -1115,7 +1115,7 @@ def meta_pg(in_root, bucket, postgres):
                 feeder = cls(*args)
                 sink = PGCopyFrom(pgconn, cls.table, columns=cls.columns)
                 row_handlers.append((feeder, sink))
-        assert len(row_handlers), "No tables should be updated"
+        assert len(row_handlers), 'No tables should be updated'
 
         if code_ver is not None: # that's update, not initial insert
             c.execute('''
@@ -1276,7 +1276,7 @@ def meta_pg(in_root, bucket, postgres):
                 FROM dns_a_
             ''')
         else:
-            print "No updates for dns_a_ table"
+            print 'No updates for dns_a_ table'
         c.execute('''
             INSERT INTO badmeta
             SELECT
