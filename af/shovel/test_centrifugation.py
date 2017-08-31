@@ -57,12 +57,13 @@ class TestPGQuoting(unittest.TestCase):
 PG = os.getenv('UNITTEST_PG')
 class TestE2EQuoting(unittest.TestCase):
     # Run like that:
-    # $ UNITTEST_PG='host=172.17.0.3 user=postgres' python test_centrifugation.py TestE2EQuoting
+    # $ UNITTEST_PG='host=spbmeta user=postgres' python test_centrifugation.py TestE2EQuoting
     def setUp(self):
         self.conn = psycopg2.connect(dsn=PG)
         self.table = 'tmptbl' + ''.join(random.choice(string.lowercase) for _ in xrange(6))
     def tearDown(self):
         self.conn.close()
+
     @unittest.skipUnless(PG, 'No PostgreSQL')
     def test_string(self):
         for mapfn in (chr, unichr):
@@ -78,6 +79,7 @@ class TestE2EQuoting(unittest.TestCase):
                     self.assertEqual(nnn, ord(ccc))
                     nrows += 1
                 self.assertEqual(nrows, 127)
+
     @unittest.skipUnless(PG, 'No PostgreSQL')
     def test_array(self):
         for mapfn in (chr, unichr):
@@ -93,6 +95,35 @@ class TestE2EQuoting(unittest.TestCase):
                     self.assertEqual(ccc, [mapfn(nnn), 'a', mapfn(nnn), 'b', mapfn(nnn)])
                     nrows += 1
                 self.assertEqual(nrows, 127)
+
+    @unittest.skipUnless(PG, 'No PostgreSQL')
+    def test_badrow_sink(self):
+        for rowno in xrange(9):
+            for ver in xrange(1 << rowno):
+                isgood = bin(ver)[2:].rjust(rowno, '0') if rowno else ''
+                with self.conn, self.conn.cursor() as c:
+                    c.execute('CREATE TEMPORARY TABLE good{} (t text) ON COMMIT DROP'.format(self.table))
+                    c.execute('CREATE TEMPORARY TABLE bad{} (tbl text, datum bytea) ON COMMIT DROP'.format(self.table))
+                    bad = PGCopyFrom(self.conn, 'bad'+self.table)
+                    good = PGCopyFrom(self.conn, 'good'+self.table, badsink=bad)
+                    for ndx, digit in enumerate(isgood):
+                        row = ('<>{}<>' if digit == '1' else '<>{}<\0>').format(ndx)
+                        good.write(row + '\n')
+                    good.close()
+                    bad.close()
+                    # okay, let's check
+                    c.execute('SELECT t FROM good{}'.format(self.table))
+                    good_set = set(_[0] for _ in c)
+                    c.execute('SELECT datum FROM bad{}'.format(self.table))
+                    bad_blob = '|'.join(str(_[0]) for _ in c)
+                    #print rowno, ver, repr(isgood), good_set, repr(bad_blob)
+                    for ndx, digit in enumerate(isgood):
+                        row = ('<>{}<>' if digit == '1' else '<>{}<\0>').format(ndx)
+                        if digit == '1':
+                            self.assertIn(row, good_set)
+                        else:
+                            self.assertIn(row, bad_blob)
+                    # COMMIT
 
 class TextExcHash(unittest.TestCase):
     def deep_throw(self):

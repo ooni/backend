@@ -198,6 +198,10 @@ def pg_quote(s):
     else:
         raise RuntimeError('Unable to quote unknown type', s)
 
+def pg_binquote(s):
+    assert isinstance(s, str)
+    return '\\\\x' + s.encode('hex')
+
 def pg_unquote(s):
     if not isinstance(s, basestring):
         raise RuntimeError('Unable to quote unknown type', s)
@@ -212,10 +216,12 @@ class PGCopyFrom(object):
     # sessions and pipe data across threads with significant CPU overhead and
     # inability to process every OONI measurement using set of functions to
     # have clean "residual" document after data extraction.
-    def __init__(self, pgconn, table, wbufsize=2097152, **kwargs):
+    def __init__(self, pgconn, table, badsink=None, wbufsize=2097152, **kwargs):
         # default chunk size is taken as approx. cwnd between production VMs
         self.__pgconn = pgconn
         self.__table = table
+        self.__badsink = badsink
+        self.flush = self.__flush_easygoing if badsink is None else self.__flush_stubborn
         self.__wbufsize = wbufsize
         self.__kwargs = kwargs
         self.__buf = StringIO()
@@ -225,16 +231,81 @@ class PGCopyFrom(object):
         if pos > 0 and pos + len(line) > self.__wbufsize:
             self.flush()
         self.__buf.write(line)
-    def flush(self):
+    def __flush_easygoing(self):
         self.__buf.reset()
         with self.__pgconn.cursor() as c:
-            try:
-                c.copy_from(self.__buf, self.__table, **self.__kwargs)
-            except Exception:
-                print >>sys.stderr, repr(self.__buf.getvalue())
-                raise
+            c.copy_from(self.__buf, self.__table, **self.__kwargs)
         self.__buf.reset()
         self.__buf.truncate()
+    def __flush_stubborn(self):
+        self.__buf.seek(0, os.SEEK_END)
+        buf_size = self.__buf.tell()
+        bad_lines = []
+        base_line = 0
+        start_pos = 0
+        bad_size = 0
+        good_size = 0
+        eols = None
+        with self.__pgconn.cursor() as c:
+            while start_pos < buf_size:
+                self.__buf.seek(start_pos)
+                c.execute('SAVEPOINT flush_stubborn')
+                try:
+                    c.copy_from(self.__buf, self.__table, **self.__kwargs)
+                except psycopg2.DataError as exc:
+                    m = re.search(r'\bCOPY {}, line (\d+)'.format(self.__table), exc.diag.context)
+                    if m is not None: # yes, it's best possible way to extract that datum :-(
+                        line = int(m.group(1)) - 1
+                        assert line >= 0
+                        line += base_line
+                        c.execute('ROLLBACK TO SAVEPOINT flush_stubborn')
+                    else:
+                        raise
+                else:
+                    line = None
+                c.execute('RELEASE SAVEPOINT flush_stubborn') # NB: ROLLBACK does not RELEASE, https://www.postgresql.org/message-id/1354145331.1766.84.camel%40sussancws0025
+                if line is None:
+                    self.__buf.truncate(start_pos)
+                    good_size += buf_size - start_pos
+                    start_pos = buf_size # to break the loop
+                else:
+                    if eols is None: # delay computation till error
+                        eols = list(m.end() for m in re.finditer('\n', self.__buf.getvalue()))
+                    start = eols[line-1] if line > 0 else 0
+                    end = eols[line]
+                    if bad_lines and bad_lines[-1][1] == start:
+                        start, _ = bad_lines.pop() # merge consequent bad lines
+                    bad_lines.append((start, end))
+                    assert end > start_pos
+                    start_pos = end
+                    base_line = line + 1
+            # __buf is either empty or ends with some bad lines now
+            if bad_lines:
+                for start, end in bad_lines:
+                    self.__buf.seek(start)
+                    bad = self.__buf.read(end - start)
+                    assert len(bad) == end - start
+                    self.__badsink.write(BadrowFeeder.badrow_row(self.__table, bad))
+                    bad_size += len(bad)
+                good_buf = StringIO()
+                # transforming bad_lines to good_lines
+                good_lines = list(sum(bad_lines, ()))
+                if good_lines[0] == 0: # first blob was bad
+                    good_lines.pop(0)
+                else: # first blob was good
+                    good_lines.insert(0, 0)
+                good_lines.pop() # last blob is always bad :)
+                for start, end in zip(good_lines[::2], good_lines[1::2]):
+                    self.__buf.seek(start)
+                    good_buf.write(self.__buf.read(end - start))
+                good_size += good_buf.tell()
+                if good_buf.tell():
+                    self.__buf = good_buf
+                    self.__flush_easygoing()
+                else:
+                    self.__buf.truncate(0)
+            assert good_size + bad_size == buf_size
+        assert self.__buf.tell() == 0
     def close(self):
         self.flush()
         self.__buf.close()
@@ -551,6 +622,14 @@ class BadmetaFeeder(object):
                 pg_quote(exc_hash(report) if report is not None else None),
                 pg_quote(exc_hash(measurement) if measurement is not None else None))
 
+class BadrowFeeder(object):
+    _compat_code_ver_ = (3.5,) # NB: it's unused variable
+    table = 'badrow'
+    columns = ('tbl', 'code_ver', 'datum')
+    @staticmethod
+    def badrow_row(table, datum):
+        return '{}\t{:d}\t\\\\x{}\n'.format(pg_quote(table), CODE_VER, datum.encode('hex'))
+
 IPV4_RE = re.compile(r'^\d+\.\d+\.\d+\.\d+$')
 
 class TcpFeeder(object):
@@ -754,8 +833,9 @@ class BaseHttpFeeder(object):
     def body_sha256(self, body):
         if body is not None:
             body_sha256 = hashlib.sha256(body)
-            self.body_sink.put(body_sha256.digest(), body)
-            body_sha256 = '\\\\x' + body_sha256.hexdigest()
+            digest = body_sha256.digest()
+            self.body_sink.put(digest, body)
+            body_sha256 = pg_binquote(digest)
         else:
             body_sha256 = pg_quote(None)
         return body_sha256
@@ -1089,6 +1169,7 @@ def meta_pg(in_root, bucket, postgres):
         # TODO: check if table should be feeded with `row` or just skipped
 
         body_sink = BodySimhashSink(stconn)
+        badrow_sink = PGCopyFrom(pgconn, BadrowFeeder.table, columns=BadrowFeeder.columns)
         badmeta_feeder = BadmetaFeeder(pgconn)
         badmeta_sink = PGCopyFrom(pgconn, badmeta_feeder.table, columns=badmeta_feeder.columns)
         if code_ver is None:
@@ -1113,7 +1194,7 @@ def meta_pg(in_root, bucket, postgres):
             if code_ver not in cls.compat_code_ver:
                 # this table should be updated
                 feeder = cls(*args)
-                sink = PGCopyFrom(pgconn, cls.table, columns=cls.columns)
+                sink = PGCopyFrom(pgconn, cls.table, badsink=badrow_sink, columns=cls.columns)
                 row_handlers.append((feeder, sink))
         assert len(row_handlers), 'No tables should be updated'
 
@@ -1130,7 +1211,7 @@ def meta_pg(in_root, bucket, postgres):
                     feeder.table))
             c.execute('DROP TABLE bktmsm') # clean-up early
 
-        sink_handlers = [_[1] for _ in row_handlers] + [body_sink, badmeta_sink, msm_sink]
+        sink_handlers = [_[1] for _ in row_handlers] + [body_sink, badrow_sink, badmeta_sink, msm_sink]
         if code_ver is None:
             # NB: report_feeder is last pop_handlers and there are no pop_handlers for `UPDATE` !
             pop_handlers = [_[0] for _ in row_handlers] + [report_feeder]
@@ -1151,7 +1232,6 @@ def meta_pg(in_root, bucket, postgres):
                 ORDER BY filename, frame_off, intra_off'''.format(*meta_tables),
                 [bucket])
             for filename, itfile in groupby(cmeta, itemgetter(0)):
-                print filename
                 with open(os.path.join(in_root, filename)) as fd:
                     for (frame_off, frame_size), itframe in groupby(itfile, itemgetter(1, 2)):
                         assert fd.tell() == frame_off
