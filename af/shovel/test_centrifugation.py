@@ -48,8 +48,10 @@ class TestPGQuoting(unittest.TestCase):
         self.assertEqual(pg_quote(True), 'TRUE')
         self.assertEqual(pg_quote(False), 'FALSE')
     def test_bits(self):
-        blob = ''.join(map(chr, xrange(256)))
+        blob = u''.join(map(unichr, xrange(1, 256))).encode('utf-8')
         self.assertEqual(blob, pg_unquote(pg_quote(blob)))
+        self.assertEqual(u'\ufffd'.encode('utf-8'), pg_quote(u'\u0000'))
+        self.assertEqual(u'\ufffd'.encode('utf-8'), pg_quote('\0'))
     def test_ugly(self):
         blob = r'\\n'
         self.assertEqual(blob, pg_unquote(pg_quote(blob)))

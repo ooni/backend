@@ -30,6 +30,8 @@ from canning import isomidnight, dirname
 # It does NOT take into account metadata tables right now:
 # - autoclaved: it's not obvious if anything can be updated there
 # - report & measurement: have significant amount of metadata and may be actually updated eventually
+# Technically `http_headers` was added after CODE_VER=3, but bad headers were
+# causing bucket-wide exception, so re-import is not forced.
 CODE_VER = 3
 
 FLAG_TRUE_TEMP = True # keep temporary tables if the flag is false
@@ -136,6 +138,10 @@ def http_status_code(code):
     else:
         raise RuntimeError('Invalid HTTP code', code)
 
+def http_headers(headers):
+    # make headers dict friendly to postgres
+    return {pg_uniquote(k): pg_uniquote(v) for k, v in headers.iteritems()}
+
 def dns_ttl(ttl):
     # RFC1035 states: positive values of a signed 32 bit number
     if ttl is None or 0 < ttl <= 0x7fffffff:
@@ -161,6 +167,12 @@ BAD_UTF8_RE = re.compile( # https://stackoverflow.com/questions/18673213/detect-
     \u0000
     ''')
 
+def pg_uniquote(s):
+    if isinstance(s, str):
+        s = unicode(s, 'utf-8')
+    assert isinstance(s, unicode)
+    return BAD_UTF8_RE.sub(u'\ufffd', s) # `re` is smart enough to return same object in case of no-op
+
 def pg_quote(s):
     # The following characters must be preceded by a backslash if they
     # appear as part of a column value: backslash itself, newline, carriage
@@ -174,7 +186,7 @@ def pg_quote(s):
         #   example at https://github.com/TheTorProject/ooni-pipeline/issues/65
         if isinstance(s, str):
             s = unicode(s, 'utf-8')
-        s = BAD_UTF8_RE.sub(ur'\ufffd', s).encode('utf-8')
+        s = BAD_UTF8_RE.sub(u'\ufffd', s).encode('utf-8')
         return s.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
     elif s is None:
         return '\\N'
@@ -884,7 +896,7 @@ class HttpControlFeeder(BaseHttpFeeder):
                         pg_quote(http_status_code(status_code)),
                         pg_quote(body_length),
                         pg_quote(r.get('title')),
-                        pg_quote(ujson.dumps(r['headers']))) # seems, empty headers dict is still present it case of failure
+                        pg_quote(ujson.dumps(http_headers(r['headers'])))) # seems, empty headers dict is still present it case of failure
         elif datum['test_name'] == 'http_requests':
             for r in datum['test_keys']['requests']:
                 if r['request']['tor']['is_tor']:
@@ -895,7 +907,7 @@ class HttpControlFeeder(BaseHttpFeeder):
                         response = {}
                     headers = response.get('headers')
                     if headers is not None:
-                        headers = ujson.dumps(headers)
+                        headers = ujson.dumps(http_headers(headers))
                     ret += '{:d}\tTRUE\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
                         msm_no,
                         pg_quote(r.get('failure')),
@@ -953,7 +965,7 @@ class HttpRequestFeeder(BaseHttpFeeder):
             response = {}
         headers = response.get('headers')
         if headers is not None:
-            headers = ujson.dumps(headers)
+            headers = ujson.dumps(http_headers(headers))
         return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
             msm_no,
             pg_quote(r['request']['url']),
