@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
 # That's a sanity check to ensure that we can migrate from historical public/sanitised to public/autoclaved:
 # 1. every sanitised/ file is in autoclaved/
