@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 import string
-import sys
 import tarfile
 import tempfile
 import time

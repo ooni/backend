@@ -9,16 +9,96 @@
 
 import argparse
 import datetime
+import gzip
 import hashlib
 import os
 import tempfile
 from functools import partial
 
 import ujson
+import lz4.frame as lz4frame
 
 import autoclaving
 from canning import dirname
-from centrifugation import stream_datum, FILE_START, FILE_END, REPORT_START, REPORT_END, BADBLOB, DATUM
+
+FILE_START, FILE_END, REPORT_START, REPORT_END, BADBLOB, DATUM = object(), object(), object(), object(), object(), object()
+
+def stream_datum(atclv_root, bucket, take_file=None):
+    with gzip.GzipFile(os.path.join(atclv_root, bucket, autoclaving.INDEX_FNAME), 'r') as indexfd:
+        filefd = None
+        dociter = autoclaving.stream_json_blobs(indexfd)
+        for _, doc in dociter:
+            doc = ujson.loads(doc)
+            t = doc['type']
+            if t == 'datum':
+                # {"orig_sha1": "q7…I=", "text_off": 156846, "text_size": 58327, "type": "datum"}
+                intra_off = doc['text_off'] - text_off
+                datum = blob[intra_off:intra_off+doc['text_size']]
+                assert intra_off >= 0 and len(datum) == doc['text_size']
+                datum = ujson.loads(datum)
+                doc['frame_off'] = frame_off
+                doc['frame_size'] = frame_size
+                doc['intra_off'] = intra_off
+                doc['intra_size'] = doc['text_size']
+                doc['datum'] = datum
+                yield DATUM, doc
+                del intra_off, datum
+
+            elif t == 'frame':
+                # {"file_off": 0, "file_size": 162864, "text_off": 0, "text_size": 362462, … }
+                frame_off, frame_size = doc['file_off'], doc['file_size']
+                assert filefd.tell() == frame_off
+                blob = filefd.read(frame_size)
+                assert len(blob) == frame_size
+                blob = lz4frame.decompress(blob)
+                assert len(blob) == doc['text_size']
+                text_off = doc['text_off']
+
+            elif t == '/frame':
+                del frame_off, frame_size, text_off, blob
+
+            elif t == 'report':
+                # {"orig_sha1": "HO…U=",
+                #  "src_size": 104006450,
+                #  "textname": "2017-01-01/20161231T000030Z-US-AS…-0.2.0-probe.json", …}
+                yield REPORT_START, doc
+
+            elif t == '/report':
+                # {"info": "<class '__main__.TruncatedReportError'>",
+                #  "src_cutoff": 49484700, … }
+                yield REPORT_END, doc
+
+            elif t == 'file':
+                # {"filename": "2017-01-01/20161231T000030Z-US-AS…-0.2.0-probe.json.lz4", …}
+                filename = doc['filename']
+                assert filename.startswith(bucket)
+                if take_file is None or take_file(filename):
+                    filefd = open(os.path.join(atclv_root, filename), 'rb')
+                    del filename
+                    yield FILE_START, doc
+                else:
+                    for _, skipdoc in dociter:
+                        if '/file"' in skipdoc and ujson.loads(skipdoc)['type'] == '/file':
+                            break
+                    del filename, skipdoc
+
+            elif t == '/file':
+                # {"file_crc32": -156566611, "file_sha1": "q/…8=", "file_size": 18132131, …}
+                assert filefd.tell() == doc['file_size']
+                filefd.close()
+                filefd = None
+                yield FILE_END, doc
+
+            elif t == 'badblob':
+                # {"orig_sha1": "RXQFwOtpKtS0KicYi8JnWeQYYBw=",
+                #  "src_off": 99257, "src_size": 238,
+                #  "info": "<class 'yaml.constructor.ConstructorError'>", …}
+                yield BADBLOB, doc
+
+            else:
+                raise RuntimeError('Unknown record type', t)
+        if filefd is not None:
+            raise RuntimeError('Truncated autoclaved index', atclv_root, bucket)
 
 def parse_time(s):
     return datetime.datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
