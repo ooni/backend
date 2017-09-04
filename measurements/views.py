@@ -21,7 +21,7 @@ def register(app):
         resolver=connexion_resolver,
         arguments=dict(),
         swagger_json=True,
-        swagger_ui=True,
+        swagger_ui=False,
         swagger_path=None,
         swagger_url=None,
         resolver_error_handler=None,

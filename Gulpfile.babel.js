@@ -24,6 +24,10 @@ let modulesPath = path.join(basePrefix, "node_modules");
 let webpackConfig = {
   quiet: false,
   verbose: true,
+  node: {
+    fs: "empty",
+    child_process: "empty"
+  },
   stats: {
     colors: true,
     modules: true,
@@ -74,7 +78,8 @@ gulp.task("dist:js", () => {
     path.resolve(staticPrefix, 'scripts', 'by_date.js'),
     path.resolve(staticPrefix, 'scripts', 'country_flag.js'),
     path.resolve(staticPrefix, 'scripts', 'main.js'),
-    path.resolve(staticPrefix, 'scripts', 'stats.js')
+    path.resolve(staticPrefix, 'scripts', 'stats.js'),
+    path.resolve(staticPrefix, 'scripts', 'redoc.js')
   ];
 
   return gulp.src(files)
@@ -88,7 +93,7 @@ gulp.task("dist:js", () => {
 gulp.task('dist:icons:font-awesome', () => {
   let faPath = path.dirname(require.resolve("font-awesome/package.json"));
   let faFontPath = path.join(faPath, "fonts", "**.*");
-  
+
   return gulp.src(faFontPath)
             .pipe(gulp.dest(path.join(distPath, "fonts", "font-awesome"))); 
 });

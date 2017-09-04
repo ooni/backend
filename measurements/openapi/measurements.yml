@@ -6,6 +6,9 @@ info:
     name: Open Observatory of Network Interference (OONI)
     email: contact@openobservatory.org
     url: 'https://ooni.torproject.org/'
+  x-logo:
+    url: 'https://ooni.torproject.org/images/ooni-header-mascot-2x.png'
+    backgroundColor: '#FFF'
 basePath: '/api/v1'
 paths:
   /files:
@@ -181,7 +184,7 @@ paths:
           description: 'Number of records to return (default: 100)'
       responses:
         '200':
-          description: Returns the JSON blob for the specified measurement
+          description: Returns the list of measurement IDs for the specified criteria
           schema:
             $ref: "#/definitions/MeasurementList"
 
@@ -199,6 +202,7 @@ paths:
           schema:
             $ref: "#/definitions/VersionInfo"
 
+
         default:
           description: Default response
 
@@ -208,6 +212,9 @@ definitions:
       version:
         type: string
         description: The current version of the measurements API
+
+    example:
+      version: '1.0.0-beta3'
 
   PaginationMetadata:
     properties:
@@ -237,6 +244,19 @@ definitions:
         $ref: "#/definitions/PaginationMetadata"
       results:
         $ref: "#/definitions/File"
+    example:
+      metadata:
+        offset: 0
+        limit: 100
+        count: 420
+        pages: 5
+        next_url: 'https://measurements.ooni.io/files?offset=100&limit=100'
+      results:
+        - download_url: 'https://s3.amazonaws.com/ooni-public/sanitised/2017-09-04/20170904T021115Z-US-AS7922-ndt-20170903T164039Z_AS7922_tx4Us3Eddf4XZYu9eFBiJrWq6FyS5dMLuAhF2lDx6AZs2XpGz1-0.2.0-probe.json'
+          index: 754699
+          probe_asn: AS7922
+          probe_cc: US
+          test_start_time: '2017-09-04T02:11:15Z'
 
   File:
     properties:
@@ -267,6 +287,18 @@ definitions:
         $ref: "#/definitions/PaginationMetadata"
       results:
         $ref: "#/definitions/MeasurementMetadata"
+
+    example:
+      metadata:
+        offset: 0
+        limit: 100
+        count: 420
+        pages: 5
+        next_url: 'https://measurements.ooni.io/measurements?offset=100&limit=100'
+      results:
+        - measurement_url: 'https://measurements.ooni.io/measurement/xxxx-yyy-zzz-dddd-eeee-ffff'
+          measurement_id: 'xxxx-yyy-zzz-dddd-eeee-ffff'
+
 
   MeasurementMetadata:
     properties:
