@@ -15,25 +15,25 @@ RUN set -x \
     && apt-get update \
     && apt-get install curl -y \
     && curl -sL https://deb.nodesource.com/setup_6.x | bash - \
-    && apt-get install git postgresql-client bzip2 gcc g++ make libpq-dev libffi-dev nodejs --no-install-recommends -y \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && apt-get update \
+    && apt-get install git postgresql-client bzip2 gcc g++ make \
+        libpq-dev libffi-dev nodejs yarn --no-install-recommends -y \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY package.json /tmp/package.json
+COPY yarn.lock /tmp/yarn.lock
 
 # Install NPM dependencies
 RUN set -x \
     && npm install -g gulp-cli
 
-# This depedency was creating issues so we install it separately
 RUN set -x \
     && cd /tmp \
-    && npm install node-sass
-
-RUN set -x \
-    && cd /tmp \
-    && npm install --loglevel http \
+    && yarn install --loglevel http \
     && mkdir /app \
     && cp -a /tmp/node_modules /app/
 

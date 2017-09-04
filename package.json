@@ -4,7 +4,7 @@
   },
   "name": "ooni-measurements",
   "version": "1.0.0-beta.3",
-  "license": "BSD",
+  "license": "BSD-2-Clause",
   "dependencies": {
     "babel-core": "6.14.0",
     "babel-loader": "6.2.5",
