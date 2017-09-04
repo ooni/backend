@@ -17,6 +17,8 @@ from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
 from measurements.models import Report, Measurement, Autoclaved
 
+# Exporting it
+from .docs import api_docs_blueprint
 pages_blueprint = Blueprint('pages', 'measurements',
                             static_folder='static',
                             static_url_path='/static/')
