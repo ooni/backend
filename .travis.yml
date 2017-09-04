@@ -37,9 +37,12 @@ script:
 # Wait for postgres database to be running
 - 'while ! echo exit | nc localhost 5433; do sleep 10; done'
 - sleep 10
+- make APP_ENV=testing create-tables
 - make test
-deploy:
-  provider: script
-  script: 'scripts/deploy.sh staging $HOME/.ssh/id_rsa_travis'
-  on:
-    branch: master
+
+# Disable auto deployment
+#deploy:
+#  provider: script
+#  script: 'scripts/deploy.sh staging $HOME/.ssh/id_rsa_travis'
+#  on:
+#    branch: master

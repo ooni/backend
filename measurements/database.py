@@ -15,10 +15,6 @@ from sqlalchemy_utils import database_exists, create_database
 
 Base = declarative_base()
 
-def create_tables(app):
-    from measurements import models
-    Base.metadata.create_all(bind=app.db_engine)
-
 def init_db(app):
     app.db_engine = create_engine(
         app.config['DATABASE_URL'], convert_unicode=True

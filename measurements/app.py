@@ -12,8 +12,7 @@ from flask_cors import CORS
 from flask_cache import Cache
 
 from measurements import config
-from measurements.database import init_db, create_tables
-from measurements.filestore import init_filestore
+from measurements.database import init_db
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -33,15 +32,15 @@ def init_app(app):
         app.logger.setLevel(logging.WARNING)
     elif app.config['APP_ENV'] == 'development':
         app.logger.setLevel(logging.DEBUG)
-
-    # Set the jinja templates to reload when in development
-    if app.config['APP_ENV'] == 'development':
+        # Set the jinja templates to reload when in development
         app.jinja_env.auto_reload = True
         app.config['TEMPLATES_AUTO_RELOAD'] = True
+        app.config['DEBUG'] = True
 
     for key in app.config.keys():
-        # Do not log, even in debug, anything containing the work "SECRET"
-        if "SECRET" in key:
+        SECRET_SUBSTRINGS = ["_SECRET_", "DATABASE_URL"]
+        # Do not log, even in debug, anything containing the word "SECRET" or "DATABASE_URL"
+        if any([s in key for s in SECRET_SUBSTRINGS]):
             continue
         app.logger.debug("{}: {}".format(key, app.config[key]))
 
@@ -52,6 +51,10 @@ def init_app(app):
 
     cache.init_app(app, config=app.config['CACHE_CONFIG'])
 
+def check_config(config):
+    if not config['REPORTS_DIR'].startswith("s3://"):
+        raise Exception("REPORTS_DIR must start with s3://")
+
 def create_app(*args, **kw):
     from measurements import views
 
@@ -59,10 +62,10 @@ def create_app(*args, **kw):
 
     # Order matters
     init_app(app)
-    init_db(app)
-    init_filestore(app)
+    check_config(app.config)
 
-    create_tables(app)
+    init_db(app)
+
     views.register(app)
 
     @app.teardown_appcontext
