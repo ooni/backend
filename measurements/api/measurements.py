@@ -198,6 +198,7 @@ def list_measurements(
     if order.lower() not in ('asc', 'desc'):
         raise BadRequest("Invalid order")
 
+
     cols = [
         Measurement.input_no.label('m_input_no'),
         Measurement.measurement_start_time.label('measurement_start_time'),
@@ -209,6 +210,7 @@ def list_measurements(
         Report.test_name.label('test_name'),
         Report.report_no.label('report_no')
     ]
+
     if input_:
         cols += [
             Input.input_no.label('input_no'),
@@ -217,12 +219,12 @@ def list_measurements(
 
     q = current_app.db_session.query(*cols).join(Report, Report.report_no == Measurement.report_no)
 
-    if input_ is not None:
+    if input_:
         q = q.join(Measurement, Measurement.input_no == Input.input_no)
         q = q.filter(Input.input.like('%{}%'.format(input_)))
-    if report_id is not None:
+    if report_id:
         q = q.filter(Report.report_id == report_id)
-    if probe_cc is not None:
+    if probe_cc:
         q = q.filter(Report.probe_cc == probe_cc)
     if probe_asn is not None:
         q = q.filter(Report.probe_asn == probe_asn)
