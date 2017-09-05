@@ -305,9 +305,25 @@ definitions:
       measurement_id:
         type: string
         description: The ID of the measurement
+
       measurement_url:
         type: string
         description: The URL used to retrieve the measurement blob
+
+      anomaly_level:
+        type: string
+        description: |-
+          This is used to indicate the level of the anomaly.
+          The possible anomaly levels are:
+            * `confirmed`: for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.)
+            * `warning`: this measurement requires special attention (it's likely to be a case of blocking), however it has not been confirmed
+            * `error`: there was an error in the measurement (the control request failed, there was a bug, etc.)
+            * `ok`: we are "sure" there was no network anomaly
+        enum:
+          - confirmed
+          - warning
+          - error
+          - ok
 
   MeasurementBlob:
     properties:
