@@ -265,8 +265,8 @@ def files_download(textname):
         subquery.c.frame_size,
         subquery.c.intra_off,
         subquery.c.intra_size,
-        subquery.c.row_number.label('c_row_number'),
-        subquery.c.total_count.label('c_total_count'),
+        subquery.c.row_number,
+        subquery.c.total_count,
         subquery.c.report_size,
         subquery.c.filename
     ).filter(or_(subquery.c.row_number == 1, subquery.c.row_number == subquery.c.total_count))
