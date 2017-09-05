@@ -11,7 +11,7 @@ import lz4framed
 from flask import Blueprint, render_template, current_app, request, redirect, \
     Response, stream_with_context
 from pycountry import countries
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
@@ -238,41 +238,53 @@ def decompress_autoclaved(
 
 @pages_blueprint.route('/files/download/<path:textname>')
 def files_download(textname):
-    q = current_app.db_session.query(
-            Measurement.id.label('m_id'),
-            Measurement.report_no.label('report_no'),
+    subquery = current_app.db_session.query(
             Measurement.frame_off.label('frame_off'),
             Measurement.frame_size.label('frame_size'),
             Measurement.intra_off.label('intra_off'),
             Measurement.intra_size.label('intra_size'),
-            Report.report_no.label('r_report_no'),
-            Report.autoclaved_no.label('r_autoclaved_no'),
-            Autoclaved.filename.label('a_filename'),
-            Autoclaved.autoclaved_no.label('a_autoclaved_no'),
+            func.row_number().over(order_by='frame_off, intra_off').label('row_number'),
+            func.count().over().label('total_count'),
+            func.sum(Measurement.intra_size).over().label('report_size'),
+            Autoclaved.filename.label('filename'),
     ).filter(Report.textname == textname) \
         .join(Report, Report.report_no == Measurement.report_no) \
         .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no) \
-        .order_by(Measurement.frame_off.asc(), Measurement.intra_off.asc())
+        .subquery()
+
+    q = current_app.db_session.query(
+        subquery.c.frame_off,
+        subquery.c.frame_size,
+        subquery.c.intra_off,
+        subquery.c.intra_size,
+        subquery.c.row_number.label('c_row_number'),
+        subquery.c.total_count.label('c_total_count'),
+        subquery.c.report_size,
+        subquery.c.filename
+    ).filter(or_(subquery.c.row_number == 1, subquery.c.row_number == subquery.c.total_count))
 
     msmts = q.all()
     if len(msmts) == 0:
         current_app.logger.debug("Could not find %s" % textname)
         raise NotFound("No file with that filename found")
 
-    autoclaved_filename = msmts[0].a_filename
+    autoclaved_filename = msmts[0].filename
     intra_off = msmts[0].intra_off
-    intra_size = 0
-    for msmt in msmts:
-        if autoclaved_filename != msmt.a_filename:
-            raise HTTPException("Autoclaved file is spanned across multiple files")
-        intra_size += msmt.intra_size
-    frames_off = msmts[0].frame_off
-    frames_size = msmts[-1].frame_off - frames_off + msmts[-1].frame_size
+    frame_off = msmts[0].frame_off
+    total_frame_size = msmts[-1].frame_off - msmts[0].frame_off + msmts[-1].frame_size
+    report_size = msmts[0].report_size
+
+    current_app.logger.debug("Computed boundaries for: %s" % autoclaved_filename)
+    current_app.logger.debug("  intra_off: %d" % intra_off)
+    current_app.logger.debug("  frame_off: %d" % frame_off)
+    current_app.logger.debug("  total_frame_size: %d" % total_frame_size)
+    current_app.logger.debug("  report_size: %d" % report_size)
+
     resp_generator = decompress_autoclaved(autoclaved_filename,
-                                           frames_off,
-                                           frames_size,
+                                           frame_off,
+                                           total_frame_size,
                                            intra_off,
-                                           intra_size)
+                                           report_size)
     return Response(stream_with_context(resp_generator()), mimetype='text/json')
 
 # These two are needed to avoid breaking older URLs
