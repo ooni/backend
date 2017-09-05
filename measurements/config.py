@@ -19,10 +19,6 @@ BASE_URL = os.environ.get("BASE_URL",
 AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
                                       "http://datacollector.infra.ooni.io/ooni-public/autoclaved/")
 
-# This can either be a local directory (ex. /data/ooni/public/sanitised)
-# or an s3 endpoint (ex. s3://ooni-public/sanitised)
-REPORTS_DIR = os.environ.get("REPORTS_DIR", "s3://ooni-public/sanitised/")
-
 # S3 related configuration
 S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", None)
 S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", None)
