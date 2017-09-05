@@ -30,18 +30,6 @@ def test_api_docs(client):
      resp = client.get(url_for('api_docs.api_docs'))
      assert resp.status_code == 200
 
-def test_api_private_asn_by_month(client):
-    resp = client.get(url_for('api_private.api_private_asn_by_month'))
-    assert resp.status_code == 200
-
-def test_api_private_counties_by_month(client):
-    resp = client.get(url_for('api_private.api_private_counties_by_month'))
-    assert resp.status_code == 200
-
-def test_api_private_runs_by_month(client):
-    resp = client.get(url_for('api_private.api_private_runs_by_month'))
-    assert resp.status_code == 200
-
 def test_pages_index(client):
     resp = client.get(url_for('pages.index'))
     assert resp.status_code == 200
