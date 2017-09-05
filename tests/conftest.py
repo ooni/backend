@@ -14,4 +14,5 @@ def pytest_collection_modifyitems(items):
 @pytest.fixture
 def app():
     app = create_app()
+    app.debug = True
     return app
