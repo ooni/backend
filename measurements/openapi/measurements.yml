@@ -149,6 +149,17 @@ paths:
           in: query
           type: string
           description: Return results only strictly greater than the provided index
+
+        - name: anomaly_type
+          in: query
+          type: string
+          description: the type of anomaly you are looking for
+          enum:
+            - confirmed
+            - warning
+            - failure
+            - ok
+
         - name: order_by
           in: query
           type: string
@@ -261,20 +272,17 @@ definitions:
   File:
     properties:
       probe_asn:
-        type: string
-        description: The Autonomous system number of the result
+        $ref: "#/definitions/ProbeASN"
       probe_cc:
-        type: string
-        description: The country code of the result
+        $ref: "#/definitions/ProbeCC"
       test_name:
-        type: string
-        description: The name of the test that was run
+        $ref: "#/definitions/TestName"
       index:
         type: integer
         description: the index of this result (useful when using since_index)
       test_start_time:
-        type: string
-        description: start time for the measurement is ISO 8601 format
+        $ref: "#/definitions/TestStartTime"
+
       download_url:
         type: string
         description: >-
@@ -310,37 +318,81 @@ definitions:
         type: string
         description: The URL used to retrieve the measurement blob
 
-      anomaly_level:
-        type: string
-        description: |-
-          This is used to indicate the level of the anomaly.
-          The possible anomaly levels are:
-            * `confirmed`: for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.)
-            * `warning`: this measurement requires special attention (it's likely to be a case of blocking), however it has not been confirmed
-            * `error`: there was an error in the measurement (the control request failed, there was a bug, etc.)
-            * `ok`: we are "sure" there was no network anomaly
-        enum:
-          - confirmed
-          - warning
-          - error
-          - ok
+      measurement_start_time:
+        $ref: "#/definitions/MeasurementStartTime"
+
+      test_name:
+        $ref: "#/definitions/TestName"
+
+      input:
+        $ref: "#/definitions/Input"
+
+      probe_cc:
+        $ref: "#/definitions/ProbeCC"
+
+      probe_asn:
+        $ref: "#/definitions/ProbeASN"
+
+      anomaly_type:
+        $ref: "#/definitions/AnomalyType"
+
+  AnomalyType:
+    type: string
+    description: |-
+      This is used to indicate the type of the anomaly.
+      The possible anomaly types are:
+        * `confirmed`: for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.)
+        * `warning`: this measurement requires special attention (it's likely to be a case of blocking), however it has not been confirmed
+        * `failure`: there was an error in the measurement (the control request failed, there was a bug, etc.)
+        * `ok`: we are "sure" there was no network anomaly
+    enum:
+      - confirmed
+      - warning
+      - failure
+      - ok
+
+  TestStartTime:
+    type: string
+    description: |-
+      Timestamp of when the test was started (many measurements) in
+      UTC time coordinates (ex. 2015-08-24 12:02:23) (Note: ooniprobe <=
+      1.4.0 generates skewed timing information)
+
+  MeasurementStartTime:
+    type: string
+    description: |-
+      Timestamp of when the measurement was performed in
+      UTC time coordinates (ex. `2015-08-24 12:02:23`) (Note: ooniprobe <=
+      1.4.0 generates skewed timing information).
+      This timestamp is more accurate than the `test_start_time` field
+
+  Input:
+    type: string
+    description: |-
+      If the test takes an input this will contain the value of it
+      these can be for example URLs, hostnames, IPs, etc.
+
+  ProbeCC:
+    type: string
+    description: The two letter country code of the probe or ZZ if inlcudecountry is set to false
+
+  ProbeASN:
+    type: string
+    description: |-
+      The AS Number of the probe (prefixed by AS, ex. AS1234)
+      or AS0 if includeasn is set to false
+
+  TestName:
+    type: string
+    description: The name of test that generated this measurement
 
   MeasurementBlob:
     properties:
       test_start_time:
-        type: string
-        description: |-
-          Timestamp of when the test was started (many measurements) in
-          UTC time coordinates (ex. 2015-08-24 12:02:23) (Note: ooniprobe <=
-          1.4.0 generates skewed timing information)
+        $ref: "#/definitions/TestStartTime"
 
       measurement_start_time:
-        type: string
-        description: |-
-          Timestamp of when the measurement was performed in
-          UTC time coordinates (ex. `2015-08-24 12:02:23`) (Note: ooniprobe <=
-          1.4.0 generates skewed timing information).
-          This timestamp is more accurate than the `test_start_time` field
+        $ref: "#/definitions/MeasurementStartTime"
 
       test_keys:
         type: object
@@ -365,8 +417,7 @@ definitions:
         description: This is an identifier of this particular measurement
 
       probe_cc:
-        type: string
-        description: The two letter country code of the probe or ZZ if inlcudecountry is set to false
+        $ref: "#/definitions/ProbeCC"
 
       test_runtime:
         type: number
@@ -385,10 +436,7 @@ definitions:
           includecity is set to false (note: recent version of ooniprobe always set this to null)
 
       probe_asn:
-        type: string
-        description: |-
-          The AS Number of the probe (prefixed by AS, ex. AS1234)
-          or AS0 if includeasn is set to false
+        $ref: "#/definitions/ProbeASN"
 
       annotations:
         type: object
@@ -423,8 +471,7 @@ definitions:
         description: The date in which the measurement was processed
 
       test_name:
-        type: string
-        description: The name of test that generated this measurement
+        $ref: "#/definitions/TestStartTime"
 
       report_id:
         type: string
@@ -437,4 +484,3 @@ definitions:
       options:
         type: object
         description: The version of the backend that collected this measurement
-

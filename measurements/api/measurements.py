@@ -257,6 +257,8 @@ def list_measurements(
             'test_name': row.test_name,
             'measurement_start_time': row.measurement_start_time,
             'input': row.input if row.m_input_no else None,
+            # XXX @darkk how do I get this field populated?
+            'anomaly_type': None
         })
 
     pages = -1
