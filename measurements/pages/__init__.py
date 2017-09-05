@@ -208,33 +208,32 @@ def files_in_country(country_code):
                            order_by=order_by,
                            current_country=country_code)
 
-def decompress_autoclaved(autoclaved_filename, frames_off, frames_size, intra_off, intra_size):
+def decompress_autoclaved(
+        autoclaved_filename,
+        frame_off,
+        total_frame_size,
+        intra_off,
+        report_size
+    ):
+    url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
     def generator():
-        url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
-
-        current_app.logger.debug("Fetching autoclaved from: %s" % url)
-        current_app.logger.debug("  frames_off: %d" % frames_off)
-        current_app.logger.debug("  frames_size: %d" % frames_size)
-        current_app.logger.debug("  intra_off: %d" % intra_off)
-        current_app.logger.debug("  intra_size: %d" % intra_size)
         try:
-            r = requests.get(url, headers={"Range": "bytes={}-{}".format(frames_off, frames_off + frames_size)},
-                                stream=True)
+            headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size)}
+            r = requests.get(url, headers=headers, stream=True)
             streamed_data = 0
-            for chunk in lz4framed.Decompressor(r.raw):
-                current_app.logger.debug("chunking away 1")
-                d = chunk
-                current_app.logger.debug("chunking away 2")
-                if streamed_data == 0 and intra_off > 0:
-                    d = chunk[intra_off:]
-                if streamed_data > (intra_size + len(d)):
-                    d = chunk[:(streamed_data - intra_size)]
-                yield d
-                streamed_data += len(d)
-            current_app.logger.debug("sent: %d" % streamed_data)
+            while streamed_data < report_size:
+                for chunk in lz4framed.Decompressor(r.raw):
+                    # I am at the beginning of the stream and I need to send some
+                    # offset into the data
+                    if streamed_data == 0 and intra_off > 0:
+                        chunk = chunk[intra_off:]
+                    # Avoid streaming more data than I should
+                    if (streamed_data + len(chunk)) > report_size:
+                        chunk = chunk[:abs(streamed_data - report_size)]
+                    yield chunk
+                    streamed_data += len(chunk)
         except Exception as exc:
-            current_app.logger.error("failed to fetch streamed data: %s" % exc)
-            raise HTTPException("Failed to fetch data")
+            raise HTTPException("Failed to fetch data: %s" % exc)
     return generator
 
 @pages_blueprint.route('/files/download/<path:textname>')
@@ -269,7 +268,11 @@ def files_download(textname):
         intra_size += msmt.intra_size
     frames_off = msmts[0].frame_off
     frames_size = msmts[-1].frame_off - frames_off + msmts[-1].frame_size
-    resp_generator = decompress_autoclaved(autoclaved_filename, frames_off, frames_size, intra_off, intra_size)
+    resp_generator = decompress_autoclaved(autoclaved_filename,
+                                           frames_off,
+                                           frames_size,
+                                           intra_off,
+                                           intra_size)
     return Response(stream_with_context(resp_generator()), mimetype='text/json')
 
 # These two are needed to avoid breaking older URLs
