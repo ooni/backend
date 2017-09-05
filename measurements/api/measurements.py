@@ -234,25 +234,30 @@ def api_list_measurements():
     except ValueError:
         raise BadRequest("Invalid offset or limit")
 
-    q = current_app.db_session.query(
+    cols = [
+        Measurement.input_no.label('m_input_no'),
+        Measurement.measurement_start_time.label('measurement_start_time'),
+        Measurement.id.label('m_id'),
+        Measurement.report_no.label('m_report_no'),
+        Report.report_id.label('report_id'),
+        Report.probe_cc.label('probe_cc'),
+        Report.probe_asn.label('probe_asn'),
+        Report.test_name.label('test_name'),
+        Report.report_no.label('report_no')
+    ]
+    if input_:
+        cols += [
             Input.input_no.label('input_no'),
-            Input.input.label('input'),
-            Measurement.input_no.label('m_input_no'),
-            Measurement.measurement_start_time.label('measurement_start_time'),
-            Measurement.id.label('m_id'),
-            Measurement.report_no.label('m_report_no'),
-            Report.report_id.label('report_id'),
-            Report.probe_cc.label('probe_cc'),
-            Report.probe_asn.label('probe_asn'),
-            Report.test_name.label('test_name'),
-            Report.report_no.label('report_no')
-    ).join(Measurement, Measurement.input_no == Input.input_no)\
-     .join(Report, Report.report_no == Measurement.report_no)
+            Input.input.label('input')
+        ]
 
+    q = current_app.db_session.query(*cols).join(Report, Report.report_no == Measurement.report_no)
+
+    if input_:
+        q = q.join(Measurement, Measurement.input_no == Input.input_no)
+        q = q.filter(Input.input.like('%{}%'.format(input_)))
     if report_id:
         q = q.filter(Report.report_id == report_id)
-    if input_:
-        q = q.filter(Input.input.like('%{}%'.format(input_)))
     if probe_cc:
         q = q.filter(Report.probe_cc == probe_cc)
     if probe_asn:
