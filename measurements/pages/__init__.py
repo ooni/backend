@@ -231,7 +231,16 @@ def decompress_autoclaved(
                     if (streamed_data + len(chunk)) > report_size:
                         chunk = chunk[:abs(streamed_data - report_size)]
                     yield chunk
+
+                    # Sanity checks to ensure the streamed data start with
+                    # `{` and ends with `\n`
+                    if streamed_data == 0:
+                        assert chunk[0] == '{', 'Chunk starts with %s != {' % chunk[0]
+                    if streamed_data + len(chunk) == report_size:
+                        assert chunk[-1] == '\n', 'Chunk ends with %s != \\n' % chunk[-1]
+
                     streamed_data += len(chunk)
+            assert report_size == streamed_data, 'I expected to stream %d but only did %d' % (report_size, streamed_data)
         except Exception as exc:
             raise HTTPException("Failed to fetch data: %s" % exc)
     return generator
@@ -245,7 +254,7 @@ def files_download(textname):
             Measurement.intra_size.label('intra_size'),
             func.row_number().over(order_by='frame_off, intra_off').label('row_number'),
             func.count().over().label('total_count'),
-            func.sum(Measurement.intra_size).over().label('report_size'),
+            func.sum(Measurement.intra_size + 1).over().label('report_size'),
             Autoclaved.filename.label('filename'),
     ).filter(Report.textname == textname) \
         .join(Report, Report.report_no == Measurement.report_no) \
@@ -272,7 +281,7 @@ def files_download(textname):
     intra_off = msmts[0].intra_off
     frame_off = msmts[0].frame_off
     total_frame_size = msmts[-1].frame_off - msmts[0].frame_off + msmts[-1].frame_size
-    report_size = msmts[0].report_size + 1 # We add one for the final newline
+    report_size = msmts[0].report_size
 
     current_app.logger.debug("Computed boundaries for: %s" % autoclaved_filename)
     current_app.logger.debug("  intra_off: %d" % intra_off)
