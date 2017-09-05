@@ -215,32 +215,31 @@ def decompress_autoclaved(
         intra_off,
         report_size
     ):
-    url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
     def generator():
         try:
+            url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
             headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size)}
             r = requests.get(url, headers=headers, stream=True)
-            streamed_data = 0
-            while streamed_data < report_size:
-                for chunk in lz4framed.Decompressor(r.raw):
-                    # I am at the beginning of the stream and I need to send some
-                    # offset into the data
-                    if streamed_data == 0 and intra_off > 0:
-                        chunk = chunk[intra_off:]
-                    # Avoid streaming more data than I should
-                    if (streamed_data + len(chunk)) > report_size:
-                        chunk = chunk[:abs(streamed_data - report_size)]
-                    yield chunk
+            beginning = True
+            # Create a copy because we are in a closure
+            to_read = report_size
+            while to_read > 0:
+                for d in lz4framed.Decompressor(r.raw):
+                    if beginning and intra_off > 0:
+                        d = d[intra_off:]
+                    if len(d) > to_read:
+                        d = d[:to_read]
 
                     # Sanity checks to ensure the streamed data start with
                     # `{` and ends with `\n`
-                    if streamed_data == 0:
-                        assert chunk[:1] == b'{', 'Chunk starts with %r != {' % chunk[:1]
-                    if streamed_data + len(chunk) == report_size:
-                        assert chunk[-1:] == b'\n', 'Chunk ends with %r != \\n' % chunk[-1:]
+                    if beginning:
+                        assert d[:1] == b'{', 'Chunk starts with %r != {' % d[:1]
+                    if to_read == len(d):
+                        assert d[-1:] == b'\n', 'Chunk ends with %r != \\n' % d[-1:]
 
-                    streamed_data += len(chunk)
-            assert report_size == streamed_data, 'I expected to stream %d but only did %d' % (report_size, streamed_data)
+                    yield d
+                    to_read -= len(d)
+                    beginning = False
         except Exception as exc:
             raise HTTPException("Failed to fetch data: %s" % exc)
     return generator
