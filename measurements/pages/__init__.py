@@ -235,9 +235,9 @@ def decompress_autoclaved(
                     # Sanity checks to ensure the streamed data start with
                     # `{` and ends with `\n`
                     if streamed_data == 0:
-                        assert chunk[:1] == b'{', 'Chunk starts with %s != {' % chunk[:1]
+                        assert chunk[:1] == b'{', 'Chunk starts with %r != {' % chunk[:1]
                     if streamed_data + len(chunk) == report_size:
-                        assert chunk[-1:] == b'\n', 'Chunk ends with %s != \\n' % chunk[-1:]
+                        assert chunk[-1:] == b'\n', 'Chunk ends with %r != \\n' % chunk[-1:]
 
                     streamed_data += len(chunk)
             assert report_size == streamed_data, 'I expected to stream %d but only did %d' % (report_size, streamed_data)
