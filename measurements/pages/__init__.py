@@ -272,7 +272,7 @@ def files_download(textname):
     intra_off = msmts[0].intra_off
     frame_off = msmts[0].frame_off
     total_frame_size = msmts[-1].frame_off - msmts[0].frame_off + msmts[-1].frame_size
-    report_size = msmts[0].report_size
+    report_size = msmts[0].report_size + 1 # We add one for the final newline
 
     current_app.logger.debug("Computed boundaries for: %s" % autoclaved_filename)
     current_app.logger.debug("  intra_off: %d" % intra_off)
