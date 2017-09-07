@@ -1,7 +1,7 @@
 from flask import url_for
 
 def test_api_list_reports_index(client):
-    resp = client.get(url_for('api.api_list_report_files'))
+    resp = client.get(url_for('/api/v1.measurements_api_list_files'))
     assert resp.status_code == 200
     assert isinstance(resp.json['results'], list)
     assert isinstance(resp.json['metadata'], dict)
@@ -18,13 +18,15 @@ def test_api_list_reports_index(client):
     ])
 
 def test_api_list_reports_error(client):
-    resp = client.get(url_for('api.api_list_report_files', order="INVALID"))
+    resp = client.get(url_for('/api/v1.measurements_api_list_files', order="INVALID"))
     assert resp.status_code == 400
-    assert resp.json['error_message'] == "Invalid order"
+    assert resp.json['title'] == 'Bad Request'
+    assert resp.json['detail'].startswith('\'INVALID\' is not one of')
 
-    resp = client.get(url_for('api.api_list_report_files', order_by="INVALID"))
+    resp = client.get(url_for('/api/v1.measurements_api_list_files', order_by="INVALID"))
     assert resp.status_code == 400
-    assert resp.json['error_message'] == "Invalid order_by"
+    assert resp.json['title'] == 'Bad Request'
+    assert resp.json['detail'].startswith('\'INVALID\' is not one of')
 
 def test_api_docs(client):
      resp = client.get(url_for('api_docs.api_docs'))

@@ -1,6 +1,23 @@
-{% extends 'base.html' %}
-{% block uncontained %}
-<div class="container">
-{{ docs_text | markdown }}
-</div>
-{% endblock %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OONI Measurements API Documentation</title>
+    <!-- needed for adaptive design -->
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!--
+    ReDoc doesn't change outer page styles
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <redoc></redoc>
+  	<script src="{{ url_for('static', filename='dist/js/redoc.js') }}"></script>
+  </body>
+</html>
