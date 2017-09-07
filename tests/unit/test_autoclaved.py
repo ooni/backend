@@ -1,4 +1,5 @@
 import hashlib
+import pytest
 from measurements.pages import decompress_autoclaved
 
 # The s3 URL is something like:
@@ -77,20 +78,20 @@ AUTOCLAVED = {
     },
 }
 
-def test_decompress(client):
-    for name, ac in AUTOCLAVED.items():
-        decompressor = decompress_autoclaved(
-                ac['autoclaved_filename'],
-                ac['frame_off'],
-                ac['total_frame_size'],
-                ac['intra_off'],
-                ac['report_size'])
-        download_size = 0
-        h = hashlib.sha256()
-        g = decompressor()
-        all_data = 0
-        for chunk in g:
-            all_data += len(chunk)
-            h.update(chunk)
-        assert all_data == ac['report_size'], all_data
-        assert h.hexdigest() == ac['expected_shasum'], h.hexdigest()
+@pytest.mark.parametrize("name,ac", AUTOCLAVED.items())
+def test_decompress(client, name, ac):
+    decompressor = decompress_autoclaved(
+            ac['autoclaved_filename'],
+            ac['frame_off'],
+            ac['total_frame_size'],
+            ac['intra_off'],
+            ac['report_size'])
+    download_size = 0
+    h = hashlib.sha256()
+    g = decompressor()
+    all_data = 0
+    for chunk in g:
+        all_data += len(chunk)
+        h.update(chunk)
+    assert all_data == ac['report_size'], all_data
+    assert h.hexdigest() == ac['expected_shasum'], h.hexdigest()
