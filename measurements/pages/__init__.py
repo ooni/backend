@@ -220,7 +220,8 @@ def decompress_autoclaved(
     def generator():
         try:
             url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
-            headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size)}
+            # byte positions specified are inclusive -- https://tools.ietf.org/html/rfc7233#section-2.1
+            headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size - 1)}
             r = requests.get(url, headers=headers, stream=True)
             beginning = True
             # Create a copy because we are in a closure
@@ -246,10 +247,10 @@ def decompress_autoclaved(
             # `autoclaved` file format may have `\n` in separate LZ4 frame,
             # database stores offset for JSON blobs without trailing newline,
             # here is hack adding newline as next frame boundaries are unknown.
-            if r.raw.read(1) != '': # stream must be already EOFed
+            if r.raw.read(1) != b'': # stream must be already EOFed
                 raise HTTPException("Unprocessed LZ4 data left")
             if to_read == 1:
-                yield '\n'
+                yield b'\n'
         except Exception as exc:
             raise HTTPException("Failed to fetch data: %s" % exc)
     return generator
