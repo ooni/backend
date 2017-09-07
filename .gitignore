@@ -9,6 +9,7 @@ ooni_measurements.db
 ./data/
 
 node_modules/
+package-lock.json
 
 measurements/static/dist/
 
