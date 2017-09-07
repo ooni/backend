@@ -16,6 +16,9 @@ from measurements.pages import decompress_autoclaved
 # dc5e65ae1785afac7bb2d5c01b7d052954236c6e5a4e0bee38d0693cc52285bf  -
 # $ tar -I lz4 --list -v -f 2013-05-06/tcp_connect.0.tar.lz4 2013-05-06/20130506T113818Z-VN-AS45899-tcp_connect-no_report_id-0.1.0-probe.yaml
 # -rw-r--r-- ooni/torproject 865023 2017-02-22 15:16 2013-05-06/20130506T113818Z-VN-AS45899-tcp_connect-no_report_id-0.1.0-probe.yaml
+#
+# Also, it's interesting to test # `2014-11-22/20141122T040940Z-US-AS1968-tcp_connect-no_report_id-0.1.0-probe.yaml`
+# manually. It has ~1'000'000 measurements and may trigger some interesting behavior.
 
 AUTOCLAVED = {
     # A report spanning many frames, aligned with frame beginning and frame end.
