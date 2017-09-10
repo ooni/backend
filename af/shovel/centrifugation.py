@@ -264,7 +264,7 @@ class PGCopyFrom(object):
                 c.execute('SAVEPOINT flush_stubborn')
                 try:
                     c.copy_from(self.__buf, self.__table, **self.__kwargs)
-                except psycopg2.DataError as exc:
+                except (psycopg2.DataError, psycopg2.IntegrityError) as exc:
                     m = re.search(r'\bCOPY {}, line (\d+)'.format(self.__table), exc.diag.context)
                     if m is not None: # yes, it's best possible way to extract that datum :-(
                         line = int(m.group(1)) - 1
