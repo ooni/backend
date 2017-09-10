@@ -1295,7 +1295,10 @@ def meta_pg(in_root, bucket, postgres):
             for filename, itfile in groupby(cmeta, itemgetter(0)):
                 with open(os.path.join(in_root, filename)) as fd:
                     for (frame_off, frame_size), itframe in groupby(itfile, itemgetter(1, 2)):
-                        assert fd.tell() == frame_off
+                        fd_fpos_lag = frame_off - fd.tell()
+                        assert fd_fpos_lag >= 0
+                        if fd_fpos_lag > 0:
+                            fd.seek(fd_fpos_lag, os.SEEK_CUR)
                         blob = fd.read(frame_size)
                         assert len(blob) == frame_size
                         blob = lz4frame.decompress(blob)
