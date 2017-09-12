@@ -1,7 +1,4 @@
 {
-  "engines": {
-    "node": "6.6.0"
-  },
   "name": "ooni-measurements",
   "version": "1.0.0-beta.3",
   "license": "BSD-2-Clause",

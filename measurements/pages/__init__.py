@@ -220,12 +220,13 @@ def decompress_autoclaved(
     def generator():
         try:
             url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
-            headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size)}
+            # byte positions specified are inclusive -- https://tools.ietf.org/html/rfc7233#section-2.1
+            headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size - 1)}
             r = requests.get(url, headers=headers, stream=True)
             beginning = True
             # Create a copy because we are in a closure
             to_read = report_size
-            while to_read > 0:
+            while to_read > 1:
                 for d in lz4framed.Decompressor(r.raw):
                     if beginning and intra_off > 0:
                         d = d[intra_off:]
@@ -234,14 +235,22 @@ def decompress_autoclaved(
 
                     # Sanity checks to ensure the streamed data start with
                     # `{` and ends with `\n`
-                    if beginning:
-                        assert d[:1] == b'{', 'Chunk starts with %r != {' % d[:1]
-                    if to_read == len(d):
-                        assert d[-1:] == b'\n', 'Chunk ends with %r != \\n' % d[-1:]
+                    if beginning and d[:1] != b'{':
+                        raise HTTPException('Chunk starts with %r != {' % d[:1])
+                    if to_read == len(d) and d[-1:] != b'\n':
+                        raise HTTPException('Chunk ends with %r != \\n' % d[-1:])
 
                     yield d
                     to_read -= len(d)
-                    beginning = False
+                    if len(d): # valid lz4 frame may have 0 bytes
+                        beginning = False
+            # `autoclaved` file format may have `\n` in separate LZ4 frame,
+            # database stores offset for JSON blobs without trailing newline,
+            # here is hack adding newline as next frame boundaries are unknown.
+            if r.raw.read(1) != b'': # stream must be already EOFed
+                raise HTTPException("Unprocessed LZ4 data left")
+            if to_read == 1:
+                yield b'\n'
         except Exception as exc:
             raise HTTPException("Failed to fetch data: %s" % exc)
     return generator
@@ -277,6 +286,7 @@ def files_download(textname):
     if len(msmts) == 0:
         current_app.logger.debug("Could not find %s" % textname)
         raise NotFound("No file with that filename found")
+    msmts.sort(key=operator.attrgetter('frame_off')) # at most two rows, but it could be single
 
     autoclaved_filename = msmts[0].filename
     intra_off = msmts[0].intra_off
