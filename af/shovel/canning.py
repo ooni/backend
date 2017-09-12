@@ -3,6 +3,7 @@
 
 import argparse
 import datetime
+import gzip
 import json
 import operator
 import os
@@ -299,7 +300,7 @@ def can_to_blob(input_fname, bucket, output_dir, fname):
 
 # Not to be confused with `manifest.json`.  The file is not compressed as it
 # does not save that much space as the file takes only a couple of megabytes.
-INDEX_FNAME = 'index.json'
+INDEX_FNAME = 'index.json.gz'
 
 
 def finalize_can(output_file, can, fdindex):
@@ -320,17 +321,14 @@ def listdir_filesize(d):
     return filesize
 
 
-def load_index(fd):
+def load_index(fileobj):
     index = []
-    for line in fd:
-        if line[-1] != '\n':
-            raise CannerError('Bad line end')
-        if line == '\n': # explicit EOF
-            if next(fd, None) is not None:
-                raise CannerError('Data after explicit EOF')
-            return index
-        index.append(json.loads(line[:-1])) # json doesn't grok memoryview
-    raise CannerError('No explicit EOF')
+    with gzip.GzipFile(fileobj=fileobj, mode='r') as fd:
+        for line in fd:
+            if line[-1] != '\n':
+                raise CannerError('Bad line end')
+            index.append(json.loads(line[:-1])) # json doesn't grok memoryview
+    return index
 
 
 def load_verified_index(output_dir, bucket):

@@ -44,39 +44,8 @@ if FLAG_DEBUG_CHAOS:
     import random
 
 # There are some reports that have duplicate report_id, same filename and same
-# content.  These reports should be skipped and this list is the easiest way to
-# skip them as that's quite non-frequent case, so I don't want to create smart
-# detector for cross-bucket duplicates.
-# Comments come from canned/YYYY-MM-DD/index.json
-DUPLICATE_REPORTS = {
-    # {"text_crc32": -234055755, "text_sha1": "7FTfUuVum/Ln1R3q2v8efq/r4mY=", "text_size": 1634, "textname": "2015-07-20/20150720T153551Z-CA-AS5645-http_invalid_request_line-cM3Xib672fUG4CYtgdScJ9TgvDDWpuh88pN9a1GsPDGHtRM3COgJg03bzXCXpwgE-0.1.0-probe.yaml"}
-    # {"text_crc32": -234055755, "text_sha1": "7FTfUuVum/Ln1R3q2v8efq/r4mY=", "text_size": 1634, "textname": "2015-12-14/20150720T153551Z-CA-AS5645-http_invalid_request_line-cM3Xib672fUG4CYtgdScJ9TgvDDWpuh88pN9a1GsPDGHtRM3COgJg03bzXCXpwgE-0.1.0-probe.yaml"}
-    '2015-12-14/20150720T153551Z-CA-AS5645-http_invalid_request_line-cM3Xib672fUG4CYtgdScJ9TgvDDWpuh88pN9a1GsPDGHtRM3COgJg03bzXCXpwgE-0.1.0-probe.yaml',
-
-    # …"text_crc32": 161371386, "text_sha1": "fbi45PnZ+PfgNmROnVilEor3MCQ=", "text_size": 38459592, "textname": "2015-07-20/20150720T074413Z-DE-AS16265-http_requests-j4Iylj5QWzPfz98IuZKaLiz6IJBcTKLXTcuGWGc5aT0vBSBa3QKdF0Tl9S9k20vh-0.1.0-probe.yaml"}
-    # {"text_crc32": 161371386, "text_sha1": "fbi45PnZ+PfgNmROnVilEor3MCQ=", "text_size": 38459592, "textname": "2015-12-17/20150720T074413Z-DE-AS16265-http_requests-j4Iylj5QWzPfz98IuZKaLiz6IJBcTKLXTcuGWGc5aT0vBSBa3QKdF0Tl9S9k20vh-0.1.0-probe.yaml"}
-    '2015-12-17/20150720T074413Z-DE-AS16265-http_requests-j4Iylj5QWzPfz98IuZKaLiz6IJBcTKLXTcuGWGc5aT0vBSBa3QKdF0Tl9S9k20vh-0.1.0-probe.yaml',
-
-    # {"text_crc32": 1625954739, "text_sha1": "PIZF5mmV9f5xYabQZi0/edphEWk=", "text_size": 2613, "textname": "2015-12-16/20151221T163102Z-IR-AS201227-http_invalid_request_line-8bf5jj5kSvc7kQphdfmkqmdc1hoHE3qRwEnnk8mLvnggkdqL8Jpd6qAQEirvmlXc-0.1.0-probe.yaml"}
-    # {"text_crc32": 1625954739, "text_sha1": "PIZF5mmV9f5xYabQZi0/edphEWk=", "text_size": 2613, "textname": "2016-02-22/20151221T163102Z-IR-AS201227-http_invalid_request_line-8bf5jj5kSvc7kQphdfmkqmdc1hoHE3qRwEnnk8mLvnggkdqL8Jpd6qAQEirvmlXc-0.1.0-probe.yaml"}
-    '2016-02-22/20151221T163102Z-IR-AS201227-http_invalid_request_line-8bf5jj5kSvc7kQphdfmkqmdc1hoHE3qRwEnnk8mLvnggkdqL8Jpd6qAQEirvmlXc-0.1.0-probe.yaml',
-
-    # XXX: These two files differ, but the first one includes EVERY `datum` from the second one.
-    # Also, measurements are _reordered_ within the file. It looks like strange in-place editing.
-    # You can compare output of following commands:
-    # $ zcat 2016-02-11/index.json.gz | awk '/20160210T163242Z-IR-AS201227-http_requests-yZthLDkKNe6IdePf7B1gMgNvRxSMDwNGWD6BB1MWcuY2T3q7oLmDQkjhZARARuic-0.1.0-probe.yaml/ {a = 1} (a == 1 && /"datum"/) {print} /"\/report"/ {a = 0}' | jq .orig_sha1 | sort
-    # {"text_crc32": 413542756, "text_sha1": "xVNkUEwQmauT/F6uO1X6ICvCRN0=", "text_size": 25559440, "textname": "2016-02-11/20160210T163242Z-IR-AS201227-http_requests-yZthLDkKNe6IdePf7B1gMgNvRxSMDwNGWD6BB1MWcuY2T3q7oLmDQkjhZARARuic-0.1.0-probe.yaml"}
-    # {"text_crc32": -1449913125, "text_sha1": "BI75eyhWrwX/BdVOzLA8GIu/Pxg=", "text_size": 15786443, "textname": "2016-02-23/20160210T163242Z-IR-AS201227-http_requests-yZthLDkKNe6IdePf7B1gMgNvRxSMDwNGWD6BB1MWcuY2T3q7oLmDQkjhZARARuic-0.1.0-probe.yaml"}
-    '2016-02-23/20160210T163242Z-IR-AS201227-http_requests-yZthLDkKNe6IdePf7B1gMgNvRxSMDwNGWD6BB1MWcuY2T3q7oLmDQkjhZARARuic-0.1.0-probe.yaml',
-
-    # {"text_crc32": -1687788608, "text_sha1": "yMrj9luFqzDqVVRXSdJDRy3A77I=", "text_size": 4264, "textname": "2017-02-27/20170227T001708Z-VE-AS8048-ndt-20170227T001710Z_AS8048_zllYcC8xXlcLoeh3CxfonkjCKeukdPGn0gNpCukLWJWVpQvk0C-0.2.0-probe.json"}
-    # {"text_crc32": -1687788608, "text_sha1": "yMrj9luFqzDqVVRXSdJDRy3A77I=", "text_size": 4264, "textname": "2017-02-28/20170227T001708Z-VE-AS8048-ndt-20170227T001710Z_AS8048_zllYcC8xXlcLoeh3CxfonkjCKeukdPGn0gNpCukLWJWVpQvk0C-0.2.0-probe.json"}
-    '2017-02-28/20170227T001708Z-VE-AS8048-ndt-20170227T001710Z_AS8048_zllYcC8xXlcLoeh3CxfonkjCKeukdPGn0gNpCukLWJWVpQvk0C-0.2.0-probe.json',
-
-    # {"text_crc32": -751231545, "text_sha1": "SmEdTk7E/MVnEsCv/O91Ck8HQp8=", "text_size": 53288547, "textname": "2017-07-03/20170702T032238Z-PK-AS45595-web_connectivity-20170702T032239Z_AS45595_TJY9AfWMgNEB7hLL4kf9GMNkg7yUeJa9FDJHzM5DALBnJMBe4z-0.2.0-probe.json"}
-    # {"text_crc32": -751231545, "text_sha1": "SmEdTk7E/MVnEsCv/O91Ck8HQp8=", "text_size": 53288547, "textname": "2017-07-04/20170702T032238Z-PK-AS45595-web_connectivity-20170702T032239Z_AS45595_TJY9AfWMgNEB7hLL4kf9GMNkg7yUeJa9FDJHzM5DALBnJMBe4z-0.2.0-probe.json"}
-    '2017-07-04/20170702T032238Z-PK-AS45595-web_connectivity-20170702T032239Z_AS45595_TJY9AfWMgNEB7hLL4kf9GMNkg7yUeJa9FDJHzM5DALBnJMBe4z-0.2.0-probe.json',
-}
+# content, there are ~500 of them by 2017-07-12. Some of them should be skipped.
+DUPLICATE_REPORTS = set()
 
 WORD_RE = re.compile('''[^\t\n\x0b\x0c\r !"#$%&\'()*+,-./:;<=>?@[\\\\\\]^_`{|}~']+''')
 
@@ -1214,6 +1183,9 @@ def meta_pg(in_root, bucket, postgres):
     stconn = psycopg2.connect(dsn=postgres) # short-transaction connection
 
     with pgconn, pgconn.cursor() as c: # main transaction
+        c.execute('SELECT textname FROM repeated_report WHERE NOT used')
+        DUPLICATE_REPORTS.update(_[0] for _ in c)
+
         autoclaved_index = os.path.join(in_root, bucket, autoclaving.INDEX_FNAME)
         code_ver = get_checked_code_ver(pgconn, autoclaved_index, bucket)
         if code_ver is None:
