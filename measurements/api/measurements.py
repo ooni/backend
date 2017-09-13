@@ -263,7 +263,7 @@ def list_measurements(
 
     q = current_app.db_session.query(*cols)\
             .join(Report, Report.report_no == Measurement.report_no)\
-            .join(Label, Label.msm_no== Measurement.msm_no)
+            .outerjoin(Label, Label.msm_no== Measurement.msm_no)
 
     if input_:
         q = q.join(Measurement, Measurement.input_no == Input.input_no)
