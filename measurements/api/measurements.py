@@ -19,7 +19,7 @@ from six.moves.urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET
-from measurements.models import Report, Input, Measurement, Autoclaved
+from measurements.models import Report, Input, Measurement, Autoclaved, Label
 
 def get_version():
     return jsonify({
