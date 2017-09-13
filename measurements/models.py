@@ -119,6 +119,8 @@ class Label(Base):
     This table is used to manually markup or annotate measurements with some values.
     """
     __tablename__ = 'label'
+    label_no = Column(Integer, primary_key=True)
+
     msm_no = Column(Integer, ForeignKey('measurement.msm_no'))
     measurement = relationship('Measurement', back_populates='label')
 
