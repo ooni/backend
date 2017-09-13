@@ -150,15 +150,24 @@ paths:
           type: string
           description: Return results only strictly greater than the provided index
 
-        - name: anomaly_type
+        - name: confirmed
           in: query
-          type: string
-          description: the type of anomaly you are looking for
-          enum:
-            - confirmed
-            - warning
-            - failure
-            - ok
+          type: boolean
+          description: |
+            Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).
+
+        - name: anomaly
+          in: query
+          type: boolean
+          description: |
+            Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
+
+        - name: failure
+          in: query
+          type: boolean
+          description: |
+            There was an error in the measurement (the control request failed, there was a bug, etc.).
+            Default is to consider it both true or false (`failure=true,false`)
 
         - name: order_by
           in: query
@@ -333,23 +342,29 @@ definitions:
       probe_asn:
         $ref: "#/definitions/ProbeASN"
 
-      anomaly_type:
-        $ref: "#/definitions/AnomalyType"
+      confirmed:
+        $ref: "#/definitions/ConfirmedAnomaly"
 
-  AnomalyType:
-    type: string
+      anomaly:
+        $ref: "#/definitions/Anomaly"
+
+      failure:
+        $ref: "#/definitions/MeasurementFailure"
+
+  ConfirmedAnomaly:
+    type: boolean
     description: |-
-      This is used to indicate the type of the anomaly.
-      The possible anomaly types are:
-        * `confirmed`: for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.)
-        * `warning`: this measurement requires special attention (it's likely to be a case of blocking), however it has not been confirmed
-        * `failure`: there was an error in the measurement (the control request failed, there was a bug, etc.)
-        * `ok`: we are "sure" there was no network anomaly
-    enum:
-      - confirmed
-      - warning
-      - failure
-      - ok
+      Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.)
+
+  Anomaly:
+    type: boolean
+    description: |-
+        Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
+
+  MeasurementFailure:
+    type: boolean
+    description: |-
+        There was an error in the measurement (the control request failed, there was a bug, etc.)
 
   TestStartTime:
     type: string
