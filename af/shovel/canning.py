@@ -13,6 +13,7 @@ import sys
 import tarfile
 import tempfile
 import threading
+import time
 import traceback
 from base64 import b64encode
 from contextlib import closing, contextmanager
@@ -298,9 +299,9 @@ def can_to_blob(input_fname, bucket, output_dir, fname):
     return output_file, can
 
 
-# Not to be confused with `manifest.json`.  The file is not compressed as it
-# does not save that much space as the file takes only a couple of megabytes.
+# Not to be confused with `manifest.json`.
 INDEX_FNAME = 'index.json.gz'
+EPOCH = int(time.time()) # time to be stamped in produced tar files
 
 
 def finalize_can(output_file, can, fdindex):
@@ -419,15 +420,15 @@ def canning(input_root, output_root, bucket):
     asis, tarfiles = pack_bucket(filesize)
 
     with tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdindex:
-        for fname, slice_files in tarfiles.iteritems():
-            output_file, can = can_to_tar(input_root, bucket, slice_files, output_dir, fname)
-            finalize_can(output_file, can, fdindex)
+        with closing(gzip.GzipFile(filename='index.json', mtime=EPOCH, mode='wb', fileobj=fdindex)) as metafd:
+            for fname, slice_files in tarfiles.iteritems():
+                output_file, can = can_to_tar(input_root, bucket, slice_files, output_dir, fname)
+                finalize_can(output_file, can, metafd)
 
-        for fname in asis:
-            output_file, can = can_to_blob(os.path.join(input_dir, fname), bucket, output_dir, fname)
-            finalize_can(output_file, can, fdindex)
+            for fname in asis:
+                output_file, can = can_to_blob(os.path.join(input_dir, fname), bucket, output_dir, fname)
+                finalize_can(output_file, can, metafd)
 
-        fdindex.write('\n') # explicit EOF -- empty non-json line
         os.link(fdindex.name, index_fpath)
     os.chmod(index_fpath, 0444)
     os.chmod(output_dir, 0555) # done!
