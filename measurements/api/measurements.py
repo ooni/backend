@@ -184,7 +184,7 @@ def list_measurements(
         limit=100,
         failure=None,
         anomaly=None,
-        confirmed='true'
+        confirmed=None
     ):
     input_ = request.args.get("input")
 
@@ -320,7 +320,7 @@ def list_measurements(
             'probe_asn': "AS{}".format(row.probe_asn),
             'test_name': row.test_name,
             'measurement_start_time': row.measurement_start_time,
-            'input': row.input if row.m_input_no else None,
+            'input': row.input if (input_ and row.m_input_no) else None,
             'anomaly': row.anomaly,
             'confirmed': row.confirmed,
             'failure': (row.exc != None
