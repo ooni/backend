@@ -294,7 +294,7 @@ def list_measurements(
         q = q.filter(Measurement.measurement_start_time <= until)
 
     if confirmed is not None:
-        q = q.filter(c_confirmed== confirmed)
+        q = q.filter(c_confirmed == confirmed)
     if anomaly is not None:
         q = q.filter(c_anomaly == anomaly)
     if failure is True:
