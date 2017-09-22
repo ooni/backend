@@ -1,4 +1,5 @@
 import os
+import re
 import math
 import time
 
@@ -20,6 +21,9 @@ from six.moves.urllib.parse import urljoin, urlencode
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET
 from measurements.models import Report, Input, Measurement, Autoclaved, Label
+
+MSM_ID_PREFIX = 'temp-id'
+RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
 
 def get_version():
     return jsonify({
@@ -131,8 +135,12 @@ def list_files(
 
 def get_measurement(measurement_id):
     # XXX this query is SUPER slow
+    m = RE_MSM_ID.match(measurement_id)
+    if not m:
+        raise BadRequest("Invalid measurement_id")
+    msm_no = int(m.group(1))
+
     q = current_app.db_session.query(
-            Measurement.id.label('m_id'),
             Measurement.report_no.label('report_no'),
             Measurement.frame_off.label('frame_off'),
             Measurement.frame_size.label('frame_size'),
@@ -143,7 +151,7 @@ def get_measurement(measurement_id):
             Autoclaved.filename.label('a_filename'),
             Autoclaved.autoclaved_no.label('a_autoclaved_no'),
 
-    ).filter(Measurement.id == measurement_id)\
+    ).filter(Measurement.msm_no == msm_no)\
         .join(Report, Report.report_no == Measurement.report_no)\
         .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
     try:
@@ -158,6 +166,10 @@ def get_measurement(measurement_id):
     # XXX use for streaming support lz4framed.Decompressor
     # @darkk how big can these lz4 frames even become? Should this be a concern?
     msmt_data = lz4framed.decompress(r.raw.read())[msmt.intra_off:msmt.intra_off+msmt.intra_size]
+
+    # XXX do we also want to replace on the fly the measurement_id inside of
+    # the report itself?
+    # msmt_data = msmt_data.replace(msmt.m_id, measurement_id)
     return current_app.response_class(
         msmt_data,
         mimetype=current_app.config['JSONIFY_MIMETYPE']
@@ -238,7 +250,7 @@ def list_measurements(
     cols = [
         Measurement.input_no.label('m_input_no'),
         Measurement.measurement_start_time.label('measurement_start_time'),
-        Measurement.id.label('m_id'),
+        Measurement.msm_no.label('msm_no'),
         Measurement.report_no.label('m_report_no'),
 
         c_anomaly,
@@ -308,13 +320,14 @@ def list_measurements(
     iter_start_time = time.time()
     results = []
     for row in q:
+        measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
         url = urljoin(
             current_app.config['BASE_URL'],
-            '/api/v1/measurement/%s' % row.m_id
+            '/api/v1/measurement/%s' % measurement_id
         )
         results.append({
             'measurement_url': url,
-            'measurement_id': row.m_id,
+            'measurement_id': measurement_id,
             'report_id': row.report_id,
             'probe_cc': row.probe_cc,
             'probe_asn': "AS{}".format(row.probe_asn),
