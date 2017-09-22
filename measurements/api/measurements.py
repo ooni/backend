@@ -159,6 +159,9 @@ def get_measurement(measurement_id):
     except exc.MultipleResultsFound:
         current_app.logger.warning("Duplicate rows for measurement_id: %s" % measurement_id)
         msmt = q.first()
+    except exc.NoResultFound:
+        # XXX we should actually return a 404 here
+        raise BadRequest("No measurement found")
 
     r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
             headers={"Range": "bytes={}-{}".format(msmt.frame_off, msmt.frame_off+msmt.frame_size)}, stream=True)
