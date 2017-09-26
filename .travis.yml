@@ -42,6 +42,7 @@ script:
   - ps auxww|grep oonib|grep -v grep
   - cat oonib.pid
   - kill -TERM `cat oonib.pid`
+  - ps auxww|grep oonib|grep -v grep
   #- chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
   - echo "Build successful."
   - $(which coverage) run $(which trial) oonib
