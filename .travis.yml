@@ -38,7 +38,9 @@ script:
   - test -f "private.key.org" && rm -f private.key.org
   - test -f "server.csr" && rm -f server.csr
   - ./bin/oonib &
-  - sleep 3
+  - sleep 30
+  - ps auxww|grep oonib|grep -v grep
+  - cat oonib.pid
   - kill -TERM `cat oonib.pid`
   #- chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
   - echo "Build successful."
