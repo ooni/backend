@@ -55,8 +55,8 @@ script:
   #
   # 2. I need to copy the pidfile because it is deleted by the daemon when
   #    it exits, as such, using the original pidfile is racy.
-  - cp oonib.pid oonib-persist.pid
   - sleep 30
+  - cp oonib.pid oonib-persist.pid
   - kill -TERM `cat oonib-persist.pid`
   - wait `cat oonib-persist.pid`
 
