@@ -42,16 +42,23 @@ script:
 
   # 2. smoke test oonib: does it startup, does it react to SIGTERM?
   - ./bin/oonib &
+  # Notes on smoke testing
+  # ----------------------
+  #
+  # 1. The original smoke testing procedure was much more robust but travis
+  #    started segfaulting and, upon investigating that, it occurred to me
+  #    that having a simplified procedure like the one below would also work.
+  #
+  #    Specifically, if the process does not exit after `TERM`, my understanding
+  #    is that the build will hang until travis kills it. This would fail the
+  #    build and so we would know that the deamon doesn't handle `TERM`.
+  #
+  # 2. I need to copy the pidfile because it is deleted by the daemon when
+  #    it exits, as such, using the original pidfile is racy.
+  - cp oonib.pid oonib-persist.pid
   - sleep 30
-  - ps auxww|grep oonib|grep -v grep
-  - cat oonib.pid
-  - kill -TERM `cat oonib.pid`
-  # The original script was much more robust but made travis segfault and I
-  # think that it's a good indication of failure to respond to the `TERM`
-  # signal also the case where the travis build is killed after a timeout of
-  # ten seconds, so we can afford doing simple things here.
-  - wait `cat oonib.pid`
-  - ps auxww|grep oonib|grep -v grep
+  - kill -TERM `cat oonib-persist.pid`
+  - wait `cat oonib-persist.pid`
 
   # 3. run regress tests
   - $(which coverage) run $(which trial) oonib
