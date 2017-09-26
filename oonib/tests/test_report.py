@@ -14,6 +14,19 @@ from oonib.report.handlers import closeReport
 from oonib.report.api import reportAPI
 from oonib.tests.handler_helpers import HandlerTestCase, mock_initialize, MockTime
 
+# Version number testing
+# ----------------------
+#
+# We need to test an array of version numbers ranging from super compliant
+# with semver (mobile apps since v1.2.0) to very basic (e.g. 0.1, as used
+# in some cases by ooni-probe test implementations).
+#
+# To emphasize this, I have refactored this regress test to put the
+# various version numbers we use here at the beginning of file.
+FULL_SEMVER_VERSION = "1.7.0-beta.1+11.7"
+BASIC_SEMVER_VERSION = "1.7.0"
+SIMPLE_VERSION = "1.0"
+
 sample_report_entry = {
     'agent': 'agent',
     'input': 'http://example.com',
@@ -42,7 +55,7 @@ sample_report_entry = {
     'probe_city': None,
     'probe_ip': '127.0.0.1',
     'software_name': 'ooniprobe',
-    'software_version': '1.1.0',
+    'software_version': FULL_SEMVER_VERSION,
     'test_start_time': '2016-01-01 12:34:56',
     'test_name': 'fake_test',
     'test_version': '0.1.0'
@@ -60,18 +73,18 @@ probe_cc: ZZ
 probe_city: null
 probe_ip: 127.0.0.1
 software_name: ooniprobe
-software_version: 1.1.0
+software_version: %s
 test_start_time: '2016-01-01 12:34:56'
 test_name: fake_test
 test_version: 0.1.0
 ...
-"""
+""" % BASIC_SEMVER_VERSION
 
 dummy_data = {
     'software_name': 'ooni-test',
-    'software_version': '0.1',
+    'software_version': SIMPLE_VERSION,
     'test_name': 'some-test',
-    'test_version': '0.1',
+    'test_version': SIMPLE_VERSION,
     'probe_asn': 'AS0',
     'probe_cc': 'ZZ',
     'test_start_time': '2016-01-01 12:34:56'

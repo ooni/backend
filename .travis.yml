@@ -27,8 +27,10 @@ install:
   - pip install -r requirements.txt
   - pip install coveralls
   - python setup.py install
-# command to run tests, e.g. python setup.py test
+
 script:
+
+  # 1. prepare for running oonib
   - cp oonib.conf.example oonib.conf
   - openssl genrsa -des3 -passout pass:oonib -out private.key 4096
   - openssl req -batch -passin pass:oonib -new -key private.key -out server.csr
@@ -37,8 +39,29 @@ script:
   - openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
   - test -f "private.key.org" && rm -f private.key.org
   - test -f "server.csr" && rm -f server.csr
-  - chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
-  - echo "Build successful."
+
+  # 2. smoke test oonib: does it startup, does it react to SIGTERM?
+  - ./bin/oonib &
+  # Notes on smoke testing
+  # ----------------------
+  #
+  # 1. The original smoke testing procedure was much more robust but travis
+  #    started segfaulting and, upon investigating that, it occurred to me
+  #    that having a simplified procedure like the one below would also work.
+  #
+  #    Specifically, if the process does not exit after `TERM`, my understanding
+  #    is that the build will hang until travis kills it. This would fail the
+  #    build and so we would know that the deamon doesn't handle `TERM`.
+  #
+  # 2. I need to copy the pidfile because it is deleted by the daemon when
+  #    it exits, as such, using the original pidfile is racy.
+  - sleep 30
+  - cp oonib.pid oonib-persist.pid
+  - kill -TERM `cat oonib-persist.pid`
+  - wait `cat oonib-persist.pid`
+
+  # 3. run regress tests
   - $(which coverage) run $(which trial) oonib
+
 after_success:
   - coveralls --rcfile=".coveragerc"

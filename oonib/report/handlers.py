@@ -81,7 +81,18 @@ def parseUpdateReportRequest(request, report_id=None):
 
 
 def validateHeader(header):
-    version_string = re.compile(r"^[0-9A-Za-z_\-\.]+$")
+    # Version-number-regex context
+    # ----------------------------
+    #
+    # We are updating our software to always use semver, but for historical
+    # reasons there are also cases where we use '0.1', so better to be
+    # very liberal an accept anything version-ish in here.
+    #
+    # Live regexp testing: https://regex101.com/r/zhnfFl/3
+    #
+    # See also: github.com/measurement-kit/measurement-kit/pull/1388
+    version_string = re.compile(r"^[0-9A-Za-z_.+-]+$")
+
     name = re.compile(r"^[a-zA-Z0-9_\- ]+$")
     probe_asn = re.compile(r"^AS[0-9]+$")
     probe_cc = re.compile(r"^[A-Z]{2}$")
