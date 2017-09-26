@@ -1,6 +1,13 @@
 ChangeLog
 =========
 
+1.3.4 (Tue, 26 Sep 2017)
+------------------------
+
+* fix(report/handlers): accept more semver versions (#111)
+
+* README.rst: also apt-get install libdumbnet-dev (#108)
+
 1.3.3 (Thu, 2 Feb 2017)
 -------------------------
 * Add support for allows clients to send HTTP request headers
