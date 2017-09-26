@@ -27,8 +27,10 @@ install:
   - pip install -r requirements.txt
   - pip install coveralls
   - python setup.py install
-# command to run tests, e.g. python setup.py test
+
 script:
+
+  # 1. prepare for running oonib
   - cp oonib.conf.example oonib.conf
   - openssl genrsa -des3 -passout pass:oonib -out private.key 4096
   - openssl req -batch -passin pass:oonib -new -key private.key -out server.csr
@@ -37,15 +39,22 @@ script:
   - openssl x509 -req -days 365 -in server.csr -signkey private.key -out certificate.crt
   - test -f "private.key.org" && rm -f private.key.org
   - test -f "server.csr" && rm -f server.csr
+
+  # 2. smoke test oonib: does it startup, does it react to SIGTERM?
   - ./bin/oonib &
   - sleep 30
   - ps auxww|grep oonib|grep -v grep
   - cat oonib.pid
   - kill -TERM `cat oonib.pid`
-  - sleep 3
+  # The original script was much more robust but made travis segfault and I
+  # think that it's a good indication of failure to respond to the `TERM`
+  # signal also the case where the travis build is killed after a timeout of
+  # ten seconds, so we can afford doing simple things here.
+  - wait `cat oonib.pid`
   - ps auxww|grep oonib|grep -v grep
-  #- chmod +x .travis.test.sh && ./.travis.test.sh 30 ./bin/oonib
-  - echo "Build successful."
+
+  # 3. run regress tests
   - $(which coverage) run $(which trial) oonib
+
 after_success:
   - coveralls --rcfile=".coveragerc"
