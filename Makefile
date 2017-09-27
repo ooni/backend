@@ -1,4 +1,5 @@
 APP_ENV = development
+DATABASE_URL?=postgresql://postgres@localhost:5432/ooni_measurements
 VERSION = $(shell cat package.json \
   | grep version \
   | head -1 \
@@ -7,7 +8,7 @@ VERSION = $(shell cat package.json \
   | tr -d '[[:space:]]')
 APP_NAME = openobservatory/ooni-api:$(VERSION)
 
-PYTHON_WITH_ENV = PYTHONPATH=$(shell pwd) APP_ENV=$(APP_ENV) python
+PYTHON_WITH_ENV = PYTHONPATH=$(shell pwd) APP_ENV=$(APP_ENV) DATABASE_URL=$(DATABASE_URL) python
 
 default:
 	@echo "ERR: Did not specify a command"
