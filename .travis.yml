@@ -37,8 +37,6 @@ script:
 - npm -v
 # Build the docker image
 - make APP_ENV=testing build
-- make APP_ENV=testing serve
-# Wait for postgres database to be running
 - make APP_ENV=testing create-tables
 - make test
 
