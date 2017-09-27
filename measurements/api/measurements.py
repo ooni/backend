@@ -163,8 +163,9 @@ def get_measurement(measurement_id):
         # XXX we should actually return a 404 here
         raise BadRequest("No measurement found")
 
+    range_header = "bytes={}-{}".format(msmt.frame_off, msmt.frame_off + msmt.frame_size - 1)
     r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
-            headers={"Range": "bytes={}-{}".format(msmt.frame_off, msmt.frame_off+msmt.frame_size)}, stream=True)
+            headers={"Range": range_header}, stream=True)
 
     # XXX use for streaming support lz4framed.Decompressor
     # @darkk how big can these lz4 frames even become? Should this be a concern?
