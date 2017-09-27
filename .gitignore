@@ -1,6 +1,7 @@
 *.py[co]
 __pycache__
 
+.coverage
 .cache/
 .idea/
 .state/
