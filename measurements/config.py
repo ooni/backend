@@ -13,8 +13,7 @@ CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
 APP_ENV = os.environ.get("APP_ENV", "development")
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///ooni_measurements.db")
 
-BASE_URL = os.environ.get("BASE_URL",
-                          "https://measurements.ooni.torproject.org/")
+BASE_URL = os.environ.get("BASE_URL", "https://api.ooni.io/")
 
 AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
                                       "http://datacollector.infra.ooni.io/ooni-public/autoclaved/")

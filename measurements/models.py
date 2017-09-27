@@ -14,6 +14,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import (
     Column, Integer, String, Text,
     DateTime, Float, JSON, Numeric,
+    ARRAY, Boolean,
     ForeignKey
 )
 
@@ -55,7 +56,7 @@ class Report(Base):
     report_no = Column(Integer, primary_key=True)
 
     autoclaved_no = Column(Integer, ForeignKey('autoclaved.autoclaved_no'))
-    autoclaved = relationship("Autoclaved", back_populates="reports")
+    autoclaved = relationship('Autoclaved', back_populates='reports')
 
     test_start_time = Column(DateTime)
     probe_cc = Column(String(2))
@@ -67,15 +68,15 @@ class Report(Base):
     orig_sha1 = Column(SHA1)
     report_id = Column(String)
     software_no = Column(Integer,  ForeignKey('software.software_no'))
-    software  = relationship("Software", back_populates="reports")
+    software  = relationship('Software', back_populates='reports')
 
-    measurements = relationship("Measurement", back_populates="report", lazy="dynamic")
+    measurements = relationship('Measurement', back_populates='report', lazy='dynamic')
 
 class Autoclaved(Base):
     __tablename__ = 'autoclaved'
 
     autoclaved_no = Column(Integer, primary_key=True)
-    reports = relationship("Report", back_populates="autoclaved")
+    reports = relationship('Report', back_populates='autoclaved')
 
     filename = Column(String)
     bucket_date = Column(DateTime)
@@ -89,8 +90,8 @@ class Measurement(Base):
 
     msm_no = Column(Integer, primary_key=True)
 
-    report_no = Column(Integer, ForeignKey("report.report_no"))
-    report = relationship("Report", back_populates="measurements")
+    report_no = Column(Integer, ForeignKey('report.report_no'))
+    report = relationship('Report', back_populates='measurements')
 
     frame_off = Column(SIZE4)
     frame_size = Column(SIZE4)
@@ -102,15 +103,37 @@ class Measurement(Base):
     orig_sha1 = Column(SHA1)
     id = Column(UUID)
 
-    input_no = Column(Integer, ForeignKey("input.input_no"))
-    input = relationship("Input", back_populates="measurements")
+    exc = Column(ARRAY(Integer))
+    residual_no = Column(Integer)
+    msm_failure = Column(Boolean)
+    anomaly = Column(Boolean)
+    confirmed = Column(Boolean)
+
+    label = relationship('Label', back_populates='measurement')
+
+    input_no = Column(Integer, ForeignKey('input.input_no'))
+    input = relationship('Input', back_populates='measurements')
+
+class Label(Base):
+    """
+    This table is used to manually markup or annotate measurements with some values.
+    """
+    __tablename__ = 'label'
+    label_no = Column(Integer, primary_key=True)
+
+    msm_no = Column(Integer, ForeignKey('measurement.msm_no'))
+    measurement = relationship('Measurement', back_populates='label')
+
+    msm_failure = Column(Boolean)
+    anomaly = Column(Boolean)
+    confirmed = Column(Boolean)
 
 class Input(Base):
     __tablename__ = 'input'
     input_no = Column(Integer, primary_key=True)
     input = Column(String)
 
-    measurements = relationship("Measurement", back_populates="input")
+    measurements = relationship('Measurement', back_populates='input')
 
 class Software(Base):
     __tablename__ = 'software'
@@ -120,4 +143,4 @@ class Software(Base):
     software_name = Column(String)
     software_version = Column(String)
 
-    reports = relationship("Report", back_populates="software")
+    reports = relationship('Report', back_populates='software')

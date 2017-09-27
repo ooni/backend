@@ -1,4 +1,5 @@
 import os
+import re
 import math
 import time
 
@@ -12,14 +13,17 @@ from flask import Blueprint, current_app, request
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import lazyload, exc
 
 from six.moves.urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET
-from measurements.models import Report, Input, Measurement, Autoclaved
+from measurements.models import Report, Input, Measurement, Autoclaved, Label
+
+MSM_ID_PREFIX = 'temp-id'
+RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
 
 def get_version():
     return jsonify({
@@ -131,8 +135,12 @@ def list_files(
 
 def get_measurement(measurement_id):
     # XXX this query is SUPER slow
+    m = RE_MSM_ID.match(measurement_id)
+    if not m:
+        raise BadRequest("Invalid measurement_id")
+    msm_no = int(m.group(1))
+
     q = current_app.db_session.query(
-            Measurement.id.label('m_id'),
             Measurement.report_no.label('report_no'),
             Measurement.frame_off.label('frame_off'),
             Measurement.frame_size.label('frame_size'),
@@ -143,7 +151,7 @@ def get_measurement(measurement_id):
             Autoclaved.filename.label('a_filename'),
             Autoclaved.autoclaved_no.label('a_autoclaved_no'),
 
-    ).filter(Measurement.id == measurement_id)\
+    ).filter(Measurement.msm_no == msm_no)\
         .join(Report, Report.report_no == Measurement.report_no)\
         .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
     try:
@@ -151,17 +159,32 @@ def get_measurement(measurement_id):
     except exc.MultipleResultsFound:
         current_app.logger.warning("Duplicate rows for measurement_id: %s" % measurement_id)
         msmt = q.first()
+    except exc.NoResultFound:
+        # XXX we should actually return a 404 here
+        raise BadRequest("No measurement found")
 
+    range_header = "bytes={}-{}".format(msmt.frame_off, msmt.frame_off + msmt.frame_size - 1)
     r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
-            headers={"Range": "bytes={}-{}".format(msmt.frame_off, msmt.frame_off+msmt.frame_size)}, stream=True)
+            headers={"Range": range_header}, stream=True)
 
     # XXX use for streaming support lz4framed.Decompressor
     # @darkk how big can these lz4 frames even become? Should this be a concern?
     msmt_data = lz4framed.decompress(r.raw.read())[msmt.intra_off:msmt.intra_off+msmt.intra_size]
+
+    # XXX do we also want to replace on the fly the measurement_id inside of
+    # the report itself?
+    # msmt_data = msmt_data.replace(msmt.m_id, measurement_id)
     return current_app.response_class(
         msmt_data,
         mimetype=current_app.config['JSONIFY_MIMETYPE']
     )
+
+def clean_list_arg(l):
+    """
+    Takes a list argument in the form of "foo, bar, tar" and returns it as a
+    cleaned up list (["foo", "bar", "tar"]).
+    """
+    return map(lambda x: x.strip(), l.split(','))
 
 def list_measurements(
         report_id=None,
@@ -174,7 +197,10 @@ def list_measurements(
         order_by=None,
         order='desc',
         offset=0,
-        limit=100
+        limit=100,
+        failure=None,
+        anomaly=None,
+        confirmed=None
     ):
     input_ = request.args.get("input")
 
@@ -182,6 +208,25 @@ def list_measurements(
         if probe_asn.startswith('AS'):
             probe_asn = probe_asn[2:]
         probe_asn = int(probe_asn)
+
+    # When the user specifies a list that includes all the possible values for
+    # boolean arguments, that is logically the same of applying no filtering at
+    # all.
+    if failure is not None:
+        if set(clean_list_arg(failure)) == set(['true', 'false']):
+            failure = None
+        else:
+            failure = failure == 'true'
+    if anomaly is not None:
+        if set(clean_list_arg(anomaly)) == set(['true', 'false']):
+            anomaly = None
+        else:
+            anomaly = anomaly == 'true'
+    if confirmed is not None:
+        if set(clean_list_arg(confirmed)) == set(['true', 'false']):
+            confirmed = None
+        else:
+            confirmed = confirmed == 'true'
 
     try:
         if since is not None:
@@ -199,11 +244,26 @@ def list_measurements(
         raise BadRequest("Invalid order")
 
 
+    c_anomaly = func.coalesce(Label.anomaly, Measurement.anomaly, False)\
+                    .label('anomaly')
+    c_confirmed = func.coalesce(Label.confirmed, Measurement.confirmed, False)\
+                    .label('confirmed')
+    c_msm_failure = func.coalesce(Label.msm_failure, Measurement.msm_failure, False)\
+                    .label('msm_failure')
+
     cols = [
         Measurement.input_no.label('m_input_no'),
         Measurement.measurement_start_time.label('measurement_start_time'),
-        Measurement.id.label('m_id'),
+        Measurement.msm_no.label('msm_no'),
         Measurement.report_no.label('m_report_no'),
+
+        c_anomaly,
+        c_confirmed,
+        c_msm_failure,
+
+        Measurement.exc.label('exc'),
+        Measurement.residual_no.label('residual_no'),
+
         Report.report_id.label('report_id'),
         Report.probe_cc.label('probe_cc'),
         Report.probe_asn.label('probe_asn'),
@@ -217,7 +277,9 @@ def list_measurements(
             Input.input.label('input')
         ]
 
-    q = current_app.db_session.query(*cols).join(Report, Report.report_no == Measurement.report_no)
+    q = current_app.db_session.query(*cols)\
+            .join(Report, Report.report_no == Measurement.report_no)\
+            .outerjoin(Label, Label.msm_no== Measurement.msm_no)
 
     if input_:
         q = q.join(Measurement, Measurement.input_no == Input.input_no)
@@ -235,6 +297,24 @@ def list_measurements(
     if until is not None:
         q = q.filter(Measurement.measurement_start_time <= until)
 
+    if confirmed is not None:
+        q = q.filter(c_confirmed == confirmed)
+    if anomaly is not None:
+        q = q.filter(c_anomaly == anomaly)
+    if failure is True:
+        q = q.filter(or_(
+            Measurement.exc != None,
+            Measurement.residual_no != None,
+            c_failure == True,
+        ))
+    if failure is False:
+        q = q.filter(and_(
+            Measurement.exc == None,
+            Measurement.residual_no == None,
+            c_failure == False
+        ))
+
+
     if order_by is not None:
         q = q.order_by('{} {}'.format(order_by, order))
 
@@ -244,19 +324,25 @@ def list_measurements(
     iter_start_time = time.time()
     results = []
     for row in q:
+        measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
         url = urljoin(
             current_app.config['BASE_URL'],
-            '/api/v1/measurement/%s' % row.m_id
+            '/api/v1/measurement/%s' % measurement_id
         )
         results.append({
             'measurement_url': url,
-            'measurement_id': row.m_id,
+            'measurement_id': measurement_id,
             'report_id': row.report_id,
             'probe_cc': row.probe_cc,
             'probe_asn': "AS{}".format(row.probe_asn),
             'test_name': row.test_name,
             'measurement_start_time': row.measurement_start_time,
-            'input': row.input if row.m_input_no else None,
+            'input': row.input if (input_ and row.m_input_no) else None,
+            'anomaly': row.anomaly,
+            'confirmed': row.confirmed,
+            'failure': (row.exc != None
+                        or row.residual_no != None
+                        or row.msm_failure),
         })
 
     pages = -1

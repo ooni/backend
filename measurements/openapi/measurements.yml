@@ -149,6 +149,26 @@ paths:
           in: query
           type: string
           description: Return results only strictly greater than the provided index
+
+        - name: confirmed
+          in: query
+          type: boolean
+          description: |
+            Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).
+
+        - name: anomaly
+          in: query
+          type: boolean
+          description: |
+            Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
+
+        - name: failure
+          in: query
+          type: boolean
+          description: |
+            There was an error in the measurement (the control request failed, there was a bug, etc.).
+            Default is to consider it both true or false (`failure=true,false`)
+
         - name: order_by
           in: query
           type: string
@@ -250,7 +270,7 @@ definitions:
         limit: 100
         count: 420
         pages: 5
-        next_url: 'https://measurements.ooni.io/files?offset=100&limit=100'
+        next_url: 'https://api.ooni.io/files?offset=100&limit=100'
       results:
         - download_url: 'https://s3.amazonaws.com/ooni-public/sanitised/2017-09-04/20170904T021115Z-US-AS7922-ndt-20170903T164039Z_AS7922_tx4Us3Eddf4XZYu9eFBiJrWq6FyS5dMLuAhF2lDx6AZs2XpGz1-0.2.0-probe.json'
           index: 754699
@@ -261,20 +281,17 @@ definitions:
   File:
     properties:
       probe_asn:
-        type: string
-        description: The Autonomous system number of the result
+        $ref: "#/definitions/ProbeASN"
       probe_cc:
-        type: string
-        description: The country code of the result
+        $ref: "#/definitions/ProbeCC"
       test_name:
-        type: string
-        description: The name of the test that was run
+        $ref: "#/definitions/TestName"
       index:
         type: integer
         description: the index of this result (useful when using since_index)
       test_start_time:
-        type: string
-        description: start time for the measurement is ISO 8601 format
+        $ref: "#/definitions/TestStartTime"
+
       download_url:
         type: string
         description: >-
@@ -294,9 +311,9 @@ definitions:
         limit: 100
         count: 420
         pages: 5
-        next_url: 'https://measurements.ooni.io/measurements?offset=100&limit=100'
+        next_url: 'https://api.ooni.io/measurements?offset=100&limit=100'
       results:
-        - measurement_url: 'https://measurements.ooni.io/measurement/xxxx-yyy-zzz-dddd-eeee-ffff'
+        - measurement_url: 'https://api.ooni.io/measurement/xxxx-yyy-zzz-dddd-eeee-ffff'
           measurement_id: 'xxxx-yyy-zzz-dddd-eeee-ffff'
 
 
@@ -305,26 +322,92 @@ definitions:
       measurement_id:
         type: string
         description: The ID of the measurement
+
       measurement_url:
         type: string
         description: The URL used to retrieve the measurement blob
 
+      measurement_start_time:
+        $ref: "#/definitions/MeasurementStartTime"
+
+      test_name:
+        $ref: "#/definitions/TestName"
+
+      input:
+        $ref: "#/definitions/Input"
+
+      probe_cc:
+        $ref: "#/definitions/ProbeCC"
+
+      probe_asn:
+        $ref: "#/definitions/ProbeASN"
+
+      confirmed:
+        $ref: "#/definitions/ConfirmedAnomaly"
+
+      anomaly:
+        $ref: "#/definitions/Anomaly"
+
+      failure:
+        $ref: "#/definitions/MeasurementFailure"
+
+  ConfirmedAnomaly:
+    type: boolean
+    description: |-
+      Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.)
+
+  Anomaly:
+    type: boolean
+    description: |-
+        Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
+
+  MeasurementFailure:
+    type: boolean
+    description: |-
+        There was an error in the measurement (the control request failed, there was a bug, etc.)
+
+  TestStartTime:
+    type: string
+    description: |-
+      Timestamp of when the test was started (many measurements) in
+      UTC time coordinates (ex. 2015-08-24 12:02:23) (Note: ooniprobe <=
+      1.4.0 generates skewed timing information)
+
+  MeasurementStartTime:
+    type: string
+    description: |-
+      Timestamp of when the measurement was performed in
+      UTC time coordinates (ex. `2015-08-24 12:02:23`) (Note: ooniprobe <=
+      1.4.0 generates skewed timing information).
+      This timestamp is more accurate than the `test_start_time` field
+
+  Input:
+    type: string
+    description: |-
+      If the test takes an input this will contain the value of it
+      these can be for example URLs, hostnames, IPs, etc.
+
+  ProbeCC:
+    type: string
+    description: The two letter country code of the probe or ZZ if inlcudecountry is set to false
+
+  ProbeASN:
+    type: string
+    description: |-
+      The AS Number of the probe (prefixed by AS, ex. AS1234)
+      or AS0 if includeasn is set to false
+
+  TestName:
+    type: string
+    description: The name of test that generated this measurement
+
   MeasurementBlob:
     properties:
       test_start_time:
-        type: string
-        description: |-
-          Timestamp of when the test was started (many measurements) in
-          UTC time coordinates (ex. 2015-08-24 12:02:23) (Note: ooniprobe <=
-          1.4.0 generates skewed timing information)
+        $ref: "#/definitions/TestStartTime"
 
       measurement_start_time:
-        type: string
-        description: |-
-          Timestamp of when the measurement was performed in
-          UTC time coordinates (ex. `2015-08-24 12:02:23`) (Note: ooniprobe <=
-          1.4.0 generates skewed timing information).
-          This timestamp is more accurate than the `test_start_time` field
+        $ref: "#/definitions/MeasurementStartTime"
 
       test_keys:
         type: object
@@ -349,8 +432,7 @@ definitions:
         description: This is an identifier of this particular measurement
 
       probe_cc:
-        type: string
-        description: The two letter country code of the probe or ZZ if inlcudecountry is set to false
+        $ref: "#/definitions/ProbeCC"
 
       test_runtime:
         type: number
@@ -369,10 +451,7 @@ definitions:
           includecity is set to false (note: recent version of ooniprobe always set this to null)
 
       probe_asn:
-        type: string
-        description: |-
-          The AS Number of the probe (prefixed by AS, ex. AS1234)
-          or AS0 if includeasn is set to false
+        $ref: "#/definitions/ProbeASN"
 
       annotations:
         type: object
@@ -407,8 +486,7 @@ definitions:
         description: The date in which the measurement was processed
 
       test_name:
-        type: string
-        description: The name of test that generated this measurement
+        $ref: "#/definitions/TestStartTime"
 
       report_id:
         type: string
@@ -421,4 +499,3 @@ definitions:
       options:
         type: object
         description: The version of the backend that collected this measurement
-
