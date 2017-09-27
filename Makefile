@@ -5,82 +5,54 @@ VERSION = $(shell cat package.json \
   | awk -F: '{ print $$2 }' \
   | sed 's/[",]//g' \
   | tr -d '[[:space:]]')
+APP_NAME = openobservatory/ooni-api:$(VERSION)
 
-DOCKER_EXTRA =
-DOCKER_COMPOSE = docker-compose -f docker-compose.yml -f config/$(APP_ENV).yml  $(DOCKER_EXTRA)
+PYTHON_WITH_ENV = PYTHONPATH=$(shell pwd) APP_ENV=$(APP_ENV) python
 
 default:
 	@echo "ERR: Did not specify a command"
 	@exit 1
 
-.state/docker-build-$(APP_ENV):
-	$(DOCKER_COMPOSE) build
-	#
-	# Set the state
-	mkdir -p .state
-	touch .state/docker-build-$(APP_ENV)
-
 clean:
 	rm -rf measurements/static/dist
 
 build:
-	$(DOCKER_COMPOSE) build
-	#
-	# Set the state
-	mkdir -p .state
-	touch .state/docker-build-$(APP_ENV)
+	docker build -t $(APP_NAME) .
 
-serve-d: .state/docker-build-$(APP_ENV)
-	$(DOCKER_COMPOSE) up -d
+dev:
+	$(PYTHON_WITH_ENV) -m measurements run -p 3000 --reload
 
-serve: .state/docker-build-$(APP_ENV)
-	$(DOCKER_COMPOSE) up
+# XXX remove these if devtool backward compatibility does not matter
+serve: dev
+develop: dev
+develop-rebuild: dev
 
-shell: .state/docker-build-$(APP_ENV)
-	$(DOCKER_COMPOSE) run --service-ports web python -m measurements shell
+shell:
+	$(PYTHON_WITH_ENV) -m measurements shell
 
-create-tables: .state/docker-build-$(APP_ENV)
-	$(DOCKER_COMPOSE) run web python -m measurements create_tables
+create-tables:
+	$(PYTHON_WITH_ENV) -m measurements create_tables
 
 load-fixtures:
-	$(DOCKER_COMPOSE) run web python -m measurements updatefiles --file dev/fixtures.txt --no-check
+	$(PYTHON_WITH_ENV) -m measurements updatefiles --file dev/fixtures.txt --no-check
 
 test-unit:
-	echo "Running unittests"
-	$(DOCKER_COMPOSE) run web /bin/bash -c 'python -m coverage run -m pytest --strict -m unit && python -m coverage report -m'
+	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m unit
 
 test-functional:
-	echo "Running functional tests"
-	$(DOCKER_COMPOSE) run web pytest -m functional
+	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m functional
 
-test: APP_ENV=testing
-test: test-unit .state/docker-build-$(APP_ENV) test-functional
+test: test-unit test-functional
+	$(PYTHON_WITH_ENV) -m coverage report -m
 
 dropdb:
-	$(DOCKER_COMPOSE) run db psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
+	psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
 
-develop: APP_ENV=development
-develop: .state/docker-build-$(APP_ENV) serve
-
-develop-shell: APP_ENV=development
-develop-shell: .state/docker-build-$(APP_ENV) shell
-
-develop-rebuild: APP_ENV=development
-develop-rebuild: build serve
-
-staging: APP_ENV=staging
-staging: serve-d
-
-push-staging:
-	make APP_ENV=staging build
-	docker-compose -f docker-compose.yml -f config/staging.yml up -d
-
-production: APP_ENV=production
-production: serve-d
-
-docker-push:
-	echo "Building version $(VERSION)"
-	docker build -t openobservatory/ooni-measurements:$(VERSION) .
+push: build
+	echo "Pushing $(APP_NAME) to docker hub"
 	docker push openobservatory/ooni-measurements:$(VERSION)
 
-.PHONY: default build serve clean shell develop develop-rebuild dropdb test production
+.PHONY: default dev build clean shell \
+		test test-unit test-functional \
+		create-tables dropdb \
+		develop develop-rebuild serve
