@@ -51,7 +51,7 @@ dropdb:
 
 push: build
 	echo "Pushing $(APP_NAME) to docker hub"
-	docker push openobservatory/ooni-measurements:$(VERSION)
+	docker push $(APP_NAME)
 
 .PHONY: default dev build clean shell \
 		test test-unit test-functional \
