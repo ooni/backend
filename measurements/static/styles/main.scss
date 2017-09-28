@@ -138,10 +138,12 @@ header {
   color: #fff;
   @include opacity(.65);
   border-bottom: 2px solid transparent;
+  box-shadow: none;
 
   &:active,
   &.active {
     @include opacity(1);
+    box-shadow: none;
     border-bottom: 2px solid #fff;
   }
 
@@ -149,6 +151,7 @@ header {
   &:focus,
   &.focus{
     @include opacity(1);
+    box-shadow: none;
     border-bottom: 2px solid #fff;
   }
 }
