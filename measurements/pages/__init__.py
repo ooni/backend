@@ -24,9 +24,17 @@ pages_blueprint = Blueprint('pages', 'measurements',
                             static_url_path='/static/')
 
 
+def _latest_reports():
+    q = current_app.db_session.query(Report) \
+            .order_by("textname DESC") \
+            .limit(10)
+    return q
+
+
 @pages_blueprint.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html',
+                           latest_reports=_latest_reports())
 
 
 @pages_blueprint.route('/stats')

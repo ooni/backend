@@ -30,6 +30,7 @@
     "redoc": "^1.18.1",
     "sass-loader": "^4.0.2",
     "style-loader": "^0.13.1",
+    "typeface-fira-sans": "^0.0.35",
     "url-loader": "^0.5.7",
     "vinyl-named": "^1.1.0",
     "webpack": "^1.13.3",
