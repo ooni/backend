@@ -1,3 +1,8 @@
+# ooni-measurements 1.0.0-rc.2 [2017-09-28]
+
+Fixes:
+* API filtering anomaly,confirmed,failure
+
 # ooni-measurements 1.0.0-rc.1 [2017-09-28]
 
 Added:
