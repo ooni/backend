@@ -1,3 +1,21 @@
+# ooni-measurements 1.0.0-rc.1 [2017-09-28]
+
+Added:
+
+* API endpoints for listing and filtering anomalous measurements
+
+* API endpoints for downloading full reports
+
+Changed:
+
+* Better API documentation based on OpenAPI 2.0
+
+* Improve request validation thanks to OpenAPI
+
+* Oonify the UI
+
+* Better testing
+
 # ooni-measurements 1.0.0-beta.3 [2017-07-18]
 
 * Add version API
