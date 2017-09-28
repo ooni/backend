@@ -179,13 +179,6 @@ def get_measurement(measurement_id):
         mimetype=current_app.config['JSONIFY_MIMETYPE']
     )
 
-def clean_list_arg(l):
-    """
-    Takes a list argument in the form of "foo, bar, tar" and returns it as a
-    cleaned up list (["foo", "bar", "tar"]).
-    """
-    return map(lambda x: x.strip(), l.split(','))
-
 def list_measurements(
         report_id=None,
         probe_asn=None,
@@ -213,20 +206,21 @@ def list_measurements(
     # boolean arguments, that is logically the same of applying no filtering at
     # all.
     if failure is not None:
-        if set(clean_list_arg(failure)) == set(['true', 'false']):
+        if set(failure) == set(['true', 'false']):
             failure = None
         else:
-            failure = failure == 'true'
+            failure = failure == ['true']
     if anomaly is not None:
-        if set(clean_list_arg(anomaly)) == set(['true', 'false']):
+        current_app.logger.warning("Duplicate rows for measurement_id: %s" % anomaly)
+        if set(anomaly) == set(['true', 'false']):
             anomaly = None
         else:
-            anomaly = anomaly == 'true'
+            anomaly = anomaly == ['true']
     if confirmed is not None:
-        if set(clean_list_arg(confirmed)) == set(['true', 'false']):
+        if set(confirmed) == set(['true', 'false']):
             confirmed = None
         else:
-            confirmed = confirmed == 'true'
+            confirmed = confirmed == ['true']
 
     try:
         if since is not None:

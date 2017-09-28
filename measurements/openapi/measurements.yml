@@ -152,19 +152,28 @@ paths:
 
         - name: confirmed
           in: query
-          type: boolean
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
           description: |
             Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).
 
         - name: anomaly
           in: query
-          type: boolean
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
           description: |
             Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
 
         - name: failure
           in: query
-          type: boolean
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
           description: |
             There was an error in the measurement (the control request failed, there was a bug, etc.).
             Default is to consider it both true or false (`failure=true,false`)
