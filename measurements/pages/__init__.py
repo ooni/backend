@@ -11,7 +11,7 @@ import lz4framed
 from flask import Blueprint, render_template, current_app, request, redirect, \
     Response, stream_with_context
 from pycountry import countries
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, desc
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
@@ -110,7 +110,9 @@ def _report_dates():
     q = current_app.db_session.query(
         func.count(func.date_trunc('day', Report.test_start_time)),
         func.date_trunc('day', Report.test_start_time)
-    ).group_by(func.date_trunc('day', Report.test_start_time)).order_by(func.date_trunc('day', Report.test_start_time))
+    ).filter(Report.test_start_time <= datetime.now())\
+     .group_by(func.date_trunc('day', Report.test_start_time))\
+     .order_by(desc(func.date_trunc('day', Report.test_start_time)))
     for row in q:
         count, day = row
         yield {
