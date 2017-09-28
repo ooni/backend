@@ -1,15 +1,79 @@
 {% extends 'base.html' %}
 
+{% block navbar %}
+
+<header>
+<div class="hero">
+  <img
+    src="{{ url_for('static', filename='dist/images/API-Horizontal-MonochromeInverted.png') }}"
+    srcset="{{ url_for('static', filename='dist/images/API-Horizontal-MonochromeInverted@2x.png') }} 2x"
+  />
+
+  {% include 'navbar-home.html' %}
+</header>
+
+</div>
+
+{% endblock %}
+
 {% block uncontained %}
   <div class="container">
-    <div class="page-header">
-      <h1>Welcome to the OONI API for measurements</h1>
-    </div>
-  <p class="lead">Download and search for <strong>raw</strong> OONI
-    measurements</p>
-  <a class="btn btn-default" href="/files">View files</a>
-  <a class="btn btn-default" href="/api">API documentation</a>
-  <a class="btn btn-default" href="/stats">Statistics</a>
+    <div class="text-center">
+      <h1>Welcome to the OONI API</h1>
+      <p>Download and search for raw OONI measurements</p>
+      <p>The OONI measurement API allows researchers, data scientists to easily
+      access all the data collected by OONI Probes.</p>
+
+      <a class='btn btn-default' href="/api">READ THE API DOCS</a>
+
+      <h2 style="padding-top: 40px">Latest Measurements</h2>
+
+      <table class="table table-striped">
+      <thead>
+      <tr>
+        <th>
+          ASN
+        </th>
+        <th>
+          Country code
+        </th>
+
+        <th>
+          Test Start Time
+        </th>
+        <th>
+          Test Name
+        </th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for report_file in latest_reports %}
+        <tr>
+          <td>
+            AS{{ report_file.probe_asn }}
+          </td>
+
+          <td>
+            {{ report_file.probe_cc }}
+          </td>
+
+          <td>
+            {{ report_file.test_start_time }}
+          </td>
+          <td>
+            {{ report_file.test_name }}
+          </td>
+          <td>
+            <a href="/files/download/{{ report_file.textname }}">Download</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      </table>
+
+      <a class="btn btn-default" href="/files">MORE MEASUREMENTS</a>
 
   </div>
+</div>
 {% endblock %}

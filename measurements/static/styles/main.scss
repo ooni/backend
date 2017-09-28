@@ -1,4 +1,29 @@
 // Dependencies
+@import "fonts";
+
+/* CSS reset */
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed,
+figure, figcaption, footer, header, hgroup,
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: "Fira Sans", "Lucida", "Calibri", "Myriad", "Helvetica", "Arial", sans-serif;
+  vertical-align: baseline;
+}
+
+
+@import "bootstrap-variables";
 @import "bootstrap-sass/assets/stylesheets/bootstrap";
 
 $fa-font-path: "../fonts/font-awesome";
@@ -28,6 +53,8 @@ html {
 body {
   /* This must match height of footer */
   margin-bottom: 100px;
+
+  padding-bottom: 60px;
 }
 
 a {
@@ -65,17 +92,19 @@ header {
     background-color: $color-ooni-blue;
     padding-top: 10px;
     padding-bottom: 10px;
-    .view-chooser {
-      a {
-        color: $color-white;
-        transition: .5s background-color,.5s color;
-      }
-
-      a:hover {
-        background-color: $color-dark-blue;
-      }
-    }
   }
+}
+
+.hero {
+  background-color: $color-ooni-blue;
+  text-align: center;
+  padding-top: 90px;
+
+  img {
+    padding-bottom: 60px;
+  }
+
+  margin-bottom: 100px;
 }
 
 .breadcrumb .switch-view:before {
@@ -101,4 +130,25 @@ header {
 .breadcrumb .flag-view:after {
   margin-left: 5px;
   content: "\f024";
+}
+
+.btn-nav {
+  @extend .btn;
+  border-radius: 0;
+  color: #fff;
+  @include opacity(.65);
+  border-bottom: 2px solid transparent;
+
+  &:active,
+  &.active {
+    @include opacity(1);
+    border-bottom: 2px solid #fff;
+  }
+
+  &:hover,
+  &:focus,
+  &.focus{
+    @include opacity(1);
+    border-bottom: 2px solid #fff;
+  }
 }

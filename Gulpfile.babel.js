@@ -101,12 +101,29 @@ gulp.task('dist:icons:font-awesome', () => {
 gulp.task('dist:icons:bootstrap', () => { 
   let bootstrapPath = path.dirname(require.resolve("bootstrap-sass/package.json"));
   let bootstrapFontPath = path.join(bootstrapPath, "assets", "fonts", "bootstrap", "**.*");
-  
+
   return gulp.src(bootstrapFontPath)
             .pipe(gulp.dest(path.join(distPath, "fonts", "bootstrap")));  
 });
 
 gulp.task('dist:icons', ['dist:icons:font-awesome', 'dist:icons:bootstrap']);
+
+gulp.task('dist:fonts:fira-sans', () => {
+  let fPath = path.dirname(require.resolve("typeface-fira-sans/package.json"));
+  let fFontPath = path.join(fPath, "files", "**.*");
+
+  return gulp.src(fFontPath)
+            .pipe(gulp.dest(path.join(distPath, "fonts", "fira-sans"))); 
+});
+
+gulp.task('dist:fonts', ['dist:fonts:fira-sans']);
+
+gulp.task('dist:images', () => {
+  const imgPath = path.resolve(staticPrefix, 'images', '*');
+  return gulp.src(imgPath)
+    .pipe(gulp.dest(path.join(distPath, "images")));
+
+})
 
 gulp.task('dist:flags', () => {
   let flagPath = path.dirname(require.resolve("flag-icon-css/package.json"));
@@ -143,7 +160,8 @@ gulp.task("dist:css", () => {
 gulp.task("dist", (cb) => {
   return gulpSequence(
     "clean",
-    ["dist:icons", "dist:flags"],
+    ["dist:icons", "dist:flags", "dist:fonts"],
+    ["dist:images"],
     ["dist:css", "dist:js"]
   )(cb);
 });
@@ -153,7 +171,7 @@ gulp.task("watch", ["dist"], () => {
     path.join(staticPrefix, "**", "*"),
     path.join("!" + distPath, "**", "*"),
   ];
-  
+
   gulpWatch(
     watchPaths,
     gulpBatch((_, done) => { gulp.start("dist", done); })
