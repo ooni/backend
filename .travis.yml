@@ -29,14 +29,14 @@ install:
 - pip install -r requirements/main.txt
 - pip install -r requirements/tests.txt
 - npm install
+before_script:
+# create the default database in travis
+- psql -c 'create database ooni_measurements;' -U postgres
 script:
 - node -v
 - npm -v
+# Build the docker image
 - make APP_ENV=testing build
-- make APP_ENV=testing serve-d
-# Wait for postgres database to be running
-- 'while ! echo exit | nc localhost 5433; do sleep 10; done'
-- sleep 10
 - make APP_ENV=testing create-tables
 - make test
 
