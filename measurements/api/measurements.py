@@ -261,21 +261,16 @@ def list_measurements(
         Report.probe_cc.label('probe_cc'),
         Report.probe_asn.label('probe_asn'),
         Report.test_name.label('test_name'),
-        Report.report_no.label('report_no')
+        Report.report_no.label('report_no'),
+        func.coalesce(Input.input, None).label('input')
     ]
-
-    if input_:
-        cols += [
-            Input.input_no.label('input_no'),
-            Input.input.label('input')
-        ]
 
     q = current_app.db_session.query(*cols)\
             .join(Report, Report.report_no == Measurement.report_no)\
-            .outerjoin(Label, Label.msm_no== Measurement.msm_no)
+            .outerjoin(Label, Label.msm_no == Measurement.msm_no)\
+            .outerjoin(Input, Measurement.input_no == Input.input_no)
 
     if input_:
-        q = q.join(Measurement, Measurement.input_no == Input.input_no)
         q = q.filter(Input.input.like('%{}%'.format(input_)))
     if report_id:
         q = q.filter(Report.report_id == report_id)
@@ -330,7 +325,7 @@ def list_measurements(
             'probe_asn': "AS{}".format(row.probe_asn),
             'test_name': row.test_name,
             'measurement_start_time': row.measurement_start_time,
-            'input': row.input if (input_ and row.m_input_no) else None,
+            'input': row.input,
             'anomaly': row.anomaly,
             'confirmed': row.confirmed,
             'failure': (row.exc != None
