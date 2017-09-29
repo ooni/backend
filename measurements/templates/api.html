@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>OONI Measurements API Documentation</title>
+    <title>OONI API Documentation</title>
     <!-- needed for adaptive design -->
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,7 +17,9 @@
     </style>
   </head>
   <body>
-    <redoc></redoc>
-  	<script src="{{ url_for('static', filename='dist/js/redoc.js') }}"></script>
+    <redoc>
+      Loading...
+    </redoc>
+    <script src="{{ url_for('static', filename='dist/js/redoc.js') }}"></script>
   </body>
 </html>
