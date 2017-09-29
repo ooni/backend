@@ -18,7 +18,6 @@ Changed:
 
 * Better testing
 
-
 # ooni-measurements 1.0.0-rc.3 [2017-09-29]
 
 Changes:

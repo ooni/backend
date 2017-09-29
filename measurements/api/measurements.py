@@ -209,18 +209,17 @@ def list_measurements(
         if set(failure) == set(['true', 'false']):
             failure = None
         else:
-            failure = failure == ['true']
+            failure = set(failure) == set(['true'])
     if anomaly is not None:
-        current_app.logger.warning("Duplicate rows for measurement_id: %s" % anomaly)
         if set(anomaly) == set(['true', 'false']):
             anomaly = None
         else:
-            anomaly = anomaly == ['true']
+            anomaly = set(anomaly) == set(['true'])
     if confirmed is not None:
         if set(confirmed) == set(['true', 'false']):
             confirmed = None
         else:
-            confirmed = confirmed == ['true']
+            confirmed = set(confirmed) == set(['true'])
 
     try:
         if since is not None:
