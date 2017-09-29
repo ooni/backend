@@ -159,3 +159,8 @@ header {
     border-bottom: 2px solid #fff;
   }
 }
+
+// Fix bootstrap table alignment
+.table td,th {
+   text-align: center !important;
+}
