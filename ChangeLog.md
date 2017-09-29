@@ -18,6 +18,11 @@ Changed:
 
 * Better testing
 
+# ooni-measurements 1.0.0-rc.4 [2017-09-29]
+
+Fixes:
+* Critical bug in input handling
+
 # ooni-measurements 1.0.0-rc.3 [2017-09-29]
 
 Changes:
