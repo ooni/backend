@@ -1,3 +1,24 @@
+# ooni-measurements 1.0.0 [2017-09-XX]
+
+Added:
+
+* API endpoints for listing and filtering anomalous measurements
+
+* API endpoints for downloading full reports
+
+Changed:
+
+* Reverse sorting in `by_date` view and hide measurements from time travellers
+
+* Better API documentation thanks to redoc based on OpenAPI 2.0
+
+* Improve request validation thanks to connexion base on OpenAPI
+
+* Oonify the UI
+
+* Better testing
+
+
 # ooni-measurements 1.0.0-rc.3 [2017-09-29]
 
 Changes:
