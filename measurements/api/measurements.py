@@ -13,7 +13,7 @@ from flask import Blueprint, current_app, request
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, false, true
 from sqlalchemy.orm import lazyload, exc
 
 from six.moves.urllib.parse import urljoin, urlencode
@@ -238,11 +238,11 @@ def list_measurements(
         raise BadRequest("Invalid order")
 
 
-    c_anomaly = func.coalesce(Label.anomaly, Measurement.anomaly, False)\
+    c_anomaly = func.coalesce(Label.anomaly, Measurement.anomaly, false())\
                     .label('anomaly')
-    c_confirmed = func.coalesce(Label.confirmed, Measurement.confirmed, False)\
+    c_confirmed = func.coalesce(Label.confirmed, Measurement.confirmed, false())\
                     .label('confirmed')
-    c_msm_failure = func.coalesce(Label.msm_failure, Measurement.msm_failure, False)\
+    c_msm_failure = func.coalesce(Label.msm_failure, Measurement.msm_failure, false())\
                     .label('msm_failure')
 
     cols = [
