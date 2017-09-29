@@ -1,9 +1,11 @@
 # Open Observatory Pipeline
 
-This is the Open Observatory data processing pipeline.
+This is the Open Observatory data processing pipeline. Actually, two of them.
 
-It is based on the [luigi workflow engine](https://github.com/spotify/luigi)
-and supports s3 or filesystem targets or sources.
+The legacy one is based on the [luigi workflow engine](https://github.com/spotify/luigi)
+and described below.
+
+The modern one is based on the [Apache Airflow](https://airflow.incubator.apache.org/) and it's described in [docs](docs/pipeline-16.10.md).
 
 ## Setup
 
