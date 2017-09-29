@@ -1,3 +1,12 @@
+# ooni-measurements 1.0.0-rc.3 [2017-09-29]
+
+Changes:
+* Reverse sorting in `by_date` view and hide measurements from time travellers
+
+* Improve the UI
+
+* Update copy
+
 # ooni-measurements 1.0.0-rc.2 [2017-09-28]
 
 Fixes:
