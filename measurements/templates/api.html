@@ -1,25 +1,17 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>OONI API Documentation</title>
-    <!-- needed for adaptive design -->
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends 'base.html' %}
 
-    <!--
-    ReDoc doesn't change outer page styles
-    -->
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <redoc>
-      Loading...
-    </redoc>
-    <script src="{{ url_for('static', filename='dist/js/redoc.js') }}"></script>
-  </body>
-</html>
+{% block title %}Documentation{% endblock%}
+
+{% block head_css %}
+  <link href="{{ url_for('static', filename='dist/css/apidocs.css') }}"
+        rel="stylesheet">
+{% endblock %}
+
+{% block body %}
+
+  <redoc spec-url='/api/v1/swagger.json'>
+    <h1 class="text-center">Loading...</h1>
+  </redoc>
+  <script src="{{ url_for('static', filename='dist/js/redoc.js') }}"></script>
+
+{% endblock %}

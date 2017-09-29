@@ -138,6 +138,7 @@ gulp.task("dist:css", () => {
   let files = [
     path.join(stylesPath, "by_date.scss"),
     path.join(stylesPath, "main.scss"),
+    path.join(stylesPath, "apidocs.scss"),
     path.join(stylesPath, "stats.scss"),
     path.join(stylesPath, "country_flag.scss"),
     path.join(modulesPath, "metrics-graphics", "dist", "metricsgraphics.css")

@@ -123,6 +123,12 @@ paths:
 
         default:
           description: Default response
+
+      x-code-samples:
+        - lang: 'curl'
+          source: |
+            curl "https://api.ooni.io/api/v1/measurements?probe_cc=IT&confirmed=true&since=2017-09-01"
+
   /measurement/{measurement_id}:
     get:
       summary: ''
