@@ -1,7 +1,6 @@
 connexion
 Flask
 Flask-Cors
-Flask-Cache
 Flask-Misaka
 Flask-Script
 py-lz4framed

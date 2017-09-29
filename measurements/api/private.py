@@ -16,7 +16,6 @@ from sqlalchemy import func
 
 from werkzeug.exceptions import BadRequest
 
-from measurements.app import cache
 from measurements.models import Report, Measurement
 from measurements.models import TEST_NAMES
 
@@ -24,7 +23,6 @@ from measurements.models import TEST_NAMES
 api_private_blueprint = Blueprint('api_private', 'measurements')
 
 @api_private_blueprint.route('/asn_by_month')
-@cache.cached(timeout=60*60)
 def api_private_asn_by_month():
     NOW = datetime.now()
     result = []
@@ -54,7 +52,6 @@ def api_private_asn_by_month():
 
 
 @api_private_blueprint.route('/countries_by_month')
-@cache.cached(timeout=60*60)
 def api_private_counties_by_month():
     NOW = datetime.now()
     result = []
@@ -83,7 +80,6 @@ def api_private_counties_by_month():
 
 
 @api_private_blueprint.route('/runs_by_month')
-@cache.cached(timeout=60*60)
 def api_private_runs_by_month():
     NOW = datetime.now()
     result = []
@@ -111,7 +107,6 @@ def api_private_runs_by_month():
     return jsonify(result)
 
 @api_private_blueprint.route('/reports_per_day')
-@cache.cached(timeout=60*60)
 def api_private_reports_per_day():
     q = current_app.db_session.query(
         func.count(func.date_trunc('day', Report.test_start_time)),
@@ -134,7 +129,6 @@ def api_private_test_names():
     })
 
 @api_private_blueprint.route('/countries', methods=["GET"])
-@cache.cached(timeout=60*60)
 def api_private_countries():
     with_counts = request.args.get("with_counts")
     country_list = []
