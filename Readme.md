@@ -237,3 +237,7 @@ This line is what you want inside of your config:
 ```
 LocalForward localhost:8080 172.26.43.254:8080
 ```
+
+## Learn more
+
+More documentation can be found in [docs/pipeline-16.10.md](docs/pipeline-16.10.md)
