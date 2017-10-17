@@ -867,7 +867,7 @@ class VanillaTorFeeder(object):
             tor_log = test_keys.get('tor_log', '')
             transport_name = test_keys.get('transport_name', 'unknown')
 
-            ret = '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+            ret = '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
                         msm_no,
                         pg_quote(success), # nullable
                         pg_quote(error), # nullable
