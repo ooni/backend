@@ -855,28 +855,30 @@ class VanillaTorFeeder(object):
     @staticmethod
     def row(msm_no, datum):
         ret = ''
-        test_keys = datum['test_keys']
-        success = test_keys.get('success', None)
-        error = test_keys.get('error', None)
-        timeout = test_keys.get('timeout', 0)
-        tor_progress = test_keys.get('tor_progress', 0)
-        tor_progress_summary = test_keys.get('tor_progress_summary', '')
-        tor_progress_tag = test_keys.get('tor_progress_tag', '')
-        tor_version = test_keys.get('tor_version', '0.0.0')
-        tor_log = test_keys.get('tor_log', '')
-        transport_name = test_keys.get('transport_name', 'unknown')
+        if datum['test_name'] == 'vanilla_tor':
+            test_keys = datum['test_keys']
+            success = test_keys.get('success', None)
+            error = test_keys.get('error', None)
+            timeout = test_keys.get('timeout', 0)
+            tor_progress = test_keys.get('tor_progress', 0)
+            tor_progress_summary = test_keys.get('tor_progress_summary', '')
+            tor_progress_tag = test_keys.get('tor_progress_tag', '')
+            tor_version = test_keys.get('tor_version', '0.0.0')
+            tor_log = test_keys.get('tor_log', '')
+            transport_name = test_keys.get('transport_name', 'unknown')
 
-        return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
-                    msm_no,
-                    pg_quote(success), # nullable
-                    pg_quote(error), # nullable
-                    pg_quote(timeout),
-                    pg_quote(tor_progress),
-                    pg_quote(tor_progress_summary),
-                    pg_quote(tor_progress_tag),
-                    pg_quote(tor_version),
-                    pg_quote(tor_log),
-                    pg_quote(transport_name))
+            ret = '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                        msm_no,
+                        pg_quote(success), # nullable
+                        pg_quote(error), # nullable
+                        pg_quote(timeout),
+                        pg_quote(tor_progress),
+                        pg_quote(tor_progress_summary),
+                        pg_quote(tor_progress_tag),
+                        pg_quote(tor_version),
+                        pg_quote(tor_log),
+                        pg_quote(transport_name))
+        return ret
 
     @staticmethod
     def pop(datum):
