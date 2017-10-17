@@ -46,8 +46,8 @@ canning-1.py | tar c 2000-13-42/foo.yaml 2000-13-42/bar.json
 uncompressed data and send them to `tar`.
 
 `canning-2.py`: reads a `.tar` file, verifies the sizes of reports, calculates
-the sha1 and crc32 of each report, calculate size of tar file and then pipes it
-to `lz4`.
+the sha1 and crc32 of each report, calculate size of tar file and then pipes
+the unmodified tar file to `lz4`.
 
 `canning-3.py`: reads a `.lz4` from the pipe, calculates it's size, sha1 and
 crc32, dumps the lz4 file & all the checksums to disk.
@@ -205,11 +205,19 @@ COMMIT;
 You should then build a new docker image by bumping the version number inside of
 `af/shovel/build`.
 
+The image should then be pushed to dockerhub by running:
+
+```
+docker push openobservatory/shovel:latest && docker push openobservatory/shovel:0.0.NN
+```
+
 3. Redeploy an update
 
-To redeploy the updated version of the pipeline you should run from the
-`ansible` directory of the [ooni-sysadmin
-repo](https://github.com/thetorproject/ooni-sysadmin) the following:
+To redeploy the updated version of the pipeline you should use
+[ooni-sysadmin](https://github.com/thetorproject/ooni-sysadmin).
+
+Bump the version number inside of `ansible/roles/airflow/files/docker-trampoline`,
+then run from the `ansible` directory:
 
 ```
 ./play deploy-pipeline.yml --tags airflow-dags
@@ -299,7 +307,20 @@ stage" from step 2. onwards.
 
 The task you want to re-run is labelled `meta_pg`.
 
-## To extend the DAG
+Reprocessing the whole dataset takes a couple of days, it's done
+asynchronously, but the pipeline does not implement any priorities, so it may
+block data ingestion for a while.
+
+## Extending or adding a new DAG
+
+Some examples of tasks that require one or the other:
+
+* extend: fetch data from collectors or backup stuff to S3 after processing
+* new dag: fetch data regarding ASNs (as there is no dependency on other tasks)
+
+Also, DAGs may trigger another DAGs, but DAGs are "pausable" so it's another
+way to reason about extending vs. creation. E.g. one may want to be able to
+pause processing, but continue ingestion.
 
 You need to edit the DAG inside of ooni-sysadmin repo:
 https://github.com/TheTorProject/ooni-sysadmin/tree/master/ansible/roles/airflow/files/airflow-dags
@@ -308,7 +329,6 @@ Add a `BashOperator`, get the `task_id`.
 
 Then add a new switch case inside of
 `ansible/roles/airflow/files/docker-trampoline`.
-
 
 ## OONI Infrastructure specific
 
