@@ -167,6 +167,39 @@ compatible with this extractor. If you are adding a new feeder, then this
 should be a list containing the single bumped `CODE_VER` string (more on this
 below).
 
+1b. (optional) Create SQL migration script
+
+If you are populating new tables, or the schema of existing tables need to
+change, you need to create a new SQL migration script inside of `af/oometa/`.
+
+Be sure to write both the `install` and the `rollback` version of it.
+
+In the `install`, wrap everything inside of a transaction and call the
+[versioning helper](https://github.com/depesz/Versioning), for example:
+
+```
+BEGIN;
+
+select _v.register_patch( '00x-my-new-schema', ARRAY[ '00x-depends-on' ], NULL );
+
+-- Create your tables or make changes
+
+COMMIT;
+```
+
+In the `rollback`, you should restore the DB to previous state and call the
+unregister method of `_v`:
+
+```
+BEGIN;
+
+select _v.unregister_patch( '00x-my-new-schema' );
+
+-- Drop the table you create or alter the schema to be in the previous state
+
+COMMIT;
+```
+
 2. Push a new docker image
 
 You should then build a new docker image by bumping the version number inside of
