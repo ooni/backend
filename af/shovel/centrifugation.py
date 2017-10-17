@@ -32,7 +32,7 @@ from canning import isomidnight, dirname
 # - report & measurement: have significant amount of metadata and may be actually updated eventually
 # Technically `http_headers` was added after CODE_VER=3, but bad headers were
 # causing bucket-wide exception, so re-import is not forced.
-CODE_VER = 3
+CODE_VER = 4
 
 FLAG_TRUE_TEMP = True # keep temporary tables if the flag is false
 FLAG_DEBUG_CHAOS = False # random fault injection
@@ -663,7 +663,7 @@ class BadrowFeeder(object):
 IPV4_RE = re.compile(r'^\d+\.\d+\.\d+\.\d+$')
 
 class TcpFeeder(object):
-    compat_code_ver = (2, 3)
+    compat_code_ver = (2, 3, 4)
     table = 'tcp'
     columns = ('msm_no', 'ip', 'port', 'control_failure', 'test_failure', 'control_api_failure')
     # NB: control_api_failure is also recorded as `control_failure` in `http_verdict`
@@ -710,7 +710,7 @@ class TcpFeeder(object):
                 elctrl.pop('failure')
 
 class DnsFeeder(object):
-    compat_code_ver = (2, 3)
+    compat_code_ver = (2, 3, 4)
     table = 'dns_a_'
     columns = ('msm_no', 'domain', 'control_ip', 'test_ip', 'control_cname', 'test_cname',
                'ttl', 'resolver_hostname', 'client_resolver', 'control_failure', 'test_failure')
@@ -847,6 +847,50 @@ class BodySimhashSink(object):
         self.flush()
         del self.stconn, self.queue, self.known_sha256
 
+class VanillaTorFeeder(object):
+    compat_code_ver = (4, )
+    table = 'vanilla_tor'
+    columns = ('msm_no', 'success', 'error', 'timeout', 'tor_progress', 'tor_progress_tag', 'tor_progress_summary', 'tor_version', 'tor_log', 'transport_name')
+
+    @staticmethod
+    def row(msm_no, datum):
+        ret = ''
+        test_keys = datum['test_keys']
+        success = test_keys.get('success', None)
+        error = test_keys.get('error', None)
+        timeout = test_keys.get('timeout', 0)
+        tor_progress = test_keys.get('tor_progress', 0)
+        tor_progress_summary = test_keys.get('tor_progress_summary', '')
+        tor_progress_tag = test_keys.get('tor_progress_tag', '')
+        tor_version = test_keys.get('tor_version', '0.0.0')
+        tor_log = test_keys.get('tor_log', '')
+        transport_name = test_keys.get('transport_name', 'unknown')
+
+        return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                    msm_no,
+                    pg_quote(success), # nullable
+                    pg_quote(error), # nullable
+                    pg_quote(timeout),
+                    pg_quote(tor_progress),
+                    pg_quote(tor_progress_summary),
+                    pg_quote(tor_progress_tag),
+                    pg_quote(tor_version),
+                    pg_quote(tor_log),
+                    pg_quote(transport_name))
+
+    @staticmethod
+    def pop(datum):
+        test_keys = datum['test_keys']
+        test_keys.pop('success', None)
+        test_keys.pop('error', None)
+        test_keys.pop('timeout', 0)
+        test_keys.pop('tor_progress', 0)
+        test_keys.pop('tor_progress_summary', '')
+        test_keys.pop('tor_progress_tag', '')
+        test_keys.pop('tor_version', '0.0.0')
+        test_keys.pop('tor_log', '')
+        test_keys.pop('transport_name', 'unknown')
+
 TITLE_REGEXP = re.compile('<title>(.*?)</title>', re.IGNORECASE | re.DOTALL)
 
 def get_title(body):
@@ -893,7 +937,7 @@ class BaseHttpFeeder(object):
                 tor.pop('exit_name')
 
 class HttpControlFeeder(BaseHttpFeeder):
-    compat_code_ver = (2, 3)
+    compat_code_ver = (2, 3, 4)
     table = 'http_control'
     columns = ('msm_no', 'is_tor', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
     def row(self, msm_no, datum):
@@ -960,7 +1004,7 @@ class HttpControlFeeder(BaseHttpFeeder):
 
 
 class HttpRequestFeeder(BaseHttpFeeder):
-    compat_code_ver = (2, 3)
+    compat_code_ver = (2, 3, 4)
     table = 'http_request'
     columns = ('msm_no', 'url', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
     def row(self, msm_no, datum):
@@ -1015,7 +1059,7 @@ class HttpRequestFeeder(BaseHttpFeeder):
         self._pop_request(datum, r['request'])
 
 class HttpRequestFPFeeder(HttpRequestFeeder):
-    compat_code_ver = (3,)
+    compat_code_ver = (3, 4)
     table = 'http_request_fp'
     columns = ('msm_no', 'fingerprint_no')
     # It should probably become part of `http_request` and `http_control`
@@ -1074,7 +1118,7 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
         pass # done by HttpRequestFeeder
 
 class HttpVerdictFeeder(object):
-    compat_code_ver = (2, 3)
+    compat_code_ver = (2, 3, 4)
     table = 'http_verdict'
     columns = ('msm_no', 'accessible', 'control_failure', 'http_experiment_failure', 'title_match',
                'dns_consistency', 'dns_experiment_failure', 'body_proportion', 'blocking',
@@ -1220,6 +1264,7 @@ def meta_pg(in_root, bucket, postgres):
             (HttpRequestFPFeeder, (pgconn,)),
             (HttpControlFeeder, (body_sink,)),
             (HttpVerdictFeeder, ()),
+            (VanillaTorFeeder, ()),
         )
         row_handlers = []
         for cls, args in data_tables:
