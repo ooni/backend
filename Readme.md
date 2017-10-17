@@ -126,6 +126,47 @@ times.
 
 The file to edit is located in `af/shovel/centrifugation.py`.
 
+Most of the time you will be adding a new `Feeder`. A `Feeder` is something
+that populates a given table with a particular class of measurements.
+
+To create a new `Feeder` you will have to implement 2 static methods:
+
+```python
+class MyFeeder(object):
+    compat_code_ver = (4, )
+    table = 'my_fancy_test'
+    columns = ('msm_no', 'some_value')
+
+    @staticmethod
+    def row(msm_no, datum):
+        ret = ''
+        if datum['test_name'] == 'my_fancy_test':
+            some_value = datum['test_keys'].get('some_value', None)
+            ret = '{:d}\t{}\n'.format(
+              msm_no,
+              pg_quote(some_value) # nullable
+            )
+        return ret
+
+    @staticmethod
+    def pop(datum):
+        test_keys = datum['test_keys']
+        test_keys.pop('some_value', None)
+```
+
+The `row` method should return a SQL query to populate the database with the
+extracted metadata.
+
+The `pop` method should pop all the extracted keys (or the keys specific to this test that are to be ignored), so that the resulting datum is "clean".
+
+The `table` class attribute defined which table is going to be written and
+`columns` specifies which columns should be present in such table.
+
+`compat_code_ver` defines a list of centrifugration code versions that are
+compatible with this extractor. If you are adding a new feeder, then this
+should be a list containing the single bumped `CODE_VER` string (more on this
+below).
+
 2. Push a new docker image
 
 You should then build a new docker image by bumping the version number inside of
