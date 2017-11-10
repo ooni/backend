@@ -37,7 +37,7 @@ RUN set -ex \
 
 COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.py \
     aws_s3_ls.py \
-    aws_s3_cp.py \
+    aws_s3_lz4cat_sync.py \
     cleanup_reports_raw.py \
     check_sanitised.py \
     cleanup_sanitised.py \
