@@ -14,7 +14,7 @@ if datetime.fromtimestamp(0) != datetime(1970, 1, 1, 0, 0, 0):
 def parse_args():
     p = argparse.ArgumentParser(description='ooni-pipeline: *.tar.lz4 | tar -I lz4 --extract | aws s3 sync')
     p.add_argument('--src', metavar='SRC_PATH', help='Source to decompress *.lz4 files from', required=True)
-    p.add_argument('--dst', metavar='DST_PATH', help='Destination root to upload files to, passed to `aws s3 sync`', required=True)
+    p.add_argument('--dst', metavar='DST_PATH', help='Destination subdir to upload files to, passed to `aws s3 sync`', required=True)
     opt = p.parse_args()
     return opt
 
@@ -54,7 +54,7 @@ def aws_s3_lz4cat_sync(src, dst):
                 raise RuntimeError('Unexpected filename in the directory', src, fname)
             if os.listdir(tmpdir) != [date]: # check if bucket name is there and correct
                 raise RuntimeError('Unexpected archive content, something besides usual date', date)
-            check_call(['aws', 's3', 'sync', '--size-only', tmpdir, dst])
+            check_call(['aws', 's3', 'sync', '--size-only', os.path.join(tmpdir, date), dst])
 
 def main():
     opt = parse_args()
