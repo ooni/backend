@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 
+# FIXME: kill this ugly parser and replace it with `aws s3api list-objects`
+
 import argparse
 import gzip
 import json
