@@ -4,7 +4,6 @@ FROM ubuntu:16.04
 RUN set -ex \
     && apt-get update \
     && apt-get install -y python2.7 liblz4-tool python-ujson python-yaml python-psycopg2 python-six \
-            awscli \
     && : \
 # Whole python-lz4 repo is clonned as `git` can't do shallow clone of single
 # SHA1 commit and github tarball makes setuptools-scm unhappy while building.
@@ -26,8 +25,17 @@ RUN set -ex \
     && apt-get install -y python-pip \
     && pip install --system mmh3==2.3.1 \
     && : \
-    && apt-get remove --auto-remove -y python-pkg-resources build-essential python-setuptools python-setuptools-scm git-core python2.7-dev \
-    && apt-get remove --auto-remove -y python-pip \
+# awscli in ubuntu has a bug that triggers following error message in `aws s3 cp`:
+# upload failed: tmp/oo....yaml to s3://ooni-data/autoclaved/jsonl/2017-04-22/201...yaml seek() takes 2 positional arguments but 3 were given
+# awscli is released DAILY and that's a bit scary, so pretty random "latest release" version is used
+    && apt-get install -y python3-pip awscli \
+    && pip3 install --system awscli==1.11.185 \
+    && : \
+    && apt-get remove --auto-remove -y \
+            python-pkg-resources build-essential python-setuptools python-setuptools-scm git-core python2.7-dev \
+            python-pip \
+            python3-pip \
+    && : \
     && rm -rf \
         /var/tmp/python-lz4 \
         /var/tmp/simhash-py \
