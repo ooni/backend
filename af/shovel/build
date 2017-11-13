@@ -1,2 +1,2 @@
 #!/bin/sh -x
-exec docker build -t openobservatory/shovel:0.0.18 -t openobservatory/shovel:latest .
+exec docker build -t openobservatory/shovel:0.0.19 -t openobservatory/shovel:latest .

@@ -47,6 +47,8 @@ def aws_s3_ls(s3_bucket, s3_prefix):
     if len(s3_prefix) and s3_prefix[-1] != '/':
         s3_prefix += '/'
     s3obj = check_output(['aws', 's3api', 'list-objects', '--bucket', s3_bucket, '--prefix', s3_prefix])
+    if len(s3obj) == 0: # prefix absence is a special case, s3api gives empty stdout and zero exit-code
+        return {}
     s3obj = json.loads(s3obj)
     if s3obj.keys() != ['Contents']:
         raise RuntimeError('Unexpected keys in `aws s3api list-objects`', s3obj.keys())
