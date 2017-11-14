@@ -138,7 +138,7 @@ To redeploy the updated version of the pipeline you should run from the
 repo](https://github.com/thetorproject/ooni-sysadmin) the following:
 
 ```
-./play deploy-pipeline.yml --list-tags airflow-dags
+./play deploy-pipeline.yml --tags airflow-dags
 ```
 
 4. Reprocess the data
@@ -155,10 +155,18 @@ To re-process the data through the Airflow UI and scheduler, do the following:
 
 * In the confirmation page click on "OK"
 
-Note: the airflow scheduler is a bit imperfect and has issues handling too many
-dependent tasks.
+**Warning**: the airflow scheduler is imperfect and has issues handling too
+many DAGs being in `running` state wasting lots of CPU. Moreover, [using
+`airflow backfill` is also
+error-prone](https://github.com/TheTorProject/ooni-sysadmin/pull/181#issuecomment-343583222)
+as backfill process 1) does not go through scheduler so it does not respect
+Pools; 2) may delay processing of new buckets for some days because it consumes
+all worker slots; 3) marks touched DagRuns as backfilled with magic `backfill_`
+prefix so these DagRuns become always-skipped by scheduler and `airflow clear`
+does not re-trigger them anymore.
 
-In the future we will have a `Makefile` to avoid airflow scheduling overhead.
+In the future we will have a `Makefile` to run backfilling without airflow
+scheduling overhead while preserving task logs and states.
 
 ## How do add fingerprints to database
 
