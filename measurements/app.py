@@ -54,6 +54,8 @@ def init_app(app):
         app.jinja_env.auto_reload = True
         app.config['TEMPLATES_AUTO_RELOAD'] = True
         app.config['DEBUG'] = True
+    else:
+        raise RuntimeError('Unexpected APP_ENV, should be `production` or `development`', app.config['APP_ENV'])
 
     for key in app.config.keys():
         SECRET_SUBSTRINGS = ["_SECRET_", "DATABASE_URL"]

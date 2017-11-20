@@ -241,6 +241,7 @@ def decompress_autoclaved(
             # byte positions specified are inclusive -- https://tools.ietf.org/html/rfc7233#section-2.1
             headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size - 1)}
             r = requests.get(url, headers=headers, stream=True)
+            r.raise_for_status()
             beginning = True
             # Create a copy because we are in a closure
             to_read = report_size
