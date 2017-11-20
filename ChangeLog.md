@@ -1,3 +1,9 @@
+# ooni-measurements 1.0.1 [2017-09-29]
+
+Changes:
+
+* Remove in-process flask-cache
+
 # ooni-measurements 1.0.0 [2017-09-29]
 
 Added:
