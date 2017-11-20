@@ -8,14 +8,21 @@ VERSION = $(shell cat package.json \
   | tr -d '[[:space:]]')
 APP_NAME = openobservatory/ooni-api:$(VERSION)
 
-PYTHON_WITH_ENV = PYTHONPATH=$(shell pwd) APP_ENV=$(APP_ENV) DATABASE_URL=$(DATABASE_URL) python
+PWD = $(shell pwd)
+
+PYTHON_WITH_ENV = PYTHONPATH=$(PWD) APP_ENV=$(APP_ENV) DATABASE_URL=$(DATABASE_URL) python
+
+-include make.conf # to override DATABASE_URL, PYTHON_WITH_ENV to use venv and so on
 
 default:
 	@echo "ERR: Did not specify a command"
 	@exit 1
 
 clean:
-	rm -rf measurements/static/dist
+	rm -rf measurements/static/dist venv
+
+venv:
+	virtualenv -p python3.5 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
 
 build:
 	docker build -t $(APP_NAME) .

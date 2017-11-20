@@ -42,8 +42,7 @@ COPY requirements /tmp/requirements
 # Install Python dependencies
 RUN set -x \
     && pip install -U pip setuptools \
-    && pip install -r /tmp/requirements/dev.txt \
-                   -r /tmp/requirements/tests.txt \
+    && pip install -r /tmp/requirements/tests.txt \
     && pip install -r /tmp/requirements/deploy.txt \
                    -r /tmp/requirements/main.txt
 
