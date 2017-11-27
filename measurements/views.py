@@ -8,7 +8,7 @@ import json
 import pathlib
 
 import werkzeug
-from flask import Response, current_app
+from flask import Response, current_app, render_template
 
 from connexion import ProblemException, FlaskApi, Resolver, problem
 
@@ -34,6 +34,12 @@ def render_generic_exception(exception):
     response = problem(title=exception.name, detail=exception.description,
                        status=exception.code)
     return FlaskApi.get_response(response)
+
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+def bad_request(e):
+    return render_template('400.html', exception=e), 404
 
 def register(app):
     from measurements import api
@@ -61,3 +67,6 @@ def register(app):
 
     app.register_error_handler(ProblemException, render_problem_exception)
     app.register_error_handler(Exception, render_generic_exception)
+
+    app.errorhandler(404)(page_not_found)
+    app.errorhandler(400)(bad_request)

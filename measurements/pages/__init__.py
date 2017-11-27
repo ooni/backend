@@ -24,6 +24,8 @@ pages_blueprint = Blueprint('pages', 'measurements',
                             static_url_path='/static/')
 
 
+DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
+
 def _latest_reports():
     q = current_app.db_session.query(Report) \
             .order_by("textname DESC") \
@@ -142,11 +144,14 @@ def _files_on_date(date, order_by, order):
 
 @pages_blueprint.route('/files/by_date/<date>')
 def files_on_date(date):
-    # XXX do some validation of date
+    if not DAY_REGEXP.match(date):
+        raise BadRequest('Invalid date format')
+
     order_by = request.args.get('order_by', 'test_start_time')
     order = request.args.get('order', 'desc')
     if order.lower() not in ('desc', 'asc'):
-        raise BadRequest()
+        raise BadRequest('order must be desc or asc')
+
     if order_by not in ('test_start_time', 'probe_cc', 'report_id',
                         'test_name', 'probe_asn'):
         raise BadRequest()
@@ -203,7 +208,10 @@ def _files_in_country(country_code, order_by, order):
 
 @pages_blueprint.route('/files/by_country/<country_code>')
 def files_in_country(country_code):
-    # XXX do some validation of date
+    if len(country_code) != 2:
+        raise BadRequest('Country code must be two characters')
+    country_code = country_code.upper()
+
     order_by = request.args.get('order_by', 'test_start_time')
     order = request.args.get('order', 'desc')
     if order.lower() not in ('desc', 'asc'):
@@ -318,7 +326,6 @@ def files_download(textname):
     return Response(stream_with_context(resp_generator()), mimetype='text/json')
 
 # These two are needed to avoid breaking older URLs
-DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 @pages_blueprint.route('/<date>/<report_file>')
 def backward_compatible_download(date, report_file):
     if DAY_REGEXP.match(date) and report_file.endswith(".json"):
