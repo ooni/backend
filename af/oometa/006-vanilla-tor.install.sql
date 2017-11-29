@@ -4,18 +4,18 @@ select _v.register_patch( '006-vanilla-tor', ARRAY[ '005-repeated-report' ], NUL
 
 -- Everything goes to `public` schema.
 
-
 CREATE TABLE vanilla_tor (
-    msm_no                  int4 references measurement,
-    success                 bool null,
+    msm_no                  int4 not null, -- references measurement,
+    timeout                 int4 not null,
     error                   text,
-    timeout                 int4,
-    tor_progress            int4,
+    tor_progress            int2 not null,
+    success                 bool not null,
     tor_progress_tag        text,
     tor_progress_summary    text,
-    tor_version             text,
-    tor_log                 text,
-    transport_name          text
+    tor_version             text not null,
+    tor_log                 jsonb
 );
+
+COMMENT ON TABLE vanilla_tor IS 'Features: data from `vanilla_tor` measurements';
 
 COMMIT;

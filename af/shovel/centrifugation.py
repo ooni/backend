@@ -26,6 +26,7 @@ import ujson
 
 import autoclaving
 from canning import isomidnight, dirname
+from tor_log import parse_tor_log
 
 # It does NOT take into account metadata tables right now:
 # - autoclaved: it's not obvious if anything can be updated there
@@ -850,48 +851,65 @@ class BodySimhashSink(object):
 class VanillaTorFeeder(object):
     compat_code_ver = (4, )
     table = 'vanilla_tor'
-    columns = ('msm_no', 'success', 'error', 'timeout', 'tor_progress', 'tor_progress_tag', 'tor_progress_summary', 'tor_version', 'tor_log', 'transport_name')
+    columns = ('msm_no', 'timeout', 'error', 'tor_progress',  'success', 'tor_progress_tag', 'tor_progress_summary', 'tor_version', 'tor_log')
 
     @staticmethod
     def row(msm_no, datum):
-        ret = ''
-        if datum['test_name'] == 'vanilla_tor':
-            test_keys = datum['test_keys']
-            success = test_keys.get('success', None)
-            error = test_keys.get('error', None)
-            timeout = test_keys.get('timeout', 0)
-            tor_progress = test_keys.get('tor_progress', 0)
-            tor_progress_summary = test_keys.get('tor_progress_summary', '')
-            tor_progress_tag = test_keys.get('tor_progress_tag', '')
-            tor_version = test_keys.get('tor_version', '0.0.0')
-            tor_log = test_keys.get('tor_log', '')
-            transport_name = test_keys.get('transport_name', 'unknown')
+        if datum['test_name'] != 'vanilla_tor':
+            return ''
+        t = datum['test_keys']
 
-            ret = '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
-                        msm_no,
-                        pg_quote(success), # nullable
-                        pg_quote(error), # nullable
-                        pg_quote(timeout),
-                        pg_quote(tor_progress),
-                        pg_quote(tor_progress_summary),
-                        pg_quote(tor_progress_tag),
-                        pg_quote(tor_version),
-                        pg_quote(tor_log),
-                        pg_quote(transport_name))
-        return ret
+        success = t.get('success', None)
+        if success is None:
+            if t['tor_log'] is None and t['tor_progress_tag'] is None and t['tor_progress'] == 0 and t['timeout'] > 60 and t['error'] is None and t['tor_progress_summary'] is None:
+                # That's usual garbage (~0.5% of measurements) like following json, it does not deserve a row in the database
+                # You can check that it's nothing but garbage with following one-liner:
+                # $ for f in ????-??-??/vanilla_tor*.tar.lz4; do tar -I lz4 -x --to-stdout -f $f; done | jq -c 'select(.test_keys.success == null) | .test_keys' | sort | uniq -c
+                # {"transport_name":"vanilla","success":null,"tor_log":null,"tor_progress_tag":null,"tor_progress":0,"timeout":300,"error":null,"tor_version":"0.2.5.12","tor_progress_summary":null}
+                return ''
+            raise RuntimeError('Non-trivial data while .test_keys.success is null')
+
+        if t.get('transport_name') not in (None, 'vanilla'):
+            raise RuntimeError('`vanilla_tor` data with non-vanilla `transport_name`', t.get('transport_name'))
+
+        # XXX: is' unclear if it's useful as `text` value
+        #  40255 null
+        #   2037 "timeout-reached"
+        error = t.get('error', None)
+
+        # XXX: it's unclear if it's useful column in database
+        #      1 100000000
+        #      1 120
+        #      2 200
+        #  42288 300
+        timeout = t.get('timeout', 0)
+
+        tor_progress = t.get('tor_progress')
+        if tor_progress is None:
+            tor_progress = 0
+        tor_log = t.get('tor_log')
+        if tor_log:
+            tor_log = ujson.dumps(parse_tor_log(tor_log))
+
+        return '{:d}\t{:d}\t{}\t{:d}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                    msm_no,
+                    timeout,
+                    pg_quote(error),
+                    tor_progress,
+                    pg_quote(success),
+                    pg_quote(t.get('tor_progress_tag')), # XXX: looks like dup of `tor_progress`
+                    pg_quote(t.get('tor_progress_summary')), # XXX: looks like dup of `tor_progress`
+                    pg_quote(t.get('tor_version', '0.0.0')), # fav versions are "00:40:28.580", "22:09:16.876" and "None"
+                    pg_quote(tor_log))
 
     @staticmethod
     def pop(datum):
-        test_keys = datum['test_keys']
-        test_keys.pop('success', None)
-        test_keys.pop('error', None)
-        test_keys.pop('timeout', 0)
-        test_keys.pop('tor_progress', 0)
-        test_keys.pop('tor_progress_summary', '')
-        test_keys.pop('tor_progress_tag', '')
-        test_keys.pop('tor_version', '0.0.0')
-        test_keys.pop('tor_log', '')
-        test_keys.pop('transport_name', 'unknown')
+        t = datum['test_keys']
+        known_keys = ('success', 'transport_name', 'error', 'timeout',
+                'tor_progress', 'tor_log', 'tor_progress_tag',
+                'tor_progress_summary', 'tor_version')
+        for k in known_keys:
+            t.pop(key)
 
 TITLE_REGEXP = re.compile('<title>(.*?)</title>', re.IGNORECASE | re.DOTALL)
 
