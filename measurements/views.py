@@ -39,7 +39,7 @@ def page_not_found(e):
     return render_template('404.html'), 404
 
 def bad_request(e):
-    return render_template('400.html', exception=e), 404
+    return render_template('400.html', exception=e), 400
 
 def register(app):
     from measurements import api
