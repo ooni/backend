@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import os
 import json
 import pathlib
+import traceback
 
 import werkzeug
 from flask import Response, current_app, render_template
@@ -26,7 +27,9 @@ def render_generic_exception(exception):
         exc_name = "{}.{}".format(type(exception).__module__,
                                   type(exception).__name__)
         exc_desc = str(exception)
-        current_app.logger.warning('Unhandled error occurred, {}: {}'.format(exc_name, exc_desc))
+        if hasattr(exception, '__traceback__'):
+            current_app.logger.error(''.join(traceback.format_tb(exception.__traceback__)))
+        current_app.logger.error('Unhandled error occurred, {}: {}'.format(exc_name, exc_desc))
         exception = werkzeug.exceptions.InternalServerError(
             description='An unhandled application error occurred: {}'.format(exc_name)
         )
