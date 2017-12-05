@@ -7,6 +7,10 @@ there is no versioning on them.
 """
 from datetime import datetime
 
+from six.moves.urllib.parse import urljoin
+
+import requests
+
 from pycountry import countries
 
 from flask import Blueprint, current_app, request
@@ -195,3 +199,22 @@ def api_private_blockpage_list():
     return jsonify({
         'results': results
     })
+
+@api_private_blueprint.route('/measurement_count_by_country', methods=["GET"])
+def api_private_measurement_count_by_country():
+    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-by-country.json')
+    resp = requests.get(url)
+    return current_app.response_class(
+        resp.text,
+        mimetype=current_app.config['JSONIFY_MIMETYPE']
+    )
+
+
+@api_private_blueprint.route('/measurement_count_total', methods=["GET"])
+def api_private_measurement_count_total():
+    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-total.json')
+    resp = requests.get(url)
+    return current_app.response_class(
+        resp.text,
+        mimetype=current_app.config['JSONIFY_MIMETYPE']
+    )
