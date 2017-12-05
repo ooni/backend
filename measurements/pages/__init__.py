@@ -275,7 +275,7 @@ def decompress_autoclaved(
 
 @pages_blueprint.route('/files/download/<path:textname>')
 def files_download(textname):
-    if len(textname.split('/')) == 1:
+    if '/' not in textname == 1:
         # This is for backward compatibility with the new pipeline.
         # See: https://github.com/TheTorProject/ooni-measurements/issues/44
         q = current_app.db_session.query(Report.textname)\
@@ -286,7 +286,6 @@ def files_download(textname):
 
         return redirect('/files/download/%s' % first[0])
 
-    textname_filter = (Report.textname == textname)
     subquery = current_app.db_session.query(
             Measurement.frame_off.label('frame_off'),
             Measurement.frame_size.label('frame_size'),
