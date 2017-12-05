@@ -12,11 +12,11 @@ from pycountry import countries
 from flask import Blueprint, current_app, request
 from flask.json import jsonify
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from werkzeug.exceptions import BadRequest
 
-from measurements.models import Report, Measurement
+from measurements.models import Report, Measurement, Input
 from measurements.models import TEST_NAMES
 
 # prefix: /api/_
@@ -158,4 +158,40 @@ def api_private_countries():
 
     return jsonify({
         "countries": country_list
+    })
+
+
+@api_private_blueprint.route('/blockpages', methods=["GET"])
+def api_private_blockpage_list():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None:
+        raise Exception('err')
+
+    q = current_app.db_session.query(
+        Report.report_id.label('report_id'),
+        Report.probe_cc.label('probe_cc'),
+        Report.probe_asn.label('probe_asn'),
+        Report.test_start_time.label('test_start_time'),
+        Input.input.label('input')
+    ).join(Measurement, Measurement.report_no == Report.report_no) \
+     .join(Input, Measurement.input_no == Input.input_no) \
+     .filter(Measurement.confirmed == True) \
+     .filter(or_(
+        Report.test_name == 'http_requests',
+        Report.test_name == 'web_connectivity'
+      )) \
+     .filter(Report.probe_cc == probe_cc)
+
+    results = []
+    for row in q:
+        results.append({
+            'report_id': row.report_id,
+            'probe_cc': row.probe_cc,
+            'probe_asn': "AS{}".format(row.probe_asn),
+            'test_start_time': row.test_start_time,
+            'input': row.input
+        })
+
+    return jsonify({
+        'results': results
     })
