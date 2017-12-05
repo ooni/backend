@@ -275,6 +275,18 @@ def decompress_autoclaved(
 
 @pages_blueprint.route('/files/download/<path:textname>')
 def files_download(textname):
+    if len(textname.split('/')) == 1:
+        # This is for backward compatibility with the new pipeline.
+        # See: https://github.com/TheTorProject/ooni-measurements/issues/44
+        q = current_app.db_session.query(Report.textname)\
+                .filter(Report.textname.endswith(textname))
+        first = q.first()
+        if first is None:
+            raise NotFound("No file with that filename found")
+
+        return redirect('/files/download/%s' % first[0])
+
+    textname_filter = (Report.textname == textname)
     subquery = current_app.db_session.query(
             Measurement.frame_off.label('frame_off'),
             Measurement.frame_size.label('frame_size'),
@@ -285,9 +297,9 @@ def files_download(textname):
             func.sum(Measurement.intra_size + 1).over().label('report_size'),
             Autoclaved.filename.label('filename'),
     ).filter(Report.textname == textname) \
-        .join(Report, Report.report_no == Measurement.report_no) \
-        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no) \
-        .subquery()
+     .join(Report, Report.report_no == Measurement.report_no) \
+     .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no) \
+     .subquery()
 
     q = current_app.db_session.query(
         subquery.c.frame_off,
