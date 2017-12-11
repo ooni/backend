@@ -131,12 +131,12 @@ The file to edit is located in `af/shovel/centrifugation.py`.
 Most of the time you will be adding a new `Feeder`. A `Feeder` is something
 that populates a given table with a particular class of measurements.
 
-To create a new `Feeder` you will have to implement 2 static methods:
+To create a new `Feeder` you will have to implement some methods:
 
 ```python
-class MyFeeder(object):
-    compat_code_ver = (4, )
-    table = 'my_fancy_test'
+class MyFeeder(BaseFeeder):
+    min_compat_code_ver = (4, )
+    data_table = sink_table = 'my_fancy_test'
     columns = ('msm_no', 'some_value')
 
     @staticmethod
@@ -146,7 +146,7 @@ class MyFeeder(object):
             some_value = datum['test_keys'].get('some_value', None)
             ret = '{:d}\t{}\n'.format(
               msm_no,
-              pg_quote(some_value) # nullable
+              pg_quote(some_value) # if it's nullable or string
             )
         return ret
 
@@ -156,17 +156,20 @@ class MyFeeder(object):
         test_keys.pop('some_value', None)
 ```
 
-The `row` method should return a SQL query to populate the database with the
+The `row` method should return a row in `COPY FROM` syntax to populate the `sink_table` with the
 extracted metadata.
 
 The `pop` method should pop all the extracted keys (or the keys specific to this test that are to be ignored), so that the resulting datum is "clean".
 
-The `table` class attribute defined which table is going to be written and
+The `sink_table` class attribute defined which table is going to be written and
 `columns` specifies which columns should be present in such table.
+`data_table` defines the table to cleanup in case of _reprocessing_, that's
+useful if `sink_table` is temporary (in that case you'll likely have to
+implement `close()` method that melds temporary table into persistent one).
 
-`compat_code_ver` defines a list of centrifugration code versions that are
+`min_compat_code_ver` defines centrifugration code versions that are
 compatible with this extractor. If you are adding a new feeder, then this
-should be a list containing the single bumped `CODE_VER` string (more on this
+should contain the single bumped `CODE_VER` string (more on this
 below).
 
 1b. (optional) Create SQL migration script
@@ -277,8 +280,7 @@ the database directly.
 3. Bump version information in `centrifugation.py`
 
 Look inside of `centrifugation.py` and bump `CODE_VER`.
-In the same file look for references to `compat_code_ver` and change that where
-needed (you will probably have to append to the list everywhere).
+In the same file change `min_compat_code_ver` in `HttpRequestFPFeeder`.
 
 4. Fix assertion to the fingerprint table
 
@@ -343,7 +345,8 @@ There are following usual reasons to run partial re-processing:
   `vanilla_tor` (~99% of data volume is `web_connectivity` test data)
 - new files are added to the bucket when pipeline ticks more often than daily
 
-Both these cases are handled with `UPDATE autoclaved SET code_ver = 0 WHERE …`.
+PII leak may be handled with `UPDATE autoclaved SET code_ver = 0 WHERE …`, `0`
+is _reserved_ `code_ver` value also named `CODE_VER_REPROCESS`.
 `centrifugation.py` will re-ingest alike autoclaved file while preserving `msm_no`.
 
 ## OONI Infrastructure specific

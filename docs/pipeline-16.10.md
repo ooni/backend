@@ -189,7 +189,7 @@ Reprocessing is triggered by `code_ver`. Every autoclaved file has
 `centrifugation.CODE_VER` as well set in `centrifugation.py`.
 If `code_ver` and `CODE_VER` match, the file is not processed at all, it's not
 even read. If `code_ver` does not match, then the file is read, but it depends
-on `code_ver` column and `compat_code_ver` attribute if corresponding tables
+on `code_ver` column and `min_compat_code_ver` attribute if corresponding tables
 are overwritten.
 
 Gotchas

@@ -338,7 +338,7 @@ def load_autoclaved_index(autoclaved_index):
     files = {}
     with gzip.GzipFile(autoclaved_index, 'r') as indexfd:
         for _, doc in autoclaving.stream_json_blobs(indexfd):
-            if 'file"' not in doc:
+            if 'file"' not in doc: # fast-path to avoid parsing 99.9% lines
                 continue
             doc = ujson.loads(doc)
             if doc['type'] == 'file':
@@ -362,7 +362,7 @@ def load_autoclaved_db_todo(pgconn, files, bucket):
                 raise RuntimeError('Unknown filename in autoclaved PG table present in autoclaved/index.json.gz', filename)
             elif files[filename] != file_sha1: # autoclaved file changed, e.g. PII cleanup
                 reingest.add(filename)
-            elif code_ver < CODE_VER: # including CODE_VER_REPROCESS
+            elif code_ver < CODE_VER: # including CODE_VER_REPROCESS that is less than any CODE_VER
                 reprocess.add(filename)
             elif code_ver == CODE_VER:
                 pass # no-op
@@ -390,8 +390,8 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
     # preserving `*_no` sequence values and available range a more complex task
     # as sequence is non-transactional.
     if not DUPLICATE_REPORTS:
-        # FIXME: eventually this assertion should be removed and DUPLICATE_REPORTS
-        # should be per-bucket, but till then we know that there are some...
+        # FIXME: eventually this assertion should be removed (if DUPLICATE_REPORTS
+        # grows to voluminous list) and replaced with some smarter code.
         raise RuntimeError('Empty DUPLICATE_REPORTS')
     # NB: `autoclaved_meta` has no `code_ver` and `bucket_date`
     create_temp_table(pgconn, 'autoclaved_meta', '''
@@ -1028,6 +1028,7 @@ def exc_hash(exc_info):
     return to_signed32(ret)
 
 class BadmetaFeeder(BaseFeeder):
+    # no `min_compat_code_ver`, it's not a usual data table
     sink_table = 'badmeta_'
     columns = ('autoclaved_no', 'report_no', 'exc_report', 'exc_measurement')
     def __init__(self, pgconn):

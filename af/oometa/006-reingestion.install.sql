@@ -20,6 +20,8 @@ DROP TABLE badblob;
 ALTER TABLE badmeta DROP COLUMN textname;
 
 -- re-ingest `vanilla_tor`
+-- 1. bump global CODE_VER
+-- 2. prevent reprocessing of other files
 UPDATE autoclaved SET code_ver = 4
 WHERE code_ver = 3 AND NOT EXISTS (
     SELECT 1 FROM report
