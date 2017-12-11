@@ -61,7 +61,9 @@ file truncations.
 ### Autoclaving
 
 The purpose of the **autoclaving** stage is to perform normalization and
-sanitization of the report files.
+sanitization of the report files including
+[PII cleanup](https://github.com/TheTorProject/ooni-pipeline/issues/105)
+if leak is discovered.
 This means converting legacy YAML reports to JSON as well as converting all
 measurements to a consistent JSON format (and performing some fixes to the data
 format to avoid surprising consumers of the data).
@@ -87,7 +89,7 @@ stores metadata into a PostgreSQL database for further processing.
 
 Note: in the airflow DAG view this is actually called `meta_pg`.
 
-## Raw reports sensor
+### Raw reports sensor
 
 This is not technically a task, but is rather a "sensor" in airflow lingo. What
 this means is that a check is done at `chameleon` (the host that aggregates all
@@ -311,7 +313,7 @@ Reprocessing the whole dataset takes a couple of days, it's done
 asynchronously, but the pipeline does not implement any priorities, so it may
 block data ingestion for a while.
 
-## Extending or adding a new DAG
+### Extending or adding a new DAG
 
 Some examples of tasks that require one or the other:
 
@@ -330,13 +332,28 @@ Add a `BashOperator`, get the `task_id`.
 Then add a new switch case inside of
 `ansible/roles/airflow/files/docker-trampoline`.
 
+### Partial re-processing
+
+There are following usual reasons to run partial re-processing:
+
+- PII leaks are identified and corresponding public autoclaved files have to be
+  updated (as well as LZ4 framing in these files), so these files must be
+  re-processed from scratch
+- processing schema changes for some "low-volume" test method like
+  `vanilla_tor` (~99% of data volume is `web_connectivity` test data)
+- new files are added to the bucket when pipeline ticks more often than daily
+
+Both these cases are handled with `UPDATE autoclaved SET code_ver = 0 WHERE …`.
+`centrifugation.py` will re-ingest alike autoclaved file while preserving `msm_no`.
+
 ## OONI Infrastructure specific
 
-To access the machine you need to setup a SSH tunnel. It runs at
-`datacollector.ooni.io`.
+To access airflow web-interface you need to setup a SSH tunnel. It runs at
+`datacollector.infra.ooni.io`.
 
 This line is what you want inside of your config:
 ```
+Host datacollector.infra.ooni.io
 LocalForward localhost:8080 172.26.43.254:8080
 ```
 
