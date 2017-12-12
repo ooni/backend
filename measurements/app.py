@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 import logging
 import datetime
+import sys
 import os
 
 from flask import Flask, json
@@ -71,6 +72,9 @@ def check_config(config):
 
 def create_app(*args, **kw):
     from measurements import views
+
+    if sys.version_info[0] < 3:
+        raise RuntimeError("Python >= 3 is required")
 
     app = Flask(__name__)
     app.json_encoder = FlaskJSONEncoder
