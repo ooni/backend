@@ -3,7 +3,7 @@ import os
 import re
 from datetime import timedelta, datetime
 
-from six.moves.urllib.parse import urljoin
+from urllib.parse import urljoin
 
 import requests
 import lz4framed

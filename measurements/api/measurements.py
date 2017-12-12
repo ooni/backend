@@ -16,7 +16,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 from sqlalchemy import func, or_, and_, false, true
 from sqlalchemy.orm import lazyload, exc
 
-from six.moves.urllib.parse import urljoin, urlencode
+from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET

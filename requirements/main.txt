@@ -10,4 +10,3 @@ psycopg2
 requests
 SQLAlchemy
 sqlalchemy-utils
-six
