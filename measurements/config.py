@@ -18,6 +18,9 @@ BASE_URL = os.environ.get("BASE_URL", "https://api.ooni.io/")
 AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
                                       "http://datacollector.infra.ooni.io/ooni-public/autoclaved/")
 
+CENTRIFUGATION_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
+                                "http://datacollector.infra.ooni.io/ooni-public/centrifugation/")
+
 # S3 related configuration
 S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", None)
 S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", None)

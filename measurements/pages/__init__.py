@@ -3,7 +3,7 @@ import os
 import re
 from datetime import timedelta, datetime
 
-from six.moves.urllib.parse import urljoin
+from urllib.parse import urljoin
 
 import requests
 import lz4framed
@@ -23,6 +23,8 @@ pages_blueprint = Blueprint('pages', 'measurements',
                             static_folder='static',
                             static_url_path='/static/')
 
+
+DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
 def _latest_reports():
     q = current_app.db_session.query(Report) \
@@ -142,11 +144,14 @@ def _files_on_date(date, order_by, order):
 
 @pages_blueprint.route('/files/by_date/<date>')
 def files_on_date(date):
-    # XXX do some validation of date
+    if not DAY_REGEXP.match(date):
+        raise BadRequest('Invalid date format')
+
     order_by = request.args.get('order_by', 'test_start_time')
     order = request.args.get('order', 'desc')
     if order.lower() not in ('desc', 'asc'):
-        raise BadRequest()
+        raise BadRequest('order must be desc or asc')
+
     if order_by not in ('test_start_time', 'probe_cc', 'report_id',
                         'test_name', 'probe_asn'):
         raise BadRequest()
@@ -203,7 +208,10 @@ def _files_in_country(country_code, order_by, order):
 
 @pages_blueprint.route('/files/by_country/<country_code>')
 def files_in_country(country_code):
-    # XXX do some validation of date
+    if len(country_code) != 2:
+        raise BadRequest('Country code must be two characters')
+    country_code = country_code.upper()
+
     order_by = request.args.get('order_by', 'test_start_time')
     order = request.args.get('order', 'desc')
     if order.lower() not in ('desc', 'asc'):
@@ -233,6 +241,7 @@ def decompress_autoclaved(
             # byte positions specified are inclusive -- https://tools.ietf.org/html/rfc7233#section-2.1
             headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size - 1)}
             r = requests.get(url, headers=headers, stream=True)
+            r.raise_for_status()
             beginning = True
             # Create a copy because we are in a closure
             to_read = report_size
@@ -267,6 +276,17 @@ def decompress_autoclaved(
 
 @pages_blueprint.route('/files/download/<path:textname>')
 def files_download(textname):
+    if '/' not in textname:
+        # This is for backward compatibility with the new pipeline.
+        # See: https://github.com/TheTorProject/ooni-measurements/issues/44
+        q = current_app.db_session.query(Report.textname)\
+                .filter(Report.textname.endswith(textname))
+        first = q.first()
+        if first is None:
+            raise NotFound("No file with that filename found")
+
+        return redirect('/files/download/%s' % first[0])
+
     subquery = current_app.db_session.query(
             Measurement.frame_off.label('frame_off'),
             Measurement.frame_size.label('frame_size'),
@@ -277,9 +297,9 @@ def files_download(textname):
             func.sum(Measurement.intra_size + 1).over().label('report_size'),
             Autoclaved.filename.label('filename'),
     ).filter(Report.textname == textname) \
-        .join(Report, Report.report_no == Measurement.report_no) \
-        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no) \
-        .subquery()
+     .join(Report, Report.report_no == Measurement.report_no) \
+     .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no) \
+     .subquery()
 
     q = current_app.db_session.query(
         subquery.c.frame_off,
@@ -318,7 +338,6 @@ def files_download(textname):
     return Response(stream_with_context(resp_generator()), mimetype='text/json')
 
 # These two are needed to avoid breaking older URLs
-DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 @pages_blueprint.route('/<date>/<report_file>')
 def backward_compatible_download(date, report_file):
     if DAY_REGEXP.match(date) and report_file.endswith(".json"):

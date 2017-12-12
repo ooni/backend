@@ -7,16 +7,21 @@ there is no versioning on them.
 """
 from datetime import datetime
 
+from urllib.parse import urljoin
+
+import json
+import requests
+
 from pycountry import countries
 
 from flask import Blueprint, current_app, request
 from flask.json import jsonify
 
-from sqlalchemy import func
+from sqlalchemy import func, or_, distinct
 
 from werkzeug.exceptions import BadRequest
 
-from measurements.models import Report, Measurement
+from measurements.models import Report, Measurement, Input
 from measurements.models import TEST_NAMES
 
 # prefix: /api/_
@@ -159,3 +164,132 @@ def api_private_countries():
     return jsonify({
         "countries": country_list
     })
+
+# XXX Everything below here are ghetto hax to support legacy OONI Explorer
+@api_private_blueprint.route('/blockpages', methods=["GET"])
+def api_private_blockpages():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None:
+        raise Exception('err')
+
+    q = current_app.db_session.query(
+        Report.report_id.label('report_id'),
+        Report.probe_cc.label('probe_cc'),
+        Report.probe_asn.label('probe_asn'),
+        Report.test_start_time.label('test_start_time'),
+        Input.input.label('input')
+    ).join(Measurement, Measurement.report_no == Report.report_no) \
+     .join(Input, Measurement.input_no == Input.input_no) \
+     .filter(Measurement.confirmed == True) \
+     .filter(or_(
+        Report.test_name == 'http_requests',
+        Report.test_name == 'web_connectivity'
+      )) \
+     .filter(Report.probe_cc == probe_cc)
+
+    results = []
+    for row in q:
+        results.append({
+            'report_id': row.report_id,
+            'probe_cc': row.probe_cc,
+            'probe_asn': "AS{}".format(row.probe_asn),
+            'test_start_time': row.test_start_time,
+            'input': row.input
+        })
+
+    return jsonify({
+        'results': results
+    })
+
+@api_private_blueprint.route('/website_measurements', methods=["GET"])
+def api_private_website_measurements():
+    input_ = request.args.get('input')
+    if input_ is None:
+        raise Exception('err')
+
+    q = current_app.db_session.query(
+        Report.report_id.label('report_id'),
+        Report.probe_cc.label('probe_cc'),
+        Report.probe_asn.label('probe_asn'),
+        Report.test_start_time.label('test_start_time'),
+        Input.input.label('input'),
+    ).join(Measurement, Measurement.report_no == Report.report_no) \
+     .join(Input, Measurement.input_no == Input.input_no) \
+     .filter(Measurement.confirmed == True) \
+     .filter(or_(
+        Report.test_name == 'http_requests',
+        Report.test_name == 'web_connectivity'
+      )) \
+     .filter(Input.input.contains(input_))
+
+    results = []
+    for row in q:
+        results.append({
+            'report_id': row.report_id,
+            'probe_cc': row.probe_cc,
+            'probe_asn': "AS{}".format(row.probe_asn),
+            'test_start_time': row.test_start_time,
+            'input': row.input
+        })
+
+    return jsonify({
+        'results': results
+    })
+
+
+@api_private_blueprint.route('/blockpage_detected', methods=["GET"])
+def api_private_blockpage_detected():
+    q = current_app.db_session.query(
+        distinct(Report.probe_cc).label('probe_cc'),
+    ).join(Measurement, Measurement.report_no == Report.report_no) \
+     .filter(Measurement.confirmed == True) \
+     .filter(or_(
+        Report.test_name == 'http_requests',
+        Report.test_name == 'web_connectivity'
+      ))
+
+    results = []
+    for row in q:
+        results.append({
+            'probe_cc': row.probe_cc
+        })
+
+    return jsonify({
+        'results': results
+    })
+
+
+@api_private_blueprint.route('/blockpage_count', methods=["GET"])
+def api_private_blockpage_count():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None:
+        raise Exception('err')
+    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'],
+                  'blockpage-count-%s.json' % probe_cc)
+    resp_text = json.dumps({'results': []})
+    resp = requests.get(url)
+    if resp.status_code != 404:
+        resp_text = resp.text
+    return current_app.response_class(
+        resp_text,
+        mimetype=current_app.config['JSONIFY_MIMETYPE']
+    )
+
+@api_private_blueprint.route('/measurement_count_by_country', methods=["GET"])
+def api_private_measurement_count_by_country():
+    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-by-country.json')
+    resp = requests.get(url)
+    return current_app.response_class(
+        resp.text,
+        mimetype=current_app.config['JSONIFY_MIMETYPE']
+    )
+
+
+@api_private_blueprint.route('/measurement_count_total', methods=["GET"])
+def api_private_measurement_count_total():
+    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-total.json')
+    resp = requests.get(url)
+    return current_app.response_class(
+        resp.text,
+        mimetype=current_app.config['JSONIFY_MIMETYPE']
+    )

@@ -27,7 +27,7 @@ def init_db(app):
     Base.query = app.db_session.query_property()
     init_query_logging(app)
 
-QUERY_TIME_THRESHOLD = 2.0 # Time in seconds after which we will start logging warnings for too long queries
+QUERY_TIME_THRESHOLD = 60.0 # Time in seconds after which we will start logging warnings for too long queries
 
 def init_query_logging(app):
     @event.listens_for(Engine, "before_cursor_execute")

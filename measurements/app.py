@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 import logging
 import datetime
+import sys
 import os
 
 from flask import Flask, json
@@ -53,6 +54,8 @@ def init_app(app):
         app.jinja_env.auto_reload = True
         app.config['TEMPLATES_AUTO_RELOAD'] = True
         app.config['DEBUG'] = True
+    elif app.config['APP_ENV'] not in ('testing', 'staging'): # known envs according to Readme.md
+        raise RuntimeError('Unexpected APP_ENV', app.config['APP_ENV'])
 
     for key in app.config.keys():
         SECRET_SUBSTRINGS = ["_SECRET_", "DATABASE_URL"]
@@ -71,6 +74,9 @@ def check_config(config):
 
 def create_app(*args, **kw):
     from measurements import views
+
+    if sys.version_info[0] < 3:
+        raise RuntimeError("Python >= 3 is required")
 
     app = Flask(__name__)
     app.json_encoder = FlaskJSONEncoder
