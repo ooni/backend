@@ -163,19 +163,23 @@ def get_measurement(measurement_id):
         # XXX we should actually return a 404 here
         raise BadRequest("No measurement found")
 
+    # Usual size of LZ4 frames is 256kb of decompressed text.
+    # Largest size of LZ4 frame was ~55Mb compressed and ~56Mb decompressed. :-/
     range_header = "bytes={}-{}".format(msmt.frame_off, msmt.frame_off + msmt.frame_size - 1)
     r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
-            headers={"Range": range_header}, stream=True)
-
-    # XXX use for streaming support lz4framed.Decompressor
-    # @darkk how big can these lz4 frames even become? Should this be a concern?
-    msmt_data = lz4framed.decompress(r.raw.read())[msmt.intra_off:msmt.intra_off+msmt.intra_size]
-
-    # XXX do we also want to replace on the fly the measurement_id inside of
-    # the report itself?
-    # msmt_data = msmt_data.replace(msmt.m_id, measurement_id)
+            headers={"Range": range_header})
+    r.raise_for_status()
+    blob = r.content
+    if len(blob) != msmt.frame_size:
+        raise RuntimeError('Failed to fetch LZ4 frame', len(blob), msmt.frame_size)
+    blob = lz4framed.decompress(blob)[msmt.intra_off:msmt.intra_off+msmt.intra_size]
+    if len(blob) != msmt.intra_size or blob[:1] != b'{' or blob[-1:] != b'}':
+        raise RuntimeError('Failed to decompress LZ4 frame to measurement.json', len(blob), msmt.intra_size, blob[:1], blob[-1:])
+    # There is no replacement of `measurement_id` with `msm_no` or anything
+    # else to keep sanity. Maybe it'll happen as part of orchestration update.
+    # Also, blob is not decoded intentionally to save CPU
     return current_app.response_class(
-        msmt_data,
+        blob,
         mimetype=current_app.config['JSONIFY_MIMETYPE']
     )
 
