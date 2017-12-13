@@ -1,3 +1,9 @@
+# ooni-measurements 1.0.3 [2017-12-XX]
+
+Fixes:
+
+* Properly get the centrifiguation URL env variable
+
 # ooni-measurements 1.0.2 [2017-12-12]
 
 Added:
