@@ -6,7 +6,6 @@ VERSION = $(shell cat package.json \
   | awk -F: '{ print $$2 }' \
   | sed 's/[",]//g' \
   | tr -d '[[:space:]]')
-APP_NAME = openobservatory/ooni-api:$(VERSION)
 
 PWD = $(shell pwd)
 
@@ -23,9 +22,6 @@ clean:
 
 venv:
 	virtualenv -p python3.5 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
-
-build:
-	docker build -t $(APP_NAME) .
 
 dev:
 	$(PYTHON_WITH_ENV) -m measurements run -p 3000 --reload
@@ -55,10 +51,6 @@ test: test-unit test-functional
 
 dropdb:
 	psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
-
-push: build
-	echo "Pushing $(APP_NAME) to docker hub"
-	docker push $(APP_NAME)
 
 .PHONY: default dev build clean shell \
 		test test-unit test-functional \

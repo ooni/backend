@@ -1,3 +1,5 @@
+# Build: run ooni-sysadmin.git/scripts/docker-build from this directory
+
 FROM python:3.5.2-slim
 ENV PYTHONUNBUFFERED 1
 
