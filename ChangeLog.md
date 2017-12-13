@@ -1,3 +1,21 @@
+# ooni-measurements 1.0.2 [2017-12-12]
+
+Added:
+
+* Private API endpoints for legacy OONI Explorer
+
+* Styled 404 and 400 pages
+
+Changes:
+
+* Better 500 error handling
+
+* Increase the query timeout threshold
+
+Fixed:
+
+* Backward compatibility with old report links
+
 # ooni-measurements 1.0.1 [2017-09-29]
 
 Changes:
