@@ -907,6 +907,7 @@ class MeasurementFeeder(BaseFeeder):
                 LEFT JOIN input USING (input)
                 LEFT JOIN residual USING (residual)
             ''') # TODO: `LEFT JOIN measurement_blob_` to fail fast
+        del self.pgconn
 
 class MeasurementExceptionFeeder(BaseFeeder):
     sink_table = 'measurement_exc'
@@ -927,6 +928,7 @@ class MeasurementExceptionFeeder(BaseFeeder):
                 FROM measurement_exc mex
                 WHERE mex.msm_no = msm.msm_no
             ''')
+        del self.pgconn
 
 
 # Python WTF:
@@ -1014,6 +1016,7 @@ class ReportFeeder(BaseFeeder):
                 FROM report_meta
                 JOIN report_blob USING (report_no)
             ''') # TODO: `LEFT JOIN report_blob` to fail fast in case of errors
+        del self.pgconn
 
 
 TRACEBACK_LINENO_RE = re.compile(r' line \d+,')
@@ -1062,6 +1065,7 @@ class BadmetaFeeder(BaseFeeder):
             FROM badmeta_
             GROUP BY badmeta_.autoclaved_no, badmeta_.report_no
             ''')
+        del self.pgconn
 
 
 class BadrowFeeder(object):
@@ -1229,6 +1233,7 @@ class DnsFeeder(BaseFeeder):
                     ttl, resolver_hostname, client_resolver, control_failure, test_failure
                 FROM dns_a_
             ''')
+        del self.pgconn
 
 
 class BodySimhashDummyFeeder(object):
