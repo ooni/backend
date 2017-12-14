@@ -92,6 +92,19 @@ class CountingTee(object):
         self.__size += len(ret)
         self.__copy.write(ret)
         return ret
+    def tell(self):
+        return self.__src.tell()
+    def seek(self, dest): # NB: no `whence` ~ whence=os.SEEK_SET
+        skipwant = dest - self.tell()
+        if skipwant < 0:
+            raise RuntimeError('Unable to seek backwards while reading the stream')
+        elif skipwant > 0:
+            while skipwant:
+                step = min(skipwant, 262144)
+                skiplen = len(self.read(step))
+                if skiplen != step:
+                    raise RuntimeError('Unexpected end of file', step, skiplen)
+                skipwant -= step
     @property
     def size(self):
         return self.__size

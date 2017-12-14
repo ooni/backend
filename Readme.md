@@ -46,8 +46,8 @@ canning-1.py | tar c 2000-13-42/foo.yaml 2000-13-42/bar.json
 uncompressed data and send them to `tar`.
 
 `canning-2.py`: reads a `.tar` file, verifies the sizes of reports, calculates
-the sha1 and crc32 of each report, calculate size of tar file and then pipes it
-to `lz4`.
+the sha1 and crc32 of each report, calculate size of tar file and then pipes
+the unmodified tar file to `lz4`.
 
 `canning-3.py`: reads a `.lz4` from the pipe, calculates it's size, sha1 and
 crc32, dumps the lz4 file & all the checksums to disk.
@@ -61,7 +61,9 @@ file truncations.
 ### Autoclaving
 
 The purpose of the **autoclaving** stage is to perform normalization and
-sanitization of the report files.
+sanitization of the report files including
+[PII cleanup](https://github.com/TheTorProject/ooni-pipeline/issues/105)
+if leak is discovered.
 This means converting legacy YAML reports to JSON as well as converting all
 measurements to a consistent JSON format (and performing some fixes to the data
 format to avoid surprising consumers of the data).
@@ -87,7 +89,7 @@ stores metadata into a PostgreSQL database for further processing.
 
 Note: in the airflow DAG view this is actually called `meta_pg`.
 
-## Raw reports sensor
+### Raw reports sensor
 
 This is not technically a task, but is rather a "sensor" in airflow lingo. What
 this means is that a check is done at `chameleon` (the host that aggregates all
@@ -126,16 +128,101 @@ times.
 
 The file to edit is located in `af/shovel/centrifugation.py`.
 
+Most of the time you will be adding a new `Feeder`. A `Feeder` is something
+that populates a given table with a particular class of measurements.
+
+To create a new `Feeder` you will have to implement some methods:
+
+```python
+class MyFeeder(BaseFeeder):
+    min_compat_code_ver = 4
+    data_table = sink_table = 'my_fancy_test'
+    columns = ('msm_no', 'some_value')
+
+    @staticmethod
+    def row(msm_no, datum):
+        ret = ''
+        if datum['test_name'] == 'my_fancy_test':
+            some_value = datum['test_keys'].get('some_value', None)
+            ret = '{:d}\t{}\n'.format(
+              msm_no,
+              pg_quote(some_value) # if it's nullable or string
+            )
+        return ret
+
+    @staticmethod
+    def pop(datum):
+        test_keys = datum['test_keys']
+        test_keys.pop('some_value', None)
+```
+
+The `row` method should return a row in `COPY FROM` syntax to populate the `sink_table` with the
+extracted metadata.
+
+The `pop` method should pop all the extracted keys (or the keys specific to this test that are to be ignored), so that the resulting datum is "clean".
+
+The `sink_table` class attribute defined which table is going to be written and
+`columns` specifies which columns should be present in such table.
+`data_table` defines the table to cleanup in case of _reprocessing_, that's
+useful if `sink_table` is temporary (in that case you'll likely have to
+implement `close()` method that melds temporary table into persistent one).
+
+`min_compat_code_ver` defines centrifugration code versions that are
+compatible with this extractor. If you are adding a new feeder, then this
+should contain the single bumped `CODE_VER` string (more on this
+below).
+
+1b. (optional) Create SQL migration script
+
+If you are populating new tables, or the schema of existing tables need to
+change, you need to create a new SQL migration script inside of `af/oometa/`.
+
+Be sure to write both the `install` and the `rollback` version of it.
+
+In the `install`, wrap everything inside of a transaction and call the
+[versioning helper](https://github.com/depesz/Versioning), for example:
+
+```
+BEGIN;
+
+select _v.register_patch( '00x-my-new-schema', ARRAY[ '00x-depends-on' ], NULL );
+
+-- Create your tables or make changes
+
+COMMIT;
+```
+
+In the `rollback`, you should restore the DB to previous state and call the
+unregister method of `_v`:
+
+```
+BEGIN;
+
+select _v.unregister_patch( '00x-my-new-schema' );
+
+-- Drop the table you create or alter the schema to be in the previous state
+
+COMMIT;
+```
+
 2. Push a new docker image
 
 You should then build a new docker image by bumping the version number inside of
 `af/shovel/build`.
 
+The image should then be pushed to dockerhub by running:
+
+```
+docker push openobservatory/shovel:latest && docker push openobservatory/shovel:0.0.NN
+```
+
 3. Redeploy an update
 
-To redeploy the updated version of the pipeline you should run from the
-`ansible` directory of the [ooni-sysadmin
-repo](https://github.com/thetorproject/ooni-sysadmin) the following:
+To redeploy the updated version of the pipeline you should use
+[ooni-sysadmin](https://github.com/thetorproject/ooni-sysadmin).
+
+Bump the version number inside of `ansible/roles/airflow/files/docker-trampoline`,
+then run from the `ansible` directory:
 
 ```
 ./play deploy-pipeline.yml --tags airflow-dags
@@ -193,8 +280,7 @@ the database directly.
 3. Bump version information in `centrifugation.py`
 
 Look inside of `centrifugation.py` and bump `CODE_VER`.
-In the same file look for references to `compat_code_ver` and change that where
-needed (you will probably have to append to the list everywhere).
+In the same file change `min_compat_code_ver` in `HttpRequestFPFeeder`.
 
 4. Fix assertion to the fingerprint table
 
@@ -225,7 +311,20 @@ stage" from step 2. onwards.
 
 The task you want to re-run is labelled `meta_pg`.
 
-## To extend the DAG
+Reprocessing the whole dataset takes a couple of days, it's done
+asynchronously, but the pipeline does not implement any priorities, so it may
+block data ingestion for a while.
+
+### Extending or adding a new DAG
+
+Some examples of tasks that require one or the other:
+
+* extend: fetch data from collectors or backup stuff to S3 after processing
+* new dag: fetch data regarding ASNs (as there is no dependency on other tasks)
+
+Also, DAGs may trigger another DAGs, but DAGs are "pausable" so it's another
+way to reason about extending vs. creation. E.g. one may want to be able to
+pause processing, but continue ingestion.
 
 You need to edit the DAG inside of ooni-sysadmin repo:
 https://github.com/TheTorProject/ooni-sysadmin/tree/master/ansible/roles/airflow/files/airflow-dags
@@ -235,14 +334,29 @@ Add a `BashOperator`, get the `task_id`.
 Then add a new switch case inside of
 `ansible/roles/airflow/files/docker-trampoline`.
 
+### Partial re-processing
+
+There are following usual reasons to run partial re-processing:
+
+- PII leaks are identified and corresponding public autoclaved files have to be
+  updated (as well as LZ4 framing in these files), so these files must be
+  re-processed from scratch
+- processing schema changes for some "low-volume" test method like
+  `vanilla_tor` (~99% of data volume is `web_connectivity` test data)
+- new files are added to the bucket when pipeline ticks more often than daily
+
+PII leak may be handled with `UPDATE autoclaved SET code_ver = 0 WHERE …`, `0`
+is _reserved_ `code_ver` value also named `CODE_VER_REPROCESS`.
+`centrifugation.py` will re-ingest alike autoclaved file while preserving `msm_no`.
 
 ## OONI Infrastructure specific
 
-To access the machine you need to setup a SSH tunnel. It runs at
-`datacollector.ooni.io`.
+To access airflow web-interface you need to setup a SSH tunnel. It runs at
+`datacollector.infra.ooni.io`.
 
 This line is what you want inside of your config:
 ```
+Host datacollector.infra.ooni.io
 LocalForward localhost:8080 172.26.43.254:8080
 ```
 

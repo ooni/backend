@@ -170,6 +170,27 @@ Highlights
 
 *SHA1* — SHA1 is **not** used as a secure hash function, it's just a [speedy checksum](https://github.com/TheTorProject/ooni-pipeline/issues/40#issuecomment-275941676) that may be used to detect possible duplicates and for data scrubbing as LZ4 [does not currently implement](https://github.com/lz4/lz4/blob/v1.7.4.2/lib/lz4frame.c#L873) checksums for **compressed** data (aka *Block checksum*). OONI report storage is not tamper-evident as well.
 
+Centrifugation
+==============
+
+There are several possible actions to do with each autoclaved file during *centrifugation*.
+
+1. *ingest* -- the file was never seen and is processed for the first time
+2. *reingest* -- the autoclaved file was changed (including LZ4 framing) and all corresponding records should be updated
+3. *reprocess* -- the file was already processed, but some new table has to be populated
+
+Ingestion is normal process of new data entering the system.
+
+Reingestion is usually caused by PII cleanup or other updates to *autoclaving*
+step. Reingestion is usually trigged by changed `file_sha1` of autoclaved file.
+
+Reprocessing is triggered by `code_ver`. Every autoclaved file has
+`autoclaved.code_ver` mark in the metadata postgres DB and whole step has
+`centrifugation.CODE_VER` as well set in `centrifugation.py`.
+If `code_ver` and `CODE_VER` match, the file is not processed at all, it's not
+even read. If `code_ver` does not match, then the file is read, but it depends
+on `code_ver` column and `min_compat_code_ver` attribute if corresponding tables
+are overwritten.
 
 Gotchas
 =======
