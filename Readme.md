@@ -135,7 +135,7 @@ To create a new `Feeder` you will have to implement some methods:
 
 ```python
 class MyFeeder(BaseFeeder):
-    min_compat_code_ver = (4, )
+    min_compat_code_ver = 4
     data_table = sink_table = 'my_fancy_test'
     columns = ('msm_no', 'some_value')
 

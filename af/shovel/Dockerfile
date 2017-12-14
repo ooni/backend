@@ -1,3 +1,5 @@
+# Build: run ooni-sysadmin.git/scripts/docker-build from this directory
+
 FROM ubuntu:16.04
 
 # All the actions are done within single RUN to reduce number of layers & overall fetch size.
