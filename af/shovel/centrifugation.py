@@ -678,7 +678,6 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
     # badrow_sink does not need dummy feeder as `__flush_stubborn()` calls
     # write() explicitly and double fault just raises exception and aborts.
     badrow_sink = PGCopyFrom(pgconn, BadrowFeeder.sink_table, columns=BadrowFeeder.columns)
-    sink_list.append(badrow_sink)
 
     # Okay, "special" tables are done, let's register more generic DATA_TABLES.
     data_tables_args = {
@@ -701,6 +700,10 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
         if HttpRequestFeeder in flist or HttpControlFeeder in flist:
             flist.append(body)
         ver_feeders[ver] = flist
+
+    # `badrow_sink` has to be created before `data_tables` feeders, but
+    # it can be closed only AFTER all sink for those feeders are closed.
+    sink_list.append(badrow_sink)
 
     feeder_list = list(data_tables.values())
     feeder_list.extend((body, badmeta, msm_exc, msm, report))
