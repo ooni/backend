@@ -16,6 +16,7 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
 from measurements.models import Report, Measurement, Autoclaved
+from measurements.config import REQID_HDR, request_id
 
 # Exporting it
 from .docs import api_docs_blueprint
@@ -239,7 +240,10 @@ def decompress_autoclaved(
         try:
             url = urljoin(current_app.config['AUTOCLAVED_BASE_URL'], autoclaved_filename)
             # byte positions specified are inclusive -- https://tools.ietf.org/html/rfc7233#section-2.1
-            headers = {"Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size - 1)}
+            headers = {
+                "Range": "bytes={}-{}".format(frame_off, frame_off + total_frame_size - 1),
+                REQID_HDR: request_id(),
+            }
             r = requests.get(url, headers=headers, stream=True)
             r.raise_for_status()
             beginning = True

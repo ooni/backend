@@ -5,6 +5,8 @@ from __future__ import unicode_literals
 
 import os
 
+from flask import request
+
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 CACHE_DEFAULT_TIMEOUT = None
@@ -29,3 +31,10 @@ S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
 
 # As of 2017-07-18 635830 is the latest index in the database
 REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "635830"))
+
+REQID_HDR = "Request-Id"
+
+def request_id():
+    if request:
+        return request.headers.get(REQID_HDR)
+    return None

@@ -23,6 +23,7 @@ from werkzeug.exceptions import BadRequest
 
 from measurements.models import Report, Measurement, Input
 from measurements.models import TEST_NAMES
+from measurements.config import REQID_HDR, request_id
 
 # prefix: /api/_
 api_private_blueprint = Blueprint('api_private', 'measurements')
@@ -267,7 +268,7 @@ def api_private_blockpage_count():
     url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'],
                   'blockpage-count-%s.json' % probe_cc)
     resp_text = json.dumps({'results': []})
-    resp = requests.get(url)
+    resp = requests.get(url, headers={REQID_HDR: request_id()})
     if resp.status_code != 404:
         resp_text = resp.text
     return current_app.response_class(
@@ -278,7 +279,7 @@ def api_private_blockpage_count():
 @api_private_blueprint.route('/measurement_count_by_country', methods=["GET"])
 def api_private_measurement_count_by_country():
     url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-by-country.json')
-    resp = requests.get(url)
+    resp = requests.get(url, headers={REQID_HDR: request_id()})
     return current_app.response_class(
         resp.text,
         mimetype=current_app.config['JSONIFY_MIMETYPE']
@@ -288,7 +289,7 @@ def api_private_measurement_count_by_country():
 @api_private_blueprint.route('/measurement_count_total', methods=["GET"])
 def api_private_measurement_count_total():
     url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-total.json')
-    resp = requests.get(url)
+    resp = requests.get(url, headers={REQID_HDR: request_id()})
     return current_app.response_class(
         resp.text,
         mimetype=current_app.config['JSONIFY_MIMETYPE']

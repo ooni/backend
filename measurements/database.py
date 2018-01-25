@@ -13,6 +13,8 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy_utils import database_exists, create_database
 
+from measurements.config import request_id
+
 Base = declarative_base()
 
 def init_db(app):
@@ -26,6 +28,13 @@ def init_db(app):
     )
     Base.query = app.db_session.query_property()
     init_query_logging(app)
+
+    @event.listens_for(app.db_session, 'after_begin')
+    def after_begin(session, transaction, connection):
+        reqid = request_id()
+        if not reqid:
+            reqid = 'measurements'
+        session.execute('set application_name = :reqid', {'reqid': reqid})
 
 QUERY_TIME_THRESHOLD = 60.0 # Time in seconds after which we will start logging warnings for too long queries
 
