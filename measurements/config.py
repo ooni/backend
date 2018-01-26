@@ -14,6 +14,7 @@ CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
 
 APP_ENV = os.environ.get("APP_ENV", "development")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres@localhost:5432/ooni_measurements")
+DATABASE_STATEMENT_TIMEOUT = int(os.environ.get("DATABASE_STATEMENT_TIMEOUT", "0")) # to kill long-running statements ASAP
 
 BASE_URL = os.environ.get("BASE_URL", "https://api.ooni.io/")
 
