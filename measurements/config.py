@@ -33,7 +33,7 @@ S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
 # As of 2017-07-18 635830 is the latest index in the database
 REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "635830"))
 
-REQID_HDR = "Request-Id"
+REQID_HDR = "X-Request-ID"
 
 def request_id():
     if request:
