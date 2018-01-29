@@ -89,6 +89,7 @@ def create_app(*args, **kw):
 
     views.register(app)
 
+    # why is it `teardown_appcontext` and not `teardown_request` ?...
     @app.teardown_appcontext
     def shutdown_session(exception=None):
         app.db_session.remove()

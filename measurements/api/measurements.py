@@ -19,7 +19,7 @@ from sqlalchemy.orm import lazyload, exc
 from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
-from measurements.config import REPORT_INDEX_OFFSET
+from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
 from measurements.models import Report, Input, Measurement, Autoclaved, Label
 
 MSM_ID_PREFIX = 'temp-id'
@@ -167,7 +167,7 @@ def get_measurement(measurement_id):
     # Largest size of LZ4 frame was ~55Mb compressed and ~56Mb decompressed. :-/
     range_header = "bytes={}-{}".format(msmt.frame_off, msmt.frame_off + msmt.frame_size - 1)
     r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
-            headers={"Range": range_header})
+            headers={"Range": range_header, REQID_HDR: request_id()})
     r.raise_for_status()
     blob = r.content
     if len(blob) != msmt.frame_size:

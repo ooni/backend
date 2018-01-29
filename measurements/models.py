@@ -36,7 +36,9 @@ TEST_NAMES = {
     'whatsapp': 'WhatsApp',
     'vanilla_tor': 'Vanilla Tor',
     'facebook_messenger': 'Facebook Messenger',
-    'ndt': 'NDT'
+    'ndt': 'NDT',
+    'dash': 'DASH',
+    'telegram': 'Telegram',
 }
 
 # create domain size4 as int4 check (value >= 0);

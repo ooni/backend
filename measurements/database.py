@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
 import time
 
 from sqlalchemy import event
@@ -13,11 +14,24 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy_utils import database_exists, create_database
 
+from measurements.config import request_id
+
 Base = declarative_base()
 
 def init_db(app):
+    if os.path.exists('/proc/sys/kernel/random/boot_id'): # MacOS...
+        with open('/proc/sys/kernel/random/boot_id') as fd:
+            application_name = 'measurements-{:d}-{}'.format(os.getpid(), fd.read(8))
+    else:
+        application_name = 'measurements-{:d}'.format(os.getpid())
+    connect_args = {
+        # Unfortunately this application_name is not logged during `connection authorized`,
+        # but it is used for `disconnection` event even if the client dies during query!
+        'application_name': application_name,
+        'options': '-c statement_timeout={:d}'.format(app.config['DATABASE_STATEMENT_TIMEOUT']),
+    }
     app.db_engine = create_engine(
-        app.config['DATABASE_URL'], convert_unicode=True
+        app.config['DATABASE_URL'], convert_unicode=True, connect_args=connect_args
     )
     if not database_exists(app.db_engine.url):
         create_database(app.db_engine.url)
@@ -26,6 +40,13 @@ def init_db(app):
     )
     Base.query = app.db_session.query_property()
     init_query_logging(app)
+
+    @event.listens_for(app.db_session, 'after_begin')
+    def after_begin(session, transaction, connection):
+        reqid = request_id()
+        if not reqid:
+            reqid = application_name
+        session.execute('set application_name = :reqid', {'reqid': reqid})
 
 QUERY_TIME_THRESHOLD = 60.0 # Time in seconds after which we will start logging warnings for too long queries
 
