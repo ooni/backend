@@ -54,6 +54,7 @@ COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.p
     cleanup_sanitised.py \
     canned_repeated.py \
     canned_gzip_index.py \
+    tar_reports_raw.py \
     /usr/local/bin/
 
 USER daemon
