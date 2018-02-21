@@ -23,7 +23,7 @@
     "gulp-sourcemaps": "^2.2.0",
     "gulp-util": "^3.0.7",
     "gulp-watch": "^4.3.9",
-    "jquery": "^2.2.1",
+    "jquery": "^3.0.0",
     "metrics-graphics": "2.10",
     "moment": "^2.17.0",
     "node-sass": "^4.5.3",

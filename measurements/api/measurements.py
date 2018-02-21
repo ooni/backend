@@ -271,11 +271,14 @@ def list_measurements(
 
     q = current_app.db_session.query(*cols)\
             .join(Report, Report.report_no == Measurement.report_no)\
-            .outerjoin(Label, Label.msm_no == Measurement.msm_no)\
-            .outerjoin(Input, Measurement.input_no == Input.input_no)
+            .outerjoin(Label, Label.msm_no == Measurement.msm_no)
 
     if input_:
-        q = q.filter(Input.input.like('%{}%'.format(input_)))
+        q = q.join(Input, Measurement.input_no == Input.input_no)\
+             .filter(Input.input.like('%{}%'.format(input_)))
+    else:
+        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
+
     if report_id:
         q = q.filter(Report.report_id == report_id)
     if probe_cc:
@@ -305,7 +308,6 @@ def list_measurements(
             Measurement.residual_no == None,
             c_failure == False
         ))
-
 
     if order_by is not None:
         q = q.order_by('{} {}'.format(order_by, order))
