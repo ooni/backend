@@ -200,8 +200,6 @@ def list_measurements(
         confirmed=None
     ):
     input_ = request.args.get("input")
-    if input_ is not None and len(input_) < 3:
-        raise BadRequest("`input` too short")
 
     if probe_asn is not None:
         if probe_asn.startswith('AS'):

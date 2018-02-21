@@ -24,6 +24,7 @@ paths:
         - name: input
           in: query
           type: string
+          minLength: 3
           description: The input (for example a URL or IP address) to search measurements for
         - name: probe_cc
           in: query
