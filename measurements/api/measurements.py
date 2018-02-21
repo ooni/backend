@@ -191,7 +191,7 @@ def list_measurements(
         since=None,
         until=None,
         since_index=None,
-        order_by=None,
+        order_by='test_start_time',
         order='desc',
         offset=0,
         limit=100,
