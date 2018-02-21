@@ -1,6 +1,6 @@
 # OONI measurements
 
-Source for https://measurements.ooni.torproject.org/
+Source for https://api.ooni.io/
 
 ## Local development
 
