@@ -252,16 +252,28 @@ def pack_bucket(listing, can_size=64*1048576):
 
     return asis, tarfiles
 
+@contextmanager
+def tar_flistz_tempfile(bucket, slice_files):
+    # Create list of NUL-terminated files for tar `--files-from`.
+    with tempfile.NamedTemporaryFile(prefix='flistz') as flistz:
+        for name in slice_files:
+            flistz.write(bucket + '/' + name + '\0')
+        flistz.flush()
+        yield flistz.name
 
 def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
     # Size of argv array is limited, `getconf ARG_MAX` shows ~2 Mbytes on
     # modern Linux, but it may vary across platforms & devices with different
     # memory size. The code for pipeline-16.10 uses up to ~170 Kbytes of the
     # limit while grouping files at 64 Mbytes boundary with pack_bucket().
-    tar_argv = ['tar', '--create', '--directory', input_root] + ['--add-file='+bucket+'/'+_ for _ in slice_files]
+    # But one year later `ndt` arrived with lots of small measuements (4KiB per
+    # report) and it leads to 8MiB CLI arg. That's why `--add-file` is not used
+    # anymore. `--verbatim-files-from` option is not available for `tar` from
+    # Ubuntu-16.04, so it's not used as well.
     with tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdout, \
          open(os.devnull, 'rb') as devnull, \
-         ScopedPopen(tar_argv, stdin=devnull, stdout=PIPE) as proc_tar, \
+         tar_flistz_tempfile(bucket, slice_files) as files_from, \
+         ScopedPopen(['tar', '--create', '--directory', input_root, '--null', '--files-from', files_from], stdin=devnull, stdout=PIPE) as proc_tar, \
          ScopedPopen(['lz4', '-5'], stdin=PIPE, stdout=PIPE) as proc_lz4:
 
         cleanup = (proc_tar.kill, proc_lz4.kill) # circuit breaker
