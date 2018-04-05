@@ -28,89 +28,41 @@ from measurements.config import REQID_HDR, request_id
 # prefix: /api/_
 api_private_blueprint = Blueprint('api_private', 'measurements')
 
+
+def api_private_stats_by_month(orm_stat):
+    # data for https://api.ooni.io/stats
+    # Report.test_start_time protection against time travellers may be
+    # implemented in a better way, but that sanity check is probably enough.
+    now = datetime.now()
+    ooni_epoch = datetime(2012, 12, 1)
+    r = current_app.db_session.query(
+            func.date_trunc('month', Report.test_start_time).label('test_start_month'),
+            orm_stat
+        ).filter(Report.test_start_time >= ooni_epoch).filter(Report.test_start_time < now
+        ).group_by('test_start_month')
+    result = [{
+        'date': bkt.strftime("%Y-%m-%d"),
+        'value': value,
+    } for bkt, value in sorted(r)]
+    return jsonify(result)
+
 @api_private_blueprint.route('/asn_by_month')
 def api_private_asn_by_month():
-    NOW = datetime.now()
-    result = []
-    r = current_app.db_session.query(
-            Report.test_start_time,
-            Report.probe_asn) \
-        .order_by(Report.test_start_time)
-
-    # XXX this can be done better in a SQL that is not sqlite
-    monthly_buckets = {}
-    for tst, asn in r:
-        asn = 'AS%d' % asn
-        if tst > NOW:
-            # We ignore measurements from time travelers
-            continue
-        bkt = tst.strftime("%Y-%m-01")
-        monthly_buckets[bkt] = monthly_buckets.get(bkt, [])
-        if asn not in monthly_buckets[bkt]:
-            monthly_buckets[bkt].append(asn)
-
-    for bkt in monthly_buckets.keys():
-        result.append({
-            'date': bkt,
-            'value': len(monthly_buckets[bkt])
-        })
-    return jsonify(result)
-
+    # The query takes ~6s on local SSD @ AMS on 2018-04-04.
+    # It was taking ~45s when it was fetching all the table from DB and doing grouping locally.
+    return api_private_stats_by_month( func.count(distinct(Report.probe_asn)) )
 
 @api_private_blueprint.route('/countries_by_month')
-def api_private_counties_by_month():
-    NOW = datetime.now()
-    result = []
-    r = current_app.db_session.query(
-            Report.test_start_time,
-            Report.probe_cc) \
-        .order_by(Report.test_start_time)
-
-    # XXX this can be done better in a SQL that is not sqlite
-    monthly_buckets = {}
-    for tst, country in r:
-        if tst > NOW:
-            # We ignore measurements from time travelers
-            continue
-        bkt = tst.strftime("%Y-%m-01")
-        monthly_buckets[bkt] = monthly_buckets.get(bkt, [])
-        if country not in monthly_buckets[bkt]:
-            monthly_buckets[bkt].append(country)
-
-    for bkt in monthly_buckets.keys():
-        result.append({
-            'date': bkt,
-            'value': len(monthly_buckets[bkt])
-        })
-    return jsonify(result)
-
+def api_private_countries_by_month():
+    # The query takes ~10s on local SSD @ AMS on 2018-04-04.
+    # It was taking ~25s when it was fetching all the table from DB and doing grouping locally.
+    return api_private_stats_by_month( func.count(distinct(Report.probe_cc)) )
 
 @api_private_blueprint.route('/runs_by_month')
 def api_private_runs_by_month():
-    NOW = datetime.now()
-    result = []
-    r = current_app.db_session.query(
-            Report.test_start_time) \
-        .order_by(Report.test_start_time)
-
-    # XXX this can be done better in a SQL that is not sqlite
-    monthly_buckets = {}
-    for res in r:
-        tst = res.test_start_time
-        if tst > NOW:
-            # We ignore measurements from time travelers
-            continue
-        bkt = tst.strftime("%Y-%m-01")
-        monthly_buckets[bkt] = monthly_buckets.get(bkt, 0)
-        monthly_buckets[bkt] += 1
-
-    for bkt in monthly_buckets.keys():
-        result.append({
-            'date': bkt,
-            'value': monthly_buckets[bkt]
-        })
-
-    return jsonify(result)
+    # The query takes ~6s on local SSD @ AMS on 2018-04-04.
+    # It was taking ~20s when it was fetching all the table from DB and doing grouping locally.
+    return api_private_stats_by_month( func.count() )
 
 @api_private_blueprint.route('/reports_per_day')
 def api_private_reports_per_day():
