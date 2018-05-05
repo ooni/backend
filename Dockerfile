@@ -21,6 +21,11 @@ RUN set -x \
     && pip install -U pip setuptools \
     && pip install -r /tmp/requirements.txt
 
+# Install tor
+
+RUN set -x \
+    && apt-get install tor -y
+
 # Copy the directory into the container
 COPY . /app/
 
