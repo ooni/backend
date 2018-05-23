@@ -50,6 +50,7 @@ COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.p
     aws_s3_ls.py \
     aws_s3_lz4cat_sync.py \
     cleanup_reports_raw.py \
+    cleanup_uploaded.py \
     check_sanitised.py \
     cleanup_sanitised.py \
     canned_repeated.py \
