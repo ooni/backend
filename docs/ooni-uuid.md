@@ -33,6 +33,7 @@ It's nice to have int64 identifier having 32 bits allocated for `time_t` as an u
 - report_id may be duplicate across _different(!)_ report files, e.g. `2016-02-11/20160210T163242Z-IR-AS201227-http_requests-yZthLDkKNe6IdePf7B1gMgNvRxSMDwNGWD6BB1MWcuY2T3q7oLmDQkjhZARARuic-0.1.0-probe.yaml` and `2016-02-23/20160210T163242Z-IR-AS201227-http_requests-yZthLDkKNe6IdePf7B1gMgNvRxSMDwNGWD6BB1MWcuY2T3q7oLmDQkjhZARARuic-0.1.0-probe.yaml`
 - `bucket_date` can be more than a year away from HTTP `Date` timestamps while `report_id` timestamp is reasonable, e.g. [2015-02-01](https://api.ooni.io/files/download/2016-02-27/20150201T095956Z-BE-AS12392-http_requests-no_report_id-0.1.0-probe.yaml), that's likely upload of ancient measurements
 - the dataset has 3.6M reports. 80% have unique timestamps, but 753k reports have 316k coincident timestamps, having at most ~20 reports per timestamp
+- the dataset has 147M measurements, at least 28 bits are needed to numerate them
 
 And that's probably incomplete list of corner cases.
 
