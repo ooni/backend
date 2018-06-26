@@ -57,8 +57,8 @@ counter bits | 7-digit nibble-aligned offset within sha1
 The smallest known timestamp in the current dataset is 0x50bef44d (2012-12-05 07:14:21 UTC), so OOID with first nibble [0-4] may have different binary meaning.
 The largest one is 0x5b29a005 (2018-06-20 00:29:57), but that's subject to change :-)
 
-It's practical to brute-force a sha1-hmac or siphash key to make counter 24bit, so it'll be aligned at byte boundary.
-The probability of collision of single hash function truncated to 24bits among those 316k coincident timestamps is ~3e-4, so it's like brute-forcing ~11 bits.
+It's practical to brute-force a sha1-hmac or siphash key to make counter 24 bit, so it'll be aligned at byte boundary.
+The probability of collision of single hash function truncated to 24 bits among those 316k coincident timestamps is ~3e-4, so it's like brute-forcing ~11 bits.
 
 It's not practical to make counter 20 bit with _single_ hash function as it's
 equivalent to brute-forcing 186-bit key. But it's practical to have ~150..200
