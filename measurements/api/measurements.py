@@ -300,13 +300,13 @@ def list_measurements(
         q = q.filter(or_(
             Measurement.exc != None,
             Measurement.residual_no != None,
-            c_failure == True,
+            c_msm_failure == True,
         ))
     if failure is False:
         q = q.filter(and_(
             Measurement.exc == None,
             Measurement.residual_no == None,
-            c_failure == False
+            c_msm_failure == False
         ))
 
     if order_by is not None:
