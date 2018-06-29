@@ -1,4 +1,20 @@
-# ooni-measurements 1.0.3 [2017-12-XX]
+# ooni-measurements 1.0.4 [2018-06-29]
+
+Changes:
+
+* Minimum length for input is now 3 characters
+
+* Validate the test_name field in list_measurements
+
+Fixes:
+
+* Handle failure=true | failure=false query parameters to list_measurements
+
+* Fix a deprecation warning with SQLAlchemy
+
+# ooni-measurements 1.0.3 [2017-12-13]
+
+[note: untagged]
 
 Fixes:
 
