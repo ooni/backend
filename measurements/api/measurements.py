@@ -13,7 +13,7 @@ from flask import Blueprint, current_app, request
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
-from sqlalchemy import func, or_, and_, false, true
+from sqlalchemy import func, or_, and_, false, true, text
 from sqlalchemy.orm import lazyload, exc
 
 from urllib.parse import urljoin, urlencode
@@ -310,7 +310,7 @@ def list_measurements(
         ))
 
     if order_by is not None:
-        q = q.order_by('{} {}'.format(order_by, order))
+        q = q.order_by(text('{} {}'.format(order_by, order)))
 
     query_time = 0
     q = q.limit(limit).offset(offset)
