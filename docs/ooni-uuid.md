@@ -46,7 +46,7 @@ And that's probably incomplete list of corner cases.
 
 So, given that:
 
-* In body timestamps (i.e. `test_start_time`, `measurement_start_time`, etc.) are unreliable
+* Timestamps in the measurement body (i.e. `test_start_time`, `measurement_start_time`, etc.) are unreliable
 * We have bucket date and filename as a part of "golden" dataset
 * We have quite precise timestamp as part of dataset
 
