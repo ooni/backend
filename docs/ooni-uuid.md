@@ -21,8 +21,6 @@ All these identifiers are not nice due to following reasons:
 
 It's nice to have int64 identifier having 32 bits allocated for `time_t` as an unique identifier of every measurement collected. It has to respect following constraints and corner-cases:
 
-- int64 fits into postgres fixed-width native type unlike larger fields
-- some "namespace" spearation is needed to distinguish pipeline-backfilled OOIDs from collector-stamped OOIDs during rollout of stamping collector
 - max number of measurements per report file is 1000003 (20 bits) for 2014-11-22/20141122T040940Z-US-AS1968-tcp_connect-no_report_id-0.1.0-probe.yaml (top5 is 1000003, 65007, 41889, 40875, 30949)
 - max number of measurements per report file in 2018-01-01 … 2018-06-15 time window is ~5000
 - client may have wrong wall-clock date, e.g. [2018-06-02 13:05:08](https://api.ooni.io/files/download/2018-06-03/20180802T130309Z-LY-AS37284-ndt-20180602T130508Z_AS37284_Vl7cO6V33OkYBoJgQL403dM2L4arYk7WEAeiPizIW6au6aVfV5-0.2.0-probe.json) reports `test_start_time` fro2018-08-02 13:03:09 from future and [2017-11-13 15:13:05](https://api.ooni.io/files/download/2017-11-14/20031106T094115Z-IQ-AS50710-ndt-20171113T151305Z_AS50710_beuliHbl2zzV3F05or7NIt4ynhZFUCCOjKf1okz1zTov3lvLJU-0.2.0-probe.json) reports from past 2003-11-06 09:41:15.
@@ -36,14 +34,29 @@ It's nice to have int64 identifier having 32 bits allocated for `time_t` as an u
 - the dataset has 3.6M reports. 80% have unique timestamps, but 753k reports have 316k coincident timestamps, having at most ~20 reports per timestamp
 - the dataset has 147M measurements, at least 28 bits are needed to numerate them
 
+Moreover we would like the OONI UUID to have the following properties:
+
+- It's a 64 bit integer (8 bytes) so that it can fits into postgres `bigint` fixed-width native type unlike larger fields
+- A sort of "namespace" separation to distinguish pipeline-backfilled OOIDs from collector-stamped OOIDs during rollout of stamping collector
+- There is some loose ordering over the ID so that measurements that are close in time have an ID that is of similar cardinality (ex. all measurements from 2018 should have an ID that is `<<` measurements from 2019).
+
 And that's probably incomplete list of corner cases.
 
 ## Backfilled OOID
 
-So, given unreliable nature of in-body timestamps, having bucket date and filename as a part of "golden" dataset, having quite precise timestamp as part of dataset, I suggest to use following schema for _backfilled_ `OOID` (OONI UUID):
-- 32 bits representing time_t stored as `report_id` part of textname, fallback to time_t stored as prefix of the textname basename that usually represents server-side interpretation of client-side `test_start_time`. 
-- 4 bits set to `1` forming nibble `f`
+So, given that:
+
+* Timestamps in the measurement body (i.e. `test_start_time`, `measurement_start_time`, etc.) are unreliable
+* We have bucket date and filename as a part of "golden" dataset
+* We have quite precise timestamp as part of dataset
+
+The proposed schema for _backfilled_ `OOID` (OONI UUID) is the following:
+
+- 32 bits representing time_t stored as `report_id` part of textname, fallback to time_t stored as prefix of the textname basename that usually represents server-side interpretation of client-side `test_start_time` (i.e. we try to get from the data we have available the time that is closest to when the measurement was submitted to the collector, approximating, in the worst case, to the time in which the measurement was added to a bucket). 
+- 4 bits set to `1` forming nibble `f` (which is a reserved magic value to indicate the `ooid` was backfilled)
 - 28 bits of counter indicating measurement index within report file initialised with 28 least significant bits of `sha1(b'2014-11-18/2014…-probe.yaml')`
+
+Note: we tested with historical data up to 2018-06-20, that using the 28 least significant bits of the output of `sha1` does not lead to a collision, but we may change this offset if we notice a collision while we roll-out this feature. See the below sections for more details on this.
 
 Amount of static bits may be reduced to single `1` bit, but 28 bits of entropy are enough to avoid collisions and single `f` nibble looks nice in logs.
 
@@ -97,15 +110,6 @@ counter bits | 7-digit nibble-aligned offset within sha1
 The smallest known timestamp in the current dataset is 0x50bef44d (2012-12-05 07:14:21 UTC), so OOID with first nibble [0-4] may have different binary meaning.
 The largest one is 0x5b29a005 (2018-06-20 00:29:57), but that's subject to change :-)
 
-It's practical to brute-force a sha1-hmac or siphash key to make counter 24 bit, so it'll be aligned at byte boundary.
-The probability of collision of single hash function truncated to 24 bits among those 316k coincident timestamps is ~3e-4, so it's like brute-forcing ~11 bits.
-
-It's not practical to make counter 20 bit with _single_ hash function as it's
-equivalent to brute-forcing 186-bit key. But it's practical to have ~128...256
-_independent_ keys for hash function to have collision-free 20 bit counter for backfilling.
-
-Estimates of those probabilities are available in [jupyter notebook](./ooid-hash-prob.ipynb).
-
 Here is the Python code implementing suggested OOID:
 
 ```python
@@ -131,6 +135,21 @@ Test vectors:
 >>> ooid('2018-06-20/20180620T002915Z-DE-AS28753-http_header_field_manipulation-20180620T002917Z_AS28753_ZryhjoYMtU6jEx9TOjDCRuBo5z5te2fLWWj7gkvmkMkbLlnFTi-0.2.0-probe.json', 0)
 '5b299fddf5c34544'
 ```
+
+### Using less bits for counter
+
+If the OOID prefix is the same for all the measurements in the report file, then the minimal possible bit length for the counter is 20 bits. There is a report having 1000003 measurements that needs at least 20 bits.
+
+It's not trivial to have numbering schema that depends only on report file and does not provide collisions across different reports. The outline of collision probability for $time:$static:$counter schema over the whole dataset is estimated below.
+
+It's practical to brute-force a sha1-hmac or siphash key to make counter 24 bit, so it'll be aligned at byte boundary.
+The probability of collision of single hash function truncated to 24 bits among those 316k coincident timestamps is ~3e-4, so it's like brute-forcing ~11 bits.
+
+It's not practical to make counter 20 bit with _single_ hash function as it's
+equivalent to brute-forcing 186-bit key. But it's practical to have ~128...256
+_independent_ keys for hash function to have collision-free 20 bit counter for backfilling.
+
+Estimates of those probabilities are available in [jupyter notebook](./ooid-hash-prob.ipynb).
 
 ## Collector-stamped OOID
 
