@@ -108,15 +108,6 @@ counter bits | 7-digit nibble-aligned offset within sha1
 The smallest known timestamp in the current dataset is 0x50bef44d (2012-12-05 07:14:21 UTC), so OOID with first nibble [0-4] may have different binary meaning.
 The largest one is 0x5b29a005 (2018-06-20 00:29:57), but that's subject to change :-)
 
-It's practical to brute-force a sha1-hmac or siphash key to make counter 24 bit, so it'll be aligned at byte boundary.
-The probability of collision of single hash function truncated to 24 bits among those 316k coincident timestamps is ~3e-4, so it's like brute-forcing ~11 bits.
-
-It's not practical to make counter 20 bit with _single_ hash function as it's
-equivalent to brute-forcing 186-bit key. But it's practical to have ~128...256
-_independent_ keys for hash function to have collision-free 20 bit counter for backfilling.
-
-Estimates of those probabilities are available in [jupyter notebook](./ooid-hash-prob.ipynb).
-
 Here is the Python code implementing suggested OOID:
 
 ```python
@@ -142,6 +133,21 @@ Test vectors:
 >>> ooid('2018-06-20/20180620T002915Z-DE-AS28753-http_header_field_manipulation-20180620T002917Z_AS28753_ZryhjoYMtU6jEx9TOjDCRuBo5z5te2fLWWj7gkvmkMkbLlnFTi-0.2.0-probe.json', 0)
 '5b299fddf5c34544'
 ```
+
+### Using less bits for counter
+
+If the OOID prefix is the same for all the measurements in the report file, then the minimal possible bit length for the counter is 20 bits. There is a report having 1000003 measurements that needs at least 20 bits.
+
+It's not trivial to have numbering schema that depends only on report file and does not provide collisions across different reports. The outline of collision probability for $time:$static:$counter schema over the whole dataset is estimated below.
+
+It's practical to brute-force a sha1-hmac or siphash key to make counter 24 bit, so it'll be aligned at byte boundary.
+The probability of collision of single hash function truncated to 24 bits among those 316k coincident timestamps is ~3e-4, so it's like brute-forcing ~11 bits.
+
+It's not practical to make counter 20 bit with _single_ hash function as it's
+equivalent to brute-forcing 186-bit key. But it's practical to have ~128...256
+_independent_ keys for hash function to have collision-free 20 bit counter for backfilling.
+
+Estimates of those probabilities are available in [jupyter notebook](./ooid-hash-prob.ipynb).
 
 ## Collector-stamped OOID
 
