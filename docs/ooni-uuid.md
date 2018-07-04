@@ -56,6 +56,8 @@ The proposed schema for _backfilled_ `OOID` (OONI UUID) is the following:
 - 4 bits set to `1` forming nibble `f` (which is a reserved magic value to indicate the `ooid` was backfilled)
 - 28 bits of counter indicating measurement index within report file initialised with 28 least significant bits of `sha1(b'2014-11-18/2014…-probe.yaml')`
 
+Note: we tested with historical data up to 2018-06-20, that using the 28 least significant bits of the output of `sha1` does not lead to a collision, but we may change this offset if we notice a collision while we roll-out this feature. See the below sections for more details on this.
+
 Amount of static bits may be reduced to single `1` bit, but 28 bits of entropy are enough to avoid collisions and single `f` nibble looks nice in logs.
 
 ### `textname` to `time_t` test vectors
