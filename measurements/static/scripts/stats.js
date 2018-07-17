@@ -13,7 +13,11 @@ var markers = [{
 }, {
   'date': new Date('2016-10-14T00:00:00.000Z'),
   'label': 'ooniprobe 2.0.0 released'
-}];
+},{
+  'date': new Date('2017-02-08T00:00:00.000Z'),
+  'label': 'OONI Probe mobile app launched'
+}
+];
 
 d3.json('/api/_/asn_by_month', (data) => {
     data = MG.convert.date(data, 'date');
@@ -30,7 +34,8 @@ d3.json('/api/_/asn_by_month', (data) => {
         animate_on_load: true,
         target: '#asn_by_month',
         x_accessor: 'date',
-        y_accessor: 'value'
+        y_accessor: 'value',
+        markers: markers
     });
 });
 
@@ -49,7 +54,8 @@ d3.json('/api/_/countries_by_month', (data) => {
         color: '#046799',
         target: '#countries_by_month',
         x_accessor: 'date',
-        y_accessor: 'value'
+        y_accessor: 'value',
+        markers: markers
     });
 });
 
@@ -68,6 +74,7 @@ d3.json('/api/_/runs_by_month', (data) => {
         color: '#046799',
         target: '#runs_by_month',
         x_accessor: 'date',
-        y_accessor: 'value'
+        y_accessor: 'value',
+        markers: markers
     });
 });

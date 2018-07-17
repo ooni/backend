@@ -6,6 +6,7 @@ not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 from urllib.parse import urljoin
 
@@ -33,15 +34,19 @@ def api_private_stats_by_month(orm_stat):
     # data for https://api.ooni.io/stats
     # Report.test_start_time protection against time travellers may be
     # implemented in a better way, but that sanity check is probably enough.
+    ## ooni_epoch = datetime(2012, 12, 1)
+
     now = datetime.now()
-    ooni_epoch = datetime(2012, 12, 1)
+    end_date = datetime(now.year, now.month, 1)
+    start_date = end_date - relativedelta(months=24)
+
     r = current_app.db_session.query(
             func.date_trunc('month', Report.test_start_time).label('test_start_month'),
             orm_stat
-        ).filter(Report.test_start_time >= ooni_epoch).filter(Report.test_start_time < now
+        ).filter(Report.test_start_time >= start_date).filter(Report.test_start_time < end_date
         ).group_by('test_start_month')
     result = [{
-        'date': bkt.strftime("%Y-%m-%d"),
+        'date': (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
         'value': value,
     } for bkt, value in sorted(r)]
     return jsonify(result)
