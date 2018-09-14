@@ -33,6 +33,9 @@ RUN set -ex \
     && apt-get install -y python3-pip awscli \
     && pip3 install --system awscli==1.11.185 \
     && : \
+    && apt-get install --no-install-recommends -y openssh-client rsync \
+    && useradd -m ooshovel -u 1000 \
+    && : \
     && apt-get remove --auto-remove -y \
             python-pkg-resources build-essential python-setuptools python-setuptools-scm git-core python2.7-dev \
             python-pip \
