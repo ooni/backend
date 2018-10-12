@@ -37,6 +37,9 @@ d3.json('/api/_/asn_by_month', (data) => {
         y_accessor: 'value',
         markers: markers
     });
+
+    d3.select("#asn_by_month").select(".loader")
+      .attr("style", "display: none");
 });
 
 d3.json('/api/_/countries_by_month', (data) => {
@@ -57,6 +60,8 @@ d3.json('/api/_/countries_by_month', (data) => {
         y_accessor: 'value',
         markers: markers
     });
+    d3.select("#countries_by_month").select(".loader")
+      .attr("style", "display: none");
 });
 
 d3.json('/api/_/runs_by_month', (data) => {
@@ -77,4 +82,7 @@ d3.json('/api/_/runs_by_month', (data) => {
         y_accessor: 'value',
         markers: markers
     });
+
+    d3.select("#runs_by_month").select(".loader")
+      .attr("style", "display: none");
 });
