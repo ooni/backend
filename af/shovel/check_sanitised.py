@@ -20,7 +20,7 @@ import ujson
 import lz4.frame as lz4frame
 
 import autoclaving
-from canning import dirname
+from oonipl.cli import dirname
 
 FILE_START, FILE_END, REPORT_START, REPORT_END, BADBLOB, DATUM = object(), object(), object(), object(), object(), object()
 

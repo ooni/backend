@@ -49,7 +49,6 @@ RUN set -ex \
     && :
 
 COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.py \
-    tor_log.py \
     aws_s3_ls.py \
     aws_s3_lz4cat_sync.py \
     cleanup_reports_raw.py \
@@ -60,5 +59,7 @@ COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.p
     canned_gzip_index.py \
     tar_reports_raw.py \
     /usr/local/bin/
+
+COPY oonipl /usr/local/lib/python2.7/dist-packages/oonipl
 
 USER daemon

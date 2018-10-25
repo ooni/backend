@@ -9,9 +9,10 @@ import json
 import os
 
 import autoclaving
-from canning import dirname, listdir_filesize
+from canning import listdir_filesize
 from check_sanitised import calc_santoken
 from cleanup_reports_raw import s3_ls_jsongz
+from oonipl.cli import dirname
 
 def cleanup_sanitised(sanitised_root, autoclaved_root, bucket, s3_ls):
     if 'public/sanitised/' not in s3_ls['metadata']['url']:

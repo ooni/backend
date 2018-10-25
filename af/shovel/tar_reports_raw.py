@@ -10,8 +10,9 @@ import time
 
 from contextlib import closing
 
-from canning import dirname, load_verified_index, listdir_filesize, stream_canning
-from aws_s3_lz4cat_sync import ScopedTmpdir
+from canning import load_verified_index, listdir_filesize, stream_canning
+from oonipl.cli import dirname
+from oonipl.tmp import ScopedTmpdir
 
 def filelist_from_canndx(canned_index):
     filelist = []

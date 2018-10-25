@@ -13,8 +13,10 @@ from subprocess import PIPE
 
 import psycopg2
 
-from canning import ScopedPopen, dirname, INDEX_FNAME
-from centrifugation import PGCopyFrom, pg_quote, pg_binquote
+from canning import INDEX_FNAME
+from oonipl.pg import PGCopyFrom, pg_quote, pg_binquote
+from oonipl.cli import dirname
+from oonipl.popen import ScopedPopen
 
 def get_repeated_sha1(files):
     # to avoid keeping 300Mb+ (and counting) in RAM

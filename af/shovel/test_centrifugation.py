@@ -17,7 +17,8 @@ from base64 import b64encode
 
 import psycopg2
 
-from centrifugation import httpt_body, PGCopyFrom, pg_quote, pg_unquote, exc_hash, pop_values, ChecksummingTee, NopTeeFd
+from centrifugation import httpt_body, exc_hash, pop_values, ChecksummingTee, NopTeeFd
+from oonipl.pg import PGCopyFrom, pg_quote, _pg_unquote
 
 
 def _httpt_body(body, te=None):
@@ -57,12 +58,12 @@ class TestPGQuoting(unittest.TestCase):
         self.assertEqual(pg_quote(False), 'FALSE')
     def test_bits(self):
         blob = u''.join(map(unichr, xrange(1, 256))).encode('utf-8')
-        self.assertEqual(blob, pg_unquote(pg_quote(blob)))
+        self.assertEqual(blob, _pg_unquote(pg_quote(blob)))
         self.assertEqual(u'\ufffd'.encode('utf-8'), pg_quote(u'\u0000'))
         self.assertEqual(u'\ufffd'.encode('utf-8'), pg_quote('\0'))
     def test_ugly(self):
         blob = r'\\n'
-        self.assertEqual(blob, pg_unquote(pg_quote(blob)))
+        self.assertEqual(blob, _pg_unquote(pg_quote(blob)))
 
 PG = os.getenv('UNITTEST_PG')
 
