@@ -6,13 +6,9 @@ import gzip
 import json
 import os
 
-from canning import dirname, load_verified_index, listdir_filesize
-
-def json_gz(fname):
-    return json.load(gzip.GzipFile(fname))
-
-def jsonl_gz(fname):
-    return map(json.loads, gzip.GzipFile(fname))
+from canning import load_verified_index, listdir_filesize
+from oonipl.cli import dirname
+from oonipl.jsonz import jsonl_gz, json_gz
 
 def cleanup_reports_raw(reports_raw_root, bucket, texts):
     dirname = os.path.join(reports_raw_root, bucket)

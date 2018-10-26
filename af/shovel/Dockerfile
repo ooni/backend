@@ -16,16 +16,9 @@ RUN set -ex \
     && git checkout -b build dc512f81f3d73069610ce33bb88abfff1fb2f96d \
     && python2.7 setup.py install --single-version-externally-managed --root=/ \
     && : \
-# Cython simhash, tag: v0.3.0, python-six is dependency, not build-dep
-    && git clone https://github.com/seomoz/simhash-py.git /var/tmp/simhash-py \
-    && cd /var/tmp/simhash-py \
-    && git checkout -b build 79bd4044f046c5542aee8e72849932f9e5d65403 \
-    && git submodule update --init --recursive \
-    && python2.7 setup.py install \
-    && : \
 # `pip` pollutes /root/.cache
     && apt-get install -y python-pip \
-    && pip install --system mmh3==2.3.1 \
+    && pip install --system mmh3==2.3.1 simhash-py=0.4.0 \
     && : \
 # awscli in ubuntu has a bug that triggers following error message in `aws s3 cp`:
 # upload failed: tmp/oo....yaml to s3://ooni-data/autoclaved/jsonl/2017-04-22/201...yaml seek() takes 2 positional arguments but 3 were given
@@ -49,7 +42,6 @@ RUN set -ex \
     && :
 
 COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.py \
-    tor_log.py \
     aws_s3_ls.py \
     aws_s3_lz4cat_sync.py \
     cleanup_reports_raw.py \
@@ -60,5 +52,7 @@ COPY canning.py daily_workflow.py autoclaving.py centrifugation.py originas2pg.p
     canned_gzip_index.py \
     tar_reports_raw.py \
     /usr/local/bin/
+
+COPY oonipl /usr/local/lib/python2.7/dist-packages/oonipl
 
 USER daemon

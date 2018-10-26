@@ -5,11 +5,10 @@ import gzip
 import json
 import os
 import re
-import shutil
-import tempfile
-from contextlib import contextmanager
 from datetime import datetime
 from subprocess import check_call, check_output
+
+from oonipl.tmp import ScopedTmpdir
 
 if datetime.fromtimestamp(0) != datetime(1970, 1, 1, 0, 0, 0):
     raise RuntimeError('awscli requires TZ=UTC')
@@ -21,14 +20,6 @@ def parse_args():
     p.add_argument('--s3-prefix', metavar='PREFIX', help='S3 bucket prefix to upload files to', required=True)
     opt = p.parse_args()
     return opt
-
-@contextmanager
-def ScopedTmpdir(*args, **kwargs):
-    tmpdir = tempfile.mkdtemp(*args, **kwargs)
-    try:
-        yield tmpdir
-    finally:
-        shutil.rmtree(tmpdir)
 
 def strip_prefix(s, prefix):
     l = len(prefix)

@@ -23,8 +23,10 @@ import yaml
 from yaml import CLoader # fail-fast if it's not built
 
 import canning
-from canning import ScopedPopen, PIPE, isomidnight, dirname, listdir_filesize
+from canning import listdir_filesize
 from daily_workflow import NormaliseReport, SanitiseReport
+from oonipl.cli import dirname, isomidnight
+from oonipl.popen import ScopedPopen, PIPE
 
 
 EPOCH = int(time.time()) # time to be stamped in produced tar files

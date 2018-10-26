@@ -4,8 +4,8 @@
 import argparse
 import os
 
-from canning import dirname
-from cleanup_reports_raw import json_gz
+from oonipl.cli import dirname
+from oonipl.jsonz import json_gz
 
 def filename(s):
     if not os.path.isfile(s):
