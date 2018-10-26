@@ -182,7 +182,7 @@ class TestPartialReprocessing(unittest.TestCase):
         acroot, bucket = '/srv/autoclaved', '2017-08-28'
         with self.conn, self.conn.cursor() as c:
             # almost every table besides `fingerprint`
-            c.execute('TRUNCATE TABLE autoclaved, badmeta, badrow, dns_a, domain, http_body_simhash, http_control, http_request, http_request_fp, http_verdict, input, label, measurement, report, residual, software, tcp, vanilla_tor')
+            c.execute('TRUNCATE TABLE autoclaved, badmeta, badrow, dns_a, domain, http_control, http_request, http_request_fp, http_verdict, input, label, measurement, report, residual, software, tcp, vanilla_tor')
 
         files, modify, add = self.take_part_of_bucket(acroot, bucket)
 

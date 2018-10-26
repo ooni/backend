@@ -11,6 +11,7 @@ import numbers
 import os
 import re
 import sys
+import time
 import traceback
 from base64 import b64decode
 from contextlib import closing
@@ -29,20 +30,20 @@ from canning import ChecksummingTee, NopTeeFd
 from oonipl.tor_log import parse_tor_log
 from oonipl.cli import isomidnight, dirname
 from oonipl.pg import PGCopyFrom, pg_quote, pg_binquote, pg_uniquote
+from oonipl.sim import sim_shi4_mm3_layout, sim_shi4_mm3_text
 
 # It does NOT take into account metadata tables right now:
 # - autoclaved: it's not obvious if anything can be updated there
 # - report & measurement: have significant amount of metadata and may be actually updated eventually
 # Technically `http_headers` was added after CODE_VER=3, but bad headers were
 # causing bucket-wide exception, so re-import is not forced.
-CODE_VER = 4
+CODE_VER = 5
 
 CODE_VER_REPROCESS = 0 # special `code_ver` value to do partial re-processing
 
 FLAG_TRUE_TEMP = True # keep temporary tables if the flag is false
 FLAG_DEBUG_CHAOS = False # random fault injection
 FLAG_FAIL_FAST = False
-FLAG_SKIP_SIMHASH = True # it takes 75% of time, disable it for a while 
 assert not (FLAG_DEBUG_CHAOS and FLAG_FAIL_FAST), 'Absurd!'
 
 if FLAG_DEBUG_CHAOS:
@@ -51,23 +52,6 @@ if FLAG_DEBUG_CHAOS:
 # There are some reports that have duplicate report_id, same filename and same
 # content, there are ~500 of them by 2017-07-12. Some of them should be skipped.
 DUPLICATE_REPORTS = set()
-
-WORD_RE = re.compile('''[^\t\n\x0b\x0c\r !"#$%&\'()*+,-./:;<=>?@[\\\\\\]^_`{|}~']+''')
-
-def sim_shi4_mm3(text):
-    # NB: It makes quite little sense to use both 64bit numbers to compare
-    # hashes as pairwise Hamming distance using high 64bit is highly correlated
-    # with the distance computed using low 64bit. It's actually expected, but
-    # it means, that summing these distances is not linear and should be avoided.
-    # -- https://gist.github.com/darkk/e2b2762c4fe053a3cf8a299520f0490e
-    i1, i2 = itertools.tee(WORD_RE.finditer(text))
-    for _ in xrange(3): # 4 words per shingle
-        next(i2, None)
-    # mmh3.hash64 produces pairs of signed i64
-    # simhash.compute expects list of unsigned ui64 and produces unsigned ui64
-    mm = [mmh3.hash64(text[m1.start():m2.end()]) for m1, m2 in itertools.izip(i1, i2)]
-    return (simhash.compute([_[0] & 0xffffffffffffffff for _ in mm]),
-            simhash.compute([_[1] & 0xffffffffffffffff for _ in mm]))
 
 # NB: 30% of simtext2pg.py is spent here
 def to_signed(integer):
@@ -496,12 +480,6 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
     for feeder in (report, msm, msm_exc, badmeta):
         sink_list.append(feeder.init_sink(pgconn))
 
-    # `body` is dummy feeder to mimic feeder/sink protocol and be able to flush
-    # rows into DB while processing measurements one-by-one.
-    body = BodySimhashDummyFeeder()
-    body.sink = BodySimhashSink(stconn)
-    sink_list.append(body.sink)
-
     # badrow_sink does not need dummy feeder as `__flush_stubborn()` calls
     # write() explicitly and double fault just raises exception and aborts.
     badrow_sink = PGCopyFrom(pgconn, BadrowFeeder.sink_table, columns=BadrowFeeder.columns)
@@ -510,8 +488,8 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
     data_tables_args = {
         DnsFeeder: (pgconn,),
         HttpRequestFPFeeder: (pgconn,),
-        HttpRequestFeeder: (body.sink,),
-        HttpControlFeeder: (body.sink,),
+        HttpRequestFeeder: (),
+        HttpControlFeeder: (),
     }
     data_tables = {} # class -> feeder instance
     ver_feeders = {} # code_ver -> list of feeders
@@ -524,8 +502,6 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
                     sink_list.append(feeder.init_sink(pgconn, badrow_sink))
                     data_tables[cls] = feeder
                 flist.append(data_tables[cls])
-        if HttpRequestFeeder in flist or HttpControlFeeder in flist:
-            flist.append(body)
         ver_feeders[ver] = flist
 
     # `badrow_sink` has to be created before `data_tables` feeders, but
@@ -533,7 +509,7 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
     sink_list.append(badrow_sink)
 
     feeder_list = list(data_tables.values())
-    feeder_list.extend((body, badmeta, msm_exc, msm, report))
+    feeder_list.extend((badmeta, msm_exc, msm, report))
 
     return report, msm, msm_exc, badmeta, ver_feeders, sink_list, feeder_list
 
@@ -624,6 +600,7 @@ def iter_autoclaved_datum(pgconn, autoclaved_root, bucket):
         ''', [bucket, CODE_VER])
         for (filename, file_size, file_crc32, file_sha1), itfile in groupby(cmeta, itemgetter(0, 1, 2, 3)):
             print 'Processing autoclaved {}'.format(filename)
+            begin = time.time() # time.monotonic() is Python 3.5+
             with open(os.path.join(autoclaved_root, filename)) as fd:
                 fd = ChecksummingTee(fd, NopTeeFd)
                 for (frame_off, frame_size), itframe in groupby(itfile, itemgetter(4, 5)):
@@ -640,6 +617,9 @@ def iter_autoclaved_datum(pgconn, autoclaved_root, bucket):
                         yield code_ver, autoclaved_no, report_no, msm_no, datum
                 for _ in iter(functools.partial(fd.read, 4096), ''):
                     pass # skip till EOF
+                real = time.time() - begin
+                size_mib = fd.size / (2. ** 20)
+                print "Processed {}: {:.1f} MiB, {:.1f} s, {:.1f} MiB/s".format(filename, size_mib, real, size_mib / real)
                 db_cksum = (file_size, file_crc32, str(file_sha1)) # file_sha1 is returned as buffer()
                 fd_cksum = (fd.size, fd.crc32, fd.sha1)
                 if db_cksum != fd_cksum:
@@ -1064,83 +1044,6 @@ class DnsFeeder(BaseFeeder):
         del self.pgconn
 
 
-class BodySimhashDummyFeeder(object):
-    fake_row = object()
-    @staticmethod
-    def row(msm_no, datum):
-        return BodySimhashDummyFeeder.fake_row
-    @staticmethod
-    def close():
-        pass
-
-class BodySimhashSink(object):
-    # NB: this data goes to small-transaction connection (stconn) to be
-    # available to other nodes as soon as it's commited.
-    # Queue is buffered to avoid round-trip to database for every webpage.
-    # Computation is delayed till filling the database as it's rather
-    # expensive, throughput is ~7.5 Mbytes/s, so roundtrip to DB is done to
-    # exclude already parsed pages. It's unclear if extra roundtrip makes sense
-    # when known_sha256 cache is used.
-    # Average body size is 75kb and cross-report cachehit is ~18%.
-    fake_row = object()
-    def __init__(self, stconn):
-        self.stconn = stconn
-        self.known_sha256 = IsKnownL2(85000, 15000)
-        self.queue = {}
-        self.known = 0
-        self.size = 0
-    def put(self, body_sha256, body):
-        if FLAG_SKIP_SIMHASH:
-            return
-        assert isinstance(body_sha256, str) and isinstance(body, str)
-        if self.known_sha256.is_known(body_sha256): # either in DB or in queue
-            self.known += 1
-            return
-        self.queue[body_sha256] = body
-        self.size += len(body)
-        # `write()` is not called from `put()` to have clean place to raise
-        # exception from, as there are several places calling `put()` guardede
-        # by TrappedException and exception in `flush()` should be fatal.
-    def write(self, row):
-        assert row is BodySimhashDummyFeeder.fake_row
-        if self.size > 16777216 or len(self.queue) > 2048:
-            self.flush()
-    def flush(self):
-        with self.stconn, self.stconn.cursor() as c:
-            # NB: https://www.datadoghq.com/blog/100x-faster-postgres-performance-by-changing-1-line/ when postgres < 9.3
-            c.execute('SELECT body_sha256 FROM http_body_simhash WHERE body_sha256 = ANY(%s)',
-                [map(psycopg2.Binary, self.queue.iterkeys())])
-            just_fetched = [str(_[0]) for _ in c]
-            for body_sha256 in just_fetched:
-                del self.queue[body_sha256]
-            args = []
-            for body_sha256, body in self.queue.iteritems():
-                hi, lo = sim_shi4_mm3(body)
-                hi, lo = to_signed(hi), to_signed(lo)
-                args.append(psycopg2.Binary(body_sha256)) # http://initd.org/psycopg/docs/usage.html#binary-adaptation
-                args.append(hi)
-                args.append(lo)
-            assert len(args) % 3 == 0
-            if len(args):
-                c.execute('INSERT INTO http_body_simhash (body_sha256, simhash_shi4mm3hi, simhash_shi4mm3lo) VALUES {} '
-                          'ON CONFLICT DO NOTHING RETURNING body_sha256'.format(
-                          ', '.join(['(%s, %s, %s)'] * (len(args) / 3))),
-                          args)
-                just_inserted = {_[0] for _ in c}
-            else:
-                just_inserted = {}
-            print 'BodySimhashSink: skipped {:d} queue {:d} pre-filter {:d} db-dup {:d}'.format(
-                    self.known,
-                    len(self.queue) + len(just_fetched),
-                    len(just_fetched),
-                    len(self.queue) - len(just_inserted))
-        self.queue.clear()
-        self.known = 0
-        self.size = 0
-    def close(self):
-        self.flush()
-        del self.stconn, self.queue, self.known_sha256
-
 class VanillaTorFeeder(BaseFeeder):
     min_compat_code_ver = 4
     data_table = sink_table = 'vanilla_tor'
@@ -1215,17 +1118,15 @@ def get_title(body):
     return title
 
 class BaseHttpFeeder(BaseFeeder):
-    def __init__(self, body_sink):
-        self.body_sink = body_sink
-    def body_sha256(self, body):
+    def pg_body_hash(self, body):
         if body is not None:
-            body_sha256 = hashlib.sha256(body)
-            digest = body_sha256.digest()
-            self.body_sink.put(digest, body)
-            body_sha256 = pg_binquote(digest)
+            body_sha256 = pg_binquote(hashlib.sha256(body).digest())
+            body_simhash = sim_shi4_mm3_layout(body)
+            body_text_simhash = sim_shi4_mm3_text(body)
         else:
             body_sha256 = pg_quote(None)
-        return body_sha256
+            body_simhash = body_text_simhash = pg_quote(None)
+        return body_sha256, body_simhash, body_text_simhash
     COMMON_HEADERS = {
         'Accept-Language': 'en-US;q=0.8,en;q=0.5',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -1250,9 +1151,10 @@ class BaseHttpFeeder(BaseFeeder):
                 tor.pop('exit_name')
 
 class HttpControlFeeder(BaseHttpFeeder):
-    min_compat_code_ver = 2
+    min_compat_code_ver = 5
     data_table = sink_table = 'http_control'
-    columns = ('msm_no', 'is_tor', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
+    columns = ('msm_no', 'is_tor', 'failure', 'status_code', 'body_length', 'title', 'headers',
+               'body_sha256', 'body_simhash', 'body_text_simhash')
     def row(self, msm_no, datum):
         ret = ''
         if datum['test_name'] == 'web_connectivity':
@@ -1265,7 +1167,7 @@ class HttpControlFeeder(BaseHttpFeeder):
                 body_length = r.get('body_length')
                 if body_length == -1:
                     body_length = None
-                ret = '{:d}\tFALSE\t{}\t{}\t{}\t{}\t{}\t\\N\n'.format(
+                ret = '{:d}\tFALSE\t{}\t{}\t{}\t{}\t{}\t\\N\t\\N\t\\N\n'.format(
                         msm_no,
                         pg_quote(r['failure']),
                         pg_quote(http_status_code(status_code)),
@@ -1277,20 +1179,22 @@ class HttpControlFeeder(BaseHttpFeeder):
                 if r['request']['tor']['is_tor']:
                     response = r['response']
                     body = httpt_body(response)
-                    body_sha256 = self.body_sha256(body)
+                    body_sha256, body_simhash, body_text_simhash = self.pg_body_hash(body)
                     if response is None:
                         response = {}
                     headers = response.get('headers')
                     if headers is not None:
                         headers = ujson.dumps(http_headers(headers))
-                    ret += '{:d}\tTRUE\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                    ret += '{:d}\tTRUE\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
                         msm_no,
                         pg_quote(r.get('failure')),
                         pg_quote(http_status_code(response.get('code'))),
                         pg_quote(len(body) if body is not None else r.get('response_length')),
                         pg_quote(get_title(body)),
                         pg_quote(headers),
-                        body_sha256)
+                        body_sha256,
+                        body_simhash,
+                        body_text_simhash)
         return ret
     def pop(self, datum):
         if datum['test_name'] == 'web_connectivity':
@@ -1317,9 +1221,10 @@ class HttpControlFeeder(BaseHttpFeeder):
 
 
 class HttpRequestFeeder(BaseHttpFeeder):
-    min_compat_code_ver = 2
+    min_compat_code_ver = 5
     data_table = sink_table = 'http_request'
-    columns = ('msm_no', 'url', 'failure', 'status_code', 'body_length', 'title', 'headers', 'body_sha256')
+    columns = ('msm_no', 'url', 'failure', 'status_code', 'body_length', 'title', 'headers',
+               'body_sha256', 'body_simhash', 'body_text_simhash')
     def row(self, msm_no, datum):
         ret = ''
         if datum['test_name'] == 'web_connectivity':
@@ -1335,13 +1240,13 @@ class HttpRequestFeeder(BaseHttpFeeder):
     def _row(self, msm_no, r):
         response = r['response']
         body = httpt_body(response)
-        body_sha256 = self.body_sha256(body)
+        body_sha256, body_simhash, body_text_simhash = self.pg_body_hash(body)
         if response is None: # may be `null` both for web_connectivity and http_requests
             response = {}
         headers = response.get('headers')
         if headers is not None:
             headers = ujson.dumps(http_headers(headers))
-        return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+        return '{:d}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
             msm_no,
             pg_quote(r['request']['url']),
             pg_quote(r.get('failure')),
@@ -1349,7 +1254,9 @@ class HttpRequestFeeder(BaseHttpFeeder):
             pg_quote(len(body) if body is not None else r.get('response_length')),
             pg_quote(get_title(body)),
             pg_quote(headers),
-            body_sha256)
+            body_sha256,
+            body_simhash,
+            body_text_simhash)
     def pop(self, datum):
         if datum['test_name'] == 'web_connectivity':
             for r in datum['test_keys']['requests']:
@@ -1502,30 +1409,6 @@ DATA_TABLES = (
     HttpRequestFPFeeder,
     HttpVerdictFeeder,
 )
-
-class IsKnownL2(object):
-    # Fixed-size in-memory set to check if some object is "known".
-    # Two-layer Random-Replacement cache improves efficiency
-    # measurably compared to one-big Random-Replacement cache.
-    def __init__(self, l1, l2):
-        self.__l1 = set()
-        self.__l2 = set()
-        self.__l1len = l1
-        self.__l2len = l2
-    def is_known(self, key):
-        l1, l2 = self.__l1, self.__l2
-        if key in l2:
-            return True
-        if key in l1:
-            l1.remove(key)
-            l2.add(key)
-            if len(l2) > self.__l2len:
-                l2.pop() # FIXME: not quite random element
-            return True
-        l1.add(key)
-        if len(l1) > self.__l1len:
-            l1.pop() # not quite random element
-        return False
 
 def meta_pg(in_root, bucket, postgres):
     assert in_root[-1] != '/' and '/' not in bucket and os.path.isdir(os.path.join(in_root, bucket))
