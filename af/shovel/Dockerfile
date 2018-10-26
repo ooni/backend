@@ -18,7 +18,7 @@ RUN set -ex \
     && : \
 # `pip` pollutes /root/.cache
     && apt-get install -y python-pip \
-    && pip install --system mmh3==2.3.1 simhash-py=0.4.0 \
+    && pip install --system mmh3==2.3.1 simhash-py==0.4.0 \
     && : \
 # awscli in ubuntu has a bug that triggers following error message in `aws s3 cp`:
 # upload failed: tmp/oo....yaml to s3://ooni-data/autoclaved/jsonl/2017-04-22/201...yaml seek() takes 2 positional arguments but 3 were given
