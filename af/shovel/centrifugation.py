@@ -233,6 +233,14 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
         intra_size  size4   NOT NULL,
         orig_sha1   sha1    NOT NULL
     ''')
+    create_temp_table(pgconn, 'badblob_meta', '''
+        filename        text    not null,
+        textname        text    not null,
+        canned_off      size4   not null,
+        canned_size     size4   not null,
+        orig_sha1       sha1    not null,
+        exc_str         text    not null
+    ''')
     if not ingest and not reingest: # short-cut
         return
     autoclaved_columns = ('autoclaved_no', 'autoclaved_xref', 'filename', 'reingest',
@@ -254,6 +262,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
         ('/report', 're'):  PGCopyFrom(pgconn, 'report_meta', columns=report_columns),
         ('datum', 'new'):   PGCopyFrom(pgconn, 'measurement_meta', columns=measurement_columns[1:]),
         ('datum', 're'):    PGCopyFrom(pgconn, 'measurement_meta', columns=measurement_columns),
+        'badblob':          PGCopyFrom(pgconn, 'badblob_meta', ('filename', 'textname', 'canned_off', 'canned_size', 'orig_sha1', 'exc_str')),
     }
     def write_row(atclv_filename, doc_type, copy_row):
         if atclv_filename in ingest:
@@ -324,6 +333,16 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
                         doc['text_off'] - frm['text_off'], # intra-frame off, as text_off is absolute
                         doc['text_size'], # intra-frame size equals to stream size :)
                         pg_binquote(b64decode(doc['orig_sha1']))))
+            elif t == 'badblob':
+                if atclv is None or rpt is None:
+                    raise RuntimeError('Corrupt index file', autoclaved_index, doc)
+                dest_wbuf[t].write('{}\t{}\t{:d}\t{:d}\t{}\t{}\n'.format(
+                    pg_quote(atclv['filename']),
+                    pg_quote(rpt['textname']),
+                    doc['src_off'],
+                    doc['src_size'],
+                    pg_binquote(b64decode(doc['orig_sha1'])),
+                    pg_quote(doc['info'])))
             else:
                 raise RuntimeError('Unknown index.json.gz row type', autoclaved_index, doc)
     # `dest_wbuf` is not managed with closing() to avoid masking one exception
@@ -1455,6 +1474,12 @@ def meta_pg(in_root, bucket, postgres):
         ''', [bucket, CODE_VER])
         if c.rowcount != len(ingest) + len(reingest):
             raise RuntimeError('Bad rowcount in autoclaved_meta', c.rowcount, len(ingest), len(reingest))
+        # `badblob` is low-cardinality table, it does not deserve optimisations.
+        c.execute('DELETE FROM badblob WHERE bucket_date = %s', [bucket])
+        c.execute('''INSERT INTO badblob
+            SELECT filename, textname, canned_off, canned_size, %s AS bucket_date, orig_sha1, exc_str
+            FROM badblob_meta
+        ''', [bucket])
     return
 
 ########################################################################
