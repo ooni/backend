@@ -1147,6 +1147,8 @@ class VanillaTorFeeder(BaseFeeder):
 
     @staticmethod
     def pop(datum):
+        if datum['test_name'] != 'vanilla_tor':
+            return
         t = datum['test_keys']
         known_keys = ('success', 'transport_name', 'error', 'timeout',
                 'tor_progress', 'tor_log', 'tor_progress_tag',
