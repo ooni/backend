@@ -10,6 +10,7 @@ import itertools
 import numbers
 import os
 import re
+import struct
 import sys
 import time
 import traceback
@@ -455,6 +456,8 @@ def delete_data_to_reprocess(pgconn, bucket):
         # `del_msm` due to `reingest` action, it does NOT represent new files
         # to be ingested.
         code_ver = set() if len(list(c)) == 0 else {CODE_VER_REPROCESS}
+        # Some of deleted rows may have some values that are heavy to re-compute every time:
+        simhash_cache = {} # sha256.digest() -> struct.pack('qq', ...)
         # `code_ver` is updated with all known versions of the bucket.
         c.execute('SELECT DISTINCT code_ver FROM autoclaved WHERE bucket_date = %s', [bucket])
         code_ver.update(_[0] for _ in c)
@@ -475,8 +478,27 @@ def delete_data_to_reprocess(pgconn, bucket):
                 should_be_cleaned = ver < tbl.min_compat_code_ver
                 should_be_cleaned_now = tbl.min_compat_code_ver <= next_ver
                 if should_be_cleaned and should_be_cleaned_now:
-                    c.execute('DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM del_msm)'.format(tbl.data_table))
-                    print 'DELETE FROM {} because of ver={:d} ~ {:d} rows gone'.format(tbl.data_table, ver, c.rowcount)
+                    if 'body_simhash' in tbl.columns and 'body_text_simhash' in tbl.columns:
+                        rowcount = None
+                        c.execute('''WITH del AS (DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM del_msm)
+                            RETURNING body_sha256, body_simhash, body_text_simhash
+                            ) SELECT body_sha256, body_simhash, body_text_simhash
+                              FROM del WHERE body_sha256 IS NOT NULL
+                              UNION
+                              SELECT NULL, COUNT(*), NULL FROM del
+                        '''.format(tbl.data_table))
+                        for row in c:
+                            if row[0] is not None:
+                                key = str(row[0]) # convert memoryview(Py3) / buffer(Py2) to str / bytes
+                                assert len(key) == 256 / 8
+                                value = BaseHttpFeeder.simhash_value_type.pack(row[1], row[2])
+                                simhash_cache[key] = value
+                            else:
+                                rowcount = row[1] # alike row must be there
+                    else:
+                        c.execute('DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM del_msm)'.format(tbl.data_table))
+                        rowcount = c.rowcount
+                    print 'DELETE FROM {} because of ver={:d} ~ {:d} rows gone'.format(tbl.data_table, ver, rowcount)
         c.execute('DROP TABLE del_msm')
         # when DATA_TABLES cleanup is done, CODE_VER_REPROCESS is added to handle files to `ingest`
         c.execute('SELECT 1 FROM autoclaved_meta WHERE NOT reingest LIMIT 1')
@@ -486,7 +508,7 @@ def delete_data_to_reprocess(pgconn, bucket):
             # simplifies version arithmetics in prepare_destination()
             code_ver.add(CODE_VER_REPROCESS)
     assert None not in code_ver
-    return code_ver
+    return code_ver, simhash_cache
 
 def prepare_destination(pgconn, stconn, bucket_code_ver):
     assert None not in bucket_code_ver
@@ -1137,11 +1159,24 @@ def get_title(body):
     return title
 
 class BaseHttpFeeder(BaseFeeder):
+    # The cache is class-wide as there are two subclasses doing this
+    # computation, both benefit from the cache and shared statistics.
+    simhash_value_type = struct.Struct('qq') # as-is from DB, signed, saves 25% of RAM for cache
+    simhash_cache = {} # sha256.digest() -> simhash_value_type
+    simhash_stat = {'get': 0, 'hit': 0}
+
     def pg_body_hash(self, body):
         if body is not None:
-            body_sha256 = pg_binquote(hashlib.sha256(body).digest())
-            body_simhash = sim_shi4_mm3_layout(body)
-            body_text_simhash = sim_shi4_mm3_text(body)
+            body_sha256 = hashlib.sha256(body).digest()
+            c = self.simhash_cache.get(body_sha256)
+            self.simhash_stat['get'] += 1
+            if c is not None:
+                self.simhash_stat['hit'] += 1
+                body_simhash, body_text_simhash = self.simhash_value_type.unpack(c)
+            else:
+                body_simhash = sim_shi4_mm3_layout(body)
+                body_text_simhash = sim_shi4_mm3_text(body)
+            body_sha256 = pg_binquote(body_sha256)
         else:
             body_sha256 = pg_quote(None)
             body_simhash = body_text_simhash = pg_quote(None)
@@ -1168,6 +1203,15 @@ class BaseHttpFeeder(BaseFeeder):
                 tor.pop('exit_ip')
             if tor['exit_name'] is None:
                 tor.pop('exit_name')
+    def close(self):
+        if self.simhash_cache:
+            print 'SimhashCache: len {:d}, hit {:d}, get {:d}, hit-rate {:.3f}'.format(
+                    len(self.simhash_cache),
+                    self.simhash_stat['hit'],
+                    self.simhash_stat['get'],
+                    self.simhash_stat['hit'] * 1. / self.simhash_stat['get'])
+            self.simhash_cache.clear()
+            self.simhash_stat.clear() # make the object unusable to avoid mistakes
 
 class HttpControlFeeder(BaseHttpFeeder):
     min_compat_code_ver = 5
@@ -1451,8 +1495,10 @@ def meta_pg(in_root, bucket, postgres):
             return
         print 'bucket={}: ingest {:d}, reingest {:d}, reprocess {:d}'.format(bucket, len(ingest), len(reingest), len(reprocess))
         copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket)
-        bucket_code_ver = delete_data_to_reprocess(pgconn, bucket)
+        bucket_code_ver, simhash_cache = delete_data_to_reprocess(pgconn, bucket)
         del autoclaved_index, files
+        BaseHttpFeeder.simhash_cache.update(simhash_cache)
+        del simhash_cache
         copy_data_from_autoclaved(pgconn, stconn, in_root, bucket, bucket_code_ver)
         del bucket_code_ver
         # Okay, server-side cursor feeding indexes is closed and the code is
