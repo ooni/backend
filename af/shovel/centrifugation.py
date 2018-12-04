@@ -516,7 +516,7 @@ def delete_data_to_reprocess(pgconn, bucket):
     assert None not in code_ver
     return code_ver, simhash_cache
 
-def prepare_destination(pgconn, stconn, bucket_code_ver):
+def prepare_destination(pgconn, stconn, bucket_code_ver, bucket_date):
     assert None not in bucket_code_ver
     sink_list = []
 
@@ -530,6 +530,9 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
     # badrow_sink does not need dummy feeder as `__flush_stubborn()` calls
     # write() explicitly and double fault just raises exception and aborts.
     badrow_sink = PGCopyFrom(pgconn, BadrowFeeder.sink_table, columns=BadrowFeeder.columns)
+
+    # That's slightly non-orthogonal as it updates cache for two feeders.
+    BaseHttpFeeder.simhash_cache_update(pgconn, bucket_date)
 
     # Okay, "special" tables are done, let's register more generic DATA_TABLES.
     data_tables_args = {
@@ -564,7 +567,7 @@ def copy_data_from_autoclaved(pgconn, stconn, in_root, bucket, bucket_code_ver):
     TrappedException = None if FLAG_FAIL_FAST else Exception
 
     report, msm, msm_exc, badmeta, ver_feeders, sink_list, feeder_list = prepare_destination(
-            pgconn, stconn, bucket_code_ver)
+            pgconn, stconn, bucket_code_ver, bucket)
     assert None not in ver_feeders
     # `NULL` is special `code_ver`, but `NULL` and `0` are same for DATA_TABLES
     if CODE_VER_REPROCESS in bucket_code_ver:
@@ -1169,9 +1172,48 @@ def get_title(body):
 class BaseHttpFeeder(BaseFeeder):
     # The cache is class-wide as there are two subclasses doing this
     # computation, both benefit from the cache and shared statistics.
-    simhash_value_type = struct.Struct('qq') # as-is from DB, signed, saves 25% of RAM for cache
+    # Packing value to string (as-is from DB, signed), frees ~26% of RAM used
+    # by cache compared to tuple of two int64 values.
+    # Bit-packing it to int128 can save ~31%, but it needs carefull handling
+    # of the sign of the signed integer, so it's not implemented.
+    simhash_value_type = struct.Struct('qq')
     simhash_cache = {} # sha256.digest() -> simhash_value_type
     simhash_stat = {'get': 0, 'hit': 0}
+
+    @classmethod
+    def simhash_cache_update(cls, pgconn, bucket_date):
+        # Fetches the freshest bucket before current one into simhash_cache.
+        # Preloading the cache with single bucket gives cache-hit ~45%.
+        create_temp_table(pgconn, 'shcmsm', 'msm_no integer NOT NULL')
+        with pgconn.cursor() as c:
+            c.execute('''INSERT INTO shcmsm (msm_no)
+            SELECT msm_no
+            FROM autoclaved
+            JOIN report USING (autoclaved_no)
+            JOIN measurement USING (report_no)
+            WHERE bucket_date = (
+                SELECT MAX(bucket_date) FROM autoclaved WHERE bucket_date < %s
+            );
+            CREATE UNIQUE INDEX ON shcmsm (msm_no);
+            ANALYZE shcmsm;
+            SELECT MIN(msm_no), MAX(msm_no) FROM shcmsm
+            ''', [bucket_date])
+            msm_min, msm_max = c.fetchone() # to avoid full-scan by all means
+            c.execute('''SELECT body_sha256, body_simhash, body_text_simhash FROM {}
+            WHERE msm_no IN (SELECT * FROM shcmsm) AND msm_no >= %s AND msm_no <= %s
+                  AND body_sha256 IS NOT NULL
+            UNION
+            SELECT body_sha256, body_simhash, body_text_simhash FROM {}
+            WHERE msm_no IN (SELECT * FROM shcmsm) AND msm_no >= %s AND msm_no <= %s
+                  AND body_sha256 IS NOT NULL
+            '''.format(HttpRequestFeeder.data_table, HttpControlFeeder.data_table),
+            [msm_min, msm_max, msm_min, msm_max])
+            for row in c:
+                key = str(row[0]) # convert memoryview(Py3) / buffer(Py2) to str / bytes
+                assert len(key) == 256 / 8
+                value = cls.simhash_value_type.pack(row[1], row[2])
+                cls.simhash_cache[key] = value
+            c.execute('DROP TABLE shcmsm')
 
     def pg_body_hash(self, body):
         if body is not None:
@@ -1184,6 +1226,9 @@ class BaseHttpFeeder(BaseFeeder):
             else:
                 body_simhash = sim_shi4_mm3_layout(body)
                 body_text_simhash = sim_shi4_mm3_text(body)
+                # doing that on-the-fly raises cache-hit from ~45% to ~60%
+                c = self.simhash_value_type.pack(body_simhash, body_text_simhash)
+                self.simhash_cache[body_sha256] = c
             body_sha256 = pg_binquote(body_sha256)
         else:
             body_sha256 = pg_quote(None)
