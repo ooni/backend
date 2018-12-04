@@ -138,7 +138,13 @@ def http_headers(headers):
 
 def dns_ttl(ttl):
     # RFC1035 states: positive values of a signed 32 bit number
-    if ttl is None or 0 < ttl <= 0x7fffffff:
+    # Reality states: 0 is possible TTL on the wire, both for hand-crafted
+    # packets and for packets from 8.8.8.8 --
+    # https://00f.net/2011/11/17/how-long-does-a-dns-ttl-last/
+    # OONI Data states: `ttl` may be 0 both from the wire and from MK bug
+    # -- https://github.com/measurement-kit/measurement-kit/issues/1556
+    # FIXME: replace `0` coming from affected MK versions with `null`
+    if ttl is None or 0 <= ttl <= 0x7fffffff:
         return ttl
     else:
         raise RuntimeError('Invalid DNS TTL', ttl)
