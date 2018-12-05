@@ -1178,7 +1178,7 @@ class BaseHttpFeeder(BaseFeeder):
     # of the sign of the signed integer, so it's not implemented.
     simhash_value_type = struct.Struct('qq')
     simhash_cache = {} # sha256.digest() -> simhash_value_type
-    simhash_stat = {'get': 0, 'hit': 0}
+    simhash_stat = {'get': 0, 'hit': 0, 'getbyte': 0, 'hitbyte': 0}
 
     @classmethod
     def simhash_cache_update(cls, pgconn, bucket_date):
@@ -1220,8 +1220,10 @@ class BaseHttpFeeder(BaseFeeder):
             body_sha256 = hashlib.sha256(body).digest()
             c = self.simhash_cache.get(body_sha256)
             self.simhash_stat['get'] += 1
+            self.simhash_stat['getbyte'] += len(body) # XXX: is it bytes or chars?!
             if c is not None:
                 self.simhash_stat['hit'] += 1
+                self.simhash_stat['hitbyte'] += len(body)
                 body_simhash, body_text_simhash = self.simhash_value_type.unpack(c)
             else:
                 body_simhash = sim_shi4_mm3_layout(body)
@@ -1258,11 +1260,15 @@ class BaseHttpFeeder(BaseFeeder):
                 tor.pop('exit_name')
     def close(self):
         if self.simhash_cache:
-            print 'SimhashCache: len {:d}, hit {:d}, get {:d}, hit-rate {:.3f}'.format(
+            mb = 1024. * 1024
+            print 'SimhashCache: len {:d}, hit {:d} ({:.1f} MiB), get {:d} ({:.1f} MiB), hit-rate {:.3f} ({:.3f} of bytes)'.format(
                     len(self.simhash_cache),
                     self.simhash_stat['hit'],
+                    self.simhash_stat['hitbyte'] / mb,
                     self.simhash_stat['get'],
-                    self.simhash_stat['hit'] * 1. / self.simhash_stat['get'])
+                    self.simhash_stat['getbyte'] / mb,
+                    self.simhash_stat['hit'] * 1. / self.simhash_stat['get'],
+                    self.simhash_stat['hitbyte'] * 1. / self.simhash_stat['getbyte'])
             self.simhash_cache.clear()
             self.simhash_stat.clear() # make the object unusable to avoid mistakes
 
