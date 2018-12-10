@@ -359,7 +359,7 @@ inspect the log that will likely contain the reason for the failure.
 
 Once you have made the necessary fixes that you believe should fix the DAG
 (generally this will involve running the `ooni/sysadmin` playbook
-`deploy-pipeline`), you should "Clear" the state of the DAG to have it re-run.
+`deploy-pipeline`), you should "Clear" the state of the task to have it re-run.
 
 ## OONI Infrastructure specific
 
