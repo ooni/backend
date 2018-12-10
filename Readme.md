@@ -361,6 +361,9 @@ Once you have made the necessary fixes that you believe should fix the DAG
 (generally this will involve running the `ooni/sysadmin` playbook
 `deploy-pipeline`), you should "Clear" the state of the task to have it re-run.
 
+![Clear task](.assets/AirflowClearTask.png)
+
+
 ## OONI Infrastructure specific
 
 To access airflow web-interface you need to setup a SSH tunnel. It runs at
