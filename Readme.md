@@ -349,6 +349,21 @@ PII leak may be handled with `UPDATE autoclaved SET code_ver = 0 WHERE …`, `0`
 is _reserved_ `code_ver` value also named `CODE_VER_REPROCESS`.
 `centrifugation.py` will re-ingest alike autoclaved file while preserving `msm_no`.
 
+### Investigating DAG failures
+
+It's mostly useful to look at the "Tree view" (ex. http://127.0.0.1:8080/admin/airflow/tree?num_runs=25&dag_id=fetcher) for the DAG, rather than the "Dag
+Runs". The `failure` state can be relative to a full DAG or to a Task.
+
+When in the "Tree View" you can click on a single task and "View Log" to
+inspect the log that will likely contain the reason for the failure.
+
+Once you have made the necessary fixes that you believe should fix the DAG
+(generally this will involve running the `ooni/sysadmin` playbook
+`deploy-pipeline`), you should "Clear" the state of the task to have it re-run.
+
+![Clear task](.assets/AirflowClearTask.png)
+
+
 ## OONI Infrastructure specific
 
 To access airflow web-interface you need to setup a SSH tunnel. It runs at
