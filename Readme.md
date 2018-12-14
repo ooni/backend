@@ -363,6 +363,20 @@ Once you have made the necessary fixes that you believe should fix the DAG
 
 ![Clear task](.assets/AirflowClearTask.png)
 
+### Empty bucket creation
+
+In case when there is a need to create an "empty bucket" (e.g. new buckets were
+not created for a while due to temporary pipeline stall or lack of data in the
+past), it's done in a following way:
+
+- `$ ssh datacollector.infra.ooni.io`
+- `$ cd /data/ooni/private/reports-raw-shals`
+- `$ sha256sum </dev/null | sudo -u benchmark dd of=YYYY-MM-DD`
+- _Clear_ state of _failed_ `reports_raw_sensor` for corresponding date in [`hist_canning` DAG Tree View](http://127.0.0.1:8080/admin/airflow/tree?dag_id=hist_canning)
+
+The `reports-raw-shals` file is a "seal" that signals that all the data files
+from all the collectors are successfully merged into single bucket directory.
+It is generated [by `docker-trampoline` script at `reports_raw_merge` step](https://github.com/ooni/sysadmin/blob/master/ansible/roles/airflow/files/docker-trampoline#L191-L194).
 
 ## OONI Infrastructure specific
 
