@@ -373,6 +373,10 @@ To signal to consumers explicitly that these buckets are empty, we need to
 create an "empty bucket" (e.g. new buckets were not created for a while due to
 temporary pipeline stall or lack of data in the past)
 
+This state looks like the following in the airflow view:
+
+![Should create empty buckets](.assets/ShouldCreateEmptyBuckets.png)
+
 This is done in the following way:
 
 - `$ ssh datacollector.infra.ooni.io`
