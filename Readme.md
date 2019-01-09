@@ -1,4 +1,4 @@
-# OONI measurements
+# OONI API
 
 Source for https://api.ooni.io/
 
