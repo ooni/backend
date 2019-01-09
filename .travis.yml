@@ -35,8 +35,6 @@ before_script:
 script:
 - node -v
 - npm -v
-# Build the docker image
-- make APP_ENV=testing build
 - make APP_ENV=testing create-tables
 - make test
 
