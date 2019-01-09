@@ -8,6 +8,7 @@ python-dateutil==2.7.3
 pycountry==16.11.8
 psycopg2==2.7.5
 requests==2.21.0
+sentry-sdk[flask]==0.6.6
 SQLAlchemy==1.2.12
 SQLAlchemy-Utils==0.33.6
 # Deps of deps
