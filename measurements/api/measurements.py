@@ -15,6 +15,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy import func, or_, and_, false, true, text
 from sqlalchemy.orm import lazyload, exc
+from psycopg2.extensions import QueryCanceledError
 
 from urllib.parse import urljoin, urlencode
 
@@ -317,27 +318,32 @@ def list_measurements(
 
     iter_start_time = time.time()
     results = []
-    for row in q:
-        measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
-        url = urljoin(
-            current_app.config['BASE_URL'],
-            '/api/v1/measurement/%s' % measurement_id
-        )
-        results.append({
-            'measurement_url': url,
-            'measurement_id': measurement_id,
-            'report_id': row.report_id,
-            'probe_cc': row.probe_cc,
-            'probe_asn': "AS{}".format(row.probe_asn),
-            'test_name': row.test_name,
-            'measurement_start_time': row.measurement_start_time,
-            'input': row.input,
-            'anomaly': row.anomaly,
-            'confirmed': row.confirmed,
-            'failure': (row.exc != None
-                        or row.residual_no != None
-                        or row.msm_failure),
-        })
+
+    try:
+        for row in q:
+            measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
+            url = urljoin(
+                current_app.config['BASE_URL'],
+                '/api/v1/measurement/%s' % measurement_id
+            )
+            results.append({
+                'measurement_url': url,
+                'measurement_id': measurement_id,
+                'report_id': row.report_id,
+                'probe_cc': row.probe_cc,
+                'probe_asn': "AS{}".format(row.probe_asn),
+                'test_name': row.test_name,
+                'measurement_start_time': row.measurement_start_time,
+                'input': row.input,
+                'anomaly': row.anomaly,
+                'confirmed': row.confirmed,
+                'failure': (row.exc != None
+                            or row.residual_no != None
+                            or row.msm_failure),
+            })
+    except QueryCanceledError:
+        current_app.logger.error("Query timeout: %s" % q)
+        raise HTTPException("Query timeout")
 
     pages = -1
     count = -1
