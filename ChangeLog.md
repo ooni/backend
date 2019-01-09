@@ -4,6 +4,8 @@ Changes:
 
 * Updates to charts on stats page
 
+* Drop label table from the metadb
+
 Added:
 
 * Support for error logging with sentry
