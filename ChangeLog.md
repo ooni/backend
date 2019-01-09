@@ -1,4 +1,14 @@
-# ooni-measurements 1.0.4 [2018-06-29]
+# ooni-api 1.0.5 [2019-01-09]
+
+Changes:
+
+* Updates to charts on stats page
+
+Added:
+
+* Support for error logging with sentry
+
+# ooni-api 1.0.4 [2018-06-29]
 
 Changes:
 
@@ -12,7 +22,7 @@ Fixes:
 
 * Fix a deprecation warning with SQLAlchemy
 
-# ooni-measurements 1.0.3 [2017-12-13]
+# ooni-api 1.0.3 [2017-12-13]
 
 [note: untagged]
 
@@ -20,7 +30,7 @@ Fixes:
 
 * Properly get the centrifiguation URL env variable
 
-# ooni-measurements 1.0.2 [2017-12-12]
+# ooni-api 1.0.2 [2017-12-12]
 
 Added:
 
