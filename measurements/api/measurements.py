@@ -21,7 +21,7 @@ from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
-from measurements.models import Report, Input, Measurement, Autoclaved, Label
+from measurements.models import Report, Input, Measurement, Autoclaved
 
 MSM_ID_PREFIX = 'temp-id'
 RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
@@ -242,11 +242,11 @@ def list_measurements(
         raise BadRequest("Invalid order")
 
 
-    c_anomaly = func.coalesce(Label.anomaly, Measurement.anomaly, false())\
+    c_anomaly = func.coalesce(Measurement.anomaly, false())\
                     .label('anomaly')
-    c_confirmed = func.coalesce(Label.confirmed, Measurement.confirmed, false())\
+    c_confirmed = func.coalesce(Measurement.confirmed, false())\
                     .label('confirmed')
-    c_msm_failure = func.coalesce(Label.msm_failure, Measurement.msm_failure, false())\
+    c_msm_failure = func.coalesce(Measurement.msm_failure, false())\
                     .label('msm_failure')
 
     cols = [
@@ -271,8 +271,7 @@ def list_measurements(
     ]
 
     q = current_app.db_session.query(*cols)\
-            .join(Report, Report.report_no == Measurement.report_no)\
-            .outerjoin(Label, Label.msm_no == Measurement.msm_no)
+            .join(Report, Report.report_no == Measurement.report_no)
 
     if input_:
         q = q.join(Input, Measurement.input_no == Input.input_no)\

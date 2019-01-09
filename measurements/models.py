@@ -111,24 +111,8 @@ class Measurement(Base):
     anomaly = Column(Boolean)
     confirmed = Column(Boolean)
 
-    label = relationship('Label', back_populates='measurement')
-
     input_no = Column(Integer, ForeignKey('input.input_no'))
     input = relationship('Input', back_populates='measurements')
-
-class Label(Base):
-    """
-    This table is used to manually markup or annotate measurements with some values.
-    """
-    __tablename__ = 'label'
-    label_no = Column(Integer, primary_key=True)
-
-    msm_no = Column(Integer, ForeignKey('measurement.msm_no'))
-    measurement = relationship('Measurement', back_populates='label')
-
-    msm_failure = Column(Boolean)
-    anomaly = Column(Boolean)
-    confirmed = Column(Boolean)
 
 class Input(Base):
     __tablename__ = 'input'
