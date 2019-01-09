@@ -35,7 +35,7 @@ shell:
 	$(PYTHON_WITH_ENV) -m measurements shell
 
 create-tables:
-	$(PYTHON_WITH_ENV) -m measurements create_tables
+	$(PYTHON_WITH_ENV) -m measurements create-tables
 
 load-fixtures:
 	$(PYTHON_WITH_ENV) -m measurements updatefiles --file dev/fixtures.txt --no-check
