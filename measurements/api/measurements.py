@@ -1,4 +1,5 @@
 import os
+import io
 import re
 import math
 import time
@@ -9,7 +10,7 @@ import connexion
 import requests
 import lz4framed
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, make_response
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
@@ -134,7 +135,7 @@ def list_files(
         'results': results
     })
 
-def get_measurement(measurement_id):
+def get_measurement(measurement_id, download=None):
     # XXX this query is SUPER slow
     m = RE_MSM_ID.match(measurement_id)
     if not m:
@@ -147,6 +148,7 @@ def get_measurement(measurement_id):
             Measurement.frame_size.label('frame_size'),
             Measurement.intra_off.label('intra_off'),
             Measurement.intra_size.label('intra_size'),
+            Report.textname.label('textname'),
             Report.report_no.label('r_report_no'),
             Report.autoclaved_no.label('r_autoclaved_no'),
             Autoclaved.filename.label('a_filename'),
@@ -179,10 +181,13 @@ def get_measurement(measurement_id):
     # There is no replacement of `measurement_id` with `msm_no` or anything
     # else to keep sanity. Maybe it'll happen as part of orchestration update.
     # Also, blob is not decoded intentionally to save CPU
-    return current_app.response_class(
-        blob,
-        mimetype=current_app.config['JSONIFY_MIMETYPE']
-    )
+    filename = "ooni-msmt-{}-{}".format(measurement_id, msmt.textname.replace('/', '-'))
+    response = make_response(blob)
+    response.headers.set('Content-Type', 'application/json')
+    if download is not None:
+        response.headers.set('Content-Disposition',
+                'attachment', filename=filename)
+    return response
 
 def list_measurements(
         report_id=None,

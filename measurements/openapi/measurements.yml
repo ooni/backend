@@ -153,6 +153,10 @@ paths:
           required: true
           type: string
           description: The measurement_id to retrieve the measurement for
+        - name: download
+          in: query
+          type: boolean
+          description: If we should be triggering a file download
       responses:
         '200':
           description: Returns the JSON blob for the specified measurement
