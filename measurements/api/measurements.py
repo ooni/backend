@@ -10,6 +10,8 @@ import connexion
 import requests
 import lz4framed
 
+from sentry_sdk import configure_scope
+
 from flask import Blueprint, current_app, request, make_response
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
@@ -26,6 +28,13 @@ from measurements.models import Report, Input, Measurement, Autoclaved
 
 MSM_ID_PREFIX = 'temp-id'
 RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
+
+class QueryTimeoutError(HTTPException):
+    code = 504
+    description = (
+        "The database query timed out.",
+        "Try changing the query parameters."
+    )
 
 def get_version():
     return jsonify({
@@ -323,67 +332,71 @@ def list_measurements(
     iter_start_time = time.time()
     results = []
 
-    try:
-        for row in q:
-            measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
-            url = urljoin(
+    with configure_scope() as scope:
+        scope.set_extra("sql_query", str(q))
+
+        try:
+            for row in q:
+                measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
+                url = urljoin(
+                    current_app.config['BASE_URL'],
+                    '/api/v1/measurement/%s' % measurement_id
+                )
+                results.append({
+                    'measurement_url': url,
+                    'measurement_id': measurement_id,
+                    'report_id': row.report_id,
+                    'probe_cc': row.probe_cc,
+                    'probe_asn': "AS{}".format(row.probe_asn),
+                    'test_name': row.test_name,
+                    'measurement_start_time': row.measurement_start_time,
+                    'input': row.input,
+                    'anomaly': row.anomaly,
+                    'confirmed': row.confirmed,
+                    'failure': (row.exc != None
+                                or row.residual_no != None
+                                or row.msm_failure),
+                })
+        except exc.OperationalError as exc:
+            if isinstance(exc.orig, QueryCanceledError):
+                raise QueryTimeoutError()
+            raise exc
+
+        pages = -1
+        count = -1
+        current_page = math.ceil(offset / limit) + 1
+
+        # We got less results than what we expected, we know the count and that we are done
+        if len(results) < limit:
+            count = offset + len(results)
+            pages = math.ceil(count / limit)
+            next_url = None
+        else:
+            # XXX this is too intensive. find a workaround
+            #count_start_time = time.time()
+            #count = q.count()
+            #pages = math.ceil(count / limit)
+            #current_page = math.ceil(offset / limit) + 1
+            #query_time += time.time() - count_start_time
+            next_args = request.args.to_dict()
+            next_args['offset'] = "%s" % (offset + limit)
+            next_args['limit'] = "%s" % limit
+            next_url = urljoin(
                 current_app.config['BASE_URL'],
-                '/api/v1/measurement/%s' % measurement_id
+                '/api/v1/measurements?%s' % urlencode(next_args)
             )
-            results.append({
-                'measurement_url': url,
-                'measurement_id': measurement_id,
-                'report_id': row.report_id,
-                'probe_cc': row.probe_cc,
-                'probe_asn': "AS{}".format(row.probe_asn),
-                'test_name': row.test_name,
-                'measurement_start_time': row.measurement_start_time,
-                'input': row.input,
-                'anomaly': row.anomaly,
-                'confirmed': row.confirmed,
-                'failure': (row.exc != None
-                            or row.residual_no != None
-                            or row.msm_failure),
-            })
-    except QueryCanceledError:
-        current_app.logger.error("Query timeout: %s" % q)
-        raise HTTPException("Query timeout")
 
-    pages = -1
-    count = -1
-    current_page = math.ceil(offset / limit) + 1
-
-    # We got less results than what we expected, we know the count and that we are done
-    if len(results) < limit:
-        count = offset + len(results)
-        pages = math.ceil(count / limit)
-        next_url = None
-    else:
-        # XXX this is too intensive. find a workaround
-        #count_start_time = time.time()
-        #count = q.count()
-        #pages = math.ceil(count / limit)
-        #current_page = math.ceil(offset / limit) + 1
-        #query_time += time.time() - count_start_time
-        next_args = request.args.to_dict()
-        next_args['offset'] = "%s" % (offset + limit)
-        next_args['limit'] = "%s" % limit
-        next_url = urljoin(
-            current_app.config['BASE_URL'],
-            '/api/v1/measurements?%s' % urlencode(next_args)
-        )
-
-    query_time += time.time() - iter_start_time
-    metadata = {
-        'offset': offset,
-        'limit': limit,
-        'count': count,
-        'pages': pages,
-        'current_page': current_page,
-        'next_url': next_url,
-        'query_time': query_time
-    }
-    return jsonify({
-        'metadata': metadata,
-        'results': results
-    })
+        query_time += time.time() - iter_start_time
+        metadata = {
+            'offset': offset,
+            'limit': limit,
+            'count': count,
+            'pages': pages,
+            'current_page': current_page,
+            'next_url': next_url,
+            'query_time': query_time
+        }
+        return jsonify({
+            'metadata': metadata,
+            'results': results
+        })
