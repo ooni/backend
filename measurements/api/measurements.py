@@ -17,7 +17,9 @@ from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy import func, or_, and_, false, true, text
-from sqlalchemy.orm import lazyload, exc
+from sqlalchemy.orm import lazyload
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
 
 from urllib.parse import urljoin, urlencode
@@ -168,10 +170,10 @@ def get_measurement(measurement_id, download=None):
         .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
     try:
         msmt = q.one()
-    except exc.MultipleResultsFound:
+    except MultipleResultsFound:
         current_app.logger.warning("Duplicate rows for measurement_id: %s" % measurement_id)
         msmt = q.first()
-    except exc.NoResultFound:
+    except NoResultFound:
         # XXX we should actually return a 404 here
         raise BadRequest("No measurement found")
 
@@ -357,10 +359,10 @@ def list_measurements(
                                 or row.residual_no != None
                                 or row.msm_failure),
                 })
-        except exc.OperationalError as e:
-            if isinstance(e.orig, QueryCanceledError):
+        except OperationalError as exc:
+            if isinstance(exc.orig, QueryCanceledError):
                 raise QueryTimeoutError()
-            raise e
+            raise exc
 
         pages = -1
         count = -1
