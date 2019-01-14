@@ -357,10 +357,10 @@ def list_measurements(
                                 or row.residual_no != None
                                 or row.msm_failure),
                 })
-        except exc.OperationalError as exc:
-            if isinstance(exc.orig, QueryCanceledError):
+        except exc.OperationalError as e:
+            if isinstance(e.orig, QueryCanceledError):
                 raise QueryTimeoutError()
-            raise exc
+            raise e
 
         pages = -1
         count = -1
