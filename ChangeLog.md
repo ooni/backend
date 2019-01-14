@@ -1,3 +1,11 @@
+# ooni-api 1.0.6 [2019-01-09]
+
+Added:
+
+* Download of individual measurements
+
+* Recording query timeout exceptions with the query string as context to sentry
+
 # ooni-api 1.0.5 [2019-01-09]
 
 Changes:
