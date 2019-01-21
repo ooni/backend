@@ -10,7 +10,7 @@ import connexion
 import requests
 import lz4framed
 
-from sentry_sdk import configure_scope
+from sentry_sdk import configure_scope, capture_exception
 
 from flask import Blueprint, current_app, request, make_response
 from flask.json import jsonify
@@ -361,6 +361,7 @@ def list_measurements(
                 })
         except OperationalError as exc:
             if isinstance(exc.orig, QueryCanceledError):
+                capture_exception(exc)
                 raise QueryTimeoutError()
             raise exc
 
