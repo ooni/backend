@@ -361,7 +361,7 @@ def list_measurements(
                 })
         except OperationalError as exc:
             if isinstance(exc.orig, QueryCanceledError):
-                capture_exception(exc)
+                capture_exception(QueryTimeoutError())
                 raise QueryTimeoutError()
             raise exc
 
