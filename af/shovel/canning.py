@@ -16,12 +16,14 @@ import threading
 import time
 import traceback
 from base64 import b64encode
-from contextlib import closing, contextmanager
+from contextlib import closing
 from hashlib import sha1
 from zlib import crc32 # btw, binascii.crc32 is four times slower than zlib.crc32
 
 from oonipl.cli import dirname, isomidnight
 from oonipl.popen import ScopedPopen, PIPE
+from oonipl.can import load_index, flistz_tempfile
+from oonipl.const import LZ4_LEVEL
 
 class CannerError(RuntimeError):
     pass
@@ -242,15 +244,6 @@ def pack_bucket(listing, can_size=64*1048576):
 
     return asis, tarfiles
 
-@contextmanager
-def tar_flistz_tempfile(bucket, slice_files):
-    # Create list of NUL-terminated files for tar `--files-from`.
-    with tempfile.NamedTemporaryFile(prefix='flistz') as flistz:
-        for name in slice_files:
-            flistz.write(bucket + '/' + name + '\0')
-        flistz.flush()
-        yield flistz.name
-
 def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
     # Size of argv array is limited, `getconf ARG_MAX` shows ~2 Mbytes on
     # modern Linux, but it may vary across platforms & devices with different
@@ -262,9 +255,9 @@ def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
     # Ubuntu-16.04, so it's not used as well.
     with tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdout, \
          open(os.devnull, 'rb') as devnull, \
-         tar_flistz_tempfile(bucket, slice_files) as files_from, \
+         flistz_tempfile(slice_files, bucket=bucket) as files_from, \
          ScopedPopen(['tar', '--create', '--directory', input_root, '--null', '--files-from', files_from], stdin=devnull, stdout=PIPE) as proc_tar, \
-         ScopedPopen(['lz4', '-5'], stdin=PIPE, stdout=PIPE) as proc_lz4:
+         ScopedPopen(['lz4', LZ4_LEVEL], stdin=PIPE, stdout=PIPE) as proc_lz4:
 
         cleanup = (proc_tar.kill, proc_lz4.kill) # circuit breaker
         can = Future(cleanup, tarfile_canning_feeder, proc_tar.stdout, proc_lz4.stdin)
@@ -292,7 +285,7 @@ def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
 def can_to_blob(input_fname, bucket, output_dir, fname):
     with open(input_fname, 'rb') as fdin, \
          tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdout, \
-         ScopedPopen(['lz4', '-5'], stdin=PIPE, stdout=PIPE) as proc_lz4:
+         ScopedPopen(['lz4', LZ4_LEVEL], stdin=PIPE, stdout=PIPE) as proc_lz4:
 
         can = Future(proc_lz4.kill, raw_canning_feeder, fdin, proc_lz4.stdin)
         chksum = Future(proc_lz4.kill, blob_checksumming_feeder, proc_lz4.stdout, fdout)
@@ -335,16 +328,6 @@ def listdir_filesize(d):
         if stat.S_ISREG(st.st_mode):
             filesize.append((fname, st.st_size))
     return filesize
-
-
-def load_index(fileobj):
-    index = []
-    with gzip.GzipFile(fileobj=fileobj, mode='r') as fd:
-        for line in fd:
-            if line[-1] != '\n':
-                raise CannerError('Bad line end')
-            index.append(json.loads(line[:-1])) # json doesn't grok memoryview
-    return index
 
 
 def load_verified_index(output_dir, bucket):
