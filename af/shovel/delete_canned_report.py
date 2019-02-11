@@ -8,54 +8,46 @@ import argparse
 import gzip
 import json
 import os
-import tempfile
-import time
 
 from contextlib import closing
 
 import oonipl.can as can
+import oonipl.tmp as tmp
 from oonipl.const import LZ4_LEVEL
 from oonipl.cli import dirname, filename
 from oonipl.popen import ScopedPopen, PIPE
 
 from canning import stream_canning
 
-EPOCH = int(time.time()) # time to be stamped in produced tar files
-
 def canned_report_delete(src_root, index, affected, to_del, dst_root, index_dst, compress):
     dst_base = os.path.dirname(index_dst)
-    with tempfile.NamedTemporaryFile(prefix='tmpndx', dir=dst_base) as fdraw:
-        with closing(gzip.GzipFile(filename='index.json', mtime=EPOCH, mode='wb', fileobj=fdraw)) as fdindex:
-            for row in index:
-                if row['filename'] in affected:
-                    if 'canned' not in row:
-                        continue # skip the row in index, do nothing to files
-                    for k in ('file_crc32', 'file_sha1', 'file_size', 'text_size'):
-                        row.pop(k, None)
-                    sentence = {_['textname'] for _ in row['canned']} & to_del
-                    with open(os.path.join(src_root, row['filename']), 'rb') as fdin, \
-                         tempfile.NamedTemporaryFile(prefix='tmptz', dir=dst_base) as fdout, \
-                         can.flistz_tempfile(sentence) as files_from, \
-                         ScopedPopen([compress[0], '-d'], stdin=fdin, stdout=PIPE) as decomp, \
-                         ScopedPopen(['tar', '--delete', '--null', '--files-from', files_from],
-                            stdin=decomp.stdout, stdout=PIPE) as tar, \
-                         ScopedPopen(compress, stdin=tar.stdout, stdout=PIPE) as comp:
+    with tmp.open_tmp_gz(index_dst, chmod=0444) as fdindex:
+        for row in index:
+            if row['filename'] in affected:
+                if 'canned' not in row:
+                    continue # skip the row in index, do nothing to files
+                for k in ('file_crc32', 'file_sha1', 'file_size', 'text_size'):
+                    row.pop(k, None)
+                sentence = {_['textname'] for _ in row['canned']} & to_del
+                with open(os.path.join(src_root, row['filename']), 'rb') as fdin, \
+                     tmp.open_tmp(os.path.join(dst_root, row['filename']), chmod=0444) as fdout, \
+                     can.flistz_tempfile(sentence) as files_from, \
+                     ScopedPopen([compress[0], '-d'], stdin=fdin, stdout=PIPE) as decomp, \
+                     ScopedPopen(['tar', '--delete', '--null', '--files-from', files_from],
+                        stdin=decomp.stdout, stdout=PIPE) as tar, \
+                     ScopedPopen(compress, stdin=tar.stdout, stdout=PIPE) as comp:
 
-                        csum = stream_canning(comp.stdout, fdout)
-                        # NB: reverse order of the pipeline due to EPIPE propagation!
-                        for proc, name in ((comp, '~gzip'), (tar, 'tar'), (decomp, '~zcat')):
-                            if proc.wait() != 0:
-                                raise RuntimeError('Subprocess failure', name, proc, proc.returncode)
-                        row['file_crc32'] = csum['text_crc32']
-                        row['file_sha1'] = csum['text_sha1']
-                        row['file_size'] = csum['text_size']
-                        os.link(fdout.name, os.path.join(dst_root, row['filename']))
-                    row['canned'] = [_ for _ in row['canned'] if _['textname'] not in sentence]
-                    os.chmod(os.path.join(dst_root, row['filename']), 0444)
-                json.dump(row, fdindex, sort_keys=True)
-                fdindex.write('\n')
-        os.link(fdraw.name, index_dst)
-    os.chmod(index_dst, 0444)
+                    csum = stream_canning(comp.stdout, fdout)
+                    # NB: reverse order of the pipeline due to EPIPE propagation!
+                    for proc, name in ((comp, '~gzip'), (tar, 'tar'), (decomp, '~zcat')):
+                        if proc.wait() != 0:
+                            raise RuntimeError('Subprocess failure', name, proc, proc.returncode)
+                    row['file_crc32'] = csum['text_crc32']
+                    row['file_sha1'] = csum['text_sha1']
+                    row['file_size'] = csum['text_size']
+                row['canned'] = [_ for _ in row['canned'] if _['textname'] not in sentence]
+            json.dump(row, fdindex, sort_keys=True)
+            fdindex.write('\n')
 
 def sanity_check(to_del, dst_root, index_dst):
     with closing(gzip.GzipFile(index_dst, mode='r')) as fdindex:
