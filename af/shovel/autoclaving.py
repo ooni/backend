@@ -23,6 +23,8 @@ import yaml
 from yaml import CLoader # fail-fast if it's not built
 
 import canning
+import oonipl.can as can
+import oonipl.tmp as tmp
 from canning import listdir_filesize
 from daily_workflow import NormaliseReport, SanitiseReport
 from oonipl.cli import dirname, isomidnight
@@ -371,8 +373,7 @@ def autoclave_blob(inputfd, caninfo, metafd, outfd):
         # {'type': '/file'} is written by LZ4WriteFramedStream.close
 
 
-def verify_index(index_fpath, bucket, in_dir, out_dir):
-    in_files = {'{}/{}'.format(bucket, f) for f in os.listdir(in_dir) if f != canning.INDEX_FNAME}
+def verify_index(index_fpath, bucket, in_files, out_dir):
     out_size = {'{}/{}'.format(bucket, f): sz for f, sz in listdir_filesize(out_dir) if f != INDEX_FNAME}
     ondisk_size = filename = None
     with gzip.GzipFile(index_fpath, 'r') as fd:
@@ -399,34 +400,78 @@ def verify_index(index_fpath, bucket, in_dir, out_dir):
 
 def autoclaving(in_root, out_root, bucket):
     assert in_root[-1] != '/' and out_root[-1] != '/' and '/' not in bucket
-    in_dir = os.path.join(in_root, bucket)
-    out_dir = os.path.join(out_root, bucket)
+    in_dir = dirname(os.path.join(in_root, bucket))
+    out_dir = dirname(os.path.join(out_root, bucket))
     # Bucket MUST exist as single bucket is mounted to data processing container.
-    assert os.path.isdir(in_dir) and os.path.isdir(out_dir)
-
     index_fpath = os.path.join(out_dir, INDEX_FNAME)
     if os.path.exists(index_fpath): # verify if everything is OK or die
-        verify_index(index_fpath, bucket, in_dir, out_dir)
+        in_files = {'{}/{}'.format(bucket, f) for f in os.listdir(in_dir) if f != canning.INDEX_FNAME}
+        verify_index(index_fpath, bucket, in_files, out_dir)
         print 'The bucket {} is already canned'.format(bucket)
         return
 
     canindex = canning.load_verified_index(in_dir, bucket)
-    with tempfile.NamedTemporaryFile(prefix='tmpacv', dir=out_dir) as fdindex:
-        with closing(gzip.GzipFile(filename='index.json', mtime=EPOCH, mode='wb', fileobj=fdindex)) as metafd:
-            for caninfo in canindex:
-                out_fpath = os.path.join(out_root, caninfo['filename'])
-                with open(os.path.join(in_root, caninfo['filename']), 'rb') as inputfd, \
-                     tempfile.NamedTemporaryFile(prefix='tmpacv', dir=out_dir) as outfd:
-                    if 'canned' in caninfo:
-                        autoclave_tar(inputfd, caninfo, metafd, outfd)
-                    else:
-                        autoclave_blob(inputfd, caninfo, metafd, outfd)
-                    os.link(outfd.name, out_fpath)
-                os.chmod(out_fpath, 0444)
-        os.link(fdindex.name, index_fpath)
-    os.chmod(index_fpath, 0444)
+    with tmp.open_tmp_gz(index_fpath, chmod=0444) as metafd:
+        for caninfo in canindex:
+            with open(os.path.join(in_root, caninfo['filename']), 'rb') as inputfd, \
+                 tmp.open_tmp(os.path.join(out_root, caninfo['filename']), chmod=0444) as outfd:
+                if 'canned' in caninfo:
+                    autoclave_tar(inputfd, caninfo, metafd, outfd)
+                else:
+                    autoclave_blob(inputfd, caninfo, metafd, outfd)
     os.chmod(out_dir, 0555) # done!
 
+def autoclaving_missing(in_root, out_root, bucket):
+    with open(os.path.join(in_root, bucket, canning.INDEX_FNAME)) as fd:
+        canindex = can.load_index(fd)
+    needed = {
+        caninfo['filename']
+        for caninfo in canindex
+        if not os.path.exists(os.path.join(out_root, caninfo['filename']))
+    }
+    for filename in needed:
+        if not os.path.exists(os.path.join(in_root, filename)):
+            RuntimeError('Source file missing', in_root, bucket, filename)
+    in_dir = dirname(os.path.join(in_root, bucket))
+    out_dir = dirname(os.path.join(out_root, bucket))
+    index_fpath = os.path.join(out_root, bucket, INDEX_FNAME)
+    if not needed:
+        in_files = {caninfo['filename'] for caninfo in canindex}
+        verify_index(index_fpath, bucket, in_files, out_dir)
+        print 'The bucket {} has no missing files'.format(bucket)
+        return
+
+    with tmp.ScopedTmpdir(dir=out_dir) as tmpdir:
+        with tmp.open_tmp_gz(os.path.join(tmpdir, INDEX_FNAME), chmod=0400) as out_ndx:
+            with gzip.GzipFile(os.path.join(out_dir, INDEX_FNAME), 'r') as in_ndx:
+                doc_stream = stream_json_blobs(in_ndx)
+                for offset, line in doc_stream:
+                    doc = ujson.loads(line)
+                    if doc['type'] != 'file':
+                        raise RuntimeError('Expected type:file in index', out_dir, offset, doc)
+                    copy = doc['filename'] not in needed
+                    if copy:
+                        out_ndx.write(line + '\n')
+                    for offset, line in doc_stream:
+                        if copy:
+                            out_ndx.write(line + '\n')
+                        if 'file"' in line and ujson.loads(line)['type'] == '/file':
+                            break # handle next file
+            for caninfo in canindex:
+                filename = caninfo['filename']
+                if filename in needed:
+                    with open(os.path.join(in_root, filename), 'rb') as inputfd, \
+                         tmp.open_tmp(os.path.join(tmpdir, os.path.basename(filename)), chmod=0444) as outfd:
+                        if 'canned' in caninfo:
+                            autoclave_tar(inputfd, caninfo, out_ndx, outfd)
+                        else:
+                            autoclave_blob(inputfd, caninfo, out_ndx, outfd)
+        os.link(index_fpath, index_fpath + '~') # to have failflag & backup in case of failure
+        os.rename(os.path.join(tmpdir, INDEX_FNAME), index_fpath)
+        for filename in needed:
+            os.link(os.path.join(tmpdir, os.path.basename(filename)), os.path.join(out_root, filename))
+        os.unlink(index_fpath + '~')
+    os.chmod(out_dir, 0555) # done!
 
 def parse_args():
     p = argparse.ArgumentParser(description='ooni-pipeline: private/canned -> public/autoclaved')
@@ -435,6 +480,7 @@ def parse_args():
     p.add_argument('--canned-root', metavar='DIR', type=dirname, help='Path to .../private/canned', required=True)
     p.add_argument('--autoclaved-root', metavar='DIR', type=dirname, help='Path to .../public/autoclaved', required=True)
     p.add_argument('--bridge-db', metavar='PATH', type=file, help='Path to .../private/bridge_db.json', required=True)
+    p.add_argument('--missing', action='store_true', help='Handle `canned\' missing from `autoclaved\' to prepare for reingestion')
     opt = p.parse_args()
     if (opt.end - opt.start) != timedelta(days=1):
         p.error('The script processes 24h batches')
@@ -454,7 +500,10 @@ def main():
         global BRIDGE_DB
         BRIDGE_DB = ujson.load(fd)
     bucket = opt.start.strftime('%Y-%m-%d')
-    autoclaving(opt.canned_root, opt.autoclaved_root, bucket)
+    if not opt.missing:
+        autoclaving(opt.canned_root, opt.autoclaved_root, bucket)
+    else:
+        autoclaving_missing(opt.canned_root, opt.autoclaved_root, bucket)
 
 if __name__ == '__main__':
     main()
