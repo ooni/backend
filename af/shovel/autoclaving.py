@@ -442,7 +442,7 @@ def autoclaving_missing(in_root, out_root, bucket):
         return
 
     with tmp.ScopedTmpdir(dir=out_dir) as tmpdir:
-        with tmp.open_tmp_gz(os.path.join(tmpdir, INDEX_FNAME), chmod=0400) as out_ndx:
+        with tmp.open_tmp_gz(os.path.join(tmpdir, INDEX_FNAME), chmod=0444) as out_ndx:
             with gzip.GzipFile(os.path.join(out_dir, INDEX_FNAME), 'r') as in_ndx:
                 doc_stream = stream_json_blobs(in_ndx)
                 for offset, line in doc_stream:
