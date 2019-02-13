@@ -1261,14 +1261,15 @@ class BaseHttpFeeder(BaseFeeder):
     def close(self):
         if self.simhash_cache:
             mb = 1024. * 1024
+            s = self.simhash_stat
             print 'SimhashCache: len {:d}, hit {:d} ({:.1f} MiB), get {:d} ({:.1f} MiB), hit-rate {:.3f} ({:.3f} of bytes)'.format(
                     len(self.simhash_cache),
-                    self.simhash_stat['hit'],
-                    self.simhash_stat['hitbyte'] / mb,
-                    self.simhash_stat['get'],
-                    self.simhash_stat['getbyte'] / mb,
-                    self.simhash_stat['hit'] * 1. / self.simhash_stat['get'],
-                    self.simhash_stat['hitbyte'] * 1. / self.simhash_stat['getbyte'])
+                    s['hit'],
+                    s['hitbyte'] / mb,
+                    s['get'],
+                    s['getbyte'] / mb,
+                    s['hit'] * 1. / s['get'] if s['get'] else 0.,
+                    s['hitbyte'] * 1. / s['getbyte'] if s['getbyte'] else 0.)
             self.simhash_cache.clear()
             self.simhash_stat.clear() # make the object unusable to avoid mistakes
 
