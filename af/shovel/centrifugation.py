@@ -368,7 +368,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
             WHERE atclv.autoclaved_xref = meta.autoclaved_xref
         ''') # every row
         c.execute('''UPDATE report_meta AS meta SET report_no = rpt.report_no
-            FROM autoclaved AS atclv, report AS rpt
+            FROM report AS rpt
             WHERE meta.report_no = 0
               AND meta.autoclaved_no = rpt.autoclaved_no
               AND meta.textname = rpt.textname
