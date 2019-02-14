@@ -283,6 +283,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
     with gzip.GzipFile(autoclaved_index, 'r') as indexfd:
         atclv, rpt, frm = None, None, None # carry corresponding doc
         autoclaved_xref, report_xref = None, None # act as "should-process" flag as well
+        report_datum = None # to skip empty reports
         for _, doc in autoclaving.stream_json_blobs(indexfd):
             doc = ujson.loads(doc)
             t = doc['type']
@@ -308,19 +309,20 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
                 if atclv is None or rpt is not None or report_xref is not None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
                 rpt = doc
+                report_datum = 0
                 if autoclaved_xref is not None and rpt['textname'] not in DUPLICATE_REPORTS:
                     report_xref = next(report_xref_seq)
             elif t == '/report':
                 if atclv is None or rpt is None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
-                if autoclaved_xref is not None and report_xref is not None:
+                if autoclaved_xref is not None and report_xref is not None and report_datum > 0:
                     write_row(atclv['filename'], t, '{:d}\t0\t{:d}\t{}\t{}\t{}\n'.format(
                         report_xref,
                         autoclaved_xref,
                         pg_quote(doc.get('src_cutoff')), # nullable
                         pg_quote(rpt['textname']),
                         pg_binquote(b64decode(rpt['orig_sha1']))))
-                rpt, report_xref = None, None
+                rpt, report_xref, report_datum = None, None, None
             elif t == 'frame':
                 if frm is not None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
@@ -333,6 +335,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
                 if atclv is None or rpt is None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
                 if autoclaved_xref is not None and report_xref is not None:
+                    report_datum += 1
                     write_row(atclv['filename'], t, '0\t{:d}\t{:d}\t{:d}\t{:d}\t{:d}\t{}\n'.format(
                         report_xref,
                         frm['file_off'],
@@ -866,6 +869,12 @@ class ReportFeeder(BaseFeeder):
             datum.pop(key, None)
     def close(self): # also handles TABLE `report_meta`
         with self.pgconn.cursor() as c:
+            # NB: if `report_blob` has no corresponding record for `report_meta` row
+            # it means that either the report file is empty or all the measurements
+            # in the report file fail ReportFeeder ingestion.
+            # Empty reports are filtered by `report_datum` in `copy_meta_from_index()`
+            # but ReportFeeder may still fail, so `JOIN` is not `LEFT JOIN` to avoid
+            # fail-fast behavior on `close()`.
             c.execute('''
                 INSERT INTO report
                 SELECT report_no, autoclaved_no, test_start_time, probe_cc, probe_asn, probe_ip,
@@ -873,7 +882,7 @@ class ReportFeeder(BaseFeeder):
                        COALESCE(report_id, translate(encode(orig_sha1, 'base64'), '/+=', '_-')), software_no
                 FROM report_meta
                 JOIN report_blob USING (report_no)
-            ''') # TODO: `LEFT JOIN report_blob` to fail fast in case of errors
+            ''')
         del self.pgconn
 
 
