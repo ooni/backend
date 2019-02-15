@@ -11,3 +11,5 @@ remote_syslog.pid
 *.env
 .idea/
 .vagrant/
+af/oometa/tsv/
+af/oometa/tsvdump.dir/
