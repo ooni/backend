@@ -4,13 +4,8 @@
 import argparse
 import os
 
-from oonipl.cli import dirname
+from oonipl.cli import dirname, filename
 from oonipl.jsonz import json_gz
-
-def filename(s):
-    if not os.path.isfile(s):
-        raise ValueError('Not a file', s)
-    return s
 
 def parse_args():
     p = argparse.ArgumentParser(description='ooni-pipeline: cleanup uploaded files from a dir')

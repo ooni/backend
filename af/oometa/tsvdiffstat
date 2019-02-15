@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# The script is used to estimate the difference between table slice fetched
+# from remote MetaDB instance via `tsvfetch` and corresponding tables dumped
+# from local MetaDB instance via `tsvdump`.
+#
+
+for tbl in autoclaved report measurement; do
+    echo "==> ${tbl}"
+    diff -u --label ${tbl}.xxx_no <(cut -f 1 tsv/${tbl}.tsv | sort -n) --label ${tbl}.xxx_no <(cut -f 1 tsvdump.dir/${tbl}.tsv | sort -n) | diffstat
+done
+
+for fname in tsv/*.tsv; do
+    tbl=$(basename "$fname" .tsv)
+    echo "==> ${tbl}"
+    diff -u --label ${tbl}.tsv <(sort tsv/${tbl}.tsv) --label ${tbl}.tsv <(sort tsvdump.dir/${tbl}.tsv) | diffstat
+done

@@ -10,6 +10,7 @@ import itertools
 import numbers
 import os
 import re
+import struct
 import sys
 import time
 import traceback
@@ -137,7 +138,13 @@ def http_headers(headers):
 
 def dns_ttl(ttl):
     # RFC1035 states: positive values of a signed 32 bit number
-    if ttl is None or 0 < ttl <= 0x7fffffff:
+    # Reality states: 0 is possible TTL on the wire, both for hand-crafted
+    # packets and for packets from 8.8.8.8 --
+    # https://00f.net/2011/11/17/how-long-does-a-dns-ttl-last/
+    # OONI Data states: `ttl` may be 0 both from the wire and from MK bug
+    # -- https://github.com/measurement-kit/measurement-kit/issues/1556
+    # FIXME: replace `0` coming from affected MK versions with `null`
+    if ttl is None or 0 <= ttl <= 0x7fffffff:
         return ttl
     else:
         raise RuntimeError('Invalid DNS TTL', ttl)
@@ -276,6 +283,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
     with gzip.GzipFile(autoclaved_index, 'r') as indexfd:
         atclv, rpt, frm = None, None, None # carry corresponding doc
         autoclaved_xref, report_xref = None, None # act as "should-process" flag as well
+        report_datum = None # to skip empty reports
         for _, doc in autoclaving.stream_json_blobs(indexfd):
             doc = ujson.loads(doc)
             t = doc['type']
@@ -301,19 +309,20 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
                 if atclv is None or rpt is not None or report_xref is not None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
                 rpt = doc
+                report_datum = 0
                 if autoclaved_xref is not None and rpt['textname'] not in DUPLICATE_REPORTS:
                     report_xref = next(report_xref_seq)
             elif t == '/report':
                 if atclv is None or rpt is None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
-                if autoclaved_xref is not None and report_xref is not None:
+                if autoclaved_xref is not None and report_xref is not None and report_datum > 0:
                     write_row(atclv['filename'], t, '{:d}\t0\t{:d}\t{}\t{}\t{}\n'.format(
                         report_xref,
                         autoclaved_xref,
                         pg_quote(doc.get('src_cutoff')), # nullable
                         pg_quote(rpt['textname']),
                         pg_binquote(b64decode(rpt['orig_sha1']))))
-                rpt, report_xref = None, None
+                rpt, report_xref, report_datum = None, None, None
             elif t == 'frame':
                 if frm is not None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
@@ -326,6 +335,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
                 if atclv is None or rpt is None:
                     raise RuntimeError('Corrupt index file', autoclaved_index, doc)
                 if autoclaved_xref is not None and report_xref is not None:
+                    report_datum += 1
                     write_row(atclv['filename'], t, '0\t{:d}\t{:d}\t{:d}\t{:d}\t{:d}\t{}\n'.format(
                         report_xref,
                         frm['file_off'],
@@ -361,7 +371,7 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
             WHERE atclv.autoclaved_xref = meta.autoclaved_xref
         ''') # every row
         c.execute('''UPDATE report_meta AS meta SET report_no = rpt.report_no
-            FROM autoclaved AS atclv, report AS rpt
+            FROM report AS rpt
             WHERE meta.report_no = 0
               AND meta.autoclaved_no = rpt.autoclaved_no
               AND meta.textname = rpt.textname
@@ -455,6 +465,8 @@ def delete_data_to_reprocess(pgconn, bucket):
         # `del_msm` due to `reingest` action, it does NOT represent new files
         # to be ingested.
         code_ver = set() if len(list(c)) == 0 else {CODE_VER_REPROCESS}
+        # Some of deleted rows may have some values that are heavy to re-compute every time:
+        simhash_cache = {} # sha256.digest() -> struct.pack('qq', ...)
         # `code_ver` is updated with all known versions of the bucket.
         c.execute('SELECT DISTINCT code_ver FROM autoclaved WHERE bucket_date = %s', [bucket])
         code_ver.update(_[0] for _ in c)
@@ -475,8 +487,27 @@ def delete_data_to_reprocess(pgconn, bucket):
                 should_be_cleaned = ver < tbl.min_compat_code_ver
                 should_be_cleaned_now = tbl.min_compat_code_ver <= next_ver
                 if should_be_cleaned and should_be_cleaned_now:
-                    c.execute('DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM del_msm)'.format(tbl.data_table))
-                    print 'DELETE FROM {} because of ver={:d} ~ {:d} rows gone'.format(tbl.data_table, ver, c.rowcount)
+                    if 'body_simhash' in tbl.columns and 'body_text_simhash' in tbl.columns:
+                        rowcount = None
+                        c.execute('''WITH del AS (DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM del_msm)
+                            RETURNING body_sha256, body_simhash, body_text_simhash
+                            ) SELECT body_sha256, body_simhash, body_text_simhash
+                              FROM del WHERE body_sha256 IS NOT NULL
+                              UNION
+                              SELECT NULL, COUNT(*), NULL FROM del
+                        '''.format(tbl.data_table))
+                        for row in c:
+                            if row[0] is not None:
+                                key = str(row[0]) # convert memoryview(Py3) / buffer(Py2) to str / bytes
+                                assert len(key) == 256 / 8
+                                value = BaseHttpFeeder.simhash_value_type.pack(row[1], row[2])
+                                simhash_cache[key] = value
+                            else:
+                                rowcount = row[1] # alike row must be there
+                    else:
+                        c.execute('DELETE FROM {} WHERE msm_no IN (SELECT msm_no FROM del_msm)'.format(tbl.data_table))
+                        rowcount = c.rowcount
+                    print 'DELETE FROM {} because of ver={:d} ~ {:d} rows gone'.format(tbl.data_table, ver, rowcount)
         c.execute('DROP TABLE del_msm')
         # when DATA_TABLES cleanup is done, CODE_VER_REPROCESS is added to handle files to `ingest`
         c.execute('SELECT 1 FROM autoclaved_meta WHERE NOT reingest LIMIT 1')
@@ -486,9 +517,9 @@ def delete_data_to_reprocess(pgconn, bucket):
             # simplifies version arithmetics in prepare_destination()
             code_ver.add(CODE_VER_REPROCESS)
     assert None not in code_ver
-    return code_ver
+    return code_ver, simhash_cache
 
-def prepare_destination(pgconn, stconn, bucket_code_ver):
+def prepare_destination(pgconn, stconn, bucket_code_ver, bucket_date):
     assert None not in bucket_code_ver
     sink_list = []
 
@@ -502,6 +533,9 @@ def prepare_destination(pgconn, stconn, bucket_code_ver):
     # badrow_sink does not need dummy feeder as `__flush_stubborn()` calls
     # write() explicitly and double fault just raises exception and aborts.
     badrow_sink = PGCopyFrom(pgconn, BadrowFeeder.sink_table, columns=BadrowFeeder.columns)
+
+    # That's slightly non-orthogonal as it updates cache for two feeders.
+    BaseHttpFeeder.simhash_cache_update(pgconn, bucket_date)
 
     # Okay, "special" tables are done, let's register more generic DATA_TABLES.
     data_tables_args = {
@@ -536,7 +570,7 @@ def copy_data_from_autoclaved(pgconn, stconn, in_root, bucket, bucket_code_ver):
     TrappedException = None if FLAG_FAIL_FAST else Exception
 
     report, msm, msm_exc, badmeta, ver_feeders, sink_list, feeder_list = prepare_destination(
-            pgconn, stconn, bucket_code_ver)
+            pgconn, stconn, bucket_code_ver, bucket)
     assert None not in ver_feeders
     # `NULL` is special `code_ver`, but `NULL` and `0` are same for DATA_TABLES
     if CODE_VER_REPROCESS in bucket_code_ver:
@@ -835,6 +869,12 @@ class ReportFeeder(BaseFeeder):
             datum.pop(key, None)
     def close(self): # also handles TABLE `report_meta`
         with self.pgconn.cursor() as c:
+            # NB: if `report_blob` has no corresponding record for `report_meta` row
+            # it means that either the report file is empty or all the measurements
+            # in the report file fail ReportFeeder ingestion.
+            # Empty reports are filtered by `report_datum` in `copy_meta_from_index()`
+            # but ReportFeeder may still fail, so `JOIN` is not `LEFT JOIN` to avoid
+            # fail-fast behavior on `close()`.
             c.execute('''
                 INSERT INTO report
                 SELECT report_no, autoclaved_no, test_start_time, probe_cc, probe_asn, probe_ip,
@@ -842,7 +882,7 @@ class ReportFeeder(BaseFeeder):
                        COALESCE(report_id, translate(encode(orig_sha1, 'base64'), '/+=', '_-')), software_no
                 FROM report_meta
                 JOIN report_blob USING (report_no)
-            ''') # TODO: `LEFT JOIN report_blob` to fail fast in case of errors
+            ''')
         del self.pgconn
 
 
@@ -1119,6 +1159,8 @@ class VanillaTorFeeder(BaseFeeder):
 
     @staticmethod
     def pop(datum):
+        if datum['test_name'] != 'vanilla_tor':
+            return
         t = datum['test_keys']
         known_keys = ('success', 'transport_name', 'error', 'timeout',
                 'tor_progress', 'tor_log', 'tor_progress_tag',
@@ -1137,11 +1179,68 @@ def get_title(body):
     return title
 
 class BaseHttpFeeder(BaseFeeder):
+    # The cache is class-wide as there are two subclasses doing this
+    # computation, both benefit from the cache and shared statistics.
+    # Packing value to string (as-is from DB, signed), frees ~26% of RAM used
+    # by cache compared to tuple of two int64 values.
+    # Bit-packing it to int128 can save ~31%, but it needs carefull handling
+    # of the sign of the signed integer, so it's not implemented.
+    simhash_value_type = struct.Struct('qq')
+    simhash_cache = {} # sha256.digest() -> simhash_value_type
+    simhash_stat = {'get': 0, 'hit': 0, 'getbyte': 0, 'hitbyte': 0}
+
+    @classmethod
+    def simhash_cache_update(cls, pgconn, bucket_date):
+        # Fetches the freshest bucket before current one into simhash_cache.
+        # Preloading the cache with single bucket gives cache-hit ~45%.
+        create_temp_table(pgconn, 'shcmsm', 'msm_no integer NOT NULL')
+        with pgconn.cursor() as c:
+            c.execute('''INSERT INTO shcmsm (msm_no)
+            SELECT msm_no
+            FROM autoclaved
+            JOIN report USING (autoclaved_no)
+            JOIN measurement USING (report_no)
+            WHERE bucket_date = (
+                SELECT MAX(bucket_date) FROM autoclaved WHERE bucket_date < %s
+            );
+            CREATE UNIQUE INDEX ON shcmsm (msm_no);
+            ANALYZE shcmsm;
+            SELECT MIN(msm_no), MAX(msm_no) FROM shcmsm
+            ''', [bucket_date])
+            msm_min, msm_max = c.fetchone() # to avoid full-scan by all means
+            c.execute('''SELECT body_sha256, body_simhash, body_text_simhash FROM {}
+            WHERE msm_no IN (SELECT * FROM shcmsm) AND msm_no >= %s AND msm_no <= %s
+                  AND body_sha256 IS NOT NULL
+            UNION
+            SELECT body_sha256, body_simhash, body_text_simhash FROM {}
+            WHERE msm_no IN (SELECT * FROM shcmsm) AND msm_no >= %s AND msm_no <= %s
+                  AND body_sha256 IS NOT NULL
+            '''.format(HttpRequestFeeder.data_table, HttpControlFeeder.data_table),
+            [msm_min, msm_max, msm_min, msm_max])
+            for row in c:
+                key = str(row[0]) # convert memoryview(Py3) / buffer(Py2) to str / bytes
+                assert len(key) == 256 / 8
+                value = cls.simhash_value_type.pack(row[1], row[2])
+                cls.simhash_cache[key] = value
+            c.execute('DROP TABLE shcmsm')
+
     def pg_body_hash(self, body):
         if body is not None:
-            body_sha256 = pg_binquote(hashlib.sha256(body).digest())
-            body_simhash = sim_shi4_mm3_layout(body)
-            body_text_simhash = sim_shi4_mm3_text(body)
+            body_sha256 = hashlib.sha256(body).digest()
+            c = self.simhash_cache.get(body_sha256)
+            self.simhash_stat['get'] += 1
+            self.simhash_stat['getbyte'] += len(body) # XXX: is it bytes or chars?!
+            if c is not None:
+                self.simhash_stat['hit'] += 1
+                self.simhash_stat['hitbyte'] += len(body)
+                body_simhash, body_text_simhash = self.simhash_value_type.unpack(c)
+            else:
+                body_simhash = sim_shi4_mm3_layout(body)
+                body_text_simhash = sim_shi4_mm3_text(body)
+                # doing that on-the-fly raises cache-hit from ~45% to ~60%
+                c = self.simhash_value_type.pack(body_simhash, body_text_simhash)
+                self.simhash_cache[body_sha256] = c
+            body_sha256 = pg_binquote(body_sha256)
         else:
             body_sha256 = pg_quote(None)
             body_simhash = body_text_simhash = pg_quote(None)
@@ -1168,6 +1267,20 @@ class BaseHttpFeeder(BaseFeeder):
                 tor.pop('exit_ip')
             if tor['exit_name'] is None:
                 tor.pop('exit_name')
+    def close(self):
+        if self.simhash_cache:
+            mb = 1024. * 1024
+            s = self.simhash_stat
+            print 'SimhashCache: len {:d}, hit {:d} ({:.1f} MiB), get {:d} ({:.1f} MiB), hit-rate {:.3f} ({:.3f} of bytes)'.format(
+                    len(self.simhash_cache),
+                    s['hit'],
+                    s['hitbyte'] / mb,
+                    s['get'],
+                    s['getbyte'] / mb,
+                    s['hit'] * 1. / s['get'] if s['get'] else 0.,
+                    s['hitbyte'] * 1. / s['getbyte'] if s['getbyte'] else 0.)
+            self.simhash_cache.clear()
+            self.simhash_stat.clear() # make the object unusable to avoid mistakes
 
 class HttpControlFeeder(BaseHttpFeeder):
     min_compat_code_ver = 5
@@ -1451,8 +1564,10 @@ def meta_pg(in_root, bucket, postgres):
             return
         print 'bucket={}: ingest {:d}, reingest {:d}, reprocess {:d}'.format(bucket, len(ingest), len(reingest), len(reprocess))
         copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket)
-        bucket_code_ver = delete_data_to_reprocess(pgconn, bucket)
+        bucket_code_ver, simhash_cache = delete_data_to_reprocess(pgconn, bucket)
         del autoclaved_index, files
+        BaseHttpFeeder.simhash_cache.update(simhash_cache)
+        del simhash_cache
         copy_data_from_autoclaved(pgconn, stconn, in_root, bucket, bucket_code_ver)
         del bucket_code_ver
         # Okay, server-side cursor feeding indexes is closed and the code is

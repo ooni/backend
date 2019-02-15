@@ -4,6 +4,11 @@
 import os
 import datetime
 
+def filename(s):
+    if not os.path.isfile(s):
+        raise ValueError('Not a file', s)
+    return s
+
 def dirname(s):
     if not os.path.isdir(s):
         raise ValueError('Not a directory', s)
