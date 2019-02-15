@@ -1,9 +1,7 @@
-There may be reasons to remove some reports from historical data.  The document
-describes, how to do that with minimal resources waste and minimal damage to the
+This document describes, how to remove reports from historical data with minimal resources waste and minimal damage to the
 on-going data processing.
 
-The document is valid as of February 2019, when the Airflow data processing
-graph looked like following one:
+This document is valid as of February 2019, when the [Airflow data processing graph](./pipeline-16.10.md#data-flow) looked like following one:
 
 ![hist_canning DAG](./airflow-pipeline.png)
 
@@ -30,12 +28,11 @@ in addition to aforementioned places:
 - `s3://ooni-data-private/`
 - `s3://ooni-data/sanitised/`
 
-Dealing with legacy data is out of scope of the document.
+Dealing with legacy data is out of the scope of this document.
 
 ## Archive re-compression
 
-Both `archives-raw/yaml` and `canned` archives have to be re-compressed deleting
-affected report files.
+Both `archives-raw/yaml` and `canned` archives have to be re-compressed deleting affected report files.
 
 To keep `index.json.gz` file in-sync with actual archives, `delete_canned_report.py`
 script has to be used. The script is conceptually a wrapper around
