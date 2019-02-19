@@ -55,7 +55,6 @@ script:
   - sleep 30
   - cp oonib.pid oonib-persist.pid
   - kill -TERM `cat oonib-persist.pid`
-  - wait `cat oonib-persist.pid`
 
   # 3. run regress tests
   - $(which coverage) run $(which trial) oonib
