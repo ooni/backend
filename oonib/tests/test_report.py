@@ -90,6 +90,17 @@ dummy_data = {
     'test_start_time': '2016-01-01 12:34:56'
 }
 
+probe_android_200 = {
+    'software_name': 'ooniprobe-android',
+    'software_version': '2.0.0',
+    'test_name': 'web_connectivity',
+    'test_version': '0.1.0',
+    'probe_asn': 'AS0',
+    'probe_cc': 'ZZ',
+    'test_start_time': '2016-01-01 12:34:56'
+}
+
+
 for _, handler in reportAPI:
     handler.initialize = mock_initialize
 
@@ -109,6 +120,13 @@ class TestReport(HandlerTestCase):
             "POST", data)
         defer.returnValue(response)
 
+
+    @defer.inlineCallbacks
+    def test_create_android_2_dot_00(self):
+        response = yield self.request('/report', "POST", probe_android_200)
+        response_body = json.loads(response.body)
+        self.assertIn('error', response_body)
+        self.assertEqual(response_body['error'], 'invalid-request-field software_version')
 
     @defer.inlineCallbacks
     def test_create_valid_report(self):

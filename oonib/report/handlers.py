@@ -138,6 +138,14 @@ def validateHeader(header):
     except KeyError:
         pass
 
+    # This is to not accept new measurements coming from OONI Probe Android
+    # 2.0.0, which was affected by bug:
+    # https://github.com/ooni/probe-android/issues/188
+    sw_name = header.get('software_name')
+    sw_ver = header.get('software_version')
+    if sw_name == 'ooniprobe-android' and (sw_ver == '2.0.0' or sw_ver.startswith('2.0.0-')):
+        raise e.InvalidRequestField('software_version')
+
     return header
 
 
