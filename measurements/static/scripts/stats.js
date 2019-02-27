@@ -19,7 +19,7 @@ var markers = [{
 }
 ];
 
-d3.json('/api/_/asn_by_month', (data) => {
+d3.json('https://api.ooni.io/api/_/asn_by_month', (data) => {
     data = MG.convert.date(data, 'date');
     MG.data_graphic({
         title: "ASNs by month",
@@ -42,7 +42,7 @@ d3.json('/api/_/asn_by_month', (data) => {
       .attr("style", "display: none");
 });
 
-d3.json('/api/_/countries_by_month', (data) => {
+d3.json('https://api.ooni.io/api/_/countries_by_month', (data) => {
     data = MG.convert.date(data, 'date');
     MG.data_graphic({
         title: "Countries by month",
@@ -64,7 +64,7 @@ d3.json('/api/_/countries_by_month', (data) => {
       .attr("style", "display: none");
 });
 
-d3.json('/api/_/runs_by_month', (data) => {
+d3.json('https://api.ooni.io/api/_/runs_by_month', (data) => {
     data = MG.convert.date(data, 'date');
     MG.data_graphic({
         title: "Runs by month",
