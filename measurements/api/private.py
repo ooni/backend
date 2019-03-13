@@ -18,12 +18,12 @@ from pycountry import countries
 from flask import Blueprint, current_app, request
 from flask.json import jsonify
 
-from sqlalchemy import func, or_, distinct
+from sqlalchemy import func, and_, or_, distinct, sql, select
 
 from werkzeug.exceptions import BadRequest
 
 from measurements.models import Report, Measurement, Input
-from measurements.models import TEST_NAMES
+from measurements.models import TEST_NAMES, TEST_GROUPS, get_test_group_case
 from measurements.config import REQID_HDR, request_id
 
 # prefix: /api/_
@@ -251,3 +251,82 @@ def api_private_measurement_count_total():
         resp.text,
         mimetype=current_app.config['JSONIFY_MIMETYPE']
     )
+
+def get_recent_network_coverage(probe_cc, test_groups):
+    where_clause = [
+        sql.text("test_start_time > current_date - interval '30 day'"),
+        sql.text("probe_cc = :probe_cc"),
+    ]
+    if test_groups is not None:
+        tg_or = []
+        for tg in test_groups:
+            try:
+                tg_names = TEST_GROUPS[tg]
+                tg_or += [sql.literal_column("test_name") == tg_name for tg_name in tg_names]
+            except KeyError:
+                raise Exception('invalid test_group')
+        where_clause.append(or_(*tg_or))
+
+    s = select([
+        sql.text("COUNT(DISTINCT probe_asn)"),
+        sql.text("date_trunc('day', test_start_time) as day")
+    ]).where(
+        and_(*where_clause)
+    ).group_by(
+        sql.text("day")
+    ).order_by(
+        sql.text("day")
+    ).select_from(sql.table('ooexpl_recent_msmt_count'))
+    network_coverage = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
+    for count, date in q:
+        network_coverage.append({
+            'count': int(count),
+            'date': str(date)
+        })
+    return network_coverage
+
+def get_recent_test_coverage(probe_cc):
+    s = select([
+        sql.text("SUM(msmt_count)"),
+        sql.text("date_trunc('day', test_start_time) as day"),
+        sql.text(get_test_group_case() + ' AS test_group')
+    ]).where(
+        and_(
+            sql.text("test_start_time > current_date - interval '30 day'"),
+            sql.text("probe_cc = :probe_cc"),
+        )
+    ).group_by(
+        sql.text("test_group, day")
+    ).order_by(
+        sql.text("test_group, day")
+    ).select_from(sql.table('ooexpl_recent_msmt_count'))
+
+    test_coverage = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
+    for count, date, test_group in q:
+        test_coverage.append({
+            'count': int(count),
+            'date': str(date),
+            'test_group': test_group
+        })
+    return test_coverage
+
+@api_private_blueprint.route('/test_coverage', methods=["GET"])
+def api_private_test_coverage():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    network_where_clause = [
+        sql.text("test_start_time > current_date - interval '30 day'"),
+        sql.text("probe_cc = :probe_cc"),
+    ]
+    test_groups = request.args.get('test_groups')
+    if test_groups is not None:
+        test_groups = test_groups.split(',')
+
+    return jsonify({
+        'test_coverage': get_recent_test_coverage(probe_cc),
+        'network_coverage': get_recent_network_coverage(probe_cc, test_groups)
+    })
