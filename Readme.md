@@ -2,7 +2,7 @@
 
 version: 3.0.0
 
-> If OONI were a car, the OONI Pipeline would be it's engine
+> If OONI were a car, the OONI Pipeline would be its engine
 
 Pipeline is responsible for aggregating data from network measurement clients
 (such as OONI Probe) and analyze it to identify network anomalies.
