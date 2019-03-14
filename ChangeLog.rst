@@ -1,6 +1,11 @@
 ChangeLog
 =========
 
+1.3.5 (Thu, 21 Feb 2019)
+------------------------
+
+* Disable collecting reports from ooniprobe-android 2.0.0
+
 1.3.4 (Tue, 26 Sep 2017)
 ------------------------
 
