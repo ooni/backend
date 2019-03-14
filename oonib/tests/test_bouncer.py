@@ -571,4 +571,54 @@ class TestProductionTests(BaseTestBouncer):
         response_body = json.loads(response.body)
         print(response_body['net-tests'])
 
+    @defer.inlineCallbacks
+    def test_collectors(self):
+        response = yield self.request('/api/v1/collectors', 'GET', None)
+        response_body = json.loads(response.body)
+        self.assertEqual(response_body['results'], [{
+            "address": "httpo://ihiderha53f36lsd.onion",
+            "type": "onion",
+        }, {
+            "address": "https://a.collector.ooni.io:4441",
+            "type": "https"
+        }, {
+            "address": "https://das0y2z2ribx3.cloudfront.net",
+            "front": "a0.awsstatic.com",
+            "type": "cloudfront"
+        }])
+
+    @defer.inlineCallbacks
+    def test_test_helpers(self):
+        response = yield self.request('/api/v1/test-helpers', 'GET', None)
+        response_body = json.loads(response.body)
+        self.assertEqual(response_body['results'], {
+            "dns": [{"type": "legacy", "address": "213.138.109.232:57004"}],
+            "http-return-json-headers": [{
+                "type": "legacy",
+                "address": "http://38.107.216.10:80"
+            }],
+            "ssl": [{
+                "type": "legacy",
+                "address": "https://213.138.109.232"
+            }],
+            "tcp-echo": [{
+                "type": "legacy",
+                "address": "213.138.109.232"
+            }],
+            "traceroute": [{
+                "type": "legacy",
+                "address": "213.138.109.232"
+            }],
+            "web-connectivity": [{
+                "type": "legacy",
+                "address": "httpo://7jne2rpg5lsaqs6b.onion"
+            }, {
+                "address": "https://a.web-connectivity.th.ooni.io:4442",
+                "type": "https",
+            }, {
+                "address": "https://d2vt18apel48hw.cloudfront.net",
+                "front": "a0.awsstatic.com",
+                "type": "cloudfront",
+            }]
+        })
 

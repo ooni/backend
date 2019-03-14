@@ -190,6 +190,72 @@ class Bouncer(object):
             nettests.append(nettest)
         return {'net-tests': nettests}
 
+    def formatCollectorsWithoutPolicy(self):
+        ''' Formats the collectors without policy for the new
+            /api/v1/collectors endpoint. '''
+        results = []
+        for collector in self.knownCollectorsWithoutPolicy:
+            results.append({'type': 'onion', 'address': collector})
+            section = self.bouncerFile.get('collector')
+            if not section: continue
+            info = section.get(collector)
+            if not info: continue
+            for alt in info['collector-alternate']:
+                r = {}
+                for k in ('type', 'address', 'front'): r[k] = alt.get(k)
+                if not r['type'] or not r['address']: continue
+                if not r['front']: del r['front']
+                results.append(r)
+        return results
+
+    def formatTestHelpersWithoutPolicy(self):
+        ''' Formats the test helpers without policy for the new
+            /api/v1/test-helpers endpoint. '''
+        results = {}
+        for collector in self.knownCollectorsWithoutPolicy:
+            section = self.bouncerFile.get('collector')
+            if not section: continue
+            info = section.get(collector)
+            if not info: continue
+            helper = info.get('test-helper')
+            if helper:
+                for k, v in helper.items():
+                    results.setdefault(k, []).append({
+                        'type': 'legacy',
+                        'address': v,
+                    })
+            alt = info.get('test-helper-alternate')
+            if alt:
+                for k, v in alt.items():
+                    results.setdefault(k, [])
+                    for e in v:
+                        r = {}
+                        for x in ('type', 'address', 'front'): r[x] = e.get(x)
+                        if not r['type'] or not r['address']: continue
+                        if not r['front']: del r['front']
+                        results[k].append(r)
+        return results
+
+
+class APIv1Collectors(OONIBHandler):
+    def initialize(self):
+        self.bouncer = Bouncer(config.main.bouncer_file)
+
+    def get(self):
+        self.write({
+            "results": self.bouncer.formatCollectorsWithoutPolicy()
+        })
+
+
+class APIv1TestHelpers(OONIBHandler):
+    def initialize(self):
+        self.bouncer = Bouncer(config.main.bouncer_file)
+
+    def get(self):
+        self.write({
+            "results": self.bouncer.formatTestHelpersWithoutPolicy()
+        })
+
 
 class BouncerHandlerBase(OONIBHandler):
     def initialize(self):
