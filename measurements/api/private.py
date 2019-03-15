@@ -104,7 +104,7 @@ def api_private_countries():
         sql.text("probe_cc")
     ).order_by(
         sql.text("probe_cc")
-    ).select_from(sql.table('ooexpl_bucket_msmt_count'))
+    ).select_from(sql.table('ooexpl_bucket_msm_count'))
 
     q = current_app.db_session.execute(s)
     country_list = []
@@ -257,7 +257,8 @@ def api_private_measurement_count_total():
 
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
-        sql.text("test_start_time > current_date - interval '30 day'"),
+        sql.text("test_day > current_date - interval '31 day'"),
+        sql.text("test_day < current_date - interval '1 day'"),
         sql.text("probe_cc = :probe_cc"),
     ]
     if test_groups is not None:
@@ -272,14 +273,14 @@ def get_recent_network_coverage(probe_cc, test_groups):
 
     s = select([
         sql.text("COUNT(DISTINCT probe_asn)"),
-        sql.text("date_trunc('day', test_start_time) as day")
+        sql.text("test_day")
     ]).where(
         and_(*where_clause)
     ).group_by(
-        sql.text("day")
+        sql.text("test_day")
     ).order_by(
-        sql.text("day")
-    ).select_from(sql.table('ooexpl_recent_msmt_count'))
+        sql.text("test_day")
+    ).select_from(sql.table('ooexpl_recent_msm_count'))
     network_coverage = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
     for count, date in q:
@@ -291,19 +292,21 @@ def get_recent_network_coverage(probe_cc, test_groups):
 
 def get_recent_test_coverage(probe_cc):
     s = select([
-        sql.text("SUM(msmt_count)"),
-        sql.text("date_trunc('day', test_start_time) as day"),
+        sql.text("SUM(count)"),
+        sql.text("test_day"),
         sql.text(get_test_group_case() + ' AS test_group')
     ]).where(
         and_(
-            sql.text("test_start_time > current_date - interval '30 day'"),
+            sql.text("test_day > current_date - interval '31 day'"),
+            # We exclude the last day to wait for the pipeline
+            sql.text("test_day < current_date - interval '1 day'"),
             sql.text("probe_cc = :probe_cc"),
         )
     ).group_by(
-        sql.text("test_group, day")
+        sql.text("test_group, test_day")
     ).order_by(
-        sql.text("test_group, day")
-    ).select_from(sql.table('ooexpl_recent_msmt_count'))
+        sql.text("test_group, test_day")
+    ).select_from(sql.table('ooexpl_recent_msm_count'))
 
     test_coverage = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
@@ -321,10 +324,6 @@ def api_private_test_coverage():
     if probe_cc is None or len(probe_cc) != 2:
         raise Exception('missing probe_cc')
 
-    network_where_clause = [
-        sql.text("test_start_time > current_date - interval '30 day'"),
-        sql.text("probe_cc = :probe_cc"),
-    ]
     test_groups = request.args.get('test_groups')
     if test_groups is not None:
         test_groups = test_groups.split(',')
@@ -389,7 +388,7 @@ def api_private_website_stats():
     ]).where(
         and_(
             sql.text("measurement_start_time > current_date - interval '31 day'"),
-            sql.text("measurement_start_time < current_date"),
+            sql.text("measurement_start_time < current_date - interval '1 day'"),
             sql.text("probe_cc = :probe_cc"),
             sql.text("probe_asn = :probe_asn"),
             sql.text("input = :input"),
