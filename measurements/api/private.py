@@ -8,9 +8,10 @@ there is no versioning on them.
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlencode
 
 import json
+import math
 import requests
 
 
@@ -331,4 +332,157 @@ def api_private_test_coverage():
     return jsonify({
         'test_coverage': get_recent_test_coverage(probe_cc),
         'network_coverage': get_recent_network_coverage(probe_cc, test_groups)
+    })
+
+@api_private_blueprint.route('/website_network_tests', methods=["GET"])
+def api_private_website_network_tests():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    s = select([
+        sql.text("COUNT(*)"),
+        sql.text("probe_asn"),
+    ]).where(
+        and_(
+            sql.text("probe_cc = :probe_cc")
+        )
+    ).group_by(
+        sql.text("probe_asn")
+    ).order_by(
+        sql.text("count DESC")
+    ).select_from(sql.table('ooexpl_website_msmts'))
+
+    results = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
+    for count, probe_asn in q:
+        results.append({
+            'count': int(count),
+            'probe_asn': int(probe_asn),
+        })
+    return jsonify({
+        'results': results
+    })
+
+sql_anomaly_count = sql.text("COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count")
+sql_confirmed_count = sql.text("COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count")
+sql_failure_count = sql.text("COALESCE(sum(CASE WHEN failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count")
+
+@api_private_blueprint.route('/website_stats', methods=["GET"])
+def api_private_website_stats():
+    url = request.args.get('input')
+
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    probe_asn = request.args.get('probe_asn')
+    if probe_asn is None:
+        raise Exception('missing probe_asn')
+
+    s = select([
+        sql.text("date_trunc('day', measurement_start_time) as date"),
+        sql_anomaly_count,
+        sql_confirmed_count,
+        sql_failure_count,
+        sql.text("COUNT(*) as total_count")
+    ]).where(
+        and_(
+            sql.text("measurement_start_time > current_date - interval '31 day'"),
+            sql.text("measurement_start_time < current_date"),
+            sql.text("probe_cc = :probe_cc"),
+            sql.text("probe_asn = :probe_asn"),
+            sql.text("input = :input"),
+        )
+    ).group_by(
+        sql.text("date")
+    ).order_by(
+        sql.text("date")
+    ).select_from(sql.table('ooexpl_website_msmts'))
+
+    results = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn, 'input': url})
+    for date, anomaly_count, confirmed_count, failure_count, total_count in q:
+        results.append({
+            'date': date,
+            'anomaly_count': int(anomaly_count),
+            'confirmed_count': int(confirmed_count),
+            'failure_count': int(failure_count),
+            'total_count': int(total_count)
+        })
+    return jsonify({
+        'results': results
+    })
+
+@api_private_blueprint.route('/website_test_urls', methods=["GET"])
+def api_private_website_test_urls():
+    limit = request.args.get('limit', 100)
+    if limit <= 0:
+        limit = 100
+    offset = request.args.get('offset', 0)
+
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    probe_asn = request.args.get('probe_asn')
+    if probe_asn is None:
+        raise Exception('missing probe_asn')
+
+    probe_asn = int(probe_asn.replace('AS', ''))
+
+    s = select([
+        sql.text("input"),
+        sql_anomaly_count,
+        sql_confirmed_count,
+        sql_failure_count,
+        sql.text("COUNT(*) as total_count")
+    ]).where(
+        and_(
+            sql.text("measurement_start_time > current_date - interval '31 day'"),
+            sql.text("measurement_start_time < current_date"),
+            sql.text("probe_cc = :probe_cc"),
+            sql.text("probe_asn = :probe_asn"),
+        )
+    ).group_by(
+        sql.text("input")
+    ).order_by(
+        sql.text("confirmed_count DESC, anomaly_count DESC, total_count DESC, input ASC")
+    ).limit(
+        int(limit)
+    ).offset(
+        int(offset)
+    ).select_from(sql.table('ooexpl_website_msmts'))
+
+    current_page = math.ceil(offset / limit) + 1
+    metadata = {
+        'offset': offset,
+        'limit': limit,
+        'current_page': current_page,
+        'next_url': None
+    }
+    results = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn})
+    for input, anomaly_count, confirmed_count, failure_count, total_count in q:
+        results.append({
+            'input': input,
+            'anomaly_count': int(anomaly_count),
+            'confirmed_count': int(confirmed_count),
+            'failure_count': int(failure_count),
+            'total_count': int(total_count)
+        })
+
+    if len(results) >= limit:
+        next_args = request.args.to_dict()
+        next_args['offset'] = "%s" % (offset + limit)
+        next_args['limit'] = "%s" % limit
+        next_url = urljoin(
+            current_app.config['BASE_URL'],
+            '/api/_/website_test_urls?%s' % urlencode(next_args)
+        )
+        metadata['next_url'] = next_url
+
+    return jsonify({
+        'metadata': metadata,
+        'results': results
     })
