@@ -429,6 +429,22 @@ def api_private_website_test_urls():
         raise Exception('missing probe_asn')
 
     probe_asn = int(probe_asn.replace('AS', ''))
+    where_clause = [
+        sql.text("measurement_start_time > current_date - interval '31 day'"),
+        sql.text("measurement_start_time < current_date"),
+        sql.text("probe_cc = :probe_cc"),
+        sql.text("probe_asn = :probe_asn"),
+    ]
+    query_params = {'probe_cc': probe_cc, 'probe_asn': probe_asn}
+
+    row = current_app.db_session.execute(
+        select([
+            sql.text("COUNT(DISTINCT input)")
+        ]).where(
+            and_(*where_clause)
+        ).select_from(sql.table('ooexpl_website_msmts'))
+    , query_params).fetchone()
+    total_count = row[0]
 
     s = select([
         sql.text("input"),
@@ -437,12 +453,7 @@ def api_private_website_test_urls():
         sql_failure_count,
         sql.text("COUNT(*) as total_count")
     ]).where(
-        and_(
-            sql.text("measurement_start_time > current_date - interval '31 day'"),
-            sql.text("measurement_start_time < current_date"),
-            sql.text("probe_cc = :probe_cc"),
-            sql.text("probe_asn = :probe_asn"),
-        )
+        and_(*where_clause)
     ).group_by(
         sql.text("input")
     ).order_by(
@@ -458,10 +469,11 @@ def api_private_website_test_urls():
         'offset': offset,
         'limit': limit,
         'current_page': current_page,
+        'total_count': total_count,
         'next_url': None
     }
     results = []
-    q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn})
+    q = current_app.db_session.execute(s, query_params)
     for input, anomaly_count, confirmed_count, failure_count, total_count in q:
         results.append({
             'input': input,
