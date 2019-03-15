@@ -334,7 +334,7 @@ def api_private_test_coverage():
         'network_coverage': get_recent_network_coverage(probe_cc, test_groups)
     })
 
-@api_private_blueprint.route('/website_network_tests', methods=["GET"])
+@api_private_blueprint.route('/website_networks', methods=["GET"])
 def api_private_website_network_tests():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
@@ -414,7 +414,7 @@ def api_private_website_stats():
         'results': results
     })
 
-@api_private_blueprint.route('/website_test_urls', methods=["GET"])
+@api_private_blueprint.route('/website_urls', methods=["GET"])
 def api_private_website_test_urls():
     limit = request.args.get('limit', 100)
     if limit <= 0:
@@ -478,7 +478,7 @@ def api_private_website_test_urls():
         next_args['limit'] = "%s" % limit
         next_url = urljoin(
             current_app.config['BASE_URL'],
-            '/api/_/website_test_urls?%s' % urlencode(next_args)
+            '/api/_/website_urls?%s' % urlencode(next_args)
         )
         metadata['next_url'] = next_url
 
