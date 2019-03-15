@@ -13,7 +13,6 @@ from urllib.parse import urljoin
 import json
 import requests
 
-from pycountry import countries
 
 from flask import Blueprint, current_app, request
 from flask.json import jsonify
@@ -25,6 +24,7 @@ from werkzeug.exceptions import BadRequest
 from measurements.models import Report, Measurement, Input
 from measurements.models import TEST_NAMES, TEST_GROUPS, get_test_group_case
 from measurements.config import REQID_HDR, request_id
+from measurements.countries import lookup_country
 
 # prefix: /api/_
 api_private_blueprint = Blueprint('api_private', 'measurements')
@@ -93,31 +93,33 @@ def api_private_test_names():
 
 @api_private_blueprint.route('/countries', methods=["GET"])
 def api_private_countries():
-    with_counts = request.args.get("with_counts")
-    country_list = []
-    if not with_counts:
-        country_list = [{ 'alpha_2': c.alpha_2, 'name': c.name } for c in countries]
-    else:
-        # XXX we probably actually want to get this from redis or compute it
-        # periodically since it take 60 seconds to run.
-        q = current_app.db_session.query(
-                func.count(Measurement.id),
-                Report.probe_cc.label('probe_cc')
-        ).join(Report, Report.report_no == Measurement.report_no) \
-         .group_by(Report.probe_cc)
-        for count, probe_cc in q:
-            if probe_cc.upper() == 'ZZ':
-                continue
+    # We don't consider this field anymore:
+    # with_counts = request.args.get("with_counts")
 
-            try:
-                c = countries.lookup(probe_cc)
-                country_list.append({
-                    'count': count,
-                    'alpha_2': c.alpha_2,
-                    'name': c.name,
-                })
-            except Exception as exc:
-                current_app.logger.warning("Failed to lookup: %s" % probe_cc)
+    s = select([
+        sql.text("SUM(count)"),
+        sql.text('probe_cc')
+    ]).group_by(
+        sql.text("probe_cc")
+    ).order_by(
+        sql.text("probe_cc")
+    ).select_from(sql.table('ooexpl_bucket_msmt_count'))
+
+    q = current_app.db_session.execute(s)
+    country_list = []
+    for count, probe_cc in q:
+        if probe_cc.upper() == 'ZZ':
+            continue
+
+        try:
+            c = lookup_country(probe_cc)
+            country_list.append({
+                'count': int(count),
+                'alpha_2': c.alpha_2,
+                'name': c.name,
+            })
+        except Exception as exc:
+            current_app.logger.warning("Failed to lookup: %s" % probe_cc)
 
     return jsonify({
         "countries": country_list

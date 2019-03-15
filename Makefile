@@ -26,6 +26,9 @@ venv:
 dev:
 	$(PYTHON_WITH_ENV) -m measurements run -p 3000 --reload
 
+update-country-list:
+	curl https://raw.githubusercontent.com/hellais/country-util/master/data/country-list.json > measurements/countries/country-list.json
+
 # XXX remove these if devtool backward compatibility does not matter
 serve: dev
 develop: dev
