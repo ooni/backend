@@ -44,7 +44,7 @@ class CountryDB(object):
         value = value.lower()
         c = self.country_map.get(value, None)
         if c is None:
-            raise LookupError('Could not find a record for %r' % value)
+            raise KeyError('Could not find a record for %r' % value)
         return c
 
 countries = CountryDB(COUNTRY_LIST_FILE)

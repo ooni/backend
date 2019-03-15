@@ -10,13 +10,14 @@ import lz4framed
 
 from flask import Blueprint, render_template, current_app, request, redirect, \
     Response, stream_with_context
-from pycountry import countries
+
 from sqlalchemy import func, or_, desc
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
 from measurements.models import Report, Measurement, Autoclaved
 from measurements.config import REQID_HDR, request_id
+from measurements.countries import lookup_country
 
 # Exporting it
 from .docs import api_docs_blueprint
@@ -177,7 +178,8 @@ def _files_by_country():
         country = "Unknown"
         if alpha_2 != "ZZ":
             try:
-                country = countries.get(alpha_2=alpha_2).name
+                c = lookup_country(alpha_2)
+                country = c.name
             except KeyError:
                 country = "Unknown (%s)" % alpha_2
         results.append({
