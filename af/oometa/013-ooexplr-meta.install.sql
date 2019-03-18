@@ -2,40 +2,44 @@ BEGIN;
 
 select _v.register_patch( '013-ooexplr-meta', ARRAY[ '012-sha256-input-uniq' ], NULL );
 
-CREATE TABLE ooexpl_recent_msmt_count AS
+CREATE TABLE ooexpl_recent_msm_count AS
 SELECT
-COUNT(msm_no) as msmt_count,
+COUNT(msm_no) as count,
 probe_cc,
 probe_asn,
 test_name,
-test_start_time,
+date_trunc('day', measurement_start_time) as test_day,
 bucket_date
 FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
-WHERE test_start_time > current_date - interval '31 day'
-GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date;
+WHERE measurement_start_time > current_date - interval '31 day'
+GROUP BY probe_cc, probe_asn, test_name, test_day, bucket_date;
 
-ALTER TABLE ooexpl_recent_msmt_count
-ADD PRIMARY KEY(probe_asn, probe_cc, test_name, test_start_time, bucket_date);
+ALTER TABLE ooexpl_recent_msm_count
+ADD PRIMARY KEY(probe_asn, probe_cc, test_name, test_day, bucket_date);
 
-CREATE INDEX "ooexpl_recent_msmt_count_probe_cc_idx" ON "public"."ooexpl_bucket_msmt_count"("probe_cc");
-CREATE INDEX "ooexpl_recent_msmt_count_test_name_idx" ON "public"."ooexpl_bucket_msmt_count"("test_name");
-CREATE INDEX "ooexpl_recent_msmt_count_test_start_time_idx" ON "public"."ooexpl_bucket_msmt_count"("test_start_time");
+comment on table ooexpl_recent_msm_count residual is 'OONI Explorer stats table for counting measurements by probe_cc, probe_asn from the past 30 days';
 
-CREATE TABLE ooexpl_bucket_msmt_count AS
+CREATE INDEX "ooexpl_recent_msm_count_probe_cc_idx" ON "public"."ooexpl_recent_msm_count"("probe_cc");
+CREATE INDEX "ooexpl_recent_msm_count_test_name_idx" ON "public"."ooexpl_recent_msm_count"("test_name");
+CREATE INDEX "ooexpl_recent_msm_count_test_start_time_idx" ON "public"."ooexpl_recent_msm_count"("test_start_time");
+
+CREATE TABLE ooexpl_bucket_msm_count AS
 SELECT
 COUNT(msm_no) as count,
 probe_asn,
 probe_cc,
 bucket_date
-FROM measurement 
+FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 GROUP BY bucket_date, probe_asn, probe_cc;
 
-ALTER TABLE ooexpl_bucket_msmt_count
+ALTER TABLE ooexpl_bucket_msm_count
 ADD PRIMARY KEY(probe_asn, probe_cc, bucket_date);
+
+comment on table ooexpl_bucket_msm_count residual is 'OONI Explorer stats table for counting the total number of measurements since the beginning of time by probe_cc and probe_asn';
 
 CREATE TABLE ooexpl_website_msmts AS
 SELECT
