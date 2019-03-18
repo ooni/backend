@@ -415,10 +415,10 @@ def api_private_website_stats():
 
 @api_private_blueprint.route('/website_urls', methods=["GET"])
 def api_private_website_test_urls():
-    limit = request.args.get('limit', 10)
+    limit = int(request.args.get('limit', 10))
     if limit <= 0:
         limit = 10
-    offset = request.args.get('offset', 0)
+    offset = int(request.args.get('offset', 0))
 
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
