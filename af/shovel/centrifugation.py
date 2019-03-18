@@ -177,7 +177,8 @@ def load_autoclaved_db_todo(pgconn, files, bucket):
     This functions tries to understand what needs to be done for a particular
     set of autoclaved filenames.
 
-    It looks at the code_ver stored in the autoclaved table and understands what action needs to be performed on a autoclaved file.
+    It looks at the code_ver stored in the autoclaved table and understands
+    what action needs to be performed on a autoclaved file.
 
     The possible actions are:
         * ingest ~ The autoclaved file does not appear in the DB, so it needs
@@ -188,7 +189,9 @@ def load_autoclaved_db_todo(pgconn, files, bucket):
         it needs to be re-ingested. We preserve the `msm_no`, but update the
         binary representation of the autoclaved file & re-parse data.
 
-        * reprocess ~ the code_ver in the autocalved table is older than that of the centrifugation file, hence we need to re-parse the data (or some subset of the tables)
+        * reprocess ~ the code_ver in the autocalved table is older than that
+        of the centrifugation file, hence we need to re-parse the data (or some
+        subset of the tables)
 
     Args:
         pgconn: a postgres connection
