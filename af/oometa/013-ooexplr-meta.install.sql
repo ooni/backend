@@ -41,39 +41,37 @@ ADD PRIMARY KEY(probe_asn, probe_cc, bucket_date);
 
 comment on table ooexpl_bucket_msm_count residual is 'OONI Explorer stats table for counting the total number of measurements since the beginning of time by probe_cc and probe_asn';
 
-CREATE TABLE ooexpl_website_msmts AS
-SELECT
-measurement.msm_no,
-input.input,
-probe_asn,
-probe_cc,
-anomaly,
-confirmed,
-msm_failure as failure,
-blocking,
-http_experiment_failure,
-dns_experiment_failure,
-control_failure,
-bucket_date
-FROM measurement
-JOIN input ON input.input_no = measurement.input_no 
-JOIN report ON report.report_no = measurement.report_no
-JOIN http_verdict ON http_verdict.msm_no = measurement.msm_no
-JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
-WHERE test_name = 'web_connectivity' AND measurement_start_time > current_date - interval '31 day';
-
-UPDATE ooexpl_website_msmts
-SET
-anomaly = CASE 
-	WHEN blocking != 'false' AND blocking != NULL THEN TRUE
-	ELSE FALSE
-END,
-confirmed = FALSE,
-failure = CASE
-	WHEN control_failure != NULL OR blocking = NULL THEN TRUE
-	ELSE FALSE
-END;
-UPDATE ooexpl_website_msmts SET anomaly = TRUE, confirmed = TRUE WHERE msm_no IN (SELECT msm_no FROM http_request_fp);
+CREATE MATERIALIZED VIEW ooexpl_website_msmts AS
+    SELECT
+    measurement.msm_no,
+    input.input,
+    probe_asn,
+    probe_cc,
+    anomaly = CASE
+        WHEN blocking != 'false' AND blocking != NULL THEN TRUE
+        WHEN msm_no IN (SELECT msm_no FROM http_request_fp) THEN TRUE
+        ELSE FALSE
+    END,
+    confirmed = CASE
+        WHEN msm_no IN (SELECT msm_no FROM http_request_fp) THEN TRUE
+        ELSE FALSE
+        END,
+    failure = CASE
+        WHEN control_failure != NULL OR blocking = NULL THEN TRUE
+        ELSE FALSE
+    END,
+    blocking,
+    http_experiment_failure,
+    dns_experiment_failure,
+    control_failure,
+    bucket_date
+    FROM measurement
+    JOIN input ON input.input_no = measurement.input_no 
+    JOIN report ON report.report_no = measurement.report_no
+    JOIN http_verdict ON http_verdict.msm_no = measurement.msm_no
+    JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
+    WHERE test_name = 'web_connectivity'
+    AND measurement_start_time > current_date - interval '31 day';
 
 CREATE INDEX "ooexpl_website_msmts_anomaly_idx" ON "public"."ooexpl_website_msmts"("anomaly");
 CREATE INDEX "ooexpl_website_msmts_confirmed_idx" ON "public"."ooexpl_website_msmts"("confirmed");
