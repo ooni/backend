@@ -44,7 +44,7 @@ comment on table ooexpl_bucket_msm_count residual is 'OONI Explorer stats table 
 CREATE MATERIALIZED VIEW ooexpl_website_msmts AS
     SELECT
     measurement.msm_no,
-    input.input,
+    input.input_no,
     probe_asn,
     probe_cc,
     anomaly = CASE
