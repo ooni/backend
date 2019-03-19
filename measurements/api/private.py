@@ -379,31 +379,44 @@ def api_private_website_stats():
     if probe_asn is None:
         raise Exception('missing probe_asn')
 
-    s = select([
-        sql.text("date_trunc('day', measurement_start_time) as date"),
-        sql_anomaly_count,
-        sql_confirmed_count,
-        sql_failure_count,
-        sql.text("COUNT(*) as total_count")
-    ]).where(
-        and_(
-            sql.text("measurement_start_time > current_date - interval '31 day'"),
-            sql.text("measurement_start_time < current_date - interval '1 day'"),
-            sql.text("probe_cc = :probe_cc"),
-            sql.text("probe_asn = :probe_asn"),
-            sql.text("input = :input"),
-        )
-    ).group_by(
-        sql.text("date")
-    ).order_by(
-        sql.text("date")
-    ).select_from(sql.table('ooexpl_website_msmts'))
+    s = sql.text("""SELECT
+d.test_day,
+COALESCE(anomaly_count, 0) as anomaly_count,
+COALESCE(confirmed_count, 0) as confirmed_count,
+COALESCE(failure_count, 0) as failure_count,
+COALESCE(total_count, 0) as total_count
+FROM (
+(
+	SELECT
+	date_trunc('day', (current_date - offs)) AS test_day
+	FROM generate_series(0, 31, 1) AS offs
+) d
+LEFT OUTER JOIN
+(
+
+	SELECT
+	date_trunc('day', measurement_start_time) as test_day,
+	COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
+	COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
+	COALESCE(sum(CASE WHEN failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
+	FROM ooexpl_website_msmts
+	WHERE measurement_start_time > current_date - interval '31 day'
+	AND measurement_start_time < current_date - interval '1 day'
+	AND probe_cc =  :probe_cc
+	AND probe_asn = :probe_asn
+	AND input = :input
+	GROUP BY test_day
+
+) m
+ON d.test_day = m.test_day
+)
+ORDER BY test_day;""")
 
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn, 'input': url})
-    for date, anomaly_count, confirmed_count, failure_count, total_count in q:
+    for test_day, anomaly_count, confirmed_count, failure_count, total_count in q:
         results.append({
-            'date': date,
+            'test_day': test_day,
             'anomaly_count': int(anomaly_count),
             'confirmed_count': int(confirmed_count),
             'failure_count': int(failure_count),
@@ -557,23 +570,31 @@ def api_private_im_stats():
         raise Exception('missing probe_asn')
     probe_asn = int(probe_asn.replace('AS', ''))
 
-    s = select([
-        sql.text("SUM(count)"),
-        sql.text("test_day"),
-    ]).where(
-        and_(
-            sql.text("test_day > current_date - interval '31 day'"),
-            # We exclude the last day to wait for the pipeline
-            sql.text("test_day < current_date - interval '1 day'"),
-            sql.text("probe_cc = :probe_cc"),
-            sql.text("probe_asn = :probe_asn"),
-            sql.text("test_name = :test_name"),
-        )
-    ).group_by(
-        sql.text("test_day")
-    ).order_by(
-        sql.text("test_day")
-    ).select_from(sql.table('ooexpl_recent_msm_count'))
+    s = sql.text("""SELECT COALESCE(count, 0), d.test_day
+FROM (
+(
+	SELECT
+	date_trunc('day', (current_date - offs)) AS test_day
+	FROM generate_series(0, 31, 1) AS offs
+) d
+LEFT OUTER JOIN
+(
+	SELECT
+	SUM(count) as count,
+	test_day
+	FROM ooexpl_recent_msm_count
+	WHERE
+    probe_cc = :probe_cc
+    AND test_name = :test_name
+    AND probe_asn = :probe_asn
+	AND test_day > current_date - interval '31 day'
+	AND test_day < current_date - interval '1 day'
+	GROUP BY test_day
+) m
+ON d.test_day = m.test_day
+)
+ORDER BY test_day;""")
+
     query_params = {
         'probe_cc': probe_cc,
         'probe_asn': probe_asn,
