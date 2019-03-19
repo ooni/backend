@@ -693,6 +693,7 @@ def api_private_network_stats():
             'download_speed_mbps_median': download,
             'upload_speed_mbps_median': upload,
             'rtt_avg': rtt,
+            'middlebox_detected': None
         })
 
     if len(results) >= limit:
