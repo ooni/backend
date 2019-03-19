@@ -497,3 +497,98 @@ def api_private_website_test_urls():
         'metadata': metadata,
         'results': results
     })
+
+@api_private_blueprint.route('/im_networks', methods=["GET"])
+def api_private_im_networks():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+    test_names = [sql.literal_column("test_name") == tg_name for tg_name in TEST_GROUPS['im']]
+    s = select([
+        sql.text("SUM(count) as msm_count"),
+        sql.text("MAX(test_day)"),
+        sql.text("probe_asn"),
+        sql.text("test_name")
+    ]).where(
+        and_(
+            sql.text("test_day > current_date - interval '31 day'"),
+            # We exclude the last day to wait for the pipeline
+            sql.text("test_day < current_date - interval '1 day'"),
+            sql.text("probe_cc = :probe_cc"),
+            or_(*test_names)
+        )
+    ).group_by(
+        sql.text("test_name, probe_asn")
+    ).order_by(
+        sql.text("test_name, msm_count DESC")
+    ).select_from(sql.table('ooexpl_recent_msm_count'))
+
+    results = {}
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
+    for msm_count, last_tested, probe_asn, test_name in q:
+        results[test_name] = results.get(test_name, {
+            'anomaly_networks': [],
+            'ok_networks': [],
+            'last_tested': last_tested
+        })
+        results[test_name]['ok_networks'].append({
+            'asn': probe_asn,
+            'name': '',
+            'total_count': msm_count,
+            'last_tested': last_tested
+        })
+        if results[test_name]['last_tested'] < last_tested:
+            results[test_name]['last_tested'] = last_tested
+
+    return jsonify(results)
+
+@api_private_blueprint.route('/im_stats', methods=["GET"])
+def api_private_im_stats():
+    test_name = request.args.get('test_name')
+    if not test_name or test_name not in TEST_GROUPS['im']:
+        raise Exception('invalid test_name')
+
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    probe_asn = request.args.get('probe_asn')
+    if probe_asn is None:
+        raise Exception('missing probe_asn')
+    probe_asn = int(probe_asn.replace('AS', ''))
+
+    s = select([
+        sql.text("SUM(count)"),
+        sql.text("test_day"),
+    ]).where(
+        and_(
+            sql.text("test_day > current_date - interval '31 day'"),
+            # We exclude the last day to wait for the pipeline
+            sql.text("test_day < current_date - interval '1 day'"),
+            sql.text("probe_cc = :probe_cc"),
+            sql.text("probe_asn = :probe_asn"),
+            sql.text("test_name = :test_name"),
+        )
+    ).group_by(
+        sql.text("test_day")
+    ).order_by(
+        sql.text("test_day")
+    ).select_from(sql.table('ooexpl_recent_msm_count'))
+    query_params = {
+        'probe_cc': probe_cc,
+        'probe_asn': probe_asn,
+        'test_name': test_name
+    }
+
+    results = []
+    q = current_app.db_session.execute(s, query_params)
+    for count, test_day in q:
+        results.append({
+            'test_day': test_day,
+            'total_count': count,
+            'anomaly_count': None
+        })
+
+    return jsonify({
+        'results': results
+    })

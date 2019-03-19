@@ -15,6 +15,8 @@ from flask_cors import CORS
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
+from decimal import Decimal
+from sqlalchemy.types import Float
 from measurements import config
 from measurements.database import init_db
 
@@ -36,6 +38,9 @@ class FlaskJSONEncoder(json.JSONEncoder):
 
         if isinstance(o, Decimal):
             return float(o)
+
+        if isinstance(o, set):
+            return list(o)
 
         return json.JSONEncoder.default(self, o)
 
