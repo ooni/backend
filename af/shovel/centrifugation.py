@@ -1542,6 +1542,46 @@ DATA_TABLES = (
     HttpVerdictFeeder,
 )
 
+def update_explorer_metrics(pgconn, bucket):
+    with pgconn.cursor() as c:
+        c.execute('''INSERT INTO ooexpl_bucket_msm_count (count, probe_asn, probe_cc, bucket_date)
+SELECT
+COUNT(msm_no) as count,
+probe_asn,
+probe_cc,
+bucket_date
+FROM measurement
+JOIN report ON report.report_no = measurement.report_no
+JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
+WHERE bucket_date = '%s'
+GROUP BY bucket_date, probe_asn, probe_cc
+ON CONFLICT (probe_asn, probe_cc, bucket_date) DO
+UPDATE
+SET count = EXCLUDED.count;
+''', [bucket])
+        c.execute('''INSERT INTO ooexpl_recent_msm_count (count, probe_cc, probe_asn, test_name, test_day, bucket_date)
+SELECT
+COUNT(msm_no) as count,
+probe_cc,
+probe_asn,
+test_name,
+date_trunc('day', measurement_start_time) as test_day,
+bucket_date
+FROM measurement
+JOIN report ON report.report_no = measurement.report_no
+JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
+WHERE
+bucket_date = '%s'
+AND measurement_start_time > current_date - interval '30 day'
+GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date
+ON CONFLICT (probe_cc, probe_asn, test_name, test_day, bucket_date) DO
+UPDATE
+SET count = EXCLUDED.count;''', [bucket])
+        # XXX we should probably also add a statement here to delete
+        # measurements older than some number of days.
+        c.execute('REFRESH MATERIALIZED VIEW ooexpl_website_msmts')
+
+
 def meta_pg(in_root, bucket, postgres):
     assert in_root[-1] != '/' and '/' not in bucket and os.path.isdir(os.path.join(in_root, bucket))
 
@@ -1595,6 +1635,7 @@ def meta_pg(in_root, bucket, postgres):
             SELECT filename, textname, canned_off, canned_size, %s AS bucket_date, orig_sha1, exc_str
             FROM badblob_meta
         ''', [bucket])
+        update_explorer_metrics(pgconn, bucket)
     return
 
 ########################################################################
