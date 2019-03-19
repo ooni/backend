@@ -5,7 +5,7 @@ In here live private API endpoints for use only by OONI services. You should
 not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 from urllib.parse import urljoin, urlencode
@@ -30,6 +30,9 @@ from measurements.countries import lookup_country
 # prefix: /api/_
 api_private_blueprint = Blueprint('api_private', 'measurements')
 
+def daterange(start_date, end_date):
+    for n in range(int ((end_date - start_date).days)):
+        yield start_date + timedelta(n)
 
 def api_private_stats_by_month(orm_stat):
     # data for https://api.ooni.io/stats
@@ -255,9 +258,19 @@ def api_private_measurement_count_total():
         mimetype=current_app.config['JSONIFY_MIMETYPE']
     )
 
+def last_30days():
+    first_day = datetime.now() - timedelta(31)
+    first_day = datetime(first_day.year, first_day.month, first_day.day)
+
+    last_day = datetime.now() - timedelta(1)
+    last_day = datetime(last_day.year, last_day.month, last_day.day)
+
+    for d in daterange(first_day, last_day):
+        yield d
+
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
-        sql.text("test_day > current_date - interval '31 day'"),
+        sql.text("test_day >= current_date - interval '31 day'"),
         sql.text("test_day < current_date - interval '1 day'"),
         sql.text("probe_cc = :probe_cc"),
     ]
@@ -281,12 +294,17 @@ def get_recent_network_coverage(probe_cc, test_groups):
     ).order_by(
         sql.text("test_day")
     ).select_from(sql.table('ooexpl_recent_msm_count'))
-    network_coverage = []
+
+    network_map = {k: 0 for k in TEST_GROUPS.keys()}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
     for count, date in q:
+        network_map[date] = count
+
+    network_coverage = []
+    for test_day in last_30days():
         network_coverage.append({
-            'count': int(count),
-            'date': str(date)
+            'count': network_map.get(test_day, 0),
+            'test_day': test_day
         })
     return network_coverage
 
@@ -297,7 +315,7 @@ def get_recent_test_coverage(probe_cc):
         sql.text(get_test_group_case() + ' AS test_group')
     ]).where(
         and_(
-            sql.text("test_day > current_date - interval '31 day'"),
+            sql.text("test_day >= (current_date - interval '31 day')"),
             # We exclude the last day to wait for the pipeline
             sql.text("test_day < current_date - interval '1 day'"),
             sql.text("probe_cc = :probe_cc"),
@@ -308,14 +326,20 @@ def get_recent_test_coverage(probe_cc):
         sql.text("test_group, test_day")
     ).select_from(sql.table('ooexpl_recent_msm_count'))
 
-    test_coverage = []
+    coverage_map = {k: {} for k in TEST_GROUPS.keys()}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
-    for count, date, test_group in q:
-        test_coverage.append({
-            'count': int(count),
-            'date': str(date),
-            'test_group': test_group
-        })
+    for count, test_day, test_group in q:
+        coverage_map[test_group][test_day] = int(count)
+
+    test_coverage = []
+    for test_group, coverage in coverage_map.items():
+        for test_day in last_30days():
+            test_coverage.append({
+                'count': coverage_map[test_group].get(test_day, 0),
+                'test_day': test_day,
+                'test_group': test_group
+            })
+
     return test_coverage
 
 @api_private_blueprint.route('/test_coverage', methods=["GET"])
@@ -400,7 +424,7 @@ LEFT OUTER JOIN
 	COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
 	COALESCE(sum(CASE WHEN failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
 	FROM ooexpl_website_msmts
-	WHERE measurement_start_time > current_date - interval '31 day'
+	WHERE measurement_start_time >= current_date - interval '31 day'
 	AND measurement_start_time < current_date - interval '1 day'
 	AND probe_cc =  :probe_cc
 	AND probe_asn = :probe_asn
@@ -443,7 +467,7 @@ def api_private_website_test_urls():
 
     probe_asn = int(probe_asn.replace('AS', ''))
     where_clause = [
-        sql.text("measurement_start_time > current_date - interval '31 day'"),
+        sql.text("measurement_start_time >= current_date - interval '31 day'"),
         sql.text("measurement_start_time < current_date"),
         sql.text("probe_cc = :probe_cc"),
         sql.text("probe_asn = :probe_asn"),
@@ -524,7 +548,7 @@ def api_private_im_networks():
         sql.text("test_name")
     ]).where(
         and_(
-            sql.text("test_day > current_date - interval '31 day'"),
+            sql.text("test_day >= current_date - interval '31 day'"),
             # We exclude the last day to wait for the pipeline
             sql.text("test_day < current_date - interval '1 day'"),
             sql.text("probe_cc = :probe_cc"),
@@ -587,7 +611,7 @@ LEFT OUTER JOIN
     probe_cc = :probe_cc
     AND test_name = :test_name
     AND probe_asn = :probe_asn
-	AND test_day > current_date - interval '31 day'
+	AND test_day >= current_date - interval '31 day'
 	AND test_day < current_date - interval '1 day'
 	GROUP BY test_day
 ) m
