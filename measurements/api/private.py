@@ -637,3 +637,75 @@ ORDER BY test_day;""")
     return jsonify({
         'results': results
     })
+
+@api_private_blueprint.route('/network_stats', methods=["GET"])
+def api_private_network_stats():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    limit = int(request.args.get('limit', 10))
+    if limit <= 0:
+        limit = 10
+    offset = int(request.args.get('offset', 0))
+
+    row = current_app.db_session.execute(
+        select([
+            sql.text("COUNT(DISTINCT probe_asn)")
+        ]).where(
+            and_(sql.text("probe_cc = :probe_cc"))
+        ).select_from(sql.table('ooexpl_netinfo'))
+    , {'probe_cc': probe_cc}).fetchone()
+    total_count = row[0]
+
+    s = select([
+        sql.text("client_asn_name"),
+        sql.text("probe_asn"),
+        sql.text("count"),
+        sql.text("download_speed_mbps_median"),
+        sql.text("upload_speed_mbps_median"),
+        sql.text("rtt_avg"),
+    ]).where(
+        and_(sql.text("probe_cc = :probe_cc"))
+    ).order_by(
+        sql.text("count DESC")
+    ).limit(
+        limit
+    ).offset(
+        offset
+    ).select_from(sql.table('ooexpl_netinfo'))
+
+    current_page = math.ceil(offset / limit) + 1
+    metadata = {
+        'offset': offset,
+        'limit': limit,
+        'current_page': current_page,
+        'total_count': total_count,
+        'next_url': None
+    }
+    results = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
+    for asn_name, asn, msm_count, download, upload, rtt in q:
+        results.append({
+            'asn_name': asn_name,
+            'asn': asn,
+            'msm_count': msm_count,
+            'download_speed_mbps_median': download,
+            'upload_speed_mbps_median': upload,
+            'rtt_avg': rtt,
+        })
+
+    if len(results) >= limit:
+        next_args = request.args.to_dict()
+        next_args['offset'] = "%s" % (offset + limit)
+        next_args['limit'] = "%s" % limit
+        next_url = urljoin(
+            current_app.config['BASE_URL'],
+            '/api/_/network_stats?%s' % urlencode(next_args)
+        )
+        metadata['next_url'] = next_url
+
+    return jsonify({
+        'metadata': metadata,
+        'results': results
+    })
