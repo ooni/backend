@@ -242,9 +242,7 @@ class APIv1Collectors(OONIBHandler):
         self.bouncer = Bouncer(config.main.bouncer_file)
 
     def get(self):
-        self.write({
-            "results": self.bouncer.formatCollectorsWithoutPolicy()
-        })
+        self.write(self.bouncer.formatCollectorsWithoutPolicy())
 
 
 class APIv1TestHelpers(OONIBHandler):
@@ -252,9 +250,7 @@ class APIv1TestHelpers(OONIBHandler):
         self.bouncer = Bouncer(config.main.bouncer_file)
 
     def get(self):
-        self.write({
-            "results": self.bouncer.formatTestHelpersWithoutPolicy()
-        })
+        self.write(self.bouncer.formatTestHelpersWithoutPolicy())
 
 
 class BouncerHandlerBase(OONIBHandler):

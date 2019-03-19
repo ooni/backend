@@ -575,7 +575,7 @@ class TestProductionTests(BaseTestBouncer):
     def test_collectors(self):
         response = yield self.request('/api/v1/collectors', 'GET', None)
         response_body = json.loads(response.body)
-        self.assertEqual(response_body['results'], [{
+        self.assertEqual(response_body, [{
             "address": "httpo://ihiderha53f36lsd.onion",
             "type": "onion",
         }, {
@@ -591,7 +591,7 @@ class TestProductionTests(BaseTestBouncer):
     def test_test_helpers(self):
         response = yield self.request('/api/v1/test-helpers', 'GET', None)
         response_body = json.loads(response.body)
-        self.assertEqual(response_body['results'], {
+        self.assertEqual(response_body, {
             "dns": [{"type": "legacy", "address": "213.138.109.232:57004"}],
             "http-return-json-headers": [{
                 "type": "legacy",
