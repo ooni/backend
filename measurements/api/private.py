@@ -710,3 +710,30 @@ def api_private_network_stats():
         'metadata': metadata,
         'results': results
     })
+
+
+@api_private_blueprint.route('/country_overview', methods=["GET"])
+def api_private_country_overview():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+
+    row = current_app.db_session.execute(
+        select([
+            sql.text("COUNT(DISTINCT input)")
+        ]).where(
+            and_(
+                sql.text("confirmed = TRUE"),
+                sql.text("probe_cc = :probe_cc")
+            )
+        ).select_from(sql.table('ooexpl_website_msmts'))
+    , {'probe_cc': probe_cc}).fetchone()
+
+    websites_confirmed_blocked = row[0]
+
+    return jsonify({
+        'websites_confirmed_blocked': websites_confirmed_blocked,
+        'middlebox_detected_networks': None,
+        'im_apps_blocked': None,
+        'circumvention_tools_blocked': None,
+    })
