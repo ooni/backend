@@ -118,6 +118,12 @@ It's important to keep in mind that every task inside of the Airflow DAG needs
 to be optimized for big units of computation, you should avoid having small
 tasks, otherwise you incur in a lot of scheduling/orchestration overhead.
 
+To run the pipeline tests you should run:
+
+```
+python tests/test_integration.py
+```
+
 ### Modifying the centrifugation stage
 
 Most of the time you will probably care to edit the **centrifugation** stage
