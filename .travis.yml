@@ -1,0 +1,8 @@
+sudo: required
+language: python
+services:
+  - docker
+install:
+  - pip install -r tests/requirements.txt
+script:
+  - python tests/test_integration.py
