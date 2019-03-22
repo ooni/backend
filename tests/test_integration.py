@@ -107,7 +107,7 @@ def run_centrifugation(client, bucket_date):
     return shovel_container
 
 def main():
-    bucket_date = '2018-01-01'
+    bucket_date = '2017-06-05'
 
     docker_client = docker.from_env()
 
