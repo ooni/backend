@@ -152,7 +152,14 @@ def dns_ttl(ttl):
 ########################################################################
 
 def load_autoclaved_index(autoclaved_index):
-    # Returns: {filename: file_sha1 for autoclaved}
+    """
+    Loads the autoclaved index file and return the list of compressed
+    autoclaved files with their relative sha1.
+    Example of an autocalved filename is: `2017-11-23/web_connectivity.02.tar.lz4`
+
+    Returns:
+        {filename: file_sha1 for autoclaved}
+    """
     files = {}
     with gzip.GzipFile(autoclaved_index, 'r') as indexfd:
         for _, doc in autoclaving.stream_json_blobs(indexfd):
@@ -166,10 +173,35 @@ def load_autoclaved_index(autoclaved_index):
     return files
 
 def load_autoclaved_db_todo(pgconn, files, bucket):
-    # Returns: {files to ingest}, {files to re-ingest}, {files to re-process}
-    #   ingest    ~ create new measurement records
-    #   reingest  ~ preserve measurement `msm_no`, update binary representation of autoclaved file & re-parse data
-    #   reprocess ~ just re-parse data (or some sub-set of tables)
+    """
+    This functions tries to understand what needs to be done for a particular
+    set of autoclaved filenames.
+
+    It looks at the code_ver stored in the autoclaved table and understands
+    what action needs to be performed on a autoclaved file.
+
+    The possible actions are:
+        * ingest ~ The autoclaved file does not appear in the DB, so it needs
+        to be ingested for the first time. This creates new measurement
+        records.
+
+        * reingest  ~ The file hash in the autoclaved DB table has changed, so
+        it needs to be re-ingested. We preserve the `msm_no`, but update the
+        binary representation of the autoclaved file & re-parse data.
+
+        * reprocess ~ the code_ver in the autocalved table is older than that
+        of the centrifugation file, hence we need to re-parse the data (or some
+        subset of the tables)
+
+    Args:
+        pgconn: a postgres connection
+        files: is a dict with keys set to the autoclaved filenames and values
+            set to the sha1 of the file. This is the output of
+            load_autoclaved_index().
+        bucket: is the string of the bucket date
+    Returns:
+        ({files to ingest}, {files to re-ingest}, {files to re-process})
+    """
     files = files.copy() # shallow copy to pop values from
     reingest, reprocess = set(), set()
     with pgconn.cursor() as c:
@@ -424,12 +456,16 @@ def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
             raise RuntimeError('Unable to preserve rows properly while re-ingesting', bucket, stat)
 
 def load_global_duplicate_reports(pgconn):
+    """
+    Add to the global `DUPLICATE_REPORTS` `set()` the list of report files
+    which are duplicate.
+    """
     with pgconn.cursor() as c:
         c.execute('SELECT textname FROM repeated_report WHERE NOT used')
         DUPLICATE_REPORTS.update(_[0] for _ in c)
 
 def delete_data_to_reprocess(pgconn, bucket):
-    # Evreything in *_meta is either ingested from scratch or re-ingested.
+    # Everything in *_meta is either ingested from scratch or re-ingested.
     # Some other rows in SOME tables (depending on code_ver) should also be deleted.
     with pgconn.cursor() as c:
         # Following queries are done like that as reingest is rare, so that's usually no-op.
