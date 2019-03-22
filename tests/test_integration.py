@@ -45,6 +45,12 @@ def pg_install_tables(container):
         with open(fname, 'rb') as in_file:
             socket.sendall(in_file.read())
 
+    time.sleep(1)
+    for line in container.logs().split("\n"):
+        if line.startswith("ERROR"):
+            print(line)
+            raise Exception("Detected error in query")
+
 def fetch_autoclaved_bucket(dst_dir, bucket_date):
     dst_bucket_dir = os.path.join(dst_dir, bucket_date)
     if not os.path.exists(dst_bucket_dir):
@@ -128,6 +134,7 @@ def main():
     4.0K	2018-12-10
     """
     bucket_date = '2018-05-07'
+    #bucket_date = '2018-01-01'
 
     docker_client = docker.from_env()
 
