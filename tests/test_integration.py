@@ -102,7 +102,7 @@ def run_centrifugation(client, bucket_date):
     )
     container_logs = shovel_container.logs(stream=True)
     for line in container_logs:
-        print(line)
+        sys.stdout.write(line)
     print("runtime: {}".format(time.time() - start_time))
     return shovel_container
 
