@@ -1583,6 +1583,8 @@ SET count = EXCLUDED.count;''', [bucket])
 
 
 def meta_pg(in_root, bucket, postgres):
+    print "meta_pg: {} {}".format(in_root, bucket)
+
     assert in_root[-1] != '/' and '/' not in bucket and os.path.isdir(os.path.join(in_root, bucket))
 
     # 1. Tables use bucket suffix to allow concurrent workers filling different tables.
