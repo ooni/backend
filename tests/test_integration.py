@@ -65,7 +65,7 @@ def fetch_autoclaved_bucket(dst_dir, bucket_date):
                 if s.st_size == f.get('Size'):
                     print('SKIP')
                     continue
-            except IOError:
+            except Exception: # XXX maybe make this more strict. It's FileNotFoundError on py3 and OSError on py2
                 pass
             resource.meta.client.download_file('ooni-data', fkey, dst_pathname)
 
