@@ -1553,7 +1553,7 @@ bucket_date
 FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
-WHERE bucket_date = '%s'
+WHERE bucket_date = %s
 GROUP BY bucket_date, probe_asn, probe_cc
 ON CONFLICT (probe_asn, probe_cc, bucket_date) DO
 UPDATE
@@ -1571,8 +1571,8 @@ FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE
-bucket_date = '%s'
-AND measurement_start_time > current_date - interval '30 day'
+bucket_date = %s
+AND measurement_start_time > current_date - interval '31 day'
 GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date
 ON CONFLICT (probe_cc, probe_asn, test_name, test_day, bucket_date) DO
 UPDATE
