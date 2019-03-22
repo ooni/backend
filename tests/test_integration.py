@@ -39,9 +39,11 @@ def start_pg(client):
 
 def pg_install_tables(container):
     _, socket = container.exec_run(cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True)
+    if hasattr(socket, '_sock'):
+        socket = socket._sock
     for fname in sorted(glob(os.path.join(AF_ROOT, 'oometa', '*.install.sql'))):
         with open(fname, 'rb') as in_file:
-            socket._sock.sendall(in_file.read())
+            socket.sendall(in_file.read())
 
 def fetch_autoclaved_bucket(dst_dir, bucket_date):
     dst_bucket_dir = os.path.join(dst_dir, bucket_date)
@@ -63,7 +65,7 @@ def fetch_autoclaved_bucket(dst_dir, bucket_date):
                 if s.st_size == f.get('Size'):
                     print('SKIP')
                     continue
-            except FileNotFoundError:
+            except IOError:
                 pass
             resource.meta.client.download_file('ooni-data', fkey, dst_pathname)
 
