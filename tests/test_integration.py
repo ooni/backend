@@ -119,6 +119,8 @@ def main():
         pg_install_tables(pg_container)
 
         shovel_container = run_centrifugation(docker_client, bucket_date)
+        result = shovel_container.wait()
+        assert result.get('StatusCode') == 0, "shovel container exit code was not zero"
     except Exception as exc:
         print("Failure ", exc)
     finally:
