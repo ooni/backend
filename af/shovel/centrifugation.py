@@ -1573,7 +1573,7 @@ JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE
 bucket_date = %s
 AND measurement_start_time > current_date - interval '31 day'
-GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date
+GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date, test_day
 ON CONFLICT (probe_cc, probe_asn, test_name, test_day, bucket_date) DO
 UPDATE
 SET count = EXCLUDED.count;''', [bucket])
