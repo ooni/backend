@@ -201,11 +201,9 @@ class Bouncer(object):
             info = section.get(collector)
             if not info: continue
             for alt in info['collector-alternate']:
-                r = {}
-                for k in ('type', 'address', 'front'): r[k] = alt.get(k)
-                if not r['type'] or not r['address']: continue
-                if not r['front']: del r['front']
-                results.append(r)
+                r = self.format_alternate_address(alt)
+                if r:
+                    results.append(r)
         return results
 
     def formatTestHelpersWithoutPolicy(self):
@@ -229,12 +227,23 @@ class Bouncer(object):
                 for k, v in alt.items():
                     results.setdefault(k, [])
                     for e in v:
-                        r = {}
-                        for x in ('type', 'address', 'front'): r[x] = e.get(x)
-                        if not r['type'] or not r['address']: continue
-                        if not r['front']: del r['front']
-                        results[k].append(r)
+                        r = self.format_alternate_address(e)
+                        if r:
+                            results[k].append(r)
         return results
+
+    @staticmethod
+    def format_alternate_address(entry):
+        res = {
+            'type': entry.get('type'),
+            'address': entry.get('address'),
+            'front': entry.get('front'),
+        }
+        if not res['type'] or not res['address']:
+            return None  # reject invalid input with missing mandatory fields
+        if not res['front']:
+            del res['front']  # make sure we do not emit a None optional field
+        return res
 
 
 class APIv1Collectors(OONIBHandler):

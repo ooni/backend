@@ -6,6 +6,7 @@ from twisted.internet import defer
 from cyclone import web
 
 from oonib.bouncer.api import bouncerAPI
+from oonib.bouncer.handlers import Bouncer
 from oonib.tests.handler_helpers import HandlerTestCase
 
 fake_bouncer_file = """
@@ -106,6 +107,23 @@ helpers:
          attribute: value
 """ % (reports_dir, archive_dir, input_dir, decks_dir, bouncer_filename)
 
+
+class FormatHelperAddressTest(HandlerTestCase):
+    def test_behaviour(self):
+        vector = (
+            ({}, None),
+            ({'type': 'https'}, None),
+            ({'address': 'https://a.org'}, None),
+            ({'address': 'https://a.org', 'type': 'https'},
+             {'address': 'https://a.org', 'type': 'https'}),
+            ({'address': 'https://a.org',
+              'type': 'cloudfront', 'front': 'aaa'},
+             {'address': 'https://a.org',
+              'type': 'cloudfront', 'front': 'aaa'}),
+        )
+        for inputs, expects in vector:
+            outputs = Bouncer.format_alternate_address(inputs)
+        self.assertEqual(expects, outputs)
 
 class BaseTestBouncer(HandlerTestCase):
     def setUp(self, *args, **kw):
