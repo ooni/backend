@@ -2,7 +2,40 @@ BEGIN;
 
 select _v.register_patch( '013-ooexplr-meta', ARRAY[ '012-sha256-input-uniq' ], NULL );
 
-CREATE TABLE ooexpl_recent_msm_count AS
+CREATE TABLE ooexpl_bucket_msm_count (
+    count bigint,
+    probe_asn integer,
+    probe_cc character(2),
+    bucket_date date
+    CONSTRAINT ooexpl_bucket_msm_count_pkey PRIMARY KEY (probe_asn, probe_cc, bucket_date)
+);
+
+comment on table ooexpl_bucket_msm_count is 'OONI Explorer stats table for counting the total number of measurements since the beginning of time by probe_cc and probe_asn';
+
+INSERT INTO ooexpl_bucket_msm_count (count, probe_asn, probe_cc, bucket_date)
+SELECT
+COUNT(msm_no) as count,
+probe_asn,
+probe_cc,
+bucket_date
+FROM measurement
+JOIN report ON report.report_no = measurement.report_no
+JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
+GROUP BY bucket_date, probe_asn, probe_cc;
+
+CREATE TABLE ooexpl_recent_msm_count (
+    count bigint,
+    probe_cc character(2),
+    probe_asn integer,
+    test_name ootest,
+    test_day timestamp without time zone,
+    bucket_date date,
+    CONSTRAINT ooexpl_recent_msm_count_pkey PRIMARY KEY (probe_asn, probe_cc, test_name, test_day, bucket_date)
+);
+
+CREATE UNIQUE INDEX ooexpl_recent_msm_count_pkey ON ooexpl_recent_msm_count(probe_asn int4_ops,probe_cc bpchar_ops,test_name enum_ops,test_day timestamp_ops,bucket_date date_ops);
+
+INSERT INTO ooexpl_recent_msm_count (count, probe_cc, probe_asn, test_name, test_day, bucket_date)
 SELECT
 COUNT(msm_no) as count,
 probe_cc,
@@ -14,32 +47,9 @@ FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE measurement_start_time > current_date - interval '31 day'
-GROUP BY probe_cc, probe_asn, test_name, test_day, bucket_date;
-
-ALTER TABLE ooexpl_recent_msm_count
-ADD PRIMARY KEY(probe_asn, probe_cc, test_name, test_day, bucket_date);
+GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date;
 
 comment on table ooexpl_recent_msm_count is 'OONI Explorer stats table for counting measurements by probe_cc, probe_asn from the past 30 days';
-
-CREATE INDEX "ooexpl_recent_msm_count_probe_cc_idx" ON "public"."ooexpl_recent_msm_count"("probe_cc");
-CREATE INDEX "ooexpl_recent_msm_count_test_name_idx" ON "public"."ooexpl_recent_msm_count"("test_name");
-CREATE INDEX "ooexpl_recent_msm_count_test_start_time_idx" ON "public"."ooexpl_recent_msm_count"("test_start_time");
-
-CREATE TABLE ooexpl_bucket_msm_count AS
-SELECT
-COUNT(msm_no) as count,
-probe_asn,
-probe_cc,
-bucket_date
-FROM measurement
-JOIN report ON report.report_no = measurement.report_no
-JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
-GROUP BY bucket_date, probe_asn, probe_cc;
-
-ALTER TABLE ooexpl_bucket_msm_count
-ADD PRIMARY KEY(probe_asn, probe_cc, bucket_date);
-
-comment on table ooexpl_bucket_msm_count is 'OONI Explorer stats table for counting the total number of measurements since the beginning of time by probe_cc and probe_asn';
 
 CREATE MATERIALIZED VIEW ooexpl_website_msmts AS
     SELECT
