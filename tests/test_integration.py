@@ -109,7 +109,9 @@ def main():
         pg_install_tables(pg_container)
 
         print("Running centrifugation in shovel")
+        start_time = time.time()
         shovel_container = run_centrifugation(docker_client, bucket_date)
+        print("Runtime: {}".format(time.time() - start_time)
     except Exception as exc:
         print("Failure ", exc)
     finally:
