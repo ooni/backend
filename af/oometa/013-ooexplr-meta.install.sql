@@ -19,7 +19,7 @@ GROUP BY probe_cc, probe_asn, test_name, test_day, bucket_date;
 ALTER TABLE ooexpl_recent_msm_count
 ADD PRIMARY KEY(probe_asn, probe_cc, test_name, test_day, bucket_date);
 
-comment on table ooexpl_recent_msm_count residual is 'OONI Explorer stats table for counting measurements by probe_cc, probe_asn from the past 30 days';
+comment on table ooexpl_recent_msm_count is 'OONI Explorer stats table for counting measurements by probe_cc, probe_asn from the past 30 days';
 
 CREATE INDEX "ooexpl_recent_msm_count_probe_cc_idx" ON "public"."ooexpl_recent_msm_count"("probe_cc");
 CREATE INDEX "ooexpl_recent_msm_count_test_name_idx" ON "public"."ooexpl_recent_msm_count"("test_name");
@@ -39,7 +39,7 @@ GROUP BY bucket_date, probe_asn, probe_cc;
 ALTER TABLE ooexpl_bucket_msm_count
 ADD PRIMARY KEY(probe_asn, probe_cc, bucket_date);
 
-comment on table ooexpl_bucket_msm_count residual is 'OONI Explorer stats table for counting the total number of measurements since the beginning of time by probe_cc and probe_asn';
+comment on table ooexpl_bucket_msm_count is 'OONI Explorer stats table for counting the total number of measurements since the beginning of time by probe_cc and probe_asn';
 
 CREATE MATERIALIZED VIEW ooexpl_website_msmts AS
     SELECT
