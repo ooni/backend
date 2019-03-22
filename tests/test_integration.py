@@ -77,12 +77,18 @@ def run_centrifugation(client, bucket_date):
     centrifugation_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
     centrifugation_cmd += " --autoclaved-root /mnt/testdata --postgres 'host={} user={}'".format(METADB_NAME, METADB_PG_USER)
 
-    shovel_container = client.containers.run(
+    start_time = time.time()
+
+    print("Running shovel @{}: {}".format(start_time, centrifugation_cmd))
+    output_stream = client.containers.run(
         'openobservatory/pipeline-shovel:latest',
         centrifugation_cmd,
         mem_limit='512m',
         user='{}:{}'.format(os.getuid(),os.getgid()),
         privileged=True,
+        stream=True,
+        stdout=True,
+        stderr=True,
         working_dir='/mnt',
         links={
             METADB_NAME: None
@@ -94,7 +100,10 @@ def run_centrifugation(client, bucket_date):
             }
         }
     )
-    return shovel_container
+    print(output_stream)
+    for line in output_stream:
+        print(line)
+    return time.time() - start_time
 
 def main():
     bucket_date = '2018-01-01'
@@ -108,16 +117,13 @@ def main():
         pg_container = start_pg(docker_client)
         pg_install_tables(pg_container)
 
-        print("Running centrifugation in shovel")
-        start_time = time.time()
-        shovel_container = run_centrifugation(docker_client, bucket_date)
-        print("Runtime: {}".format(time.time() - start_time)
+        runtime = run_centrifugation(docker_client, bucket_date)
+        print("Runtime: {}".format(runtime))
     except Exception as exc:
         print("Failure ", exc)
     finally:
         print("Cleaning up")
         pg_container.remove(force=True)
-        shovel_container.remove(force=True)
 
 if __name__ == '__main__':
     main()
