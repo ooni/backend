@@ -190,6 +190,77 @@ class Bouncer(object):
             nettests.append(nettest)
         return {'net-tests': nettests}
 
+    def formatCollectorsWithoutPolicy(self):
+        ''' Formats the collectors without policy for the new
+            /api/v1/collectors endpoint. '''
+        results = []
+        for collector in self.knownCollectorsWithoutPolicy:
+            results.append({'type': 'onion', 'address': collector})
+            section = self.bouncerFile.get('collector')
+            if not section: continue
+            info = section.get(collector)
+            if not info: continue
+            for alt in info['collector-alternate']:
+                r = self.format_alternate_address(alt)
+                if r:
+                    results.append(r)
+        return results
+
+    def formatTestHelpersWithoutPolicy(self):
+        ''' Formats the test helpers without policy for the new
+            /api/v1/test-helpers endpoint. '''
+        results = {}
+        for collector in self.knownCollectorsWithoutPolicy:
+            section = self.bouncerFile.get('collector')
+            if not section: continue
+            info = section.get(collector)
+            if not info: continue
+            helper = info.get('test-helper')
+            if helper:
+                for k, v in helper.items():
+                    results.setdefault(k, []).append({
+                        'type': 'legacy',
+                        'address': v,
+                    })
+            alt = info.get('test-helper-alternate')
+            if alt:
+                for k, v in alt.items():
+                    results.setdefault(k, [])
+                    for e in v:
+                        r = self.format_alternate_address(e)
+                        if r:
+                            results[k].append(r)
+        return results
+
+    @staticmethod
+    def format_alternate_address(entry):
+        res = {
+            'type': entry.get('type'),
+            'address': entry.get('address'),
+            'front': entry.get('front'),
+        }
+        if not res['type'] or not res['address']:
+            return None  # reject invalid input with missing mandatory fields
+        if not res['front']:
+            del res['front']  # make sure we do not emit a None optional field
+        return res
+
+
+class APIv1Collectors(OONIBHandler):
+    def initialize(self):
+        self.bouncer = Bouncer(config.main.bouncer_file)
+
+    def get(self):
+        self.write(self.bouncer.formatCollectorsWithoutPolicy())
+
+
+class APIv1TestHelpers(OONIBHandler):
+    def initialize(self):
+        self.bouncer = Bouncer(config.main.bouncer_file)
+
+    def get(self):
+        self.write(self.bouncer.formatTestHelpersWithoutPolicy())
+
 
 class BouncerHandlerBase(OONIBHandler):
     def initialize(self):

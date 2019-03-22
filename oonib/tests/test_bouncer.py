@@ -6,6 +6,7 @@ from twisted.internet import defer
 from cyclone import web
 
 from oonib.bouncer.api import bouncerAPI
+from oonib.bouncer.handlers import Bouncer
 from oonib.tests.handler_helpers import HandlerTestCase
 
 fake_bouncer_file = """
@@ -106,6 +107,23 @@ helpers:
          attribute: value
 """ % (reports_dir, archive_dir, input_dir, decks_dir, bouncer_filename)
 
+
+class FormatHelperAddressTest(HandlerTestCase):
+    def test_behaviour(self):
+        vector = (
+            ({}, None),
+            ({'type': 'https'}, None),
+            ({'address': 'https://a.org'}, None),
+            ({'address': 'https://a.org', 'type': 'https'},
+             {'address': 'https://a.org', 'type': 'https'}),
+            ({'address': 'https://a.org',
+              'type': 'cloudfront', 'front': 'aaa'},
+             {'address': 'https://a.org',
+              'type': 'cloudfront', 'front': 'aaa'}),
+        )
+        for inputs, expects in vector:
+            outputs = Bouncer.format_alternate_address(inputs)
+        self.assertEqual(expects, outputs)
 
 class BaseTestBouncer(HandlerTestCase):
     def setUp(self, *args, **kw):
@@ -571,4 +589,54 @@ class TestProductionTests(BaseTestBouncer):
         response_body = json.loads(response.body)
         print(response_body['net-tests'])
 
+    @defer.inlineCallbacks
+    def test_collectors(self):
+        response = yield self.request('/api/v1/collectors', 'GET', None)
+        response_body = json.loads(response.body)
+        self.assertEqual(response_body, [{
+            "address": "httpo://ihiderha53f36lsd.onion",
+            "type": "onion",
+        }, {
+            "address": "https://a.collector.ooni.io:4441",
+            "type": "https"
+        }, {
+            "address": "https://das0y2z2ribx3.cloudfront.net",
+            "front": "a0.awsstatic.com",
+            "type": "cloudfront"
+        }])
+
+    @defer.inlineCallbacks
+    def test_test_helpers(self):
+        response = yield self.request('/api/v1/test-helpers', 'GET', None)
+        response_body = json.loads(response.body)
+        self.assertEqual(response_body, {
+            "dns": [{"type": "legacy", "address": "213.138.109.232:57004"}],
+            "http-return-json-headers": [{
+                "type": "legacy",
+                "address": "http://38.107.216.10:80"
+            }],
+            "ssl": [{
+                "type": "legacy",
+                "address": "https://213.138.109.232"
+            }],
+            "tcp-echo": [{
+                "type": "legacy",
+                "address": "213.138.109.232"
+            }],
+            "traceroute": [{
+                "type": "legacy",
+                "address": "213.138.109.232"
+            }],
+            "web-connectivity": [{
+                "type": "legacy",
+                "address": "httpo://7jne2rpg5lsaqs6b.onion"
+            }, {
+                "address": "https://a.web-connectivity.th.ooni.io:4442",
+                "type": "https",
+            }, {
+                "address": "https://d2vt18apel48hw.cloudfront.net",
+                "front": "a0.awsstatic.com",
+                "type": "cloudfront",
+            }]
+        })
 
