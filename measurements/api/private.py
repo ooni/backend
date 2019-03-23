@@ -737,3 +737,19 @@ def api_private_country_overview():
         'im_apps_blocked': None,
         'circumvention_tools_blocked': None,
     })
+
+@api_private_blueprint.route('/global_overview', methods=["GET"])
+def api_private_global_overview():
+    row = current_app.db_session.execute(
+        select([
+            sql.text("COUNT(DISTINCT probe_cc)"),
+            sql.text("COUNT(DISTINCT probe_asn)"),
+            sql.text("SUM(count)"),
+        ]).select_from(sql.table('ooexpl_bucket_msm_count'))
+    ).fetchone()
+
+    return jsonify({
+        'country_count': row[0],
+        'network_count': row[1],
+        'measurement_count': row[2],
+    })
