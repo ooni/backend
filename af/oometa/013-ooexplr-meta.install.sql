@@ -21,7 +21,7 @@ bucket_date
 FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
-GROUP BY bucket_date, probe_asn, probe_cc;
+GROUP BY 2,3,4;
 
 CREATE TABLE ooexpl_recent_msm_count (
     "count" bigint,
@@ -45,7 +45,7 @@ FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE measurement_start_time > current_date - interval '31 day'
-GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date, test_day;
+GROUP BY 2,3,4,5,6;
 
 comment on table ooexpl_recent_msm_count is 'OONI Explorer stats table for counting measurements by probe_cc, probe_asn from the past 30 days';
 
