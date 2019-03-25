@@ -1573,7 +1573,7 @@ JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE
 bucket_date = %s
 AND measurement_start_time > current_date - interval '31 day'
-AND test_name != NULL
+AND test_name IS NOT NULL
 GROUP BY 2,3,4,5,6
 ON CONFLICT (probe_cc, probe_asn, test_name, test_day, bucket_date) DO
 UPDATE
