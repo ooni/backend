@@ -130,6 +130,7 @@ class TestCentrifugation(unittest.TestCase):
         1.1G	2017-02-09
         1.7G	2017-04-16
         4.8G	2018-03-04
+        1.3G	2019-03-01
         2.7G 2017-06-05
         60M	        2016-07-07
 
@@ -142,9 +143,7 @@ class TestCentrifugation(unittest.TestCase):
         4.0K	2018-12-09
         4.0K	2018-12-10
         """
-        #bucket_date = '2018-01-01'
-
-        bucket_date = '2018-05-07'
+        bucket_date = '2019-03-01'
         fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
 
         print("Starting pg container")
