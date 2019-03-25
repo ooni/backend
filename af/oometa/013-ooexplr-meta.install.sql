@@ -44,7 +44,7 @@ bucket_date
 FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
-WHERE measurement_start_time > current_date - interval '31 day'
+WHERE measurement_start_time > current_date - interval '31 day' AND test_name != NULL
 GROUP BY 2,3,4,5,6;
 
 comment on table ooexpl_recent_msm_count is 'OONI Explorer stats table for counting measurements by probe_cc, probe_asn from the past 30 days';

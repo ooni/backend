@@ -1554,7 +1554,7 @@ FROM measurement
 JOIN report ON report.report_no = measurement.report_no
 JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE bucket_date = %s
-GROUP BY bucket_date, probe_asn, probe_cc
+GROUP BY 2,3,4
 ON CONFLICT (probe_asn, probe_cc, bucket_date) DO
 UPDATE
 SET count = EXCLUDED.count;
@@ -1573,7 +1573,8 @@ JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 WHERE
 bucket_date = %s
 AND measurement_start_time > current_date - interval '31 day'
-GROUP BY probe_cc, probe_asn, test_name, test_start_time, bucket_date, test_day
+AND test_name != NULL
+GROUP BY 2,3,4,5,6
 ON CONFLICT (probe_cc, probe_asn, test_name, test_day, bucket_date) DO
 UPDATE
 SET count = EXCLUDED.count;''', [bucket])
