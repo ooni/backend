@@ -1,6 +1,9 @@
+import unittest
+
 import os
 import sys
 import time
+import traceback
 from datetime import datetime, timedelta
 from glob import glob
 
@@ -23,7 +26,7 @@ def start_pg(client):
             name=METADB_NAME,
             hostname=METADB_NAME,
             environment={
-                'POSTGRES_USER': METADB_PG_USER 
+                'POSTGRES_USER': METADB_PG_USER
             },
             ports={
                 '5432/tcp': 25432
@@ -46,8 +49,8 @@ def pg_install_tables(container):
             socket.sendall(in_file.read())
 
     time.sleep(1)
-    for line in container.logs().split("\n"):
-        if line.startswith("ERROR"):
+    for line in container.logs().split(b"\n"):
+        if line.startswith(b"ERROR"):
             print(line)
             raise Exception("Detected error in query")
 
@@ -108,52 +111,59 @@ def run_centrifugation(client, bucket_date):
     )
     container_logs = shovel_container.logs(stream=True)
     for line in container_logs:
-        sys.stdout.write(line)
+        sys.stdout.write(line.decode('utf8'))
+        sys.stdout.flush()
     print("runtime: {}".format(time.time() - start_time))
     return shovel_container
 
-def main():
-    """
-    Buckets sizes for testing:
-    665M	2018-05-07
-    906M	2018-05-08
-    700M	2018-05-09
-    1.1G	2017-02-09
-    1.7G	2017-04-16
-    4.8G	2018-03-04
-    2.7G 2017-06-05
-    60M	        2016-07-07
+class TestCentrifugation(unittest.TestCase):
+    def setUp(self):
+        self.docker_client = docker.from_env()
+        self.to_remove_containers = []
 
-    Empty buckets:
-    4.0K	2015-12-24
-    4.0K	2015-12-25
-    4.0K	2015-12-26
-    4.0K	2015-12-27
-    4.0K	2015-12-28
-    4.0K	2018-12-09
-    4.0K	2018-12-10
-    """
-    bucket_date = '2018-05-07'
-    #bucket_date = '2018-01-01'
+    def test_run_small_bucket(self):
+        """
+        Buckets sizes for testing:
+        665M	2018-05-07
+        906M	2018-05-08
+        700M	2018-05-09
+        1.1G	2017-02-09
+        1.7G	2017-04-16
+        4.8G	2018-03-04
+        2.7G 2017-06-05
+        60M	        2016-07-07
 
-    docker_client = docker.from_env()
+        Empty buckets:
+        4.0K	2015-12-24
+        4.0K	2015-12-25
+        4.0K	2015-12-26
+        4.0K	2015-12-27
+        4.0K	2015-12-28
+        4.0K	2018-12-09
+        4.0K	2018-12-10
+        """
+        #bucket_date = '2018-01-01'
 
-    fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
+        bucket_date = '2018-05-07'
+        fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
 
-    try:
         print("Starting pg container")
-        pg_container = start_pg(docker_client)
+        pg_container = start_pg(self.docker_client)
+        self.to_remove_containers.append(pg_container)
+
         pg_install_tables(pg_container)
 
-        shovel_container = run_centrifugation(docker_client, bucket_date)
+        shovel_container = run_centrifugation(self.docker_client, bucket_date)
+        self.to_remove_containers.append(shovel_container)
         result = shovel_container.wait()
-        assert result.get('StatusCode') == 0, "shovel container exit code was not zero"
-    except Exception as exc:
-        print("Failure ", exc)
-    finally:
-        print("Cleaning up")
-        pg_container.remove(force=True)
-        shovel_container.remove(force=True)
+        self.assertEqual(
+            result.get('StatusCode'),
+            0
+        )
+
+    def tearDown(self):
+        for container in self.to_remove_containers:
+            container.remove(force=True)
 
 if __name__ == '__main__':
-    main()
+    unittest.main()
