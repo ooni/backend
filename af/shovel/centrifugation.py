@@ -1399,7 +1399,7 @@ class HttpRequestFeeder(BaseHttpFeeder):
                     self._pop(datum, r)
     def _pop(self, datum, r):
         response = r['response']
-        r['request'].pop('url') 
+        r['request'].pop('url')
         r.pop('failure', None)
         if response is not None:
             response.pop('body')
