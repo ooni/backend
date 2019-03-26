@@ -1,6 +1,11 @@
 ChangeLog
 =========
 
+1.3.6 (Mon, 25 Mar 2019)
+------------------------
+
+* Implement the OONI bouncer v2.0.0 spec
+
 1.3.5 (Thu, 21 Feb 2019)
 ------------------------
 
