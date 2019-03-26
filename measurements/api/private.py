@@ -293,7 +293,7 @@ def get_recent_network_coverage(probe_cc, test_groups):
         sql.text("test_day")
     ).order_by(
         sql.text("test_day")
-    ).select_from(sql.table('ooexpl_recent_msm_count'))
+    ).select_from(sql.table('ooexpl_daily_msm_count'))
 
     network_map = {k: 0 for k in TEST_GROUPS.keys()}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
@@ -324,7 +324,7 @@ def get_recent_test_coverage(probe_cc):
         sql.text("test_group, test_day")
     ).order_by(
         sql.text("test_group, test_day")
-    ).select_from(sql.table('ooexpl_recent_msm_count'))
+    ).select_from(sql.table('ooexpl_daily_msm_count'))
 
     coverage_map = {k: {} for k in TEST_GROUPS.keys()}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
@@ -374,7 +374,7 @@ def api_private_website_network_tests():
         sql.text("probe_asn")
     ).order_by(
         sql.text("count DESC")
-    ).select_from(sql.table('ooexpl_website_msmts'))
+    ).select_from(sql.table('ooexpl_website_msm'))
 
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
@@ -423,12 +423,13 @@ LEFT OUTER JOIN
 	COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
 	COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
 	COALESCE(sum(CASE WHEN failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
-	FROM ooexpl_website_msmts
+	FROM ooexpl_website_msm
+    JOIN input ON input.input_no = ooexpl_website_msm.input_no
 	WHERE measurement_start_time >= current_date - interval '31 day'
 	AND measurement_start_time < current_date - interval '1 day'
 	AND probe_cc =  :probe_cc
 	AND probe_asn = :probe_asn
-	AND input = :input
+	AND input.input = :input
 	GROUP BY test_day
 
 ) m
@@ -476,30 +477,34 @@ def api_private_website_test_urls():
 
     row = current_app.db_session.execute(
         select([
-            sql.text("COUNT(DISTINCT input)")
+            sql.text("COUNT(DISTINCT input_no)")
         ]).where(
             and_(*where_clause)
-        ).select_from(sql.table('ooexpl_website_msmts'))
+        ).select_from(sql.table('ooexpl_website_msm'))
     , query_params).fetchone()
     total_count = row[0]
 
     s = select([
-        sql.text("input"),
+        sql.text("input.input"),
         sql_anomaly_count,
         sql_confirmed_count,
         sql_failure_count,
-        sql.text("COUNT(*) as total_count")
+        sql.text("COUNT(*) as total_count"),
     ]).where(
         and_(*where_clause)
     ).group_by(
-        sql.text("input")
+        sql.text("input.input")
     ).order_by(
-        sql.text("confirmed_count DESC, anomaly_count DESC, total_count DESC, input ASC")
+        sql.text("confirmed_count DESC, anomaly_count DESC, total_count DESC, input.input ASC")
     ).limit(
         int(limit)
     ).offset(
         int(offset)
-    ).select_from(sql.table('ooexpl_website_msmts'))
+    ).select_from(
+        sql.table('ooexpl_website_msm').join(
+            'input', sql.text('input.input_no = ooexpl_website_msm.input_no')
+        )
+    )
 
     current_page = math.ceil(offset / limit) + 1
     metadata = {
@@ -558,7 +563,7 @@ def api_private_im_networks():
         sql.text("test_name, probe_asn")
     ).order_by(
         sql.text("test_name, msm_count DESC")
-    ).select_from(sql.table('ooexpl_recent_msm_count'))
+    ).select_from(sql.table('ooexpl_daily_msm_count'))
 
     results = {}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
@@ -606,7 +611,7 @@ LEFT OUTER JOIN
 	SELECT
 	SUM(count) as count,
 	test_day
-	FROM ooexpl_recent_msm_count
+	FROM ooexpl_daily_msm_count
 	WHERE
     probe_cc = :probe_cc
     AND test_name = :test_name
@@ -720,13 +725,13 @@ def api_private_country_overview():
 
     row = current_app.db_session.execute(
         select([
-            sql.text("COUNT(DISTINCT input)")
+            sql.text("COUNT(DISTINCT input_no)")
         ]).where(
             and_(
                 sql.text("confirmed = TRUE"),
                 sql.text("probe_cc = :probe_cc")
             )
-        ).select_from(sql.table('ooexpl_website_msmts'))
+        ).select_from(sql.table('ooexpl_website_msm'))
     , {'probe_cc': probe_cc}).fetchone()
 
     websites_confirmed_blocked = row[0]

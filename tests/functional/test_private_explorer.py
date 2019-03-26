@@ -68,7 +68,7 @@ def test_api_private_im_networks(client):
     assert response.status_code == 200
 
 def test_api_private_im_stats(client):
-    response = client.get("/api/_/im_stats"
+    response = client.get("/api/_/im_stats",
                           query_string={
                               "probe_cc": "IT",
                               "probe_asn": 12874
@@ -77,5 +77,5 @@ def test_api_private_im_stats(client):
 
 def test_api_private_network_stats(client):
     response = client.get("/api/_/network_stats",
-                          {"probe_cc": "GR"})
+                          query_string={"probe_cc": "GR"})
     assert response.status_code == 200
