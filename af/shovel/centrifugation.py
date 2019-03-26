@@ -1559,7 +1559,7 @@ ON CONFLICT (probe_asn, probe_cc, bucket_date) DO
 UPDATE
 SET count = EXCLUDED.count;
 ''', [bucket])
-        c.execute('''INSERT INTO ooexpl_recent_msm_count (count, probe_cc, probe_asn, test_name, test_day, bucket_date)
+        c.execute('''INSERT INTO ooexpl_daily_msm_count (count, probe_cc, probe_asn, test_name, test_day, bucket_date)
 SELECT
 COUNT(msm_no) as count,
 probe_cc,
@@ -1580,8 +1580,39 @@ UPDATE
 SET count = EXCLUDED.count;''', [bucket])
         # XXX we should probably also add a statement here to delete
         # measurements older than some number of days.
-        c.execute('REFRESH MATERIALIZED VIEW ooexpl_website_msmts')
-
+        c.execute('''INSERT INTO ooexpl_website_msm ("msm_no", "input_no", "probe_asn", "probe_cc", "measurement_start_time", "anomaly", "confirmed", "failure", "bucket_date")
+SELECT
+    measurement.msm_no,
+    input.input_no,
+    probe_asn,
+    probe_cc,
+    measurement_start_time,
+    CASE
+        WHEN blocking != 'false' AND blocking != NULL THEN TRUE
+        WHEN measurement.msm_no IN (SELECT msm_no FROM http_request_fp) THEN TRUE
+        ELSE FALSE
+    END as anomaly,
+    CASE
+        WHEN measurement.msm_no IN (SELECT msm_no FROM http_request_fp) THEN TRUE
+        ELSE FALSE
+    END as confirmed,
+    CASE
+        WHEN control_failure != NULL OR blocking = NULL THEN TRUE
+        ELSE FALSE
+    END as failure,
+    bucket_date
+    FROM measurement
+    JOIN input ON input.input_no = measurement.input_no
+    JOIN report ON report.report_no = measurement.report_no
+    JOIN http_verdict ON http_verdict.msm_no = measurement.msm_no
+    JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
+    WHERE test_name = 'web_connectivity'
+    AND bucket_date = %s
+    AND measurement_start_time > current_date - interval '31 day'
+ON CONFLICT (msm_no) DO UPDATE SET
+    anomaly = EXCLUDED.anomaly,
+    confirmed = EXCLUDED.confirmed,
+    failure = EXCLUDED.failure;''', [bucket])
 
 def meta_pg(in_root, bucket, postgres):
     print "meta_pg: {} {}".format(in_root, bucket)
