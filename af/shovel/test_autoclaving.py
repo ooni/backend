@@ -1,3 +1,7 @@
+import os
+# This is needed to make daily_workflow work
+os.environ['TZ'] = 'UTC'
+
 from cStringIO import StringIO
 import unittest
 from operator import itemgetter
