@@ -4,16 +4,41 @@ Source for https://api.ooni.io/
 
 ## Local development
 
-To run this locally you need `docker`, `docker-compose` and `make`.
+### Requirements
 
-If those are installed you will then be able to run the following:
+* Docker
+* Make
+* Python >= 3.5
+* Postgresql
 
+### Quickstart
+
+**Note**: the default database configuration is `postgres@localhost:5432/ooni_measurements`,
+you only need to run the second step below (`export DATABASE_URL`) in case you want to use a different one.
+
+```bash
+pip install -r requirements.txt # Install all the python dependencies
+export DATABASE_URL=postgresql://my_db_user:my_db_password@localhost:5432/ooni_measurements
+make create-tables # Create the database and tables
+make serve # Run the server
 ```
-make serve
-```
 
-This will start the docker containers needed to run the application locally,
+The last step will start the docker containers needed to run the application locally,
  building also all the required web assets.
+
+### Running the tests
+
+First, install the tests requirements, by running:
+
+```bash
+pip install -r requirements/test.txt
+```
+
+And then you can run the tests:
+
+```bash
+make test
+```
 
 ## Deployment
 
