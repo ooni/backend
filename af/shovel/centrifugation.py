@@ -104,8 +104,10 @@ def httpt_body(response):
                 break
         else:
             # that's bad to throw:
-            # - control measurement from shows partial body https://explorer.ooni.torproject.org/measurement/xLa7pgssTf9GRA6b3KZqJNyXFHXvZeB7XwxH9iAsuLsq4hGD27vXtgqnRKIJXyWO?input=http:%2F%2Fwww.radioislam.org
-            # - that also happens "for real" https://explorer.ooni.torproject.org/measurement/20160715T020111Z_AS27775_kUa9SzwloGExQliV9qg8QHJBv20UTNgaVDb1mGG22XTH2N4J4y?input=http:%2F%2Fakwa.ru
+            # - control measurement from shows partial body
+            #  https://explorer.ooni.io/measurement/xLa7pgssTf9GRA6b3KZqJNyXFHXvZeB7XwxH9iAsuLsq4hGD27vXtgqnRKIJXyWO?input=http:%2F%2Fwww.radioislam.org
+            # - that also happens "for real"
+            #  https://explorer.ooni.io/measurement/20160715T020111Z_AS27775_kUa9SzwloGExQliV9qg8QHJBv20UTNgaVDb1mGG22XTH2N4J4y?input=http:%2F%2Fakwa.ru
             raise RuntimeError('Chunked body without `Transfer-Encoding: chunked`', response['headers'])
         out = []
         offset = body.index('\r')

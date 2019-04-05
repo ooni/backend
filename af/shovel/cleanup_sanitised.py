@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 
 # It SHOULD be run after successful `check_sanitised` run, that's why it requires `santoken`.
+"""
+This was used to cleanup chameleon sanitised files.
+"""
 
 import argparse
 import gzip
