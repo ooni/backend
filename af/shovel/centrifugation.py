@@ -714,6 +714,34 @@ class BaseFeeder(object):
     def close(self):
         pass # assert self.sink.closed
 
+def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
+    # It's tricky to UPDATE flags correctly on reprocessing and reingestion as
+    # only subset of tables is updated, and flags reflect summary of _all_ the
+    # relevant tables. There is some optimisation possibility in moving that
+    # calculation into ingestion, but keeping the ingestion code in-sync with
+    # reprocessing and reingestion cases is not probably worth the benefit.
+    # Note, `anomaly` and `confirmed` store false value as `NULL`. That a) is
+    # legacy from a previous scheme, b) saves 1 byte per row for `false` values
+    # as NULLs are stored as bit flags.
+    with pgconn.cursor() as c:
+        c.execute('SELECT MIN(msm_no), MAX(msm_no) FROM {msm}'.format(msm=msm_tbl))
+        msm_min, msm_max = c.fetchone() # helps planner to avoid full-scan
+        create_temp_table(pgconn, flags_tbl, '''
+            msm_no    integer NOT NULL,
+            anomaly   boolean NULL,
+            confirmed boolean NULL
+        ''')
+        c.execute('''
+        INSERT INTO {flags} SELECT msm_no, bool_or(anomaly), bool_or(confirmed) FROM (
+            SELECT msm_no, true AS anomaly, true AS confirmed FROM http_request_fp
+            WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
+            UNION ALL
+            SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
+            WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
+              AND blocking != 'false' AND blocking IS NOT NULL
+        ) t GROUP BY msm_no;
+        '''.format(flags=flags_tbl, msm=msm_tbl), [msm_min, msm_max, msm_min, msm_max])
+
 class MeasurementFeeder(BaseFeeder):
     sink_table = 'measurement_blob'
     columns = ('msm_no', 'measurement_start_time', 'test_runtime', 'id', 'input', 'exc', 'residual')
@@ -748,25 +776,32 @@ class MeasurementFeeder(BaseFeeder):
                     pg_quote(none_if_len0(exc)),
                     pg_quote(ujson.dumps(datum)))
     def close(self):
+        create_temp_table(self.pgconn, 'msm_no_new', 'msm_no integer NOT NULL')
         with self.pgconn.cursor() as c:
             c.execute('''
                 INSERT INTO input (input)
                 SELECT DISTINCT input FROM measurement_blob WHERE input IS NOT NULL
-                ON CONFLICT DO NOTHING
-            ''')
-            c.execute('''
+                ON CONFLICT DO NOTHING;
+
                 INSERT INTO residual (residual)
                 SELECT DISTINCT residual FROM measurement_blob
-                ON CONFLICT DO NOTHING
+                ON CONFLICT DO NOTHING;
+
+                INSERT INTO msm_no_new SELECT msm_no FROM measurement_meta;
+                CREATE UNIQUE INDEX ON msm_no_new (msm_no);
+                ANALYZE msm_no_new;
             ''')
+            calc_measurement_flags(self.pgconn, 'flags_new', 'msm_no_new')
             c.execute('''
                 INSERT INTO measurement
                 SELECT msm_no, report_no, frame_off, frame_size, intra_off, intra_size,
-                measurement_start_time, test_runtime, orig_sha1, id, input_no, exc, residual_no
+                measurement_start_time, test_runtime, orig_sha1, id, input_no, exc, residual_no,
+                NULL as msm_failure, anomaly, confirmed
                 FROM measurement_meta
                 JOIN measurement_blob USING (msm_no)
                 LEFT JOIN input USING (input)
                 LEFT JOIN residual USING (residual)
+                LEFT JOIN flags_new USING (msm_no)
             ''') # TODO: `LEFT JOIN measurement_blob_` to fail fast
         del self.pgconn
 
@@ -776,18 +811,42 @@ class MeasurementExceptionFeeder(BaseFeeder):
     def __init__(self, pgconn):
         self.pgconn = pgconn
         create_temp_table(pgconn, self.sink_table, 'msm_no integer NOT NULL, exc integer[] NOT NULL')
+        create_temp_table(pgconn, 'msm_no_old', 'msm_no integer NOT NULL')
+        self.msm_no_sink = PGCopyFrom(pgconn, 'msm_no_old', columns=('msm_no',))
     @staticmethod
     def msm_rownpop(msm_no, _, exc):
+        self.msm_no_sink.write('{:d}\n'.format(msm_no))
         if FLAG_DEBUG_CHAOS and random.random() < 0.01:
             raise RuntimeError('bad luck with measurement')
         return '{:d}\t{}\n'.format(msm_no, pg_quote(exc)) if len(exc) else ''
     def close(self):
+        self.msm_no_sink.close() # flush
         with self.pgconn.cursor() as c:
+            c.execute('''
+                CREATE UNIQUE INDEX ON msm_no_old (msm_no);
+                ANALYZE msm_no_old;
+            ''')
+            calc_measurement_flags(self.pgconn, 'flags_old', 'msm_no_old')
+            # Combining two UPDATEs into two MAY be benificial in theory,
+            # BUT measurement_exc is expected to be tiny and delta with flags
+            # is expected to be tiny as well.
             c.execute('''
                 UPDATE measurement msm
                 SET exc = array_append(msm.exc, NULL) || mex.exc
                 FROM measurement_exc mex
-                WHERE mex.msm_no = msm.msm_no
+                WHERE mex.msm_no = msm.msm_no;
+
+                UPDATE measurement msm
+                SET anomaly = f.anomaly, confirmed = f.confirmed
+                FROM msm_no_old
+                LEFT JOIN flags_old f USING (msm_no)
+                WHERE msm.msm_no = msm_no_old.msm_no AND (
+                    msm.anomaly IS DISTINCT FROM f.anomaly
+                    OR
+                    msm.confirmed IS DISTINCT FROM f.confirmed
+                );
+
+                DROP TABLE msm_no_old, flags_old;
             ''')
         del self.pgconn
 
