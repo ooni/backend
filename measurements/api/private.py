@@ -733,14 +733,45 @@ def api_private_country_overview():
             )
         ).select_from(sql.table('ooexpl_website_msm'))
     , {'probe_cc': probe_cc}).fetchone()
-
     websites_confirmed_blocked = row[0]
+
+    row = current_app.db_session.execute(
+        select([
+            sql.text("SUM(count)"),
+            sql.text("COUNT(DISTINCT probe_asn)")
+        ]).where(
+            and_(
+                sql.text("probe_cc = :probe_cc")
+            )
+        ).select_from(sql.table('ooexpl_bucket_msm_count'))
+    , {'probe_cc': probe_cc}).fetchone()
+    measurement_count = row[0]
+    network_count = row[1]
+
+    row = current_app.db_session.execute(
+        select([
+            sql.text("bucket_date")
+        ]).where(
+            and_(
+                sql.text("probe_cc = :probe_cc")
+            )
+        ).select_from(sql.table('ooexpl_bucket_msm_count')
+        ).order_by(
+            sql.text("bucket_date ASC")
+        ).limit(
+            1
+        )
+    , {'probe_cc': probe_cc}).fetchone()
+    first_bucket_date = row[0]
 
     return jsonify({
         'websites_confirmed_blocked': websites_confirmed_blocked,
         'middlebox_detected_networks': None,
         'im_apps_blocked': None,
         'circumvention_tools_blocked': None,
+        'measurement_count': measurement_count,
+        'network_count': network_count,
+        'first_bucket_date': first_bucket_date
     })
 
 @api_private_blueprint.route('/global_overview', methods=["GET"])
