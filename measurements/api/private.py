@@ -771,7 +771,7 @@ def api_private_country_overview():
         )
     , {'probe_cc': probe_cc}).fetchone()
     first_bucket_date = None
-    if len(row) > 0:
+    if row:
         first_bucket_date = row[0]
 
     return jsonify({
