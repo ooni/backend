@@ -368,6 +368,8 @@ def api_private_website_network_tests():
         sql.text("probe_asn"),
     ]).where(
         and_(
+            sql.text("test_start_time >= current_date - interval '31 day'"),
+            sql.text("test_start_time < current_date"),
             sql.text("probe_cc = :probe_cc")
         )
     ).group_by(
