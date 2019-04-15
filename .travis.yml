@@ -22,5 +22,4 @@ install:
 before_script:
 - scripts/travis_init_db.sh
 script:
-- make APP_ENV=testing create-tables
 - make test

@@ -29,19 +29,8 @@ dev:
 update-country-list:
 	curl https://raw.githubusercontent.com/hellais/country-util/master/data/country-list.json > measurements/countries/country-list.json
 
-# XXX remove these if devtool backward compatibility does not matter
-serve: dev
-develop: dev
-develop-rebuild: dev
-
 shell:
 	$(PYTHON_WITH_ENV) -m measurements shell
-
-create-tables:
-	$(PYTHON_WITH_ENV) -m measurements create-tables
-
-load-fixtures:
-	$(PYTHON_WITH_ENV) -m measurements updatefiles --file dev/fixtures.txt --no-check
 
 test-unit:
 	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m unit
@@ -52,10 +41,5 @@ test-functional:
 test: test-unit test-functional
 	$(PYTHON_WITH_ENV) -m coverage report -m
 
-dropdb:
-	psql -h db -d postgres -U postgres -c "DROP DATABASE IF EXISTS measurements"
-
 .PHONY: default dev build clean shell \
-		test test-unit test-functional \
-		create-tables dropdb \
-		develop develop-rebuild serve
+		test test-unit test-functional
