@@ -770,7 +770,9 @@ def api_private_country_overview():
             1
         )
     , {'probe_cc': probe_cc}).fetchone()
-    first_bucket_date = row[0]
+    first_bucket_date = None
+    if len(row) > 0:
+        first_bucket_date = row[0]
 
     return jsonify({
         'websites_confirmed_blocked': websites_confirmed_blocked,
