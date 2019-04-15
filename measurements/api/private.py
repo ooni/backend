@@ -266,7 +266,7 @@ def last_30days():
     last_day = datetime(last_day.year, last_day.month, last_day.day)
 
     for d in daterange(first_day, last_day):
-        yield d
+        yield d.strftime("%Y-%m-%d")
 
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
@@ -298,7 +298,7 @@ def get_recent_network_coverage(probe_cc, test_groups):
     network_map = {k: 0 for k in TEST_GROUPS.keys()}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
     for count, date in q:
-        network_map[date] = count
+        network_map[date.strftime("%Y-%m-%d")] = count
 
     network_coverage = []
     for test_day in last_30days():
@@ -329,7 +329,7 @@ def get_recent_test_coverage(probe_cc):
     coverage_map = {k: {} for k in TEST_GROUPS.keys()}
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
     for count, test_day, test_group in q:
-        coverage_map[test_group][test_day] = int(count)
+        coverage_map[test_group][test_day.strftime("%Y-%m-%d")] = int(count)
 
     test_coverage = []
     for test_group, coverage in coverage_map.items():
