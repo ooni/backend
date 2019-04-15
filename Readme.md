@@ -213,14 +213,9 @@ COMMIT;
 
 2. Push a new docker image
 
-You should then build a new docker image by bumping the version number inside of
-`af/shovel/build`.
+You should then build a new docker image by running `ooni-sysadmin/scripts/docker-build`.
 
-The image should then be pushed to dockerhub by running:
-
-```
-docker push openobservatory/shovel:latest && docker push openobservatory/shovel:0.0.NN
-```
+This will build and upload an image tagged for example: `openobservatory/pipeline-shovel:20190415-5fac5cf9`.
 
 3. Redeploy an update
 
