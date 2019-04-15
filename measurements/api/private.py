@@ -389,9 +389,9 @@ def api_private_website_network_tests():
         'results': results
     })
 
-sql_anomaly_count = sql.text("COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count")
+sql_anomaly_count = sql.text("COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND msm_failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count")
 sql_confirmed_count = sql.text("COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count")
-sql_failure_count = sql.text("COALESCE(sum(CASE WHEN failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count")
+sql_failure_count = sql.text("COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count")
 
 @api_private_blueprint.route('/website_stats', methods=["GET"])
 def api_private_website_stats():
