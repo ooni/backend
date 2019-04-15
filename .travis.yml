@@ -8,7 +8,7 @@ services:
 - postgresql
 - docker
 addons:
-  postgresql: "9.4"
+  postgresql: "9.6"
 #cache:
 #  directories:
 #  - node_modules/
