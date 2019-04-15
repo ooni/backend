@@ -7,6 +7,8 @@ sudo: required
 services:
 - postgresql
 - docker
+addons:
+  postgresql: "9.4"
 #cache:
 #  directories:
 #  - node_modules/
