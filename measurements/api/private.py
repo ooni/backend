@@ -470,8 +470,8 @@ def api_private_website_test_urls():
 
     probe_asn = int(probe_asn.replace('AS', ''))
     where_clause = [
-        sql.text("measurement_start_time >= current_date - interval '31 day'"),
-        sql.text("measurement_start_time < current_date"),
+        sql.text("test_start_time >= current_date - interval '31 day'"),
+        sql.text("test_start_time < current_date"),
         sql.text("probe_cc = :probe_cc"),
         sql.text("probe_asn = :probe_asn"),
     ]
@@ -734,8 +734,8 @@ def api_private_country_overview():
             and_(
                 sql.text("confirmed = TRUE"),
                 sql.text("probe_cc = :probe_cc"),
-                sql.text("measurement_start_time >= current_date - interval '31 day'"),
-                sql.text("measurement_start_time < current_date")
+                sql.text("test_start_time >= current_date - interval '31 day'"),
+                sql.text("test_start_time < current_date")
             )
         ).select_from(sql.table('measurement').join(
             sql.table('report'), sql.text('report.report_no = measurement.report_no')
