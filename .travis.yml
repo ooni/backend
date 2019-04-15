@@ -10,37 +10,14 @@ services:
 #cache:
 #  directories:
 #  - node_modules/
-before_install:
-# Decrypt the travis secrets
-- 'openssl aes-256-cbc -K $encrypted_965b8cbf2a7d_key -iv $encrypted_965b8cbf2a7d_iv -in secrets/secrets.tar.enc -out secrets/secrets.tar -d'
-- tar xvf secrets/secrets.tar --directory secrets
-- mkdir -p $HOME/.ssh/
-- mv secrets/id_rsa_travis $HOME/.ssh/
-- mkdir -p /opt/
-- mv secrets/secrets.env /opt/secrets.env
 install:
-- 'rm -rf ~/.nvm && git clone https://github.com/creationix/nvm.git ~/.nvm && (cd ~/.nvm && git checkout `git describe --abbrev=0 --tags`) && source ~/.nvm/nvm.sh && nvm install $TRAVIS_NODE_VERSION'
-# Install docker-machine
-- 'curl -L https://github.com/docker/machine/releases/download/v0.8.2/docker-machine-`uname -s`-`uname -m` > docker-machine'
-- sudo mv docker-machine /usr/local/bin/docker-machine
-- sudo chmod +x /usr/local/bin/docker-machine
 # Install python dependencies
 - pip install -U pip setuptools wheel codecov
 - pip install -r requirements/main.txt
 - pip install -r requirements/tests.txt
 - npm install
 before_script:
-# create the default database in travis
-- psql -c 'create database ooni_measurements;' -U postgres
+- scripts/travis_init_db.sh
 script:
-- node -v
-- npm -v
 - make APP_ENV=testing create-tables
 - make test
-
-# Disable auto deployment
-#deploy:
-#  provider: script
-#  script: 'scripts/deploy.sh staging $HOME/.ssh/id_rsa_travis'
-#  on:
-#    branch: master
