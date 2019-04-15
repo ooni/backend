@@ -420,16 +420,15 @@ FROM (
 LEFT OUTER JOIN
 (
     SELECT
-    date_trunc('day', measurement_start_time) as test_day,
+    date_trunc('day', test_start_time) as test_day,
     COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND msm_failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
     COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
     COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
     FROM measurement
     JOIN input ON input.input_no = measurement.input_no
     JOIN report ON report.report_no = measurement.report_no
-
-    WHERE measurement_start_time >= current_date - interval '31 day'
-    AND measurement_start_time < current_date - interval '1 day'
+    WHERE test_start_time >= current_date - interval '31 day'
+    AND test_start_time < current_date - interval '1 day'
     AND probe_cc =  :probe_cc
     AND probe_asn = :probe_asn
     AND input.input = :input
