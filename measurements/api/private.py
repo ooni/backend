@@ -374,7 +374,9 @@ def api_private_website_network_tests():
         sql.text("probe_asn")
     ).order_by(
         sql.text("count DESC")
-    ).select_from(sql.table('ooexpl_website_msm'))
+    ).select_from(sql.table('measurement').join(
+        sql.table('report'), sql.text('report.report_no = measurement.report_no')
+    ))
 
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
@@ -411,27 +413,27 @@ COALESCE(failure_count, 0) as failure_count,
 COALESCE(total_count, 0) as total_count
 FROM (
 (
-	SELECT
-	date_trunc('day', (current_date - offs)) AS test_day
-	FROM generate_series(0, 31, 1) AS offs
+    SELECT
+    date_trunc('day', (current_date - offs)) AS test_day
+    FROM generate_series(0, 31, 1) AS offs
 ) d
 LEFT OUTER JOIN
 (
+    SELECT
+    date_trunc('day', measurement_start_time) as test_day,
+    COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND msm_failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
+    COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
+    COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
+    FROM measurement
+    JOIN input ON input.input_no = measurement.input_no
+    JOIN report ON report.report_no = measurement.report_no
 
-	SELECT
-	date_trunc('day', measurement_start_time) as test_day,
-	COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
-	COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
-	COALESCE(sum(CASE WHEN failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
-	FROM ooexpl_website_msm
-    JOIN input ON input.input_no = ooexpl_website_msm.input_no
-	WHERE measurement_start_time >= current_date - interval '31 day'
-	AND measurement_start_time < current_date - interval '1 day'
-	AND probe_cc =  :probe_cc
-	AND probe_asn = :probe_asn
-	AND input.input = :input
-	GROUP BY test_day
-
+    WHERE measurement_start_time >= current_date - interval '31 day'
+    AND measurement_start_time < current_date - interval '1 day'
+    AND probe_cc =  :probe_cc
+    AND probe_asn = :probe_asn
+    AND input.input = :input
+    GROUP BY test_day
 ) m
 ON d.test_day = m.test_day
 )
@@ -480,7 +482,9 @@ def api_private_website_test_urls():
             sql.text("COUNT(DISTINCT input_no)")
         ]).where(
             and_(*where_clause)
-        ).select_from(sql.table('ooexpl_website_msm'))
+        ).select_from(sql.table('measurement').join(
+            sql.table('report'), sql.text('report.report_no = measurement.report_no')
+        ))
     , query_params).fetchone()
     total_count = row[0]
 
@@ -500,11 +504,11 @@ def api_private_website_test_urls():
         int(limit)
     ).offset(
         int(offset)
-    ).select_from(
-        sql.table('ooexpl_website_msm').join(
-            'input', sql.text('input.input_no = ooexpl_website_msm.input_no')
-        )
-    )
+    ).select_from(sql.table('measurement').join(
+        sql.table('report'), sql.text('report.report_no = measurement.report_no')
+    ).join(
+        sql.table('input'), sql.text('input.input_no = measurement.input_no')
+    ))
 
     current_page = math.ceil(offset / limit) + 1
     metadata = {
@@ -729,9 +733,13 @@ def api_private_country_overview():
         ]).where(
             and_(
                 sql.text("confirmed = TRUE"),
-                sql.text("probe_cc = :probe_cc")
+                sql.text("probe_cc = :probe_cc"),
+                sql.text("measurement_start_time >= current_date - interval '31 day'"),
+                sql.text("measurement_start_time < current_date")
             )
-        ).select_from(sql.table('ooexpl_website_msm'))
+        ).select_from(sql.table('measurement').join(
+            sql.table('report'), sql.text('report.report_no = measurement.report_no')
+        ))
     , {'probe_cc': probe_cc}).fetchone()
     websites_confirmed_blocked = row[0]
 
