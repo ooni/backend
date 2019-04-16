@@ -76,7 +76,8 @@ def test_api_private_im_stats(client):
                           })
     assert response.status_code == 200
 
-def test_api_private_network_stats(client):
-    response = client.get("/api/_/network_stats",
-                          query_string={"probe_cc": "GR"})
-    assert response.status_code == 200
+# XXX this is commented out as the ingestion of these metrics happens outside of the pipeline
+#def test_api_private_network_stats(client):
+#    response = client.get("/api/_/network_stats",
+#                          query_string={"probe_cc": "GR"})
+#    assert response.status_code == 200
