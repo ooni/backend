@@ -71,7 +71,8 @@ def test_api_private_im_stats(client):
     response = client.get("/api/_/im_stats",
                           query_string={
                               "probe_cc": "IT",
-                              "probe_asn": 12874
+                              "probe_asn": 12874,
+                              "test_name": "telegram"
                           })
     assert response.status_code == 200
 
