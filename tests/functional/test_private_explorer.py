@@ -62,7 +62,7 @@ def test_api_private_website_stats(client):
 
 def test_api_private_im_networks(client):
     response = client.get("/api/_/im_networks",
-                          query_params={
+                          query_string={
                               "probe_cc": "IT"
                           })
     assert response.status_code == 200
