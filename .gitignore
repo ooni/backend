@@ -13,3 +13,4 @@ remote_syslog.pid
 .vagrant/
 af/oometa/tsv/
 af/oometa/tsvdump.dir/
+/testdata/
