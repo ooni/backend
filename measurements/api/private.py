@@ -228,35 +228,81 @@ def api_private_blockpage_count():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None:
         raise Exception('err')
-    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'],
-                  'blockpage-count-%s.json' % probe_cc)
-    resp_text = json.dumps({'results': []})
-    resp = requests.get(url, headers={REQID_HDR: request_id()})
-    if resp.status_code != 404:
-        resp_text = resp.text
-    return current_app.response_class(
-        resp_text,
-        mimetype=current_app.config['JSONIFY_MIMETYPE']
-    )
+
+    s = sql.text("""SELECT
+COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0),
+COUNT(*),
+test_day
+FROM (
+	SELECT
+	DISTINCT input as input,
+	date_trunc('day', test_start_time) as test_day,
+	bool_or(confirmed) as confirmed
+	FROM measurement
+	JOIN input ON input.input_no = measurement.input_no
+	JOIN report ON report.report_no = measurement.report_no
+	WHERE test_start_time >= current_date - interval '2 months'
+	AND test_start_time < current_date - interval '1 day'
+	AND probe_cc =  :probe_cc
+	AND test_name = 'web_connectivity'
+	GROUP BY 1,2
+) as wc
+GROUP BY 3;""")
+
+    results = []
+    q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
+    for confirmed_count, total_count, test_day in q:
+        results.append({
+            'test_start_time': test_day,
+            'block_count': int(confirmed_count),
+            'total_count': int(total_count)
+        })
+
+    return jsonify({
+        'results': results
+    })
 
 @api_private_blueprint.route('/measurement_count_by_country', methods=["GET"])
 def api_private_measurement_count_by_country():
-    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-by-country.json')
-    resp = requests.get(url, headers={REQID_HDR: request_id()})
-    return current_app.response_class(
-        resp.text,
-        mimetype=current_app.config['JSONIFY_MIMETYPE']
-    )
+    """
+    Example:
+    {"results": [{"probe_cc": "UZ", "count": 1433} ...]
+    """
+    s = select([
+        sql.text("SUM(count)"),
+        sql.text('probe_cc')
+    ]).group_by(
+        sql.text("probe_cc")
+    ).order_by(
+        sql.text("probe_cc")
+    ).select_from(sql.table('ooexpl_bucket_msm_count'))
+
+    q = current_app.db_session.execute(s)
+    results = []
+    for count, probe_cc in q:
+       results.append({
+            'count': int(count),
+            'probe_cc': probe_cc
+        })
+    return jsonify({
+        'results': results
+    })
 
 
 @api_private_blueprint.route('/measurement_count_total', methods=["GET"])
 def api_private_measurement_count_total():
-    url = urljoin(current_app.config['CENTRIFUGATION_BASE_URL'], 'count-total.json')
-    resp = requests.get(url, headers={REQID_HDR: request_id()})
-    return current_app.response_class(
-        resp.text,
-        mimetype=current_app.config['JSONIFY_MIMETYPE']
-    )
+    s = select([
+        sql.text("SUM(count)")
+    ]).select_from(sql.table('ooexpl_bucket_msm_count'))
+
+    total_count = 0
+    row = current_app.db_session.execute(s).fetchone()
+    if row:
+        total_count = row[0]
+
+    return jsonify({
+        'total': total_count
+    })
 
 def last_30days():
     first_day = datetime.now() - timedelta(31)
