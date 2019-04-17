@@ -1,4 +1,9 @@
 #!/usr/bin/env python2
+"""
+This was a one-off script used to create a compressed version of index files.
+
+It should probably be dropped as it's not referred to outside of the Dockerfile.
+"""
 
 import gzip
 import os
@@ -20,7 +25,7 @@ def gzip_canning_index(fname):
                     if next(textin, None) is None:
                         # NB: explicit EOF is not stored, gzip has CRC32 and
                         # file length, python module gzip checks them
-                        break 
+                        break
                     else:
                         raise RuntimeError('Data after explicit EOF')
                 else:
