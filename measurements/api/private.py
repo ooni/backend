@@ -545,11 +545,81 @@ def api_private_website_test_urls():
         'results': results
     })
 
+@api_private_blueprint.route('/vanilla_tor_stats', methods=["GET"])
+def api_private_vanilla_tor_stats():
+    probe_cc = request.args.get('probe_cc')
+    if probe_cc is None or len(probe_cc) != 2:
+        raise Exception('missing probe_cc')
+    s = sql.text("""SELECT
+	vt.probe_asn,
+	MAX(vt.measurement_start_time) as last_tested,
+	AVG(
+	GREATEST(
+		LEAST(vt.test_runtime, vt.timeout),
+		0
+	)) AS test_runtime_avg, -- I do this to overcome some bugs in few measurements that have a very high runtime or a negative runtime
+  MIN(vt.test_runtime) AS test_runtime_min,
+  MAX(vt.test_runtime) AS test_runtime_max,
+  COUNT(CASE WHEN vt.success = true THEN 1 END) as success_count,
+  COUNT(CASE WHEN vt.success = false THEN 1 END) as failure_count,
+  COUNT(*) as total_count
+FROM (
+	SELECT
+	  measurement.msm_no,
+	  report.probe_cc,
+	  report.probe_asn,
+	  measurement.measurement_start_time,
+	  measurement.test_runtime,
+	  vanilla_tor.timeout,
+	  vanilla_tor.success
+	FROM report
+	JOIN measurement ON report.report_no = measurement.report_no
+	JOIN vanilla_tor ON vanilla_tor.msm_no = measurement.msm_no
+	WHERE measurement_start_time > (now() - interval '6 months')
+	AND test_name = 'vanilla_tor'
+	AND probe_cc = :probe_cc
+) as vt
+GROUP BY 1;""")
+
+    # This is the minimum number of tests to consider a result noteworthy
+    MIN_TESTS = 5
+    ANOMALY_PERC = 0.6
+
+    results = {
+        'networks': [],
+        'notok_networks': 0
+    }
+    q = current_app.db_session.execute(s, {"probe_cc": probe_cc})
+    for row  in q:
+        (probe_asn, last_tested,
+            test_runtime_avg, test_runtime_min, test_runtime_max,
+            success_count, failure_count, total_count) = row
+
+        results['last_tested'] = results.get('last_tested', last_tested)
+        if results['last_tested'] < last_tested:
+            results['last_tested'] = last_tested
+        if total_count > 5 and \
+            float(success_count)/float(total_count) < ANOMALY_PERC:
+            results['notok_networks'] += 1
+
+        results['networks'].append({
+            'probe_asn': probe_asn,
+            'last_tested': last_tested,
+            'test_runtime_avg': test_runtime_avg,
+            'test_runtime_min': test_runtime_min,
+            'test_runtime_max': test_runtime_max,
+            'success_count': success_count,
+            'failure_count': failure_count,
+            'total_count': total_count
+        })
+    return jsonify(results)
+
 @api_private_blueprint.route('/im_networks', methods=["GET"])
 def api_private_im_networks():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
         raise Exception('missing probe_cc')
+
     test_names = [sql.literal_column("test_name") == tg_name for tg_name in TEST_GROUPS['im']]
     s = select([
         sql.text("SUM(count) as msm_count"),
