@@ -776,8 +776,8 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
                 true AS confirmed
             FROM http_request_fp
             JOIN fingerprint ON fingerprint.fingerprint_no = http_request_fp.fingerprint_no
-            JOIN measurement_blob ON http_request_fp.msm_no = measurement_blob.msm_no
-            JOIN report_blob ON report_blob.report_no = measurement_blob.report_no
+            JOIN measurement_meta ON http_request_fp.msm_no = measurement_meta.msm_no
+            JOIN report_blob ON report_blob.report_no = measurement_meta.report_no
             WHERE origin_cc = probe_cc
             AND msm_no IN (SELECT msm_no FROM {msm})
             AND msm_no >= %s AND msm_no <= %s
