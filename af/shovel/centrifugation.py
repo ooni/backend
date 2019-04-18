@@ -779,8 +779,8 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
             JOIN measurement_meta USING (msm_no)
             JOIN report_blob USING (report_no)
             WHERE origin_cc = probe_cc
-            AND http_request_fp.msm_no IN (SELECT msm_no FROM {msm})
-            AND http_request_fp.msm_no >= %s AND http_request_fp.msm_no <= %s
+            AND msm_no IN (SELECT msm_no FROM {msm})
+            AND msm_no >= %s AND msm_no <= %s
             UNION ALL
             SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
             WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
