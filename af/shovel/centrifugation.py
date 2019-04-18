@@ -771,8 +771,16 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
         ''')
         c.execute('''
         INSERT INTO {flags} SELECT msm_no, bool_or(anomaly), bool_or(confirmed) FROM (
-            SELECT msm_no, true AS anomaly, true AS confirmed FROM http_request_fp
-            WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
+            SELECT msm_no,
+                true AS anomaly,
+                true AS confirmed
+            FROM http_request_fp
+            JOIN fingerprint ON (fingerprint_no)
+            JOIN measurement_blob USING (msm_no)
+            JOIN report_blob ON (report_no)
+            WHERE origin_cc = probe_cc
+            AND msm_no IN (SELECT msm_no FROM {msm})
+            AND msm_no >= %s AND msm_no <= %s
             UNION ALL
             SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
             WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
