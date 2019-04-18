@@ -771,7 +771,7 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
         ''')
         c.execute('''
         INSERT INTO {flags} SELECT msm_no, bool_or(anomaly), bool_or(confirmed) FROM (
-            SELECT msm_no,
+            SELECT http_request_fp.msm_no AS msm_no,
                 true AS anomaly,
                 true AS confirmed
             FROM http_request_fp
@@ -779,8 +779,8 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
             JOIN measurement_meta ON http_request_fp.msm_no = measurement_meta.msm_no
             JOIN report_blob ON report_blob.report_no = measurement_meta.report_no
             WHERE origin_cc = probe_cc
-            AND msm_no IN (SELECT msm_no FROM {msm})
-            AND msm_no >= %s AND msm_no <= %s
+            AND http_request_fp.msm_no IN (SELECT msm_no FROM {msm})
+            AND http_request_fp.msm_no >= %s AND http_request_fp.msm_no <= %s
             UNION ALL
             SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
             WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
