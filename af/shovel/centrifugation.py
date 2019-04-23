@@ -1542,7 +1542,7 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
                     ''
                 ) from fingerprint
             ''')
-            assert '916446978a4a86741d0236d19ce7157e' == next(c)[0], 'fingerprint table does not match CODE_VER={}'.format(CODE_VER)
+            assert '63b78da421413ef8ae0d2f1555963e26' == next(c)[0], 'fingerprint table does not match CODE_VER={}'.format(CODE_VER)
             c.execute('SELECT fingerprint_no, body_substr, header, header_prefix, header_value FROM fingerprint')
             for fingerprint_no, body_substr, header, header_prefix, header_value in c:
                 if body_substr is not None:
