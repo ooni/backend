@@ -184,8 +184,19 @@ class TestCentrifugation(unittest.TestCase):
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
 
         new_flags = get_flags_count()
-        print("new_flags: {}".format(new_flags))
+        for k, count in flags.items():
+            assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
+                k, count, new_flags[k]
+            )
 
+        # This forces reingestion of data
+        with pg_conn() as conn:
+            with conn.cursor() as c:
+                c.execute("UPDATE autoclaved SET file_sha1 = digest('wat', 'sha1')")
+        shovel_container = run_centrifugation(self.docker_client, bucket_date)
+
+        flags = new_flags.copy()
+        new_flags = get_flags_count()
         for k, count in flags.items():
             assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
                 k, count, new_flags[k]
