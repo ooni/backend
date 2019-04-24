@@ -173,7 +173,7 @@ class TestCentrifugation(unittest.TestCase):
         pg_install_tables(pg_container)
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
-        flags = get_flags_count()
+        flags = get_flag_counts()
         print("flags: {}".format(flags))
 
         # This forces reprocessing of data
@@ -183,7 +183,7 @@ class TestCentrifugation(unittest.TestCase):
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
 
-        new_flags = get_flags_count()
+        new_flags = get_flag_counts()
         for k, count in flags.items():
             assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
                 k, count, new_flags[k]
@@ -196,7 +196,7 @@ class TestCentrifugation(unittest.TestCase):
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
 
         flags = new_flags.copy()
-        new_flags = get_flags_count()
+        new_flags = get_flag_counts()
         for k, count in flags.items():
             assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
                 k, count, new_flags[k]
