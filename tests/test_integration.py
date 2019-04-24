@@ -120,15 +120,21 @@ def run_centrifugation(client, bucket_date):
 def pg_conn():
     return psycopg2.connect('host={} user={} port={}'.format('localhost', METADB_PG_USER, 25432))
 
-def get_confirmed_count():
+def get_flag_counts():
+    flags = {}
     with pg_conn() as conn:
         with conn.cursor() as c:
             c.execute("""select
                 SUM(case when confirmed = TRUE then 1 else 0 end) as confirmed_count,
-                SUM(case when confirmed IS NULL then 1 else 0 end) as unconfirmed_count
+                SUM(case when confirmed IS NULL then 1 else 0 end) as unconfirmed_count,
+                SUM(case when anomaly = TRUE then 1 else 0 end) as anomaly_count
                 from measurement;
                 """)
-            return c.fetchone()
+            row = c.fetchone()
+            flags['confirmed'] = row[0]
+            flags['unconfirmed'] = row[1]
+            flags['anomaly'] = row[2]
+    return flags
 
 class TestCentrifugation(unittest.TestCase):
     def setUp(self):
@@ -167,8 +173,8 @@ class TestCentrifugation(unittest.TestCase):
         pg_install_tables(pg_container)
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
-        confirmed_count, unconfirmed_count = get_confirmed_count()
-        print("confirmed,unconfirmed: {},{}".format(confirmed_count, unconfirmed_count))
+        flags = get_flags_count()
+        print("flags: {}".format(flags))
 
         # This forces reprocessing of data
         with pg_conn() as conn:
@@ -176,11 +182,14 @@ class TestCentrifugation(unittest.TestCase):
                 c.execute('UPDATE autoclaved SET code_ver = 1')
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
-        new_confirmed_count, new_unconfirmed_count = get_confirmed_count()
-        print("new_confirmed,new_unconfirmed: {},{}".format(new_confirmed_count, new_unconfirmed_count))
 
-        assert new_confirmed_count == confirmed_count
-        assert new_unconfirmed_count == unconfirmed_count
+        new_flags = get_flags_count()
+        print("new_flags: {}".format(new_flags))
+
+        for k, count in flags.items():
+            assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
+                k, count, new_flags[k]
+            )
 
         self.to_remove_containers.append(shovel_container)
         result = shovel_container.wait()
