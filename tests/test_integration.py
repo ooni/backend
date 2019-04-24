@@ -116,6 +116,19 @@ def run_centrifugation(client, bucket_date):
     print("runtime: {}".format(time.time() - start_time))
     return shovel_container
 
+def pg_conn():
+    return psycopg2.connect('host={} user={} port={}'.format('localhost', METADB_PG_USER, 25432))
+
+def get_confirmed_count():
+    with pg_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("""select
+                SUM(case when confirmed = TRUE then 1 else 0 end) as confirmed_count,
+                SUM(case when confirmed = NULL then 1 else 0 end) as unconfirmed_count
+                from measurement;
+                """)
+            return c.fetchone()
+
 class TestCentrifugation(unittest.TestCase):
     def setUp(self):
         self.docker_client = docker.from_env()
@@ -153,6 +166,21 @@ class TestCentrifugation(unittest.TestCase):
         pg_install_tables(pg_container)
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
+        confirmed_count, unconfirmed_count = get_confirmed_count()
+        print("confirmed,unconfirmed: {},{}".format(confirmed_count, unconfirmed_count))
+
+        # This forces reprocessing of data
+        with pg_conn() as conn:
+            with conn.cursor() as c:
+                c.excute('UPDATE autoclaved SET code_ver = 1')
+
+        shovel_container = run_centrifugation(self.docker_client, bucket_date)
+        new_confirmed_count, new_unconfirmed_count = get_confirmed_count()
+        print("new_confirmed,new_unconfirmed: {},{}".format(new_confirmed_count, new_unconfirmed_count))
+
+        assert new_confirmed_count == confirmed_count
+        assert new_unconfirmed_count == unconfirmed_count
+
         self.to_remove_containers.append(shovel_container)
         result = shovel_container.wait()
         self.assertEqual(
