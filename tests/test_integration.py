@@ -3,6 +3,7 @@ import unittest
 import os
 import sys
 import time
+import psycopg2
 import traceback
 from datetime import datetime, timedelta
 from glob import glob
@@ -124,7 +125,7 @@ def get_confirmed_count():
         with conn.cursor() as c:
             c.execute("""select
                 SUM(case when confirmed = TRUE then 1 else 0 end) as confirmed_count,
-                SUM(case when confirmed = NULL then 1 else 0 end) as unconfirmed_count
+                SUM(case when confirmed IS NULL then 1 else 0 end) as unconfirmed_count
                 from measurement;
                 """)
             return c.fetchone()
@@ -172,7 +173,7 @@ class TestCentrifugation(unittest.TestCase):
         # This forces reprocessing of data
         with pg_conn() as conn:
             with conn.cursor() as c:
-                c.excute('UPDATE autoclaved SET code_ver = 1')
+                c.execute('UPDATE autoclaved SET code_ver = 1')
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
         new_confirmed_count, new_unconfirmed_count = get_confirmed_count()
