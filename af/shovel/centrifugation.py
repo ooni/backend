@@ -771,8 +771,16 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
         ''')
         c.execute('''
         INSERT INTO {flags} SELECT msm_no, bool_or(anomaly), bool_or(confirmed) FROM (
-            SELECT msm_no, true AS anomaly, true AS confirmed FROM http_request_fp
-            WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
+            SELECT http_request_fp.msm_no AS msm_no,
+                true AS anomaly,
+                true AS confirmed
+            FROM http_request_fp
+            JOIN fingerprint USING (fingerprint_no)
+            JOIN measurement_meta USING (msm_no)
+            JOIN report_blob USING (report_no)
+            WHERE origin_cc = probe_cc
+            AND msm_no IN (SELECT msm_no FROM {msm})
+            AND msm_no >= %s AND msm_no <= %s
             UNION ALL
             SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
             WHERE msm_no IN (SELECT msm_no FROM {msm}) AND msm_no >= %s AND msm_no <= %s
@@ -1534,7 +1542,7 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
                     ''
                 ) from fingerprint
             ''')
-            assert '916446978a4a86741d0236d19ce7157e' == next(c)[0], 'fingerprint table does not match CODE_VER={}'.format(CODE_VER)
+            assert '63b78da421413ef8ae0d2f1555963e26' == next(c)[0], 'fingerprint table does not match CODE_VER={}'.format(CODE_VER)
             c.execute('SELECT fingerprint_no, body_substr, header, header_prefix, header_value FROM fingerprint')
             for fingerprint_no, body_substr, header, header_prefix, header_value in c:
                 if body_substr is not None:

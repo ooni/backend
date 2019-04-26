@@ -3,6 +3,7 @@ import unittest
 import os
 import sys
 import time
+import psycopg2
 import traceback
 from datetime import datetime, timedelta
 from glob import glob
@@ -116,6 +117,25 @@ def run_centrifugation(client, bucket_date):
     print("runtime: {}".format(time.time() - start_time))
     return shovel_container
 
+def pg_conn():
+    return psycopg2.connect('host={} user={} port={}'.format('localhost', METADB_PG_USER, 25432))
+
+def get_flag_counts():
+    flags = {}
+    with pg_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("""select
+                SUM(case when confirmed = TRUE then 1 else 0 end) as confirmed_count,
+                SUM(case when confirmed IS NULL then 1 else 0 end) as unconfirmed_count,
+                SUM(case when anomaly = TRUE then 1 else 0 end) as anomaly_count
+                from measurement;
+                """)
+            row = c.fetchone()
+            flags['confirmed'] = row[0]
+            flags['unconfirmed'] = row[1]
+            flags['anomaly'] = row[2]
+    return flags
+
 class TestCentrifugation(unittest.TestCase):
     def setUp(self):
         self.docker_client = docker.from_env()
@@ -153,6 +173,35 @@ class TestCentrifugation(unittest.TestCase):
         pg_install_tables(pg_container)
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
+        flags = get_flag_counts()
+        print("flags: {}".format(flags))
+
+        # This forces reprocessing of data
+        with pg_conn() as conn:
+            with conn.cursor() as c:
+                c.execute('UPDATE autoclaved SET code_ver = 1')
+
+        shovel_container = run_centrifugation(self.docker_client, bucket_date)
+
+        new_flags = get_flag_counts()
+        for k, count in flags.items():
+            assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
+                k, count, new_flags[k]
+            )
+
+        # This forces reingestion of data
+        with pg_conn() as conn:
+            with conn.cursor() as c:
+                c.execute("UPDATE autoclaved SET file_sha1 = digest('wat', 'sha1')")
+        shovel_container = run_centrifugation(self.docker_client, bucket_date)
+
+        flags = new_flags.copy()
+        new_flags = get_flag_counts()
+        for k, count in flags.items():
+            assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
+                k, count, new_flags[k]
+            )
+
         self.to_remove_containers.append(shovel_container)
         result = shovel_container.wait()
         self.assertEqual(
