@@ -62,11 +62,13 @@ This case is almost the same one as the case of a static blockpage: the MetaDB h
 
 Overall steps needed to mark existing & future measurements are the same as for HTML blockpage fingerprint with small alterations:
 
-- ...
+- _(same)_ pause ongoing ingestion and ensure that there are no `meta_pg` TaskInstances running
+- _(same)_ update `fingerprint` table in [the database schema](https://github.com/ooni/pipeline/blob/065cccdfeb531e93a22d2aacc05ec05e990f99ee/af/oometa/) following [an example](https://github.com/ooni/pipeline/blob/065cccdfeb531e93a22d2aacc05ec05e990f99ee/af/oometa/003-fingerprints.install.sql#L31-L62) and [roll it out](https://github.com/ooni/sysadmin/blob/4defab8e92a2e53e2679a17214162ed058089e7f/ansible/deploy-pipeline-ddl.yml). The fingerprints are stored in the schema to generate `fingerprint_no serial`.
 - create a temporary table having `msm_no` of the measurements matching the fingerprint _perfectly_ according to features existing in database (e.g. `select msm_no from http_request where headers->>'Location' = 'http://homeline.kg/access/blockpage.html'`, keep in mind that keys of headers are case-sensitive)
-- ...
+- _(same)_ insert those `msm_no` together with matching `fingerprint_no` into `http_request_fp` table as if those were actually ingested by `centrifugation.py`
+- _(same)_ update `anomaly` and `confirmed` flags in `measurement` table for the affected measurement according to the logic codified in `calc_measurement_flags()`
 - update `centrifugation.py`: set up-to-date `fingerprint` table checksum in `HttpRequestFPFeeder.__init__()`. There is no need to bump `CODE_VER` for feature-based fingerprints as we are 100% confident that reprocessing is not needed and ongoing data processing is paused.
-- ...
+- _(same)_ roll out `openobservatory/pipeline-shovel` and unpause data ingestion
 - there is no need for reprocessing as there is no possibility for false negative here
 
 _A temporary table_ is not necessary a result of `CREATE TEMPORARY TABLE`, it may also be a query executed on a read-only replica with faster disk drives with the output of the query directed to a local file that becomes `UNLOGGED` table on a master via out-of-band data transfer or via _Foreign Data Wrapper_.
