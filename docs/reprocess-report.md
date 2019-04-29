@@ -8,7 +8,7 @@ Reading [overall pipeline design document](./pipeline-16.10.md) is useful to und
 
 There are a few problems that make reingestion and reprocessing a non-instant and non-trivial process:
 
-- reprocessing **all** the data is slow: fresh data is ingested at ~1.0 MByte/s. Throughput is measured per CPU core processing autoclaved files. So at least ~46 CPU-days are needed to ingest 3.8 TB dataset + PostgreSQL [may double](https://github.com/ooni/pipeline/issues/140) that estimate.
+- reprocessing **all** the data is slow: fresh data is ingested at ≈1.0 MByte/s. Throughput is measured per CPU core processing autoclaved files. So at least ≈46 CPU-days are needed to ingest 3.8 TB dataset + PostgreSQL [may double](https://github.com/ooni/pipeline/issues/140) that estimate.
 - rewriting **all** feature tables on reprocessing produces unnecessary _PostgreSQL table bloat_. Features are deleted from feature tables on reprocessing and re-inserted back instead of the minimal possible update to avoid mistakes caused by incremental computation. Full-bucket _update_ is equivalent to _delete + insert_ as that's the way for PostgreSQL to implement MVCC.
 - airflow 1.8 scheduler fails to schedule tasks properly when 2'300 DAGs are started at once to reprocess all the buckets. It starts hogging CPU, that negatively affects both reprocessing speed and ingestion of new data.
 
@@ -33,13 +33,22 @@ Identify, if possible, if the blockpage is a _static_ or a _dynamic_ one. Static
 
 Sidenote: having a blockpage at hand is an opportunity to mine blocked URLs showing same blockpage and mine more blockpages, as different ISPs may show different blockpage for the same blocked URL.
 
-Then HIT should be solved to extract a fingerprint for the blockpage. The fingerprint should be added to the set of fingerprints and `openobservatory/pipeline-shovel` should be rolled out before reprocessing of historical data.
+Then _human intelligence task_ should be solved to extract a fingerprint for the blockpage. The fingerprint should be added to the set of fingerprints and `openobservatory/pipeline-shovel` should be rolled out before reprocessing of historical data.
 
-If the blockpage is a static one, there is a fast-path alternative to reprocessing: it's possible to update MetaDB directly without actual reprocessing as SHA256 collision is very unlikely and `body_sha256` may be used as a feature _identifying_ the blockpage server (at the current stage of OONI Methodology development). See feature-based fingerprint case for more on the fast-path.
+If the blockpage is a static one, there is a fast-path alternative to reprocessing: it's possible to update MetaDB directly without actual reprocessing as SHA256 collision is very unlikely and `body_sha256` may be used as a feature _identifying_ the blockpage server (at the current stage of OONI Methodology development). See feature-based fingerprint case for more on the fast-path. Keep in mind that the HTTP Body substring fingerprint is still _derived_ from the body, so avoiding full-dataset reprocessing may lead to false negatives.
 
-In case of dynamic blockpage, there is a possibility to *estimate* the set of affected measurements limiting the number of autoclaved files to reprocess.
+Overall steps needed to mark existing & future measurements are:
 
-TBD: case with -- body_sha256 = '\x833b2fb8887eed1c0d496670148efa8b6a6e65b89f8df42dbd716464e3cf47a6'
+- pause ongoing ingestion and ensure that there are no `meta_pg` TaskInstances running
+- update `fingerprint` table in [the database schema](https://github.com/ooni/pipeline/blob/065cccdfeb531e93a22d2aacc05ec05e990f99ee/af/oometa/) following [an example](https://github.com/ooni/pipeline/blob/065cccdfeb531e93a22d2aacc05ec05e990f99ee/af/oometa/003-fingerprints.install.sql#L31-L62) and [roll it out](https://github.com/ooni/sysadmin/blob/4defab8e92a2e53e2679a17214162ed058089e7f/ansible/deploy-pipeline-ddl.yml). The fingerprints are stored in the schema to generate `fingerprint_no serial`.
+- create a temporary table having `msm_no` of the measurements matching the fingerprint _with confidence_ according to the _derived_ features existing in database (e.g. `select msm_no from http_request where body_sha256 = '\x833b2fb8887eed1c0d496670148efa8b6a6e65b89f8df42dbd716464e3cf47a6'` for static blockpages)
+- insert those `msm_no` together with matching `fingerprint_no` into `http_request_fp` table as if those were actually ingested by `centrifugation.py`
+- update `anomaly` and `confirmed` flags in `measurement` table for the affected measurement according to the logic codified in `calc_measurement_flags()`
+- update `centrifugation.py`: 1) set up-to-date `fingerprint` table checksum in `HttpRequestFPFeeder.__init__()`, 2) bump global `CODE_VER` and `HttpRequestFPFeeder.min_compat_code_ver` (and only it, to avoid rewriting other tables)
+- roll out `openobservatory/pipeline-shovel` and unpause data ingestion
+- reprocess all the previous buckets under GNU Make control
+
+It's possible to try to use `body_simhash` to reprocess _likely-affected_ buckets first to reduce time-to-publication latency, but that's out of the scope of the document.
 
 ## Case: new feature-based fingerprint
 
@@ -51,15 +60,14 @@ E.g. aforementioned [homeline.kg ISP](https://explorer.ooni.torproject.org/measu
 
 This case is almost the same one as the case of a static blockpage: the MetaDB has all the data to follow fast-path updating measurement metadata (`http_request_fp` table, `confirmed` and `anomaly` flags, etc.) with direct DB queries. The downside of fast-path is that it'll lead to duplication of logic between the queries and `centrifugation.py` that may (by mistake) lead to inconsistencies if the logic is not perfectly equivalent.
 
-Overall steps needed to mark existing & future measurements are:
+Overall steps needed to mark existing & future measurements are the same as for HTML blockpage fingerprint with small alterations:
 
-- pause ongoing ingestion and ensure that there are no `meta_pg` TaskInstances running
-- update `fingerprint` table in [the database schema](https://github.com/ooni/pipeline/blob/master/af/oometa/) following [an example](https://github.com/ooni/pipeline/blob/master/af/oometa/003-fingerprints.install.sql#L31-L62) and [roll it out](https://github.com/ooni/sysadmin/blob/master/ansible/deploy-pipeline-ddl.yml). The fingerprints are stored in the schema to generate `fingerprint_no serial`.
+- ...
 - create a temporary table having `msm_no` of the measurements matching the fingerprint _perfectly_ according to features existing in database (e.g. `select msm_no from http_request where headers->>'Location' = 'http://homeline.kg/access/blockpage.html'`, keep in mind that keys of headers are case-sensitive)
-- insert those `msm_no` together with matching `fingerprint_no` into `http_request_fp` table as if those were actually ingested by `centrifugation.py`
-- update `anomaly` and `confirmed` flags in `measurement` table for the affected measurement according to the logic codified in `calc_measurement_flags()`
-- update `fingerprint` table checksum in `HttpRequestFPFeeder.__init__()` in `centrifugation.py` and roll out `openobservatory/pipeline-shovel` (there is no need to bump `CODE_VER` for feature-based fingerprints as we are 100% confident that reprocessing is not needed and ongoing data processing is paused)
-- unpause data ingestion
+- ...
+- update `centrifugation.py`: set up-to-date `fingerprint` table checksum in `HttpRequestFPFeeder.__init__()`. There is no need to bump `CODE_VER` for feature-based fingerprints as we are 100% confident that reprocessing is not needed and ongoing data processing is paused.
+- ...
+- there is no need for reprocessing as there is no possibility for false negative here
 
 _A temporary table_ is not necessary a result of `CREATE TEMPORARY TABLE`, it may also be a query executed on a read-only replica with faster disk drives with the output of the query directed to a local file that becomes `UNLOGGED` table on a master via out-of-band data transfer or via _Foreign Data Wrapper_.
 
@@ -76,6 +84,8 @@ One may want to use [commit adding `vanilla_tor` stats](https://github.com/ooni/
 - `TheFeeder.row()` creates a string that is suitable for sending to the table via `COPY`
 - `TheFeeder.pop()` removes fields from the JSON object those are completely ingested by the feeder and should NOT be considered a part of the _residual_
 - test, deploy, reprocess all (or the affected) buckets under GNU Make control
+
+One may save significant amount of CPU time marking old _autoclaved_ files as already processed by the new version of code bumping their corresponding `code_ver` in the database. It may be useful in a case when a feature has to be extracted **only(!)** from a known subset of reports, so the reports that have no data on the specific feature may be skipped safely. Example is extracting a feature of a "low-volume" test. E.g. `web_connectivity` test takes 99.4% of data volue of 2019Q1, so _any_ other test is a low-volume one. Another example is a extracting a feature that was shipped as a part of some specific `software` version, so `autoclaved` having no records coming from the new software may be manually labeled with a newer `code_ver` and skipped safely.
 
 ## Case: adding new feature to existing table
 
@@ -95,4 +105,14 @@ TBD.
 
 ## GNU Make crutch for Airflow
 
-TBD.
+Airflow has an issue in a scheduler, it starts consuming unreasonable amount of resources if there are thousands of _running_ DAGs. So, reprocessing of ≈2300 daily buckets of OONI data has to be micro-managed. One of the usual Linix tools to execute parallel processes is GNU Make, so, it was takeo for the [`pipeline-reprocess`](https://github.com/ooni/sysadmin/blob/4defab8e92a2e53e2679a17214162ed058089e7f/scripts/pipeline-reprocess) script.
+
+The way to use the script is the following:
+
+- download it to your $HOME at `datacollector.infra.ooni.io` running Airflow
+- edit `PRJ` with a slug representing a reprocessing session
+- choose a way to list buckets-to-reprocess with `TYPEOF_DEPS`
+- edit `$(PRJ)/...-deps` to reflect the desired logic to select buckets to reprocess
+- run `tmux` and `./pipeline-reprocess reprocess` within tmux session
+
+The script will execute TaskInstances via `airflow run` one-by-one within predefined concurrency limits.
