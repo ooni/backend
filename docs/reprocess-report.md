@@ -118,7 +118,7 @@ The way to use the script is the following:
 - download it to your $HOME at `datacollector.infra.ooni.io` running Airflow
 - edit `PRJ` with a slug representing a reprocessing session
 - choose a way to list buckets-to-reprocess with `TYPEOF_DEPS`
-- edit `$(PRJ)/...-deps` to reflect the desired logic to select buckets to reprocess
+- edit `$(PRJ)/...-deps` target in the makefile to reflect the desired logic to select buckets to reprocess
 - run `tmux` and `./pipeline-reprocess reprocess` within tmux session
 
 The script will execute TaskInstances via `airflow run` one-by-one within predefined concurrency limits.
