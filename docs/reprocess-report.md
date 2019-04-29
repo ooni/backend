@@ -8,9 +8,9 @@ Reading [overall pipeline design document](./pipeline-16.10.md) is useful to und
 
 There are a few problems that make reingestion and reprocessing a non-instant and non-trivial process:
 
-- reprocessing **all** the data is slow: fresh data is ingested at ~1.0 MByte/s. Throughput is measured per CPU core processing autoclaved files. So at least ~46 CPU-days are needed to process 3.8 TB dataset + PostgreSQL [may double](https://github.com/ooni/pipeline/issues/140) that estimate.
+- reprocessing **all** the data is slow: fresh data is ingested at ~1.0 MByte/s. Throughput is measured per CPU core processing autoclaved files. So at least ~46 CPU-days are needed to ingest 3.8 TB dataset + PostgreSQL [may double](https://github.com/ooni/pipeline/issues/140) that estimate.
 - rewriting **all** feature tables on reprocessing produces unnecessary _PostgreSQL table bloat_. Features are deleted from feature tables on reprocessing and re-inserted back instead of the minimal possible update to avoid mistakes caused by incremental computation. Full-bucket _update_ is equivalent to _delete + insert_ as that's the way for PostgreSQL to implement MVCC.
-- airflow 1.8 scheduler fails to schedule tasks properly when 2'300 DAGs are started at once to reprocess all the buckets. It starts hogging CPU, that negativly affects both reprocessing speed and ingestion of new data.
+- airflow 1.8 scheduler fails to schedule tasks properly when 2'300 DAGs are started at once to reprocess all the buckets. It starts hogging CPU, that negatively affects both reprocessing speed and ingestion of new data.
 
 There are a few hacks that make reingestion and reprocessing more "instant" in various cases:
 
@@ -20,6 +20,8 @@ There are a few hacks that make reingestion and reprocessing more "instant" in v
 - GNU Make can be used to [run airflow tasks](https://github.com/ooni/sysadmin/blob/8224b4627dd2e16529b98f9907f0fbd280814035/scripts/pipeline-reprocess) with pre-defined concurrency level to limit pressure on Airflow's scheduler.
 - `SimhashCache` fetches subset of `sha256(body)` to `simhash(text(body)), simhash(body)` mapping from the MetaDB before reingestion, that speeds reingestion up from 1.0 MB/s to 4.3 MB/s
 - one-pass ingestion of streamed json input into _separate_ tables is not trivial. It's achieved maintaining [write buffer](https://github.com/ooni/pipeline/blob/1b2688d75a7abc09e446a7d965dd8011f5b5564d/af/shovel/oonipl/pg.py) for each table and flushing the buffer with `COPY` when few megabytes of data are accumulated.
+
+Currently following fingerprints to _"confirm"_ cases of network interference are implemented: HTTP Body substring, HTTP Header prefix, HTTP Header value. NB: HTTP Bodies are _not_ stored in the MetaDB, so those are not feature-based fingerprints.
 
 ## Case: new HTML blockpage fingerprint
 
@@ -37,7 +39,11 @@ If the blockpage is a static one, there is a fast-path alternative to reprocessi
 
 In case of dynamic blockpage, there is a possibility to *estimate* the set of affected measurements limiting the number of autoclaved files to reprocess.
 
+TBD: case with -- body_sha256 = '\x833b2fb8887eed1c0d496670148efa8b6a6e65b89f8df42dbd716464e3cf47a6'
+
 ## Case: new feature-based fingerprint
+
+The goal of special handling of feature-based case is that the case does not depend on voluminous HTTP bodies. So the flags for the dataset can be updated within couple of hours given quite modest computing resources (4 vCPU, 16 GiB RAM, HDD) compared to ≈46 CPU-days needed ingest whole dataset from scratch.
 
 Examples are `Location` redirects and DNS-based redirects to blockpage servers.
 
@@ -45,7 +51,19 @@ E.g. aforementioned [homeline.kg ISP](https://explorer.ooni.torproject.org/measu
 
 This case is almost the same one as the case of a static blockpage: the MetaDB has all the data to follow fast-path updating measurement metadata (`http_request_fp` table, `confirmed` and `anomaly` flags, etc.) with direct DB queries. The downside of fast-path is that it'll lead to duplication of logic between the queries and `centrifugation.py` that may (by mistake) lead to inconsistencies if the logic is not perfectly equivalent.
 
-TBD: given concrete examples, add HOWTO for them
+Overall steps needed to mark existing & future measurements are:
+
+- pause ongoing ingestion and ensure that there are no `meta_pg` TaskInstances running
+- update `fingerprint` table in [the database schema](https://github.com/ooni/pipeline/blob/master/af/oometa/) following [an example](https://github.com/ooni/pipeline/blob/master/af/oometa/003-fingerprints.install.sql#L31-L62) and [roll it out](https://github.com/ooni/sysadmin/blob/master/ansible/deploy-pipeline-ddl.yml). The fingerprints are stored in the schema to generate `fingerprint_no serial`.
+- create a temporary table having `msm_no` of the measurements matching the fingerprint _perfectly_ according to features existing in database (e.g. `select msm_no from http_request where headers->>'Location' = 'http://homeline.kg/access/blockpage.html'`, keep in mind that keys of headers are case-sensitive)
+- insert those `msm_no` together with matching `fingerprint_no` into `http_request_fp` table as if those were actually ingested by `centrifugation.py`
+- update `anomaly` and `confirmed` flags in `measurement` table for the affected measurement according to the logic codified in `calc_measurement_flags()`
+- update `fingerprint` table checksum in `HttpRequestFPFeeder.__init__()` in `centrifugation.py` and roll out `openobservatory/pipeline-shovel` (there is no need to bump `CODE_VER` for feature-based fingerprints as we are 100% confident that reprocessing is not needed and ongoing data processing is paused)
+- unpause data ingestion
+
+_A temporary table_ is not necessary a result of `CREATE TEMPORARY TABLE`, it may also be a query executed on a read-only replica with faster disk drives with the output of the query directed to a local file that becomes `UNLOGGED` table on a master via out-of-band data transfer or via _Foreign Data Wrapper_.
+
+Unfortunately, it's not trivial to give a concrete example of the queries as these examples have to be kept in-sync with the rest of the code and, what's more important, different cardinality of the tables may need different strategies for UPDATE. E.g. [CREATE TABLE + rename](https://github.com/ooni/pipeline/pull/144#issuecomment-483365330) strategy may be order of magnitude more performant than `UPDATE` when the UPDATE touches _many_ rows (it was touching ≈5% of rows in the case).
 
 ## Case: new feature table
 
