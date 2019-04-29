@@ -85,7 +85,7 @@ One may want to use [commit adding `vanilla_tor` stats](https://github.com/ooni/
 - `TheFeeder.pop()` removes fields from the JSON object those are completely ingested by the feeder and should NOT be considered a part of the _residual_
 - test, deploy, reprocess all (or the affected) buckets under GNU Make control
 
-One may save significant amount of CPU time marking old _autoclaved_ files as already processed by the new version of code bumping their corresponding `code_ver` in the database. It may be useful in a case when a feature has to be extracted **only(!)** from a known subset of reports, so the reports that have no data on the specific feature may be skipped safely. Example is extracting a feature of a "low-volume" test. E.g. `web_connectivity` test takes 99.4% of data volue of 2019Q1, so _any_ other test is a low-volume one. Another example is a extracting a feature that was shipped as a part of some specific `software` version, so `autoclaved` having no records coming from the new software may be manually labeled with a newer `code_ver` and skipped safely.
+One may save significant amount of CPU time marking old _autoclaved_ files as already processed by the new version of code bumping their corresponding `code_ver` in the database. It may be useful in a case when a feature has to be extracted **only(!)** from a known subset of reports, so the reports that have no data on the specific feature may be skipped safely. Example is extracting a feature of a "low-volume" test. E.g. `web_connectivity` test takes 99.4% of data volume of 2019Q1, so _any_ other test is a low-volume one. Another example is a extracting a feature that was shipped as a part of some specific `software` version, so `autoclaved` having no records coming from the new software may be manually labeled with a newer `code_ver` and skipped safely.
 
 ## Case: adding new feature to existing table
 
@@ -101,11 +101,15 @@ Let's use [commit adding `body_simhash` extraction](https://github.com/ooni/pipe
 
 ## Marking autoclaved files for reprocessing
 
-TBD.
+The _autoclaved_ files are selected for reingestion and reprocessing based on their `code_ver`. If `autoclaved.code_ver` matches `centrifugation.py:CODE_VER` then the file is skipped altogether (file is not read and decompressed, json is not parsed). If `autoclaved.code_ver` is _compatible_ with `Feeder.min_compat_code_ver` (greater-equal-than) then the corresponding PostgreSQL table is not re-written during a centrifugation pass. So it can be used to reduce amount of burned CPU and database disk IO.
+
+_autoclaved_ file may be marked with `code_ver` equal to 0 (`CODE_VER_REPROCESS`) to force reprocessing of all the feature-tables for this file. There should be no reasons for that besides, maybe, clean-up after a manual database modifications.
+
+Reingestion is different from reprocessing as it may handle changes to autoclaved files themselves and update `autoclaved`, `report`, `measurement` tables accordingly. The easiest way to force reingestion manually is to set `autoclaved.file_sha1` to all-zeros of something like `digest('', 'sha1')`. One of the possible reasons for that is [report deletion](./delete-report.md).
 
 ## GNU Make crutch for Airflow
 
-Airflow has an issue in a scheduler, it starts consuming unreasonable amount of resources if there are thousands of _running_ DAGs. So, reprocessing of ≈2300 daily buckets of OONI data has to be micro-managed. One of the usual Linix tools to execute parallel processes is GNU Make, so, it was takeo for the [`pipeline-reprocess`](https://github.com/ooni/sysadmin/blob/4defab8e92a2e53e2679a17214162ed058089e7f/scripts/pipeline-reprocess) script.
+Airflow has an issue in a scheduler, it starts consuming unreasonable amount of resources if there are thousands of _running_ DAGs. So, reprocessing of ≈2300 daily buckets of OONI data has to be micro-managed. One of the usual Linux tools to execute parallel processes is GNU Make, so, it was taken for the [`pipeline-reprocess`](https://github.com/ooni/sysadmin/blob/4defab8e92a2e53e2679a17214162ed058089e7f/scripts/pipeline-reprocess) script.
 
 The way to use the script is the following:
 
