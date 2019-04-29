@@ -1,6 +1,6 @@
 This document describes how to reprocess historical data ingesting new features while minimizing resources waste and negative effect on the on-going data processing.
 
-This document is valid as of March 2019.
+This document is valid as of May 2019.
 
 Reading [overall pipeline design document](./pipeline-16.10.md) is useful to understand the following text.
 
