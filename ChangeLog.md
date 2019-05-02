@@ -1,3 +1,11 @@
+# ooni-api 1.1.0 [2019-05-02]
+
+Added:
+
+* New API endpoints for OONI Explorer: https://github.com/ooni/api/pull/77
+
+* Sentry logging of exceptions
+
 # ooni-api 1.0.6 [2019-01-14]
 
 Added:
