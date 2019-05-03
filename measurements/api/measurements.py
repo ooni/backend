@@ -103,7 +103,7 @@ def list_files(
     if since_index:
         q = q.filter(Report.report_no > report_no)
 
-    q = q.order_by('{} {}'.format(order_by, order))
+    q = q.order_by(text('{} {}'.format(order_by, order)))
     count = q.count()
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
