@@ -1,5 +1,7 @@
 from .config import PROMETHEUS_PORT
 
+# This config is taken from:
+# https://github.com/rycus86/prometheus_flask_exporter#multiprocess-applications
 from prometheus_flask_exporter.multiprocess import GunicornPrometheusMetrics
 
 def when_ready(server):
