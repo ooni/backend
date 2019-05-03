@@ -9,4 +9,4 @@ from prometheus_flask_exporter.multiprocess import GunicornPrometheusMetrics
 application = create_app()
 application.wsgi_app = ProxyFix(application.wsgi_app)
 
-metrics = GunicornPrometheusMetrics(application)
+metrics = GunicornPrometheusMetrics(application, group_by='endpoint')
