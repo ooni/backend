@@ -6,7 +6,7 @@ from measurements.app import create_app
 
 from prometheus_flask_exporter.multiprocess import GunicornPrometheusMetrics
 
-app = create_app()
-app.wsgi_app = ProxyFix(app.wsgi_app)
+application = create_app()
+application.wsgi_app = ProxyFix(application.wsgi_app)
 
-metrics = GunicornPrometheusMetrics(app)
+metrics = GunicornPrometheusMetrics(application)
