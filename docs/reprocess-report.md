@@ -126,7 +126,7 @@ Airflow has an issue in a scheduler, it starts consuming unreasonable amount of 
 The way to use the script is the following:
 
 - download it to your $HOME at `datacollector.infra.ooni.io` running Airflow
-- edit `PRJ` with a slug representing a reprocessing session
+- edit `PRJ` with a slug representing a reprocessing session (ex: https://github.com/ooni/sysadmin/commit/bf9c967da7b2e2cc0c5efca0351cdf679d861b2f#diff-0bd5c245bef1335609715572487a3117)
 - choose a way to list buckets-to-reprocess with `TYPEOF_DEPS`
 - edit `$(PRJ)/...-deps` target in the makefile to reflect the desired logic to select buckets to reprocess
 - run `tmux` and `./pipeline-reprocess reprocess` within tmux session
