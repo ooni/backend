@@ -89,6 +89,16 @@ One may want to use [commit adding `vanilla_tor` stats](https://github.com/ooni/
 
 One may save significant amount of CPU time marking old _autoclaved_ files as already processed by the new version of code bumping their corresponding `code_ver` in the database. It may be useful in a case when a feature has to be extracted **only(!)** from a known subset of reports, so the reports that have no data on the specific feature may be skipped safely. Example is extracting a feature of a "low-volume" test. E.g. `web_connectivity` test takes 99.4% of data volume of 2019Q1, so _any_ other test is a low-volume one. Another example is a extracting a feature that was shipped as a part of some specific `software` version, so `autoclaved` having no records coming from the new software may be manually labeled with a newer `code_ver` and skipped safely.
 
+For example if you were to need to reprocess only measurements for `"test_name": "telegram"`, you could run the following query on the db:
+
+```
+UPDATE autoclaved SET code_ver = 6 WHERE code_ver = 5 AND autoclaved_no IN (
+    SELECT autoclaved_no FROM autoclaved WHERE autoclaved_no NOT IN (
+        SELECT DISTINCT autoclaved_no FROM report WHERE test_name = 'telegram'));
+```
+
+Assuming the current code_ver is 5 and the next code_ver is going to be 6, as per https://github.com/ooni/pipeline/pull/177.
+
 ## Case: adding new feature to existing table
 
 Let's use [commit adding `body_simhash` extraction](https://github.com/ooni/pipeline/commit/8e14b20ec368572c0bb831fb958bcc70eb9108a6) as an example. Things to do are the following:
