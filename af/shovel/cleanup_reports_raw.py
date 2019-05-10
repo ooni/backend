@@ -1,5 +1,9 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
+"""
+This script is used to delete raw reports in uncompressed form to ensure they
+are stored compressed as canned .tar.gz files.
+"""
 
 import argparse
 import gzip

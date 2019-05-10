@@ -1,4 +1,10 @@
 #!/usr/bin/env python2.7
+"""
+This is used to populate the repeated_report table with duplicate report_id.
+
+It's not used regularly, but it should be run when a report with a duplicate
+report_id is detected or measurements with duplicate measurement_id.
+"""
 
 import argparse
 import functools

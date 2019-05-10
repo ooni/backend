@@ -2,7 +2,7 @@
 
 version: 3.0.0
 
-> If OONI were a car, the OONI Pipeline would be it's engine
+> If OONI were a car, the OONI Pipeline would be its engine
 
 Pipeline is responsible for aggregating data from network measurement clients
 (such as OONI Probe) and analyze it to identify network anomalies.
@@ -118,6 +118,12 @@ It's important to keep in mind that every task inside of the Airflow DAG needs
 to be optimized for big units of computation, you should avoid having small
 tasks, otherwise you incur in a lot of scheduling/orchestration overhead.
 
+To run the pipeline tests you should run:
+
+```
+python tests/test_integration.py
+```
+
 ### Modifying the centrifugation stage
 
 Most of the time you will probably care to edit the **centrifugation** stage
@@ -207,14 +213,9 @@ COMMIT;
 
 2. Push a new docker image
 
-You should then build a new docker image by bumping the version number inside of
-`af/shovel/build`.
+You should then build a new docker image by running `ooni-sysadmin/scripts/docker-build`.
 
-The image should then be pushed to dockerhub by running:
-
-```
-docker push openobservatory/shovel:latest && docker push openobservatory/shovel:0.0.NN
-```
+This will build and upload an image tagged for example: `openobservatory/pipeline-shovel:20190415-5fac5cf9`.
 
 3. Redeploy an update
 

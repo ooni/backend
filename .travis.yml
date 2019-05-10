@@ -1,0 +1,17 @@
+sudo: required
+language: python
+cache:
+  directories:
+  - testdata/
+services:
+  - docker
+install:
+  - pip install -r tests/requirements.txt
+  - pip install -r af/shovel/requirements.txt
+script:
+  # XXX these are failing due to not working with python3
+  #- python af/shovel/test_autoclaving.py
+  #- python af/shovel/test_canning.py
+  # XXX currently disabled as it requires a running DB
+  #- python af/shovel/test_centrifugation.py
+  - python tests/test_integration.py

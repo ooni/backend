@@ -1,10 +1,13 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
+import os
+# This is needed to make daily_workflow work
+os.environ['TZ'] = 'UTC'
+
 import gzip
 import functools
 import json
-import os
 import random
 import shutil
 import string
