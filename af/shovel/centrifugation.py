@@ -1519,8 +1519,9 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
     min_compat_code_ver = 3
     data_table = sink_table = 'http_request_fp'
     columns = ('msm_no', 'fingerprint_no')
-    # It should probably become part of `http_request` and `http_control`
-    # tables, but I'm too lazy to alter 40 Gb of tables right now...
+    # It may become part of `http_request` and `http_control` tables, but it also
+    # brings nice notion of clear separation between basic data features (headers,
+    # body hashsums and such) and derived features (matching fingerprints).
     def __init__(self, pgconn):
         # NB: no super(...).__init__() call!
         self.header_prefix = {} # header -> [(prefix, no)]
