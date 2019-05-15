@@ -24,6 +24,8 @@ AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
 CENTRIFUGATION_BASE_URL = os.environ.get("CENTRIFUGATION_BASE_URL",
                                 "http://datacollector.infra.ooni.io/ooni-public/centrifugation/")
 
+PROMETHEUS_PORT = int(os.environ.get("PROMETHEUS_PORT", "8080"))
+
 # S3 related configuration
 S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", None)
 S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", None)

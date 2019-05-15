@@ -145,10 +145,9 @@ def api_private_blockpages():
     ).join(Measurement, Measurement.report_no == Report.report_no) \
      .join(Input, Measurement.input_no == Input.input_no) \
      .filter(Measurement.confirmed == True) \
-     .filter(or_(
-        Report.test_name == 'http_requests',
+     .filter(
         Report.test_name == 'web_connectivity'
-      )) \
+      ) \
      .filter(Report.probe_cc == probe_cc)
 
     results = []
@@ -180,10 +179,9 @@ def api_private_website_measurements():
     ).join(Measurement, Measurement.report_no == Report.report_no) \
      .join(Input, Measurement.input_no == Input.input_no) \
      .filter(Measurement.confirmed == True) \
-     .filter(or_(
-        Report.test_name == 'http_requests',
+     .filter(
         Report.test_name == 'web_connectivity'
-      )) \
+      ) \
      .filter(Input.input.contains(input_))
 
     results = []
@@ -207,10 +205,9 @@ def api_private_blockpage_detected():
         distinct(Report.probe_cc).label('probe_cc'),
     ).join(Measurement, Measurement.report_no == Report.report_no) \
      .filter(Measurement.confirmed == True) \
-     .filter(or_(
-        Report.test_name == 'http_requests',
+     .filter(
         Report.test_name == 'web_connectivity'
-      ))
+      )
 
     results = []
     for row in q:
