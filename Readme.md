@@ -20,11 +20,10 @@ you only need to run the second step below (`export DATABASE_URL`) in case you w
 pip install -r requirements.txt # Install all the python dependencies
 export DATABASE_URL=postgresql://my_db_user:my_db_password@localhost:5432/ooni_measurements
 make create-tables # Create the database and tables
+npm install
+node_modules/gulp/bin/gulp.js dist
 make serve # Run the server
 ```
-
-The last step will start the docker containers needed to run the application locally,
- building also all the required web assets.
 
 ### Running the tests
 
