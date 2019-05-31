@@ -1686,7 +1686,42 @@ UPDATE
 SET count = EXCLUDED.count;''', [bucket])
 
         # See:  016-ooexpl_wc_confirmed.install.sql
-        c.execute('REFRESH MATERIALIZED VIEW ooexpl_wc_confirmed;')
+        update_ooexpl_wc_confirmed = '''
+INSERT INTO ooexpl_wc_confirmed
+SELECT
+COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) as confirmed_count,
+COUNT(*) as msm_count,
+date_trunc('day', test_start_time) as test_day,
+probe_cc,
+probe_asn
+FROM (
+	SELECT
+	DISTINCT input as input,
+	test_start_time,
+	probe_cc,
+	probe_asn,
+	bool_or(confirmed) as confirmed
+	FROM measurement
+	JOIN input ON input.input_no = measurement.input_no
+	JOIN report ON report.report_no = measurement.report_no
+	WHERE test_start_time >= current_date - interval '2 day'
+	AND test_start_time < current_date - interval '1 day'
+	AND test_name = 'web_connectivity'
+	GROUP BY 1,2,3,4
+) as wc
+GROUP BY 3,4,5
+ON CONFLICT DO NOTHING;'''
+        # Insert one day worth of rows.
+        # Duplicate values (if any) are not updated.
+        c.execute(update_ooexpl_wc_confirmed)
+
+        roll_ooexpl_wc_confirmed = '''
+DELETE FROM ooexpl_wc_confirmed
+WHERE test_day < (current_date - interval '20 day');
+'''
+        c.execute(roll_ooexpl_wc_confirmed)
+        # TODO: wrap c.execute to generate metrics: changed rows and run time
+
 
 def meta_pg(in_root, bucket, postgres):
     print "meta_pg: {} {}".format(in_root, bucket)
