@@ -1689,9 +1689,9 @@ SET count = EXCLUDED.count;''', [bucket])
     """
 CREATE MATERIALIZED VIEW ooexpl_wc_confirmed AS
 SELECT
-COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0),
-COUNT(*),
-date_trunc('day', test_start_time),
+COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) as confirmed_count,
+COUNT(*) as msm_count,
+date_trunc('day', test_start_time) as test_day,
 probe_cc,
 probe_asn
 FROM (
