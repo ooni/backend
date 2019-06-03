@@ -1693,33 +1693,39 @@ COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) as confirmed_coun
 COUNT(*) as msm_count,
 date_trunc('day', test_start_time) as test_day,
 probe_cc,
-probe_asn
+probe_asn,
+bucket_date
 FROM (
 	SELECT
 	DISTINCT input as input,
 	test_start_time,
 	probe_cc,
 	probe_asn,
+        bucket_date,
 	bool_or(confirmed) as confirmed
 	FROM measurement
 	JOIN input ON input.input_no = measurement.input_no
 	JOIN report ON report.report_no = measurement.report_no
-	WHERE test_start_time >= current_date - interval '2 day'
-	AND test_start_time < current_date - interval '1 day'
+	WHERE bucket_date = %s
 	AND test_name = 'web_connectivity'
 	GROUP BY 1,2,3,4
 ) as wc
-GROUP BY 3,4,5
-ON CONFLICT DO NOTHING;'''
+GROUP BY 3,4,5,6
+ON CONFLICT (test_day, probe_cc, probe_asn, bucket_date) DO
+UPDATE
+SET msm_count = EXCLUDE.msm_count,
+    confirmed_count = EXCLUDE.confirmed_count
+;'''
         # Insert one day worth of rows.
         # Duplicate values (if any) are not updated.
-        c.execute(update_ooexpl_wc_confirmed)
+        c.execute(update_ooexpl_wc_confirmed, [bucket])
 
         roll_ooexpl_wc_confirmed = '''
 DELETE FROM ooexpl_wc_confirmed
 WHERE test_day < (current_date - interval '20 day');
 '''
-        c.execute(roll_ooexpl_wc_confirmed)
+        # XXX currently disabled to populate more than 30 days worth of metrics
+        # c.execute(roll_ooexpl_wc_confirmed)
         # TODO: wrap c.execute to generate metrics: changed rows and run time
 
 
