@@ -1691,30 +1691,31 @@ INSERT INTO ooexpl_wc_confirmed
 SELECT
 COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) as confirmed_count,
 COUNT(*) as msm_count,
-date_trunc('day', test_start_time) as test_day,
+test_day,
+bucket_date,
 probe_cc,
-probe_asn,
-bucket_date
+probe_asn
 FROM (
 	SELECT
 	DISTINCT input as input,
-	test_start_time,
+    date_trunc('day', test_start_time) as test_day,
 	probe_cc,
 	probe_asn,
-        bucket_date,
+    bucket_date,
 	bool_or(confirmed) as confirmed
 	FROM measurement
 	JOIN input ON input.input_no = measurement.input_no
 	JOIN report ON report.report_no = measurement.report_no
+    JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 	WHERE bucket_date = %s
 	AND test_name = 'web_connectivity'
-	GROUP BY 1,2,3,4
+	GROUP BY input, test_start_time, probe_cc, probe_asn, bucket_date
 ) as wc
-GROUP BY 3,4,5,6
+GROUP BY test_day, probe_cc, probe_asn, bucket_date
 ON CONFLICT (test_day, probe_cc, probe_asn, bucket_date) DO
 UPDATE
-SET msm_count = EXCLUDE.msm_count,
-    confirmed_count = EXCLUDE.confirmed_count
+SET msm_count = EXCLUDED.msm_count,
+    confirmed_count = EXCLUDED.confirmed_count
 ;'''
         # Insert one day worth of rows.
         # Duplicate values (if any) are not updated.

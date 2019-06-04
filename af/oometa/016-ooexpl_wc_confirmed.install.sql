@@ -10,27 +10,28 @@ INSERT INTO ooexpl_wc_confirmed
 SELECT
 COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) as confirmed_count,
 COUNT(*) as msm_count,
-date_trunc('day', test_start_time) as test_day,
+test_day,
+bucket_date,
 probe_cc,
-probe_asn,
-bucket_date
+probe_asn
 FROM (
 	SELECT
 	DISTINCT input as input,
-	test_start_time,
+  date_trunc('day', test_start_time) as test_day,
 	probe_cc,
 	probe_asn,
-    bucket_date,
+  bucket_date,
 	bool_or(confirmed) as confirmed
 	FROM measurement
 	JOIN input ON input.input_no = measurement.input_no
 	JOIN report ON report.report_no = measurement.report_no
+  JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
 	WHERE test_start_time < current_date - interval '1 day'
 	AND test_start_time > current_date - interval '31 day'
 	AND test_name = 'web_connectivity'
-	GROUP BY 1,2,3,4
+	GROUP BY input, test_start_time, probe_cc, probe_asn, bucket_date
 ) as wc
-GROUP BY 3,4,5,6;
+GROUP BY test_day, probe_cc, probe_asn, bucket_date;
 */
 
 CREATE TABLE ooexpl_wc_confirmed (
@@ -40,7 +41,7 @@ CREATE TABLE ooexpl_wc_confirmed (
     bucket_date DATE,
     probe_cc CHARACTER(2) NOT NULL,
     probe_asn INTEGER NOT NULL,
-    CONSTRAINT unique_day_cc_asn UNIQUE (test_day, probe_cc, probe_asn)
+    CONSTRAINT unique_day_bucket_cc_asn UNIQUE (test_day, bucket_date, probe_cc, probe_asn)
   ) ;
 
 
