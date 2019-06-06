@@ -1,3 +1,9 @@
+# ooni-api 1.1.1 [2019-05-xx]
+
+Changed:
+
+* Use a view table for the `/blockpage_count` endpoint
+
 # ooni-api 1.1.0 [2019-05-02]
 
 Added:
