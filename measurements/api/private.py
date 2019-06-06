@@ -226,33 +226,17 @@ def api_private_blockpage_count():
     if probe_cc is None:
         raise Exception('err')
 
-    s = sql.text("""SELECT
-COALESCE(SUM(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0),
-COUNT(*),
-test_day
-FROM (
-	SELECT
-	DISTINCT input as input,
-	date_trunc('day', test_start_time) as test_day,
-	bool_or(confirmed) as confirmed
-	FROM measurement
-	JOIN input ON input.input_no = measurement.input_no
-	JOIN report ON report.report_no = measurement.report_no
-	WHERE test_start_time >= current_date - interval '2 months'
-	AND test_start_time < current_date - interval '1 day'
-	AND probe_cc =  :probe_cc
-	AND test_name = 'web_connectivity'
-	GROUP BY 1,2
-) as wc
-GROUP BY 3;""")
-
+    s = sql.text("""SELECT SUM(confirmed_count), SUM(msm_count), test_day
+    FROM ooexpl_wc_confirmed
+    WHERE probe_cc =  :probe_cc
+    ;""")
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
-    for confirmed_count, total_count, test_day in q:
+    for confirmed_count, msm_count, test_day in q:
         results.append({
             'test_start_time': test_day,
             'block_count': int(confirmed_count),
-            'total_count': int(total_count)
+            'total_count': int(msm_count)
         })
 
     return jsonify({
