@@ -1,4 +1,4 @@
-# ooni-api 1.1.1 [2019-05-xx]
+# ooni-api 1.1.1 [2019-06-06]
 
 Changed:
 
