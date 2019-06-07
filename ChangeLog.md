@@ -1,3 +1,8 @@
+# ooni-api 1.1.2 [2019-06-07]
+Fixes:
+
+* Bug in `/blockpage_count` and ordering
+
 # ooni-api 1.1.1 [2019-06-06]
 
 Changed:
