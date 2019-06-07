@@ -224,11 +224,13 @@ def api_private_blockpage_detected():
 def api_private_blockpage_count():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None:
-        raise Exception('err')
+        raise Exception('missing probe_cc')
 
     s = sql.text("""SELECT SUM(confirmed_count), SUM(msm_count), test_day
     FROM ooexpl_wc_confirmed
     WHERE probe_cc =  :probe_cc
+    GROUP BY test_day
+    ORDER BY test_day
     ;""")
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc})
