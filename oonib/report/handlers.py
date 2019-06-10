@@ -217,7 +217,7 @@ class ReportHandler(OONIBHandler):
         self.helpers = config.helpers
 
 class UpdateReportMixin(object):
-    def updateReport(self, report_id, parsed_request):
+    def doUpdateReport(self, report_id, parsed_request):
 
         log.debug("Got this request %s" % parsed_request)
         try:
@@ -245,7 +245,10 @@ class UpdateReportMixin(object):
 
         report_metadata_path.touch()
 
-        self.write({'status': 'success'})
+        return {'status': 'success'}
+
+    def updateReport(self, report_id, parsed_request):
+        self.write(self.doUpdateReport(report_id, parsed_request))
 
 
 class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
@@ -306,9 +309,10 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
         """
         # Note: the request is being validated inside of parseNewReportRequest.
         report_data = parseNewReportRequest(self.request.body)
-
         log.debug("Parsed this data %s" % report_data)
+        self.write(self.createReport(report_data))
 
+    def createReport(self, report_data):
         self.testName = str(report_data['test_name'])
         self.testVersion = str(report_data['test_version'])
 
@@ -336,6 +340,8 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
         elif report_data['format'] == 'yaml' and 'content' in report_data:
             header = yaml.safe_load(report_data['content'])
             data = "---\n" + yaml.dump(validateHeader(header)) + "...\n"
+        elif report_data['format'] == 'json' and 'content' in report_data:
+            data = report_data['content']
 
         report_id = otime.timestamp() + '_' \
             + report_data.get('probe_asn', 'AS0') + '_' \
@@ -372,7 +378,7 @@ class NewReportHandlerFile(ReportHandler, UpdateReportMixin):
             with report_path.open('w') as f:
                 f.write(data)
 
-        self.write(response)
+        return response
 
     def put(self):
         """
@@ -401,6 +407,37 @@ class CloseReportHandlerFile(ReportHandler):
 
     def post(self, report_id):
         closeReport(report_id)
+
+
+class NewMeasurementHandlerFile(NewReportHandlerFile):
+    """ Implements the /measurement endpoint.
+
+        See https://github.com/ooni/spec/blob/master/backends/bk-003-collector.md#34-submitting-single-measurements-using-a-single-api-call """
+
+    def post(self):
+        measurement = json.loads(self.request.body)
+        reportID = self.createReport({
+            'software_name': str(measurement['software_name']),
+            'software_version': str(measurement['software_version']),
+            'probe_asn': str(measurement['probe_asn']),
+            'probe_cc': str(measurement['probe_cc']),
+            'test_name': str(measurement['test_name']),
+            'test_version': str(measurement['test_version']),
+            'input_hashes': measurement.get('input_hashes', []),
+            'test_start_time': str(measurement['test_start_time']),
+            'data_format_version': str(
+                measurement.get('data_format_version', '0.2.0')
+            ),
+            'format': 'json',
+            'content': self.request.body,
+        })['report_id']
+        closeReport(reportID)
+        # TODO(bassosimone): the specification says that we should also
+        # return a measurement ID. Yet, it's not possible to add this
+        # functionality in here easily IMHO. So, should I also change the
+        # spec to say "SHOULD return a measurement ID"?
+        self.write({'report_id': reportID})
+
 
 class PCAPReportHandler(ReportHandler):
 
