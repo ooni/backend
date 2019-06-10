@@ -1,8 +1,8 @@
 oonibackend: backend infrastructure for ooniprobe
 =================================================
 
-.. image:: https://travis-ci.org/TheTorProject/ooni-backend.png?branch=master
-    :target: https://travis-ci.org/TheTorProject/ooni-backend
+.. image:: https://travis-ci.org/ooni/backend-legacy.png?branch=master
+    :target: https://travis-ci.org/ooni/backend-legacy
 
 .. image:: https://coveralls.io/repos/TheTorProject/ooni-backend/badge.png?branch=master
     :target: https://coveralls.io/r/TheTorProject/ooni-backend
