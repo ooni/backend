@@ -87,6 +87,18 @@ collector:
       - {address: 'https://a.web-connectivity.th.ooni.io:4442', type: https}
       - {address: 'https://d2vt18apel48hw.cloudfront.net', front: a0.awsstatic.com,
         type: cloudfront}
+  httpo://ihiderha53f36l00.onion:
+    collector-alternate:
+    - {address: 'https://a.collector.ooni.io:4441', type: https}
+    - {address: 'https://das0y2z2ribx3.cloudfront.net', front: a0.awsstatic.com, type: cloudfront}
+    test-helper: {dns: '213.138.109.232:57004', http-return-json-headers: 'http://38.107.216.10:80',
+      ssl: 'https://213.138.109.232', tcp-echo: 213.138.109.232, traceroute: 213.138.109.232,
+      web-connectivity: 'httpo://7jne2rpg5lsaqs6b.onion'}
+    test-helper-alternate:
+      web-connectivity:
+      - {address: 'https://a.web-connectivity.th.ooni.io:4442', type: https}
+      - {address: 'https://d2vt18apel48hw.cloudfront.net', front: a0.awsstatic.com,
+        type: cloudfront}
 """
 
 reports_dir = 'data/reports'
@@ -603,6 +615,9 @@ class TestProductionTests(BaseTestBouncer):
             "address": "https://das0y2z2ribx3.cloudfront.net",
             "front": "a0.awsstatic.com",
             "type": "cloudfront"
+        }, {
+            "address": "httpo://ihiderha53f36l00.onion",
+            "type": "onion",
         }])
 
     @defer.inlineCallbacks
