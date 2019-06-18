@@ -204,7 +204,7 @@ class Bouncer(object):
                 r = self.format_alternate_address(alt)
                 if r:
                     results.append(r)
-        return results
+        return self.remove_duplicates_list(results)
 
     def formatTestHelpersWithoutPolicy(self):
         ''' Formats the test helpers without policy for the new
@@ -230,7 +230,7 @@ class Bouncer(object):
                         r = self.format_alternate_address(e)
                         if r:
                             results[k].append(r)
-        return results
+        return self.remove_duplicate_dict_values(results)
 
     @staticmethod
     def format_alternate_address(entry):
@@ -244,6 +244,24 @@ class Bouncer(object):
         if not res['front']:
             del res['front']  # make sure we do not emit a None optional field
         return res
+
+    @staticmethod
+    def remove_duplicates_list(alist):
+        # Implementation note: dictionaries are non-hashable in python
+        # so we remove duplicates using a slow approach
+        #
+        # See https://stackoverflow.com/a/7961390/4354461
+        blist = []
+        for elem in alist:
+            if elem in blist:
+                continue
+            blist.append(elem)
+        return blist
+
+    def remove_duplicate_dict_values(self, adict):
+        for key in adict.keys():
+            adict[key] = self.remove_duplicates_list(adict[key])
+        return adict
 
 
 class APIv1Collectors(OONIBHandler):
