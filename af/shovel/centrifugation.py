@@ -32,6 +32,7 @@ from oonipl.tor_log import parse_tor_log
 from oonipl.cli import isomidnight, dirname
 from oonipl.pg import PGCopyFrom, pg_quote, pg_binquote, pg_uniquote
 from oonipl.sim import sim_shi4_mm3_layout, sim_shi4_mm3_text
+from oonipl.utils import dclass
 
 # It does NOT take into account metadata tables right now:
 # - autoclaved: it's not obvious if anything can be updated there
@@ -1912,16 +1913,22 @@ class HttpRequestFeeder(BaseHttpFeeder):
     )
 
     def row(self, msm_no, datum):
-        ret = ""
+        if datum["test_name"] not in ("web_connectivity", "http_requests"):
+            return ""
+
         if datum["test_name"] == "web_connectivity":
+            ret = ""
             for r in datum["test_keys"]["requests"]:
                 # ooniprobe-android does NOT set `tor` dict, it's also not set in case of DNS failure
                 assert "tor" not in r["request"] or not r["request"]["tor"]["is_tor"]
                 ret += self._row(msm_no, r)
-        elif datum["test_name"] == "http_requests":
-            for r in datum["test_keys"]["requests"]:
-                if not r["request"]["tor"]["is_tor"]:
-                    ret += self._row(msm_no, r)
+            return ret
+
+        # datum['test_name'] is 'http_requests'
+        ret = ""
+        for r in datum["test_keys"]["requests"]:
+            if not r["request"]["tor"]["is_tor"]:
+                ret += self._row(msm_no, r)
         return ret
 
     def _row(self, msm_no, r):
@@ -1981,68 +1988,117 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
     # brings nice notion of clear separation between basic data features (headers,
     # body hashsums and such) and derived features (matching fingerprints).
     def __init__(self, pgconn):
+        """Initializes self._fps_by_cc
+        """
         # NB: no super(...).__init__() call!
-        self.header_prefix = {}  # header -> [(prefix, no)]
-        self.header_value = {}  # header -> {value: no}
-        self.body_substr = []  # [(value, no)]
+        self._fps_by_cc = {}
         # These data structures are not fancy at all, one may want to say that
         # something like Aho-Corasick search should be used to check bodies,
         # but pyahocorasick==1.1.4 that claims to be quite efficient works worse
         # than naive substring search loop for <=50 body_substr fingerprints.
         with pgconn.cursor() as c:
-            c.execute(
-                """
-                select md5(
-                    md5(array_agg(fingerprint_no    order by fingerprint_no)::text) ||
-                    md5(array_agg(origin_cc         order by fingerprint_no)::text) ||
-                    md5(array_agg(body_substr       order by fingerprint_no)::text) ||
-                    md5(array_agg(header            order by fingerprint_no)::text) ||
-                    md5(array_agg(header_prefix     order by fingerprint_no)::text) ||
-                    md5(array_agg(header_value      order by fingerprint_no)::text) ||
-                    ''
-                ) from fingerprint
-            """
-            )
-            assert (
-                "63b78da421413ef8ae0d2f1555963e26" == next(c)[0]
-            ), "fingerprint table does not match CODE_VER={}".format(CODE_VER)
-            c.execute(
-                "SELECT fingerprint_no, body_substr, header, header_prefix, header_value FROM fingerprint"
-            )
-            for fingerprint_no, body_substr, header, header_prefix, header_value in c:
-                if body_substr is not None:
-                    self.body_substr.append((body_substr, fingerprint_no))
-                elif header_prefix is not None:
-                    self.header_prefix.setdefault(header.lower(), []).append(
-                        (header_prefix, fingerprint_no)
-                    )
-                elif header_value is not None:
-                    self.header_value.setdefault(header.lower(), {})[
-                        header_value
-                    ] = fingerprint_no
+            # Disabled to allow fingerprint addition
+            # c.execute('''
+            #     select md5(
+            #         md5(array_agg(fingerprint_no    order by fingerprint_no)::text) ||
+            #         md5(array_agg(origin_cc         order by fingerprint_no)::text) ||
+            #         md5(array_agg(body_substr       order by fingerprint_no)::text) ||
+            #         md5(array_agg(header            order by fingerprint_no)::text) ||
+            #         md5(array_agg(header_prefix     order by fingerprint_no)::text) ||
+            #         md5(array_agg(header_value      order by fingerprint_no)::text) ||
+            #         ''
+            #     ) from fingerprint
+            # ''')
+            # assert '63b78da421413ef8ae0d2f1555963e26' == next(c)[0], 'fingerprint table does not match CODE_VER={}'.format(CODE_VER)
 
-    def _row(self, msm_no, r):
-        ret = ""
+            # Used for global matching, see _row(...)
+            self._fps_by_cc["ZZ"] = dclass(
+                body_substr=[],  # [(value, no)]
+                header_prefix={},  # header -> [(prefix, no)]
+                header_value={},  # header -> {value: no}
+            )
+
+            c.execute(
+                "SELECT fingerprint_no, origin_cc, body_substr, header, header_prefix, header_value FROM fingerprint"
+            )
+            for (
+                fingerprint_no,
+                cc,
+                body_substr,
+                header,
+                header_prefix,
+                header_value,
+            ) in c:
+                fps = self._fps_by_cc.setdefault(
+                    cc,
+                    dclass(
+                        body_substr=[],  # [(value, no)]
+                        header_prefix={},  # header -> [(prefix, no)]
+                        header_value={},  # header -> {value: no}
+                    ),
+                )
+                if body_substr is not None:
+                    fps.body_substr.append((body_substr, fingerprint_no))
+
+                elif header_prefix is not None:
+                    p = fps.header_prefix.setdefault(header.lower(), [])
+                    p.append((header_prefix, fingerprint_no))
+
+                elif header_value is not None:
+                    v = fps.header_value.setdefault(header.lower(), {})
+                    v[header_value] = fingerprint_no
+
+    def _row(self, msm_no, r, cc):
+        matchers = [self._fps_by_cc["ZZ"]]
+        if cc != "ZZ" and cc in self._fps_by_cc:
+            matchers.append(self._fps_by_cc["cc"])
+
         response = r["response"]
         body = httpt_body(response)
-        if body is not None:
-            for body_substr, fingerprint_no in self.body_substr:
-                if body_substr in body:
-                    ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
-        headers = {
-            h.lower(): value
-            for h, value in ((response or {}).get("headers") or {}).iteritems()
-        }
-        for h, header_value in self.header_value.iteritems():
-            fingerprint_no = header_value.get(headers.get(h))
-            if fingerprint_no is not None:
-                ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
-        for h in self.header_prefix:
-            if h in headers:
-                value = headers[h]
-                for header_prefix, fingerprint_no in self.header_prefix[h]:
-                    if value.startswith(header_prefix):
+        headers = (response or {}).get("headers") or {}
+        headers = {h.lower(): value for h, value in headers.iteritems()}
+
+        ret = ""
+        for fps in matchers:
+            if body is not None:
+                for body_substr, fingerprint_no in fps.body_substr:
+                    if body_substr in body:
                         ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
+
+            for h, header_value in fps.header_value.iteritems():
+                fingerprint_no = header_value.get(headers.get(h))
+                if fingerprint_no is not None:
+                    ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
+
+            for h in fps.header_prefix:
+                if h in headers:
+                    value = headers[h]
+                    for header_prefix, fingerprint_no in fps.header_prefix[h]:
+                        if value.startswith(header_prefix):
+                            ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
+
+        return ret
+
+    def row(self, msm_no, datum):
+        # Filter requests against fingerprints in the same country
+        # and also fingerprints with origin_cc 'ZZ'.
+        if datum["test_name"] not in ("web_connectivity", "http_requests"):
+            return ""
+
+        cc = datum["probe_cc"]
+        if datum["test_name"] == "web_connectivity":
+            ret = ""
+            for r in datum["test_keys"]["requests"]:
+                # ooniprobe-android does NOT set `tor` dict, it's also not set in case of DNS failure
+                assert "tor" not in r["request"] or not r["request"]["tor"]["is_tor"]
+                ret += self._row(msm_no, r, cc)
+            return ret
+
+        # datum['test_name'] is 'http_requests'
+        ret = ""
+        for r in datum["test_keys"]["requests"]:
+            if not r["request"]["tor"]["is_tor"]:
+                ret += self._row(msm_no, r, cc)
         return ret
 
     def pop(self, datum):
