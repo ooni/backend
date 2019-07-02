@@ -5,8 +5,10 @@
 import json
 import gzip
 
+
 def json_gz(fname):
     return json.load(gzip.GzipFile(fname))
+
 
 def jsonl_gz(fname):
     return map(json.loads, gzip.GzipFile(fname))

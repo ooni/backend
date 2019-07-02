@@ -4,6 +4,7 @@
 from subprocess import Popen, PIPE
 from contextlib import contextmanager
 
+
 @contextmanager
 def ScopedPopen(*args, **kwargs):
     proc = Popen(*args, **kwargs)

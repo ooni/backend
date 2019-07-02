@@ -18,12 +18,13 @@ import traceback
 from base64 import b64encode
 from contextlib import closing
 from hashlib import sha1
-from zlib import crc32 # btw, binascii.crc32 is four times slower than zlib.crc32
+from zlib import crc32  # btw, binascii.crc32 is four times slower than zlib.crc32
 
 from oonipl.cli import dirname, isomidnight
 from oonipl.popen import ScopedPopen, PIPE
 from oonipl.can import load_index, flistz_tempfile
 from oonipl.const import LZ4_LEVEL
+
 
 class CannerError(RuntimeError):
     pass
@@ -34,14 +35,20 @@ class Future(object):
     # no EPIPE propagation => the program may deadlock in case of error.
     # That's OK for batch tasks managed by the scheduler.
     def __init__(self, cleanup, fn, *args, **kwargs):
-        self.thread = threading.Thread(name='%s/%x' % (fn.__name__, id(self)),
-                                       target=self.__threaded, args=args, kwargs=kwargs)
+        self.thread = threading.Thread(
+            name="%s/%x" % (fn.__name__, id(self)),
+            target=self.__threaded,
+            args=args,
+            kwargs=kwargs,
+        )
         if callable(cleanup):
             cleanup = (cleanup,)
         assert all([callable(cb) for cb in cleanup])
         self.cleanup = cleanup
         self.fn = fn
-        self.retval = None # raw attribute should be good enough as it's read only after `join()`
+        self.retval = (
+            None
+        )  # raw attribute should be good enough as it's read only after `join()`
         self.exc_info = None
         self.thread.start()
 
@@ -50,7 +57,7 @@ class Future(object):
             self.retval = self.fn(*args, **kwargs)
         except Exception:
             self.exc_info = sys.exc_info()
-            print >>sys.stderr, 'Exception in the Future, something may deadlock -- ',
+            print >> sys.stderr, "Exception in the Future, something may deadlock -- ",
             traceback.print_exc(file=sys.stderr)
             for cb in self.cleanup:
                 try:
@@ -61,10 +68,11 @@ class Future(object):
     def get(self):
         self.thread.join()
         if self.exc_info is not None:
-            raise self.exc_info[0], self.exc_info[1], self.exc_info[2] # type, value, traceback
+            raise self.exc_info[0], self.exc_info[1], self.exc_info[
+                2
+            ]  # type, value, traceback
         else:
             return self.retval
-
 
 
 class NopTeeFd(object):
@@ -79,24 +87,28 @@ class CountingTee(object):
         self.__src = src
         self.__copy = copy
         self.__size = 0
+
     def read(self, *args):
         ret = self.__src.read(*args)
         self.__size += len(ret)
         self.__copy.write(ret)
         return ret
+
     def tell(self):
         return self.__src.tell()
-    def seek(self, dest): # NB: no `whence` ~ whence=os.SEEK_SET
+
+    def seek(self, dest):  # NB: no `whence` ~ whence=os.SEEK_SET
         skipwant = dest - self.tell()
         if skipwant < 0:
-            raise RuntimeError('Unable to seek backwards while reading the stream')
+            raise RuntimeError("Unable to seek backwards while reading the stream")
         elif skipwant > 0:
             while skipwant:
                 step = min(skipwant, 262144)
                 skiplen = len(self.read(step))
                 if skiplen != step:
-                    raise RuntimeError('Unexpected end of file', step, skiplen)
+                    raise RuntimeError("Unexpected end of file", step, skiplen)
                 skipwant -= step
+
     @property
     def size(self):
         return self.__size
@@ -107,15 +119,18 @@ class ChecksummingTee(CountingTee):
         super(ChecksummingTee, self).__init__(src, copy)
         self.__crc32 = 0
         self.__sha1 = sha1()
+
     def read(self, *args):
         ret = super(ChecksummingTee, self).read(*args)
         self.__crc32 = crc32(ret, self.__crc32)
         self.__sha1.update(ret)
         return ret
+
     @property
     def crc32(self):
-        assert self.__crc32 <= 0x7fffffff # it's intentionally signed!
+        assert self.__crc32 <= 0x7FFFFFFF  # it's intentionally signed!
         return self.__crc32
+
     @property
     def sha1(self):
         return self.__sha1.digest()
@@ -127,7 +142,11 @@ def stream_canning(fd, teefd=NopTeeFd):
         blob = fd.read(1048576)
         if not blob:
             break
-    return {'text_crc32': fd.crc32, 'text_size': fd.size, 'text_sha1': b64encode(fd.sha1)}
+    return {
+        "text_crc32": fd.crc32,
+        "text_size": fd.size,
+        "text_sha1": b64encode(fd.sha1),
+    }
 
 
 def tarfile_canning(fileobj):
@@ -146,15 +165,17 @@ def tarfile_canning(fileobj):
       'text_size': 363559}]
     """
     canned = []
-    with tarfile.open(mode='r|', fileobj=fileobj) as tarfd:
+    with tarfile.open(mode="r|", fileobj=fileobj) as tarfd:
         for tin in tarfd:
             if not tin.isfile():
-                raise CannerError('Non-regular file in the tar', tin.name, tin.type)
+                raise CannerError("Non-regular file in the tar", tin.name, tin.type)
             with closing(tarfd.extractfile(tin)) as fd:
                 can = stream_canning(fd)
-                if tin.size != can['text_size']: # safety net, `tarfile` detects the case itself
-                    raise CannerError('Bad tar file size', tin.size, can['text_size'])
-                can['textname'] = tin.name
+                if (
+                    tin.size != can["text_size"]
+                ):  # safety net, `tarfile` detects the case itself
+                    raise CannerError("Bad tar file size", tin.size, can["text_size"])
+                can["textname"] = tin.name
                 canned.append(can)
     return canned
 
@@ -173,7 +194,7 @@ def tarfile_canning_feeder(tar_in, tar_out):
     tee = CountingTee(tar_in, tar_out)
     can = tarfile_canning(tee)
     tar_out.flush()
-    return {'canned': can, 'text_size': tee.size}
+    return {"canned": can, "text_size": tee.size}
 
 
 def blob_checksumming_feeder(blob_in, blob_out):
@@ -181,12 +202,19 @@ def blob_checksumming_feeder(blob_in, blob_out):
     # ordinary blob digest on the fly.
     can = stream_canning(blob_in, blob_out)
     blob_out.flush()
-    return {'file_crc32': can['text_crc32'], 'file_size': can['text_size'], 'file_sha1': can['text_sha1']}
+    return {
+        "file_crc32": can["text_crc32"],
+        "file_size": can["text_size"],
+        "file_sha1": can["text_sha1"],
+    }
 
 
-REPORT_FNAME_RE = re.compile(r'^\d{4}[0-1][0-9][0-3][0-9]T[0-2][0-9][0-5][0-9][0-5][0-9]Z-[A-Z]{2}-AS\d+-(?P<test_name>[^-]+)-[^-]+-[.0-9]+-probe\.(?:yaml|json)$')
+REPORT_FNAME_RE = re.compile(
+    r"^\d{4}[0-1][0-9][0-3][0-9]T[0-2][0-9][0-5][0-9][0-5][0-9]Z-[A-Z]{2}-AS\d+-(?P<test_name>[^-]+)-[^-]+-[.0-9]+-probe\.(?:yaml|json)$"
+)
 
-def pack_bucket(listing, can_size=64*1048576):
+
+def pack_bucket(listing, can_size=64 * 1048576):
     # Distribution of OONI reports file size is trimodal: LOTS of small files
     # less than <1Mbyte, some files having size like ~20±5 Mbytes and some more
     # files in 97±20 Mbytes range. 64 Mbytes cutoff is chosen to split the
@@ -202,9 +230,9 @@ def pack_bucket(listing, can_size=64*1048576):
         fname, size = pair
         m = REPORT_FNAME_RE.match(fname)
         if m is None:
-            raise CannerError('Unable to parse report filename', fname)
+            raise CannerError("Unable to parse report filename", fname)
         if size < can_size:
-            tar.setdefault(m.group('test_name'), []).append(pair)
+            tar.setdefault(m.group("test_name"), []).append(pair)
         else:
             asis.append(fname)
 
@@ -238,11 +266,12 @@ def pack_bucket(listing, can_size=64*1048576):
         # reproducible ordering and the last chunk is not that special.
 
         digits = str(len(str(slice_no)))
-        slice_fmt = '%s.%0' + digits + 'd.tar'
+        slice_fmt = "%s.%0" + digits + "d.tar"
         for slice_no, dest in slices.iteritems():
             tarfiles[slice_fmt % (test_name, slice_no)] = dest
 
     return asis, tarfiles
+
 
 def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
     # Size of argv array is limited, `getconf ARG_MAX` shows ~2 Mbytes on
@@ -253,39 +282,59 @@ def can_to_tar(input_root, bucket, slice_files, output_dir, fname):
     # report) and it leads to 8MiB CLI arg. That's why `--add-file` is not used
     # anymore. `--verbatim-files-from` option is not available for `tar` from
     # Ubuntu-16.04, so it's not used as well.
-    with tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdout, \
-         open(os.devnull, 'rb') as devnull, \
-         flistz_tempfile(slice_files, bucket=bucket) as files_from, \
-         ScopedPopen(['tar', '--create', '--directory', input_root, '--null', '--files-from', files_from], stdin=devnull, stdout=PIPE) as proc_tar, \
-         ScopedPopen(['lz4', LZ4_LEVEL], stdin=PIPE, stdout=PIPE) as proc_lz4:
+    with tempfile.NamedTemporaryFile(prefix="tmpcan", dir=output_dir) as fdout, open(
+        os.devnull, "rb"
+    ) as devnull, flistz_tempfile(
+        slice_files, bucket=bucket
+    ) as files_from, ScopedPopen(
+        [
+            "tar",
+            "--create",
+            "--directory",
+            input_root,
+            "--null",
+            "--files-from",
+            files_from,
+        ],
+        stdin=devnull,
+        stdout=PIPE,
+    ) as proc_tar, ScopedPopen(
+        ["lz4", LZ4_LEVEL], stdin=PIPE, stdout=PIPE
+    ) as proc_lz4:
 
-        cleanup = (proc_tar.kill, proc_lz4.kill) # circuit breaker
+        cleanup = (proc_tar.kill, proc_lz4.kill)  # circuit breaker
         can = Future(cleanup, tarfile_canning_feeder, proc_tar.stdout, proc_lz4.stdin)
         chksum = Future(cleanup, blob_checksumming_feeder, proc_lz4.stdout, fdout)
 
         can = can.get()
         proc_tar.wait()
         if proc_tar.returncode != 0:
-            raise CannerError('tar failed with non-zero returncode', proc_tar.returncode)
-        proc_lz4.stdin.close() # signal EOF
+            raise CannerError(
+                "tar failed with non-zero returncode", proc_tar.returncode
+            )
+        proc_lz4.stdin.close()  # signal EOF
 
         chksum = chksum.get()
         proc_lz4.wait()
         if proc_lz4.returncode != 0:
-            raise CannerError('lz4 failed with non-zero returncode', proc_lz4.returncode)
+            raise CannerError(
+                "lz4 failed with non-zero returncode", proc_lz4.returncode
+            )
 
         assert not (can.viewkeys() & chksum.viewkeys())
         can.update(chksum)
-        can['filename'] = os.path.join(bucket, fname + '.lz4')
-        output_file = os.path.join(output_dir, fname + '.lz4')
-        os.link(fdout.name, output_file) # 1. `link` does not overwrite dest, 2. temp name is auto-cleaned
+        can["filename"] = os.path.join(bucket, fname + ".lz4")
+        output_file = os.path.join(output_dir, fname + ".lz4")
+        os.link(
+            fdout.name, output_file
+        )  # 1. `link` does not overwrite dest, 2. temp name is auto-cleaned
     return output_file, can
 
 
 def can_to_blob(input_fname, bucket, output_dir, fname):
-    with open(input_fname, 'rb') as fdin, \
-         tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdout, \
-         ScopedPopen(['lz4', LZ4_LEVEL], stdin=PIPE, stdout=PIPE) as proc_lz4:
+    with open(input_fname, "rb") as fdin, tempfile.NamedTemporaryFile(
+        prefix="tmpcan", dir=output_dir
+    ) as fdout, ScopedPopen(["lz4", LZ4_LEVEL], stdin=PIPE, stdout=PIPE) as proc_lz4:
 
         can = Future(proc_lz4.kill, raw_canning_feeder, fdin, proc_lz4.stdin)
         chksum = Future(proc_lz4.kill, blob_checksumming_feeder, proc_lz4.stdout, fdout)
@@ -296,29 +345,31 @@ def can_to_blob(input_fname, bucket, output_dir, fname):
         chksum = chksum.get()
         proc_lz4.wait()
         if proc_lz4.returncode != 0:
-            raise CannerError('lz4 failed with non-zero returncode', proc_lz4.returncode)
+            raise CannerError(
+                "lz4 failed with non-zero returncode", proc_lz4.returncode
+            )
 
         assert not (can.viewkeys() & chksum.viewkeys())
-        can['textname'] = os.path.join(bucket, fname)
-        can['filename'] = os.path.join(bucket, fname + '.lz4')
+        can["textname"] = os.path.join(bucket, fname)
+        can["filename"] = os.path.join(bucket, fname + ".lz4")
         can.update(chksum)
-        output_file = os.path.join(output_dir, fname + '.lz4')
+        output_file = os.path.join(output_dir, fname + ".lz4")
         os.link(fdout.name, output_file)
     return output_file, can
 
 
 # Not to be confused with `manifest.json`.
-INDEX_FNAME = 'index.json.gz'
-EPOCH = int(time.time()) # time to be stamped in produced tar files
+INDEX_FNAME = "index.json.gz"
+EPOCH = int(time.time())  # time to be stamped in produced tar files
 
 
 def finalize_can(output_file, can, fdindex):
-    output_size = os.stat(output_file).st_size # all the files closed, buffers flushed
-    if output_size != can['file_size']: # e.g. due to low disk space & buffering
-        raise CannerError('File size', output_file, output_size, can['file_size'])
-    os.chmod(output_file, 0444) # to o+r and prevent accidental modification
+    output_size = os.stat(output_file).st_size  # all the files closed, buffers flushed
+    if output_size != can["file_size"]:  # e.g. due to low disk space & buffering
+        raise CannerError("File size", output_file, output_size, can["file_size"])
+    os.chmod(output_file, 0444)  # to o+r and prevent accidental modification
     json.dump(can, fdindex, sort_keys=True)
-    fdindex.write('\n')
+    fdindex.write("\n")
 
 
 def listdir_filesize(d):
@@ -339,10 +390,14 @@ def load_verified_index(output_dir, bucket):
     index_fpath = os.path.join(output_dir, INDEX_FNAME)
     with open(index_fpath) as fd:
         index = load_index(fd)
-    ndxsize = {_['filename']: _['file_size'] for _ in index}
-    outsize = {os.path.join(bucket, f): sz for f, sz in listdir_filesize(output_dir) if f != INDEX_FNAME}
+    ndxsize = {_["filename"]: _["file_size"] for _ in index}
+    outsize = {
+        os.path.join(bucket, f): sz
+        for f, sz in listdir_filesize(output_dir)
+        if f != INDEX_FNAME
+    }
     if ndxsize != outsize:
-        raise CannerError('Mismatching set of output files', output_dir)
+        raise CannerError("Mismatching set of output files", output_dir)
     return index
 
 
@@ -350,16 +405,16 @@ def verify_index_input(index, bucket, filesize):
     """
     Index tracks the same set of text files under the `bucket` as `filesize`.
     """
-    filesize = {'{}/{}'.format(bucket, k): v for k, v in filesize} # fname -> len
+    filesize = {"{}/{}".format(bucket, k): v for k, v in filesize}  # fname -> len
     ndxsize = {}
     for i in index:
-        if 'canned' in i:
-            for j in i['canned']:
-                ndxsize[j['textname']] = j['text_size']
+        if "canned" in i:
+            for j in i["canned"]:
+                ndxsize[j["textname"]] = j["text_size"]
         else:
-            ndxsize[i['textname']] = i['text_size']
+            ndxsize[i["textname"]] = i["text_size"]
     if filesize != ndxsize:
-        raise CannerError('Mismatching set of input files', bucket)
+        raise CannerError("Mismatching set of input files", bucket)
 
 
 def verify_index_ordering(index, bucket, filesize, asis, tarfiles):
@@ -371,24 +426,24 @@ def verify_index_ordering(index, bucket, filesize, asis, tarfiles):
     - Ordering & slicing is NOT verified
     """
     assert len(filesize) == len(asis) + sum(map(len, tarfiles.itervalues()))
-    filesize = {'{}/{}'.format(bucket, k): v for k, v in filesize} # fname -> len
+    filesize = {"{}/{}".format(bucket, k): v for k, v in filesize}  # fname -> len
 
-    bktasis = {k: filesize[k] for k in ('{}/{}'.format(bucket, _) for _ in asis)}
-    ndxasis = {_['textname']: _['text_size'] for _ in index if 'canned' not in _}
-    if bktasis != ndxasis: # NB: ordering!
-        raise CannerError('Mismatching set of as-is files', bucket)
+    bktasis = {k: filesize[k] for k in ("{}/{}".format(bucket, _) for _ in asis)}
+    ndxasis = {_["textname"]: _["text_size"] for _ in index if "canned" not in _}
+    if bktasis != ndxasis:  # NB: ordering!
+        raise CannerError("Mismatching set of as-is files", bucket)
 
-    bkttars = {'{}/{}.lz4'.format(bucket, _): v for _, v in tarfiles.iteritems()}
-    ndxtars = {_['filename']: _['canned'] for _ in index if 'canned' in _}
+    bkttars = {"{}/{}.lz4".format(bucket, _): v for _, v in tarfiles.iteritems()}
+    ndxtars = {_["filename"]: _["canned"] for _ in index if "canned" in _}
     if bkttars.viewkeys() != ndxtars.viewkeys():
-        raise CannerError('Mismatching set of tar files', bucket)
+        raise CannerError("Mismatching set of tar files", bucket)
 
     for tar in bkttars:
-        if bkttars[tar] != [_['textname'] for _ in ndxtars[tar]]: # NB: ordering!
-            raise CannerError('Mismatching set of files in the tar', bucket, tar)
+        if bkttars[tar] != [_["textname"] for _ in ndxtars[tar]]:  # NB: ordering!
+            raise CannerError("Mismatching set of files in the tar", bucket, tar)
         for i in ndxtars[tar]:
-            if filesize[i['textname']] != i['text_size']:
-                raise CannerError('Mismatching file size', bucket, tar, i['textname'])
+            if filesize[i["textname"]] != i["text_size"]:
+                raise CannerError("Mismatching file size", bucket, tar, i["textname"])
 
 
 def canning(input_root, output_root, bucket):
@@ -400,7 +455,7 @@ def canning(input_root, output_root, bucket):
     - store manifest to ease data scrubbing
     - read raw files exactly once to save disk bandwidth and lower pagecache pollution
     """
-    assert input_root[-1] != '/' and output_root[-1] != '/' and '/' not in bucket
+    assert input_root[-1] != "/" and output_root[-1] != "/" and "/" not in bucket
     input_dir = os.path.join(input_root, bucket)
     output_dir = os.path.join(output_root, bucket)
     # Bucket MUST exist as single bucket is mounted to data processing container.
@@ -409,38 +464,72 @@ def canning(input_root, output_root, bucket):
     filesize = listdir_filesize(input_dir)
 
     index_fpath = os.path.join(output_dir, INDEX_FNAME)
-    if os.path.exists(index_fpath): # verify if everything is OK or die
+    if os.path.exists(index_fpath):  # verify if everything is OK or die
         index = load_verified_index(output_dir, bucket)
         verify_index_input(index, bucket, filesize)
-        print 'The bucket {} is already canned'.format(bucket)
+        print "The bucket {} is already canned".format(bucket)
         return
 
     asis, tarfiles = pack_bucket(filesize)
 
-    with tempfile.NamedTemporaryFile(prefix='tmpcan', dir=output_dir) as fdindex:
-        with closing(gzip.GzipFile(filename='index.json', mtime=EPOCH, mode='wb', fileobj=fdindex)) as metafd:
+    with tempfile.NamedTemporaryFile(prefix="tmpcan", dir=output_dir) as fdindex:
+        with closing(
+            gzip.GzipFile(
+                filename="index.json", mtime=EPOCH, mode="wb", fileobj=fdindex
+            )
+        ) as metafd:
             for fname, slice_files in tarfiles.iteritems():
-                output_file, can = can_to_tar(input_root, bucket, slice_files, output_dir, fname)
+                output_file, can = can_to_tar(
+                    input_root, bucket, slice_files, output_dir, fname
+                )
                 finalize_can(output_file, can, metafd)
 
             for fname in asis:
-                output_file, can = can_to_blob(os.path.join(input_dir, fname), bucket, output_dir, fname)
+                output_file, can = can_to_blob(
+                    os.path.join(input_dir, fname), bucket, output_dir, fname
+                )
                 finalize_can(output_file, can, metafd)
 
         os.link(fdindex.name, index_fpath)
     os.chmod(index_fpath, 0444)
-    os.chmod(output_dir, 0555) # done!
+    os.chmod(output_dir, 0555)  # done!
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description='ooni-pipeline: private/reports-raw -> private/canned')
-    p.add_argument('--start', metavar='ISOTIME', type=isomidnight, help='Airflow execution date', required=True)
-    p.add_argument('--end', metavar='ISOTIME', type=isomidnight, help='Airflow execution date + schedule interval', required=True)
-    p.add_argument('--reports-raw-root', metavar='DIR', type=dirname, help='Path to .../private/reports-raw', required=True)
-    p.add_argument('--canned-root', metavar='DIR', type=dirname, help='Path to .../private/canned', required=True)
+    p = argparse.ArgumentParser(
+        description="ooni-pipeline: private/reports-raw -> private/canned"
+    )
+    p.add_argument(
+        "--start",
+        metavar="ISOTIME",
+        type=isomidnight,
+        help="Airflow execution date",
+        required=True,
+    )
+    p.add_argument(
+        "--end",
+        metavar="ISOTIME",
+        type=isomidnight,
+        help="Airflow execution date + schedule interval",
+        required=True,
+    )
+    p.add_argument(
+        "--reports-raw-root",
+        metavar="DIR",
+        type=dirname,
+        help="Path to .../private/reports-raw",
+        required=True,
+    )
+    p.add_argument(
+        "--canned-root",
+        metavar="DIR",
+        type=dirname,
+        help="Path to .../private/canned",
+        required=True,
+    )
     opt = p.parse_args()
     if (opt.end - opt.start) != datetime.timedelta(days=1):
-        p.error('The script processes 24h batches')
+        p.error("The script processes 24h batches")
     return opt
 
 
@@ -456,9 +545,9 @@ def main():
     #
     # These are two only hardcoded values so far that may have reason to be tuned.
     opt = parse_args()
-    bucket = opt.start.strftime('%Y-%m-%d')
+    bucket = opt.start.strftime("%Y-%m-%d")
     canning(opt.reports_raw_root, opt.canned_root, bucket)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
