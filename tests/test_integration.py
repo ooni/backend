@@ -1,13 +1,18 @@
-import os
-import sys
-import time
-import stat
+"""
+Run integration test
+
+Run with using: `tox`
+Help: `tox -- -h`
+"""
+
 import errno
-import string
+import os
+import psycopg2
 import random
 import shutil
-import tempfile
-import psycopg2
+import string
+import sys
+import time
 from datetime import datetime, timedelta
 from glob import glob
 
@@ -72,6 +77,7 @@ def pg_install_tables(container):
 
 
 def fetch_autoclaved_bucket(dst_dir, bucket_date):
+    print("Fetch bucket")
     dst_bucket_dir = os.path.join(dst_dir, bucket_date)
     if not os.path.exists(dst_bucket_dir):
         os.makedirs(dst_bucket_dir)
@@ -84,15 +90,13 @@ def fetch_autoclaved_bucket(dst_dir, bucket_date):
         for f in result.get("Contents", []):
             fkey = f.get("Key")
             dst_pathname = os.path.join(dst_bucket_dir, os.path.basename(fkey))
-            print("[+] Downloading {}".format(dst_pathname))
-
             try:
                 s = os.stat(dst_pathname)
                 if s.st_size == f.get("Size"):
-                    print("SKIP")
                     continue
             except Exception:  # XXX maybe make this more strict. It's FileNotFoundError on py3 and OSError on py2
                 pass
+            print("[+] Downloading {}".format(dst_pathname))
             resource.meta.client.download_file("ooni-data", fkey, dst_pathname)
 
 
