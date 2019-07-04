@@ -1,8 +1,9 @@
 """
 Run integration test
 
-Run with using: `tox`
+Run with tox using: `tox`
 Help: `tox -- -h`
+Run against a shovel image tag: `tox -- --shovel-image-tag 20190704-4659f159`
 """
 
 import errno
