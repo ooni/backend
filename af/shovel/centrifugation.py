@@ -34,6 +34,10 @@ from oonipl.pg import PGCopyFrom, pg_quote, pg_binquote, pg_uniquote
 from oonipl.sim import sim_shi4_mm3_layout, sim_shi4_mm3_text
 from oonipl.utils import dclass
 
+from oonipl.metrics import setup_metrics
+
+metrics = setup_metrics(host="172.17.0.1", name="centrifugation")
+
 # It does NOT take into account metadata tables right now:
 # - autoclaved: it's not obvious if anything can be updated there
 # - report & measurement: have significant amount of metadata and may be actually updated eventually
@@ -1988,6 +1992,7 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
     # It may become part of `http_request` and `http_control` tables, but it also
     # brings nice notion of clear separation between basic data features (headers,
     # body hashsums and such) and derived features (matching fingerprints).
+    @metrics.timer("fingerprints.init")
     def __init__(self, pgconn):
         """Initializes self._fps_by_cc
         """

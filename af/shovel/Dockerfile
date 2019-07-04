@@ -5,7 +5,7 @@ FROM ubuntu:16.04
 # All the actions are done within single RUN to reduce number of layers & overall fetch size.
 RUN set -ex \
     && apt-get update \
-    && apt-get install -y python2.7 liblz4-tool python-ujson python-yaml python-psycopg2 python-six \
+    && apt-get install -y python2.7 liblz4-tool python-ujson python-yaml python-psycopg2 python-six python-statsd \
     && : \
 # Whole python-lz4 repo is clonned as `git` can't do shallow clone of single
 # SHA1 commit and github tarball makes setuptools-scm unhappy while building.
