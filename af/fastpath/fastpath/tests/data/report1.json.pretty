@@ -1,0 +1,179 @@
+{
+  "annotations": {
+    "engine_name": "libmeasurement_kit",
+    "engine_version": "0.10.4",
+    "engine_version_full": "v0.10.4",
+    "flavor": "full",
+    "network_type": "wifi",
+    "platform": "android"
+  },
+  "data_format_version": "0.2.0",
+  "id": "f6a2515c-895a-41b8-8138-b050fcb36eaf",
+  "input": "http://www.collegehumor.com/",
+  "input_hashes": [],
+  "measurement_start_time": "2019-07-20 20:18:30",
+  "options": [],
+  "probe_asn": "AS20115",
+  "probe_cc": "US",
+  "probe_city": null,
+  "probe_ip": "127.0.0.1",
+  "report_id": "20190720T201820Z_AS20115_4wkxlgdcVOMs3bn3dJ3tzfFz6axh48W2FgAbyN6YwDBBGDvUor",
+  "software_name": "ooniprobe-android",
+  "software_version": "2.1.0",
+  "test_helpers": {
+    "backend": {
+      "address": "https://c.web-connectivity.th.ooni.io:443",
+      "type": "https"
+    }
+  },
+  "test_keys": {
+    "accessible": true,
+    "agent": "redirect",
+    "blocking": false,
+    "body_length_match": true,
+    "body_proportion": 1,
+    "client_resolver": "68.114.46.235",
+    "control": {
+      "dns": {
+        "addrs": [
+          "52.200.20.147",
+          "52.3.56.44"
+        ],
+        "failure": null
+      },
+      "http_request": {
+        "body_length": 93538,
+        "failure": null,
+        "headers": {
+          "Accept-Ranges": "bytes",
+          "Age": "110",
+          "Cache-Control": "max-age=120, must-revalidate, max-age=86400",
+          "Content-Type": "text/html",
+          "Date": "Sat, 20 Jul 2019 20:18:32 GMT",
+          "Expires": "Sun, 21 Jul 2019 20:16:42 GMT",
+          "Vary": "Accept-Encoding",
+          "X-CH-Backend": "be-ch-01.cv.live",
+          "X-Cache": "HIT",
+          "X-Cache-Hits": "16",
+          "X-UA-Compatible": "IE=edge",
+          "X-Varnish": "823821175 824508469",
+          "X-Varnish-IP": "10.99.14.233"
+        },
+        "status_code": 200,
+        "title": "CollegeHumor - The Funniest Stuff On the Internet"
+      },
+      "tcp_connect": {
+        "52.200.20.147:80": {
+          "failure": null,
+          "status": true
+        },
+        "52.3.56.44:80": {
+          "failure": null,
+          "status": true
+        }
+      }
+    },
+    "control_failure": null,
+    "dns_consistency": "consistent",
+    "dns_experiment_failure": null,
+    "headers_match": true,
+    "http_experiment_failure": null,
+    "queries": [
+      {
+        "answers": [
+          {
+            "answer_type": "CNAME",
+            "hostname": "www.collegehumor.com",
+            "ttl": null
+          },
+          {
+            "answer_type": "A",
+            "ipv4": "52.200.20.147",
+            "ttl": null
+          },
+          {
+            "answer_type": "A",
+            "ipv4": "52.3.56.44",
+            "ttl": null
+          }
+        ],
+        "engine": "system",
+        "failure": null,
+        "hostname": "www.collegehumor.com",
+        "query_type": "A",
+        "resolver_hostname": null,
+        "resolver_port": null
+      }
+    ],
+    "requests": [
+      {
+        "failure": null,
+        "request": {
+          "body": "",
+          "headers": {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US;q=0.8,en;q=0.5",
+            "User-Agent": "..."
+          },
+          "method": "GET",
+          "tor": {
+            "exit_ip": null,
+            "exit_name": null,
+            "is_tor": false
+          },
+          "url": "http://www.collegehumor.com/"
+        },
+        "response": {
+          "body": "...",
+          "code": 200,
+          "headers": {
+            "Accept-Ranges": "bytes",
+            "Age": "109",
+            "Cache-Control": "max-age=120, must-revalidate, max-age=86400",
+            "Connection": "keep-alive",
+            "Content-Type": "text/html",
+            "Date": "Sat, 20 Jul 2019 20:18:31 GMT",
+            "Expires": "Sun, 21 Jul 2019 20:16:42 GMT",
+            "Transfer-Encoding": "chunked",
+            "Vary": "Accept-Encoding",
+            "X-CH-Backend": "be-ch-01.cv.live",
+            "X-Cache": "HIT",
+            "X-Cache-Hits": "15",
+            "X-UA-Compatible": "IE=edge",
+            "X-Varnish": "823788349 824508469",
+            "X-Varnish-IP": "10.99.14.233"
+          },
+          "response_line": "HTTP/1.1 200 OK"
+        }
+      }
+    ],
+    "retries": null,
+    "socksproxy": null,
+    "status_code_match": true,
+    "tcp_connect": [
+      {
+        "ip": "52.200.20.147",
+        "port": 80,
+        "status": {
+          "blocked": false,
+          "failure": null,
+          "success": true
+        }
+      },
+      {
+        "ip": "52.3.56.44",
+        "port": 80,
+        "status": {
+          "blocked": false,
+          "failure": null,
+          "success": true
+        }
+      }
+    ],
+    "title_match": true
+  },
+  "test_name": "web_connectivity",
+  "test_runtime": 0.9220230579376221,
+  "test_start_time": "2019-07-20 20:18:16",
+  "test_version": "0.0.1"
+}

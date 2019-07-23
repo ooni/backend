@@ -124,6 +124,7 @@ test_categories = {
     "tcpt": {"http_filtering_bypass", "http_invalid_request_line", "http_trix"},
 }
 
+
 regexps = {
     "ipv4": "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})",
     "hostname": "([a-zA-Z0-9](?:(?:[a-zA-Z0-9-]*|(?<!-)\.(?![-.]))*[a-zA-Z0-9]+)?)",

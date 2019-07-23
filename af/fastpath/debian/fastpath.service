@@ -1,0 +1,39 @@
+[Unit]
+Description=OONI Fastpath
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/fastpath
+Restart=on-abort
+Type=simple
+RestartSec=2s
+WorkingDirectory=/var/lib/fastpath
+
+User=fastpath
+Group=fastpath
+ReadOnlyDirectories=/
+ReadWriteDirectories=/proc/self
+ReadWriteDirectories=/var/lib/fastpath
+
+StandardOutput=syslog+console
+StandardError=syslog+console
+
+PermissionsStartOnly=true
+LimitNOFILE=65536
+
+# Hardening
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+SystemCallFilter=~@clock @debug @cpu-emulation @keyring @module @mount @obsolete @raw-io @reboot @swap
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectHome=yes
+#ProtectHome=read-only
+ProtectSystem=strict
+ProtectSystem=full
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+
+[Install]
+WantedBy=multi-user.target
