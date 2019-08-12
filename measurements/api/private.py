@@ -130,7 +130,6 @@ def api_private_countries():
     })
 
 # XXX Everything below here are ghetto hax to support legacy OONI Explorer
-two_months_ago = datetime.now() - relativedelta(months=2)
 @api_private_blueprint.route('/blockpages', methods=["GET"])
 def api_private_blockpages():
     probe_cc = request.args.get('probe_cc')
@@ -150,8 +149,7 @@ def api_private_blockpages():
      .filter(
         Report.test_name == 'web_connectivity'
       ) \
-     .filter(Report.probe_cc == probe_cc)
-     .filter(Report.test_start_time > two_months_ago)
+     .filter(Report.probe_cc == probe_cc).limit(100)
 
     results = []
     for row in q:
@@ -185,8 +183,7 @@ def api_private_website_measurements():
      .filter(
         Report.test_name == 'web_connectivity'
       ) \
-     .filter(Input.input.contains(input_))
-     .filter(Report.test_start_time > two_months_ago)
+     .filter(Input.input.contains(input_)).limit(100)
 
     results = []
     for row in q:
