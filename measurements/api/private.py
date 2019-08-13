@@ -136,6 +136,7 @@ def api_private_blockpages():
     if probe_cc is None:
         raise Exception('err')
 
+
     q = current_app.db_session.query(
         Report.report_id.label('report_id'),
         Report.probe_cc.label('probe_cc'),
@@ -148,7 +149,7 @@ def api_private_blockpages():
      .filter(
         Report.test_name == 'web_connectivity'
       ) \
-     .filter(Report.probe_cc == probe_cc)
+     .filter(Report.probe_cc == probe_cc).limit(100)
 
     results = []
     for row in q:
@@ -182,7 +183,7 @@ def api_private_website_measurements():
      .filter(
         Report.test_name == 'web_connectivity'
       ) \
-     .filter(Input.input.contains(input_))
+     .filter(Input.input.contains(input_)).limit(100)
 
     results = []
     for row in q:
