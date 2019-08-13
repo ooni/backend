@@ -1,3 +1,9 @@
+# ooni-api 1.1.3 [2019-08-13]
+
+Changed:
+
+* Improvements to the performance of the legacy explorer endpoints
+
 # ooni-api 1.1.2 [2019-06-07]
 Fixes:
 
