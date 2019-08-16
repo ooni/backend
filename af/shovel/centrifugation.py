@@ -2051,7 +2051,7 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
     def _row(self, msm_no, r, cc):
         matchers = [self._fps_by_cc["ZZ"]]
         if cc != "ZZ" and cc in self._fps_by_cc:
-            matchers.append(self._fps_by_cc["cc"])
+            matchers.append(self._fps_by_cc[cc])
 
         response = r["response"]
         body = httpt_body(response)
