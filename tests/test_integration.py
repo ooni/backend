@@ -3,11 +3,13 @@ import unittest
 import os
 import sys
 import time
+import shutil
 import psycopg2
 import traceback
 from datetime import datetime, timedelta
 from glob import glob
 
+import requests
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
@@ -79,20 +81,10 @@ def fetch_autoclaved_bucket(dst_dir, bucket_date):
                 pass
             resource.meta.client.download_file('ooni-data', fkey, dst_pathname)
 
-def run_centrifugation(client, bucket_date):
-    fmt = '%Y-%m-%d'
-    end_bucket_date = (datetime.strptime(bucket_date, fmt) + timedelta(1)).strftime(fmt)
-
-    centrifugation_cmd = '/mnt/af/shovel/centrifugation.py --start {}T00:00:00'.format(bucket_date)
-    centrifugation_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
-    centrifugation_cmd += " --autoclaved-root /mnt/testdata --postgres 'host={} user={}'".format(METADB_NAME, METADB_PG_USER)
-
-    start_time = time.time()
-
-    print("running shovel @{}: {}".format(start_time, centrifugation_cmd))
+def shovel_run(client, cmd):
     shovel_container = client.containers.run(
         'openobservatory/pipeline-shovel:latest',
-        centrifugation_cmd,
+        cmd,
         mem_limit='512m',
         user='{}:{}'.format(os.getuid(),os.getgid()),
         working_dir='/mnt',
@@ -110,12 +102,44 @@ def run_centrifugation(client, bucket_date):
         stderr=True,
         detach=True
     )
+    start_time = time.time()
     container_logs = shovel_container.logs(stream=True)
     for line in container_logs:
         sys.stdout.write(line.decode('utf8'))
         sys.stdout.flush()
     print("runtime: {}".format(time.time() - start_time))
     return shovel_container
+
+def run_centrifugation(client, bucket_date):
+    end_bucket_date = get_end_bucket_date(bucket_date)
+
+    centrifugation_cmd = '/mnt/af/shovel/centrifugation.py --start {}T00:00:00'.format(bucket_date)
+    centrifugation_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
+    centrifugation_cmd += " --autoclaved-root /mnt/testdata/autoclaved --postgres 'host={} user={}'".format(METADB_NAME, METADB_PG_USER)
+
+    print("running shovel @{}: {}".format(start_time, centrifugation_cmd))
+    shovel_container = shovel_run(client, centrifugation_cmd)
+
+    return shovel_container
+
+def download_file(url, dst_filename):
+    with requests.get(url, stream=True) as r:
+        with open(dst_filename, 'wb') as f:
+            shutil.copyfileobj(r.raw, f)
+    return dst_filename
+
+def download_report_files(dst_dir):
+    textnames = [
+        '2019-08-18/20190818T000012Z-IT-AS137-web_connectivity-20190818T000012Z_AS137_l8jGuIafZviOcWsjIpSNKgSDMK9UdDnx3Qdbvl73KXujCL6w58-0.2.0-probe.json',
+        '2019-08-18/20190818T094637Z-IR-AS31549-web_connectivity-20190818T094639Z_AS31549_8wsmxeiEfEXhZz7Adm7aFBCB0bAYz8UYJWsCGxRzDNYirniZva-0.2.0-probe.json',
+        '2019-08-18/20190818T094131Z-IR-AS31549-vanilla_tor-20190818T094132Z_AS31549_dDsgseksbdQ1sJn4Z1wDJD2Y2nHhFJa23DiyJlYTVKofPxWv5k-0.2.0-probe.json',
+        '2019-08-18/20190818T081446Z-DE-AS8881-http_header_field_manipulation-20190818T081451Z_AS8881_zqlJZozB32oWWytaFyGZU0ouAyAIrEarNo1ahjwZ2xOEdF4RI9-0.2.0-probe.json'
+    ]
+    base_url = 'https://api.ooni.io/files/download/'
+    for tn in textnames:
+        url = base_url + tn
+        dst_filename = os.path.join(dst_dir, os.path.basename(tn))
+        download_file(url, dst_filename)
 
 def pg_conn():
     return psycopg2.connect('host={} user={} port={}'.format('localhost', METADB_PG_USER, 25432))
@@ -136,7 +160,35 @@ def get_flag_counts():
             flags['anomaly'] = row[2]
     return flags
 
-class TestCentrifugation(unittest.TestCase):
+def get_end_bucket_date(start_date):
+    fmt = '%Y-%m-%d'
+    return (datetime.strptime(start_date, fmt) + timedelta(1)).strftime(fmt)
+
+def run_canning_autoclaving():
+    start_date = '2018-01-01'
+    end_bucket_date = get_end_bucket_date(start_date)
+
+    reports_raw_dir = os.path.join(TESTDATA_DIR, 'reports_raw')
+    if not os.path.exists(reports_raw_dir):
+        os.makedirs(reports_raw_dir)
+    download_report_files(reports_raw_dir)
+
+    docker_client = docker.from_env()
+    canning_cmd = '/mnt/af/shovel/canning.py --start {}T00:00:00'.format(start_date)
+    canning_cmd+= ' --end {}T00:00:00'.format(end_bucket_date)
+    canning_cmd += " --reports-raw-root /mnt/testdata/reports_raw --canned-root /mnt/testdata/canned"
+
+    canning_container = shovel_run(client, canning_cmd)
+    canning_container.remove(force=True)
+
+    autoclaving_cmd = '/mnt/af/shovel/autoclaving.py --start {}T00:00:00'.format(start_date)
+    autoclaving_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
+    autoclaving_cmd += " --canned-root /mnt/testdata/canned --autoclaved-root /mnt/testdata/autoclaved --bridge-db /mnt/testdata/bridge_db.json"
+    autoclaving_container = shovel_run(client, autoclaving_cmd)
+    autoclaving_container.remove(force=True)
+
+
+class TestFullPipeline(unittest.TestCase):
     def setUp(self):
         self.docker_client = docker.from_env()
         self.to_remove_containers = []
@@ -163,14 +215,16 @@ class TestCentrifugation(unittest.TestCase):
         4.0K	2018-12-09
         4.0K	2018-12-10
         """
-        bucket_date = '2018-05-07'
-        fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
+        #bucket_date = '2018-05-07'
+        #fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
 
         print("Starting pg container")
         pg_container = start_pg(self.docker_client)
         self.to_remove_containers.append(pg_container)
 
         pg_install_tables(pg_container)
+
+        run_canning_autoclaving()
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
         flags = get_flag_counts()
