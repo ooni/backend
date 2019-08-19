@@ -301,7 +301,7 @@ def last_30days():
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
         sql.text("test_day >= current_date - interval '31 day'"),
-        sql.text("test_day < current_date - interval '1 day'"),
+        sql.text("test_day < current_date"),
         sql.text("probe_cc = :probe_cc"),
     ]
     if test_groups is not None:
@@ -347,7 +347,7 @@ def get_recent_test_coverage(probe_cc):
         and_(
             sql.text("test_day >= (current_date - interval '31 day')"),
             # We exclude the last day to wait for the pipeline
-            sql.text("test_day < current_date - interval '1 day'"),
+            sql.text("test_day < current_date"),
             sql.text("probe_cc = :probe_cc"),
         )
     ).group_by(
@@ -460,7 +460,7 @@ LEFT OUTER JOIN
     JOIN input ON input.input_no = measurement.input_no
     JOIN report ON report.report_no = measurement.report_no
     WHERE test_start_time >= current_date - interval '31 day'
-    AND test_start_time < current_date - interval '1 day'
+    AND test_start_time < current_date
     AND probe_cc =  :probe_cc
     AND probe_asn = :probe_asn
     AND input.input = :input
@@ -660,7 +660,7 @@ def api_private_im_networks():
         and_(
             sql.text("test_day >= current_date - interval '31 day'"),
             # We exclude the last day to wait for the pipeline
-            sql.text("test_day < current_date - interval '1 day'"),
+            sql.text("test_day < current_date"),
             sql.text("probe_cc = :probe_cc"),
             or_(*test_names)
         )
@@ -722,7 +722,7 @@ LEFT OUTER JOIN
     AND test_name = :test_name
     AND probe_asn = :probe_asn
 	AND test_day >= current_date - interval '31 day'
-	AND test_day < current_date - interval '1 day'
+	AND test_day < current_date
 	GROUP BY test_day
 ) m
 ON d.test_day = m.test_day
