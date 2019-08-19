@@ -117,7 +117,7 @@ def run_centrifugation(client, bucket_date):
     centrifugation_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
     centrifugation_cmd += " --autoclaved-root /mnt/testdata/autoclaved --postgres 'host={} user={}'".format(METADB_NAME, METADB_PG_USER)
 
-    print("running shovel @{}: {}".format(start_time, centrifugation_cmd))
+    print("running shovel: {}".format(centrifugation_cmd))
     shovel_container = shovel_run(client, centrifugation_cmd)
 
     return shovel_container
@@ -168,13 +168,18 @@ def get_end_bucket_date(start_date):
     fmt = '%Y-%m-%d'
     return (datetime.strptime(start_date, fmt) + timedelta(1)).strftime(fmt)
 
+def maybe_makedirs(bucket_dir):
+    for dn in ['reports_raw', 'autoclaved', 'canned']:
+        p = os.path.join(TESTDATA_DIR, dn, bucket_dir)
+        if not os.path.exists(p):
+            os.makedirs(p)
+
 def run_canning_autoclaving():
     start_date = '2018-01-01'
     end_bucket_date = get_end_bucket_date(start_date)
 
-    reports_raw_dir = os.path.join(TESTDATA_DIR, 'reports_raw')
-    if not os.path.exists(reports_raw_dir):
-        os.makedirs(reports_raw_dir)
+    reports_raw_dir = os.path.join(TESTDATA_DIR, 'reports_raw', start_date)
+    maybe_makedirs(start_date)
 
     print("Downloading report files")
     download_report_files(reports_raw_dir)
@@ -224,6 +229,7 @@ class TestFullPipeline(unittest.TestCase):
         4.0K	2018-12-09
         4.0K	2018-12-10
         """
+        bucket_date = '2018-01-01'
         #bucket_date = '2018-05-07'
         #fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
 
