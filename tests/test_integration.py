@@ -124,8 +124,9 @@ def run_centrifugation(client, bucket_date):
 
 def download_file(url, dst_filename):
     with requests.get(url, stream=True) as r:
-        with open(dst_filename, 'wb') as f:
+        with open(dst_filename+'.tmp', 'wb') as f:
             shutil.copyfileobj(r.raw, f)
+    os.rename(dst_filename+'.tmp', dst_filename)
     return dst_filename
 
 def download_report_files(dst_dir):
@@ -139,6 +140,9 @@ def download_report_files(dst_dir):
     for tn in textnames:
         url = base_url + tn
         dst_filename = os.path.join(dst_dir, os.path.basename(tn))
+        print("downloading {}".format(dst_filename))
+        if os.path.exists(dst_filename):
+            continue
         download_file(url, dst_filename)
 
 def pg_conn():
