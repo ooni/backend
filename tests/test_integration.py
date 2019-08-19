@@ -171,6 +171,8 @@ def run_canning_autoclaving():
     reports_raw_dir = os.path.join(TESTDATA_DIR, 'reports_raw')
     if not os.path.exists(reports_raw_dir):
         os.makedirs(reports_raw_dir)
+
+    print("Downloading report files")
     download_report_files(reports_raw_dir)
 
     docker_client = docker.from_env()
@@ -178,12 +180,15 @@ def run_canning_autoclaving():
     canning_cmd+= ' --end {}T00:00:00'.format(end_bucket_date)
     canning_cmd += " --reports-raw-root /mnt/testdata/reports_raw --canned-root /mnt/testdata/canned"
 
+    print("Running canning command")
     canning_container = shovel_run(client, canning_cmd)
     canning_container.remove(force=True)
 
     autoclaving_cmd = '/mnt/af/shovel/autoclaving.py --start {}T00:00:00'.format(start_date)
     autoclaving_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
     autoclaving_cmd += " --canned-root /mnt/testdata/canned --autoclaved-root /mnt/testdata/autoclaved --bridge-db /mnt/testdata/bridge_db.json"
+
+    print("Running autoclaving command")
     autoclaving_container = shovel_run(client, autoclaving_cmd)
     autoclaving_container.remove(force=True)
 
@@ -224,6 +229,7 @@ class TestFullPipeline(unittest.TestCase):
 
         pg_install_tables(pg_container)
 
+        print("Running canning and autoclaving")
         run_canning_autoclaving()
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
