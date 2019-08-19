@@ -181,7 +181,7 @@ def run_canning_autoclaving():
     canning_cmd += " --reports-raw-root /mnt/testdata/reports_raw --canned-root /mnt/testdata/canned"
 
     print("Running canning command")
-    canning_container = shovel_run(client, canning_cmd)
+    canning_container = shovel_run(docker_client, canning_cmd)
     canning_container.remove(force=True)
 
     autoclaving_cmd = '/mnt/af/shovel/autoclaving.py --start {}T00:00:00'.format(start_date)
@@ -189,7 +189,7 @@ def run_canning_autoclaving():
     autoclaving_cmd += " --canned-root /mnt/testdata/canned --autoclaved-root /mnt/testdata/autoclaved --bridge-db /mnt/testdata/bridge_db.json"
 
     print("Running autoclaving command")
-    autoclaving_container = shovel_run(client, autoclaving_cmd)
+    autoclaving_container = shovel_run(docker_client, autoclaving_cmd)
     autoclaving_container.remove(force=True)
 
 
