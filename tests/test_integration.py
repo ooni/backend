@@ -180,6 +180,8 @@ def run_canning_autoclaving():
 
     reports_raw_dir = os.path.join(TESTDATA_DIR, 'reports_raw', start_date)
     maybe_makedirs(start_date)
+    with open(os.path.join(TESTDATA_DIR, 'bridge_db.json'), 'w') as out_file:
+        out_file.write('{}')
 
     print("Downloading report files")
     download_report_files(reports_raw_dir)
