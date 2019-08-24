@@ -131,7 +131,7 @@ def download_file(url, dst_filename):
 
 def download_report_files(dst_dir):
     textnames = [
-        '2019-06-01/20190601T003644Z-IN-AS18196-web_connectivity-20190601T003645Z_AS18196_rpEBAw2sJIRwgKvm3JhOur2dNqOdtIb0ktIywHC3KAfXBgPik6-0.2.0-probe.json'
+        '2019-06-01/20190601T003644Z-IN-AS18196-web_connectivity-20190601T003645Z_AS18196_rpEBAw2sJIRwgKvm3JhOur2dNqOdtIb0ktIywHC3KAfXBgPik6-0.2.0-probe.json',
         '2019-08-18/20190818T094131Z-IR-AS31549-vanilla_tor-20190818T094132Z_AS31549_dDsgseksbdQ1sJn4Z1wDJD2Y2nHhFJa23DiyJlYTVKofPxWv5k-0.2.0-probe.json',
         '2019-08-18/20190818T081446Z-DE-AS8881-http_header_field_manipulation-20190818T081451Z_AS8881_zqlJZozB32oWWytaFyGZU0ouAyAIrEarNo1ahjwZ2xOEdF4RI9-0.2.0-probe.json'
     ]
