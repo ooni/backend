@@ -250,6 +250,8 @@ class TestFullPipeline(unittest.TestCase):
         # This forces reprocessing of data
         with pg_conn() as conn:
             with conn.cursor() as c:
+                c.execute('UPDATE measurement SET confirmed = NULL')
+                c.execute('TRUNCATE TABLE http_request_fp')
                 c.execute('UPDATE autoclaved SET code_ver = 1')
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
