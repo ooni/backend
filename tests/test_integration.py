@@ -1,18 +1,16 @@
-import unittest
-
 import os
 import sys
 import time
 import shutil
 import psycopg2
-import traceback
 from datetime import datetime, timedelta
 from glob import glob
 
-import requests
-import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
+from pytest import fixture
+import boto3
+import requests
 
 import docker
 
@@ -24,8 +22,9 @@ METADB_NAME = "ootestmetadb"
 METADB_PG_USER = "oopguser"
 
 
-def start_pg(client):
-    pg_container = client.containers.run(
+@fixture
+def pg_container(docker_client):
+    pg_container = docker_client.containers.run(
         "postgres:9.6",
         name=METADB_NAME,
         hostname=METADB_NAME,
@@ -40,7 +39,13 @@ def start_pg(client):
         if exit_code == 0:
             break
         time.sleep(0.5)
-    return pg_container
+
+    print("Starting pg container")
+    pg_install_tables(pg_container)
+
+    yield pg_container
+
+    pg_container.remove(force=True)
 
 
 def pg_install_tables(container):
@@ -218,86 +223,72 @@ def run_canning_autoclaving():
     autoclaving_container.remove(force=True)
 
 
-class TestFullPipeline(unittest.TestCase):
-    def setUp(self):
-        self.docker_client = docker.from_env()
-        self.to_remove_containers = []
-
-    def test_run_small_bucket(self):
-        """
-        Buckets sizes for testing:
-        665M	2018-05-07
-        906M	2018-05-08
-        700M	2018-05-09
-        1.1G	2017-02-09
-        1.7G	2017-04-16
-        4.8G	2018-03-04
-        1.3G	2019-03-01
-        2.7G 2017-06-05
-        60M	        2016-07-07
-
-        Empty buckets:
-        4.0K	2015-12-24
-        4.0K	2015-12-25
-        4.0K	2015-12-26
-        4.0K	2015-12-27
-        4.0K	2015-12-28
-        4.0K	2018-12-09
-        4.0K	2018-12-10
-        """
-        bucket_date = "2018-01-01"
-        # bucket_date = '2018-05-07'
-        # fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
-
-        print("Starting pg container")
-        pg_container = start_pg(self.docker_client)
-        self.to_remove_containers.append(pg_container)
-
-        pg_install_tables(pg_container)
-
-        print("Running canning and autoclaving")
-        run_canning_autoclaving()
-
-        shovel_container = run_centrifugation(self.docker_client, bucket_date)
-        flags = get_flag_counts()
-        print("flags: {}".format(flags))
-
-        # This forces reprocessing of data
-        with pg_conn() as conn:
-            with conn.cursor() as c:
-                c.execute("UPDATE measurement SET confirmed = NULL")
-                c.execute("TRUNCATE TABLE http_request_fp")
-                c.execute("UPDATE autoclaved SET code_ver = 1")
-
-        shovel_container = run_centrifugation(self.docker_client, bucket_date)
-
-        new_flags = get_flag_counts()
-        for k, count in flags.items():
-            assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
-                k, count, new_flags[k]
-            )
-
-        # This forces reingestion of data
-        with pg_conn() as conn:
-            with conn.cursor() as c:
-                c.execute("UPDATE autoclaved SET file_sha1 = digest('wat', 'sha1')")
-        shovel_container = run_centrifugation(self.docker_client, bucket_date)
-
-        flags = new_flags.copy()
-        new_flags = get_flag_counts()
-        for k, count in flags.items():
-            assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
-                k, count, new_flags[k]
-            )
-
-        self.to_remove_containers.append(shovel_container)
-        result = shovel_container.wait()
-        self.assertEqual(result.get("StatusCode"), 0)
-
-    def tearDown(self):
-        for container in self.to_remove_containers:
-            container.remove(force=True)
+@fixture
+def docker_client():
+    yield docker.from_env()
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_run_small_bucket(docker_client, pg_container):
+    """
+    Buckets sizes for testing:
+    665M	2018-05-07
+    906M	2018-05-08
+    700M	2018-05-09
+    1.1G	2017-02-09
+    1.7G	2017-04-16
+    4.8G	2018-03-04
+    1.3G	2019-03-01
+    2.7G 2017-06-05
+    60M	        2016-07-07
+
+    Empty buckets:
+    4.0K	2015-12-24
+    4.0K	2015-12-25
+    4.0K	2015-12-26
+    4.0K	2015-12-27
+    4.0K	2015-12-28
+    4.0K	2018-12-09
+    4.0K	2018-12-10
+    """
+    bucket_date = "2018-01-01"
+    # bucket_date = '2018-05-07'
+    # fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
+
+    print("Running canning and autoclaving")
+    run_canning_autoclaving()
+
+    shovel_container = run_centrifugation(docker_client, bucket_date)
+    flags = get_flag_counts()
+    print("flags: {}".format(flags))
+
+    # This forces reprocessing of data
+    with pg_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE measurement SET confirmed = NULL")
+            c.execute("TRUNCATE TABLE http_request_fp")
+            c.execute("UPDATE autoclaved SET code_ver = 1")
+
+    shovel_container = run_centrifugation(docker_client, bucket_date)
+
+    new_flags = get_flag_counts()
+    for k, count in flags.items():
+        assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
+            k, count, new_flags[k]
+        )
+
+    # This forces reingestion of data
+    with pg_conn() as conn:
+        with conn.cursor() as c:
+            c.execute("UPDATE autoclaved SET file_sha1 = digest('wat', 'sha1')")
+    shovel_container = run_centrifugation(docker_client, bucket_date)
+
+    flags = new_flags.copy()
+    new_flags = get_flag_counts()
+    for k, count in flags.items():
+        assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
+            k, count, new_flags[k]
+        )
+
+    result = shovel_container.wait()
+    assert result.get("StatusCode") == 0
+    shovel_container.remove(force=True)
