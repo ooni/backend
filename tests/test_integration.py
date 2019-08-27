@@ -16,39 +16,41 @@ from botocore.config import Config
 
 import docker
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-AF_ROOT = os.path.join(REPO_ROOT, 'af')
-TESTDATA_DIR = os.path.join(REPO_ROOT, 'testdata')
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+AF_ROOT = os.path.join(REPO_ROOT, "af")
+TESTDATA_DIR = os.path.join(REPO_ROOT, "testdata")
 
-METADB_NAME = 'ootestmetadb'
-METADB_PG_USER = 'oopguser'
+METADB_NAME = "ootestmetadb"
+METADB_PG_USER = "oopguser"
+
 
 def start_pg(client):
     pg_container = client.containers.run(
-            'postgres:9.6',
-            name=METADB_NAME,
-            hostname=METADB_NAME,
-            environment={
-                'POSTGRES_USER': METADB_PG_USER
-            },
-            ports={
-                '5432/tcp': 25432
-            },
-            detach=True
+        "postgres:9.6",
+        name=METADB_NAME,
+        hostname=METADB_NAME,
+        environment={"POSTGRES_USER": METADB_PG_USER},
+        ports={"5432/tcp": 25432},
+        detach=True,
     )
     while True:
-        exit_code, output = pg_container.exec_run("psql -U {} -c 'select 1'".format(METADB_PG_USER))
+        exit_code, output = pg_container.exec_run(
+            "psql -U {} -c 'select 1'".format(METADB_PG_USER)
+        )
         if exit_code == 0:
             break
         time.sleep(0.5)
     return pg_container
 
+
 def pg_install_tables(container):
-    _, socket = container.exec_run(cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True)
-    if hasattr(socket, '_sock'):
+    _, socket = container.exec_run(
+        cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True
+    )
+    if hasattr(socket, "_sock"):
         socket = socket._sock
-    for fname in sorted(glob(os.path.join(AF_ROOT, 'oometa', '*.install.sql'))):
-        with open(fname, 'rb') as in_file:
+    for fname in sorted(glob(os.path.join(AF_ROOT, "oometa", "*.install.sql"))):
+        with open(fname, "rb") as in_file:
             socket.sendall(in_file.read())
 
     time.sleep(1)
@@ -57,85 +59,87 @@ def pg_install_tables(container):
             print(line)
             raise Exception("Detected error in query")
 
+
 def fetch_autoclaved_bucket(dst_dir, bucket_date):
     dst_bucket_dir = os.path.join(dst_dir, bucket_date)
     if not os.path.exists(dst_bucket_dir):
         os.makedirs(dst_bucket_dir)
-    client = boto3.client('s3', config=Config(signature_version=UNSIGNED))
-    resource = boto3.resource('s3', config=Config(signature_version=UNSIGNED))
+    client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    resource = boto3.resource("s3", config=Config(signature_version=UNSIGNED))
 
-    prefix = 'autoclaved/jsonl.tar.lz4/{}/'.format(bucket_date)
-    paginator = client.get_paginator('list_objects')
-    for result in paginator.paginate(Bucket='ooni-data', Delimiter='/', Prefix=prefix):
-        for f in result.get('Contents', []):
-            fkey = f.get('Key')
+    prefix = "autoclaved/jsonl.tar.lz4/{}/".format(bucket_date)
+    paginator = client.get_paginator("list_objects")
+    for result in paginator.paginate(Bucket="ooni-data", Delimiter="/", Prefix=prefix):
+        for f in result.get("Contents", []):
+            fkey = f.get("Key")
             dst_pathname = os.path.join(dst_bucket_dir, os.path.basename(fkey))
             print("[+] Downloading {}".format(dst_pathname))
 
             try:
                 s = os.stat(dst_pathname)
-                if s.st_size == f.get('Size'):
-                    print('SKIP')
+                if s.st_size == f.get("Size"):
+                    print("SKIP")
                     continue
-            except Exception: # XXX maybe make this more strict. It's FileNotFoundError on py3 and OSError on py2
+            except Exception:  # XXX maybe make this more strict. It's FileNotFoundError on py3 and OSError on py2
                 pass
-            resource.meta.client.download_file('ooni-data', fkey, dst_pathname)
+            resource.meta.client.download_file("ooni-data", fkey, dst_pathname)
+
 
 def shovel_run(client, cmd):
     shovel_container = client.containers.run(
-        'openobservatory/pipeline-shovel:latest',
+        "openobservatory/pipeline-shovel:latest",
         cmd,
-        mem_limit='512m',
-        user='{}:{}'.format(os.getuid(),os.getgid()),
-        working_dir='/mnt',
-        links={
-            METADB_NAME: None
-        },
-        volumes={
-            REPO_ROOT: {
-                'bind': '/mnt',
-                'mode': 'rw'
-            }
-        },
+        mem_limit="512m",
+        user="{}:{}".format(os.getuid(), os.getgid()),
+        working_dir="/mnt",
+        links={METADB_NAME: None},
+        volumes={REPO_ROOT: {"bind": "/mnt", "mode": "rw"}},
         privileged=True,
         stdout=True,
         stderr=True,
-        detach=True
+        detach=True,
     )
     start_time = time.time()
     container_logs = shovel_container.logs(stream=True)
     for line in container_logs:
-        sys.stdout.write(line.decode('utf8'))
+        sys.stdout.write(line.decode("utf8"))
         sys.stdout.flush()
     print("runtime: {}".format(time.time() - start_time))
     return shovel_container
 
+
 def run_centrifugation(client, bucket_date):
     end_bucket_date = get_end_bucket_date(bucket_date)
 
-    centrifugation_cmd = '/mnt/af/shovel/centrifugation.py --start {}T00:00:00'.format(bucket_date)
-    centrifugation_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
-    centrifugation_cmd += " --autoclaved-root /mnt/testdata/autoclaved --postgres 'host={} user={}'".format(METADB_NAME, METADB_PG_USER)
+    centrifugation_cmd = "/mnt/af/shovel/centrifugation.py --start {}T00:00:00".format(
+        bucket_date
+    )
+    centrifugation_cmd += " --end {}T00:00:00".format(end_bucket_date)
+    centrifugation_cmd += " --autoclaved-root /mnt/testdata/autoclaved --postgres 'host={} user={}'".format(
+        METADB_NAME, METADB_PG_USER
+    )
 
     print("running shovel: {}".format(centrifugation_cmd))
     shovel_container = shovel_run(client, centrifugation_cmd)
 
     return shovel_container
 
+
 def download_file(url, dst_filename):
     with requests.get(url, stream=True) as r:
-        with open(dst_filename+'.tmp', 'wb') as f:
+        with open(dst_filename + ".tmp", "wb") as f:
             shutil.copyfileobj(r.raw, f)
-    os.rename(dst_filename+'.tmp', dst_filename)
+    os.rename(dst_filename + ".tmp", dst_filename)
     return dst_filename
+
 
 def download_report_files(dst_dir):
     textnames = [
-        '2019-06-01/20190601T003644Z-IN-AS18196-web_connectivity-20190601T003645Z_AS18196_rpEBAw2sJIRwgKvm3JhOur2dNqOdtIb0ktIywHC3KAfXBgPik6-0.2.0-probe.json',
-        '2019-08-18/20190818T094131Z-IR-AS31549-vanilla_tor-20190818T094132Z_AS31549_dDsgseksbdQ1sJn4Z1wDJD2Y2nHhFJa23DiyJlYTVKofPxWv5k-0.2.0-probe.json',
-        '2019-08-18/20190818T081446Z-DE-AS8881-http_header_field_manipulation-20190818T081451Z_AS8881_zqlJZozB32oWWytaFyGZU0ouAyAIrEarNo1ahjwZ2xOEdF4RI9-0.2.0-probe.json'
+        "2019-06-01/20190601T003644Z-IN-AS18196-web_connectivity-20190601T003645Z_AS18196_rpEBAw2sJIRwgKvm3JhOur2dNqOdtIb0ktIywHC3KAfXBgPik6-0.2.0-probe.json",
+        "2019-08-18/20190818T094131Z-IR-AS31549-vanilla_tor-20190818T094132Z_AS31549_dDsgseksbdQ1sJn4Z1wDJD2Y2nHhFJa23DiyJlYTVKofPxWv5k-0.2.0-probe.json",
+        "2019-08-18/20190818T081446Z-DE-AS8881-http_header_field_manipulation-20190818T081451Z_AS8881_zqlJZozB32oWWytaFyGZU0ouAyAIrEarNo1ahjwZ2xOEdF4RI9-0.2.0-probe.json",
     ]
-    base_url = 'https://api.ooni.io/files/download/'
+    base_url = "https://api.ooni.io/files/download/"
     for tn in textnames:
         url = base_url + tn
         dst_filename = os.path.join(dst_dir, os.path.basename(tn))
@@ -144,58 +148,69 @@ def download_report_files(dst_dir):
             continue
         download_file(url, dst_filename)
 
+
 def pg_conn():
-    return psycopg2.connect('host={} user={} port={}'.format('localhost', METADB_PG_USER, 25432))
+    return psycopg2.connect(
+        "host={} user={} port={}".format("localhost", METADB_PG_USER, 25432)
+    )
+
 
 def get_flag_counts():
     flags = {}
     with pg_conn() as conn:
         with conn.cursor() as c:
-            c.execute("""select
+            c.execute(
+                """select
                 SUM(case when confirmed = TRUE then 1 else 0 end) as confirmed_count,
                 SUM(case when confirmed IS NULL then 1 else 0 end) as unconfirmed_count,
                 SUM(case when anomaly = TRUE then 1 else 0 end) as anomaly_count
                 from measurement;
-                """)
+                """
+            )
             row = c.fetchone()
-            flags['confirmed'] = row[0]
-            flags['unconfirmed'] = row[1]
-            flags['anomaly'] = row[2]
+            flags["confirmed"] = row[0]
+            flags["unconfirmed"] = row[1]
+            flags["anomaly"] = row[2]
     return flags
 
+
 def get_end_bucket_date(start_date):
-    fmt = '%Y-%m-%d'
+    fmt = "%Y-%m-%d"
     return (datetime.strptime(start_date, fmt) + timedelta(1)).strftime(fmt)
 
+
 def maybe_makedirs(bucket_dir):
-    for dn in ['reports_raw', 'autoclaved', 'canned']:
+    for dn in ["reports_raw", "autoclaved", "canned"]:
         p = os.path.join(TESTDATA_DIR, dn, bucket_dir)
         if not os.path.exists(p):
             os.makedirs(p)
 
+
 def run_canning_autoclaving():
-    start_date = '2018-01-01'
+    start_date = "2018-01-01"
     end_bucket_date = get_end_bucket_date(start_date)
 
-    reports_raw_dir = os.path.join(TESTDATA_DIR, 'reports_raw', start_date)
+    reports_raw_dir = os.path.join(TESTDATA_DIR, "reports_raw", start_date)
     maybe_makedirs(start_date)
-    with open(os.path.join(TESTDATA_DIR, 'bridge_db.json'), 'w') as out_file:
-        out_file.write('{}')
+    with open(os.path.join(TESTDATA_DIR, "bridge_db.json"), "w") as out_file:
+        out_file.write("{}")
 
     print("Downloading report files")
     download_report_files(reports_raw_dir)
 
     docker_client = docker.from_env()
-    canning_cmd = '/mnt/af/shovel/canning.py --start {}T00:00:00'.format(start_date)
-    canning_cmd+= ' --end {}T00:00:00'.format(end_bucket_date)
+    canning_cmd = "/mnt/af/shovel/canning.py --start {}T00:00:00".format(start_date)
+    canning_cmd += " --end {}T00:00:00".format(end_bucket_date)
     canning_cmd += " --reports-raw-root /mnt/testdata/reports_raw --canned-root /mnt/testdata/canned"
 
     print("Running canning command")
     canning_container = shovel_run(docker_client, canning_cmd)
     canning_container.remove(force=True)
 
-    autoclaving_cmd = '/mnt/af/shovel/autoclaving.py --start {}T00:00:00'.format(start_date)
-    autoclaving_cmd += ' --end {}T00:00:00'.format(end_bucket_date)
+    autoclaving_cmd = "/mnt/af/shovel/autoclaving.py --start {}T00:00:00".format(
+        start_date
+    )
+    autoclaving_cmd += " --end {}T00:00:00".format(end_bucket_date)
     autoclaving_cmd += " --canned-root /mnt/testdata/canned --autoclaved-root /mnt/testdata/autoclaved --bridge-db /mnt/testdata/bridge_db.json"
 
     print("Running autoclaving command")
@@ -230,9 +245,9 @@ class TestFullPipeline(unittest.TestCase):
         4.0K	2018-12-09
         4.0K	2018-12-10
         """
-        bucket_date = '2018-01-01'
-        #bucket_date = '2018-05-07'
-        #fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
+        bucket_date = "2018-01-01"
+        # bucket_date = '2018-05-07'
+        # fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
 
         print("Starting pg container")
         pg_container = start_pg(self.docker_client)
@@ -250,9 +265,9 @@ class TestFullPipeline(unittest.TestCase):
         # This forces reprocessing of data
         with pg_conn() as conn:
             with conn.cursor() as c:
-                c.execute('UPDATE measurement SET confirmed = NULL')
-                c.execute('TRUNCATE TABLE http_request_fp')
-                c.execute('UPDATE autoclaved SET code_ver = 1')
+                c.execute("UPDATE measurement SET confirmed = NULL")
+                c.execute("TRUNCATE TABLE http_request_fp")
+                c.execute("UPDATE autoclaved SET code_ver = 1")
 
         shovel_container = run_centrifugation(self.docker_client, bucket_date)
 
@@ -277,14 +292,12 @@ class TestFullPipeline(unittest.TestCase):
 
         self.to_remove_containers.append(shovel_container)
         result = shovel_container.wait()
-        self.assertEqual(
-            result.get('StatusCode'),
-            0
-        )
+        self.assertEqual(result.get("StatusCode"), 0)
 
     def tearDown(self):
         for container in self.to_remove_containers:
             container.remove(force=True)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
