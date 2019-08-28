@@ -1,8 +1,5 @@
 sudo: required
 language: python
-#cache:
-#  directories:
-#  - testdata/
 services:
   - docker
 install:
