@@ -3,6 +3,8 @@ import sys
 import time
 import stat
 import errno
+import string
+import random
 import shutil
 import tempfile
 import psycopg2
@@ -224,17 +226,25 @@ def run_canning_autoclaving(pipeline_ctx):
 def docker_client():
     yield docker.from_env()
 
+def randStr(length):
+    letters = string.ascii_letters
+    return ''.join(random.choice(letters) for i in range(length))
+
+def rm_rf(path):
+    pass
+
 @fixture
 def pipeline_dir_ctx():
-    working_dir = tempfile.TemporaryDirectory(dir=TESTDATA_DIR)
+    working_dir = os.path.join(TESTDATA_DIR, 'working_dir' + randStr(20))
+    os.makedirs(working_dir)
 
     ctx = {
         'repo_root': REPO_ROOT,
-        'working_dir_root': working_dir.name,
+        'working_dir_root': working_dir,
 
         'reports_raw': os.path.join(TESTDATA_DIR, "reports_raw"),
-        'canned': os.path.join(working_dir.name, 'canned'),
-        'autoclaved': os.path.join(working_dir.name, 'autoclaved')
+        'canned': os.path.join(working_dir, 'canned'),
+        'autoclaved': os.path.join(working_dir, 'autoclaved')
     }
 
     with open(os.path.join(TESTDATA_DIR, "bridge_db.json"), "w") as out_file:
@@ -250,7 +260,16 @@ def pipeline_dir_ctx():
                 raise
     yield ctx
 
-    working_dir.cleanup()
+    shutil.rmtree(working_dir, ignore_errors=True)
+
+def print_query_fetchone_output(conn, q):
+    with conn.cursor() as c:
+        c.execute(q)
+        row = c.fetchone()
+        print("----")
+        print(q)
+        print(row)
+        print("----")
 
 def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     """
@@ -284,6 +303,9 @@ def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     shovel_container = run_centrifugation(docker_client, bucket_date, pipeline_dir_ctx)
     flags = get_flag_counts()
     print("flags[0]: {}".format(flags))
+
+    with pg_conn() as conn:
+        print_query_fetchone_output(conn, 'SELECT COUNT(*) FROM http_request_fp;')
 
     # This forces reprocessing of data
     with pg_conn() as conn:
