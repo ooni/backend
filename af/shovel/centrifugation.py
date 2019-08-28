@@ -2079,7 +2079,8 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
                     for header_prefix, fingerprint_no in fps.header_prefix[h]:
                         if value.startswith(header_prefix):
                             ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
-
+        if ret != "":
+            print("returning", ret)
         return ret
 
     def row(self, msm_no, datum):

@@ -317,6 +317,8 @@ def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     flags = get_flag_counts()
     print("flags[1]: {}".format(flags))
     shovel_container = run_centrifugation(docker_client, bucket_date, pipeline_dir_ctx)
+    flags = get_flag_counts()
+    print("flags[2]: {}".format(flags))
 
     new_flags = get_flag_counts()
     for k, count in flags.items():
@@ -336,7 +338,7 @@ def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
         assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
             k, count, new_flags[k]
         )
-    print("flags[2]: {}".format(flags))
+    print("flags[3]: {}".format(flags))
 
     result = shovel_container.wait()
     assert result.get("StatusCode") == 0
