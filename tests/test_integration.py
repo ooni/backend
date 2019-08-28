@@ -1,7 +1,10 @@
 import os
 import sys
 import time
+import stat
+import errno
 import shutil
+import tempfile
 import psycopg2
 from datetime import datetime, timedelta
 from glob import glob
@@ -90,7 +93,7 @@ def fetch_autoclaved_bucket(dst_dir, bucket_date):
             resource.meta.client.download_file("ooni-data", fkey, dst_pathname)
 
 
-def shovel_run(client, cmd):
+def shovel_run(client, cmd, pipeline_ctx):
     shovel_container = client.containers.run(
         "openobservatory/pipeline-shovel:latest",
         cmd,
@@ -98,7 +101,10 @@ def shovel_run(client, cmd):
         user="{}:{}".format(os.getuid(), os.getgid()),
         working_dir="/mnt",
         links={METADB_NAME: None},
-        volumes={REPO_ROOT: {"bind": "/mnt", "mode": "rw"}},
+        volumes={
+            pipeline_ctx['working_dir_root']: {"bind": "/data", "mode": "rw"},
+            REPO_ROOT: {"bind": "/mnt", "mode": "rw"}
+        },
         privileged=True,
         stdout=True,
         stderr=True,
@@ -113,19 +119,19 @@ def shovel_run(client, cmd):
     return shovel_container
 
 
-def run_centrifugation(client, bucket_date):
+def run_centrifugation(client, bucket_date, pipeline_ctx):
     end_bucket_date = get_end_bucket_date(bucket_date)
 
     centrifugation_cmd = "/mnt/af/shovel/centrifugation.py --start {}T00:00:00".format(
         bucket_date
     )
     centrifugation_cmd += " --end {}T00:00:00".format(end_bucket_date)
-    centrifugation_cmd += " --autoclaved-root /mnt/testdata/autoclaved --postgres 'host={} user={}'".format(
+    centrifugation_cmd += " --autoclaved-root /data/autoclaved --postgres 'host={} user={}'".format(
         METADB_NAME, METADB_PG_USER
     )
 
     print("running shovel: {}".format(centrifugation_cmd))
-    shovel_container = shovel_run(client, centrifugation_cmd)
+    shovel_container = shovel_run(client, centrifugation_cmd, pipeline_ctx)
 
     return shovel_container
 
@@ -183,52 +189,70 @@ def get_end_bucket_date(start_date):
     fmt = "%Y-%m-%d"
     return (datetime.strptime(start_date, fmt) + timedelta(1)).strftime(fmt)
 
-
-def maybe_makedirs(bucket_dir):
-    for dn in ["reports_raw", "autoclaved", "canned"]:
-        p = os.path.join(TESTDATA_DIR, dn, bucket_dir)
-        if not os.path.exists(p):
-            os.makedirs(p)
-
-
-def run_canning_autoclaving():
+def run_canning_autoclaving(pipeline_ctx):
     start_date = "2018-01-01"
     end_bucket_date = get_end_bucket_date(start_date)
 
-    reports_raw_dir = os.path.join(TESTDATA_DIR, "reports_raw", start_date)
-    maybe_makedirs(start_date)
-    with open(os.path.join(TESTDATA_DIR, "bridge_db.json"), "w") as out_file:
-        out_file.write("{}")
-
     print("Downloading report files")
+    reports_raw_dir = os.path.join(pipeline_ctx['reports_raw'], start_date)
+    for dn in ['reports_raw', 'canned', 'autoclaved']:
+        path = os.path.join(pipeline_ctx[dn], start_date)
+        if not os.path.exists(path):
+            os.makedirs(path)
     download_report_files(reports_raw_dir)
 
     docker_client = docker.from_env()
     canning_cmd = "/mnt/af/shovel/canning.py --start {}T00:00:00".format(start_date)
     canning_cmd += " --end {}T00:00:00".format(end_bucket_date)
-    canning_cmd += " --reports-raw-root /mnt/testdata/reports_raw --canned-root /mnt/testdata/canned"
+    canning_cmd += " --reports-raw-root /mnt/testdata/reports_raw --canned-root /data/canned"
 
     print("Running canning command")
-    canning_container = shovel_run(docker_client, canning_cmd)
+    canning_container = shovel_run(docker_client, canning_cmd, pipeline_ctx)
     canning_container.remove(force=True)
 
     autoclaving_cmd = "/mnt/af/shovel/autoclaving.py --start {}T00:00:00".format(
         start_date
     )
     autoclaving_cmd += " --end {}T00:00:00".format(end_bucket_date)
-    autoclaving_cmd += " --canned-root /mnt/testdata/canned --autoclaved-root /mnt/testdata/autoclaved --bridge-db /mnt/testdata/bridge_db.json"
+    autoclaving_cmd += " --canned-root /data/canned --autoclaved-root /data/autoclaved --bridge-db /mnt/testdata/bridge_db.json"
 
     print("Running autoclaving command")
-    autoclaving_container = shovel_run(docker_client, autoclaving_cmd)
+    autoclaving_container = shovel_run(docker_client, autoclaving_cmd, pipeline_ctx)
     autoclaving_container.remove(force=True)
-
 
 @fixture
 def docker_client():
     yield docker.from_env()
 
+@fixture
+def pipeline_dir_ctx():
+    working_dir = tempfile.TemporaryDirectory(dir=TESTDATA_DIR)
 
-def test_run_small_bucket(docker_client, pg_container):
+    ctx = {
+        'repo_root': REPO_ROOT,
+        'working_dir_root': working_dir.name,
+
+        'reports_raw': os.path.join(TESTDATA_DIR, "reports_raw"),
+        'canned': os.path.join(working_dir.name, 'canned'),
+        'autoclaved': os.path.join(working_dir.name, 'autoclaved')
+    }
+
+    with open(os.path.join(TESTDATA_DIR, "bridge_db.json"), "w") as out_file:
+        out_file.write("{}")
+
+    for dn in ['reports_raw', 'canned', 'autoclaved']:
+        try:
+            os.makedirs(ctx[dn])
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                pass
+            else:
+                raise
+    yield ctx
+
+    working_dir.cleanup()
+
+def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     """
     Buckets sizes for testing:
     665M	2018-05-07
@@ -255,20 +279,22 @@ def test_run_small_bucket(docker_client, pg_container):
     # fetch_autoclaved_bucket(TESTDATA_DIR, bucket_date)
 
     print("Running canning and autoclaving")
-    run_canning_autoclaving()
+    run_canning_autoclaving(pipeline_dir_ctx)
 
-    shovel_container = run_centrifugation(docker_client, bucket_date)
+    shovel_container = run_centrifugation(docker_client, bucket_date, pipeline_dir_ctx)
     flags = get_flag_counts()
-    print("flags: {}".format(flags))
+    print("flags[0]: {}".format(flags))
 
     # This forces reprocessing of data
     with pg_conn() as conn:
         with conn.cursor() as c:
-            c.execute("UPDATE measurement SET confirmed = NULL")
-            c.execute("TRUNCATE TABLE http_request_fp")
-            c.execute("UPDATE autoclaved SET code_ver = 1")
+            c.execute("UPDATE measurement SET confirmed = NULL, anomaly = NULL;")
+            c.execute("TRUNCATE TABLE http_request_fp;")
+            c.execute("UPDATE autoclaved SET code_ver = 1;")
 
-    shovel_container = run_centrifugation(docker_client, bucket_date)
+    flags = get_flag_counts()
+    print("flags[1]: {}".format(flags))
+    shovel_container = run_centrifugation(docker_client, bucket_date, pipeline_dir_ctx)
 
     new_flags = get_flag_counts()
     for k, count in flags.items():
@@ -280,7 +306,7 @@ def test_run_small_bucket(docker_client, pg_container):
     with pg_conn() as conn:
         with conn.cursor() as c:
             c.execute("UPDATE autoclaved SET file_sha1 = digest('wat', 'sha1')")
-    shovel_container = run_centrifugation(docker_client, bucket_date)
+    shovel_container = run_centrifugation(docker_client, bucket_date, pipeline_dir_ctx)
 
     flags = new_flags.copy()
     new_flags = get_flag_counts()
@@ -288,6 +314,7 @@ def test_run_small_bucket(docker_client, pg_container):
         assert count == new_flags[k], "{} count doesn't match ({} != {})".format(
             k, count, new_flags[k]
         )
+    print("flags[2]: {}".format(flags))
 
     result = shovel_container.wait()
     assert result.get("StatusCode") == 0
