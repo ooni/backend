@@ -143,10 +143,15 @@ def http_status_code(code):
     else:
         raise RuntimeError("Invalid HTTP code", code)
 
+def encode_header_value(v):
+    if isinstance(v, dict):
+        assert v.viewkeys() == {"data", "format"} and v["format"] == "base64"
+        return pg_binquote(b64decode(v["data"]))
+    return pg_uniquote(v)
 
 def http_headers(headers):
     # make headers dict friendly to postgres
-    return {pg_uniquote(k): pg_uniquote(v) for k, v in headers.iteritems()}
+    return {pg_uniquote(k): encode_header_value(v) for k, v in headers.iteritems()}
 
 
 def dns_ttl(ttl):

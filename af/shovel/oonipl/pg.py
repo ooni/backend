@@ -214,7 +214,7 @@ def pg_binquote(s):
 def pg_uniquote(s):
     if isinstance(s, str):
         s = unicode(s, "utf-8")
-    assert isinstance(s, unicode)
+    assert isinstance(s, unicode), "{} not unicode".format(s)
     return BAD_UTF8_RE.sub(
         u"\ufffd", s
     )  # `re` is smart enough to return same object in case of no-op
