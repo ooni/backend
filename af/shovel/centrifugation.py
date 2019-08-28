@@ -2057,8 +2057,11 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
         body = httpt_body(response)
         headers = (response or {}).get("headers") or {}
         headers = {h.lower(): value for h, value in headers.iteritems()}
-
         ret = ""
+
+        if body is None and len(headers) == 0:
+            return ret
+
         for fps in matchers:
             if body is not None:
                 for body_substr, fingerprint_no in fps.body_substr:
