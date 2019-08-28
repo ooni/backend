@@ -319,6 +319,8 @@ def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     shovel_container = run_centrifugation(docker_client, bucket_date, pipeline_dir_ctx)
     flags = get_flag_counts()
     print("flags[2]: {}".format(flags))
+    with pg_conn() as conn:
+        print_query_fetchone_output(conn, 'SELECT COUNT(*) FROM http_request_fp;')
 
     new_flags = get_flag_counts()
     for k, count in flags.items():
