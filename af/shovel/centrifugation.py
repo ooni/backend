@@ -1128,8 +1128,7 @@ class MeasurementExceptionFeeder(BaseFeeder):
         create_temp_table(pgconn, "msm_no_old", "msm_no integer NOT NULL")
         self.msm_no_sink = PGCopyFrom(pgconn, "msm_no_old", columns=("msm_no",))
 
-    @staticmethod
-    def msm_rownpop(msm_no, _, exc):
+    def msm_rownpop(self, msm_no, _, exc):
         self.msm_no_sink.write("{:d}\n".format(msm_no))
         if FLAG_DEBUG_CHAOS and random.random() < 0.01:
             raise RuntimeError("bad luck with measurement")
