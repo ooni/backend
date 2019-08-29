@@ -1015,10 +1015,7 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
                 true AS confirmed
             FROM http_request_fp
             JOIN fingerprint USING (fingerprint_no)
-            JOIN measurement_meta USING (msm_no)
-            JOIN report_blob USING (report_no)
-            WHERE origin_cc = probe_cc
-            AND msm_no IN (SELECT msm_no FROM {msm})
+            WHERE msm_no IN (SELECT msm_no FROM {msm})
             AND msm_no >= %s AND msm_no <= %s
             UNION ALL
             SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
