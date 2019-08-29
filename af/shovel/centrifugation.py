@@ -143,10 +143,15 @@ def http_status_code(code):
     else:
         raise RuntimeError("Invalid HTTP code", code)
 
+def encode_header_value(v):
+    if isinstance(v, dict):
+        assert v.viewkeys() == {"data", "format"} and v["format"] == "base64"
+        return pg_binquote(b64decode(v["data"]))
+    return pg_uniquote(v)
 
 def http_headers(headers):
     # make headers dict friendly to postgres
-    return {pg_uniquote(k): pg_uniquote(v) for k, v in headers.iteritems()}
+    return {pg_uniquote(k): encode_header_value(v) for k, v in headers.iteritems()}
 
 
 def dns_ttl(ttl):
@@ -1010,10 +1015,7 @@ def calc_measurement_flags(pgconn, flags_tbl, msm_tbl):
                 true AS confirmed
             FROM http_request_fp
             JOIN fingerprint USING (fingerprint_no)
-            JOIN measurement_meta USING (msm_no)
-            JOIN report_blob USING (report_no)
-            WHERE origin_cc = probe_cc
-            AND msm_no IN (SELECT msm_no FROM {msm})
+            WHERE msm_no IN (SELECT msm_no FROM {msm})
             AND msm_no >= %s AND msm_no <= %s
             UNION ALL
             SELECT msm_no, true AS anomaly, NULL AS confirmed FROM http_verdict
@@ -1123,8 +1125,7 @@ class MeasurementExceptionFeeder(BaseFeeder):
         create_temp_table(pgconn, "msm_no_old", "msm_no integer NOT NULL")
         self.msm_no_sink = PGCopyFrom(pgconn, "msm_no_old", columns=("msm_no",))
 
-    @staticmethod
-    def msm_rownpop(msm_no, _, exc):
+    def msm_rownpop(self, msm_no, _, exc):
         self.msm_no_sink.write("{:d}\n".format(msm_no))
         if FLAG_DEBUG_CHAOS and random.random() < 0.01:
             raise RuntimeError("bad luck with measurement")
@@ -2051,14 +2052,19 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
     def _row(self, msm_no, r, cc):
         matchers = [self._fps_by_cc["ZZ"]]
         if cc != "ZZ" and cc in self._fps_by_cc:
-            matchers.append(self._fps_by_cc["cc"])
+            matchers.append(self._fps_by_cc[cc])
 
         response = r["response"]
         body = httpt_body(response)
         headers = (response or {}).get("headers") or {}
         headers = {h.lower(): value for h, value in headers.iteritems()}
-
         ret = ""
+
+        # This is a fast path for when there is no body or headers to match
+        # against
+        if body is None and len(headers) == 0:
+            return ret
+
         for fps in matchers:
             if body is not None:
                 for body_substr, fingerprint_no in fps.body_substr:
@@ -2076,7 +2082,6 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
                     for header_prefix, fingerprint_no in fps.header_prefix[h]:
                         if value.startswith(header_prefix):
                             ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
-
         return ret
 
     def row(self, msm_no, datum):
