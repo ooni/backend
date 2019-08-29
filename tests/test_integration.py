@@ -1,13 +1,19 @@
-import os
-import sys
-import time
-import stat
+"""
+Run integration test
+
+Run with tox using: `tox`
+Help: `tox -- -h`
+Run against a shovel image tag: `tox -- --shovel-image-tag 20190704-4659f159`
+"""
+
 import errno
-import string
+import os
+import psycopg2
 import random
 import shutil
-import tempfile
-import psycopg2
+import string
+import sys
+import time
 from datetime import datetime, timedelta
 from glob import glob
 
@@ -29,6 +35,7 @@ METADB_PG_USER = "oopguser"
 
 @fixture
 def pg_container(docker_client):
+    ## Start Postgres in a dedicated container named in METADB_NAME
     pg_container = docker_client.containers.run(
         "postgres:9.6",
         name=METADB_NAME,
@@ -37,6 +44,7 @@ def pg_container(docker_client):
         ports={"5432/tcp": 25432},
         detach=True,
     )
+    # TODO ensure this doesn't run into an infinite loop, though it hasn't been a problem up until now.
     while True:
         exit_code, output = pg_container.exec_run(
             "psql -U {} -c 'select 1'".format(METADB_PG_USER)
@@ -57,6 +65,8 @@ def pg_install_tables(container):
     _, socket = container.exec_run(
         cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True
     )
+    # This is to support multiple versions of docker and python. 
+    # See: https://github.com/docker/docker-py/issues/2255#issuecomment-475270012
     if hasattr(socket, "_sock"):
         socket = socket._sock
     for fname in sorted(glob(os.path.join(AF_ROOT, "oometa", "*.install.sql"))):
@@ -71,6 +81,7 @@ def pg_install_tables(container):
 
 
 def fetch_autoclaved_bucket(dst_dir, bucket_date):
+    print("Fetch bucket")
     dst_bucket_dir = os.path.join(dst_dir, bucket_date)
     if not os.path.exists(dst_bucket_dir):
         os.makedirs(dst_bucket_dir)
@@ -83,15 +94,13 @@ def fetch_autoclaved_bucket(dst_dir, bucket_date):
         for f in result.get("Contents", []):
             fkey = f.get("Key")
             dst_pathname = os.path.join(dst_bucket_dir, os.path.basename(fkey))
-            print("[+] Downloading {}".format(dst_pathname))
-
             try:
                 s = os.stat(dst_pathname)
                 if s.st_size == f.get("Size"):
-                    print("SKIP")
                     continue
             except Exception:  # XXX maybe make this more strict. It's FileNotFoundError on py3 and OSError on py2
                 pass
+            print("[+] Downloading {}".format(dst_pathname))
             resource.meta.client.download_file("ooni-data", fkey, dst_pathname)
 
 
@@ -122,6 +131,8 @@ def shovel_run(client, cmd, pipeline_ctx):
 
 
 def run_centrifugation(client, bucket_date, pipeline_ctx):
+    ## Run centrifugation in a dedicated container based on
+    ## the openobservatory/pipeline-shovel:latest image
     end_bucket_date = get_end_bucket_date(bucket_date)
 
     centrifugation_cmd = "/mnt/af/shovel/centrifugation.py --start {}T00:00:00".format(
