@@ -29,6 +29,7 @@ METADB_PG_USER = "oopguser"
 
 @fixture
 def pg_container(docker_client):
+    ## Start Postgres in a dedicated container named in METADB_NAME
     pg_container = docker_client.containers.run(
         "postgres:9.6",
         name=METADB_NAME,
@@ -122,6 +123,8 @@ def shovel_run(client, cmd, pipeline_ctx):
 
 
 def run_centrifugation(client, bucket_date, pipeline_ctx):
+    ## Run centrifugation in a dedicated container based on
+    ## the openobservatory/pipeline-shovel:latest image
     end_bucket_date = get_end_bucket_date(bucket_date)
 
     centrifugation_cmd = "/mnt/af/shovel/centrifugation.py --start {}T00:00:00".format(
