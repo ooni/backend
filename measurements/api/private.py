@@ -508,6 +508,7 @@ def api_private_website_test_urls():
         sql.text("test_start_time < current_date"),
         sql.text("probe_cc = :probe_cc"),
         sql.text("probe_asn = :probe_asn"),
+        sql.text("test_name = 'web_connectivity'")
     ]
     query_params = {'probe_cc': probe_cc, 'probe_asn': probe_asn}
 
