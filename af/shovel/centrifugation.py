@@ -2060,6 +2060,8 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
         headers = {h.lower(): value for h, value in headers.iteritems()}
         ret = ""
 
+        # This is a fast path for when there is no body or headers to match
+        # against
         if body is None and len(headers) == 0:
             return ret
 
@@ -2080,8 +2082,6 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
                     for header_prefix, fingerprint_no in fps.header_prefix[h]:
                         if value.startswith(header_prefix):
                             ret += "{:d}\t{:d}\n".format(msm_no, fingerprint_no)
-        if ret != "":
-            print("returning", ret)
         return ret
 
     def row(self, msm_no, datum):
