@@ -1,3 +1,14 @@
+# ooni-api 1.1.4 [2019-08-29]
+
+Added:
+
+* Support for searching by domain in the measurement list API endpoint
+
+Changed:
+
+* Private API endpoint for Explorer for websites filters on web_connectivity test_name
+* Exceptions are now BadRequest to avoid cluttering sentry
+
 # ooni-api 1.1.3 [2019-08-13]
 
 Changed:
