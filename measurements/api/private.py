@@ -134,7 +134,7 @@ def api_private_countries():
 def api_private_blockpages():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None:
-        raise Exception('err')
+        raise BadRequest('missing probe_cc')
 
 
     q = current_app.db_session.query(
@@ -169,7 +169,7 @@ def api_private_blockpages():
 def api_private_website_measurements():
     input_ = request.args.get('input')
     if input_ is None:
-        raise Exception('err')
+        raise BadRequest('missing input')
 
     q = current_app.db_session.query(
         Report.report_id.label('report_id'),
@@ -225,7 +225,7 @@ def api_private_blockpage_detected():
 def api_private_blockpage_count():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     s = sql.text("""SELECT SUM(confirmed_count), SUM(msm_count), test_day
     FROM ooexpl_wc_confirmed
@@ -314,7 +314,7 @@ def get_recent_network_coverage(probe_cc, test_groups):
                 tg_names = TEST_GROUPS[tg]
                 tg_or += [sql.literal_column("test_name") == tg_name for tg_name in tg_names]
             except KeyError:
-                raise Exception('invalid test_group')
+                raise BadRequest('invalid test_group')
         where_clause.append(or_(*tg_or))
 
     s = select([
@@ -379,7 +379,7 @@ def get_recent_test_coverage(probe_cc):
 def api_private_test_coverage():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     test_groups = request.args.get('test_groups')
     if test_groups is not None:
@@ -394,7 +394,7 @@ def api_private_test_coverage():
 def api_private_website_network_tests():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     s = select([
         sql.text("COUNT(*)"),
@@ -434,11 +434,11 @@ def api_private_website_stats():
 
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     probe_asn = request.args.get('probe_asn')
     if probe_asn is None:
-        raise Exception('missing probe_asn')
+        raise BadRequest('missing probe_asn')
 
     s = sql.text("""SELECT
 d.test_day,
@@ -496,11 +496,11 @@ def api_private_website_test_urls():
 
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     probe_asn = request.args.get('probe_asn')
     if probe_asn is None:
-        raise Exception('missing probe_asn')
+        raise BadRequest('missing probe_asn')
 
     probe_asn = int(probe_asn.replace('AS', ''))
     where_clause = [
@@ -582,7 +582,7 @@ def api_private_website_test_urls():
 def api_private_vanilla_tor_stats():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
     s = sql.text("""SELECT
 	vt.probe_asn,
 	MAX(vt.measurement_start_time) as last_tested,
@@ -651,7 +651,7 @@ GROUP BY 1;""")
 def api_private_im_networks():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     test_names = [sql.literal_column("test_name") == tg_name for tg_name in TEST_GROUPS['im']]
     s = select([
@@ -696,15 +696,15 @@ def api_private_im_networks():
 def api_private_im_stats():
     test_name = request.args.get('test_name')
     if not test_name or test_name not in TEST_GROUPS['im']:
-        raise Exception('invalid test_name')
+        raise BadRequest('invalid test_name')
 
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     probe_asn = request.args.get('probe_asn')
     if probe_asn is None:
-        raise Exception('missing probe_asn')
+        raise BadRequest('missing probe_asn')
     probe_asn = int(probe_asn.replace('AS', ''))
 
     s = sql.text("""SELECT COALESCE(count, 0), d.test_day
@@ -755,7 +755,7 @@ ORDER BY test_day;""")
 def api_private_network_stats():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     limit = int(request.args.get('limit', 10))
     if limit <= 0:
@@ -829,7 +829,7 @@ def api_private_network_stats():
 def api_private_country_overview():
     probe_cc = request.args.get('probe_cc')
     if probe_cc is None or len(probe_cc) != 2:
-        raise Exception('missing probe_cc')
+        raise BadRequest('missing probe_cc')
 
     row = current_app.db_session.execute(
         select([

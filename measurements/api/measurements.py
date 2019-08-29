@@ -200,6 +200,32 @@ def get_measurement(measurement_id, download=None):
                 'attachment', filename=filename)
     return response
 
+def input_filter(q, input_, domain, test_name):
+    if input_ and domain:
+        raise BadRequest("Must pick either domain or input")
+
+    if not input_ and not domain:
+        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
+
+    if input_:
+        q = q.join(Input, Measurement.input_no == Input.input_no)\
+             .filter(Input.input.like('%{}%'.format(input_)))
+
+    if domain:
+        q = q.join(Input, Measurement.input_no == Input.input_no)
+        domain_filter = '{}%'.format(domain)
+        web_filter = '(https://|http://){}'.format(domain_filter)
+        if test_name not in ['web_connectivity', 'http_requests']:
+            q = q.filter(or_(
+                text('input.input SIMILAR TO :web_filter').bindparams(web_filter=web_filter),
+                text('input.input SIMILAR TO :domain_filter').bindparams(domain_filter=domain_filter)
+            ))
+        else:
+            q = q.filter(
+                text('input.input SIMILAR TO :web_filter').bindparams(web_filter=web_filter)
+            )
+    return q
+
 def list_measurements(
         report_id=None,
         probe_asn=None,
@@ -217,6 +243,7 @@ def list_measurements(
         confirmed=None
     ):
     input_ = request.args.get("input")
+    domain = request.args.get("domain")
 
     if probe_asn is not None:
         if probe_asn.startswith('AS'):
@@ -289,12 +316,7 @@ def list_measurements(
     q = current_app.db_session.query(*cols)\
             .join(Report, Report.report_no == Measurement.report_no)
 
-    if input_:
-        q = q.join(Input, Measurement.input_no == Input.input_no)\
-             .filter(Input.input.like('%{}%'.format(input_)))
-    else:
-        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
-
+    q = input_filter(q, input_=input_, domain=domain, test_name=test_name)
     if report_id:
         q = q.filter(Report.report_id == report_id)
     if probe_cc:

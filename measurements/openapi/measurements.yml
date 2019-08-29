@@ -26,6 +26,11 @@ paths:
           type: string
           minLength: 3 # `input` is handled by pg_trgm
           description: The input (for example a URL or IP address) to search measurements for
+        - name: domain
+          in: query
+          type: string
+          minLength: 3
+          description: The domain to search measurements for
         - name: probe_cc
           in: query
           type: string
