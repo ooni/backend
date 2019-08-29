@@ -298,6 +298,9 @@ def last_30days():
     for d in daterange(first_day, last_day):
         yield d.strftime("%Y-%m-%d")
 
+## END endpoints for legacy explorer
+
+## BEGIN endpoints for new explorer
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
         sql.text("test_day >= current_date - interval '31 day'"),
