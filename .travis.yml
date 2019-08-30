@@ -1,9 +1,7 @@
 sudo: required
+services: docker
 language: python
-services:
-  - docker
-install:
-  - pip install -r tests/requirements.txt
-  - pip install -r af/shovel/requirements.txt
-script:
-  - make test
+python:
+  - "2.7"
+install: pip install tox-travis
+script: tox -v -- -s
