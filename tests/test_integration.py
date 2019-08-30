@@ -31,6 +31,7 @@ TESTDATA_DIR = os.path.join(REPO_ROOT, "testdata")
 
 METADB_NAME = "ootestmetadb"
 METADB_PG_USER = "oopguser"
+PG_EXT_PORT = 25432
 
 
 @fixture
@@ -41,7 +42,7 @@ def pg_container(docker_client):
         name=METADB_NAME,
         hostname=METADB_NAME,
         environment={"POSTGRES_USER": METADB_PG_USER},
-        ports={"5432/tcp": 25432},
+        ports={"5432/tcp": PG_EXT_PORT},
         detach=True,
     )
     # TODO ensure this doesn't run into an infinite loop, though it hasn't been a problem up until now.
@@ -175,7 +176,7 @@ def download_report_files(dst_dir):
 
 def pg_conn():
     return psycopg2.connect(
-        "host={} user={} port={}".format("localhost", METADB_PG_USER, 25432)
+        "host={} user={} port={}".format("localhost", METADB_PG_USER, PG_EXT_PORT)
     )
 
 
