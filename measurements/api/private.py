@@ -444,7 +444,6 @@ def api_private_website_stats():
 d.test_day,
 COALESCE(anomaly_count, 0) as anomaly_count,
 COALESCE(confirmed_count, 0) as confirmed_count,
-COALESCE(failure_count, 0) as failure_count,
 COALESCE(total_count, 0) as total_count
 FROM (
 (
@@ -455,19 +454,15 @@ FROM (
 LEFT OUTER JOIN
 (
     SELECT
-    date_trunc('day', test_start_time) as test_day,
-    COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND msm_failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
-    COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
-    COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count
-    FROM measurement
-    JOIN input ON input.input_no = measurement.input_no
-    JOIN report ON report.report_no = measurement.report_no
-    WHERE test_start_time >= current_date - interval '31 day'
-    AND test_start_time < current_date
+    test_day,
+    anomaly_count,
+    confirmed_count,
+    total_count
+    FROM ooexpl_wc_input_counts
+    WHERE test_day >= current_date - interval '31 day'
     AND probe_cc =  :probe_cc
     AND probe_asn = :probe_asn
-    AND input.input = :input
-    GROUP BY test_day
+    AND input = :input
 ) m
 ON d.test_day = m.test_day
 )
@@ -475,12 +470,12 @@ ORDER BY test_day;""")
 
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn, 'input': url})
-    for test_day, anomaly_count, confirmed_count, failure_count, total_count in q:
+    for test_day, anomaly_count, confirmed_count, total_count in q:
         results.append({
             'test_day': test_day,
             'anomaly_count': int(anomaly_count),
             'confirmed_count': int(confirmed_count),
-            'failure_count': int(failure_count),
+            'failure_count': 0, # XXX we don't calculate this
             'total_count': int(total_count)
         })
     return jsonify({
@@ -504,46 +499,37 @@ def api_private_website_test_urls():
 
     probe_asn = int(probe_asn.replace('AS', ''))
     where_clause = [
-        sql.text("test_start_time >= current_date - interval '31 day'"),
-        sql.text("test_start_time < current_date"),
+        sql.text("test_day >= current_date - interval '31 day'"),
         sql.text("probe_cc = :probe_cc"),
         sql.text("probe_asn = :probe_asn"),
-        sql.text("test_name = 'web_connectivity'")
     ]
     query_params = {'probe_cc': probe_cc, 'probe_asn': probe_asn}
 
     row = current_app.db_session.execute(
         select([
-            sql.text("COUNT(DISTINCT input_no)")
+            sql.text("COUNT(DISTINCT input)")
         ]).where(
             and_(*where_clause)
-        ).select_from(sql.table('measurement').join(
-            sql.table('report'), sql.text('report.report_no = measurement.report_no')
-        ))
+        ).select_from(sql.table('ooexpl_wc_input_counts'))
     , query_params).fetchone()
     total_count = row[0]
 
     s = select([
-        sql.text("input.input"),
-        sql_anomaly_count,
-        sql_confirmed_count,
-        sql_failure_count,
-        sql.text("COUNT(*) as total_count"),
+        sql.text("input"),
+        sql.text("SUM(anomaly_count) as anomaly_count"),
+        sql.text("SUM(confirmed_count) as confirmed_count"),
+        sql.text("SUM(total_count) as total_count")
     ]).where(
         and_(*where_clause)
     ).group_by(
-        sql.text("input.input")
+        sql.text("input")
     ).order_by(
-        sql.text("confirmed_count DESC, anomaly_count DESC, total_count DESC, input.input ASC")
+        sql.text("confirmed_count DESC, anomaly_count DESC, total_count DESC, input ASC")
     ).limit(
         int(limit)
     ).offset(
         int(offset)
-    ).select_from(sql.table('measurement').join(
-        sql.table('report'), sql.text('report.report_no = measurement.report_no')
-    ).join(
-        sql.table('input'), sql.text('input.input_no = measurement.input_no')
-    ))
+    ).select_from(sql.table('ooexpl_wc_input_counts'))
 
     current_page = math.ceil(offset / limit) + 1
     metadata = {
@@ -555,12 +541,12 @@ def api_private_website_test_urls():
     }
     results = []
     q = current_app.db_session.execute(s, query_params)
-    for input, anomaly_count, confirmed_count, failure_count, total_count in q:
+    for input, anomaly_count, confirmed_count, total_count in q:
         results.append({
             'input': input,
             'anomaly_count': int(anomaly_count),
             'confirmed_count': int(confirmed_count),
-            'failure_count': int(failure_count),
+            'failure_count': 0, # XXX we don't have these in the table
             'total_count': int(total_count)
         })
 
@@ -834,17 +820,14 @@ def api_private_country_overview():
 
     row = current_app.db_session.execute(
         select([
-            sql.text("COUNT(DISTINCT input_no)")
+            sql.text("COUNT(DISTINCT input)")
         ]).where(
             and_(
-                sql.text("confirmed = TRUE"),
+                sql.text("confirmed_count > 0"),
                 sql.text("probe_cc = :probe_cc"),
-                sql.text("test_start_time >= current_date - interval '31 day'"),
-                sql.text("test_start_time < current_date")
+                sql.text("test_day >= current_date - interval '31 day'")
             )
-        ).select_from(sql.table('measurement').join(
-            sql.table('report'), sql.text('report.report_no = measurement.report_no')
-        ))
+        ).select_from(sql.table('ooexpl_wc_input_counts'))
     , {'probe_cc': probe_cc}).fetchone()
     websites_confirmed_blocked = row[0]
 
