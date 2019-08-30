@@ -24,6 +24,7 @@ GROUP BY test_day, input, bucket_date, probe_cc, probe_asn;
 */
 
 CREATE TABLE ooexpl_wc_input_counts (
+    input TEXT,
     confirmed_count BIGINT NOT NULL,
     anomaly_count BIGINT NOT NULL,
     total_count BIGINT NOT NULL,
