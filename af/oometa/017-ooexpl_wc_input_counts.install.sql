@@ -27,6 +27,7 @@ CREATE TABLE ooexpl_wc_input_counts (
     input TEXT,
     confirmed_count BIGINT NOT NULL,
     anomaly_count BIGINT NOT NULL,
+    failure_count BIGINT NOT NULL,
     total_count BIGINT NOT NULL,
     test_day TIMESTAMP NOT NULL,
     bucket_date DATE,
