@@ -65,7 +65,7 @@ def pg_install_tables(container):
     _, socket = container.exec_run(
         cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True
     )
-    # This is to support multiple versions of docker and python. 
+    # This is to support multiple versions of docker and python.
     # See: https://github.com/docker/docker-py/issues/2255#issuecomment-475270012
     if hasattr(socket, "_sock"):
         socket = socket._sock
@@ -317,6 +317,8 @@ def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
 
     with pg_conn() as conn:
         print_query_fetchone_output(conn, 'SELECT COUNT(*) FROM http_request_fp;')
+
+    assert flags["confirmed"] == 8, "confirmed count"
 
     # This forces reprocessing of data
     with pg_conn() as conn:
