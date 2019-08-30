@@ -2314,11 +2314,13 @@ SET msm_count = EXCLUDED.msm_count,
         c.execute(update_ooexpl_wc_confirmed, [bucket])
         update_ooexpl_wc_input_counts = """
 INSERT INTO ooexpl_wc_input_counts
+(test_day, anomaly_count, confirmed_count, failure_count, total_count, input, bucket_date, probe_cc, probe_asn)
 SELECT
 date_trunc('day', test_start_time) as test_day,
 COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND msm_failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
 COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
-COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count, COUNT(*) as total_count,
+COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count,
+COUNT(*) as total_count,
 input,
 bucket_date,
 probe_cc,
