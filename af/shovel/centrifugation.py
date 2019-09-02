@@ -2312,10 +2312,39 @@ SET msm_count = EXCLUDED.msm_count,
         # Insert one day worth of rows.
         # Duplicate values (if any) are not updated.
         c.execute(update_ooexpl_wc_confirmed, [bucket])
+        update_ooexpl_wc_input_counts = """
+INSERT INTO ooexpl_wc_input_counts
+(test_day, anomaly_count, confirmed_count, failure_count, total_count, input, bucket_date, probe_cc, probe_asn)
+SELECT
+date_trunc('day', test_start_time) as test_day,
+COALESCE(sum(CASE WHEN anomaly = TRUE AND confirmed = FALSE AND msm_failure = FALSE THEN 1 ELSE 0 END), 0) AS anomaly_count,
+COALESCE(sum(CASE WHEN confirmed = TRUE THEN 1 ELSE 0 END), 0) AS confirmed_count,
+COALESCE(sum(CASE WHEN msm_failure = TRUE THEN 1 ELSE 0 END), 0) AS failure_count,
+COUNT(*) as total_count,
+input,
+bucket_date,
+probe_cc,
+probe_asn
+FROM measurement
+JOIN input ON input.input_no = measurement.input_no
+JOIN report ON report.report_no = measurement.report_no
+JOIN autoclaved ON report.autoclaved_no = autoclaved.autoclaved_no
+WHERE test_start_time >= current_date - interval '31 day'
+AND test_start_time < current_date
+AND test_name = 'web_connectivity'
+AND bucket_date = %s
+GROUP BY test_day, input, bucket_date, probe_cc, probe_asn
+ON CONFLICT (test_day, probe_cc, probe_asn, input, bucket_date) DO
+UPDATE
+SET anomaly_count = EXCLUDED.anomaly_count,
+    total_count = EXCLUDED.total_count,
+    confirmed_count = EXCLUDED.confirmed_count;
+"""
+        c.execute(update_ooexpl_wc_input_counts, [bucket])
 
         roll_ooexpl_wc_confirmed = """
 DELETE FROM ooexpl_wc_confirmed
-WHERE test_day < (current_date - interval '20 day');
+WHERE test_day < (current_date - interval '31 day');
 """
         # XXX currently disabled to populate more than 30 days worth of metrics
         # c.execute(roll_ooexpl_wc_confirmed)
