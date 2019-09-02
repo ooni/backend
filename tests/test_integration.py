@@ -6,6 +6,7 @@ Help: `tox -- -h`
 Run against a shovel image tag: `tox -- --shovel-image-tag 20190704-4659f159`
 """
 
+import json
 import errno
 import os
 import psycopg2
@@ -172,6 +173,30 @@ def download_report_files(dst_dir):
             continue
         download_file(url, dst_filename)
 
+def generate_report_files(dst_dir):
+    sample_fname = "20190601T003644Z-IN-AS18196-web_connectivity-20190601T003645Z_AS18196_rpEBAw2sJIRwgKvm3JhOur2dNqOdtIb0ktIywHC3KAfXBgPik6-0.2.0-probe.json"
+
+    now = datetime.now() - timedelta(days=2)
+    isostamp = now.strftime("%Y%m%dT010203Z")
+    report_id = "{}_AS18196_rpEBAw2sJIRwgKvm3JhOur2dNqOdtIb0ktIywHC3KAfXBgPik6".format(isostamp)
+
+    gen_fname = '{}-IN-AS18196-web_connectivity-{}-0.2.0-probe.json'.format(isostamp, report_id)
+
+    with open(os.path.join(dst_dir, sample_fname)) as in_file:
+        j = json.loads(in_file.readline())
+
+    # We generate a report file with the time of today so that the ooexpl_
+    # metrics will get computed on this as it will be a recent measurement
+    measurement_start_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    j['report_id'] = report_id
+    j['test_start_time'] = measurement_start_time
+    j['measurement_start_time'] = measurement_start_time
+    j['report_filename'] = os.path.join('2018-01-01', gen_fname)
+    j['id'] = 'deadbeef-dead-beef-8ad8-ca2dbc56bca5'
+
+    with open(os.path.join(dst_dir, gen_fname), 'w') as out_file:
+        json.dump(j, out_file)
+        out_file.write('\n') # the autoclaving process expects there to be a newline
 
 def pg_conn():
     return psycopg2.connect(
@@ -213,6 +238,7 @@ def run_canning_autoclaving(pipeline_ctx):
         if not os.path.exists(path):
             os.makedirs(path)
     download_report_files(reports_raw_dir)
+    generate_report_files(reports_raw_dir)
 
     docker_client = docker.from_env()
     canning_cmd = "/mnt/af/shovel/canning.py --start {}T00:00:00".format(start_date)
@@ -281,6 +307,7 @@ def print_query_fetchone_output(conn, q):
         print(q)
         print(row)
         print("----")
+    return row
 
 def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     """
@@ -334,6 +361,8 @@ def test_run_small_bucket(docker_client, pg_container, pipeline_dir_ctx):
     print("flags[2]: {}".format(flags))
     with pg_conn() as conn:
         print_query_fetchone_output(conn, 'SELECT COUNT(*) FROM http_request_fp;')
+        row = print_query_fetchone_output(conn, 'SELECT COUNT(*) FROM ooexpl_wc_input_counts;')
+        assert row[0] > 0, "ooexpl_wc_input_counts is empty"
 
     new_flags = get_flag_counts()
     for k, count in flags.items():
