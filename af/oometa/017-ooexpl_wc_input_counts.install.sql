@@ -33,7 +33,7 @@ CREATE TABLE ooexpl_wc_input_counts (
     bucket_date DATE,
     probe_cc CHARACTER(2) NOT NULL,
     probe_asn INTEGER NOT NULL,
-    CONSTRAINT unique_day_bucket_cc_asn_input UNIQUE (test_day, bucket_date, probe_cc, probe_asn, input)
+    CONSTRAINT ooexpl_wc_input_unique_day_bucket_cc_asn_input UNIQUE (test_day, bucket_date, probe_cc, probe_asn, input)
 );
 
 CREATE INDEX "ooexpl_wc_input_counts_probe_cc_idx" ON "ooexpl_wc_input_counts"("probe_cc");
