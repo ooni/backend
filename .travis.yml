@@ -22,4 +22,4 @@ install:
 before_script:
 - scripts/travis_init_db.sh
 script:
-- make test
+- APP_ENV=production make test
