@@ -136,6 +136,19 @@ def api_private_blockpages():
     if probe_cc is None:
         raise BadRequest('missing probe_cc')
 
+    # Fastpath for blockpages
+    s = select([
+        sql.text("SUM(confirmed_count) as confirmed_count"),
+    ]).where(
+        sql.text("probe_cc = :probe_cc"),
+    ).select_from(sql.table('ooexpl_wc_confirmed'))
+    confirmed_count = current_app.db_session.execute(
+        s, {'probe_cc': probe_cc}
+    ).fetchone()[0]
+    if confirmed_count == 0:
+        return jsonify({
+            'results': []
+        })
 
     q = current_app.db_session.query(
         Report.report_id.label('report_id'),
