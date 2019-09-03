@@ -126,8 +126,9 @@ def per_s(name, item_count, t0):
 
 @metrics.timer("clean_caches")
 def clean_caches():
-    """Cleanup local caches
+    """Cleanup local caches.
     """
+    # Access times are updated on file load.
     # FIXME: use cache locations correctly
     now = time.time()
     threshold = 3600 * 24 * 3

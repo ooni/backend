@@ -20,7 +20,8 @@ import os
 import time
 import tarfile
 
-import lz4.frame as lz4frame # debdeps: python3-lz4
+import lz4.frame as lz4frame  # debdeps: python3-lz4
+
 # lz4frame appears faster than executing lz4cat: 2.4s vs 3.9s on a test file
 import ujson
 
@@ -36,11 +37,11 @@ for l in ("urllib3", "botocore", "s3transfer"):
     logging.getLogger(l).setLevel(logging.INFO)
 
 
-
-
-#@profile()
 def load_multiple(fn) -> dict:
-    os.utime(fn)
+    """Load contents of cans. Decompress tar archives if found.
+    Yields measurements one by one as dicts
+    """
+    os.utime(fn)  # update access time - used for cache cleanup
     # TODO: handle:
     # RuntimeError: LZ4F_decompress failed with code: ERROR_decompressionFailed
     if fn.endswith(".tar.lz4"):
@@ -57,7 +58,8 @@ def load_multiple(fn) -> dict:
                         yield ujson.loads(line)
 
                 elif m.name.endswith(".yaml"):
-                    log.debug("Loading nested %s", m.name)
+                    pass
+                    # log.debug("Loading nested %s", m.name)
                     # FIXME raise NotImplementedError()
 
     elif fn.endswith(".json.lz4"):
@@ -130,7 +132,7 @@ def fetch_cans(s3, conf, files):
         _cb.count += bytes_count
         _cb.total_count += bytes_count
         metrics.gauge("s3_download_percentage", _cb.total_count / _cb.total_size * 100)
-        speed = _cb.count / 131072 / (time.time() - _cb.start_time)
+        speed = _cb.count / 131_072 / (time.time() - _cb.start_time)
         metrics.gauge("s3_download_speed_avg_Mbps", speed)
 
     _cb.total_size = sum(t[2] for t in to_dload)
