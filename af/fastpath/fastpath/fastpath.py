@@ -29,7 +29,7 @@ import numpy as np  # debdeps: python3-numpy
 import matplotlib  # debdeps: python3-matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 # import seaborn as sns  # debdeps: python3-seaborn
 
@@ -43,10 +43,13 @@ from fastpath.metrics import setup_metrics
 
 import fastpath.utils
 
+LOCALITY_VALS = ("general", "global", "country", "isp", "local")
+
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
+fingerprints = None
 
 pd.set_option("mode.chained_assignment", "raise")
 
@@ -97,26 +100,28 @@ def setup():
 def per_s(name, item_count, t0):
     """Generate a gauge metric of items per second
     """
-    metrics.gauge(f"{name}_per_s", item_count / (time.time() - t0))
+    delta = time.time() - t0
+    if delta > 0:
+        metrics.gauge(f"{name}_per_s", item_count / delta)
 
 
-def save_plot(name, plt):
-    tmpfn = conf.outdir / name + ".png.tmp"
-    fn = conf.outdir / name + ".png"
-    log.info("Rendering", fn)
-    plt.get_figure().savefig(tmpfn)
-    tmpfn.rename(fn)
-
-
-def gen_plot(name, df, *a, **kw):
-    plt = df.plot(*a, **kw)
-    save_plot(name, plt)
-
-
-def heatmap(name, *a, **kw):
-    h = sns.heatmap(*a, **kw)
-    h.get_figure().savefig(fn)
-    save_plot(name, h)
+# def save_plot(name, plt):
+#     tmpfn = conf.outdir / name + ".png.tmp"
+#     fn = conf.outdir / name + ".png"
+#     log.info("Rendering", fn)
+#     plt.get_figure().savefig(tmpfn)
+#     tmpfn.rename(fn)
+#
+#
+# def gen_plot(name, df, *a, **kw):
+#     plt = df.plot(*a, **kw)
+#     save_plot(name, plt)
+#
+#
+# def heatmap(name, *a, **kw):
+#     h = sns.heatmap(*a, **kw)
+#     h.get_figure().savefig(fn)
+#     save_plot(name, h)
 
 
 @metrics.timer("clean_caches")
@@ -146,6 +151,11 @@ expected_colnames = {
     "blocking",
     "body_length_match",
     "body_proportion",
+    "blocking_country",
+    "blocking_general",
+    "blocking_global",
+    "blocking_isp",
+    "blocking_local",
     "client_resolver",
     "control",
     "control_failure",
@@ -228,65 +238,13 @@ def unroll(df, colname):
     del df[colname]
 
 
-def moving_average(a, n=3):
-    ret = np.cumsum(a, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1 :] / n
-
-
-import numba  # debdeps: python3-numba
-
-
-def generate_ewm(df):
-    """Apply exponential weighting to smooth out blocking_general
-    """
-    alpha = 0.80
-    df = df.set_index(["measurement_start_time"])
-    df = df.sort_values(by=["measurement_start_time"])
-    ewm = df.blocking_general.ewm(alpha=alpha).mean().to_frame()
-    ewm = ewm.reset_index()
-    return ewm.rename(columns={"index": "measurement_start_time"})
-
-
-def hysteresis(x, lower_limit, upper_limit):
-    """Apply hysteresis on a series
-    """
-    hi = x >= upper_limit
-    lo_or_hi = (x <= lower_limit) | hi
-    ind = np.nonzero(lo_or_hi)[0]
-    if not ind.size:
-        return np.zeros_like(x, dtype=bool) | False
-    cnt = np.cumsum(lo_or_hi)
-    return np.where(cnt, hi[ind[cnt - 1]], False)
-
-
 @metrics.timer("detect_blocking_changes_f")
-def detect_blocking_changes_f(df):
-    """Detect changes in blocking_general
+def detect_blocking_changes_f(status: dict, means: dict, v):
+    """Detect changes in blocking patterns
     """
-    if df.shape[0] < 2:
-        return
     upper_limit = 0.4
     lower_limit = 0.05
-    ewm = generate_ewm(df)
-
-    # Apply hysteresis to prevent bouncing
-    hys = hysteresis(ewm.blocking_general, lower_limit, upper_limit)
-    blk = ewm[["measurement_start_time"]]
-    blk.loc[:, "blocked"] = False
-    blk.loc[hys == True, "blocked"] = True
-
-    # Extract changes blocked <--> non-blocked
-    change = blk.blocked.ne(blk.blocked.shift().bfill())
-    blk = blk[change == True]
-
-    return blk
-
-
-@metrics.timer("detect_blocking_changes_f")
-def detect(status, means, v):
-    upper_limit = 0.4
-    lower_limit = 0.05
+    # status values:
     clear = 0
     cleared_from_now = 2
     blocked = 1
@@ -296,7 +254,12 @@ def detect(status, means, v):
     if k not in status:
         # cc/test_name/input tuple never seen before
         status[k] = blocked_from_now if (v.blocking_general > upper_limit) else clear
+        # The status is `clear` rather than `cleared_from_now` as we assume it
+        # was never blocked
         means[k] = (v.measurement_start_time, v.blocking_general)
+        if status[k] == blocked_from_now:
+            log.info("%r blocked", k)
+            metrics.incr("detected_blocked")
         return
 
     old_time, old_val = means[k]
@@ -304,30 +267,53 @@ def detect(status, means, v):
     # TODO: record msm leading to status change?
     new_val = (old_val + v.blocking_general) / 2
     means[k] = (v.measurement_start_time, new_val)
+
     if status[k] == blocked and new_val < lower_limit:
         status[k] = cleared_from_now
+        log.info("%r cleared", k)
+        metrics.incr("detected_cleared")
     elif status[k] in (clear, cleared_from_now) and new_val > upper_limit:
         status[k] = blocked_from_now
+        log.info("%r blocked", k)
+        metrics.incr("detected_blocked")
 
 
 def reset_status(status):
+    # See detect_blocking_changes_f for the values of `status`
+    # blocked stays as it is
+    # blocked_from_now becomes blocked
+    # clear and cleared_from_now are dropped
     # TODO: benchmark more readable alternatives
-    return {k: (v % 2) for k, v in status.items() if v in (1, 3)}
+    blocked = 1
+    blocked_from_now = 3
+    cleared_from_now = 2
+    status.update({k: (v % 2) for k, v in status.items() if v in (1, 3)})
+    for k, v in tuple(status.items()):
+        if v in (blocked, blocked_from_now):
+            status[k] = blocked
+        else:
+            status.pop(k, None)
 
 
 @metrics.timer("detect_blocking_changes")
-def detect_blocking_changes_on_msm(scores, status, means):
-    t0 = time.time()
+def detect_blocking_changes(scores: pd.DataFrame, status: dict, means: dict):
+    """Detect changes in blocking patterns. Updates status and means
+    """
     delta_t = scores.measurement_start_time.max() - scores.measurement_start_time.min()
     msm_cnt = scores.shape[0]
     log.info(
         "Detecting blocking on %d measurements over timespan %s" % (msm_cnt, delta_t)
     )
-    t0 = time.time()
-    scores.blocking_general.fillna(0, inplace=True)
+    # scores.blocking_general.fillna(0, inplace=True)
     scores.sort_index(inplace=True)
-    scores.apply(lambda b: detect(status, means, b), axis=1)
-    per_s("detect_blocking_changes", len(scores.index), t0)
+    scores.apply(lambda b: detect_blocking_changes_f(status, means, b), axis=1)
+    blocked_from_now = 3
+    cleared_from_now = 2
+    changes = {
+        k: v for k, v in status.items() if v in (cleared_from_now, blocked_from_now)
+    }
+    reset_status(status)
+    return changes
 
 
 def unroll_requests_in_report(report):
@@ -341,7 +327,11 @@ def unroll_requests_in_report(report):
         report[f"req_{n}_body"] = r.get("body", None)
         report[f"req_{n}_headers"] = r.get("headers", None)
 
-    report["test_keys"]["requests"] = None
+    report["test_keys"]["requests"] = None  # TODO: delete
+
+
+def concat(new, old):
+    return new if old is None else pd.concat([old, new], sort=False, copy=False)
 
 
 # @profile
@@ -371,72 +361,13 @@ def process_measurements(msm, agg):
     for c in categorical_columns:
         msm[c] = msm[c].astype("category")
 
-    unroll(msm, "annotations")
-    unroll(msm, "test_keys")
+    # unroll(msm, "annotations")
+    # unroll(msm, "test_keys")
 
     msm.measurement_start_time = pd.to_datetime(msm.measurement_start_time)
     # TODO: trim out absurd datetimes
 
-    # Feature setup
-    msm.loc[:, "fingerprint_matched"] = False
-
-    # Fingerprinting
-    log.debug("Matching fingerprints")
-    t0 = time.time()
-    bodysize = 0
-
-    for request_col_number in range(100):
-        if f"req_{request_col_number}_body" not in msm.columns:
-            break
-        with metrics.timer("fp_prepare"):
-            bodies = msm[f"req_{request_col_number}_body"]
-            headers = msm[f"req_{request_col_number}_headers"]
-            bodysize += bodies[bodies.notnull()].astype(str).str.len().sum()
-
-        for cc, fprints in fastpath.utils.fingerprints.items():
-            # Match fingerprints for each country
-            # Apply matching by column for efficiency
-            if (msm.cc == cc).sum() == 0:
-                # No web measurements for this country
-                continue
-            if (msm.test_name == "web_connectivity").sum() == 0:
-                # No web measurements for this country
-                continue
-
-            for fp in fprints:
-                if "body_match" in fp:
-                    bm = fp["body_match"]
-                    matched = (msm.cc == cc) & bodies[bodies.notnull()].astype(
-                        str
-                    ).str.contains(bm, na=False)
-                elif "header_full" in fp:
-                    # TODO: lowercase headers
-                    # TODO: implement fingerprints that identify
-                    # isp_blocking, local_blocking, global_blocking
-                    name = fp["header_name"]
-                    if name not in headers:
-                        continue
-                    value = fp["header_full"]
-                    matched = (msm.cc == cc) & (headers[name] == value)
-
-                else:
-                    name = fp["header_name"]
-                    if name not in headers:
-                        continue
-                    prefix = fp["header_prefix"]
-                    matched = (msm.cc == cc) & headers[name].str.startswith(prefix)
-
-                msm.loc[matched, "fingerprint_matched"] = True
-
-    per_s("fingerprints", len(msm.index), t0)
-    per_s("fingerprints_bytes", bodysize, t0)
-
-    # unroll queries
-    # queries = msm["queries"].apply(pd.Series)
-    # queries = queries.rename(columns=lambda x: "query_" + str(x))
-    # df = pd.concat([msm[:], queries[:]], axis=1)
-
-    # feature extraction
+    # Feature extraction
     msm.loc[:, "bad_title"] = False
     if "title_match" in msm:
         msm.loc[msm["title_match"] == False, "bad_title"] = True
@@ -445,23 +376,27 @@ def process_measurements(msm, agg):
     # blocking locality: global > country > ISP > local
     # unclassified locality is stored in "blocking_general"
     #
-    msm.loc[:, "blocking_global"] = 0.0
-    msm.loc[:, "blocking_country"] = 0.0
-    msm.loc[:, "blocking_isp"] = 0.0
-    msm.loc[:, "blocking_local"] = 0.0
-    msm.loc[:, "blocking_general"] = 0.0
+    # Fingerprints have been already scored in match_fingerprints and
+    # score_matches
 
     # Add body proportion score
     if "body_proportion" in msm.columns:
         msm.loc[:, "blocking_general"] += (msm.body_proportion - 1.0).abs()
 
-    # Add 1.0 for fingerprint matched
-    msm.loc[msm.fingerprint_matched == True, "blocking_general"] += 1.0
-
     # Add 1.0 for client-detected blocking
     # msm.loc[msm.blocking != False, "blocking_general"] += 1.0
 
+    # TODO: add IM tests scoring here
+
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
+    msm.blocking_general = (
+        msm.blocking_country
+        + msm.blocking_general
+        + msm.blocking_global
+        + msm.blocking_isp
+        + msm.blocking_local
+    )
+
     return msm[
         [
             "measurement_start_time",
@@ -545,20 +480,70 @@ def load_aggregation_cuboids():
     return c
 
 
-def fetch_msm_dataframe(start_day, end_day, blocksize=1000, t_interval=10):
-    t_thresh = time.time() + t_interval
-    reports = []
-    for report in fetch_reports(start_day, end_day):
-        unroll_requests_in_report(report)
-        reports.append(report)
-        # Process measurement once we reach blocksize or by elapsed time
-        if len(reports) < blocksize and time.time() < t_thresh:
-            # TODO: optimize realtime VS batch
+@metrics.timer("match_fingerprints")
+def match_fingerprints(report):
+    """Match fingerprints against HTTP headers and bodies.
+    """
+    msm_cc = report["probe_cc"]
+    if msm_cc not in fingerprints:
+        return []
+
+    matches = []
+    for req in report["test_keys"].get("requests", ()):
+        r = req.get("response", None)
+        if r is None:
             continue
-        per_s("fetch_reports", len(reports), t_thresh - t_interval)
-        yield pd.DataFrame(reports)
-        t_thresh = time.time() + t_interval
-        reports = []
+
+        # Match HTTP body if found
+        body = r["body"]
+        if body is not None:
+            for fp in fingerprints[msm_cc].get("body_match", []):
+                # fp: {"body_match": "...", "locality": "..."}
+                tb = time.time()
+                bm = fp["body_match"]
+                if bm in body:
+                    matches.append(fp)
+                    log.debug("matched body fp %s %r", msm_cc, bm)
+
+                per_s("fingerprints_bytes", len(body), tb)
+
+        del (body)
+        req["response"].pop("body", None)
+
+        # Match HTTP headers if found
+        headers = r.get("headers", {})
+        if not headers:
+            continue
+        headers = {h.lower(): v for h, v in headers.items()}
+        for fp in fingerprints[msm_cc].get("header_full", []):
+            name = fp["header_name"]
+            if name in headers and headers[name] == fp["header_full"]:
+                matches.append(fp)
+                log.debug("matched header full fp %s %r", msm_cc, bm)
+
+        for fp in fingerprints[msm_cc].get("header_prefix", []):
+            name = fp["header_name"]
+            prefix = fp["header_prefix"]
+            if name in headers and headers[name].startswith(prefix):
+                matches.append(fp)
+                log.debug("matched header prefix %s %r", msm_cc, prefix)
+
+        req["response"].pop("headers", None)
+
+    return matches
+
+
+@metrics.timer("score_matches")
+def score_matches(report, matches):
+    """Apply scores to fingerprint matches
+    """
+    for l in LOCALITY_VALS:
+        report[f"blocking_{l}"] = 0.0
+
+    for m in matches:
+        # locality: country isp local general
+        l = "blocking_" + m["locality"]
+        report[l] += 1.0
 
 
 @metrics.timer("full_run")
@@ -582,41 +567,56 @@ def core():
     # is slower than pd.DataFrame(reports, columns=expected_colnames)
     # followed by process_measurements
 
-    t0 = time.time()
+    t = time.time()
+    t00 = time.time()
     # The number of reports can vary significantly between different cans.
     # fetch_reports yields them one by one so that we can batch them here to
     # maximize the efficiency in processing the dataframe. Creating a dataframe
     # from a list of reports is way faster than creating one per report
-    blk_t_interval = 15
+    blk_t_interval = 1
     blk_t_thresh = time.time() + blk_t_interval
-    blk_size_threshold = 1900
+    blk_size_threshold = 1000
     blk = None
     scores = None
     means = {}
-    for msm in fetch_msm_dataframe(conf.start_day, conf.end_day):
-        new = process_measurements(msm, aggregation_cuboids)
-        del (msm)
-        scores = (
-            new if scores is None else pd.concat([scores, new], sort=False, copy=False)
-        )
-        del (new)
+    reports = []
+    status = {}
 
-        metrics.gauge("scores_size", scores.memory_usage(index=True).sum() / 1024)
-        if scores.shape[0] < blk_size_threshold and time.time() < blk_t_thresh:
+    for report in fetch_reports(conf.start_day, conf.end_day):
+        report_cnt += 1
+        matches = match_fingerprints(report)
+        score_matches(report, matches)
+        del matches
+        reports.append(report)
+        if len(reports) < blk_size_threshold and time.time() < blk_t_thresh:
             continue
 
-        scores.sort_values(by=["measurement_start_time"], inplace=True)
-        # changes = detect_blocking_changes_on_msm(scores, status, means)
-        scores = None
-        # blk = newblk if blk is None else pd.concat([blk, newblk])
-        # TODO: merge blk, save blk to pgsql
-        # TODO: generate charts and heatmaps
-
-        metrics.gauge("overall_reports_per_s", report_cnt / (time.time() - t0))
-        t0 = time.time()
-        report_cnt = 0
-
         blk_t_thresh = time.time() + blk_t_interval
+        msm = pd.DataFrame(reports)
+        reports = []
+
+        # process_measurements runs on a small batch, while scores keeps
+        # growing to allow comparison with past data
+        new = process_measurements(msm, aggregation_cuboids)
+        del msm
+        scores = concat(scores, new)
+        del new
+
+        # # scores.sort_values(by=["measurement_start_time"], inplace=True)
+        changes = detect_blocking_changes(scores, status, means)
+        scores = None
+        # # TODO: merge blk, save blk to pgsql
+        # # TODO: generate charts and heatmaps
+
+        metrics.gauge(
+            "overall_reports_per_s",
+            report_cnt / (max(time.time() - t00, 0.000_000_000_000_000_000_1)),
+        )
+
+        if conf.stop_after is not None and report_cnt >= conf.stop_after:
+            log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
+            clean_caches()
+            sys.exit()
 
         # Interact from CLI
         if conf.devel and conf.interact:
@@ -628,8 +628,29 @@ def core():
     clean_caches()
 
 
+def setup_fingerprints():
+    """Setup fingerprints lookup dictionary
+    """
+    global fingerprints
+    fingerprints = {}  # cc -> fprint_type -> list of dicts
+    # TODO: merge ZZ fprints into every country
+    for cc, fprints in fastpath.utils.fingerprints.items():
+        d = fingerprints.setdefault(cc, {})
+        for fp in fprints:
+            assert fp["locality"] in LOCALITY_VALS, fp["locality"]
+            if "body_match" in fp:
+                d.setdefault("body_match", []).append(fp)
+            elif "header_prefix" in fp:
+                fp["header_name"] = fp["header_name"].lower()
+                d.setdefault("header_prefix", []).append(fp)
+            elif "header_full" in fp:
+                fp["header_name"] = fp["header_name"].lower()
+                d.setdefault("header_full", []).append(fp)
+
+
 def main():
     setup()
+    setup_fingerprints()
     log.info("starting")
     core()
 
