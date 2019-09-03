@@ -457,6 +457,7 @@ def api_private_website_stats():
 d.test_day,
 COALESCE(anomaly_count, 0) as anomaly_count,
 COALESCE(confirmed_count, 0) as confirmed_count,
+COALESCE(failure_count, 0) as failure_count,
 COALESCE(total_count, 0) as total_count
 FROM (
 (
