@@ -484,7 +484,7 @@ ORDER BY test_day;""")
 
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn, 'input': url})
-    for test_day, anomaly_count, confirmed_count, failure_count, otal_count in q:
+    for test_day, anomaly_count, confirmed_count, failure_count, total_count in q:
         results.append({
             'test_day': test_day,
             'anomaly_count': int(anomaly_count),
@@ -556,7 +556,7 @@ def api_private_website_test_urls():
     }
     results = []
     q = current_app.db_session.execute(s, query_params)
-    for input, anomaly_count, confirmed_count, failure_count, otal_count in q:
+    for input, anomaly_count, confirmed_count, failure_count, total_count in q:
         results.append({
             'input': input,
             'anomaly_count': int(anomaly_count),
