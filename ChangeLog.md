@@ -1,3 +1,9 @@
+# ooni-api 1.1.5 [2019-09-03]
+
+Changed:
+
+* Optimisations for the blockpage related views
+
 # ooni-api 1.1.4 [2019-08-29]
 
 Added:
