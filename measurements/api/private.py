@@ -526,7 +526,7 @@ def api_private_website_test_urls():
     ).group_by(
         sql.text("input")
     ).order_by(
-        sql.text("confirmed_count DESC, anomaly_count DESC, total_count DESC, input ASC")
+        sql.text("confirmed_count DESC, total_count DESC, anomaly_count DESC, input ASC")
     ).limit(
         int(limit)
     ).offset(
