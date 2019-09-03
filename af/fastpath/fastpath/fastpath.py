@@ -413,17 +413,20 @@ def process_measurements(msm, agg):
 def load_s3_reports(day) -> dict:
     path = conf.s3cachedir / str(day)
     log.info("Scanning %s", path.absolute())
+    files = []
     with os.scandir(path) as d:
         for e in d:
             if not e.is_file():
                 continue
             if e.name == "index.json.gz":
                 continue
+            files.append(e)
 
-            log.debug("Ingesting %s", e.name)
-            fn = os.path.join(path, e.name)
-            for report in s3feeder.load_multiple(fn):
-                yield report
+    for e in sorted(files, key=lambda f: f.name):
+        log.debug("Ingesting %s", e.name)
+        fn = os.path.join(path, e.name)
+        for report in s3feeder.load_multiple(fn):
+            yield report
 
 
 def prepare_for_json_normalize(report):
