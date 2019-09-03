@@ -457,6 +457,7 @@ LEFT OUTER JOIN
     test_day,
     anomaly_count,
     confirmed_count,
+    failure_count,
     total_count
     FROM ooexpl_wc_input_counts
     WHERE test_day >= current_date - interval '31 day'
@@ -470,12 +471,12 @@ ORDER BY test_day;""")
 
     results = []
     q = current_app.db_session.execute(s, {'probe_cc': probe_cc, 'probe_asn': probe_asn, 'input': url})
-    for test_day, anomaly_count, confirmed_count, total_count in q:
+    for test_day, anomaly_count, confirmed_count, failure_count, otal_count in q:
         results.append({
             'test_day': test_day,
             'anomaly_count': int(anomaly_count),
             'confirmed_count': int(confirmed_count),
-            'failure_count': 0, # XXX we don't calculate this
+            'failure_count': int(failure_count),
             'total_count': int(total_count)
         })
     return jsonify({
@@ -518,6 +519,7 @@ def api_private_website_test_urls():
         sql.text("input"),
         sql.text("SUM(anomaly_count) as anomaly_count"),
         sql.text("SUM(confirmed_count) as confirmed_count"),
+        sql.text("SUM(failure_count) as failure_count"),
         sql.text("SUM(total_count) as total_count")
     ]).where(
         and_(*where_clause)
@@ -541,12 +543,12 @@ def api_private_website_test_urls():
     }
     results = []
     q = current_app.db_session.execute(s, query_params)
-    for input, anomaly_count, confirmed_count, total_count in q:
+    for input, anomaly_count, confirmed_count, failure_count, otal_count in q:
         results.append({
             'input': input,
             'anomaly_count': int(anomaly_count),
             'confirmed_count': int(confirmed_count),
-            'failure_count': 0, # XXX we don't have these in the table
+            'failure_count': int(failure_count),
             'total_count': int(total_count)
         })
 
