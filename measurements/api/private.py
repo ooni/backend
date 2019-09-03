@@ -40,15 +40,16 @@ def api_private_stats_by_month(orm_stat):
     # implemented in a better way, but that sanity check is probably enough.
     ## ooni_epoch = datetime(2012, 12, 1)
 
-    now = datetime.now()
-    end_date = datetime(now.year, now.month, 1)
-    start_date = end_date - relativedelta(months=24)
+    s = select([
+        func.date_trunc('month', sql.text('bucket_date')).label('bucket_month'),
+        orm_stat
+    ]).where(
+        sql.text("bucket_date > current_date - interval '24 month'")
+    ).group_by(
+        'bucket_month'
+    ).select_from(sql.table('ooexpl_bucket_msm_count'))
 
-    r = current_app.db_session.query(
-            func.date_trunc('month', Report.test_start_time).label('test_start_month'),
-            orm_stat
-        ).filter(Report.test_start_time >= start_date).filter(Report.test_start_time < end_date
-        ).group_by('test_start_month')
+    r = current_app.db_session.execute(s)
     result = [{
         'date': (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
         'value': value,
@@ -59,19 +60,19 @@ def api_private_stats_by_month(orm_stat):
 def api_private_asn_by_month():
     # The query takes ~6s on local SSD @ AMS on 2018-04-04.
     # It was taking ~45s when it was fetching all the table from DB and doing grouping locally.
-    return api_private_stats_by_month( func.count(distinct(Report.probe_asn)) )
+    return api_private_stats_by_month('COUNT(DISTINCT probe_asn)')
 
 @api_private_blueprint.route('/countries_by_month')
 def api_private_countries_by_month():
     # The query takes ~10s on local SSD @ AMS on 2018-04-04.
     # It was taking ~25s when it was fetching all the table from DB and doing grouping locally.
-    return api_private_stats_by_month( func.count(distinct(Report.probe_cc)) )
+    return api_private_stats_by_month('COUNT(DISTINCT probe_cc)')
 
 @api_private_blueprint.route('/runs_by_month')
 def api_private_runs_by_month():
     # The query takes ~6s on local SSD @ AMS on 2018-04-04.
     # It was taking ~20s when it was fetching all the table from DB and doing grouping locally.
-    return api_private_stats_by_month( func.count() )
+    return api_private_stats_by_month('SUM(count)')
 
 @api_private_blueprint.route('/reports_per_day')
 def api_private_reports_per_day():
