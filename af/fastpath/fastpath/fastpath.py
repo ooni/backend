@@ -34,10 +34,10 @@ matplotlib.use("Agg")
 
 # import seaborn as sns  # debdeps: python3-seaborn
 
-# Feeds reports from Collectors over SSH
+# Feeds measurements from Collectors over SSH
 import fastpath.sshfeeder as sshfeeder
 
-# Feeds reports from S3
+# Feeds measurements from S3
 import fastpath.s3feeder as s3feeder
 
 from fastpath.metrics import setup_metrics
@@ -68,7 +68,7 @@ def setup():
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--interact", action="store_true", help="Interactive mode")
     ap.add_argument(
-        "--stop-after", type=int, help="Stop after feeding N reports", default=None
+        "--stop-after", type=int, help="Stop after feeding N measurements", default=None
     )
     conf = ap.parse_args()
     if conf.devel:
@@ -319,18 +319,18 @@ def detect_blocking_changes(scores: pd.DataFrame, status: dict, means: dict):
     return changes
 
 
-def unroll_requests_in_report(report):
-    if "requests" not in report["test_keys"]:
+def unroll_requests_in_measurement(measurement):
+    if "requests" not in measurement["test_keys"]:
         return
 
-    for n, r in enumerate(report["test_keys"]["requests"]):
+    for n, r in enumerate(measurement["test_keys"]["requests"]):
         r = r.get("response", None)
         if r is None:
             continue
-        report[f"req_{n}_body"] = r.get("body", None)
-        report[f"req_{n}_headers"] = r.get("headers", None)
+        measurement[f"req_{n}_body"] = r.get("body", None)
+        measurement[f"req_{n}_headers"] = r.get("headers", None)
 
-    report["test_keys"]["requests"] = None  # TODO: delete
+    measurement["test_keys"]["requests"] = None  # TODO: delete
 
 
 def concat(new, old):
@@ -412,7 +412,6 @@ def process_measurements(msm, agg):
         ]
     ]
 
-# TODO: rename report -> measurement
 
 @metrics.timer("load_s3_reports")
 def load_s3_reports(day) -> dict:
@@ -433,8 +432,8 @@ def load_s3_reports(day) -> dict:
         log.debug("Ingesting %s", e.name)
         fn = os.path.join(path, e.name)
         fcnt += 1
-        for report in s3feeder.load_multiple(fn):
-            yield report
+        for measurement in s3feeder.load_multiple(fn):
+            yield measurement
 
         remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
         metrics.gauge("load_s3_reports_eta", remaining)
@@ -458,8 +457,8 @@ def prepare_for_json_normalize(report):
         pass
 
 
-def fetch_reports(start_day, end_day) -> dict:
-    """Fetch reports from S3 and the collectors
+def fetch_measurements(start_day, end_day) -> dict:
+    """Fetch measurements from S3 and the collectors
     """
     today = date.today()
     if start_day < today:
@@ -469,17 +468,17 @@ def fetch_reports(start_day, end_day) -> dict:
         while day < end_day:
             log.info("Processing %s", day)
             s3feeder.fetch_cans_for_a_day_with_cache(conf, day)
-            for report in load_s3_reports(day):
-                yield report
+            for measurement in load_s3_reports(day):
+                yield measurement
 
             day += timedelta(days=1)
 
     if end_day < today and not conf.devel:
         return
 
-    ## Fetch reports from collectors: backlog and then realtime ##
-    for report in sshfeeder.feed_reports_from_collectors(conf):
-        yield report
+    ## Fetch measurements from collectors: backlog and then realtime ##
+    for measurement in sshfeeder.feed_reports_from_collectors(conf):
+        yield measurement
 
 
 @dataclass
@@ -498,16 +497,16 @@ def load_aggregation_cuboids():
 
 
 @metrics.timer("match_fingerprints")
-def match_fingerprints(report):
+def match_fingerprints(measurement):
     """Match fingerprints against HTTP headers and bodies.
     """
     # TODO: apply only on web_connectivity
-    msm_cc = report["probe_cc"]
+    msm_cc = measurement["probe_cc"]
     if msm_cc not in fingerprints:
         return []
 
     matches = []
-    for req in report["test_keys"].get("requests", ()):
+    for req in measurement["test_keys"].get("requests", ()):
         r = req.get("response", None)
         if r is None:
             continue
@@ -552,21 +551,21 @@ def match_fingerprints(report):
 
 
 @metrics.timer("score_matches")
-def score_matches(report, matches):
+def score_matches(measurement, matches):
     """Apply scores to fingerprint matches
     """
     for l in LOCALITY_VALS:
-        report[f"blocking_{l}"] = 0.0
+        measurement[f"blocking_{l}"] = 0.0
 
     for m in matches:
         # locality: country isp local general
         l = "blocking_" + m["locality"]
-        report[l] += 1.0
+        measurement[l] += 1.0
 
 
 @metrics.timer("full_run")
 def core():
-    report_cnt = 0
+    measurement_cnt = 0
 
     aggregation_cuboids = load_aggregation_cuboids()
     # day_target_cc_msmcnt = load_day_target_cc_msmcnt()
@@ -582,37 +581,37 @@ def core():
     ## Fetch past cans from S3 ##
 
     # prepare_for_json_normalize followed by pd.io.json.json_normalize
-    # is slower than pd.DataFrame(reports, columns=expected_colnames)
+    # is slower than pd.DataFrame(measurements, columns=expected_colnames)
     # followed by process_measurements
 
     t = time.time()
     t00 = time.time()
-    # The number of reports can vary significantly between different cans.
+    # The number of measurements can vary significantly between different cans.
     # fetch_reports yields them one by one so that we can batch them here to
     # maximize the efficiency in processing the dataframe. Creating a dataframe
-    # from a list of reports is way faster than creating one per report
+    # from a list of measurements is way faster than creating one per measurement
     blk_t_interval = 1
     blk_t_thresh = time.time() + blk_t_interval
     blk_size_threshold = 1000
     blk = None
     scores = None
     means = {}
-    reports = []
+    measurements = []
     status = {}
 
-    for report in fetch_reports(conf.start_day, conf.end_day):
-        report_cnt += 1
+    for measurement in fetch_measurements(conf.start_day, conf.end_day):
+        measurement_cnt += 1
         # web_connectivity fingerprinting
-        matches = match_fingerprints(report)
-        score_matches(report, matches)
+        matches = match_fingerprints(measurement)
+        score_matches(measurement, matches)
         del matches
-        reports.append(report)
-        if len(reports) < blk_size_threshold and time.time() < blk_t_thresh:
+        measurements.append(measurement)
+        if len(measurements) < blk_size_threshold and time.time() < blk_t_thresh:
             continue
 
         blk_t_thresh = time.time() + blk_t_interval
-        msm = pd.DataFrame(reports)
-        reports = []
+        msm = pd.DataFrame(measurements)
+        measurements = []
 
         # process_measurements runs on a small batch, while scores keeps
         # growing to allow comparison with past data
@@ -628,11 +627,11 @@ def core():
         # # TODO: generate charts and heatmaps
 
         metrics.gauge(
-            "overall_reports_per_s",
-            report_cnt / (max(time.time() - t00, 0.000_000_000_000_000_000_1)),
+            "overall_measurements_per_s",
+            measurement_cnt / (max(time.time() - t00, 0.000_000_000_000_000_000_1)),
         )
 
-        if conf.stop_after is not None and report_cnt >= conf.stop_after:
+        if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
             log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
             clean_caches()
             sys.exit()
