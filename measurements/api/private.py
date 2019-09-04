@@ -40,16 +40,21 @@ def api_private_stats_by_month(orm_stat):
     # implemented in a better way, but that sanity check is probably enough.
     ## ooni_epoch = datetime(2012, 12, 1)
 
+    now = datetime.now()
+    end_date = datetime(now.year, now.month, 1)
+    start_date = end_date - relativedelta(months=24)
+
     s = select([
         func.date_trunc('month', sql.text('bucket_date')).label('bucket_month'),
-        orm_stat
-    ]).where(
-        sql.text("bucket_date > current_date - interval '24 month'")
-    ).group_by(
+        sql.text(orm_stat)
+    ]).where(and_(
+        sql.text("bucket_date > :start_date"),
+        sql.text("bucket_date < :end_date")
+    )).group_by(
         'bucket_month'
     ).select_from(sql.table('ooexpl_bucket_msm_count'))
 
-    r = current_app.db_session.execute(s)
+    r = current_app.db_session.execute(s, {'start_date': start_date, 'end_date': end_date})
     result = [{
         'date': (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
         'value': value,
