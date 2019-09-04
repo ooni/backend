@@ -415,6 +415,7 @@ def process_measurements(msm, agg):
 
 @metrics.timer("load_s3_reports")
 def load_s3_reports(day) -> dict:
+    t0 = time.time()
     path = conf.s3cachedir / str(day)
     log.info("Scanning %s", path.absolute())
     files = []
@@ -426,11 +427,19 @@ def load_s3_reports(day) -> dict:
                 continue
             files.append(e)
 
+    fcnt = 0
     for e in sorted(files, key=lambda f: f.name):
         log.debug("Ingesting %s", e.name)
         fn = os.path.join(path, e.name)
+        fcnt += 1
         for report in s3feeder.load_multiple(fn):
             yield report
+
+        remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
+        metrics.gauge("load_s3_reports_eta", remaining)
+        metrics.gauge("load_s3_reports_remaining_files", len(files) - fcnt)
+        remaining = timedelta(seconds=remaining)
+        log.info("load_s3_reports remaining time: %s", remaining)
 
 
 def prepare_for_json_normalize(report):
