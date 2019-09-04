@@ -527,7 +527,7 @@ def match_fingerprints(report):
             name = fp["header_name"]
             if name in headers and headers[name] == fp["header_full"]:
                 matches.append(fp)
-                log.debug("matched header full fp %s %r", msm_cc, bm)
+                log.debug("matched header full fp %s %r", msm_cc, fp["header_full"])
 
         for fp in fingerprints[msm_cc].get("header_prefix", []):
             name = fp["header_name"]
