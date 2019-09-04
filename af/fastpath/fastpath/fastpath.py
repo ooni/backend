@@ -253,6 +253,10 @@ def detect_blocking_changes_f(status: dict, means: dict, v):
     blocked_from_now = 3
 
     k = (v.cc, v.test_name, v.input)
+    if not isinstance(v.input, str):
+        # Some inputs are lists. TODO: handle them?
+        return
+
     if k not in status:
         # cc/test_name/input tuple never seen before
         status[k] = blocked_from_now if (v.blocking_general > upper_limit) else clear
