@@ -289,11 +289,8 @@ def reset_status(status):
     # blocked stays as it is
     # blocked_from_now becomes blocked
     # clear and cleared_from_now are dropped
-    # TODO: benchmark more readable alternatives
     blocked = 1
     blocked_from_now = 3
-    cleared_from_now = 2
-    status.update({k: (v % 2) for k, v in status.items() if v in (1, 3)})
     for k, v in tuple(status.items()):
         if v in (blocked, blocked_from_now):
             status[k] = blocked
