@@ -24,7 +24,8 @@ import time
 from systemd.journal import JournalHandler
 
 import pandas as pd  # debdeps: python3-pandas python3-bottleneck python3-numexpr
-import numpy as np  # debdeps: python3-numpy
+
+# import numpy as np  # debdeps: python3-numpy
 
 import matplotlib  # debdeps: python3-matplotlib
 
@@ -372,6 +373,7 @@ def process_measurements(msm, agg):
     msm.loc[:, "bad_title"] = False
     if "title_match" in msm:
         msm.loc[msm["title_match"] == False, "bad_title"] = True
+        # TODO: score
 
     ## Measurement scoring ##
     # blocking locality: global > country > ISP > local
@@ -409,6 +411,7 @@ def process_measurements(msm, agg):
         ]
     ]
 
+# TODO: rename report -> measurement
 
 @metrics.timer("load_s3_reports")
 def load_s3_reports(day) -> dict:
@@ -488,6 +491,7 @@ def load_aggregation_cuboids():
 def match_fingerprints(report):
     """Match fingerprints against HTTP headers and bodies.
     """
+    # TODO: apply only on web_connectivity
     msm_cc = report["probe_cc"]
     if msm_cc not in fingerprints:
         return []
@@ -588,6 +592,7 @@ def core():
 
     for report in fetch_reports(conf.start_day, conf.end_day):
         report_cnt += 1
+        # web_connectivity fingerprinting
         matches = match_fingerprints(report)
         score_matches(report, matches)
         del matches
