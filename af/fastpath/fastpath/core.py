@@ -299,9 +299,17 @@ def reset_status(status):
 
 
 @metrics.timer("detect_blocking_changes")
-def detect_blocking_changes(scores: pd.DataFrame, status: dict, means: dict):
+def detect_blocking_changes(summaries, status: dict, means: dict):
     """Detect changes in blocking patterns. Updates status and means
     """
+    # Convert to df
+    scores = pd.DataFrame(summaries)
+    scores.measurement_start_time = pd.to_datetime(scores.measurement_start_time)
+    scores.rename(columns={"probe_cc": "cc", "probe_asn": "asn"}, inplace=True)
+    categorical_columns = ("test_name", "cc", "asn")
+    for c in categorical_columns:
+        scores[c] = scores[c].astype("category")
+
     delta_t = scores.measurement_start_time.max() - scores.measurement_start_time.min()
     msm_cnt = scores.shape[0]
     log.info(
@@ -525,7 +533,6 @@ def match_fingerprints(measurement):
                 per_s("fingerprints_bytes", len(body), tb)
 
         del (body)
-        req["response"].pop("body", None)
 
         # Match HTTP headers if found
         headers = r.get("headers", {})
@@ -545,22 +552,54 @@ def match_fingerprints(measurement):
                 matches.append(fp)
                 log.debug("matched header prefix %s %r", msm_cc, prefix)
 
-        req["response"].pop("headers", None)
-
     return matches
 
 
-@metrics.timer("score_matches")
-def score_matches(measurement, matches):
-    """Apply scores to fingerprint matches
+@metrics.timer("score_measurement")
+def score_measurement(msm, matches):
+    """Calculate measurement scoring
     """
+    # Blocking locality: global > country > ISP > local
+    # unclassified locality is stored in "blocking_general"
+
     for l in LOCALITY_VALS:
-        measurement[f"blocking_{l}"] = 0.0
+        msm[f"blocking_{l}"] = 0.0
 
     for m in matches:
-        # locality: country isp local general
         l = "blocking_" + m["locality"]
-        measurement[l] += 1.0
+        msm[l] += 1.0
+
+    # Feature extraction
+
+    if msm.get("title_match", True) is False:
+        msm["blocking_general"] += 0.5
+
+    if "body_proportion" in msm:
+        msm["blocking_general"] += (msm["body_proportion"] - 1.0).abs()
+
+    # TODO: add IM tests scoring here
+
+    # TODO: add heuristic to split blocking_general into local/ISP/country/global
+    msm["blocking_general"] += (
+        msm["blocking_country"]
+        + msm["blocking_global"]
+        + msm["blocking_isp"]
+        + msm["blocking_local"]
+    )
+
+
+def extract_summary(measurement):
+    """Extract interesting fields
+    """
+    fields = (
+        "measurement_start_time",
+        "probe_cc",
+        "probe_asn",
+        "test_name",
+        "input",
+        "blocking_general",
+    )
+    return {k: measurement[k] for k in fields}
 
 
 @metrics.timer("full_run")
@@ -578,51 +617,34 @@ def core():
     # - report files on collectors fetched in "real-time"
     # Load json/yaml files and apply filters like canning
 
-    ## Fetch past cans from S3 ##
-
-    # prepare_for_json_normalize followed by pd.io.json.json_normalize
-    # is slower than pd.DataFrame(measurements, columns=expected_colnames)
-    # followed by process_measurements
-
     t = time.time()
     t00 = time.time()
-    # The number of measurements can vary significantly between different cans.
-    # fetch_reports yields them one by one so that we can batch them here to
-    # maximize the efficiency in processing the dataframe. Creating a dataframe
-    # from a list of measurements is way faster than creating one per measurement
     blk_t_interval = 1
     blk_t_thresh = time.time() + blk_t_interval
     blk_size_threshold = 1000
     blk = None
     scores = None
     means = {}
-    measurements = []
+    summaries = []
     status = {}
 
     for measurement in fetch_measurements(conf.start_day, conf.end_day):
         measurement_cnt += 1
         # web_connectivity fingerprinting
         matches = match_fingerprints(measurement)
-        score_matches(measurement, matches)
+        score_measurement(measurement, matches)
         del matches
-        measurements.append(measurement)
-        if len(measurements) < blk_size_threshold and time.time() < blk_t_thresh:
+        summaries.append(extract_summary(measurement))
+        del measurement
+
+        if len(summaries) < blk_size_threshold and time.time() < blk_t_thresh:
             continue
 
         blk_t_thresh = time.time() + blk_t_interval
-        msm = pd.DataFrame(measurements)
-        measurements = []
 
-        # process_measurements runs on a small batch, while scores keeps
-        # growing to allow comparison with past data
-        new = process_measurements(msm, aggregation_cuboids)
-        del msm
-        scores = concat(scores, new)
-        del new
+        changes = detect_blocking_changes(summaries, status, means)
+        summaries = []
 
-        # # scores.sort_values(by=["measurement_start_time"], inplace=True)
-        changes = detect_blocking_changes(scores, status, means)
-        scores = None
         # # TODO: merge blk, save blk to pgsql
         # # TODO: generate charts and heatmaps
 
