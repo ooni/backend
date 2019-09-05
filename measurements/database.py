@@ -9,6 +9,7 @@ import time
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
+from sqlalchemy.dialects import postgresql
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -63,5 +64,5 @@ def init_query_logging(app):
         app.logger.debug("Total Time: %f", total_time)
 
         if total_time >= QUERY_TIME_THRESHOLD:
-            app.logger.warning("Query: %s", statement)
+            app.logger.warning("Query: %s %r", statement, parameters)
             app.logger.warning("Took too much time: %f", total_time)
