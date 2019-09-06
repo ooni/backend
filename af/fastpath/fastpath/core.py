@@ -655,15 +655,15 @@ def core():
 
         if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
             log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
-            clean_caches()
-            sys.exit()
+            break
+
 
         # Interact from CLI
         if conf.devel and conf.interact:
             import bpython  # debdeps: bpython3
 
             bpython.embed(locals_=locals())
-            sys.exit()
+            break
 
     clean_caches()
 
