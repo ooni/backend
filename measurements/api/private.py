@@ -59,15 +59,15 @@ def api_private_stats_by_month(orm_stat):
         'date': (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
         'value': value,
     } for bkt, value in sorted(r)]
-    return jsonify(result)
+    return result
 
 @api_private_blueprint.route('/asn_by_month')
 def api_private_asn_by_month():
-    return api_private_stats_by_month('COUNT(DISTINCT probe_asn)')
+    return jsonify(api_private_stats_by_month('COUNT(DISTINCT probe_asn)'))
 
 @api_private_blueprint.route('/countries_by_month')
 def api_private_countries_by_month():
-    return api_private_stats_by_month('COUNT(DISTINCT probe_cc)')
+    return jsonify(api_private_stats_by_month('COUNT(DISTINCT probe_cc)'))
 
 @api_private_blueprint.route('/runs_by_month')
 def api_private_runs_by_month():
