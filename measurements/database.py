@@ -63,5 +63,5 @@ def init_query_logging(app):
         app.logger.debug("Total Time: %f", total_time)
 
         if total_time >= QUERY_TIME_THRESHOLD:
-            app.logger.warning("Query: %s", statement)
+            app.logger.warning("Query: %s %r", statement, parameters)
             app.logger.warning("Took too much time: %f", total_time)

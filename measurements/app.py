@@ -72,6 +72,12 @@ def init_app(app):
             continue
         app.logger.debug("{}: {}".format(key, app.config[key]))
 
+    if app.config['APP_ENV'] == 'production':
+        sentry_sdk.init(
+            dsn="https://dcb077b34ac140d58a7c37609cea0cf9@sentry.io/1367288",
+            integrations=[FlaskIntegration()]
+        )
+
     md = Misaka(fenced_code=True)
     md.init_app(app)
 
@@ -85,11 +91,6 @@ def create_app(*args, **kw):
 
     if sys.version_info[0] < 3:
         raise RuntimeError("Python >= 3 is required")
-
-    sentry_sdk.init(
-        dsn="https://dcb077b34ac140d58a7c37609cea0cf9@sentry.io/1367288",
-        integrations=[FlaskIntegration()]
-    )
 
     app = Flask(__name__)
     app.json_encoder = FlaskJSONEncoder
