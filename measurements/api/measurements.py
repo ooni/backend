@@ -17,7 +17,7 @@ from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy.dialects import postgresql
-from sqlalchemy import func, or_, and_, false, true, text, select, sql, column
+from sqlalchemy import func, or_, and_, false, text, select, sql, column
 from sqlalchemy.orm import lazyload
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.exc import OperationalError
