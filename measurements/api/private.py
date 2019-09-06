@@ -63,21 +63,30 @@ def api_private_stats_by_month(orm_stat):
 
 @api_private_blueprint.route('/asn_by_month')
 def api_private_asn_by_month():
-    # The query takes ~6s on local SSD @ AMS on 2018-04-04.
-    # It was taking ~45s when it was fetching all the table from DB and doing grouping locally.
     return api_private_stats_by_month('COUNT(DISTINCT probe_asn)')
 
 @api_private_blueprint.route('/countries_by_month')
 def api_private_countries_by_month():
-    # The query takes ~10s on local SSD @ AMS on 2018-04-04.
-    # It was taking ~25s when it was fetching all the table from DB and doing grouping locally.
     return api_private_stats_by_month('COUNT(DISTINCT probe_cc)')
 
 @api_private_blueprint.route('/runs_by_month')
 def api_private_runs_by_month():
     # The query takes ~6s on local SSD @ AMS on 2018-04-04.
     # It was taking ~20s when it was fetching all the table from DB and doing grouping locally.
-    return api_private_stats_by_month('SUM(count)')
+    now = datetime.now()
+    end_date = datetime(now.year, now.month, 1)
+    start_date = end_date - relativedelta(months=24)
+
+    r = current_app.db_session.query(
+            func.date_trunc('month', Report.test_start_time).label('test_start_month'),
+            func.count()
+        ).filter(Report.test_start_time >= start_date).filter(Report.test_start_time < end_date
+        ).group_by('test_start_month')
+    result = [{
+        'date': (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
+        'value': value,
+    } for bkt, value in sorted(r)]
+    return jsonify(result)
 
 @api_private_blueprint.route('/reports_per_day')
 def api_private_reports_per_day():
