@@ -918,4 +918,7 @@ def api_private_global_overview():
         'country_count': row[0],
         'network_count': row[1],
         'measurement_count': row[2],
+        'networks_by_month': api_private_stats_by_month('COUNT(DISTINCT probe_asn)'),
+        'countries_by_month': api_private_stats_by_month('COUNT(DISTINCT probe_cc)'),
+        'measurements_by_month': api_private_stats_by_month('SUM(count)')
     })
