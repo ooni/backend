@@ -1,3 +1,14 @@
+# ooni-api 1.1.6 [2019-09-10]
+
+Fixes:
+
+* Bug in the API endpoint api_private_website_stats
+
+Changed:
+
+* Upgrade wekzeurg
+* Improve the performance of the api_private_stats endpoints
+
 # ooni-api 1.1.5 [2019-09-03]
 
 Changed:
