@@ -13,26 +13,19 @@ See README.adoc
 # debdeps: python3-setuptools
 
 from argparse import ArgumentParser, Namespace
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+import hashlib
 import logging
+import multiprocessing as mp
 import os
 import sys
 import time
 
-from systemd.journal import JournalHandler
+from systemd.journal import JournalHandler  # debdeps: python3-systemd
 
-import pandas as pd  # debdeps: python3-pandas python3-bottleneck python3-numexpr
-
-# import numpy as np  # debdeps: python3-numpy
-
-import matplotlib  # debdeps: python3-matplotlib
-
-matplotlib.use("Agg")
-# import matplotlib.pyplot as plt
-
-# import seaborn as sns  # debdeps: python3-seaborn
+import ujson  # debdeps: python3-ujson
+import lz4.frame as lz4frame  # debdeps: python3-lz4
 
 # Feeds measurements from Collectors over SSH
 import fastpath.sshfeeder as sshfeeder
@@ -40,19 +33,22 @@ import fastpath.sshfeeder as sshfeeder
 # Feeds measurements from S3
 import fastpath.s3feeder as s3feeder
 
+# Push measurements into Postgres
+import fastpath.db as db
+
 from fastpath.metrics import setup_metrics
 
 import fastpath.utils
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
+NUM_WORKERS = 15
+
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
 fingerprints = None
-
-pd.set_option("mode.chained_assignment", "raise")
 
 
 def parse_date(d):
@@ -87,6 +83,7 @@ def setup():
     conf.sshcachedir = conf.cachedir / "ssh"
     conf.dfdir = conf.vardir / "dataframes"
     conf.outdir = conf.vardir / "output"
+    conf.msmtdir = conf.outdir / "measurements"
     for p in (
         conf.vardir,
         conf.cachedir,
@@ -94,6 +91,7 @@ def setup():
         conf.sshcachedir,
         conf.dfdir,
         conf.outdir,
+        conf.msmtdir,
     ):
         p.mkdir(parents=True, exist_ok=True)
 
@@ -104,25 +102,6 @@ def per_s(name, item_count, t0):
     delta = time.time() - t0
     if delta > 0:
         metrics.gauge(f"{name}_per_s", item_count / delta)
-
-
-# def save_plot(name, plt):
-#     tmpfn = conf.outdir / name + ".png.tmp"
-#     fn = conf.outdir / name + ".png"
-#     log.info("Rendering", fn)
-#     plt.get_figure().savefig(tmpfn)
-#     tmpfn.rename(fn)
-#
-#
-# def gen_plot(name, df, *a, **kw):
-#     plt = df.plot(*a, **kw)
-#     save_plot(name, plt)
-#
-#
-# def heatmap(name, *a, **kw):
-#     h = sns.heatmap(*a, **kw)
-#     h.get_figure().savefig(fn)
-#     save_plot(name, h)
 
 
 @metrics.timer("clean_caches")
@@ -229,17 +208,6 @@ expected_colnames = {
 }
 
 
-def load_day_target_cc_msmcnt():
-    pass
-
-
-def unroll(df, colname):
-    s = df[colname].apply(pd.Series)
-    for cn in s.columns:
-        df.insert(0, cn, s[cn])
-    del df[colname]
-
-
 @metrics.timer("detect_blocking_changes_f")
 def detect_blocking_changes_f(status: dict, means: dict, v):
     """Detect changes in blocking patterns
@@ -341,86 +309,6 @@ def unroll_requests_in_measurement(measurement):
     measurement["test_keys"]["requests"] = None  # TODO: delete
 
 
-def concat(new, old):
-    return new if old is None else pd.concat([old, new], sort=False, copy=False)
-
-
-# @profile
-@metrics.timer("process_measurements")
-def process_measurements(msm, agg):
-    """Unroll dataframe columns, add scoring columns, add features
-    Here the measurements are processed one-by-one and the order is not relevant
-    """
-    log.debug("Preparing measurement dataframe %s", msm.shape)
-
-    # Check for unexpected columns
-    found_colnames = set(c for c in msm.columns.values)
-    assert len(found_colnames) == len(msm.columns.values), "duplicate cols"
-    unexpected = found_colnames - expected_colnames
-    for c in tuple(unexpected):
-        if c.startswith("req_"):
-            if c.endswith("_body") or c.endswith("_headers"):
-                unexpected.discard(c)
-
-    if unexpected:
-        log.info("Unexpected keys: %s", " ".join(sorted(unexpected)))
-        raise RuntimeError()
-
-    # Create categorical columns
-    msm.rename(columns={"probe_cc": "cc", "probe_asn": "asn"}, inplace=True)
-    categorical_columns = ("test_name", "cc", "asn")
-    for c in categorical_columns:
-        msm[c] = msm[c].astype("category")
-
-    # unroll(msm, "annotations")
-    # unroll(msm, "test_keys")
-
-    msm.measurement_start_time = pd.to_datetime(msm.measurement_start_time)
-    # TODO: trim out absurd datetimes
-
-    # Feature extraction
-    msm.loc[:, "bad_title"] = False
-    if "title_match" in msm:
-        msm.loc[msm["title_match"] == False, "bad_title"] = True
-        # TODO: score
-
-    ## Measurement scoring ##
-    # blocking locality: global > country > ISP > local
-    # unclassified locality is stored in "blocking_general"
-    #
-    # Fingerprints have been already scored in match_fingerprints and
-    # score_matches
-
-    # Add body proportion score
-    if "body_proportion" in msm.columns:
-        msm.loc[:, "blocking_general"] += (msm.body_proportion - 1.0).abs()
-
-    # Add 1.0 for client-detected blocking
-    # msm.loc[msm.blocking != False, "blocking_general"] += 1.0
-
-    # TODO: add IM tests scoring here
-
-    # TODO: add heuristic to split blocking_general into local/ISP/country/global
-    msm.blocking_general = (
-        msm.blocking_country
-        + msm.blocking_general
-        + msm.blocking_global
-        + msm.blocking_isp
-        + msm.blocking_local
-    )
-
-    return msm[
-        [
-            "measurement_start_time",
-            "cc",
-            "asn",
-            "test_name",
-            "input",
-            "blocking_general",
-        ]
-    ]
-
-
 @metrics.timer("load_s3_reports")
 def load_s3_reports(day) -> dict:
     t0 = time.time()
@@ -489,21 +377,6 @@ def fetch_measurements(start_day, end_day) -> dict:
         yield measurement
 
 
-@dataclass
-class Cuboids:
-    day_cc_msmcnt: pd.DataFrame
-    day_target_cc_msmcnt_blockedcnt: pd.DataFrame
-
-
-@metrics.timer("load_aggregation_cuboids")
-def load_aggregation_cuboids():
-    c = Cuboids(
-        pd.DataFrame(columns=["day", "cc", "msmcnt"]),
-        pd.DataFrame(columns=["day", "target", "cc", "msmcnt", "blockedcnt"]),
-    )
-    return c
-
-
 @metrics.timer("match_fingerprints")
 def match_fingerprints(measurement):
     """Match fingerprints against HTTP headers and bodies.
@@ -557,59 +430,106 @@ def match_fingerprints(measurement):
 
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches):
-    """Calculate measurement scoring
+    """Calculate measurement scoring. Returns a summary dict
     """
+    # Extract interesting fields
+    fields = (
+        "input",
+        "measurement_start_time",
+        "probe_asn",
+        "probe_cc",
+        "report_id",
+        "test_name",
+        "test_start_time",
+    )
+    summary = {k: msm[k] for k in fields}
+
     # Blocking locality: global > country > ISP > local
     # unclassified locality is stored in "blocking_general"
 
-    for l in LOCALITY_VALS:
-        msm[f"blocking_{l}"] = 0.0
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
     for m in matches:
         l = "blocking_" + m["locality"]
-        msm[l] += 1.0
+        scores[l] += 1.0
 
     # Feature extraction
 
     if msm.get("title_match", True) is False:
-        msm["blocking_general"] += 0.5
+        scores["blocking_general"] += 0.5
 
     if "body_proportion" in msm:
-        msm["blocking_general"] += (msm["body_proportion"] - 1.0).abs()
+        scores["blocking_general"] += (msm["body_proportion"] - 1.0).abs()
 
     # TODO: add IM tests scoring here
 
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
-    msm["blocking_general"] += (
-        msm["blocking_country"]
-        + msm["blocking_global"]
-        + msm["blocking_isp"]
-        + msm["blocking_local"]
+    scores["blocking_general"] += (
+        scores["blocking_country"]
+        + scores["blocking_global"]
+        + scores["blocking_isp"]
+        + scores["blocking_local"]
     )
+    summary["scores"] = scores
+    return summary
 
 
-def extract_summary(measurement):
-    """Extract interesting fields
+def generate_filename(msm):
+    """Generate filesystem-safe filename from a measurement
     """
-    fields = (
-        "measurement_start_time",
-        "probe_cc",
-        "probe_asn",
-        "test_name",
-        "input",
-        "blocking_general",
-    )
-    return {k: measurement[k] for k in fields}
+    h = hashlib.sha1(msm["report_id"].encode())
+    h.update((msm["input"] or "").encode())
+
+    return h.hexdigest() + ".json.lz4"
 
 
-@metrics.timer("full_run")
+@metrics.timer("writeout_measurement")
+def writeout_measurement(msm_jstr, fn):
+    """Safely write msm to disk
+    """
+
+    f = conf.msmtdir.joinpath(fn)
+    tmpfn = f.with_suffix(".tmp")
+    with lz4frame.open(tmpfn, "w") as lzf:
+        lzf.write(msm_jstr)
+
+    if f.is_file():
+        log.info("Overwriting %s", f)
+
+    tmpfn.rename(f)
+
+
+def msm_processor(queue):
+    """Measurement processor worker
+    """
+    db.setup()
+    while True:
+        msm_jstr = queue.get()
+
+        if msm_jstr is None:
+            return
+
+        with metrics.timer("full_run"):
+            try:
+                measurement = ujson.loads(msm_jstr)
+                fn = generate_filename(measurement)
+                writeout_measurement(msm_jstr, fn)
+                matches = match_fingerprints(measurement)
+                summary = score_measurement(measurement, matches)
+                db.upsert_summary(measurement, summary, fn)
+            except Exception as e:
+                log.exception(e)
+
+
+def shut_down(queue):
+    log.info("Shutting down workers")
+    [queue.put(None) for n in range(NUM_WORKERS)]
+    queue.close()
+    queue.join_thread()
+
+
 def core():
     measurement_cnt = 0
-
-    aggregation_cuboids = load_aggregation_cuboids()
-    # day_target_cc_msmcnt = load_day_target_cc_msmcnt()
-    # day, cc -> msm_count
-    # day, target, cc -> msm_count
 
     # There are 3 main data sources, in order of age:
     # - cans on S3
@@ -617,46 +537,31 @@ def core():
     # - report files on collectors fetched in "real-time"
     # Load json/yaml files and apply filters like canning
 
-    t = time.time()
     t00 = time.time()
-    blk_t_interval = 1
-    blk_t_thresh = time.time() + blk_t_interval
-    blk_size_threshold = 1000
-    blk = None
     scores = None
     means = {}
-    summaries = []
     status = {}
+
+    # Spawn worker processes
+    queue = mp.Queue()
+    workers = [
+        mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
+    ]
+    [t.start() for t in workers]
 
     for measurement in fetch_measurements(conf.start_day, conf.end_day):
         measurement_cnt += 1
-        # web_connectivity fingerprinting
-        matches = match_fingerprints(measurement)
-        score_measurement(measurement, matches)
-        del matches
-        summaries.append(extract_summary(measurement))
-        del measurement
+        while queue.qsize() >= 500:
+            time.sleep(0.1)
+        queue.put(measurement)
+        metrics.gauge("queue_size", queue.qsize())
 
-        if len(summaries) < blk_size_threshold and time.time() < blk_t_thresh:
-            continue
-
-        blk_t_thresh = time.time() + blk_t_interval
-
-        changes = detect_blocking_changes(summaries, status, means)
-        summaries = []
-
-        # # TODO: merge blk, save blk to pgsql
-        # # TODO: generate charts and heatmaps
-
-        metrics.gauge(
-            "overall_measurements_per_s",
-            measurement_cnt / (max(time.time() - t00, 0.000_000_000_000_000_000_1)),
-        )
+        # # TODO: detect blocking changes and generate charts and heatmaps
+        # changes = detect_blocking_changes(summaries, status, means)
 
         if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
             log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
             break
-
 
         # Interact from CLI
         if conf.devel and conf.interact:
@@ -665,6 +570,7 @@ def core():
             bpython.embed(locals_=locals())
             break
 
+    shut_down(queue)
     clean_caches()
 
 
@@ -691,7 +597,7 @@ def setup_fingerprints():
 def main():
     setup()
     setup_fingerprints()
-    log.info("starting")
+    log.info("Starting")
     core()
 
 

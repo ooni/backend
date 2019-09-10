@@ -23,11 +23,14 @@ import tarfile
 import lz4.frame as lz4frame  # debdeps: python3-lz4
 
 # lz4frame appears faster than executing lz4cat: 2.4s vs 3.9s on a test file
-import ujson
+import ujson  # debdeps: python3-ujson
 
 import boto3  # debdeps: python3-boto3
 
 from fastpath.metrics import setup_metrics
+
+AWS_PROFILE = "ooni-data-private"
+BUCKET_NAME = "ooni-data-private"
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath.s3feeder")
@@ -36,10 +39,11 @@ metrics = setup_metrics(name="fastpath.s3feeder")
 for l in ("urllib3", "botocore", "s3transfer"):
     logging.getLogger(l).setLevel(logging.INFO)
 
+# TODO: enable handling YAML
 
 def load_multiple(fn) -> dict:
     """Load contents of cans. Decompress tar archives if found.
-    Yields measurements one by one as dicts
+    Yields measurements one by one as string of JSON
     """
     os.utime(fn)  # update access time - used for cache cleanup
     # TODO: handle:
@@ -53,9 +57,10 @@ def load_multiple(fn) -> dict:
                     break
                 if m.name.endswith(".json"):
                     log.debug("Loading nested %s", m.name)
+
                     k = tf.extractfile(m)
                     for line in k:
-                        yield ujson.loads(line)
+                        yield line
 
                 elif m.name.endswith(".yaml"):
                     pass
@@ -65,7 +70,7 @@ def load_multiple(fn) -> dict:
     elif fn.endswith(".json.lz4"):
         with lz4frame.open(fn) as f:
             for line in f:
-                yield ujson.loads(line)
+                yield line
 
     elif fn.endswith(".yaml.lz4"):
         # with lz4frame.open(fn) as f:
@@ -76,12 +81,14 @@ def load_multiple(fn) -> dict:
         raise RuntimeError(fn)
 
 
+def create_s3_client():
+    return boto3.Session(profile_name=AWS_PROFILE).client("s3")
+
+
 def list_cans_on_s3(prefix):
     # TODO list files based on date and return them
-    bname = "ooni-data-private"
-    boto3.setup_default_session(profile_name="ooni-data-private")
-    s3 = boto3.client("s3")
-    r = s3.list_objects_v2(Bucket=bname, Prefix="canned/" + prefix)
+    s3 = create_s3_client()
+    r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="canned/" + prefix)
     for filedesc in r["Contents"]:
         fn = filedesc["Key"]
         size = filedesc["Size"]
@@ -89,18 +96,12 @@ def list_cans_on_s3(prefix):
 
 
 def list_cans_on_s3_for_a_day(s3, day):
-    bname = "ooni-data-private"
     prefix = f"{day}/"
-    r = s3.list_objects_v2(Bucket=bname, Prefix="canned/" + prefix)
+    r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="canned/" + prefix)
     files = []
     for filedesc in r["Contents"]:
         files.append((filedesc["Key"][len("canned/") :], filedesc["Size"]))
     return files
-
-
-def create_s3_client():
-    boto3.setup_default_session(profile_name="ooni-data-private")
-    return boto3.client("s3")
 
 
 @metrics.timer("fetch_cans")
@@ -138,7 +139,6 @@ def fetch_cans(s3, conf, files):
     _cb.total_size = sum(t[2] for t in to_dload)
     _cb.total_count = 0
 
-    bname = "ooni-data-private"
     for fn, diskf, size in to_dload:
         s3fname = os.path.join("canned", fn)
         # TODO: handle missing file
@@ -147,7 +147,7 @@ def fetch_cans(s3, conf, files):
         metrics.gauge("fetching", 1)
         _cb.start_time = None
         with diskf.open("wb") as f:
-            s3.download_fileobj(bname, s3fname, f, Callback=_cb)
+            s3.download_fileobj(BUCKET_NAME, s3fname, f, Callback=_cb)
         metrics.gauge("fetching", 0)
         assert size == diskf.stat().st_size
 
