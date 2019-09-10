@@ -460,9 +460,9 @@ def score_measurement(msm, matches):
     if msm.get("title_match", True) is False:
         scores["blocking_general"] += 0.5
 
-    if "body_proportion" in msm:
-        delta = (msm["body_proportion"] - 1.0).abs()
-        scores["blocking_general"] += delta.abs()
+    if "body_proportion" in msm["test_keys"]:
+        delta = abs(msm["test_keys"]["body_proportion"] - 1.0)
+        scores["blocking_general"] += delta
 
     # TODO: add IM tests scoring here
 
