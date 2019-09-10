@@ -62,6 +62,8 @@ def setup():
     ap.add_argument("--start-day", type=lambda d: parse_date(d))
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
+    ap.add_argument("--update", action="store_true",
+                help="Update summaries and files instead of logging an error")
     ap.add_argument("--interact", action="store_true", help="Interactive mode")
     ap.add_argument(
         "--stop-after", type=int, help="Stop after feeding N measurements", default=None
@@ -459,7 +461,8 @@ def score_measurement(msm, matches):
         scores["blocking_general"] += 0.5
 
     if "body_proportion" in msm:
-        scores["blocking_general"] += (msm["body_proportion"] - 1.0).abs()
+        delta = (msm["body_proportion"] - 1.0).abs()
+        scores["blocking_general"] += delta.abs()
 
     # TODO: add IM tests scoring here
 
@@ -484,17 +487,22 @@ def generate_filename(msm):
 
 
 @metrics.timer("writeout_measurement")
-def writeout_measurement(msm_jstr, fn):
+def writeout_measurement(msm_jstr, fn, update):
     """Safely write msm to disk
     """
 
     f = conf.msmtdir.joinpath(fn)
+    if f.is_file():
+        if update:
+            log.debug("Overwriting %s", f)
+        else:
+            log.error("Refusing to overwrite %s", f)
+            metrics.incr("report_id_input_file_collision")
+            return
+
     tmpfn = f.with_suffix(".tmp")
     with lz4frame.open(tmpfn, "w") as lzf:
         lzf.write(msm_jstr)
-
-    if f.is_file():
-        log.info("Overwriting %s", f)
 
     tmpfn.rename(f)
 
@@ -513,10 +521,10 @@ def msm_processor(queue):
             try:
                 measurement = ujson.loads(msm_jstr)
                 fn = generate_filename(measurement)
-                writeout_measurement(msm_jstr, fn)
+                writeout_measurement(msm_jstr, fn, conf.update)
                 matches = match_fingerprints(measurement)
                 summary = score_measurement(measurement, matches)
-                db.upsert_summary(measurement, summary, fn)
+                db.upsert_summary(measurement, summary, fn, conf.update)
             except Exception as e:
                 log.exception(e)
 

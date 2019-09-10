@@ -48,54 +48,46 @@ def setup():
 
 
 @metrics.timer("upsert_summary")
-def upsert_summary(msm, summary, filename):
+def upsert_summary(msm, summary, filename, update):
     """Insert a row in the fastpath_scores table. Overwrite an existing one.
     """
-    tpl = """
-    INSERT INTO fastpath (report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, filename)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT ON CONSTRAINT fastpath_pkey DO UPDATE SET
+    sql_base_tpl = """
+    INSERT INTO fastpath (report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, filename, scores)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT ON CONSTRAINT fastpath_pkey DO
+    """
+    sql_update = """
+    UPDATE SET
         probe_cc = excluded.probe_cc,
         probe_asn = excluded.probe_asn,
         test_name = excluded.test_name,
         test_start_time = excluded.test_start_time,
         measurement_start_time = excluded.measurement_start_time,
-        filename = excluded.filename
+        filename = excluded.filename,
+        scores = excluded.scores
     """
+    sql_noupdate = " NOTHING"
+
+    tpl = sql_base_tpl + (sql_update if update else sql_noupdate)
+
     asn = int(msm["probe_asn"][2:])  # AS123
     args = (
         msm["report_id"],
-        msm["input"],
+        msm["input"] or "",
         msm["probe_cc"],
         asn,
         msm["test_name"],
         msm["test_start_time"],
         msm["measurement_start_time"],
-        filename
-    )
-
-    tpl_scores = """
-    INSERT INTO fastpath_scores (report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, scores)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT ON CONSTRAINT fastpath_scores_pkey DO UPDATE SET
-        probe_cc = excluded.probe_cc,
-        probe_asn = excluded.probe_asn,
-        test_name = excluded.test_name,
-        test_start_time = excluded.test_start_time,
-        measurement_start_time = excluded.measurement_start_time,
-        scores = excluded.scores
-    """
-    args_scores = (
-        msm["report_id"],
-        msm["input"],
-        msm["probe_cc"],
-        asn,
-        msm["test_name"],
-        msm["test_start_time"],
-        msm["measurement_start_time"],
+        filename,
         Json(summary["scores"], dumps=ujson.dumps),
     )
 
     with _autocommit_conn.cursor() as cur:
         cur.execute(tpl, args)
-        cur.execute(tpl_scores, args_scores)
+        if cur.rowcount == 0 and not update:
+            metrics.incr("report_id_input_db_collision")
+            log.error("report_id / input collision %r %r",
+                msm["report_id"],
+                msm["input"]
+            )
