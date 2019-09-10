@@ -469,15 +469,16 @@ LEFT OUTER JOIN
 (
     SELECT
     test_day,
-    anomaly_count,
-    confirmed_count,
-    failure_count,
-    total_count
+    SUM(anomaly_count) as anomaly_count,
+    SUM(confirmed_count) as confirmed_count,
+    SUM(failure_count) as failure_count,
+    SUM(total_count) as total_count
     FROM ooexpl_wc_input_counts
     WHERE test_day >= current_date - interval '31 day'
     AND probe_cc =  :probe_cc
     AND probe_asn = :probe_asn
     AND input = :input
+    GROUP BY test_day
 ) m
 ON d.test_day = m.test_day
 )
