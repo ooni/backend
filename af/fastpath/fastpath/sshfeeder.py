@@ -10,11 +10,9 @@ Feeds reports from the collectors
 from collections import OrderedDict
 import datetime
 import io
-import ujson # debdeps: python3-ujson
 import os
 import time
 import logging
-from pathlib import Path
 
 import paramiko
 
@@ -141,11 +139,7 @@ class Source:
                     line = data.readline()
                     if len(line) == 0:
                         break
-                    with metrics.timer("parse_json"):
-                        j = ujson.loads(line)
-                    metrics.incr("decoded.count")
-                    metrics.incr("decoded.data", data.tell())
-                    yield j
+                    yield line
 
         except Exception as e:
             metrics.gauge("fetching", 0)
@@ -178,6 +172,7 @@ def log_ingestion_delay(report):
 def feed_reports_from_collectors(conf, start_time=None):
     """Fetch reports from collectors
     """
+    # Connect to all collectors here
     sources = [Source(conf, hn) for hn in collector_hostnames]
     stop_after = conf.stop_after
     if stop_after == 0:
