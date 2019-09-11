@@ -48,16 +48,18 @@ def setup():
 
 
 @metrics.timer("upsert_summary")
-def upsert_summary(msm, summary, filename, update):
+def upsert_summary(msm, summary, tid, filename, update):
     """Insert a row in the fastpath_scores table. Overwrite an existing one.
     """
     sql_base_tpl = """
-    INSERT INTO fastpath (report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, filename, scores)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO fastpath (tid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, filename, scores)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT ON CONSTRAINT fastpath_pkey DO
     """
     sql_update = """
     UPDATE SET
+        report_id = excluded.report_id,
+        input = excluded.input,
         probe_cc = excluded.probe_cc,
         probe_asn = excluded.probe_asn,
         test_name = excluded.test_name,
@@ -72,8 +74,9 @@ def upsert_summary(msm, summary, filename, update):
 
     asn = int(msm["probe_asn"][2:])  # AS123
     args = (
+        tid,
         msm["report_id"],
-        msm["input"] or "",
+        msm["input"],
         msm["probe_cc"],
         asn,
         msm["test_name"],
@@ -87,7 +90,7 @@ def upsert_summary(msm, summary, filename, update):
         cur.execute(tpl, args)
         if cur.rowcount == 0 and not update:
             metrics.incr("report_id_input_db_collision")
-            log.error("report_id / input collision %r %r",
+            log.info("report_id / input collision %r %r",
                 msm["report_id"],
                 msm["input"]
             )

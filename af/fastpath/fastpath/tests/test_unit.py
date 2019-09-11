@@ -2,9 +2,7 @@
 # Fastpath - unit tests
 #
 
-import fastpath.fastpath as fp
-import fastpath.s3feeder as s3feeder
-import fastpath.s3uploader as s3uploader
+import fastpath.core as fp
 
 
 def test_reset_status():
@@ -15,3 +13,13 @@ def test_reset_status():
     status = dict(a=clear, b=cleared_from_now, c=blocked, d=blocked_from_now)
     fp.reset_status(status)
     assert status == dict(c=blocked, d=blocked)
+
+
+def test_pack():
+    # s3uploader.pack(dict(a=1, b=[[dict(z=[b"zz"])]]))
+    pass
+
+def test_trivial_id():
+    msm_jstr, tid = fp.trivial_id(dict(a="🐱"))
+    assert len(tid) == 32
+    assert tid == "007f9c2ba4e88f827d61604550760585"

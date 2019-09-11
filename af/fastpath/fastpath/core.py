@@ -15,6 +15,7 @@ See README.adoc
 from argparse import ArgumentParser, Namespace
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import hashlib
 import logging
 import multiprocessing as mp
@@ -62,8 +63,11 @@ def setup():
     ap.add_argument("--start-day", type=lambda d: parse_date(d))
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
-    ap.add_argument("--update", action="store_true",
-                help="Update summaries and files instead of logging an error")
+    ap.add_argument(
+        "--update",
+        action="store_true",
+        help="Update summaries and files instead of logging an error",
+    )
     ap.add_argument("--interact", action="store_true", help="Interactive mode")
     ap.add_argument(
         "--stop-after", type=int, help="Stop after feeding N measurements", default=None
@@ -71,7 +75,8 @@ def setup():
     conf = ap.parse_args()
     if conf.devel:
         root = Path(os.getcwd())
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+        format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
     else:
         root = Path("/")
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
@@ -477,34 +482,56 @@ def score_measurement(msm, matches):
     return summary
 
 
-def generate_filename(msm):
+@metrics.timer("trivial_id")
+def trivial_id(msm):
+    """Generate a trivial id of the measurement to allow upsert if needed
+    - 32-bytes hexdigest
+    - Deterministic / stateless with no DB interaction
+    - Malicious/bugged msmts with collisions on report_id/input/test_name lead
+    to different hash values avoiding the collision
+    - Malicious/duplicated msmts that are semantically identical to the "real"
+    one lead to harmless collisions
+    """
+    # Same output with Python's json
+    VER = "00"
+    msm_jstr = ujson.dumps(msm, ensure_ascii=False).encode()
+    tid = VER + hashlib.shake_128(msm_jstr).hexdigest(15)
+    return msm_jstr, tid
+
+
+def generate_filename(tid):
     """Generate filesystem-safe filename from a measurement
     """
-    h = hashlib.sha1(msm["report_id"].encode())
-    h.update((msm["input"] or "").encode())
-
-    return h.hexdigest() + ".json.lz4"
+    return tid + ".json.lz4"
 
 
 @metrics.timer("writeout_measurement")
 def writeout_measurement(msm_jstr, fn, update):
-    """Safely write msm to disk
+    """Safely write measurement to disk
     """
+    # Different processes might be trying to write the same file at the same
+    # time due to naming collisions. Use a safe tmpfile and atomic link
 
-    f = conf.msmtdir.joinpath(fn)
-    if f.is_file():
-        if update:
-            log.debug("Overwriting %s", f)
-        else:
-            log.error("Refusing to overwrite %s", f)
-            metrics.incr("report_id_input_file_collision")
-            return
+    suffix = ".{}.tmp".format(os.getpid())
+    with NamedTemporaryFile(suffix=suffix, dir=conf.msmtdir) as f:
+        with lz4frame.open(f, "w") as lzf:
+            lzf.write(msm_jstr)
+            # os.fsync(lzf.fileno())
 
-    tmpfn = f.with_suffix(".tmp")
-    with lz4frame.open(tmpfn, "w") as lzf:
-        lzf.write(msm_jstr)
+            final_fname = conf.msmtdir.joinpath(fn)
+            try:
+                os.link(f.name, final_fname)
+            except FileExistsError:
+                if update:
+                    # update access time - used for cache cleanup
+                    # no need to overwrite the file
+                    os.utime(final_fname)
+                else:
+                    log.info("Refusing to overwrite %s", final_fname)
+                    metrics.incr("report_id_input_file_collision")
+                    os.utime(final_fname)
 
-    tmpfn.rename(f)
+    metrics.incr("wrote_uncompressed_bytes", len(msm_jstr))
 
 
 def msm_processor(queue):
@@ -520,11 +547,12 @@ def msm_processor(queue):
         with metrics.timer("full_run"):
             try:
                 measurement = ujson.loads(msm_jstr)
-                fn = generate_filename(measurement)
+                msm_jstr, tid = trivial_id(measurement)
+                fn = generate_filename(tid)
                 writeout_measurement(msm_jstr, fn, conf.update)
                 matches = match_fingerprints(measurement)
                 summary = score_measurement(measurement, matches)
-                db.upsert_summary(measurement, summary, fn, conf.update)
+                db.upsert_summary(measurement, summary, tid, fn, conf.update)
             except Exception as e:
                 log.exception(e)
 
