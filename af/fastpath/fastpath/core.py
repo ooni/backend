@@ -555,6 +555,7 @@ def msm_processor(queue):
                 db.upsert_summary(measurement, summary, tid, fn, conf.update)
             except Exception as e:
                 log.exception(e)
+                metrics.incr("unhandled_exception")
 
 
 def shut_down(queue):
