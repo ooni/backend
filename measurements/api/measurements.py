@@ -17,7 +17,7 @@ from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy.dialects import postgresql
-from sqlalchemy import func, or_, and_, false, text, select, sql, column
+from sqlalchemy import func, or_, and_, false, text, select, sql, column, true, text
 from sqlalchemy.orm import lazyload
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.exc import OperationalError
@@ -201,33 +201,31 @@ def get_measurement(measurement_id, download=None):
                 'attachment', filename=filename)
     return response
 
-def input_cte(input_, domain, test_name):
+def input_filter(q, input_, domain, test_name):
     if input_ and domain:
         raise BadRequest("Must pick either domain or input")
 
     if not input_ and not domain:
-        return None
+        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
 
-    where_or = []
     if input_:
-        where_or.append(
-            text('input.input LIKE :i').bindparams(i='%{}%'.format(input_)),
-        )
+        q = q.join(Input, Measurement.input_no == Input.input_no)\
+             .filter(Input.input.like('%{}%'.format(input_)))
 
     if domain:
+        q = q.join(Input, Measurement.input_no == Input.input_no)
         domain_filter = '{}%'.format(domain)
-        where_or.append(text('input.input LIKE :domain_filter').bindparams(domain_filter=domain_filter))
-        if test_name in [None, 'web_connectivity', 'http_requests']:
-            where_or.append(text('input.input LIKE :http_filter').bindparams(http_filter='http://{}'.format(domain_filter)))
-            where_or.append(text('input.input LIKE :https_filter').bindparams(https_filter='https://{}'.format(domain_filter)))
-
-    url_q = select([
-        column("input").label('input'),
-        column("input_no").label('input_no'),
-    ]).where(
-        or_(*where_or)
-    ).select_from(sql.table('input'))
-    return url_q.cte('input_cte')
+        web_filter = '(https://|http://){}'.format(domain_filter)
+        if test_name not in ['web_connectivity', 'http_requests']:
+            q = q.filter(or_(
+                text('input.input SIMILAR TO :web_filter').bindparams(web_filter=web_filter),
+                text('input.input SIMILAR TO :domain_filter').bindparams(domain_filter=domain_filter)
+            ))
+        else:
+            q = q.filter(
+                text('input.input SIMILAR TO :web_filter').bindparams(web_filter=web_filter)
+            )
+    return q
 
 def list_measurements(
         report_id=None,
@@ -287,12 +285,14 @@ def list_measurements(
     if order.lower() not in ('asc', 'desc'):
         raise BadRequest("Invalid order")
 
+
     c_anomaly = func.coalesce(Measurement.anomaly, false())\
                     .label('anomaly')
     c_confirmed = func.coalesce(Measurement.confirmed, false())\
                     .label('confirmed')
     c_msm_failure = func.coalesce(Measurement.msm_failure, false())\
                     .label('msm_failure')
+
     cols = [
         Measurement.input_no.label('m_input_no'),
         Measurement.measurement_start_time.label('measurement_start_time'),
@@ -311,23 +311,13 @@ def list_measurements(
         Report.probe_asn.label('probe_asn'),
         Report.test_name.label('test_name'),
         Report.report_no.label('report_no'),
+        func.coalesce(Input.input, None).label('input')
     ]
 
-    cte = input_cte(input_=input_, domain=domain, test_name=test_name)
+    q = current_app.db_session.query(*cols)\
+            .join(Report, Report.report_no == Measurement.report_no)
 
-    if cte is not None:
-        cols.append(cte)
-    else:
-        cols.append(func.coalesce(Input.input, None).label('input'))
-
-    q = current_app.db_session.query(*cols)
-    if cte is not None:
-        q = q.join(cte, sql.text('input_cte.input_no = measurement.input_no'))
-    else:
-        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
-    q = q.join(Report, Report.report_no == Measurement.report_no)
-
-    q.join(Report, Report.report_no == Measurement.report_no)
+    q = input_filter(q, input_=input_, domain=domain, test_name=test_name)
     if report_id:
         q = q.filter(Report.report_id == report_id)
     if probe_cc:
@@ -367,9 +357,8 @@ def list_measurements(
     iter_start_time = time.time()
     results = []
 
-    query_str = str(q.statement.compile(dialect=postgresql.dialect()))
     with configure_scope() as scope:
-        scope.set_extra("sql_query", query_str)
+        scope.set_extra("sql_query", str(q))
 
         try:
             for row in q:
