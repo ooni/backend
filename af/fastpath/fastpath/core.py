@@ -494,7 +494,7 @@ def trivial_id(msm):
     """
     # Same output with Python's json
     VER = "00"
-    msm_jstr = ujson.dumps(msm, ensure_ascii=False).encode()
+    msm_jstr = ujson.dumps(msm, sort_keys=True, ensure_ascii=False).encode()
     tid = VER + hashlib.shake_128(msm_jstr).hexdigest(15)
     return msm_jstr, tid
 
