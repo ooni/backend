@@ -22,4 +22,4 @@ def test_pack():
 def test_trivial_id():
     msm_jstr, tid = fp.trivial_id(dict(a="🐱"))
     assert len(tid) == 32
-    assert tid == "007f9c2ba4e88f827d61604550760585"
+    assert tid == "00d1cb49bba274be952c9f701f1e13b8"
