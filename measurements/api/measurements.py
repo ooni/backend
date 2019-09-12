@@ -207,24 +207,23 @@ def input_filter(q, input_, domain, test_name):
 
     if not input_ and not domain:
         q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
+        return q
 
+    where_or = []
     if input_:
-        q = q.join(Input, Measurement.input_no == Input.input_no)\
-             .filter(Input.input.like('%{}%'.format(input_)))
+        where_or.append(Input.input.like('%{}%'.format(input_)))
 
     if domain:
-        q = q.join(Input, Measurement.input_no == Input.input_no)
         domain_filter = '{}%'.format(domain)
-        web_filter = '(https://|http://){}'.format(domain_filter)
-        if test_name not in ['web_connectivity', 'http_requests']:
-            q = q.filter(or_(
-                text('input.input SIMILAR TO :web_filter').bindparams(web_filter=web_filter),
-                text('input.input SIMILAR TO :domain_filter').bindparams(domain_filter=domain_filter)
-            ))
-        else:
-            q = q.filter(
-                text('input.input SIMILAR TO :web_filter').bindparams(web_filter=web_filter)
-            )
+        where_or.append(
+            text('input.input LIKE :domain_filter').bindparams(domain_filter=domain_filter)
+        )
+        if test_name in [None, 'web_connectivity', 'http_requests']:
+            where_or.append(text('input.input LIKE :http_filter').bindparams(http_filter='http://{}'.format(domain_filter)))
+            where_or.append(text('input.input LIKE :https_filter').bindparams(https_filter='https://{}'.format(domain_filter)))
+
+    q = q.join(Input, Measurement.input_no == Input.input_no)
+    q = q.filter(or_(*where_or))
     return q
 
 def list_measurements(
