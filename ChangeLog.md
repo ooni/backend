@@ -1,3 +1,9 @@
+# ooni-api 1.1.7 [2019-09-12]
+
+Changed:
+
+* Revert 4807a4f0aa4d0efd88bba00b349bbfdc649aab82 to improve performance
+
 # ooni-api 1.1.6 [2019-09-10]
 
 Fixes:
