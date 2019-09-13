@@ -34,7 +34,6 @@ def _ping():
         cur.execute(q)
         row = cur.fetchone()
         log.info("Database start time: %s", row[0])
-        # log.info("Query: %s", cur.query)
 
 
 def setup():
@@ -44,7 +43,7 @@ def setup():
     conn = psycopg2.connect(dsn)
     _autocommit_conn = psycopg2.connect(dsn)
     _autocommit_conn.autocommit = True
-    # _ping()
+    _ping()
 
 
 @metrics.timer("upsert_summary")
