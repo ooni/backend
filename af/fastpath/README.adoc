@@ -5,7 +5,7 @@ https://github.com/ooni/spec/issues/145[GH issue]
 
 ```
 blockdiag {
-  Collectors -> SSHFeeder -> Ingestion -> S3Parquet -> Analysis -> PSQL.events -> RSSFeed
+  Collectors -> SSHFeeder -> Ingestion -> ... -> Analysis -> PSQL.events -> RSSFeed
   S3 -> S3Feeder -> Ingestion
   PSQL.events -> Explorer
 }
@@ -41,4 +41,33 @@ journalctl -f -t fastpath --utc CODE_LINE=12
 Monitor metrics locally:
 ```bash
 make local_monitor_metrics
+```
+
+To set up credentials for development create:
+```
+~/ .aws/credentials
+~/var/lib/fastpath/ssh/id_ed25519 from /var/lib/fastpath/ssh/id_ed25519 (created by install scripts)
+touch /home/federico/var/lib/fastpath/ssh/known_hosts
+```
+
+In development mode, ~ is treated as /
+
+Run development mode:
+```
+fastpath --devel --start-day=2019-7-20 --end-day=2019-7-21
+```
+
+On the collectors:
+```
+# on fastpath
+cat ~/var/lib/fastpath/ssh/id_ed25519.pub
+# add pubkey on feeder:
+sudo vim /home/sshfeeder/.ssh/authorized_keys
+```
+
+Test connectivity:
+```
+cat  /etc/machine-id
+ssh sshfeeder@b.collector.ooni.io -i ~/var/lib/fastpath/ssh/id_ed25519
+
 ```
