@@ -27,6 +27,7 @@ import ujson  # debdeps: python3-ujson
 
 import boto3  # debdeps: python3-boto3
 
+from fastpath.normalize import iter_yaml_lz4_reports_normalized, iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
 
 AWS_PROFILE = "ooni-data-private"
@@ -39,11 +40,11 @@ metrics = setup_metrics(name="fastpath.s3feeder")
 for l in ("urllib3", "botocore", "s3transfer"):
     logging.getLogger(l).setLevel(logging.INFO)
 
-# TODO: enable handling YAML
 
 def load_multiple(fn) -> dict:
     """Load contents of cans. Decompress tar archives if found.
-    Yields measurements one by one as string of JSON
+    Yields measurements one by one as:
+        (string of JSON, None) or (None, msmt dict)
     """
     os.utime(fn)  # update access time - used for cache cleanup
     # TODO: handle:
@@ -55,27 +56,25 @@ def load_multiple(fn) -> dict:
                 m = tf.next()
                 if m is None:
                     break
+                log.debug("Loading nested %s", m.name)
+                k = tf.extractfile(m)
                 if m.name.endswith(".json"):
-                    log.debug("Loading nested %s", m.name)
-
-                    k = tf.extractfile(m)
                     for line in k:
-                        yield line
+                        yield (line, None)
 
                 elif m.name.endswith(".yaml"):
-                    pass
-                    # log.debug("Loading nested %s", m.name)
-                    # FIXME raise NotImplementedError()
+                    for msm in iter_yaml_msmt_normalized(k):
+                        yield (None, msm)
 
     elif fn.endswith(".json.lz4"):
         with lz4frame.open(fn) as f:
             for line in f:
-                yield line
+                yield (line, None)
 
     elif fn.endswith(".yaml.lz4"):
-        # with lz4frame.open(fn) as f:
-        # FIXME raise NotImplementedError()
-        pass
+        for r in iter_yaml_lz4_reports_normalized(fn):
+            metrics.incr("yaml_normalization")
+            yield (None, r)
 
     else:
         raise RuntimeError(fn)
