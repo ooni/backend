@@ -6,7 +6,7 @@ Metric generation
 
 from os.path import basename, splitext
 
-import statsd
+import statsd  # debdeps: python3-statsd
 
 
 def setup_metrics(host="localhost", name=None):
