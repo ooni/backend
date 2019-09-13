@@ -498,6 +498,8 @@ def trivial_id(msm):
     - Malicious/duplicated msmts that are semantically identical to the "real"
     one lead to harmless collisions
     """
+    # NOTE: we want the id to stay the same when a msmt is fetched from SSH
+    # and from a can on ooni-data-private/canned
     # Implementing a rolling hash without ujson.dumps is 2x faster
     # A rolling hash on only the first 2 levels of the dict is 10x faster
     #
