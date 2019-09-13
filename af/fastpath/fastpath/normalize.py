@@ -1,15 +1,21 @@
+#
+# Normalize YAML reports
+#
+
 from datetime import datetime
 import logging
 import re
 import hashlib
 import uuid
 
-# from numba import njit, jit
+import lz4.frame as lz4frame  # debdeps: python3-lz4
+
 
 # TODO: benchmark the cost of normalization for yaml and/or old formats
 # compared to normalizing using columns in a dataframe
 
-log = logging.getLogger("fastpath")
+log = logging.getLogger("normalize")
+
 
 test_name_mappings = {
     "http_host": "http_host",
@@ -162,26 +168,22 @@ def nest_test_keys(entry):
 
 
 def normalize_str(body):
-    # TODO test
     if body is None:
         return None
-    # XXX: original encoding is lost
+    assert len(body) < 10000
     if isinstance(body, bytes):
-        body = body.replace(b"\0", b"")  # .decode()
+        return body.decode("UTF-8", "backslashreplace")
+    return body.replace("\0", "")
 
-    if isinstance(body, str):
-        return body.replace("\0", "")
 
-    # try:
-    #    body = body.replace("\0", "")
-    #    if not isinstance(body, unicode):
-    #        body = unicode(body, "ascii")
-    # except UnicodeDecodeError:
-    #    try:
-    #        body = unicode(body, "utf-8")
-    #    except UnicodeDecodeError:
-    #        body = binary_to_base64_dict(body)
-    return body
+def normalize_body(body):
+    if body is None:
+        return None
+
+    if isinstance(body, bytes):
+        return body.decode("UTF-8", "backslashreplace")
+
+    return body.replace("\0", "")
 
 
 def regex_or_empty_string(pattern, source):
@@ -231,7 +233,7 @@ def normalize_httpt(entry):
 
     for session in entry["test_keys"].get("requests", []):
         if isinstance(session.get("response"), dict):
-            session["response"]["body"] = normalize_str(session["response"]["body"])
+            session["response"]["body"] = normalize_body(session["response"]["body"])
             session["response"]["headers"] = normalize_headers(
                 session["response"]["headers"]
             )
@@ -239,7 +241,7 @@ def normalize_httpt(entry):
             session["response"] = {"body": None, "headers": {}}
 
         if isinstance(session.get("request"), dict):
-            session["request"]["body"] = normalize_str(session["request"]["body"])
+            session["request"]["body"] = normalize_body(session["request"]["body"])
             session["request"]["headers"] = normalize_headers(
                 session["request"]["headers"]
             )
@@ -639,8 +641,10 @@ class BrokenFrameError(BlobSlicerError):
 class TruncatedReportError(BlobSlicerError):
     pass
 
+
 import functools
 import string
+
 
 def stream_yaml_blobs(fd):
     head = b""
@@ -705,7 +709,6 @@ def generate_report_id(header):
 
 
 def iter_yaml_lz4_reports(fn):
-    import lz4.frame as lz4frame
 
     fd = lz4frame.open(fn)
     report_gen = stream_yaml_blobs(fd)
@@ -736,15 +739,46 @@ def iter_yaml_lz4_reports(fn):
     fd.close()
 
 
+def iter_yaml_msmt_normalized(data):
+    """Yields normalized measurements from a YAML BytesIO
+    """
+    report_gen = stream_yaml_blobs(data)
+
+    off, header = next(report_gen)
+    headsha = hashlib.sha1(header)
+    # XXX: bad header kills whole bucket
+    header = yaml.load(header, Loader=CLoader)
+    if not header.get("report_id"):
+        header["report_id"] = generate_report_id(header)
+
+    for off, entry in report_gen:
+        entry_len = len(entry)
+        esha = headsha.copy()
+        esha.update(entry)
+        esha = esha.digest()
+        try:
+            entry = yaml.load(entry, Loader=CLoader)
+            if not entry:  # e.g. '---\nnull\n...\n'
+                continue
+            if "test_start_time" in entry and "test_start_time" in header:
+                header.pop("test_start_time")
+            entry.update(header)
+            yield normalize_entry(entry, "2018-05-07", "??", esha)
+        except Exception as exc:
+            yield normalize_entry(entry, "2018-05-07", "??", esha)
+
+
 def iter_yaml_lz4_reports_normalized(fn):
+    """Yields normalized measurements from a yaml.lz4 file
+    """
     for r in iter_yaml_lz4_reports(fn):
         off, entry_len, esha, entry, exc = r
         yield normalize_entry(entry, "2018-05-07", "??", esha)
 
 
+
 ### Stream entries from json.lz4 files ####
 
-import ujson
 
 def stream_json_blobs(fd):
     head = b""
@@ -767,7 +801,7 @@ def stream_json_blobs(fd):
         raise TruncatedReportError(fd.tell() - len(head), head)
 
 
-#def stream_json_reports(fd):
+# def stream_json_reports(fd):
 #    for off, entry in stream_json_blobs(fd):
 #        entry_len = len(entry)
 #        esha = hashlib.sha1(entry).digest()

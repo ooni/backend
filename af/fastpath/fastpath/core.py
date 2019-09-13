@@ -318,6 +318,7 @@ def unroll_requests_in_measurement(measurement):
 
 @metrics.timer("load_s3_reports")
 def load_s3_reports(day) -> dict:
+    # TODO: move this into s3feeder
     t0 = time.time()
     path = conf.s3cachedir / str(day)
     log.info("Scanning %s", path.absolute())
@@ -335,8 +336,8 @@ def load_s3_reports(day) -> dict:
         log.debug("Ingesting %s", e.name)
         fn = os.path.join(path, e.name)
         fcnt += 1
-        for measurement in s3feeder.load_multiple(fn):
-            yield measurement
+        for measurement_tup in s3feeder.load_multiple(fn):
+            yield measurement_tup
 
         remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
         metrics.gauge("load_s3_reports_eta", remaining)
@@ -363,25 +364,29 @@ def prepare_for_json_normalize(report):
 def fetch_measurements(start_day, end_day) -> dict:
     """Fetch measurements from S3 and the collectors
     """
+    # no --start-day or --end-day   -> Run over SSH
+    # --start-day                   -> Run on old cans, then over SSH
+    # --start-day and --end-day     -> Run on old cans
+    # --start-day and --end-day  with the same date     -> NOP
     today = date.today()
-    if start_day < today:
+    if start_day and start_day < today:
         # TODO: fetch day N+1 while processing day N
         log.info("Fetching older cans from S3")
         day = start_day
-        while day < end_day:
+        while day < (end_day or today):
             log.info("Processing %s", day)
             s3feeder.fetch_cans_for_a_day_with_cache(conf, day)
-            for measurement in load_s3_reports(day):
-                yield measurement
+            for measurement_tup in load_s3_reports(day):
+                yield measurement_tup
 
             day += timedelta(days=1)
 
-    if end_day < today and not conf.devel:
-        return
+        if end_day:
+            return
 
     ## Fetch measurements from collectors: backlog and then realtime ##
-    for measurement in sshfeeder.feed_reports_from_collectors(conf):
-        yield measurement
+    for measurement_tup in sshfeeder.feed_measurements_from_collectors(conf):
+        yield measurement_tup
 
 
 @metrics.timer("match_fingerprints")
@@ -466,7 +471,8 @@ def score_measurement(msm, matches):
         scores["blocking_general"] += 0.5
 
     if "body_proportion" in msm["test_keys"]:
-        delta = abs(msm["test_keys"]["body_proportion"] - 1.0)
+        # body_proportion can be missing or can be None
+        delta = abs((msm["test_keys"]["body_proportion"] or 1.0) - 1.0)
         scores["blocking_general"] += delta
 
     # TODO: add IM tests scoring here
@@ -492,6 +498,9 @@ def trivial_id(msm):
     - Malicious/duplicated msmts that are semantically identical to the "real"
     one lead to harmless collisions
     """
+    # Implementing a rolling hash without ujson.dumps is 2x faster
+    # A rolling hash on only the first 2 levels of the dict is 10x faster
+    #
     # Same output with Python's json
     VER = "00"
     msm_jstr = ujson.dumps(msm, sort_keys=True, ensure_ascii=False).encode()
@@ -539,14 +548,16 @@ def msm_processor(queue):
     """
     db.setup()
     while True:
-        msm_jstr = queue.get()
+        msm_tup = queue.get()
 
-        if msm_jstr is None:
+        if msm_tup is None:
             return
 
         with metrics.timer("full_run"):
             try:
-                measurement = ujson.loads(msm_jstr)
+                msm_jstr, measurement = msm_tup
+                if measurement is None:
+                    measurement = ujson.loads(msm_jstr)
                 msm_jstr, tid = trivial_id(measurement)
                 fn = generate_filename(tid)
                 writeout_measurement(msm_jstr, fn, conf.update)
@@ -586,11 +597,16 @@ def core():
     ]
     [t.start() for t in workers]
 
-    for measurement in fetch_measurements(conf.start_day, conf.end_day):
+    for measurement_tup in fetch_measurements(conf.start_day, conf.end_day):
+        assert len(measurement_tup) == 2
+        msm_jstr, msm = measurement_tup
+        assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
+        assert msm is None or isinstance(msm, dict)
+
         measurement_cnt += 1
         while queue.qsize() >= 500:
             time.sleep(0.1)
-        queue.put(measurement)
+        queue.put(measurement_tup)
         metrics.gauge("queue_size", queue.qsize())
 
         # # TODO: detect blocking changes and generate charts and heatmaps

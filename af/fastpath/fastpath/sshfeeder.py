@@ -3,7 +3,7 @@
 
 """
 
-Feeds reports from the collectors
+Feeds measurements from the collectors
 
 """
 
@@ -20,6 +20,7 @@ import warnings
 
 warnings.filterwarnings(action="ignore", module=".*paramiko.*")
 
+import fastpath.normalize as normalize
 from fastpath.metrics import setup_metrics
 
 log = logging.getLogger("fastpath")
@@ -70,7 +71,7 @@ class Source:
         self._archive_dir = f"/data/{self.hostname}/archive"
         self._old_fnames = OrderedDict()
         self._scan_time = None
-        self._initial_backlog_minutes = 1
+        self._initial_backlog_minutes = 60 * 6  # too much?
 
     @metrics.timer("scan")
     def scan_new_files(self):
@@ -94,8 +95,12 @@ class Source:
         if xc == 0:
             for line in stdout.readlines():
                 epoch, size, fn = line.strip().split(" ", 2)
+                if not fn.endswith((".json", ".yaml")):
+                    continue
+
                 if fn in self._old_fnames:
                     continue
+
                 # creation = datetime.datetime.fromtimestamp(float(epoch))
                 new_fnames.append(fn)
                 self._old_fnames[fn] = ""
@@ -110,8 +115,9 @@ class Source:
             new_fnames.sort()
         return new_fnames
 
-    def _fetch_report(self, fn):
-        """Fetch one file using a local cache
+    def _fetch_measurement(self, fn):
+        """Fetch measurements from one file using a local cache
+        :yields: (string of JSON, msmt dict) or (None, msmt dict)
         """
         cfn = self._cachedir / fn
         if cfn.exists():
@@ -121,9 +127,6 @@ class Source:
 
         metrics.incr("sshcache_miss")
 
-        if ".yaml" in fn:
-            # FIXME: implement loading YAML
-            raise NotImplementedError
         try:
             log.debug("Fetching %s", fn)
             fn = os.path.join(self._archive_dir, fn)
@@ -135,30 +138,37 @@ class Source:
                 metrics.incr("fetched.count")
                 metrics.incr("fetched.data", data.tell())
                 data.seek(0)
-                while True:
-                    line = data.readline()
-                    if len(line) == 0:
-                        break
-                    yield line
+                if fn.endswith(".yaml"):
+                    for msm in normalize.iter_yaml_msmt_normalized(data):
+                        yield (None, msm)
+                else:
+                    # JSON documents
+                    while True:
+                        line = data.readline()
+                        if len(line) == 0:
+                            break
+
+                        yield (line, None)
 
         except Exception as e:
             metrics.gauge("fetching", 0)
-            log.debug("Error %s", e)
+            log.exception(e)
+            metrics.incr("unhandled_exception")
 
-    def fetch_reports(self):
+    def fetch_measurements(self):
         """Fetch new reports
-            :returns: iterator
+            :yields: (string of JSON, None) or (None, msmt dict)
         """
         new_fnames = self.scan_new_files()
         metrics.incr("new_reports", len(new_fnames))
         for fn in new_fnames:
-            for item in self._fetch_report(fn):
+            for item in self._fetch_measurement(fn):
                 yield item
 
 
-def log_ingestion_delay(report):
+def log_ingestion_delay(msm_jstr, msm):
     try:
-        st = report["measurement_start_time"]
+        st = msm["measurement_start_time"]
         st = datetime.datetime.strptime(st, "%Y-%m-%d %H:%M:%S")
         now = datetime.datetime.utcnow()
         s = (now - st).total_seconds()
@@ -169,8 +179,10 @@ def log_ingestion_delay(report):
         pass
 
 
-def feed_reports_from_collectors(conf, start_time=None):
+def feed_measurements_from_collectors(conf, start_time=None):
     """Fetch reports from collectors
+    Yields measurements one by one as:
+    :yields: (string of JSON, None) or (None, msmt dict)
     """
     # Connect to all collectors here
     sources = [Source(conf, hn) for hn in collector_hostnames]
@@ -181,12 +193,12 @@ def feed_reports_from_collectors(conf, start_time=None):
         throttle = True
         for source in sources:
             log.debug("Checking %s", source.hostname)
-            for r in source.fetch_reports():
-                if not r:
+            for i in source.fetch_measurements():
+                if not i:
                     break
 
-                log_ingestion_delay(r)
-                yield r
+                log_ingestion_delay(*i)
+                yield i
                 throttle = False
                 if stop_after is not None:
                     stop_after -= 1
