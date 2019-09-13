@@ -45,17 +45,26 @@ class Source:
         self._cachedir = conf.sshcachedir
         with open(pkey_password_file) as f:
             pkey_password = f.read().strip()
-        pkey_filename = os.path.join(conf.vardir, pkey_filename_local_path)
+        pkey_file = conf.vardir / pkey_filename_local_path
+        assert pkey_file.is_file(), "Missing SSH private key"
+        log.info("Creating SSH client using %s", pkey_file)
         pkey = paramiko.Ed25519Key.from_private_key_file(
-            pkey_filename, password=pkey_password
+            pkey_file.as_posix(), password=pkey_password
         )
+        log.info("Key loaded, creating SSH client")
         ssh = paramiko.SSHClient()
-        ssh.load_host_keys(os.path.join(conf.vardir, "ssh/known_hosts"))
+        kn = conf.vardir / "ssh/known_hosts"
+        log.info("Loading %s", kn)
+        assert kn.is_file(), "Missing known_hosts"
+        ssh.load_host_keys(kn.as_posix())
+        del kn
         if conf.devel:
             log.info("SSH TOFU in devel mode!")
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.hostname = hostname
         self.ssh = ssh
+        log.info("Connecting to %s", self.hostname)
+        # TODO: handle reconnections
         with metrics.timer("connect." + self.hostname):
             ssh.connect(
                 hostname,

@@ -385,6 +385,7 @@ def fetch_measurements(start_day, end_day) -> dict:
             return
 
     ## Fetch measurements from collectors: backlog and then realtime ##
+    log.info("Starting fetching over SSH")
     for measurement_tup in sshfeeder.feed_measurements_from_collectors(conf):
         yield measurement_tup
 
@@ -597,36 +598,41 @@ def core():
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]
-    [t.start() for t in workers]
+    try:
+        [t.start() for t in workers]
 
-    for measurement_tup in fetch_measurements(conf.start_day, conf.end_day):
-        assert len(measurement_tup) == 2
-        msm_jstr, msm = measurement_tup
-        assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
-        assert msm is None or isinstance(msm, dict)
+        for measurement_tup in fetch_measurements(conf.start_day, conf.end_day):
+            assert len(measurement_tup) == 2
+            msm_jstr, msm = measurement_tup
+            assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
+            assert msm is None or isinstance(msm, dict)
 
-        measurement_cnt += 1
-        while queue.qsize() >= 500:
-            time.sleep(0.1)
-        queue.put(measurement_tup)
-        metrics.gauge("queue_size", queue.qsize())
+            measurement_cnt += 1
+            while queue.qsize() >= 500:
+                time.sleep(0.1)
+            queue.put(measurement_tup)
+            metrics.gauge("queue_size", queue.qsize())
 
-        # # TODO: detect blocking changes and generate charts and heatmaps
-        # changes = detect_blocking_changes(summaries, status, means)
+            # # TODO: detect blocking changes and generate charts and heatmaps
+            # changes = detect_blocking_changes(summaries, status, means)
 
-        if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
-            log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
-            break
+            if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
+                log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
+                break
 
-        # Interact from CLI
-        if conf.devel and conf.interact:
-            import bpython  # debdeps: bpython3
+            # Interact from CLI
+            if conf.devel and conf.interact:
+                import bpython  # debdeps: bpython3
 
-            bpython.embed(locals_=locals())
-            break
+                bpython.embed(locals_=locals())
+                break
 
-    shut_down(queue)
-    clean_caches()
+    except Exception as e:
+        log.exception(e)
+
+    finally:
+        shut_down(queue)
+        clean_caches()
 
 
 def setup_fingerprints():
