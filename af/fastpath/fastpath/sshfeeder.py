@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
+Feeds measurements from the collectors using SSH
 
-Feeds measurements from the collectors
+There is no local cache for this feeder: it's unlikely that we need to
+run the fastpath many times on the same files from the collectors
 
 """
 
@@ -42,7 +44,6 @@ for l in ("paramiko", "paramiko.transport"):
 
 class Source:
     def __init__(self, conf, hostname):
-        self._cachedir = conf.sshcachedir
         with open(pkey_password_file) as f:
             pkey_password = f.read().strip()
         pkey_file = conf.vardir / pkey_filename_local_path
@@ -124,17 +125,9 @@ class Source:
         return sorted(new_fnames)
 
     def _fetch_measurement(self, fn):
-        """Fetch measurements from one file using a local cache
+        """Fetch measurements from one collector using SSH/SFTP
         :yields: (string of JSON, msmt dict) or (None, msmt dict)
         """
-        cfn = self._cachedir / fn
-        if cfn.exists():
-            metrics.incr("sshcache_hit")
-            cfn.touch(exist_ok=True)
-            return
-
-        metrics.incr("sshcache_miss")
-
         try:
             log.debug("Fetching %s", fn)
             fn = os.path.join(self._archive_dir, fn)

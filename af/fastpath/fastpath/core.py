@@ -87,7 +87,6 @@ def setup():
     conf.vardir = root / "var/lib/fastpath"
     conf.cachedir = conf.vardir / "cache"
     conf.s3cachedir = conf.cachedir / "s3"
-    conf.sshcachedir = conf.cachedir / "ssh"
     conf.dfdir = conf.vardir / "dataframes"
     conf.outdir = conf.vardir / "output"
     conf.msmtdir = conf.outdir / "measurements"
@@ -95,7 +94,6 @@ def setup():
         conf.vardir,
         conf.cachedir,
         conf.s3cachedir,
-        conf.sshcachedir,
         conf.dfdir,
         conf.outdir,
         conf.msmtdir,
@@ -119,15 +117,14 @@ def clean_caches():
     # FIXME: use cache locations correctly
     now = time.time()
     threshold = 3600 * 24 * 3
-    for d in (conf.s3cachedir, conf.sshcachedir):
-        for f in d.iterdir():
-            if not f.is_file():
-                continue
-            age_s = now - f.stat().st_atime
-            if age_s > threshold:
-                log.debug("Deleting %s", f)
-                metrics.gauge("deleted_cache_file_age", age_s)
-                # TODO
+    for f in conf.s3cachedir.iterdir():
+        if not f.is_file():
+            continue
+        age_s = now - f.stat().st_atime
+        if age_s > threshold:
+            log.debug("Deleting %s", f)
+            metrics.gauge("deleted_cache_file_age", age_s)
+            # TODO: delete
 
 
 expected_colnames = {
