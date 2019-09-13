@@ -75,8 +75,8 @@ class Source:
 
     @metrics.timer("scan")
     def scan_new_files(self):
-        """
-        Updates self._old_fnames and self._scan_time
+        """Updates self._old_fnames and self._scan_time
+        Returns sorted list of filenames
         """
         new_fnames = []
         while len(self._old_fnames) > 5000:
@@ -108,12 +108,11 @@ class Source:
             log.error(
                 "Error running %r on %r as %r", find_cmd, self.hostname, ssh_username
             )
-            raise Exception("SSH error")
+            # The archive directory might be missing upon file rotation.
+            metrics.incr("ssh_error")
+            return sorted(new_fnames)
 
-        if new_fnames:
-            # FWIW try to download files in alphabetical order
-            new_fnames.sort()
-        return new_fnames
+        return sorted(new_fnames)
 
     def _fetch_measurement(self, fn):
         """Fetch measurements from one file using a local cache
@@ -159,6 +158,8 @@ class Source:
         """Fetch new reports
             :yields: (string of JSON, None) or (None, msmt dict)
         """
+        # FWIW process files in alphabetical order even if it does not
+        # match the real measurement_start_time order
         new_fnames = self.scan_new_files()
         metrics.incr("new_reports", len(new_fnames))
         for fn in new_fnames:
