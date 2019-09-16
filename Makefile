@@ -23,6 +23,12 @@ clean:
 venv:
 	virtualenv -p python3.5 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
 
+tox37:
+	tox -e py37 $(args)
+
+tox37-coverage:
+	tox -e py37 -- --cov --cov-report=term-missing $(args)
+
 dev:
 	$(PYTHON_WITH_ENV) -m measurements run -p 3000 --reload
 
