@@ -195,26 +195,20 @@ def feed_measurements_from_collectors(conf, start_time=None):
     """
     # Connect to all collectors here
     sources = [Source(conf, hn) for hn in collector_hostnames]
-    stop_after = conf.stop_after
-    if stop_after == 0:
-        return
     while True:
-        throttle = True
-        for source in sources:
-            log.debug("Checking %s", source.hostname)
-            for i in source.fetch_measurements():
-                if not i:
-                    break
+        try:
+            throttle = True
+            for source in sources:
+                log.debug("Checking %s", source.hostname)
+                for i in source.fetch_measurements():
+                    log_ingestion_delay(*i)
+                    yield i
+                    throttle = False
 
-                log_ingestion_delay(*i)
-                yield i
-                throttle = False
-                if stop_after is not None:
-                    stop_after -= 1
-                    if stop_after == 0:
-                        log.debug("Stopping due to stop_after")
-                        return
-
-        # sleep only if no reports were fetched
-        if throttle:
+            # sleep only if no reports were fetched
+            if throttle:
+                time.sleep(1)
+        except Exception as e:
+            log.exception(e)
             time.sleep(1)
+
