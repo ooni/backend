@@ -128,17 +128,23 @@ class Source:
         """Fetch measurements from one collector using SSH/SFTP
         :yields: (string of JSON, msmt dict) or (None, msmt dict)
         """
+        t = time.time()
         try:
             log.debug("Fetching %s", fn)
             fn = os.path.join(self._archive_dir, fn)
             with io.BytesIO() as data:
                 metrics.gauge("fetching", 1)
-                with metrics.timer("fetch"):
-                    self.sftp.getfo(fn, data)
+                t = metrics.timer("fetch").start()
+                # Fetch all data in a blocking call
+                self.sftp.getfo(fn, data)
                 metrics.gauge("fetching", 0)
-                metrics.incr("fetched.count")
-                metrics.incr("fetched.data", data.tell())
+                t.stop()
+                data_len = data.tell()
                 data.seek(0)
+                metrics.incr("fetched.count")
+                metrics.incr("fetched.data", data_len)
+                metrics.gauge("fetching_bw_KBps", data_len / (t.ms or 0.000_000_001))
+
                 if fn.endswith(".yaml"):
                     for msm in normalize.iter_yaml_msmt_normalized(data):
                         yield (None, msm)
