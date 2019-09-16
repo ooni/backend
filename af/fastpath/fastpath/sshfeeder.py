@@ -91,7 +91,7 @@ class Source:
         new_fnames = []
         while len(self._old_fnames) > 5000:
             # circular buffer of filenames
-            self._old_fnames.pop()
+            self._old_fnames.popitem(last=True)
 
         if self._scan_time is None:  # this is the first run
             backlog_minutes = self._initial_backlog_minutes
