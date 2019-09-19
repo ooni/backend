@@ -1,0 +1,5 @@
+=== Integration tests
+
+Integration tests are run against a live *replica* database, usually amsmetadb.ooni.nu
+
+They require a readonly user and connectivity to the database.

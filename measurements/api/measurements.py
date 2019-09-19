@@ -1,7 +1,9 @@
-import os
+
+import http.client
 import io
-import re
 import math
+import os
+import re
 import time
 
 from dateutil.parser import parse as parse_date
@@ -27,9 +29,10 @@ from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
-from measurements.models import Report, Input, Measurement, Autoclaved
+from measurements.models import Report, Input, Measurement, Autoclaved, Fastpath
 
 MSM_ID_PREFIX = 'temp-id'
+FASTPATH_MSM_ID_PREFIX = 'tid-'
 RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
 
 class QueryTimeoutError(HTTPException):
@@ -147,8 +150,42 @@ def list_files(
         'results': results
     })
 
+
+
+def get_one_fastpath_measurement(measurement_id, download):
+    """Get one measurement from the fastpath table by measurement_id,
+    fetching the file from the fastpath host
+    """
+    log = current_app.logger
+    tid = measurement_id[len(FASTPATH_MSM_ID_PREFIX):]
+
+    conn = http.client.HTTPConnection("fastpath.ooni.nu", port=8000)
+    conn.request("GET", "/{}.json.lz4".format(tid))
+    r = conn.getresponse()
+    try:
+        assert r.status == 200
+        blob = r.read()
+        conn.close()
+        blob = lz4framed.decompress(blob)
+        response = make_response(blob)
+        response.headers.set('Content-Type', 'application/json')
+        if download is not None:
+            response.headers.set('Content-Disposition',
+                    'attachment', filename=filename)
+        return response
+    except Exception as e:
+        raise BadRequest("No measurement found")
+
+
+
 def get_measurement(measurement_id, download=None):
+    """Get one measurement by measurement_id,
+    fetching the file from S3 or the fastpath host as needed
+    """
     # XXX this query is SUPER slow
+    if measurement_id.startswith(FASTPATH_MSM_ID_PREFIX):
+        return get_one_fastpath_measurement(measurement_id, download)
+
     m = RE_MSM_ID.match(measurement_id)
     if not m:
         raise BadRequest("Invalid measurement_id")
@@ -201,7 +238,10 @@ def get_measurement(measurement_id, download=None):
                 'attachment', filename=filename)
     return response
 
+
 def input_cte(input_, domain, test_name):
+    """Given a domain or an input_, build a WHERE filter
+    """
     if input_ and domain:
         raise BadRequest("Must pick either domain or input")
 
@@ -214,20 +254,41 @@ def input_cte(input_, domain, test_name):
             text('input.input LIKE :i').bindparams(i='%{}%'.format(input_)),
         )
 
-    if domain:
-        domain_filter = '{}%'.format(domain)
-        where_or.append(text('input.input LIKE :domain_filter').bindparams(domain_filter=domain_filter))
-        if test_name in [None, 'web_connectivity', 'http_requests']:
-            where_or.append(text('input.input LIKE :http_filter').bindparams(http_filter='http://{}'.format(domain_filter)))
-            where_or.append(text('input.input LIKE :https_filter').bindparams(https_filter='https://{}'.format(domain_filter)))
+    else:
+        domain_filter = "{}%".format(domain)
+        where_or.append(
+            text("input.input LIKE :domain_filter").bindparams(
+                domain_filter=domain_filter
+            )
+        )
+        if test_name in [None, "web_connectivity", "http_requests"]:
+            where_or.append(
+                text("input.input LIKE :http_filter").bindparams(
+                    http_filter="http://{}".format(domain_filter)
+                )
+            )
+            where_or.append(
+                text("input.input LIKE :https_filter").bindparams(
+                    https_filter="https://{}".format(domain_filter)
+                )
+            )
 
-    url_q = select([
-        column("input").label('input'),
-        column("input_no").label('input_no'),
-    ]).where(
-        or_(*where_or)
-    ).select_from(sql.table('input'))
+    url_q = (
+        select([column("input").label("input"), column("input_no").label("input_no")])
+        .where(or_(*where_or))
+        .select_from(sql.table("input"))
+    )
+
     return url_q.cte('input_cte')
+
+
+def log_query(log, q):
+    import sqlparse  # debdeps: python3-sqlparse
+    sql = str(q.statement.compile(dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True}))
+    sql = sqlparse.format(sql, reindent=True, keyword_case='upper')
+    log.info("\n--- query ---\n\n%s\n\n-------------", sql)
+
 
 def list_measurements(
         report_id=None,
@@ -245,9 +306,12 @@ def list_measurements(
         anomaly=None,
         confirmed=None
     ):
+    """Search for measurements using only the database. Provide pagination.
+    """
     input_ = request.args.get("input")
     domain = request.args.get("domain")
 
+    log = current_app.logger
     if probe_asn is not None:
         if probe_asn.startswith('AS'):
             probe_asn = probe_asn[2:]
@@ -256,6 +320,7 @@ def list_measurements(
     # When the user specifies a list that includes all the possible values for
     # boolean arguments, that is logically the same of applying no filtering at
     # all.
+    # TODO: treat it as an error?
     if failure is not None:
         if set(failure) == set(['true', 'false']):
             failure = None
@@ -296,7 +361,7 @@ def list_measurements(
     cols = [
         Measurement.input_no.label('m_input_no'),
         Measurement.measurement_start_time.label('measurement_start_time'),
-        Measurement.msm_no.label('msm_no'),
+        func.concat(MSM_ID_PREFIX, "-", Measurement.msm_no).label('measurement_id'),
         Measurement.report_no.label('m_report_no'),
 
         c_anomaly,
@@ -361,26 +426,82 @@ def list_measurements(
     if order_by is not None:
         q = q.order_by(text('{} {}'.format(order_by, order)))
 
-    query_time = 0
+
+    ## Create a query for fastpath
+
+    fpcols = [
+        func.coalesce(0).label('m_input_no'),
+        Fastpath.measurement_start_time.label("measurement_start_time"),
+        func.concat("tid-", Fastpath.tid).label('measurement_id'),
+        func.coalesce(0).label('m_report_no'),
+
+        func.coalesce(false()).label('anomaly'),
+        func.coalesce(false()).label('confirmed'),
+        func.coalesce(false()).label('msm_failure'),
+
+        func.coalesce([0, ]).label('exc'),
+        func.coalesce(0).label('residual_no'),
+
+        Fastpath.report_id.label("report_id"),
+        Fastpath.probe_cc.label("probe_cc"),
+        Fastpath.probe_asn.label("probe_asn"),
+        Fastpath.test_name.label("test_name"),
+        func.coalesce(0).label('report_no'),
+    ]
+    if cte is None:
+        fpcols.append(Fastpath.input.label("INPUT"))
+        assert len(fpcols) == len(cols)
+    else:
+        fpcols.append(Fastpath.input.label("input_cte_input"))
+        fpcols.append(func.coalesce(0).label('input_cte_input_no'))
+        assert len(fpcols) == len(cols) + 1
+
+    fpq = current_app.db_session.query(*fpcols)
+
+    if since is not None:
+        fpq = fpq.filter(Fastpath.measurement_start_time > since)
+    if until is not None:
+        fpq = fpq.filter(Fastpath.measurement_start_time <= until)
+    if report_id:
+        fpq = fpq.filter(Fastpath.report_id == report_id)
+    if probe_cc:
+        fpq = fpq.filter(Fastpath.probe_cc == probe_cc)
+    if probe_asn is not None:
+        fpq = fpq.filter(Fastpath.probe_asn == probe_asn)
+    if test_name is not None:
+        fpq = fpq.filter(Fastpath.test_name == test_name)
+    if input_:
+        fpq = fpq.filter(Fastpath.input == input_)
+
+    # Assemble the query
+
     q = q.limit(limit).offset(offset)
+    try:
+        q = q.union(fpq)
+    except:
+        log_query(log, q)
+        log_query(log, fpq)
+        raise
+
+    query_str = str(q.statement.compile(dialect=postgresql.dialect()))
+
+    # Run the query, generate the results list
 
     iter_start_time = time.time()
     results = []
 
-    query_str = str(q.statement.compile(dialect=postgresql.dialect()))
     with configure_scope() as scope:
         scope.set_extra("sql_query", query_str)
 
         try:
             for row in q:
-                measurement_id = '{}-{}'.format(MSM_ID_PREFIX, row.msm_no)
                 url = urljoin(
                     current_app.config['BASE_URL'],
-                    '/api/v1/measurement/%s' % measurement_id
+                    '/api/v1/measurement/%s' % row.measurement_id
                 )
                 results.append({
                     'measurement_url': url,
-                    'measurement_id': measurement_id,
+                    'measurement_id': row.measurement_id,
                     'report_id': row.report_id,
                     'probe_cc': row.probe_cc,
                     'probe_asn': "AS{}".format(row.probe_asn),
@@ -423,17 +544,18 @@ def list_measurements(
                 '/api/v1/measurements?%s' % urlencode(next_args)
             )
 
-        query_time += time.time() - iter_start_time
-        metadata = {
-            'offset': offset,
-            'limit': limit,
-            'count': count,
-            'pages': pages,
-            'current_page': current_page,
-            'next_url': next_url,
-            'query_time': query_time
-        }
-        return jsonify({
-            'metadata': metadata,
-            'results': results
-        })
+    query_time = time.time() - iter_start_time
+    metadata = {
+        'offset': offset,
+        'limit': limit,
+        'count': count,
+        'pages': pages,
+        'current_page': current_page,
+        'next_url': next_url,
+        'query_time': query_time
+    }
+
+    return jsonify({
+        'metadata': metadata,
+        'results': results
+    })
