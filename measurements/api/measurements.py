@@ -1,28 +1,24 @@
 
 import http.client
-import io
 import json
 import math
-import os
 import re
 import time
 
 from dateutil.parser import parse as parse_date
 
-import connexion
 import requests
 import lz4framed
 
 from sentry_sdk import configure_scope, capture_exception
 
-from flask import Blueprint, current_app, request, make_response
+from flask import current_app, request, make_response
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import func, or_, and_, false, text, select, sql, column
 from sqlalchemy import String, cast
-from sqlalchemy.orm import lazyload
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
@@ -172,7 +168,7 @@ def get_one_fastpath_measurement(measurement_id, download):
         response = make_response(blob)
         response.headers.set('Content-Type', 'application/json')
         return response
-    except Exception as e:
+    except Exception:
         raise BadRequest("No measurement found")
 
 
