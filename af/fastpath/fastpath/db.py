@@ -88,14 +88,31 @@ def upsert_summary(msm, summary, tid, filename, update):
         Json(summary["scores"], dumps=ujson.dumps),
     )
 
+    cols = (
+        "report_id",
+        "input",
+        "probe_cc",
+        "probe_asn",
+        "test_name",
+        "test_start_time",
+        "measurement_start_time",
+    )
+
     with _autocommit_conn.cursor() as cur:
         cur.execute(tpl, args)
         if cur.rowcount == 0 and not update:
             metrics.incr("report_id_input_db_collision")
-            log.info("report_id / input collision %r %r",
-                msm["report_id"],
-                msm["input"]
+            log.info(
+                "report_id / input collision %r %r", msm["report_id"], msm["input"]
             )
+            return
+
+        notification = {k: msm[k] for k in cols}
+        notification["trivial_id"] = tid
+        notification["scores"] = summary["scores"]
+        notification = ujson.dumps(notification)
+        q = f"SELECT pg_notify('fastpath', '{notification}');"
+        cur.execute(q)
 
 
 @metrics.timer("trim_old_measurements")
@@ -109,16 +126,16 @@ def trim_old_measurements(conf):
 
     trim_old_measurements._next_run = t + 10
     s = os.statvfs(conf.msmtdir)
-    free_gb = s.f_bavail * s.f_bsize / 2**30
+    free_gb = s.f_bavail * s.f_bsize / 2 ** 30
     if free_gb > 2.3:
         return
 
-    q = "SELECT tid FROM fastpath ORDER BY test_start_time LIMIT 100;"
+    q = "SELECT tid FROM fastpath ORDER BY test_start_time LIMIT 500;"
     with conn.cursor() as cur:
         cur.execute(q)
         for row in cur.fetchall():
             tid = row[0]
-            f = conf.msmtdir / (tid  + ".json.lz4")
+            f = conf.msmtdir / (tid + ".json.lz4")
             try:
                 f.unlink()
             except FileNotFoundError:
