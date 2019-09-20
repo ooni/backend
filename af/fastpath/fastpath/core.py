@@ -564,6 +564,7 @@ def msm_processor(queue):
                 matches = match_fingerprints(measurement)
                 summary = score_measurement(measurement, matches)
                 db.upsert_summary(measurement, summary, tid, fn, conf.update)
+                db.trim_old_measurements(conf)
             except Exception as e:
                 log.exception(e)
                 metrics.incr("unhandled_exception")

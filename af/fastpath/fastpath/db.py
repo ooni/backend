@@ -7,7 +7,10 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 
 """
 
+from random import randrange
 import logging
+import os
+import time
 
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import Json
@@ -93,3 +96,43 @@ def upsert_summary(msm, summary, tid, filename, update):
                 msm["report_id"],
                 msm["input"]
             )
+
+
+@metrics.timer("trim_old_measurements")
+def trim_old_measurements(conf):
+    """Trim old measurement rows from fastpath table
+    and delete files on disk
+    """
+    t = time.time()
+    if trim_old_measurements._next_run > t:
+        return
+
+    trim_old_measurements._next_run = t + 10
+    s = os.statvfs(conf.msmtdir)
+    free_gb = s.f_bavail * s.f_bsize / 2**30
+    if free_gb > 2.3:
+        return
+
+    q = "SELECT tid FROM fastpath ORDER BY test_start_time LIMIT 100;"
+    with conn.cursor() as cur:
+        cur.execute(q)
+        for row in cur.fetchall():
+            tid = row[0]
+            f = conf.msmtdir / (tid  + ".json.lz4")
+            try:
+                f.unlink()
+            except FileNotFoundError:
+                pass
+            sql = "DELETE FROM fastpath WHERE tid = %s"
+            cur.execute(sql, (tid,))
+            conn.commit()
+            log.debug("Deleted %s", f)
+
+        count_q = "SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='fastpath'"
+        cur.execute(count_q)
+        row_count = cur.fetchone()[0]
+        metrics.gauge("fastpath_approx_row_cnt", row_count)
+
+
+# Skew processes to run at different times
+trim_old_measurements._next_run = time.time() + randrange(2, 30)
