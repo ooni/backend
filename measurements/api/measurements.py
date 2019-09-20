@@ -1,6 +1,7 @@
 
 import http.client
 import io
+import json
 import math
 import os
 import re
@@ -20,6 +21,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import func, or_, and_, false, text, select, sql, column
+from sqlalchemy import String, cast
 from sqlalchemy.orm import lazyload
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.exc import OperationalError
@@ -169,9 +171,6 @@ def get_one_fastpath_measurement(measurement_id, download):
         blob = lz4framed.decompress(blob)
         response = make_response(blob)
         response.headers.set('Content-Type', 'application/json')
-        if download is not None:
-            response.headers.set('Content-Disposition',
-                    'attachment', filename=filename)
         return response
     except Exception as e:
         raise BadRequest("No measurement found")
@@ -181,6 +180,7 @@ def get_one_fastpath_measurement(measurement_id, download):
 def get_measurement(measurement_id, download=None):
     """Get one measurement by measurement_id,
     fetching the file from S3 or the fastpath host as needed
+    Returns only the measurement without extra data from the database
     """
     # XXX this query is SUPER slow
     if measurement_id.startswith(FASTPATH_MSM_ID_PREFIX):
@@ -367,6 +367,7 @@ def list_measurements(
         c_anomaly,
         c_confirmed,
         c_msm_failure,
+        func.coalesce("{}").label("scores"),
 
         Measurement.exc.label('exc'),
         Measurement.residual_no.label('residual_no'),
@@ -438,6 +439,7 @@ def list_measurements(
         func.coalesce(false()).label('anomaly'),
         func.coalesce(false()).label('confirmed'),
         func.coalesce(false()).label('msm_failure'),
+        cast(Fastpath.scores.label("scores"), String),
 
         func.coalesce([0, ]).label('exc'),
         func.coalesce(0).label('residual_no'),
@@ -449,7 +451,7 @@ def list_measurements(
         func.coalesce(0).label('report_no'),
     ]
     if cte is None:
-        fpcols.append(Fastpath.input.label("INPUT"))
+        fpcols.append(Fastpath.input.label("input"))
         assert len(fpcols) == len(cols)
     else:
         fpcols.append(Fastpath.input.label("input_cte_input"))
@@ -513,6 +515,7 @@ def list_measurements(
                     'failure': (row.exc != None
                                 or row.residual_no != None
                                 or row.msm_failure),
+                    'scores': json.loads(row.scores),
                 })
         except OperationalError as exc:
             if isinstance(exc.orig, QueryCanceledError):

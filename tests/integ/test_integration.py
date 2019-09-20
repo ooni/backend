@@ -143,6 +143,9 @@ def test_get_measurement_nonfastpath(client, nonfastpath_rid_input):
     pick = pick[0]
     url = pick["measurement_url"]
 
+    assert "anomaly" in pick, pick.keys()
+    assert pick["scores"] == {}
+
     # Assure the correct msmt was received
     msm = api(client, url[27:])
     for f in ("probe_asn", "probe_cc", "report_id", "input","test_name"):
@@ -165,6 +168,10 @@ def test_get_measurement_fastpath(client, fastpath_rid_input):
     pick = [r for r in response["results"] if "ent/tid-" in r["measurement_url"]]
     assert pick, "No fastpath result found in %s" % jd(response)
     pick = pick[0]
+
+    assert "anomaly" in pick, pick.keys()
+    assert pick["scores"] != {}
+
     url = pick["measurement_url"]
     msm = api(client, url[27:])
 
