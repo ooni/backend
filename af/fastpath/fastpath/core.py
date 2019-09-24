@@ -212,91 +212,6 @@ expected_colnames = {
 }
 
 
-@metrics.timer("detect_blocking_changes_f")
-def detect_blocking_changes_f(status: dict, means: dict, v):
-    """Detect changes in blocking patterns
-    """
-    upper_limit = 0.4
-    lower_limit = 0.05
-    # status values:
-    clear = 0
-    cleared_from_now = 2
-    blocked = 1
-    blocked_from_now = 3
-
-    k = (v.cc, v.test_name, v.input)
-    if not isinstance(v.input, str):
-        # Some inputs are lists. TODO: handle them?
-        return
-
-    if k not in status:
-        # cc/test_name/input tuple never seen before
-        status[k] = blocked_from_now if (v.blocking_general > upper_limit) else clear
-        # The status is `clear` rather than `cleared_from_now` as we assume it
-        # was never blocked
-        means[k] = (v.measurement_start_time, v.blocking_general)
-        if status[k] == blocked_from_now:
-            log.info("%r blocked", k)
-            metrics.incr("detected_blocked")
-        return
-
-    old_time, old_val = means[k]
-    # TODO: average weighting by time delta; add timestamp to status and means
-    # TODO: record msm leading to status change?
-    new_val = (old_val + v.blocking_general) / 2
-    means[k] = (v.measurement_start_time, new_val)
-
-    if status[k] == blocked and new_val < lower_limit:
-        status[k] = cleared_from_now
-        log.info("%r cleared", k)
-        metrics.incr("detected_cleared")
-    elif status[k] in (clear, cleared_from_now) and new_val > upper_limit:
-        status[k] = blocked_from_now
-        log.info("%r blocked", k)
-        metrics.incr("detected_blocked")
-
-
-def reset_status(status):
-    # See detect_blocking_changes_f for the values of `status`
-    # blocked stays as it is
-    # blocked_from_now becomes blocked
-    # clear and cleared_from_now are dropped
-    blocked = 1
-    blocked_from_now = 3
-    for k, v in tuple(status.items()):
-        if v in (blocked, blocked_from_now):
-            status[k] = blocked
-        else:
-            status.pop(k, None)
-
-
-@metrics.timer("detect_blocking_changes")
-def detect_blocking_changes(summaries, status: dict, means: dict):
-    """Detect changes in blocking patterns. Updates status and means
-    """
-    # Convert to df
-    scores = pd.DataFrame(summaries)
-    scores.measurement_start_time = pd.to_datetime(scores.measurement_start_time)
-    scores.rename(columns={"probe_cc": "cc", "probe_asn": "asn"}, inplace=True)
-    categorical_columns = ("test_name", "cc", "asn")
-    for c in categorical_columns:
-        scores[c] = scores[c].astype("category")
-
-    delta_t = scores.measurement_start_time.max() - scores.measurement_start_time.min()
-    msm_cnt = scores.shape[0]
-    log.info(
-        "Detecting blocking on %d measurements over timespan %s" % (msm_cnt, delta_t)
-    )
-    # scores.blocking_general.fillna(0, inplace=True)
-    scores.sort_index(inplace=True)
-    scores.apply(lambda b: detect_blocking_changes_f(status, means, b), axis=1)
-    blocked_from_now = 3
-    cleared_from_now = 2
-    changes = {
-        k: v for k, v in status.items() if v in (cleared_from_now, blocked_from_now)
-    }
-    reset_status(status)
-    return changes
 
 
 def unroll_requests_in_measurement(measurement):
@@ -588,8 +503,6 @@ def core():
 
     t00 = time.time()
     scores = None
-    means = {}
-    status = {}
 
     # Spawn worker processes
     queue = mp.Queue()
@@ -610,9 +523,6 @@ def core():
                 time.sleep(0.1)
             queue.put(measurement_tup)
             metrics.gauge("queue_size", queue.qsize())
-
-            # # TODO: detect blocking changes and generate charts and heatmaps
-            # changes = detect_blocking_changes(summaries, status, means)
 
             if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
                 log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
