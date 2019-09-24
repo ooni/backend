@@ -29,7 +29,7 @@ DB_HOST = "hkgmetadb.infra.ooni.io"
 DB_USER = "shovel"
 DB_NAME = "metadb"
 DB_PASSWORD = "yEqgNr2eXvgG255iEBxVeP"  # This is already made public
-
+FREE_SPACE_GB = 10.2
 
 def _ping():
     q = "SELECT pg_postmaster_start_time();"
@@ -127,7 +127,7 @@ def trim_old_measurements(conf):
     trim_old_measurements._next_run = t + 10
     s = os.statvfs(conf.msmtdir)
     free_gb = s.f_bavail * s.f_bsize / 2 ** 30
-    if free_gb > 2.3:
+    if free_gb > FREE_SPACE_GB:
         return
 
     q = "SELECT tid FROM fastpath ORDER BY test_start_time LIMIT 500;"
