@@ -36,6 +36,7 @@ import fastpath.s3feeder as s3feeder
 import fastpath.db as db
 
 from fastpath.metrics import setup_metrics
+from fastpath.portable_queue import Queue
 
 import fastpath.utils
 
@@ -508,7 +509,7 @@ def core():
     scores = None
 
     # Spawn worker processes
-    queue = mp.Queue()
+    queue = Queue()
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]
