@@ -54,8 +54,8 @@ def upsert_summary(msm, summary, tid, filename, update):
     """Insert a row in the fastpath_scores table. Overwrite an existing one.
     """
     sql_base_tpl = """
-    INSERT INTO fastpath (tid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, filename, scores)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO fastpath (tid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, platform, filename, scores)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT ON CONSTRAINT fastpath_pkey DO
     """
     sql_update = """
@@ -75,6 +75,9 @@ def upsert_summary(msm, summary, tid, filename, update):
     tpl = sql_base_tpl + (sql_update if update else sql_noupdate)
 
     asn = int(msm["probe_asn"][2:])  # AS123
+    platform = 'unset'
+    if 'annotations' in msm and isinstance(msm['annotations'], dict):
+        platform = msm['annotations'].get('platform', 'unset')
     args = (
         tid,
         msm["report_id"],
@@ -84,6 +87,7 @@ def upsert_summary(msm, summary, tid, filename, update):
         msm["test_name"],
         msm["test_start_time"],
         msm["measurement_start_time"],
+        platform,
         filename,
         Json(summary["scores"], dumps=ujson.dumps),
     )
