@@ -3,23 +3,7 @@
 #
 
 import fastpath.core as fp
-import fastpath.normalize as normalize
 import ujson
-
-
-def test_reset_status():
-    clear = 0
-    cleared_from_now = 2
-    blocked = 1
-    blocked_from_now = 3
-    status = dict(a=clear, b=cleared_from_now, c=blocked, d=blocked_from_now)
-    fp.reset_status(status)
-    assert status == dict(c=blocked, d=blocked)
-
-
-def test_pack():
-    # s3uploader.pack(dict(a=1, b=[[dict(z=[b"zz"])]]))
-    pass
 
 
 def test_trivial_id():
@@ -33,3 +17,80 @@ def test_trivial_id_2():
         msm = ujson.load(f)
     msm_jstr, tid = fp.trivial_id(msm)
     assert tid == "00b236a79311d1239838bb7431955592"
+
+
+def test_match_fingerprints_no_match():
+    fp.setup_fingerprints()
+    msm = {"probe_cc": "IE", "test_keys": {"requests": []}}
+    assert fp.match_fingerprints(msm) == []
+
+
+def test_match_fingerprints_match_country():
+    fp.setup_fingerprints()
+    msm = {
+        "probe_cc": "MY",
+        "test_keys": {
+            "requests": [
+                {"response": {"body": "foo ... Makluman/Notification ... foo"}}
+            ]
+        },
+    }
+    matches = fp.match_fingerprints(msm)
+    assert matches == [{"body_match": "Makluman/Notification", "locality": "country"}]
+
+
+def test_match_fingerprints_match_zz():
+    fp.setup_fingerprints()
+    msm = {
+        "probe_cc": "IE",
+        "test_keys": {
+            "requests": [
+                {
+                    "response": {
+                        "body": "",
+                        "headers": {"Server": "Kerio Control Embedded Web Server"},
+                    }
+                }
+            ]
+        },
+    }
+    matches = fp.match_fingerprints(msm)
+    assert matches == [
+        {
+            "header_full": "Kerio Control Embedded Web Server",
+            "header_name": "server",
+            "locality": "local",
+        }
+    ], matches
+
+
+def test_score_measurement_simple():
+    msm = {
+        "input": "foo",
+        "measurement_start_time": "",
+        "probe_asn": "1",
+        "report_id": "123",
+        "test_name": "web_connectivity",
+        "test_start_time": "",
+        "probe_cc": "IE",
+        "test_keys": {
+        },
+    }
+    matches = []
+    scores = fp.score_measurement(msm, matches)
+    assert scores == {
+        "input": "foo",
+        "measurement_start_time": "",
+        "probe_asn": "1",
+        "probe_cc": "IE",
+        "report_id": "123",
+        "test_name": "web_connectivity",
+        "test_start_time": "",
+        "scores": {
+            "blocking_general": 0.0,
+            "blocking_global": 0.0,
+            "blocking_country": 0.0,
+            "blocking_isp": 0.0,
+            "blocking_local": 0.0,
+        },
+    }

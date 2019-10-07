@@ -127,6 +127,7 @@ def clean_caches():
             # TODO: delete
 
 
+# Currently unused: we could warn on missing / unexpected cols
 expected_colnames = {
     "accessible",
     "advanced",
@@ -212,22 +213,6 @@ expected_colnames = {
 }
 
 
-
-
-def unroll_requests_in_measurement(measurement):
-    if "requests" not in measurement["test_keys"]:
-        return
-
-    for n, r in enumerate(measurement["test_keys"]["requests"]):
-        r = r.get("response", None)
-        if r is None:
-            continue
-        measurement[f"req_{n}_body"] = r.get("body", None)
-        measurement[f"req_{n}_headers"] = r.get("headers", None)
-
-    measurement["test_keys"]["requests"] = None  # TODO: delete
-
-
 @metrics.timer("load_s3_reports")
 def load_s3_reports(day) -> dict:
     # TODO: move this into s3feeder
@@ -308,8 +293,10 @@ def match_fingerprints(measurement):
     """
     # TODO: apply only on web_connectivity
     msm_cc = measurement["probe_cc"]
-    if msm_cc not in fingerprints:
-        return []
+
+    zzfps = fingerprints["ZZ"]
+    ccfps = fingerprints.get(msm_cc, {})
+
 
     matches = []
     for req in measurement["test_keys"].get("requests", ()):
@@ -320,7 +307,7 @@ def match_fingerprints(measurement):
         # Match HTTP body if found
         body = r["body"]
         if body is not None:
-            for fp in fingerprints[msm_cc].get("body_match", []):
+            for fp in zzfps["body_match"] + ccfps.get("body_match", []):
                 # fp: {"body_match": "...", "locality": "..."}
                 tb = time.time()
                 bm = fp["body_match"]
@@ -337,13 +324,13 @@ def match_fingerprints(measurement):
         if not headers:
             continue
         headers = {h.lower(): v for h, v in headers.items()}
-        for fp in fingerprints[msm_cc].get("header_full", []):
+        for fp in zzfps["header_full"] + ccfps.get("header_full", []):
             name = fp["header_name"]
             if name in headers and headers[name] == fp["header_full"]:
                 matches.append(fp)
                 log.debug("matched header full fp %s %r", msm_cc, fp["header_full"])
 
-        for fp in fingerprints[msm_cc].get("header_prefix", []):
+        for fp in zzfps["header_prefix"] + ccfps.get("header_prefix", []):
             name = fp["header_name"]
             prefix = fp["header_prefix"]
             if name in headers and headers[name].startswith(prefix):
@@ -545,10 +532,18 @@ def core():
 
 def setup_fingerprints():
     """Setup fingerprints lookup dictionary
+    "ZZ" applies a fingerprint globally
     """
+    # pre-process fingerprints to speed up lookup
     global fingerprints
-    fingerprints = {}  # cc -> fprint_type -> list of dicts
-    # TODO: merge ZZ fprints into every country
+    # cc -> fprint_type -> list of dicts
+    fingerprints = {
+        "ZZ": {
+            "body_match": [],
+            "header_prefix": [],
+            "header_full": []
+        }
+    }
     for cc, fprints in fastpath.utils.fingerprints.items():
         d = fingerprints.setdefault(cc, {})
         for fp in fprints:
