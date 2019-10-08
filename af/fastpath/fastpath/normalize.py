@@ -11,10 +11,11 @@ import uuid
 import lz4.frame as lz4frame  # debdeps: python3-lz4
 
 
-# TODO: benchmark the cost of normalization for yaml and/or old formats
-# compared to normalizing using columns in a dataframe
-
 log = logging.getLogger("normalize")
+
+
+class UnsupportedTestError(Exception):
+    pass
 
 
 test_name_mappings = {
@@ -397,123 +398,11 @@ def normalize_dnst(entry):
     return entry
 
 
-def normalize_scapyt(entry):
-    # TODO test this
-    answered_packets = []
-    sent_packets = []
-    for pkt in entry["test_keys"].get("answered_packets", []):
-        try:
-            sanitised_packet = {
-                "raw_packet": binary_to_base64_dict(pkt[0]["raw_packet"]),
-                "summary": pkt[0]["summary"],
-            }
-            answered_packets.append(sanitised_packet)
-        except IndexError:
-            log.error("Failed to find the index of the packet")
-            continue
-    for pkt in entry["test_keys"].get("sent_packets", []):
-        try:
-            sanitised_packet = {
-                "raw_packet": binary_to_base64_dict(pkt[0]["raw_packet"]),
-                "summary": pkt[0]["summary"],
-            }
-            sent_packets.append(sanitised_packet)
-        except IndexError:
-            log.error("Failed to find the index of the packet")
-            continue
-    entry["test_keys"]["sent_packets"] = sent_packets
-    entry["test_keys"]["answered_packets"] = answered_packets
-    return entry
-
-
 def normalize_tcpt(entry):
     return entry
 
 
 def normalize_process(entry):
-    return entry
-
-
-def normalize_tls_handshake(entry):
-    entry["test_keys"]["cert_serial_no"] = hex(
-        entry["test_keys"].get("cert_serial_no", 0)
-    )
-    entry["test_keys"]["session_key"] = binary_to_base64_dict(
-        entry["test_keys"].get("session_key", "")
-    )
-
-    normalized_subjects = []
-    for name, value in entry["test_keys"].get("cert_subject", []):
-        value = normalize_str(value)
-    entry["test_keys"]["cert_subject"] = normalized_subjects
-
-    normalized_issuer = []
-    for name, value in entry["test_keys"].get("cert_issuer", []):
-        value = normalize_str(value)
-    entry["test_keys"]["cert_issuer"] = normalized_issuer
-
-    return entry
-
-
-def normalize_captive_portal(entry):
-    if isinstance(entry.get("google_dns_cp", None), set):
-        entry["google_dns_cp"] = list(entry["google_dns_cp"])
-    elif isinstance(entry.get("google_dns_cp", {}).get("addresses", None), set):
-        entry["google_dns_cp"]["addresses"] = list(entry["google_dns_cp"]["addresses"])
-    return entry
-
-
-def sanitise_bridge_reachability(entry, bridge_db):
-    test_keys = entry["test_keys"]
-    if not test_keys.get("bridge_address", None):
-        test_keys["bridge_address"] = entry["input"]
-
-    regexp = (
-        "(Learned fingerprint ([A-Z0-9]+)"
-        "\s+for bridge (([0-9]+\.){3}[0-9]+\:\d+))|"
-        "((new bridge descriptor .+?\s+"
-        "at (([0-9]+\.){3}[0-9]+)))"
-    )
-    if test_keys.get("tor_log"):
-        test_keys["tor_log"] = re.sub(regexp, "[REDACTED]", test_keys["tor_log"])
-    else:
-        test_keys["tor_log"] = ""
-
-    hashed_fingerprint = None
-    if test_keys["bridge_address"] and test_keys["bridge_address"].strip() in bridge_db:
-        b = bridge_db[test_keys["bridge_address"].strip()]
-        test_keys["distributor"] = b["distributor"]
-        test_keys["transport"] = b["transport"]
-        fingerprint = b["fingerprint"].decode("hex")
-        hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-        test_keys["bridge_address"] = None
-    else:
-        bridge_line = test_keys["bridge_address"].split(" ")
-        fingerprint = None
-        if len(bridge_line) > 2 and len(bridge_line[2]) == 40:
-            fingerprint = bridge_line[2].decode("hex")
-        elif len(bridge_line) > 1 and len(bridge_line[1]) == 40:
-            fingerprint = bridge_line[1].decode("hex")
-
-        test_keys["distributor"] = None
-        if fingerprint:
-            hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-
-    if hashed_fingerprint is not None:
-        entry["input"] = hashed_fingerprint
-    test_keys["bridge_hashed_fingerprint"] = hashed_fingerprint
-    entry["test_keys"] = test_keys
-    return entry
-
-
-def sanitise_tcp_connect(entry, bridge_db):
-    if entry["input"] and entry["input"].strip() in bridge_db.keys():
-        b = bridge_db[entry["input"].strip()]
-        fingerprint = b["fingerprint"].decode("hex")
-        hashed_fingerprint = hashlib.sha1(fingerprint).hexdigest()
-        entry["test_keys"]["bridge_hashed_fingerprint"] = hashed_fingerprint
-        entry["input"] = hashed_fingerprint
-        return entry
     return entry
 
 
@@ -581,20 +470,25 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
         entry = normalize_httpt(entry)
     if test_name in test_categories["dnst"]:
         entry = normalize_dnst(entry)
+
+    # Ignore old, rare tests
     if test_name in test_categories["scapyt"]:
-        entry = normalize_scapyt(entry)
-    if test_name == "captive_portal":
-        entry = normalize_captive_portal(entry)
-    if test_name == "tls_handshake":
-        entry = normalize_tls_handshake(entry)
+        raise UnsupportedTestError
+
+    if test_name in ("captive_portal", "tls_handshake"):
+        raise UnsupportedTestError
 
     # TODO: tests these in
     # test_normalize_yaml_sanitise_tcp_connect_bridge_reach
     if entry["test_name"] == "tcp_connect":
-        entry = sanitise_tcp_connect(entry, BRIDGE_DB)
+        # On 2019-10-08 the last bridge_reachability entry from YAML
+        # in the metadb was from 2016-10-12
+        raise UnsupportedTestError
 
     elif entry["test_name"] == "bridge_reachability":
-        entry = sanitise_bridge_reachability(entry, BRIDGE_DB)
+        # On 2019-10-08 the last bridge_reachability entry from YAML
+        # in the metadb was from 2016-10-12
+        raise UnsupportedTestError
 
     return entry
 
@@ -603,31 +497,6 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
 
 import yaml
 from yaml import CLoader
-
-# def stream_yaml_blobs_mmap(mm):
-#     start = 0
-#     while True:
-#         mm.seek(start)
-#         prefix = mm.read(4)
-#         if prefix == b"---\n":  # ordinary preamble
-#             end = mm.find(b"\n...\n", start)
-#             yield start, mm[start : end + 5]
-#             start = end + 5
-#
-#         elif prefix == b"...\n":  # duplicate trailer
-#             start += 4
-#
-#         elif not prefix:
-#             break
-#
-#         elif chr(prefix[0]) == "#":  # comment
-#             end = mm.find(b"---\n", start)
-#             assert end != -1
-#             if end != -1:
-#                 start = end
-#
-#         else:
-#             raise BrokenFrameError()  # bloboff + start, prefix)
 
 
 class BlobSlicerError(RuntimeError):
@@ -739,6 +608,9 @@ def iter_yaml_lz4_reports(fn):
     fd.close()
 
 
+## Entry points
+
+
 def iter_yaml_msmt_normalized(data):
     """Yields normalized measurements from a YAML BytesIO
     """
@@ -752,7 +624,6 @@ def iter_yaml_msmt_normalized(data):
         header["report_id"] = generate_report_id(header)
 
     for off, entry in report_gen:
-        entry_len = len(entry)
         esha = headsha.copy()
         esha.update(entry)
         esha = esha.digest()
@@ -774,38 +645,3 @@ def iter_yaml_lz4_reports_normalized(fn):
     for r in iter_yaml_lz4_reports(fn):
         off, entry_len, esha, entry, exc = r
         yield normalize_entry(entry, "2018-05-07", "??", esha)
-
-
-
-### Stream entries from json.lz4 files ####
-
-
-def stream_json_blobs(fd):
-    head = b""
-    for blob in iter(functools.partial(fd.read, 1048576), ""):
-        bloboff = fd.tell() - len(blob)
-        head, blob = b"", head + blob
-        start = 0
-        while not head:
-            if len(blob) == start:
-                break
-            elif chr(blob[start]) != "{":  # just a sanity check
-                raise BrokenFrameError(bloboff + start, blob[start])
-            end = blob.find(b"}\n", start)  # newline is NOT valid json!
-            if end != -1:
-                yield bloboff + start, blob[start : end + 1]
-                start = end + 2
-            else:
-                head = blob[start:]
-    if head:
-        raise TruncatedReportError(fd.tell() - len(head), head)
-
-
-# def stream_json_reports(fd):
-#    for off, entry in stream_json_blobs(fd):
-#        entry_len = len(entry)
-#        esha = hashlib.sha1(entry).digest()
-#        try:
-#            yield off, entry_len, esha, ujson.loads(entry), None
-#        except Exception as exc:
-#            yield off, entry_len, esha, None, exc

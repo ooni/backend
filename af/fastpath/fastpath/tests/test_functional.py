@@ -9,8 +9,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from contextlib import contextmanager
 from datetime import date
-from enum import Enum
-from mock import patch
 from pathlib import Path
 import cProfile, pstats
 import hashlib
@@ -18,25 +16,24 @@ import logging
 import os
 import time
 
+import ujson
 import boto3  # debdeps: python3-boto3
-
 import pytest  # debdeps: python3-pytest
 
-import pandas as pd  # debdeps: python3-pandas python3-bottleneck python3-numexpr
-import numpy as np
-import matplotlib.pyplot as plt
+import fastpath.core as fp
+import fastpath.normalize as norm
+from fastpath.normalize import gen_simhash
+from fastpath.normalize import iter_yaml_lz4_reports, normalize_entry
 
-from fastpath.fastpath import core
-from fastpath.normalize import iter_yaml_lz4_reports
-from fastpath.utils import fingerprints
-import fastpath.fastpath as fp
+# from fastpath.utils import fingerprints
 
 log = logging.getLogger()
 
 
-def fetch_cans_from_s3_if_needed():
+@pytest.fixture
+def cans():
     """
-    Download interesting cans to a local directory
+    Download interesting cans from S3 to a local directory
 
     Uses credentials from ~/.aws/config in the block:
     [ooni-data-private]
@@ -46,30 +43,30 @@ def fetch_cans_from_s3_if_needed():
     Explore bucket from CLI:
     AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
     """
-
-    fnames = (
+    _cans = dict(
         # "2013-05-05/20130505T065438Z-VN-AS24173-captive_portal-no_report_id-0.1.0-probe.yaml.lz4",
-        "2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
-        "2013-09-12/20130912T150305Z-MD-AS1547-http_requests-no_report_id-0.1.0-probe.yaml.lz4",
-        "2013-05-05/20130505T103213Z-VN-AS24173-http_requests-no_report_id-0.1.0-probe.yaml.lz4",
-        "2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
-        "2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
+        # "2013-09-12/20130912T150305Z-MD-AS1547-http_requests-no_report_id-0.1.0-probe.yaml.lz4",
+        vn = "2013-05-05/20130505T103213Z-VN-AS24173-http_requests-no_report_id-0.1.0-probe.yaml.lz4",
+        it = "2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
+        cn = "2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
+        yaml16 = "2016-07-07/20160706T000046Z-GB-AS9105-http_requests-TYXZLcFg4yUp9Io2LrOMM7CjLk0QcIdsMPiCZtVgkxUrTxnFM0GiMbr8iGDl3OEe-0.1.0-probe.yaml.lz4",
+        yaml17 = "2017-12-21/20171220T153044Z-BE-AS5432-dns_consistency-mnKRlHuqk8Eo6XMJt5ZkVQrgReaEXPEWaO9NafgXxSVIhAswTXT7QJc6zhsuttpK-0.1.0-probe.yaml.lz4",
+        yaml18 = "2018-03-21/20180320T211810Z-NL-AS1103-dns_consistency-yiCRUmXy6MndqnV3g5QYBKGich5OwP9cQQfOiYnxYAfZatgQZlStuWIT30yu586R-0.1.0-probe.yaml.lz4",
     )
-    # "2019-07-18/20190718T062527Z-http_header_field_manipulation-20190718T062527Z_AS131222_mBLc1XGcG2c0WuYOMFymz8TDzlLalzmtzIX3ADHpuxYWixm0Wa-AS131222-ZZ-probe-0.2.0.yaml",
-    fnames = [os.path.join("testdata", fn) for fn in fnames]
-    to_dload = sorted(fn for fn in fnames if not os.path.isfile(fn))
-    # FIXME
-    return fnames
-    # FIXME: fetch_msm_dataframe download cans by itself
+    for k, v in _cans.items():
+        _cans[k] = Path("testdata") / v
+
+    to_dload = sorted(f for f in _cans.values() if not f.is_file())
     if not to_dload:
-        return fnames
+        return _cans
 
     bname = "ooni-data-private"
     boto3.setup_default_session(profile_name="ooni-data-private")
     s3 = boto3.client("s3")
     for fn in to_dload:
-        s3fname = fn.replace("testdata", "canned")
+        s3fname = fn.as_posix().replace("testdata", "canned")
         r = s3.list_objects_v2(Bucket=bname, Prefix=s3fname)
+        assert r["KeyCount"] == 1, r
         filedesc = r["Contents"][0]
         size = filedesc["Size"]
         print("Downloading can %s size %d MB" % (fn, size / 1024 / 1024))
@@ -79,12 +76,7 @@ def fetch_cans_from_s3_if_needed():
             s3.download_fileobj(bname, s3fname, f)
         assert size == os.path.getsize(fn)
 
-    return fnames
-
-
-@pytest.fixture
-def cans():
-    return fetch_cans_from_s3_if_needed()
+    return _cans
 
 
 # TODO mock out metrics
@@ -107,7 +99,9 @@ def notest_load_yaml_cans(cans):
 
 def notest_load_yaml_can(cans):
     print("no mmap")
-    can = "testdata/2013-09-12/20130912T150305Z-MD-AS1547-http_requests-no_report_id-0.1.0-probe.yaml.lz4"
+    # can = "testdata/2013-09-12/20130912T150305Z-MD-AS1547-http_requests-no_report_id-0.1.0-probe.yaml.lz4"
+    fn = "fastpath/tests/data/20190912T115043Z-ndt7-20190912T115043Z_AS15169_0B9KifXvlmX0yttm3Q5rfUL9YYed8uXrvRtPELmZuuFek7NJDf-AS15169-US-probe-0.2.0.yaml"
+
     t0 = time.time()
     cnt = 0
     for report in iter_yaml_lz4_reports(can):
@@ -121,32 +115,119 @@ def notest_core(cans):
     core(can)
 
 
-import json
 
 
-def jsha(j):
+def load_json_from_disk(fn):
+    with open(fn) as f:
+        return ujson.load(f)
+
+
+def hash(j):
     # deterministic hash to compare entries
-    x = json.dumps(j, sort_keys=True)
-    return hashlib.sha1(x.encode()).hexdigest()[:8]
+    jstr = ujson.dumps(j, sort_keys=True, ensure_ascii=False).encode()
+    return hashlib.shake_128(jstr).hexdigest(4)
 
 
 def notest_normalize_json(cans):
-    can = "testdata/2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4"
-    j = load_json_from_disk(can)
+    # can = "testdata/2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4"
+    j = load_json_from_disk(fn)
     expected = {0: "977713ee", 1: "42ec375e", 2: "9bec4a5f", 3: "a38504ed"}
     for n, entry in enumerate(j):
         esha = b"x" * 20
         entry = normalize_entry(entry, "2018-05-07", "??", esha)
         if n in expected:
-            assert jsha(entry) == expected[n]
+            assert hash(entry) == expected[n]
 
 
-def notest_normalize_yaml(cans):
-    # data_format_version is not 0.2.0
-    can = "testdata/2013-05-05/20130505T103213Z-VN-AS24173-http_requests-no_report_id-0.1.0-probe.yaml.lz4"
-    for r in iter_yaml_lz4_reports(can):
+# def test_normalize_yaml(cans):
+#    # data_format_version is not 0.2.0
+#    can = "testdata/2013-05-05/20130505T103213Z-VN-AS24173-http_requests-no_report_id-0.1.0-probe.yaml.lz4"
+#    #fn = "fastpath/tests/data/20190912T115043Z-ndt7-20190912T115043Z_AS15169_0B9KifXvlmX0yttm3Q5rfUL9YYed8uXrvRtPELmZuuFek7NJDf-AS15169-US-probe-0.2.0.yaml"
+#    for r in iter_yaml_lz4_reports(can):
+#        off, entry_len, esha, entry, exc = r
+#        entry = normalize_entry(entry, "2018-05-07", "??", esha)
+
+
+## YAML normalization
+
+def FIXME_test_normalize_yaml_2016(cans):
+    can = "fastpath/tests/data/20160706T000046Z-GB-AS9105-http_requests-TYXZLcFg4yUp9Io2LrOMM7CjLk0QcIdsMPiCZtVgkxUrTxnFM0GiMbr8iGDl3OEe-0.1.0-probe.yaml.lz4"
+    tested_categories = set(
+        (
+            "captive_portal",
+            "chinatrigger",
+            "dns_consistency",
+            "dns_injection",
+            "dns_spoof",
+            "domclass_collector",
+            "http_filtering_bypass",
+            "http_header_field_manipulation",
+            "http_host",
+            "http_invalid_request_line",
+            "http_keyword_filtering",
+            "http_requests",
+            "http_trix",
+            "http_uk_mobile_networks",
+            "http_url_list",
+            "keyword_filtering",
+            "lantern",
+            "meek_fronted_requests",
+            "multi_protocol_traceroute",
+            "parasitic_traceroute",
+            "psiphon",
+            "squid",
+            "tor_http_requests_test",
+        )
+    )
+    for n, r in enumerate(iter_yaml_lz4_reports(can)):
         off, entry_len, esha, entry, exc = r
-        entry = normalize_entry(entry, "2018-05-07", "??", esha)
+        print(entry["test_name"])
+        test_name = entry.get("test_name", "invalid")
+        test_name = norm.test_name_mappings.get(test_name, test_name.lower())
+        if test_name not in tested_categories:
+            continue
+        print(test_name)
+        print("****")
+        print(n)
+
+        tested_categories.discard(test_name)
+
+        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
+        assert hash(entry) == "e83a742b"
+
+        if len(tested_categories) < 20:
+            print("done break %d" % n)
+            break  # we are done
+
+    print("done %d", n)
+    print(tested_categories)
+
+
+def test_normalize_yaml_2016(cans):
+    can = cans["yaml16"]
+    for n, r in enumerate(iter_yaml_lz4_reports(can)):
+        off, entry_len, esha, entry, exc = r
+        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
+        assert hash(entry) == "e83a742b"
+        break
+
+
+def test_normalize_yaml_dns_consistency_2017(cans):
+    can = cans["yaml17"]
+    for n, r in enumerate(iter_yaml_lz4_reports(can)):
+        off, entry_len, esha, entry, exc = r
+        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
+        assert hash(entry) == "685b9af4"
+        break
+
+
+def test_normalize_yaml_dns_consistency_2018(cans):
+    can = cans["yaml18"]
+    for n, r in enumerate(iter_yaml_lz4_reports(can)):
+        off, entry_len, esha, entry, exc = r
+        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
+        assert hash(entry) == "c9d0b754"
+        break
 
 
 def notest_normalize_yaml_sanitise_tcp_connect_bridge_reach(cans):
@@ -171,7 +252,6 @@ def notest_normalize_all(cans):
         print(time.time() - t0)
 
 
-from fastpath.normalize import gen_simhash
 
 
 def test_simhash():
@@ -181,15 +261,10 @@ def test_simhash():
     assert gen_simhash(s) == 816_031_085_364_464_265
 
 
-def profile_simhash():
-    import cProfile
-
-    pr = cProfile.Profile()
-    pr.enable()
-    for x in range(40000):
+def benchmark_simhash(benchmark):
+    # debdeps: python3-pytest-benchmark
+    for x in range(400):
         gen_simhash(str(x))
-    pr.disable()
-    pr.print_stats(sort=1)
 
 
 def setup_module(module):
@@ -219,61 +294,34 @@ def profile():
     ps.print_stats(20)
 
 
-@patch.dict(fingerprints, {"US": mock_fingerprints}, clear=True)
-def test_process_measurements():
-    with open("tests/data/report1.json") as f:
-        r1 = json.load(f)
-    with open("tests/data/report1blocked.json") as f:
-        r1blk = json.load(f)
-    with open("tests/data/report2.json") as f:
-        r2 = json.load(f)
-
-    msm = pd.DataFrame([r1, r1blk])
-    agg = fp.Cuboids(pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
-    out = fp.process_measurements(msm, agg)
-    assert sum(out.fingerprint_matched == True) == 1
-    assert agg.day_target_cc_msmcnt_blockedcnt.shape[0] == 1
-    assert agg.day_target_cc_msmcnt_blockedcnt.reset_index().ratio[0] == 0.5
-
-    # add another r1
-    msm = pd.DataFrame([r1])
-    out = fp.process_measurements(msm, agg)
-    print(repr(agg.day_target_cc_msmcnt_blockedcnt))
-    assert agg.day_target_cc_msmcnt_blockedcnt.shape[0] == 1
-    assert agg.day_target_cc_msmcnt_blockedcnt.reset_index().cnt[False][0] == 2
-
-    msm = pd.DataFrame([r2])
-    out = fp.process_measurements(msm, agg)
-    assert sum(out.fingerprint_matched == True) == 0
-    assert agg.day_target_cc_msmcnt_blockedcnt.shape[0] == 8
-    log.info(agg.day_target_cc_msmcnt_blockedcnt)
+# @patch.dict(fingerprints, {"US": mock_fingerprints}, clear=True)
 
 
-def test_windowing():
-    ## Generates tests/output/blocking_detection.png
-    # Create a reproducible set of measurement_start_time and blocking_general
-    fig, ax = plt.subplots()
-    np.random.seed(0)
-    n = 100
-    start_t = 1_565_000_000
-    end_t = start_t + (3600 * 24 * 14)
-    e = sorted(10 ** 9 * np.random.randint(start_t, end_t, n))
-    d = {
-        "blocking_general": np.random.random(n) * 0.8
-        + np.sin(np.arange(n) / n * 14) / 2,
-        "measurement_start_time": pd.to_datetime(e),
-    }
-    df = pd.DataFrame(d, index=pd.DatetimeIndex(e))
-    df.blocking_general = df.blocking_general.clip(0, 1)
-    df.blocking_general.plot(ax=ax)
-
-    blk = fp.detect_blocking_changes(df)
-    assert blk.shape[0] == 4
-
-    blk.loc[:, "blocked_n"] = blk.blocked.astype(int)
-    blk.plot(
-        x="measurement_start_time", y="blocked_n", style="o", ax=ax
-    ).get_figure().savefig("tests/output/blocking_detection.png")
+# def test_windowing():
+#     ## Generates tests/output/blocking_detection.png
+#     # Create a reproducible set of measurement_start_time and blocking_general
+#     fig, ax = plt.subplots()
+#     np.random.seed(0)
+#     n = 100
+#     start_t = 1_565_000_000
+#     end_t = start_t + (3600 * 24 * 14)
+#     e = sorted(10 ** 9 * np.random.randint(start_t, end_t, n))
+#     d = {
+#         "blocking_general": np.random.random(n) * 0.8
+#         + np.sin(np.arange(n) / n * 14) / 2,
+#         "measurement_start_time": pd.to_datetime(e),
+#     }
+#     df = pd.DataFrame(d, index=pd.DatetimeIndex(e))
+#     df.blocking_general = df.blocking_general.clip(0, 1)
+#     df.blocking_general.plot(ax=ax)
+#
+#     blk = fp.detect_blocking_changes(df)
+#     assert blk.shape[0] == 4
+#
+#     blk.loc[:, "blocked_n"] = blk.blocked.astype(int)
+#     blk.plot(
+#         x="measurement_start_time", y="blocked_n", style="o", ax=ax
+#     ).get_figure().savefig("tests/output/blocking_detection.png")
 
 
 @pytest.fixture
@@ -325,20 +373,20 @@ def plot_blocking(msm, ewm, blk, cc, inp):
     ).get_figure().savefig(fn)
 
 
-def test_windowing_mock_msm(mockmsm):
-    mockmsm.set_index(["cc", "test_name", "input"], inplace=True)
-    blk = mockmsm.groupby(level=["cc", "test_name", "input"]).apply(
-        lambda df: fp.detect_blocking_changes_f(df)
-    )
-
-    # redo generate_ewm: it's not exposed by detect_blocking_changes_f
-    ewm = mockmsm.groupby(level=["cc", "test_name", "input"]).apply(
-        lambda x: fp.generate_ewm(x)
-    )
-    for cc in ("US", "RU"):
-        for inp in ("bar",):
-            # plot one cc/input to tests/output/blocking_detection_...
-            plot_blocking(mockmsm, ewm, blk, cc, inp)
+# def test_windowing_mock_msm(mockmsm):
+#     mockmsm.set_index(["cc", "test_name", "input"], inplace=True)
+#     blk = mockmsm.groupby(level=["cc", "test_name", "input"]).apply(
+#         lambda df: fp.detect_blocking_changes_f(df)
+#     )
+#
+#     # redo generate_ewm: it's not exposed by detect_blocking_changes_f
+#     ewm = mockmsm.groupby(level=["cc", "test_name", "input"]).apply(
+#         lambda x: fp.generate_ewm(x)
+#     )
+#     for cc in ("US", "RU"):
+#         for inp in ("bar",):
+#             # plot one cc/input to tests/output/blocking_detection_...
+#             plot_blocking(mockmsm, ewm, blk, cc, inp)
 
 
 @pytest.fixture
@@ -370,62 +418,6 @@ def baked_scores():
         scores.to_msgpack("scores.mpk")
 
     return pd.read_msgpack("scores.mpk")
-
-
-def test_windowing_on_real_data(baked_scores):
-    ## Generates tests/output/blocking_detection.png
-    scores = baked_scores
-    assert len(baked_scores.index) > 0
-    status = {}
-    means = {}
-    fp.detect_blocking_changes_on_msm(scores, status, means)
-    log.info("Msm size: %d", len(baked_scores.index))
-    log.info("Status size: %d", len(status))
-    for (cc, test_name, inp), blocked in status.items():
-        if blocked == 0:
-            continue
-        s = "detected" if blocked > 1 else "cleared"
-        log.info("Blocking %s %s %s %s", s, cc, test_name, inp)
-
-
-def test_windowing_new():
-    ## Generates tests/output/blocking_detection.png
-    scores = pd.DataFrame(
-        data=dict(
-            blocking_general=[0.0, 0.9],
-            cc=["CA", "UK"],
-            measurement_start_time=[3, 4],
-            test_name=["web_connectivity", "web_connectivity"],
-            input=["foo", "bar"],
-        )
-    )
-    # scores.set_index(["measurement_start_time"], inplace=True)
-    status = {}
-    means = {}
-    fp.detect_blocking_changes_on_msm(scores, status, means)
-    assert status == {
-        ("CA", "web_connectivity", "foo"): 0,
-        ("UK", "web_connectivity", "bar"): 3,
-    }
-    status = fp.reset_status(status)
-    assert status == {("UK", "web_connectivity", "bar"): 1}
-
-    scores[scores.cc == "CA"].global_blocking = 1.0
-    scores[scores.cc == "UK"].global_blocking = 0.1
-
-    fp.detect_blocking_changes_on_msm(scores, status, means)
-    status = fp.reset_status(status)
-    fp.detect_blocking_changes_on_msm(scores, status, means)
-    log.info(status)
-    assert status == {
-        ("UK", "web_connectivity", "bar"): 1,
-        ("CA", "web_connectivity", "foo"): 0,
-    }
-    # for (cc, test_name, inp), blocked in status.items():
-    #     if blocked == 0:
-    #         continue
-    #     s = "detected" if blocked > 1 else "cleared"
-    #     log.info("Blocking %s %s %s %s", s, cc, test_name, inp)
 
 
 def notest_process_measurements_real_files():
