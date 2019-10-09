@@ -299,6 +299,43 @@ def normalize_httpt(entry):
     return entry
 
 
+def _normalize_answer(ans):
+    try:
+        ttl = regex_or_empty_string("ttl=(\d+)", ans[0])
+    except Exception:
+        log.error("Failed to parse ttl in %s" % ans[0])
+        ttl = None
+
+    answer_type = regex_or_empty_string("type=([A-Z]+)", ans[0])
+
+    na = dict(ttl=ttl, answer_type=answer_type)
+
+    if answer_type == "A":
+        na["ipv4"] = regex_or_empty_string("address=" + regexps["ipv4"], ans[1])
+
+    elif answer_type == "MX":
+        na["hostname"] = regex_or_empty_string("address=" + regexps["ipv4"], ans[1])
+        na["preference"] = regex_or_empty_string("preference=(\d+)", ans[1])
+
+    elif answer_type in ["PTR", "CNAME"]:
+        na["hostname"] = regex_or_empty_string("name=" + regexps["hostname"], ans[1])
+
+    elif answer_type == "SOA":
+        na["responsible_name"] = regex_or_empty_string(
+            "rname=" + regexps["hostname"], ans[1]
+        )
+        na["hostname"] = regex_or_empty_string(
+            "mname=" + regexps["hostname"], ans[1]
+        )
+        na["serial_number"] = regex_or_empty_string("serial=(\d+)", ans[1])
+        na["refresh_interval"] = regex_or_empty_string("refresh=(\d+)", ans[1])
+        na["retry_interval"] = regex_or_empty_string("retry=(\d+)", ans[1])
+        na["minimum_ttl"] = regex_or_empty_string("minimum=(\d+)", ans[1])
+        na["expiration_limit"] = regex_or_empty_string("expire=(\d+)", ans[1])
+
+    return na
+
+
 def normalize_dnst(entry):
     entry["test_keys"].pop("test_resolvers", None)
 
@@ -338,54 +375,9 @@ def normalize_dnst(entry):
 
         answers = []
         for answer in query.pop("answers", []):
-            try:
-                ttl = regex_or_empty_string("ttl=(\d+)", answer[0])
-            except Exception:
-                log.error("Failed to parse ttl in %s" % answer[0])
-                ttl = None
-
-            answer_type = regex_or_empty_string("type=([A-Z]+)", answer[0])
-
-            normalized_answer = dict(ttl=ttl, answer_type=answer_type)
-
-            if answer_type == "A":
-                normalized_answer["ipv4"] = regex_or_empty_string(
-                    "address=" + regexps["ipv4"], answer[1]
-                )
-            elif answer_type == "MX":
-                normalized_answer["hostname"] = regex_or_empty_string(
-                    "address=" + regexps["ipv4"], answer[1]
-                )
-                normalized_answer["preference"] = regex_or_empty_string(
-                    "preference=(\d+)", answer[1]
-                )
-            elif answer_type in ["PTR", "CNAME"]:
-                normalized_answer["hostname"] = regex_or_empty_string(
-                    "name=" + regexps["hostname"], answer[1]
-                )
-            elif answer_type == "SOA":
-                normalized_answer["responsible_name"] = regex_or_empty_string(
-                    "rname=" + regexps["hostname"], answer[1]
-                )
-                normalized_answer["hostname"] = regex_or_empty_string(
-                    "mname=" + regexps["hostname"], answer[1]
-                )
-                normalized_answer["serial_number"] = regex_or_empty_string(
-                    "serial=(\d+)", answer[1]
-                )
-                normalized_answer["refresh_interval"] = regex_or_empty_string(
-                    "refresh=(\d+)", answer[1]
-                )
-                normalized_answer["retry_interval"] = regex_or_empty_string(
-                    "retry=(\d+)", answer[1]
-                )
-                normalized_answer["minimum_ttl"] = regex_or_empty_string(
-                    "minimum=(\d+)", answer[1]
-                )
-                normalized_answer["expiration_limit"] = regex_or_empty_string(
-                    "expire=(\d+)", answer[1]
-                )
+            normalized_answer = _normalize_answer(answer)
             answers.append(normalized_answer)
+
         query["answers"] = answers
 
         failure = query.get("failure", None)
