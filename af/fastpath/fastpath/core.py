@@ -290,8 +290,8 @@ def fetch_measurements(start_day, end_day) -> dict:
 @metrics.timer("match_fingerprints")
 def match_fingerprints(measurement):
     """Match fingerprints against HTTP headers and bodies.
+    Used only on web_connectivity
     """
-    # TODO: apply only on web_connectivity
     msm_cc = measurement["probe_cc"]
 
     zzfps = fingerprints["ZZ"]
@@ -463,7 +463,10 @@ def msm_processor(queue):
                 msm_jstr, tid = trivial_id(measurement)
                 fn = generate_filename(tid)
                 writeout_measurement(msm_jstr, fn, conf.update)
-                matches = match_fingerprints(measurement)
+                if measurement.get("test_name", None) == "web_connectivity":
+                    matches = match_fingerprints(measurement)
+                else:
+                    matches = []
                 summary = score_measurement(measurement, matches)
                 db.upsert_summary(measurement, summary, tid, fn, conf.update)
                 db.trim_old_measurements(conf)
