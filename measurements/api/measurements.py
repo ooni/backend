@@ -30,7 +30,7 @@ from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
 from measurements.models import Report, Input, Measurement, Autoclaved, Fastpath
 
 MSM_ID_PREFIX = 'temp-id'
-FASTPATH_MSM_ID_PREFIX = 'tid-'
+FASTPATH_MSM_ID_PREFIX = 'temp-fid-'
 RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
 
 class QueryTimeoutError(HTTPException):
@@ -429,7 +429,7 @@ def list_measurements(
     fpcols = [
         func.coalesce(0).label('m_input_no'),
         Fastpath.measurement_start_time.label("measurement_start_time"),
-        func.concat("tid-", Fastpath.tid).label('measurement_id'),
+        func.concat(FASTPATH_MSM_ID_PREFIX, Fastpath.tid).label('measurement_id'),
         func.coalesce(0).label('m_report_no'),
 
         func.coalesce(false()).label('anomaly'),
