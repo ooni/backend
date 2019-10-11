@@ -44,7 +44,7 @@ class FlaskJSONEncoder(json.JSONEncoder):
 
         return json.JSONEncoder.default(self, o)
 
-def init_app(app):
+def init_app(app, testmode=False):
     # We load configurations first from the config file (where some options
     # are overridable via environment variables) or from the config file
     # pointed to by the MEASUREMENTS_CONFIG environment variable.
@@ -52,7 +52,9 @@ def init_app(app):
     app.config.from_object('measurements.config')
     app.config.from_envvar('MEASUREMENTS_CONFIG', silent=True)
 
-    app.logger.addHandler(logging.StreamHandler())
+    # Prevent messy duplicate logs during testing
+    if not testmode:
+        app.logger.addHandler(logging.StreamHandler())
 
     if app.config['APP_ENV'] == 'production':
         app.logger.setLevel(logging.WARNING)
@@ -86,7 +88,7 @@ def init_app(app):
 def check_config(config):
     pass
 
-def create_app(*args, **kw):
+def create_app(*args, testmode=False, **kw):
     from measurements import views
 
     if sys.version_info[0] < 3:
@@ -96,7 +98,7 @@ def create_app(*args, **kw):
     app.json_encoder = FlaskJSONEncoder
 
     # Order matters
-    init_app(app)
+    init_app(app, testmode=testmode)
     check_config(app.config)
 
     init_db(app)
