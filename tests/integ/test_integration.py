@@ -1,8 +1,20 @@
-import os
+"""
+Integration test for API
 
-import pytest
+Warning: this test runs against a real database
+See README.adoc
+"""
+
+import os
 import json
 
+import pytest
+
+from measurements.api.measurements import FASTPATH_MSM_ID_PREFIX
+
+# The flask app is created in tests/conftest.py
+#
+#
 
 def jd(o):
     return json.dumps(o, indent=2, sort_keys=True)
@@ -11,7 +23,6 @@ def jd(o):
 @pytest.fixture(autouse=True, scope="session")
 def db_safety_check():
     assert os.environ["DATABASE_URL"] == "postgresql://readonly@localhost:5433/metadb"
-
 
 @pytest.fixture()
 def fastpath_dup_rid_input(app):
@@ -41,14 +52,14 @@ def dbquery(app, sql):
 
 @pytest.fixture()
 def fastpath_rid_input(app):
-    """Access DB directly. Get a random msmt
+    """Access DB directly. Get a fresh msmt
     There's an infrequent race condition in case the record is deleted while
     the test runs.
     Returns (rid, input)
     """
     sql = """SELECT report_id, input FROM fastpath
     WHERE input IS NOT NULL
-    ORDER BY measurement_start_time
+    ORDER BY measurement_start_time DESC
     LIMIT 1"""
     return dbquery(app, sql)[0:2]
 
@@ -165,7 +176,8 @@ def test_get_measurement_fastpath(client, fastpath_rid_input):
     assert response["metadata"]["count"] > 0, jd(response)
     assert len(response["results"]) > 0, jd(response)
 
-    pick = [r for r in response["results"] if "ent/tid-" in r["measurement_url"]]
+    url_substr = "measurement/{}".format(FASTPATH_MSM_ID_PREFIX)
+    pick = [r for r in response["results"] if url_substr in r["measurement_url"]]
     assert pick, "No fastpath result found in %s" % jd(response)
     pick = pick[0]
 

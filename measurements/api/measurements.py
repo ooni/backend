@@ -32,6 +32,9 @@ from measurements.models import Report, Input, Measurement, Autoclaved, Fastpath
 MSM_ID_PREFIX = 'temp-id'
 FASTPATH_MSM_ID_PREFIX = 'temp-fid-'
 RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
+FASTPATH_SERVER = "fastpath.ooni.nu"
+FASTPATH_PORT = 8000
+
 
 class QueryTimeoutError(HTTPException):
     code = 504
@@ -155,10 +158,18 @@ def get_one_fastpath_measurement(measurement_id, download):
     fetching the file from the fastpath host
     """
     log = current_app.logger
-    tid = measurement_id[len(FASTPATH_MSM_ID_PREFIX):]
+    tid = measurement_id[len(FASTPATH_MSM_ID_PREFIX) :]
 
-    conn = http.client.HTTPConnection("fastpath.ooni.nu", port=8000)
-    conn.request("GET", "/{}.json.lz4".format(tid))
+    path = "/measurements/{}.json.lz4".format(tid)
+    log.info(
+        "Incoming fastpath query %r. Fetching %s:%d%s",
+        measurement_id,
+        FASTPATH_SERVER,
+        FASTPATH_PORT,
+        path,
+    )
+    conn = http.client.HTTPConnection(FASTPATH_SERVER, FASTPATH_PORT)
+    conn.request("GET", path)
     r = conn.getresponse()
     try:
         assert r.status == 200
@@ -178,10 +189,10 @@ def get_measurement(measurement_id, download=None):
     fetching the file from S3 or the fastpath host as needed
     Returns only the measurement without extra data from the database
     """
-    # XXX this query is SUPER slow
     if measurement_id.startswith(FASTPATH_MSM_ID_PREFIX):
         return get_one_fastpath_measurement(measurement_id, download)
 
+    # XXX this query is SUPER slow
     m = RE_MSM_ID.match(measurement_id)
     if not m:
         raise BadRequest("Invalid measurement_id")
