@@ -1,5 +1,4 @@
 import csv
-import json
 
 # blocking locality: global > country > isp > local
 # unclassified locality is named "general"
@@ -342,7 +341,7 @@ def read_fingerprints_csv():
         print(fingerprints)
 
 
-def mock_out_long_strings(d, maxlen):
+def mock_out_long_strings(d, maxlen):  # noqa
     # Used for debugging
     if isinstance(d, list):
         for q in d:
@@ -362,14 +361,3 @@ def mock_out_long_strings(d, maxlen):
                 elif isinstance(v, str):
                     if len(v) > maxlen:
                         d[k] = "..."
-
-
-def show(df):
-    """Show dataframe - used for debugging
-    """
-
-    j = df.to_json()
-    # j = df.to_json(orient='records')
-    j = json.loads(j)
-    mock_out_long_strings(j, 200)
-    return json.dumps(j, sort_keys=True, indent=2)
