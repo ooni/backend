@@ -23,11 +23,10 @@ import tarfile
 import lz4.frame as lz4frame  # debdeps: python3-lz4
 
 # lz4frame appears faster than executing lz4cat: 2.4s vs 3.9s on a test file
-import ujson  # debdeps: python3-ujson
 
 import boto3  # debdeps: python3-boto3
 
-from fastpath.normalize import iter_yaml_lz4_reports_normalized, iter_yaml_msmt_normalized
+from fastpath.normalize import iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
 
 AWS_PROFILE = "ooni-data-private"
@@ -63,7 +62,9 @@ def load_multiple(fn) -> dict:
                         yield (line, None)
 
                 elif m.name.endswith(".yaml"):
-                    for msm in iter_yaml_msmt_normalized(k):
+                    continue # FIXME
+                    bucket_tstamp = "FIXME"
+                    for msm in iter_yaml_msmt_normalized(k, bucket_tstamp):
                         yield (None, msm)
 
     elif fn.endswith(".json.lz4"):
@@ -72,9 +73,12 @@ def load_multiple(fn) -> dict:
                 yield (line, None)
 
     elif fn.endswith(".yaml.lz4"):
-        for r in iter_yaml_lz4_reports_normalized(fn):
-            metrics.incr("yaml_normalization")
-            yield (None, r)
+        with lz4frame.open(fn) as f:
+            raise Exception("Unsupported format: YAML")
+            bucket_tstamp = "FIXME"
+            for msm in iter_yaml_msmt_normalized(f, bucket_tstamp):
+                metrics.incr("yaml_normalization")
+                yield (None, msm)
 
     else:
         raise RuntimeError(fn)

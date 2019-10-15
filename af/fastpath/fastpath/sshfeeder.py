@@ -146,8 +146,11 @@ class Source:
                 metrics.gauge("fetching_bw_KBps", data_len / (t.ms or 0.000_000_001))
 
                 if fn.endswith(".yaml"):
-                    for msm in normalize.iter_yaml_msmt_normalized(data):
+                    raise Exception("Unsupported format: YAML")
+                    bucket_tstamp = "FIXME"
+                    for msm in normalize.iter_yaml_msmt_normalized(data, bucket_tstamp):
                         yield (None, msm)
+
                 else:
                     # JSON documents
                     while True:

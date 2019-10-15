@@ -324,9 +324,7 @@ def _normalize_answer(ans):
         na["responsible_name"] = regex_or_empty_string(
             "rname=" + regexps["hostname"], ans[1]
         )
-        na["hostname"] = regex_or_empty_string(
-            "mname=" + regexps["hostname"], ans[1]
-        )
+        na["hostname"] = regex_or_empty_string("mname=" + regexps["hostname"], ans[1])
         na["serial_number"] = regex_or_empty_string("serial=(\d+)", ans[1])
         na["refresh_interval"] = regex_or_empty_string("refresh=(\d+)", ans[1])
         na["retry_interval"] = regex_or_empty_string("retry=(\d+)", ans[1])
@@ -425,13 +423,14 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
             entry = nest_test_keys(entry)
         return entry
 
-    test_start_time = datetime.fromtimestamp(entry.pop("start_time", 0))
+    ts = entry.pop("start_time", 0)
+    test_start_time = datetime.utcfromtimestamp(ts)
     try:
         tst = entry.pop("test_start_time")
         # This is the old test_start_time key that now is called
         # "measurement_start_time"
         if isinstance(tst, float):
-            measurement_start_time = datetime.fromtimestamp(tst)
+            measurement_start_time = datetime.utcfromtimestamp(tst)
         elif tst is None:
             measurement_start_time = test_start_time
         else:
@@ -508,6 +507,9 @@ import string
 
 
 def stream_yaml_blobs(fd):
+    """Detects YAML objects from a stream.
+    Returns an iterator of (offset, blob)
+    """
     head = b""
     for blob in iter(functools.partial(fd.read, 1048576), ""):
         if len(blob) == 0:
@@ -570,18 +572,21 @@ def generate_report_id(header):
 
 
 def iter_yaml_lz4_reports(fn):
+    """Iterate YAML reports from a lz4 file
+    """
+    assert str(fn).endswith("lz4")
 
     fd = lz4frame.open(fn)
-    report_gen = stream_yaml_blobs(fd)
+    blobgen = stream_yaml_blobs(fd)
 
-    off, header = next(report_gen)
+    off, header = next(blobgen)
     headsha = hashlib.sha1(header)
     # XXX: bad header kills whole bucket
     header = yaml.load(header, Loader=CLoader)
     if not header.get("report_id"):
         header["report_id"] = generate_report_id(header)
 
-    for off, entry in report_gen:
+    for off, entry in blobgen:
         entry_len = len(entry)
         esha = headsha.copy()
         esha.update(entry)
@@ -603,19 +608,24 @@ def iter_yaml_lz4_reports(fn):
 ## Entry points
 
 
-def iter_yaml_msmt_normalized(data):
-    """Yields normalized measurements from a YAML BytesIO
+def iter_yaml_msmt_normalized(data, bucket_tstamp):
+    """Yields normalized measurements from a YAML bytestream
     """
-    report_gen = stream_yaml_blobs(data)
+    assert bucket_tstamp.startswith("20")
+    assert len(bucket_tstamp) == 10
+    # Taken from autoclaving.py stream_yaml_reports
+    blobgen = stream_yaml_blobs(data)
 
-    off, header = next(report_gen)
+    off, header = next(blobgen)
     headsha = hashlib.sha1(header)
     # XXX: bad header kills whole bucket
     header = yaml.load(header, Loader=CLoader)
+    # Generates report_id if needed
     if not header.get("report_id"):
         header["report_id"] = generate_report_id(header)
 
-    for off, entry in report_gen:
+    report_filename = "2015-07-01/20150701T002642Z-BG-AS31250-http_invalid_request_line-4GDkLs6AzKBFD0OsxYE6DvyYvF8Bs5liFah4juh9CSicvDX73c7NaeGHOzeSFmUp-0.1.0-probe.yaml"
+    for off, entry in blobgen:
         esha = headsha.copy()
         esha.update(entry)
         esha = esha.digest()
@@ -626,14 +636,39 @@ def iter_yaml_msmt_normalized(data):
             if "test_start_time" in entry and "test_start_time" in header:
                 header.pop("test_start_time")
             entry.update(header)
-            yield normalize_entry(entry, "2018-05-07", "??", esha)
+            yield normalize_entry(entry, bucket_tstamp, report_filename, esha)
         except Exception as exc:
-            yield normalize_entry(entry, "2018-05-07", "??", esha)
+            yield normalize_entry(entry, bucket_tstamp, report_filename, esha)
 
 
-def iter_yaml_lz4_reports_normalized(fn):
-    """Yields normalized measurements from a yaml.lz4 file
-    """
-    for r in iter_yaml_lz4_reports(fn):
-        off, entry_len, esha, entry, exc = r
-        yield normalize_entry(entry, "2018-05-07", "??", esha)
+# def _iter_yaml_msmt(data):
+#     """Yields measurements 5-tuples from a YAML BytesIO
+#     """
+#     # Taken from autoclaving.py stream_yaml_reports
+#     blobgen = stream_yaml_blobs(data)
+#
+#     # This is the header of a report
+#     off, header = next(blobgen)
+#     headsha = hashlib.sha1(header)
+#     # XXX: bad header kills whole bucket
+#     header = yaml.load(header, Loader=CLoader)
+#     # Generates report_id if needed
+#     if not header.get("report_id"):
+#         header["report_id"] = generate_report_id(header)
+#
+#     # Iterate over measurements
+#     for off, entry in blobgen:
+#         entry_len = len(entry)
+#         esha = headsha.copy()
+#         esha.update(entry)
+#         esha = esha.digest()
+#         try:
+#             entry = yaml.load(entry, Loader=CLoader)
+#             if not entry:  # e.g. '---\nnull\n...\n'
+#                 continue
+#             if "test_start_time" in entry and "test_start_time" in header:
+#                 header.pop("test_start_time")
+#             entry.update(header)
+#             yield off, entry_len, esha, entry, None
+#         except Exception as exc:
+#             yield off, entry_len, esha, None, exc
