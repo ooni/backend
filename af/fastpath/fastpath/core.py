@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 
 """
@@ -36,7 +36,7 @@ import fastpath.s3feeder as s3feeder
 import fastpath.db as db
 
 from fastpath.metrics import setup_metrics
-from fastpath.portable_queue import Queue
+import fastpath.portable_queue as queue
 
 import fastpath.utils
 
@@ -509,7 +509,7 @@ def core():
     scores = None
 
     # Spawn worker processes
-    queue = Queue()
+    # 'queue' is a singleton from the portable_queue module
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]
