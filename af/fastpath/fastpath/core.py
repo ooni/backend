@@ -422,6 +422,8 @@ def writeout_measurement(msm_jstr, fn, update):
     """
     # Different processes might be trying to write the same file at the same
     # time due to naming collisions. Use a safe tmpfile and atomic link
+    # NamedTemporaryFile creates files with permissions 600
+    # but we want other users (Nginx) to be able to read the measurement
 
     suffix = ".{}.tmp".format(os.getpid())
     with NamedTemporaryFile(suffix=suffix, dir=conf.msmtdir) as f:
@@ -431,6 +433,7 @@ def writeout_measurement(msm_jstr, fn, update):
 
             final_fname = conf.msmtdir.joinpath(fn)
             try:
+                os.chmod(f.name, 0o644)
                 os.link(f.name, final_fname)
             except FileExistsError:
                 if update:
