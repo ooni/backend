@@ -16,6 +16,7 @@ from measurements.api.measurements import FASTPATH_MSM_ID_PREFIX
 #
 #
 
+
 def jd(o):
     return json.dumps(o, indent=2, sort_keys=True)
 
@@ -23,6 +24,7 @@ def jd(o):
 @pytest.fixture(autouse=True, scope="session")
 def db_safety_check():
     assert os.environ["DATABASE_URL"] == "postgresql://readonly@localhost:5433/metadb"
+
 
 @pytest.fixture()
 def fastpath_dup_rid_input(app):
@@ -42,26 +44,61 @@ def fastpath_dup_rid_input(app):
             return (row[0], "http://www.ea.com", row[1])
 
 
-def dbquery(app, sql):
+def dbquery(app, sql, *a):
     """Access DB directly, returns row as tuple.
     """
     with app.app_context():
-        row = app.db_session.execute(sql).fetchone()
+        row = app.db_session.execute(sql, *a).fetchone()
         return row
 
 
 @pytest.fixture()
 def fastpath_rid_input(app):
-    """Access DB directly. Get a fresh msmt
-    There's an infrequent race condition in case the record is deleted while
-    the test runs.
+    """Access DB directly. Get a fresh msmt that does not exists
+    in the traditional pipeline yet
     Returns (rid, input)
     """
-    sql = """SELECT report_id, input FROM fastpath
+    if False:  # slow
+        sql = """
+        SELECT
+            fastpath.report_id,
+            fastpath.input
+        FROM fastpath
+        WHERE input IS NOT NULL
+        AND fastpath.report_id IS NOT NULL
+        AND NOT EXISTS (
+            SELECT
+            FROM report
+            WHERE report.report_id = fastpath.report_id
+        )
+        LIMIT 1
+        """
+        rid, inp = dbquery(app, sql)[0:2]
+        assert rid, repr(rid)
+        assert rid.strip()
+        assert inp
+        assert inp.strip()
+        return rid, inp
+
+    sql = """
+    SELECT report_id, input FROM fastpath
     WHERE input IS NOT NULL
     ORDER BY measurement_start_time DESC
-    LIMIT 1"""
-    return dbquery(app, sql)[0:2]
+    LIMIT 1
+    """
+    rid, inp = dbquery(app, sql)[0:2]
+    assert rid.strip()
+    assert inp.strip()
+
+    check = """
+    SELECT COUNT(report_id)
+    FROM report
+    WHERE report_id = '%s'
+    """
+    cnt = dbquery(app, check)[0]
+    assert cnt == 0
+
+    return (rid, inp)
 
 
 @pytest.fixture()
@@ -69,13 +106,40 @@ def nonfastpath_rid_input(app):
     """Access DB directly. Get a random msmt
     Returns (rid, input)
     """
-    sql = """SELECT report.report_id, input.input
-        FROM measurement
-        JOIN report ON report.report_no = measurement.report_no
-        JOIN input ON input.input_no = measurement.input_no
-        LIMIT 1
+    sql = """
+    SELECT report.report_id, input.input
+    FROM measurement
+    JOIN report ON report.report_no = measurement.report_no
+    JOIN input ON input.input_no = measurement.input_no
+    LIMIT 1
     """
     return dbquery(app, sql)[0:3]
+
+
+@pytest.fixture()
+def shared_rid_input(app):
+    """Access DB directly. Get a random msmt
+    that has a match both in the measurement and fastpath tables
+    Returns (rid, input)
+    """
+    sql = """
+    SELECT
+        fastpath.report_id,
+        fastpath.input
+    FROM fastpath
+    WHERE input IS NOT NULL
+    AND fastpath.report_id IS NOT NULL
+    AND EXISTS (
+        SELECT
+        FROM report
+        WHERE report.report_id = fastpath.report_id
+    )
+    LIMIT 1
+    """
+    rid, inp = dbquery(app, sql)[0:2]
+    assert rid.strip()
+    assert inp.strip()
+    return rid, inp
 
 
 def api(client, subpath):
@@ -120,7 +184,7 @@ def test_list_measurements_fastpath(client, fastpath_rid_input):
     """
     rid, inp = fastpath_rid_input
     p = f"measurements?report_id={rid}&input={inp}"
-    response = api(client, f"measurements?report_id={rid}&input={inp}")
+    response = api(client, p)
     # This has collisions with data in the traditional pipeline
     assert response["metadata"]["count"] > 0, jd(response)
 
@@ -137,8 +201,11 @@ def test_get_measurement(client):
     assert len(response["test_keys"]["requests"][0]["response"]["body"]) == 72089
 
 
+@pytest.mark.get_measurement
 def test_get_measurement_nonfastpath(client, nonfastpath_rid_input):
     """Simulate Explorer behavior
+    Get a measurement from the traditional pipeline that has no match
+    in the fastpath table
     """
     # Get a real rid/inp directly from the database
     rid, inp = nonfastpath_rid_input
@@ -148,47 +215,96 @@ def test_get_measurement_nonfastpath(client, nonfastpath_rid_input):
     assert response["metadata"]["count"] > 0, jd(response)
     assert len(response["results"]) > 0, jd(response)
 
+    # List measurements and pick the first result
     pick = [r for r in response["results"] if "ent/temp-id-" in r["measurement_url"]]
     assert pick, "No result found in %s" % jd(response)
     # TODO: how does Explorer pick an entry?
+    assert len(pick) == 1
     pick = pick[0]
     url = pick["measurement_url"]
-
     assert "anomaly" in pick, pick.keys()
     assert pick["scores"] == {}
 
     # Assure the correct msmt was received
     msm = api(client, url[27:])
-    for f in ("probe_asn", "probe_cc", "report_id", "input","test_name"):
+    for f in ("probe_asn", "probe_cc", "report_id", "input", "test_name"):
         # (measurement_start_time differs in the timezone letter)
         assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
 
 
-def test_get_measurement_fastpath(client, fastpath_rid_input):
+@pytest.mark.get_measurement
+def test_get_measurement_fastpath(app, client, fastpath_rid_input):
     """Simulate Explorer behavior
+    Get a measurement from the fastpath table that has no match in the
+    traditional pipeline
     """
+    log = app.logger
     # Get a real rid/inp directly from the database
     rid, inp = fastpath_rid_input
 
     # This has collisions with data from the traditional pipeline
     p = f"measurements?report_id={rid}&input={inp}"
+    log.info("Calling API on %s", p)
     response = api(client, p)
     assert response["metadata"]["count"] > 0, jd(response)
     assert len(response["results"]) > 0, jd(response)
 
+    # List measurements and pick the first result
     url_substr = "measurement/{}".format(FASTPATH_MSM_ID_PREFIX)
     pick = [r for r in response["results"] if url_substr in r["measurement_url"]]
     assert pick, "No fastpath result found in %s" % jd(response)
+    assert len(pick) == 1
     pick = pick[0]
-
     assert "anomaly" in pick, pick.keys()
     assert pick["scores"] != {}
+    assert "blocking_general" in pick["scores"]
 
     url = pick["measurement_url"]
-    msm = api(client, url[27:])
+    relurl = url[27:]
+    log.info("Calling API on %r", relurl)
+    msm = api(client, relurl)
 
     # Assure the correct msmt was received
-    msm = api(client, url[27:])
-    for f in ("probe_asn", "probe_cc", "report_id", "input","test_name"):
+    msm = api(client, relurl)
+    for f in ("probe_asn", "probe_cc", "report_id", "input", "test_name"):
+        # (measurement_start_time differs in the timezone letter)
+        assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
+
+
+@pytest.mark.get_measurement
+def test_get_measurement_joined(app, client, shared_rid_input):
+    """Simulate Explorer behavior
+    Get a measurement that has an entry in the fastpath table and also
+    in the traditional pipeline
+    """
+    log = app.logger
+    # Get a real rid/inp directly from the database
+    rid, inp = shared_rid_input
+
+    # The rid/inp have entries both in fastpath and in the traditional pipeline
+    p = f"measurements?report_id={rid}&input={inp}"
+    log.info("Calling API on %s", p)
+    response = api(client, p)
+    assert response["metadata"]["count"] > 0, jd(response)
+    assert len(response["results"]) > 0, jd(response)
+
+    # List measurements and pick the first result
+    url_substr = "measurement/{}".format(FASTPATH_MSM_ID_PREFIX)
+    pick = [r for r in response["results"] if url_substr in r["measurement_url"]]
+    assert pick, "No fastpath result found in %s" % jd(response)
+    assert len(pick) == 1
+    pick = pick[0]
+    assert "anomaly" in pick, pick.keys()
+    assert pick["scores"] != {}
+    assert "blocking_general" in pick["scores"]
+
+    url = pick["measurement_url"]
+    relurl = url[27:]
+    log.info("Calling API on %r", relurl)
+    msm = api(client, relurl)
+
+    # Assure the correct msmt was received
+    msm = api(client, relurl)
+    for f in ("probe_asn", "probe_cc", "report_id", "input", "test_name"):
         # (measurement_start_time differs in the timezone letter)
         assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
