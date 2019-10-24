@@ -51,16 +51,17 @@ def init_db(app):
 QUERY_TIME_THRESHOLD = 60.0 # Time in seconds after which we will start logging warnings for too long queries
 
 def init_query_logging(app):
+    """Set hooks to log queries"""
+
     @event.listens_for(Engine, "before_cursor_execute")
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         conn.info.setdefault('query_start_time', []).append(time.time())
-        app.logger.debug("Start Query: %s", statement)
+        app.logger.debug("Starting query: %s", cursor.mogrify(statement, parameters))
 
     @event.listens_for(Engine, "after_cursor_execute")
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         total_time = time.time() - conn.info['query_start_time'].pop(-1)
-        app.logger.debug("Query Complete!")
-        app.logger.debug("Total Time: %f", total_time)
+        app.logger.debug("Query complete. Total time: %f", total_time)
 
         if total_time >= QUERY_TIME_THRESHOLD:
             app.logger.warning("Query: %s %r", statement, parameters)
