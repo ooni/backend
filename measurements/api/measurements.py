@@ -169,15 +169,19 @@ def get_one_fastpath_measurement(measurement_id, download):
         path,
     )
     conn = http.client.HTTPConnection(FASTPATH_SERVER, FASTPATH_PORT)
+    log.debug("Fetching %s:%d %r", FASTPATH_SERVER, FASTPATH_PORT, path)
     conn.request("GET", path)
     r = conn.getresponse()
+    log.debug("Response status: %d", r.status)
     try:
         assert r.status == 200
         blob = r.read()
         conn.close()
+        log.debug("Decompressing LZ4 data")
         blob = lz4framed.decompress(blob)
         response = make_response(blob)
         response.headers.set('Content-Type', 'application/json')
+        log.debug("Sending JSON response")
         return response
     except Exception:
         raise BadRequest("No measurement found")
@@ -315,10 +319,13 @@ def list_measurements(
     ):
     """Search for measurements using only the database. Provide pagination.
     """
+    log = current_app.logger
+
+    ## Prepare query parameters
+
     input_ = request.args.get("input")
     domain = request.args.get("domain")
 
-    log = current_app.logger
     if probe_asn is not None:
         if probe_asn.startswith('AS'):
             probe_asn = probe_asn[2:]
@@ -359,6 +366,7 @@ def list_measurements(
     if order.lower() not in ('asc', 'desc'):
         raise BadRequest("Invalid order")
 
+    ## Create SQL query
     c_anomaly = func.coalesce(Measurement.anomaly, false())\
                     .label('anomaly')
     c_confirmed = func.coalesce(Measurement.confirmed, false())\
