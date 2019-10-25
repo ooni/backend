@@ -301,6 +301,48 @@ def log_query(log, q):
     log.info("\n--- query ---\n\n%s\n\n-------------", sql)
 
 
+def _merge_two_results(a, b):
+    """Merge 2 measurements. Collect useful fields from traditional pipeline
+    and fastpath
+    """
+    if a["scores"]:
+        # a is fastpath
+        if b["scores"]:
+            # both fastpath, ignore b
+            return a
+
+        else:
+            # merge in useful fields from traditional
+            for f in ("anomaly", "confirmed"):
+                a[f] = b[f]
+            return a
+
+    else:
+        if b["scores"]:
+            # merge in useful fields from fastpath
+            for f in ("scores", "measurement_url", "measurement_id"):
+                a[f] = b[f]
+            return a
+
+        else:
+            # both trad, ignore b
+            return a
+
+
+def _merge_results(tmpresults):
+    """Merge list_measurements() outputs from traditional pipeline and fastpath
+    """
+    resultsmap = {}
+    for r in tmpresults:
+        k = (r["report_id"], r["input"])
+        if k not in resultsmap:
+            resultsmap[k] = r
+        else:
+            resultsmap[k] = _merge_two_results(resultsmap[k], r)
+
+    return tuple(resultsmap.values())
+
+
 def list_measurements(
         report_id=None,
         probe_asn=None,
@@ -319,6 +361,9 @@ def list_measurements(
     ):
     """Search for measurements using only the database. Provide pagination.
     """
+    # FIXME: list_measurements and get_measurement will be simplified and
+    # made faster by https://github.com/ooni/pipeline/issues/48
+
     log = current_app.logger
 
     ## Prepare query parameters
@@ -505,18 +550,18 @@ def list_measurements(
     # Run the query, generate the results list
 
     iter_start_time = time.time()
-    results = []
 
     with configure_scope() as scope:
         scope.set_extra("sql_query", query_str)
 
         try:
+            tmpresults = []
             for row in q:
                 url = urljoin(
                     current_app.config['BASE_URL'],
                     '/api/v1/measurement/%s' % row.measurement_id
                 )
-                results.append({
+                tmpresults.append({
                     'measurement_url': url,
                     'measurement_id': row.measurement_id,
                     'report_id': row.report_id,
@@ -537,6 +582,10 @@ def list_measurements(
                 capture_exception(QueryTimeoutError())
                 raise QueryTimeoutError()
             raise exc
+
+        # For each report_id / input tuple, we want at most one entry from the
+        # traditional pipeline and one from fastpath, merged together
+        results = _merge_results(tmpresults)
 
         pages = -1
         count = -1
