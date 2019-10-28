@@ -196,7 +196,11 @@ def get_measurement(measurement_id, download=None):
     if measurement_id.startswith(FASTPATH_MSM_ID_PREFIX):
         return get_one_fastpath_measurement(measurement_id, download)
 
-    # XXX this query is SUPER slow
+    # XXX this query is slow due to filtering by report_id and input
+    # It also occasionally return multiple rows and serves only the first one
+    # TODO: add timing metric
+    # TODO: switch to OOID to speed up the query
+    # https://github.com/ooni/pipeline/issues/48
     m = RE_MSM_ID.match(measurement_id)
     if not m:
         raise BadRequest("Invalid measurement_id")
