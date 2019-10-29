@@ -197,7 +197,7 @@ def feed_measurements_from_collectors(conf, start_time=None):
     :yields: (string of JSON, None) or (None, msmt dict)
     """
     # Connect to all collectors here
-    sources = [Source(conf, hn) for hn in collector_hostnames]
+    sources = [Source(conf, hn) for hn in conf.collector_hostnames]
     while True:
         try:
             throttle = True

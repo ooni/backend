@@ -13,6 +13,7 @@ See README.adoc
 # debdeps: python3-setuptools
 
 from argparse import ArgumentParser, Namespace
+from configparser import ConfigParser
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -84,6 +85,12 @@ def setup():
 
     conf.conffile = root / "etc/fastpath.conf"
     log.info("Using conf file %r", conf.conffile)
+    cp = ConfigParser()
+    with open(conf.conffile) as f:
+        cp.read_file(f)
+        conf.collector_hostnames = cp["DEFAULT"]["collectors"].split()
+        log.info("collectors: %s", conf.collector_hostnames)
+
     conf.vardir = root / "var/lib/fastpath"
     conf.cachedir = conf.vardir / "cache"
     conf.s3cachedir = conf.cachedir / "s3"
@@ -297,7 +304,6 @@ def match_fingerprints(measurement):
     zzfps = fingerprints["ZZ"]
     ccfps = fingerprints.get(msm_cc, {})
 
-
     matches = []
     for req in measurement["test_keys"].get("requests", ()):
         r = req.get("response", None)
@@ -317,7 +323,7 @@ def match_fingerprints(measurement):
 
                 per_s("fingerprints_bytes", len(body), tb)
 
-        del (body)
+        del body
 
         # Match HTTP headers if found
         headers = r.get("headers", {})
@@ -508,7 +514,9 @@ def core():
         for measurement_tup in fetch_measurements(conf.start_day, conf.end_day):
             assert len(measurement_tup) == 2
             msm_jstr, msm = measurement_tup
-            assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
+            assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(
+                msm_jstr
+            )
             assert msm is None or isinstance(msm, dict)
 
             measurement_cnt += 1
@@ -518,7 +526,9 @@ def core():
             metrics.gauge("queue_size", queue.qsize())
 
             if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
-                log.info("Exiting with stop_after. Total runtime: %f", time.time() - t00)
+                log.info(
+                    "Exiting with stop_after. Total runtime: %f", time.time() - t00
+                )
                 break
 
             # Interact from CLI
@@ -543,13 +553,7 @@ def setup_fingerprints():
     # pre-process fingerprints to speed up lookup
     global fingerprints
     # cc -> fprint_type -> list of dicts
-    fingerprints = {
-        "ZZ": {
-            "body_match": [],
-            "header_prefix": [],
-            "header_full": []
-        }
-    }
+    fingerprints = {"ZZ": {"body_match": [], "header_prefix": [], "header_full": []}}
     for cc, fprints in fastpath.utils.fingerprints.items():
         d = fingerprints.setdefault(cc, {})
         for fp in fprints:
