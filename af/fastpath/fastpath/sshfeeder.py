@@ -33,6 +33,7 @@ pkey_filename_local_path = "ssh/id_ed25519"
 pkey_password_file = "/etc/machine-id"
 collector_hostnames = ("b.collector.ooni.io", "c.collector.ooni.io")
 
+ARCHIVE_DIR = "/srv/collector/archive"
 FIND = "/usr/bin/find {} -maxdepth 1 -type f -cmin -{} -printf '%C@ %s %f\n'"
 
 metrics = setup_metrics(name="fastpath.feeder")
@@ -78,7 +79,7 @@ class Source:
         self.sftp = ssh.open_sftp()
         # assert self.sftp.get_channel().get_transport()._preferred_compression[1] == 'zlib'
         self.new_downloads = []
-        self._archive_dir = f"/data/{self.hostname}/archive"
+        self._archive_dir = ARCHIVE_DIR
         self._old_fnames = OrderedDict()
         self._scan_time = None
         self._initial_backlog_minutes = 60 * 6  # too much?
