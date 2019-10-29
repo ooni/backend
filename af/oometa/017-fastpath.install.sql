@@ -18,12 +18,15 @@ CREATE TABLE fastpath (
     "test_start_time" timestamp without time zone NOT NULL,
     "measurement_start_time" timestamp without time zone,
     "filename" text, -- will be NULL after files are deleted
+
     "scores" JSON NOT NULL
 );
 
-CREATE INDEX report_id_idx ON fastpath(report_id);
+CREATE INDEX report_id_idx ON fastpath (report_id);
 
-CREATE INDEX input_idx ON fastpath(input);
+CREATE INDEX input_idx ON fastpath (input);
+
+CREATE INDEX measurement_start_time_idx ON fastpath (measurement_start_time);
 
 COMMENT ON TABLE fastpath IS 'Measurements created by fastpath';
 
@@ -33,4 +36,9 @@ COMMENT ON COLUMN fastpath.filename IS 'File served by the fastpath host contain
 
 COMMENT ON COLUMN fastpath.scores IS 'Scoring metadata';
 
+GRANT SELECT ON fastpath TO amsapi;
+
+GRANT SELECT ON fastpath TO readonly;
+
 COMMIT;
+
