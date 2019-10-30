@@ -356,6 +356,93 @@ def match_fingerprints(measurement):
     return matches
 
 
+@metrics.timer("score_measurement_telegram")
+def score_measurement_telegram(msm, summary):
+    """Calculate measurement scoring for Telegram.
+    Returns a summary dict
+    """
+    # Ignore tcp_blocking, http_blocking and web_failure from the probe
+    tk = msm["test_keys"]
+    del msm
+    web_status = tk.get("telegram_web_status", None)
+    if web_status == "ok":
+        web_blocking = False
+    elif web_status == "blocked":
+        web_blocking = True
+    else:
+        # unknown
+        web_blocking = None
+
+    # First the probe tests N TCP connections
+    tcp_connect = tk.get("tcp_connect", [])
+    accessible_endpoints = 0
+    unreachable_endpoints = 0
+    for entry in tcp_connect:
+        s = entry.get("status", {})
+        success = s.get("success", None)
+        if success is True:
+            accessible_endpoints += 1
+        elif success is False:
+            unreachable_endpoints += 1
+        else:
+            pass # unknown
+
+    # Then the probe tests N HTTP connections
+    http_success_cnt = 0
+    http_failure_cnt = 0
+    web_failure = None
+    for request in tk.get("requests", []):
+        if "request" not in request:
+            # client bug
+            continue
+        if request["request"]["url"] in ("https://web.telegram.org/",
+                                         "http://web.telegram.org/"):
+            if request["failure"] is not None:
+                web_failure = request["failure"]
+
+            # TODO extract_html_title(request["response"]["body"] and check if
+            # it matches "Telegram Web"
+            # see: https://github.com/measurement-kit/measurement-kit/blob/f63ed8b7f186dbb27cf32489216826752d070620/src/libmeasurement_kit/ooni/telegram.cpp#L101
+
+            # We skip the telegram web requests for counting the
+            # http_success_cnt
+            continue
+
+        if request["failure"] is None:
+            http_success_cnt += 1
+        else:
+            # TODO also consider looking at request["response"]["body"] to
+            # match the expected telegram backend response
+            http_failure_cnt += 1
+
+    # Scoring
+
+    if (accessible_endpoints + unreachable_endpoints) > 0:
+        s = unreachable_endpoints / (accessible_endpoints + unreachable_endpoints)
+    else:
+        s = .5
+
+    if (http_failure_cnt + http_success_cnt) > 0:
+        s += http_failure_cnt / (http_failure_cnt + http_success_cnt)
+    else:
+        s += .5
+
+    if web_blocking:
+        s += 1
+
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores["blocking_general"] = s
+    scores["web_failure"] = web_failure
+    scores["accessible_endpoints"] = accessible_endpoints
+    scores["unreachable_endpoints"] = unreachable_endpoints
+    scores["http_success_cnt"] = http_success_cnt
+    scores["http_failure_cnt"] = http_failure_cnt
+    if web_failure is not None:
+        scores["msg"] = "Telegam failure: {}".format(web_failure)
+    summary["scores"] = scores
+    return summary
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches):
     """Calculate measurement scoring. Returns a summary dict
@@ -371,6 +458,12 @@ def score_measurement(msm, matches):
         "test_start_time",
     )
     summary = {k: msm[k] for k in fields}
+    # TODO: remove unneded summary entries (not saved in database)
+
+    if msm["test_name"] == "telegram":
+        return score_measurement_telegram(msm, summary)
+
+    # web_connectivity processing
 
     # Blocking locality: global > country > ISP > local
     # unclassified locality is stored in "blocking_general"
