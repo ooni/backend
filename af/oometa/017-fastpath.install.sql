@@ -17,6 +17,7 @@ CREATE TABLE fastpath (
     "test_name" ootest,
     "test_start_time" timestamp without time zone NOT NULL,
     "measurement_start_time" timestamp without time zone,
+    "platform" text,
     "filename" text, -- will be NULL after files are deleted
 
     "scores" JSON NOT NULL
