@@ -8,7 +8,7 @@ case "$1" in
         addgroup --system --quiet fastpath
         adduser --system --quiet --ingroup fastpath --no-create-home --home /var/lib/fastpath fastpath
         mkdir -p /var/lib/fastpath/ssh/
-        chown fastpath /var/lib/fastpath -R
+        chown fastpath /var/lib/fastpath
         if [ ! -f /var/lib/fastpath/ssh/id_ed25519 ]
         then
           logger "fastpath - Generating SSH key"
