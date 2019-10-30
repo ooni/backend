@@ -35,6 +35,7 @@ COMMENT ON COLUMN fastpath.filename IS 'File served by the fastpath host contain
 
 COMMENT ON COLUMN fastpath.scores IS 'Scoring metadata';
 
+-- TODO add these to ansible role
 -- Skip grants during tests on Travis CI
 DO $$
 BEGIN
