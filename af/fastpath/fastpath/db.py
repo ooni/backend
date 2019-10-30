@@ -75,9 +75,9 @@ def upsert_summary(msm, summary, tid, filename, update):
     tpl = sql_base_tpl + (sql_update if update else sql_noupdate)
 
     asn = int(msm["probe_asn"][2:])  # AS123
-    platform = 'unset'
-    if 'annotations' in msm and isinstance(msm['annotations'], dict):
-        platform = msm['annotations'].get('platform', 'unset')
+    platform = "unset"
+    if "annotations" in msm and isinstance(msm["annotations"], dict):
+        platform = msm["annotations"].get("platform", "unset")
     args = (
         tid,
         msm["report_id"],
