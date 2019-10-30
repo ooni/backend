@@ -1,5 +1,5 @@
-fastpath (0.1) unstable; urgency=medium
+fastpath (0.3) UNRELEASED; urgency=medium
 
-  * Initial release
+  * v 0.3
 
- -- Federico Ceratto <federico@openobservatory.org>  Tue, 29 Oct 2019 15:49:08 +0000
+ -- Federico Ceratto <federico@debian.org>  Wed, 30 Oct 2019 16:15:15 +0000
