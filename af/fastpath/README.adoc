@@ -1,0 +1,73 @@
+
+=== OONI Fastpath pipeline
+
+https://github.com/ooni/spec/issues/145[GH issue]
+
+```
+blockdiag {
+  Collectors -> SSHFeeder -> Ingestion -> ... -> Analysis -> PSQL.events -> RSSFeed
+  S3 -> S3Feeder -> Ingestion
+  PSQL.events -> Explorer
+}
+```
+
+http://interactive.blockdiag.com/?compression=deflate&src=eJxLyslPzk7JTExXqOZSUHDOz8lJTS7JLypW0LVTCA72cEtNTUktAnE889JTi0sy8_PAMsYBiUWFpaklII5jXmJOZXEmWEtAcKCPXmpZal4JmBsUHAwyAWhysDFEHxYDgbJo2lwrCnLyi1KLuGoB1TMyHQ[Rendered diagram]
+
+See the `makefile` file for useful commands.
+
+Run unit tests locally:
+
+```bash
+make functests
+```
+
+Run devel mode:
+```bash
+make run_devel
+```
+
+Monitor logs:
+```bash
+journalctl -f -t fastpath --utc -o short-precise
+
+# show fields
+journalctl -f -t fastpath  -N | sort
+
+# filter by field, e.g.:
+journalctl -f -t fastpath --utc CODE_LINE=12
+
+```
+
+Monitor metrics locally:
+```bash
+make local_monitor_metrics
+```
+
+To set up credentials for development create:
+```
+~/ .aws/credentials
+~/var/lib/fastpath/ssh/id_ed25519 from /var/lib/fastpath/ssh/id_ed25519 (created by install scripts)
+touch /home/federico/var/lib/fastpath/ssh/known_hosts
+```
+
+In development mode, ~ is treated as /
+
+Run development mode:
+```
+fastpath --devel --start-day=2019-7-20 --end-day=2019-7-21
+```
+
+On the collectors:
+```
+# on fastpath
+cat ~/var/lib/fastpath/ssh/id_ed25519.pub
+# add pubkey on feeder:
+sudo vim /home/sshfeeder/.ssh/authorized_keys
+```
+
+Test connectivity:
+```
+cat  /etc/machine-id
+ssh sshfeeder@b.collector.ooni.io -i ~/var/lib/fastpath/ssh/id_ed25519
+
+```
