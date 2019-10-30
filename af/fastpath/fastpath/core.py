@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 
 """
@@ -24,8 +24,6 @@ import os
 import sys
 import time
 
-from systemd.journal import JournalHandler  # debdeps: python3-systemd
-
 import ujson  # debdeps: python3-ujson
 import lz4.frame as lz4frame  # debdeps: python3-lz4
 
@@ -39,6 +37,7 @@ import fastpath.s3feeder as s3feeder
 import fastpath.db as db
 
 from fastpath.metrics import setup_metrics
+import fastpath.portable_queue as queue
 
 import fastpath.utils
 
@@ -79,8 +78,13 @@ def setup():
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
     else:
+        try:
+            from systemd.journal import JournalHandler  # debdeps: python3-systemd
+            log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
+        except:
+            # this will be the case on macOS for example
+            pass
         root = Path("/")
-        log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
         log.setLevel(logging.DEBUG)
 
     conf.conffile = root / "etc/fastpath.conf"
@@ -504,7 +508,7 @@ def core():
     scores = None
 
     # Spawn worker processes
-    queue = mp.Queue()
+    # 'queue' is a singleton from the portable_queue module
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]

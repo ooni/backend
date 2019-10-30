@@ -1,0 +1,7 @@
+paramiko
+statsd
+ujson
+lz4
+pyyaml
+boto3
+# systemd <- This is an optional requirement on linux
