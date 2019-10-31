@@ -355,6 +355,7 @@ def match_fingerprints(measurement):
 
     return matches
 
+
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm, summary):
     tk = msm["test_keys"]
@@ -364,25 +365,22 @@ def score_measurement_facebook_messenger(msm, summary):
     # If the value of these keys is false (inconsistent) there is something
     # fishy
     consistency_keys = [
-        'facebook_b_api_dns_consistent',
-        'facebook_b_api_reachable',
-        'facebook_b_graph_dns_consistent',
-        'facebook_b_graph_reachable',
-        'facebook_edge_dns_consistent',
-        'facebook_edge_reachable',
-        'facebook_external_cdn_dns_consistent',
-        'facebook_external_cdn_reachable',
-        'facebook_scontent_cdn_dns_consistent',
-        'facebook_scontent_cdn_reachable',
-        'facebook_star_dns_consistent',
-        'facebook_star_reachable',
-        'facebook_stun_dns_consistent'
+        "facebook_b_api_dns_consistent",
+        "facebook_b_api_reachable",
+        "facebook_b_graph_dns_consistent",
+        "facebook_b_graph_reachable",
+        "facebook_edge_dns_consistent",
+        "facebook_edge_reachable",
+        "facebook_external_cdn_dns_consistent",
+        "facebook_external_cdn_reachable",
+        "facebook_scontent_cdn_dns_consistent",
+        "facebook_scontent_cdn_reachable",
+        "facebook_star_dns_consistent",
+        "facebook_star_reachable",
+        "facebook_stun_dns_consistent",
     ]
     # These are keys that if they are true it means there is something fishy
-    anomaly_keys = [
-        'facebook_tcp_blocking',
-        'facebook_dns_blocking'
-    ]
+    anomaly_keys = ["facebook_tcp_blocking", "facebook_dns_blocking"]
 
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     s = 0
@@ -490,6 +488,7 @@ def score_measurement_telegram(msm, summary):
     summary["scores"] = scores
     return summary
 
+
 @metrics.timer("score_measurement_hhfm")
 def score_measurement_hhfm(msm, summary):
     tk = msm["test_keys"]
@@ -497,15 +496,15 @@ def score_measurement_hhfm(msm, summary):
     s = 0
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
-    exp_req_headers = tk['requests'][0].get('request', {}).get('headers', {})
+    exp_req_headers = tk["requests"][0].get("request", {}).get("headers", {})
     # We add this as it's not explicitly included in the data from the probe
     # although it is actually sent
-    exp_req_headers['Connection'] = 'close'
-    exp_req_failure = tk['requests'][0].get('failure', None)
+    exp_req_headers["Connection"] = "close"
+    exp_req_failure = tk["requests"][0].get("failure", None)
 
     exp_resp_body = None
     if exp_req_failure is None:
-        exp_resp_body = tk['requests'][0]['response'].get('body', None)
+        exp_resp_body = tk["requests"][0]["response"].get("body", None)
     else:
         s += 0.5
 
@@ -523,12 +522,12 @@ def score_measurement_hhfm(msm, summary):
         s += 1
 
     if ctrl_headers:
-        if len(exp_req_headers) != len(ctrl_headers['headers_dict']):
+        if len(exp_req_headers) != len(ctrl_headers["headers_dict"]):
             headers_modified = True
             s += 1
         for k, v in exp_req_headers.items():
             try:
-                if v != ctrl_headers['headers_dict'][k][0]:
+                if v != ctrl_headers["headers_dict"][k][0]:
                     headers_modified = True
             except KeyError:
                 s += 0.5
@@ -539,6 +538,7 @@ def score_measurement_hhfm(msm, summary):
     scores["blocking_general"] = s
     summary["scores"] = scores
     return summary
+
 
 @metrics.timer("score_measurement_whatsapp")
 def score_measurement_whatsapp(msm, summary):
