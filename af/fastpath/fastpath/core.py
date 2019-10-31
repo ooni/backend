@@ -490,6 +490,55 @@ def score_measurement_telegram(msm, summary):
     summary["scores"] = scores
     return summary
 
+@metrics.timer("score_measurement_hhfm")
+def score_measurement_hhfm(msm, summary):
+    tk = msm["test_keys"]
+    del ms
+    s = 0
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+
+    exp_req_headers = tk['requests'][0].get('request', {}).get('headers', {})
+    # We add this as it's not explicitly included in the data from the probe
+    # although it is actually sent
+    exp_req_headers['Connection'] = 'close'
+    exp_req_failure = tk['requests'][0].get('failure', None)
+
+    exp_resp_body = None
+    if exp_req_failure is None:
+        exp_resp_body = tk['requests'][0]['response'].get('body', None)
+    else:
+        s += 0.5
+
+    headers_modified = False
+    total_tampering = False
+    ctrl_headers = None
+    try:
+        # {"headers_dict": {"acCePT-languagE": ["en-US,en;q=0.8"], ...},
+        #  "request_line": "geT / HTTP/1.1",
+        #  "request_headers": [ ["Connection", "close"], ... ]
+        # }
+        ctrl_headers = ujson.loads(exp_resp_body)
+    except:
+        total_tampering = True
+        s += 1
+
+    if ctrl_headers:
+        if len(exp_req_headers) != len(ctrl_headers['headers_dict']):
+            headers_modified = True
+            s += 1
+        for k, v in exp_req_headers.items():
+            try:
+                if v != ctrl_headers['headers_dict'][k][0]:
+                    headers_modified = True
+            except KeyError:
+                s += 0.5
+                headers_modified = True
+
+    scores["total_tampering"] = total_tampering
+    scores["headers_modified"] = headers_modified
+    scores["blocking_general"] = s
+    summary["scores"] = scores
+    return summary
 
 @metrics.timer("score_measurement_whatsapp")
 def score_measurement_whatsapp(msm, summary):
@@ -567,6 +616,8 @@ def score_measurement(msm, matches):
         return score_measurement_telegram(msm, summary)
     if msm["test_name"] == "facebook_messenger":
         return score_measurement_facebook_messenger(msm, summary)
+    if msm["test_name"] == "http_header_field_manipulation":
+        return score_measurement_hhfm(msm, summary)
 
     if msm["test_name"] == "whatsapp":
         return score_measurement_whatsapp(msm, summary)
