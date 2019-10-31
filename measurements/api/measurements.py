@@ -425,6 +425,7 @@ def list_measurements(
     cols = [
         Measurement.input_no.label('m_input_no'),
         Measurement.measurement_start_time.label('measurement_start_time'),
+        Report.test_start_time.label('test_start_time'),
         func.concat(MSM_ID_PREFIX, "-", Measurement.msm_no).label('measurement_id'),
         Measurement.report_no.label('m_report_no'),
 
@@ -488,14 +489,12 @@ def list_measurements(
             c_msm_failure == False
         ))
 
-    if order_by is not None:
-        q = q.order_by(text('{} {}'.format(order_by, order)))
-
-
     ## Create a query for fastpath
 
     fpcols = [
         func.coalesce(0).label('m_input_no'),
+        # We use test_start_time here as the batch pipeline has many NULL measurement_start_times
+        Fastpath.measurement_start_time.label("test_start_time"),
         Fastpath.measurement_start_time.label("measurement_start_time"),
         func.concat(FASTPATH_MSM_ID_PREFIX, Fastpath.tid).label('measurement_id'),
         func.coalesce(0).label('m_report_no'),
@@ -539,20 +538,27 @@ def list_measurements(
     if input_:
         fpq = fpq.filter(Fastpath.input == input_)
 
+    if order_by is not None:
+        q = q.order_by(text('{} {}'.format(order_by, order)))
+    q = q.limit(limit).offset(offset)
     # Assemble the query
 
-    q = q.limit(limit).offset(offset)
     try:
+        if order_by is not None:
+            fpq  = fpq.order_by(text('{} {}'.format(order_by, order)))
+        fpq = fpq.limit(limit).offset(offset)
         q = q.union(fpq)
     except:
         log_query(log, q)
         log_query(log, fpq)
         raise
 
+    if order_by is not None:
+        q = q.order_by(text('{} {}'.format(order_by, order)))
+
     query_str = str(q.statement.compile(dialect=postgresql.dialect()))
 
     # Run the query, generate the results list
-
     iter_start_time = time.time()
 
     with configure_scope() as scope:
@@ -628,5 +634,5 @@ def list_measurements(
 
     return jsonify({
         'metadata': metadata,
-        'results': results
+        'results': results[:100]
     })
