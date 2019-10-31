@@ -39,10 +39,10 @@ shell:
 	$(PYTHON_WITH_ENV) -m measurements shell
 
 test-unit:
-	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m unit
+	$(PYTHON_WITH_ENV) -m coverage run -m pytest -m unit
 
 test-functional:
-	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m functional
+	$(PYTHON_WITH_ENV) -m coverage run -m pytest -m functional
 
 test: test-unit test-functional
 	$(PYTHON_WITH_ENV) -m coverage report -m
