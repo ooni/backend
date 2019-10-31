@@ -355,6 +355,52 @@ def match_fingerprints(measurement):
 
     return matches
 
+@metrics.timer("score_measurement_facebook_messenger")
+def score_measurement_facebook_messenger(msm, summary):
+    tk = msm["test_keys"]
+    del ms
+
+    # TODO recompute all these keys in the pipeline
+    # If the value of these keys is false (inconsistent) there is something
+    # fishy
+    consistency_keys = [
+        'facebook_b_api_dns_consistent',
+        'facebook_b_api_reachable',
+        'facebook_b_graph_dns_consistent',
+        'facebook_b_graph_reachable',
+        'facebook_edge_dns_consistent',
+        'facebook_edge_reachable',
+        'facebook_external_cdn_dns_consistent',
+        'facebook_external_cdn_reachable',
+        'facebook_scontent_cdn_dns_consistent',
+        'facebook_scontent_cdn_reachable',
+        'facebook_star_dns_consistent',
+        'facebook_star_reachable',
+        'facebook_stun_dns_consistent'
+    ]
+    # These are keys that if they are true it means there is something fishy
+    anomaly_keys = [
+        'facebook_tcp_blocking',
+        'facebook_dns_blocking'
+    ]
+
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    s = 0
+    for key in consistency_keys:
+        v = tk.get(key, None)
+        if v == False:
+            s += 0.5
+        scores[key] = v
+
+    for key in anomaly_keys:
+        v = tk.get(key, None)
+        if v == False:
+            s += 0.5
+        scores[key] = v
+    scores["blocking_general"] = s
+    summary["scores"] = scores
+    return summary
+
 
 @metrics.timer("score_measurement_telegram")
 def score_measurement_telegram(msm, summary):
@@ -519,6 +565,8 @@ def score_measurement(msm, matches):
 
     if msm["test_name"] == "telegram":
         return score_measurement_telegram(msm, summary)
+    if msm["test_name"] == "facebook_messenger":
+        return score_measurement_facebook_messenger(msm, summary)
 
     if msm["test_name"] == "whatsapp":
         return score_measurement_whatsapp(msm, summary)
