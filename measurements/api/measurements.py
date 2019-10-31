@@ -634,5 +634,5 @@ def list_measurements(
 
     return jsonify({
         'metadata': metadata,
-        'results': results[:100]
+        'results': results[:limit]
     })
