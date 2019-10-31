@@ -385,7 +385,7 @@ def score_measurement_telegram(msm, summary):
         elif success is False:
             unreachable_endpoints += 1
         else:
-            pass # unknown
+            pass  # unknown
 
     # Then the probe tests N HTTP connections
     http_success_cnt = 0
@@ -395,8 +395,10 @@ def score_measurement_telegram(msm, summary):
         if "request" not in request:
             # client bug
             continue
-        if request["request"]["url"] in ("https://web.telegram.org/",
-                                         "http://web.telegram.org/"):
+        if request["request"]["url"] in (
+            "https://web.telegram.org/",
+            "http://web.telegram.org/",
+        ):
             if request["failure"] is not None:
                 web_failure = request["failure"]
 
@@ -420,12 +422,12 @@ def score_measurement_telegram(msm, summary):
     if (accessible_endpoints + unreachable_endpoints) > 0:
         s = unreachable_endpoints / (accessible_endpoints + unreachable_endpoints)
     else:
-        s = .5
+        s = 0.5
 
     if (http_failure_cnt + http_success_cnt) > 0:
         s += http_failure_cnt / (http_failure_cnt + http_success_cnt)
     else:
-        s += .5
+        s += 0.5
 
     if web_blocking:
         s += 1
@@ -439,6 +441,61 @@ def score_measurement_telegram(msm, summary):
     scores["http_failure_cnt"] = http_failure_cnt
     if web_failure is not None:
         scores["msg"] = "Telegam failure: {}".format(web_failure)
+    summary["scores"] = scores
+    return summary
+
+
+@metrics.timer("score_measurement_whatsapp")
+def score_measurement_whatsapp(msm, summary):
+    """Calculate measurement scoring for Whatsapp.
+    Returns a summary dict
+    """
+    # TODO: check data_format_version?
+
+    score = 0
+    tk = msm["test_keys"]
+    msg = ""
+    for req in msm.get("requests", []):
+        if "X-FB-TRIP-ID" not in req.get("response", {}).get("headers", {}):
+            score += 0.2
+            msg += "Missing HTTP header"
+
+    # del msm
+    if tk.get("registration_server_status", "ok") != "ok":
+        score += 0.2
+    if tk.get("whatsapp_web_failure", None) != None:
+        score += 0.2
+    if tk.get("whatsapp_endpoints_status", "ok") != "ok":
+        score += 0.2
+    if tk.get("whatsapp_web_status", "ok") != "ok":
+        # TODO: recalculate using HTML body title
+        score += 0.2
+    if tk.get("whatsapp_endpoints_dns_inconsistent", []) != []:
+        score += 0.2
+    if tk.get("whatsapp_endpoints_blocked", []) != []:
+        score += 0.2
+
+    registration_server_failure = tk.get("registration_server_failure", None)
+    if registration_server_failure is not None:
+        if registration_server_failure.startswith("unknown_failure"):
+            # Client error
+            # TODO: implement confidence = 0
+            score = 0
+        else:
+            score += 0.2
+
+    if (
+        msm.get("software_name", "") == "ooniprobe"
+        and msm.get("software_version", "") in ("2.1.0", "2.2.0", "2.3.0")
+        and tk.get("whatsapp_web_status", "") == "blocked"
+    ):
+        # The probe is reporting a false positive: due to the empty client headers
+        # it hits https://www.whatsapp.com/unsupportedbrowser
+        if score == 0.2:
+            score = 0
+
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores["blocking_general"] = score
     summary["scores"] = scores
     return summary
 
@@ -462,6 +519,9 @@ def score_measurement(msm, matches):
 
     if msm["test_name"] == "telegram":
         return score_measurement_telegram(msm, summary)
+
+    if msm["test_name"] == "whatsapp":
+        return score_measurement_whatsapp(msm, summary)
 
     # web_connectivity processing
 

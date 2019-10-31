@@ -3,10 +3,8 @@ Simulate feeding from the collectors or cans on S3 using a local can
 """
 
 from pathlib import Path
-import hashlib
 import logging
 import os
-import time
 
 import ujson
 import boto3  # debdeps: python3-boto3
@@ -37,6 +35,7 @@ def cans():
         it="2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
         cn="2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
         telegram="2019-08-29/telegram.0.tar.lz4",
+        whatsapp="2019-08-29/whatsapp.0.tar.lz4",
         # telegram="2019-08-29/20190829T105210Z-IR-AS31549-telegram-20190829T105214Z_AS31549_t32ZZ5av3B6yNruRIFhCnuT1dHTnwPk7vwIa9F0TAe064HG4tk-0.2.0-probe.json",
         # whatsapp="2019-06-15/20190615T070248Z-ET-AS24757-whatsapp-20190615T070253Z_AS24757_gRi6dhAqgWa7Yp4tah4LX6Rl1j6c8kJuja3OgZranEpMicEj2p-0.2.0-probe.json",
         # fb="2019-06-27/20190627T214121Z-ET-AS24757-facebook_messenger-20190627T214126Z_AS24757_h8g9P5kTmmzyX1VyOjqcVonIbFNujm84l2leMCwC2gX3BI78fI-0.2.0-probe.json",
@@ -68,7 +67,32 @@ def cans():
 
 
 def log_obj(o):
-    log.info(json.dumps(o, sort_keys=True, ensure_ascii=False, indent=2))
+    log.info(ujson.dumps(o, sort_keys=True, ensure_ascii=False, indent=2))
+
+
+def _print_msm_node(n, depth=0):
+    ind = "  " * depth
+    if isinstance(n, list):
+        for cnt, i in enumerate(n):
+            print("{}{}>".format(ind, cnt))
+            _print_msm_node(i, depth + 1)
+
+    elif isinstance(n, dict):
+        for k in sorted(n):
+            v = n[k]
+            if k == "body":
+                print("{}{}".format(ind, "body: ..."))
+            elif isinstance(v, list) or isinstance(v, dict):
+                print("{}{}:".format(ind, k))
+                _print_msm_node(n[k], depth + 1)
+            else:
+                print("{}{}: {}".format(ind, k, v))
+
+    else:
+        print(ind, n)
+
+
+print_msm = _print_msm_node
 
 
 # TODO mock out metrics
@@ -148,3 +172,43 @@ def test_telegram(cans):
                 "msg": "Telegam failure: connect_error",
             }
         # fmt: on
+
+
+def test_whatsapp(cans):
+    can = cans["whatsapp"]
+    debug = False
+    for measurement_tup in s3feeder.load_multiple(can.as_posix()):
+        msm_jstr, msm = measurement_tup
+        msm = msm or ujson.loads(msm_jstr)
+        summary = fp.score_measurement(msm, [])
+        # fmt: off
+        if msm["report_id"] == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
+            assert summary["scores"] == {
+                "blocking_general": 0.8,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }, msm
+
+        if msm["report_id"] == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr":
+            # The probe is reporting a false positive: due to the empty client headers
+            # it hits https://www.whatsapp.com/unsupportedbrowser
+            print_msm(msm)
+            assert summary["scores"] == {
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }, msm
+
+        # To inspect the test dataset for false positives run this:
+        if debug:
+            if summary["scores"]["blocking_general"] > 0:
+                print("-----")
+                print_msm(msm)
+                print(summary["scores"])
+
+    if debug:
+        assert 0, "Debug"
