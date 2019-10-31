@@ -1,6 +1,7 @@
 """
 Simulate feeding from the collectors or cans on S3 using a local can
 """
+# Format with black -t py37 -l 120
 
 from pathlib import Path
 import logging
@@ -114,8 +115,7 @@ def test_telegram(cans):
         if msm is None:
             msm = ujson.loads(msm_jstr)
         summary = fp.score_measurement(msm, [])
-        # fmt: off
-        if (msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0"):
+        if msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
             assert summary["scores"] == {
                 "blocking_general": 1.5,
                 "blocking_global": 0.0,
@@ -129,7 +129,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
             }, msm
 
-        elif (msm["report_id"] == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r"):
+        elif msm["report_id"] == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r":
             assert summary["scores"] == {
                 "blocking_general": 1.0,
                 "blocking_global": 0.0,
@@ -143,7 +143,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
                 "msg": "Telegam failure: connection_reset",
             }
-        elif (msm["report_id"] == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM"):
+        elif msm["report_id"] == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM":
             assert summary["scores"] == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
@@ -157,7 +157,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 10,
                 "msg": "Telegam failure: generic_timeout_error",
             }
-        elif (msm["report_id"] == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz"):
+        elif msm["report_id"] == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz":
             assert summary["scores"] == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
@@ -171,7 +171,6 @@ def test_telegram(cans):
                 "http_failure_cnt": 10,
                 "msg": "Telegam failure: connect_error",
             }
-        # fmt: on
 
 
 def test_whatsapp(cans):
@@ -204,11 +203,8 @@ def test_whatsapp(cans):
             }, msm
 
         # To inspect the test dataset for false positives run this:
-        if debug:
-            if summary["scores"]["blocking_general"] > 0:
-                print("-----")
-                print_msm(msm)
-                print(summary["scores"])
-
-    if debug:
-        assert 0, "Debug"
+        if debug and summary["scores"]["blocking_general"] > 0:
+            print("-----")
+            print_msm(msm)
+            print(summary["scores"])
+            raise Exception("debug")
