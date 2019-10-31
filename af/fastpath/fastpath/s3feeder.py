@@ -40,12 +40,14 @@ for l in ("urllib3", "botocore", "s3transfer"):
     logging.getLogger(l).setLevel(logging.INFO)
 
 
-def load_multiple(fn) -> dict:
+def load_multiple(fn, touch=True) -> tuple:
     """Load contents of cans. Decompress tar archives if found.
     Yields measurements one by one as:
         (string of JSON, None) or (None, msmt dict)
     """
-    os.utime(fn)  # update access time - used for cache cleanup
+    if touch:
+        os.utime(fn)  # update access time - used for cache cleanup
+
     # TODO: handle:
     # RuntimeError: LZ4F_decompress failed with code: ERROR_decompressionFailed
     if fn.endswith(".tar.lz4"):
