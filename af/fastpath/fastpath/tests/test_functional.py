@@ -47,6 +47,11 @@ def cans():
         hhfm_2019_10_27="2019-10-27/http_header_field_manipulation.0.tar.lz4",
         hhfm_2019_10_28="2019-10-28/http_header_field_manipulation.0.tar.lz4",
         hhfm_2019_10_29="2019-10-29/http_header_field_manipulation.0.tar.lz4",
+        tor_2018_10_26="2018-10-26/vanilla_tor.0.tar.lz4",
+        tor_2019_10_26="2019-10-26/vanilla_tor.0.tar.lz4",
+        tor_2019_10_27="2019-10-27/vanilla_tor.0.tar.lz4",
+        tor_2019_10_28="2019-10-28/vanilla_tor.0.tar.lz4",
+        tor_2019_10_29="2019-10-29/vanilla_tor.0.tar.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -84,11 +89,9 @@ def list_cans_on_s3_for_a_day(day, filter=None):
 
 def disabled_test_list_cans():
     """Used for debugging"""
-    list_cans_on_s3_for_a_day("2019-10-27", "header_field_manipulation")
-    list_cans_on_s3_for_a_day("2019-10-28", "header_field_manipulation")
-    list_cans_on_s3_for_a_day("2019-10-29", "header_field_manipulation")
-    list_cans_on_s3_for_a_day("2019-10-30", "header_field_manipulation")
-    list_cans_on_s3_for_a_day("2019-10-31", "header_field_manipulation")
+    f = "vanilla"
+    for d in range(26, 31):
+        list_cans_on_s3_for_a_day("2019-10-{}".format(d), filter=f)
     assert 0
 
 
@@ -108,6 +111,8 @@ def _print_msm_node(n, depth=0):
             v = n[k]
             if k == "body":
                 print("{}{}".format(ind, "body: ..."))
+            #elif k == "tor_log":
+            #    print("{}{}".format(ind, "tor_log: ..."))
             elif isinstance(v, list) or isinstance(v, dict):
                 print("{}{}:".format(ind, k))
                 _print_msm_node(n[k], depth + 1)
@@ -414,3 +419,48 @@ def disabled_test_score_measurement_hhfm_stats(cans):
         print(i, c)
     print("Total", sum(s.values()))
     assert 0
+
+
+def test_score_vanilla_tor_2018(cans):
+    can = cans["tor_2018_10_26"]
+    timeouts = (
+        "20181026T003600Z_AS4134_SIts9rD3mrpgIrxrBy6NY7LHJGsBm2dbV4Q8rOHnFEQVESMqB1",
+        "20181026T154843Z_AS57963_GKCdB85BgIqr5frZ2Z8qOXVZgdpNGajLRXSidMeRVWg8Qvto3e",
+    )
+    for msm in load_can(can):
+        scores = fp.score_measurement(msm, [])
+        rid = msm["report_id"]
+        if rid in timeouts:
+            # Real timeout
+            assert scores["blocking_general"] > 0
+
+
+def test_score_vanilla_tor(cans):
+    cnt = 0
+    blocked_cnt = 0
+    total_score = 0
+
+    for d in range(26, 30):
+        can = cans["tor_2019_10_{}".format(d)]
+        for msm in load_can(can):
+            scores = fp.score_measurement(msm, [])
+            rid = msm["report_id"]
+            cnt += 1
+            if rid == "20191029T012425Z_AS45194_So00Y296Ve6q1TvjOtKqsvH1ieiVF566PlcUUOw4Ia37HGPwPL":
+                # timeout
+                assert scores["blocking_general"] > 0
+                blocked_cnt +=1
+                total_score += scores["blocking_general"]
+
+            elif scores["blocking_general"] > 0:
+                blocked_cnt +=1
+                total_score += scores["blocking_general"]
+                #print("https://explorer.ooni.org/measurement/{}".format(rid))
+                #print_msm(msm)
+                #print(scores)
+                #assert 0
+
+    p = blocked_cnt * 100 / cnt
+    assert 0.35 < p < 0.36, p
+    avg = total_score / cnt
+    assert 0.003 < avg < 0.004

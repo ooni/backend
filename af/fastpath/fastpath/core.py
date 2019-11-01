@@ -378,6 +378,17 @@ def falsekeys(d, keys):
     return True
 
 
+def nonekeys(d, keys):
+    """Check for values set to None in a dict"""
+    if isinstance(keys, str):
+        keys = (keys,)
+    for k in keys:
+        if d.get(k, True) != None:
+            return False
+
+    return True
+
+
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm):
     tk = msm["test_keys"]
@@ -656,6 +667,41 @@ def score_measurement_whatsapp(msm):
     return scores
 
 
+@metrics.timer("score_vanilla_tor")
+def score_vanilla_tor(msm):
+    """Calculate measurement scoring for Tor
+    Returns a scores dict
+    """
+    tk = msm["test_keys"]
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+
+    nks = ("error", "success", "tor_log", "tor_progress_summary", "tor_progress_tag")
+    if msm["software_name"] == "ooniprobe" and nonekeys(tk, nks):
+        if tk["tor_progress"] == 0:
+            # client bug?
+            scores["msg"] = "Client bug"
+            return scores
+
+    tor_log = tk.get("tor_log", None)
+    if tor_log is None:
+        # unknown bug
+        return scores
+
+    if (
+        "Bootstrapped 100%: Done" in tor_log
+        or "Bootstrapped 100% (done): Done" in tor_log
+    ):
+        # Success
+        return scores
+
+    progress = float(tk.get("tor_progress", 0))
+    progress = min(100, max(0, progress))
+    # If the Tor bootstrap reaches, for example, 80% maybe it's being heavily
+    # throttled or it's just a very slow network: blocking score is set to 0.68
+    scores["blocking_general"] = 1.0 - progress * 0.004
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
     """Calculate measurement scoring. Returns a scores dict
@@ -668,6 +714,8 @@ def score_measurement(msm, matches) -> dict:
         return score_measurement_hhfm(msm)
     if msm["test_name"] == "whatsapp":
         return score_measurement_whatsapp(msm)
+    if msm["test_name"] == "vanilla_tor":
+        return score_vanilla_tor(msm)
 
     # web_connectivity processing
 
