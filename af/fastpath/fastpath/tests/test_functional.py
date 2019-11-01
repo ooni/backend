@@ -34,8 +34,9 @@ def cans():
     AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
     """
     _cans = dict(
-        it="2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
-        cn="2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
+        web_conn_it="2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
+        web_conn_cn="2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
+        web_conn_30="2019-10-30/web_connectivity.00.tar.lz4",
         telegram="2019-08-29/telegram.0.tar.lz4",
         whatsapp="2019-08-29/whatsapp.0.tar.lz4",
         facebook_messenger="2019-08-29/facebook_messenger.0.tar.lz4",
@@ -89,7 +90,7 @@ def list_cans_on_s3_for_a_day(day, filter=None):
 
 def disabled_test_list_cans():
     """Used for debugging"""
-    f = "vanilla"
+    f = "psiphon"
     for d in range(26, 31):
         list_cans_on_s3_for_a_day("2019-10-{}".format(d), filter=f)
     assert 0
@@ -464,3 +465,32 @@ def test_score_vanilla_tor(cans):
     assert 0.35 < p < 0.36, p
     avg = total_score / cnt
     assert 0.003 < avg < 0.004
+
+
+def test_score_web_connectivity(cans):
+    can = cans["web_conn_30"]
+    blocked = (
+        "20191029T180431Z_AS50289_5IKNXzKJUvzKQqnlzU5r91F9KiCl1LfRlEBllZVbDHcDQg5TEt",
+        "20191029T180509Z_AS50289_CqU5a3scgi1JJ8cWEYEMSqLUzseS0uIbnWcnGSKKlW1BMbnLc5",
+    )
+    nonblocked = (
+        "20191029T180447Z_AS50289_yWeX5dJzPeh9Pk3TddqG2eO3BvLGT2SOWmOK0lhR7aRV0XX1RC",
+        "20191029T180452Z_AS50289_IIuYcQRCGA9S2cj5zFABEOvMbyXSKBExWywVgZkpe5l1uAqyT5",
+        "20191029T180525Z_AS50289_UfjRU99n2edoDn9PeWnqyGxHVorOAxBFwZj3WPQ24sl2ii4gC2",
+    )
+    for msm in load_can(can):
+        scores = fp.score_measurement(msm, [])
+        rid = msm["report_id"]
+        bl = sum(scores[k] for k in scores if k.startswith("blocking_"))
+        if rid in blocked:
+            assert bl > 0
+
+        elif rid in nonblocked:
+            assert bl < 0.3
+
+        # else:
+        #     if bl > 0:
+        #         print("https://explorer.ooni.org/measurement/{}".format(rid))
+        #         print_msm(msm)
+        #         print(scores)
+        #         assert 0

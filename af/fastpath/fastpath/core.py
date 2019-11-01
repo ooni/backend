@@ -702,26 +702,11 @@ def score_vanilla_tor(msm):
     return scores
 
 
-@metrics.timer("score_measurement")
-def score_measurement(msm, matches) -> dict:
-    """Calculate measurement scoring. Returns a scores dict
+@metrics.timer("score_web_connectivity")
+def score_web_connectivity(msm, matches) -> dict:
+    """Calculate measurement scoring for web connectivity
+    Returns a scores dict
     """
-    if msm["test_name"] == "telegram":
-        return score_measurement_telegram(msm)
-    if msm["test_name"] == "facebook_messenger":
-        return score_measurement_facebook_messenger(msm)
-    if msm["test_name"] == "http_header_field_manipulation":
-        return score_measurement_hhfm(msm)
-    if msm["test_name"] == "whatsapp":
-        return score_measurement_whatsapp(msm)
-    if msm["test_name"] == "vanilla_tor":
-        return score_vanilla_tor(msm)
-
-    # web_connectivity processing
-
-    # Blocking locality: global > country > ISP > local
-    # unclassified locality is stored in "blocking_general"
-
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
     for m in matches:
@@ -738,8 +723,6 @@ def score_measurement(msm, matches) -> dict:
         delta = abs((msm["test_keys"]["body_proportion"] or 1.0) - 1.0)
         scores["blocking_general"] += delta
 
-    # TODO: add IM tests scoring here
-
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
     scores["blocking_general"] += (
         scores["blocking_country"]
@@ -748,6 +731,32 @@ def score_measurement(msm, matches) -> dict:
         + scores["blocking_local"]
     )
     return scores
+
+
+@metrics.timer("score_measurement")
+def score_measurement(msm, matches) -> dict:
+    """Calculate measurement scoring. Returns a scores dict
+    """
+    # Blocking locality: global > country > ISP > local
+    # unclassified locality is stored in "blocking_general"
+
+    tn = msm["test_name"]
+    if tn == "telegram":
+        return score_measurement_telegram(msm)
+    if tn == "facebook_messenger":
+        return score_measurement_facebook_messenger(msm)
+    if tn == "http_header_field_manipulation":
+        return score_measurement_hhfm(msm)
+    if tn == "whatsapp":
+        return score_measurement_whatsapp(msm)
+    if tn == "vanilla_tor":
+        return score_vanilla_tor(msm)
+
+    if tn == "web_connectivity":
+        return score_web_connectivity(msm, matches)
+
+    log.debug("Unsupported test name %s", tn)
+    return {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
 
 @metrics.timer("trivial_id")
