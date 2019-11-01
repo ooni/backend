@@ -69,6 +69,22 @@ def cans():
     return _cans
 
 
+def list_cans_on_s3_for_a_day(day, filter=None):
+    s3 = s3feeder.create_s3_client()
+    fns = s3feeder.list_cans_on_s3_for_a_day(s3, day)
+    for fn, size in sorted(fns):
+        if filter is None or (filter in fn):
+            print(fn, size)
+
+def disabled_test_list_cans():
+    """Used for debugging"""
+    list_cans_on_s3_for_a_day("2019-10-27", "header_field_manipulation")
+    list_cans_on_s3_for_a_day("2019-10-28", "header_field_manipulation")
+    list_cans_on_s3_for_a_day("2019-10-29", "header_field_manipulation")
+    list_cans_on_s3_for_a_day("2019-10-30", "header_field_manipulation")
+    list_cans_on_s3_for_a_day("2019-10-31", "header_field_manipulation")
+    assert 0
+
 def log_obj(o):
     log.info(ujson.dumps(o, sort_keys=True, ensure_ascii=False, indent=2))
 
