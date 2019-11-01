@@ -54,7 +54,7 @@ def setup(conf) -> None:
 
 
 @metrics.timer("upsert_summary")
-def upsert_summary(msm, summary, tid, filename, update):
+def upsert_summary(msm, scores, tid, filename, update):
     """Insert a row in the fastpath_scores table. Overwrite an existing one.
     """
     sql_base_tpl = """
@@ -93,7 +93,7 @@ def upsert_summary(msm, summary, tid, filename, update):
         msm["measurement_start_time"],
         platform,
         filename,
-        Json(summary["scores"], dumps=ujson.dumps),
+        Json(scores, dumps=ujson.dumps),
     )
 
     cols = (
@@ -117,7 +117,7 @@ def upsert_summary(msm, summary, tid, filename, update):
 
         notification = {k: msm[k] for k in cols}
         notification["trivial_id"] = tid
-        notification["scores"] = summary["scores"]
+        notification["scores"] = scores
         notification = ujson.dumps(notification)
         q = f"SELECT pg_notify('fastpath', '{notification}');"
         cur.execute(q)

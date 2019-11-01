@@ -125,9 +125,12 @@ def setup_module(module):
 def test_telegram(cans):
     can = cans["telegram"]
     for msm in load_can(can):
-        summary = fp.score_measurement(msm, [])
-        if msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
-            assert summary["scores"] == {
+        scores = fp.score_measurement(msm, [])
+        if (
+            msm["report_id"]
+            == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0"
+        ):
+            assert scores == {
                 "blocking_general": 1.5,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -140,8 +143,11 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
             }, msm
 
-        elif msm["report_id"] == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r":
-            assert summary["scores"] == {
+        elif (
+            msm["report_id"]
+            == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r"
+        ):
+            assert scores == {
                 "blocking_general": 1.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -154,8 +160,11 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
                 "msg": "Telegam failure: connection_reset",
             }
-        elif msm["report_id"] == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM":
-            assert summary["scores"] == {
+        elif (
+            msm["report_id"]
+            == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM"
+        ):
+            assert scores == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -168,8 +177,11 @@ def test_telegram(cans):
                 "http_failure_cnt": 10,
                 "msg": "Telegam failure: generic_timeout_error",
             }
-        elif msm["report_id"] == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz":
-            assert summary["scores"] == {
+        elif (
+            msm["report_id"]
+            == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz"
+        ):
+            assert scores == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -188,9 +200,12 @@ def test_whatsapp(cans):
     can = cans["whatsapp"]
     debug = False
     for msm in load_can(can):
-        summary = fp.score_measurement(msm, [])
-        if msm["report_id"] == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
-            assert summary["scores"] == {
+        scores = fp.score_measurement(msm, [])
+        if (
+            msm["report_id"]
+            == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX"
+        ):
+            assert scores == {
                 "blocking_general": 0.8,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -198,11 +213,14 @@ def test_whatsapp(cans):
                 "blocking_local": 0.0,
             }, msm
 
-        if msm["report_id"] == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr":
+        if (
+            msm["report_id"]
+            == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr"
+        ):
             # The probe is reporting a false positive: due to the empty client headers
             # it hits https://www.whatsapp.com/unsupportedbrowser
             print_msm(msm)
-            assert summary["scores"] == {
+            assert scores == {
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -211,9 +229,9 @@ def test_whatsapp(cans):
             }, msm
 
         # To inspect the test dataset for false positives run this:
-        if debug and summary["scores"]["blocking_general"] > 0:
+        if debug and scores["blocking_general"] > 0:
             print_msm(msm)
-            print(summary["scores"])
+            print(scores)
             raise Exception("debug")
 
 
@@ -221,13 +239,19 @@ def test_facebook_messenger(cans):
     can = cans["facebook_messenger"]
     debug = False
     for msm in load_can(can):
-        summary = fp.score_measurement(msm, [])
-        if msm["report_id"] != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
+        scores = fp.score_measurement(msm, [])
+        if (
+            msm["report_id"]
+            != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC"
+        ):
             continue
 
-        if msm["report_id"] == "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
+        if (
+            msm["report_id"]
+            == "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC"
+        ):
             # not blocked
-            assert summary["scores"] == {
+            assert scores == {
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -238,9 +262,9 @@ def test_facebook_messenger(cans):
         # TODO: add more
 
         # To inspect the test dataset for false positives run this:
-        elif debug and summary["scores"]["blocking_general"] > 0:
+        elif debug and scores["blocking_general"] > 0:
             print_msm(msm)
-            print(summary["scores"])
+            print(scores)
 
     if debug:
         raise Exception("debug")
@@ -250,11 +274,14 @@ def test_facebook_messenger(cans):
 def test_facebook_messenger_bug(cans):
     can = cans["facebook_messenger"]
     for msm in load_can(can):
-        summary = fp.score_measurement(msm, [])
-        if msm["report_id"] != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO":
+        scores = fp.score_measurement(msm, [])
+        if (
+            msm["report_id"]
+            != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO"
+        ):
             continue
 
-        assert summary["scores"] == {
+        assert scores == {
             "blocking_general": 0.0,
             "blocking_global": 0.0,
             "blocking_country": 0.0,
@@ -268,26 +295,31 @@ def test_facebook_messenger_newer(cans):
     blocked_cnt = 0
     debug = False
     for tot, msm in enumerate(load_can(can)):
-        summary = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm, [])
         rid = msm["report_id"]
 
-        if rid == "20191029T101630Z_AS56040_bBOkNtg65fMfH0iOHiG8lMk4UmERxjfJL20ki33lKlyKjS0FkP":
+        if (
+            rid
+            == "20191029T101630Z_AS56040_bBOkNtg65fMfH0iOHiG8lMk4UmERxjfJL20ki33lKlyKjS0FkP"
+        ):
             # TCP really blocked
-            assert summary["scores"]["blocking_general"] >= 1.0
+            assert scores["blocking_general"] >= 1.0
             continue
 
-        elif rid == "20191029T020948Z_AS50010_ZUPoP3hOdwazqZnzPurdWgfLvoMcDL1qyOHHFtEtISjNWMgkrX":
+        elif (
+            rid
+            == "20191029T020948Z_AS50010_ZUPoP3hOdwazqZnzPurdWgfLvoMcDL1qyOHHFtEtISjNWMgkrX"
+        ):
             # DNS returns mostly 0.0.0.0 - but one connection succeeds
-            assert summary["scores"]["blocking_general"] >= 1.0
+            assert scores["blocking_general"] >= 1.0
             continue
 
-        elif summary["scores"]["blocking_general"] > 0:
+        elif scores["blocking_general"] > 0:
             blocked_cnt += 1
             if debug:
-                print(msm["probe_cc"], msm["software_name"],
-                    msm["software_version"])
+                print(msm["probe_cc"], msm["software_name"], msm["software_version"])
                 print_msm(msm)
-                print(summary["scores"])
+                print(scores)
 
     ratio = blocked_cnt / (tot + 1) * 100
     assert ratio > 7.656

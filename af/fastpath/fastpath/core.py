@@ -379,7 +379,7 @@ def falsekeys(d, keys):
 
 
 @metrics.timer("score_measurement_facebook_messenger")
-def score_measurement_facebook_messenger(msm, summary):
+def score_measurement_facebook_messenger(msm):
     tk = msm["test_keys"]
     del msm
 
@@ -439,14 +439,13 @@ def score_measurement_facebook_messenger(msm, summary):
                 scores[key] = v
 
     scores["blocking_general"] = score
-    summary["scores"] = scores
-    return summary
+    return scores
 
 
 @metrics.timer("score_measurement_telegram")
-def score_measurement_telegram(msm, summary):
+def score_measurement_telegram(msm):
     """Calculate measurement scoring for Telegram.
-    Returns a summary dict
+    Returns a scores dict
     """
     # Ignore tcp_blocking, http_blocking and web_failure from the probe
     tk = msm["test_keys"]
@@ -528,12 +527,13 @@ def score_measurement_telegram(msm, summary):
     scores["http_failure_cnt"] = http_failure_cnt
     if web_failure is not None:
         scores["msg"] = "Telegam failure: {}".format(web_failure)
-    summary["scores"] = scores
-    return summary
+    return scores
 
 
 @metrics.timer("score_measurement_hhfm")
-def score_measurement_hhfm(msm, summary):
+def score_measurement_hhfm(msm):
+    """Calculated http_header_field_manipulation
+    """
     tk = msm["test_keys"]
     del msm
     s = 0
@@ -579,14 +579,13 @@ def score_measurement_hhfm(msm, summary):
     scores["total_tampering"] = total_tampering
     scores["headers_modified"] = headers_modified
     scores["blocking_general"] = s
-    summary["scores"] = scores
-    return summary
+    return scores
 
 
 @metrics.timer("score_measurement_whatsapp")
-def score_measurement_whatsapp(msm, summary):
+def score_measurement_whatsapp(msm):
     """Calculate measurement scoring for Whatsapp.
-    Returns a summary dict
+    Returns a scores dict
     """
     # TODO: check data_format_version?
 
@@ -634,35 +633,21 @@ def score_measurement_whatsapp(msm, summary):
 
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     scores["blocking_general"] = score
-    summary["scores"] = scores
-    return summary
+    return scores
 
 
 @metrics.timer("score_measurement")
-def score_measurement(msm, matches):
-    """Calculate measurement scoring. Returns a summary dict
+def score_measurement(msm, matches) -> dict:
+    """Calculate measurement scoring. Returns a scores dict
     """
-    # Extract interesting fields
-    fields = (
-        "input",
-        "measurement_start_time",
-        "probe_asn",
-        "probe_cc",
-        "report_id",
-        "test_name",
-        "test_start_time",
-    )
-    summary = {k: msm[k] for k in fields}
-    # TODO: remove unneded summary entries (not saved in database)
-
     if msm["test_name"] == "telegram":
-        return score_measurement_telegram(msm, summary)
+        return score_measurement_telegram(msm)
     if msm["test_name"] == "facebook_messenger":
-        return score_measurement_facebook_messenger(msm, summary)
+        return score_measurement_facebook_messenger(msm)
     if msm["test_name"] == "http_header_field_manipulation":
-        return score_measurement_hhfm(msm, summary)
+        return score_measurement_hhfm(msm)
     if msm["test_name"] == "whatsapp":
-        return score_measurement_whatsapp(msm, summary)
+        return score_measurement_whatsapp(msm)
 
     # web_connectivity processing
 
@@ -694,8 +679,7 @@ def score_measurement(msm, matches):
         + scores["blocking_isp"]
         + scores["blocking_local"]
     )
-    summary["scores"] = scores
-    return summary
+    return scores
 
 
 @metrics.timer("trivial_id")
@@ -780,8 +764,8 @@ def msm_processor(queue):
                     matches = match_fingerprints(measurement)
                 else:
                     matches = []
-                summary = score_measurement(measurement, matches)
-                db.upsert_summary(measurement, summary, tid, fn, conf.update)
+                scores = score_measurement(measurement, matches)
+                db.upsert_summary(measurement, scores, tid, fn, conf.update)
                 db.trim_old_measurements(conf)
             except Exception as e:
                 log.exception(e)
