@@ -356,12 +356,34 @@ def match_fingerprints(measurement):
     return matches
 
 
+def truekeys(d, keys):
+    """Check for values set to True in a dict"""
+    if isinstance(keys, str):
+        keys = (keys, )
+    for k in keys:
+        if d.get(k, None) != True:
+            return False
+
+    return True
+
+
+def falsekeys(d, keys):
+    """Check for values set to True in a dict"""
+    if isinstance(keys, str):
+        keys = (keys, )
+    for k in keys:
+        if d.get(k, None) != False:
+            return False
+
+    return True
+
+
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm, summary):
     tk = msm["test_keys"]
-    del ms
+    del msm
 
-    # TODO recompute all these keys in the pipeline
+    # TODO: recompute all these keys in the pipeline
     # If the value of these keys is false (inconsistent) there is something
     # fishy
     consistency_keys = [
@@ -383,19 +405,40 @@ def score_measurement_facebook_messenger(msm, summary):
     anomaly_keys = ["facebook_tcp_blocking", "facebook_dns_blocking"]
 
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
-    s = 0
-    for key in consistency_keys:
-        v = tk.get(key, None)
-        if v == False:
-            s += 0.5
-        scores[key] = v
 
-    for key in anomaly_keys:
-        v = tk.get(key, None)
-        if v == False:
-            s += 0.5
-        scores[key] = v
-    scores["blocking_general"] = s
+    # Workaround for 'facebook_dns_blocking': True
+    # See tests/test_functional.py:test_facebook_messenger*
+    trues = (
+        "facebook_b_api_dns_consistent",
+        "facebook_b_api_reachable",
+        "facebook_b_graph_dns_consistent",
+        "facebook_b_graph_reachable",
+        "facebook_dns_blocking",
+        "facebook_edge_dns_consistent",
+        "facebook_edge_reachable",
+        "facebook_star_dns_consistent",
+        "facebook_star_reachable",
+        "facebook_stun_dns_consistent",
+    )
+    if truekeys(tk, trues) and falsekeys(tk, "facebook_tcp_blocking"):
+        score = 0
+
+
+    else:
+        score = 0
+        for key in consistency_keys:
+            v = tk.get(key, None)
+            if v == False:
+                score += 0.5
+                scores[key] = v
+
+        for key in anomaly_keys:
+            v = tk.get(key, None)
+            if v == True:
+                score += 0.5
+                scores[key] = v
+
+    scores["blocking_general"] = score
     summary["scores"] = scores
     return summary
 
@@ -492,7 +535,7 @@ def score_measurement_telegram(msm, summary):
 @metrics.timer("score_measurement_hhfm")
 def score_measurement_hhfm(msm, summary):
     tk = msm["test_keys"]
-    del ms
+    del msm
     s = 0
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
@@ -618,7 +661,6 @@ def score_measurement(msm, matches):
         return score_measurement_facebook_messenger(msm, summary)
     if msm["test_name"] == "http_header_field_manipulation":
         return score_measurement_hhfm(msm, summary)
-
     if msm["test_name"] == "whatsapp":
         return score_measurement_whatsapp(msm, summary)
 

@@ -37,6 +37,8 @@ def cans():
         cn="2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
         telegram="2019-08-29/telegram.0.tar.lz4",
         whatsapp="2019-08-29/whatsapp.0.tar.lz4",
+        facebook_messenger="2019-08-29/facebook_messenger.0.tar.lz4",
+        facebook_messenger2="2019-10-29/facebook_messenger.0.tar.lz4",
         # telegram="2019-08-29/20190829T105210Z-IR-AS31549-telegram-20190829T105214Z_AS31549_t32ZZ5av3B6yNruRIFhCnuT1dHTnwPk7vwIa9F0TAe064HG4tk-0.2.0-probe.json",
         # whatsapp="2019-06-15/20190615T070248Z-ET-AS24757-whatsapp-20190615T070253Z_AS24757_gRi6dhAqgWa7Yp4tah4LX6Rl1j6c8kJuja3OgZranEpMicEj2p-0.2.0-probe.json",
         # fb="2019-06-27/20190627T214121Z-ET-AS24757-facebook_messenger-20190627T214126Z_AS24757_h8g9P5kTmmzyX1VyOjqcVonIbFNujm84l2leMCwC2gX3BI78fI-0.2.0-probe.json",
@@ -93,7 +95,19 @@ def _print_msm_node(n, depth=0):
         print(ind, n)
 
 
-print_msm = _print_msm_node
+def print_msm(msm):
+    """Used for debugging"""
+    print("--msmt--")
+    if "report_id" in msm:
+        print("https://explorer.ooni.org/measurement/{}".format(msm["report_id"]))
+    _print_msm_node(msm)
+    print("--------")
+
+
+def load_can(can):
+    for msm_jstr, msm in s3feeder.load_multiple(can.as_posix(), touch=False):
+        msm = msm or ujson.loads(msm_jstr)
+        yield msm
 
 
 # TODO mock out metrics
@@ -110,10 +124,7 @@ def setup_module(module):
 
 def test_telegram(cans):
     can = cans["telegram"]
-    for measurement_tup in s3feeder.load_multiple(can.as_posix()):
-        msm_jstr, msm = measurement_tup
-        if msm is None:
-            msm = ujson.loads(msm_jstr)
+    for msm in load_can(can):
         summary = fp.score_measurement(msm, [])
         if msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
             assert summary["scores"] == {
@@ -176,11 +187,8 @@ def test_telegram(cans):
 def test_whatsapp(cans):
     can = cans["whatsapp"]
     debug = False
-    for measurement_tup in s3feeder.load_multiple(can.as_posix()):
-        msm_jstr, msm = measurement_tup
-        msm = msm or ujson.loads(msm_jstr)
+    for msm in load_can(can):
         summary = fp.score_measurement(msm, [])
-        # fmt: off
         if msm["report_id"] == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
             assert summary["scores"] == {
                 "blocking_general": 0.8,
@@ -204,7 +212,96 @@ def test_whatsapp(cans):
 
         # To inspect the test dataset for false positives run this:
         if debug and summary["scores"]["blocking_general"] > 0:
-            print("-----")
             print_msm(msm)
             print(summary["scores"])
             raise Exception("debug")
+
+
+def test_facebook_messenger(cans):
+    can = cans["facebook_messenger"]
+    debug = False
+    for msm in load_can(can):
+        summary = fp.score_measurement(msm, [])
+        if msm["report_id"] != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
+            continue
+
+        if msm["report_id"] == "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
+            # not blocked
+            assert summary["scores"] == {
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }, msm
+
+        # TODO: add more
+
+        # To inspect the test dataset for false positives run this:
+        elif debug and summary["scores"]["blocking_general"] > 0:
+            print_msm(msm)
+            print(summary["scores"])
+
+    if debug:
+        raise Exception("debug")
+
+
+@pytest.mark.skip(reason="Client bug in checking Facebook ASN")
+def test_facebook_messenger_bug(cans):
+    can = cans["facebook_messenger"]
+    for msm in load_can(can):
+        summary = fp.score_measurement(msm, [])
+        if msm["report_id"] != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO":
+            continue
+
+        assert summary["scores"] == {
+            "blocking_general": 0.0,
+            "blocking_global": 0.0,
+            "blocking_country": 0.0,
+            "blocking_isp": 0.0,
+            "blocking_local": 0.0,
+        }
+
+
+def test_facebook_messenger_newer(cans):
+    can = cans["facebook_messenger2"]  # from 2019-10-29
+    blocked_cnt = 0
+    debug = False
+    for tot, msm in enumerate(load_can(can)):
+        summary = fp.score_measurement(msm, [])
+        rid = msm["report_id"]
+
+        if rid == "20191029T101630Z_AS56040_bBOkNtg65fMfH0iOHiG8lMk4UmERxjfJL20ki33lKlyKjS0FkP":
+            # TCP really blocked
+            assert summary["scores"]["blocking_general"] >= 1.0
+            continue
+
+        elif rid == "20191029T020948Z_AS50010_ZUPoP3hOdwazqZnzPurdWgfLvoMcDL1qyOHHFtEtISjNWMgkrX":
+            # DNS returns mostly 0.0.0.0 - but one connection succeeds
+            assert summary["scores"]["blocking_general"] >= 1.0
+            continue
+
+        elif summary["scores"]["blocking_general"] > 0:
+            blocked_cnt += 1
+            if debug:
+                print(msm["probe_cc"], msm["software_name"],
+                    msm["software_version"])
+                print_msm(msm)
+                print(summary["scores"])
+
+    ratio = blocked_cnt / (tot + 1) * 100
+    assert ratio > 7.656
+    assert ratio < 7.657
+
+    # TODO: investigate false positives, impement workarounds
+    # and update tests and ratio
+
+    # https://explorer.ooni.org/measurement/20191029T213318Z_AS1257_DA3tEqiSVtfOllWDIXcw6KVJdit0TX9Tiv8y2Xganhlx2iWzzh
+    # https://explorer.ooni.org/measurement/20191029T213035Z_AS1257_v8XgIqXZqfZObmToEdeAkjs8R3F6ZPwMIieQJ0ewWdgyG75NiP
+
+    # empty tcp_connect:
+    # https://explorer.ooni.org/measurement/20191029T003015Z_AS0_DRQLG75YbuAA24UBvGilpatyq9kPUpbcVLR28JBN8EBfv8CzcT
+    # https://explorer.ooni.org/measurement/20191029T153938Z_AS33771_l0QJDcqNE5h0ePNxIbTKXY0Gr4LTJwl2Vg4gvPBeCvhcEisKzT
+
+    # Everything around DNS looks broken but TCP is OK
+    # https://explorer.ooni.org/measurement/20191029T213318Z_AS1257_DA3tEqiSVtfOllWDIXcw6KVJdit0TX9Tiv8y2Xganhlx2iWzzh
