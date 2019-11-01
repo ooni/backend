@@ -359,7 +359,7 @@ def match_fingerprints(measurement):
 def truekeys(d, keys):
     """Check for values set to True in a dict"""
     if isinstance(keys, str):
-        keys = (keys, )
+        keys = (keys,)
     for k in keys:
         if d.get(k, None) != True:
             return False
@@ -370,7 +370,7 @@ def truekeys(d, keys):
 def falsekeys(d, keys):
     """Check for values set to True in a dict"""
     if isinstance(keys, str):
-        keys = (keys, )
+        keys = (keys,)
     for k in keys:
         if d.get(k, None) != False:
             return False
@@ -422,7 +422,6 @@ def score_measurement_facebook_messenger(msm):
     )
     if truekeys(tk, trues) and falsekeys(tk, "facebook_tcp_blocking"):
         score = 0
-
 
     else:
         score = 0
@@ -535,50 +534,71 @@ def score_measurement_hhfm(msm):
     """Calculated http_header_field_manipulation
     """
     tk = msm["test_keys"]
+    rid = msm["report_id"]
     del msm
-    s = 0
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
-    exp_req_headers = tk["requests"][0].get("request", {}).get("headers", {})
-    # We add this as it's not explicitly included in the data from the probe
-    # although it is actually sent
-    exp_req_headers["Connection"] = "close"
-    exp_req_failure = tk["requests"][0].get("failure", None)
+    # See test_functional.py:test_score_measurement_hhfm_stats
+    #
+    # exp_req_failure = tk["requests"][0].get("failure", None)
+    # if exp_req_failure is not None:
+    #    # failure state set by probe
+    #    scores["blocking_general"] = 0.5
+    #    return scores
 
-    exp_resp_body = None
-    if exp_req_failure is None:
-        exp_resp_body = tk["requests"][0]["response"].get("body", None)
-    else:
-        s += 0.5
-
-    headers_modified = False
-    total_tampering = False
-    ctrl_headers = None
+    # response->body contains a JSON document like:
+    # {"headers_dict": {"acCePT-languagE": ["en-US,en;q=0.8"], ...},
+    #  "request_line": "geT / HTTP/1.1",
+    #  "request_headers": [ ["Connection", "close"], ... ]
+    # }
     try:
-        # {"headers_dict": {"acCePT-languagE": ["en-US,en;q=0.8"], ...},
-        #  "request_line": "geT / HTTP/1.1",
-        #  "request_headers": [ ["Connection", "close"], ... ]
-        # }
-        ctrl_headers = ujson.loads(exp_resp_body)
+        resp = tk["requests"][0].get("response", {})
+    except (KeyError, IndexError):
+        # See 20191028T115649Z_AS28573_eIrzDM4njwMjxBi0ODrerI5N03zM7qQoCvl4xpapTccdW0kCRg"
+        scores["blocking_general"] = 0.0
+        return scores
+
+    # See 20191027T002012Z_AS45595_p2qNg0FmL4d2kIuLQXEn36MbraErPPA5i64eE1e6nLfGluHpLk
+    if resp is None:
+        # Broken test?
+        scores["blocking_general"] = 0.0
+        return scores
+
+    resp_body = resp.get("body", None)
+    if resp_body is None:
+        scores["total_tampering"] = True
+        scores["blocking_general"] = 1.0
+        scores["msg"] = "Empty body"
+        return scores
+
+    # Compare sent and received HTTP headers
+    try:
+        ctrl_headers = ujson.loads(resp_body)["headers_dict"]
     except:
-        total_tampering = True
-        s += 1
+        scores["blocking_general"] = 1.0
+        scores["msg"] = "Malformed ctrl_headers"
+        return scores
 
-    if ctrl_headers:
-        if len(exp_req_headers) != len(ctrl_headers["headers_dict"]):
-            headers_modified = True
-            s += 1
-        for k, v in exp_req_headers.items():
-            try:
-                if v != ctrl_headers["headers_dict"][k][0]:
-                    headers_modified = True
-            except KeyError:
-                s += 0.5
-                headers_modified = True
+    # "unpack" value and turn into a set of tuples to run a comparison
+    ctrl = set((k, v[0]) for k, v in ctrl_headers.items())
 
-    scores["total_tampering"] = total_tampering
-    scores["headers_modified"] = headers_modified
-    scores["blocking_general"] = s
+    exp_req_headers = tk["requests"][0].get("request", {}).get("headers", {})
+    expected = set(exp_req_headers.items())
+
+    # The "Connection" header is not always handled correctly
+    ctrl.discard(("Connection", "close"))
+    expected.discard(("Connection", "close"))
+
+    if expected == ctrl:
+        return scores
+
+    # Headers have been manipulated!
+    scores["blocking_general"] = 1.1
+    diff = expected ^ ctrl
+    scores["msg"] = "{} unexpected header change".format(len(diff))
+    # TODO: distinguish proxies lowercasing/fixing headers
+    # or adding "benign" Via, Connection, X-BlueCoat-Via, X-Forwarded-For
+    # headers?
     return scores
 
 

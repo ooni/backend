@@ -3,6 +3,7 @@ Simulate feeding from the collectors or cans on S3 using a local can
 """
 # Format with black -t py37 -l 120
 
+from collections import Counter
 from pathlib import Path
 import logging
 import os
@@ -42,6 +43,10 @@ def cans():
         # telegram="2019-08-29/20190829T105210Z-IR-AS31549-telegram-20190829T105214Z_AS31549_t32ZZ5av3B6yNruRIFhCnuT1dHTnwPk7vwIa9F0TAe064HG4tk-0.2.0-probe.json",
         # whatsapp="2019-06-15/20190615T070248Z-ET-AS24757-whatsapp-20190615T070253Z_AS24757_gRi6dhAqgWa7Yp4tah4LX6Rl1j6c8kJuja3OgZranEpMicEj2p-0.2.0-probe.json",
         # fb="2019-06-27/20190627T214121Z-ET-AS24757-facebook_messenger-20190627T214126Z_AS24757_h8g9P5kTmmzyX1VyOjqcVonIbFNujm84l2leMCwC2gX3BI78fI-0.2.0-probe.json",
+        hhfm_2019_10_26="2019-10-26/http_header_field_manipulation.0.tar.lz4",
+        hhfm_2019_10_27="2019-10-27/http_header_field_manipulation.0.tar.lz4",
+        hhfm_2019_10_28="2019-10-28/http_header_field_manipulation.0.tar.lz4",
+        hhfm_2019_10_29="2019-10-29/http_header_field_manipulation.0.tar.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -76,6 +81,7 @@ def list_cans_on_s3_for_a_day(day, filter=None):
         if filter is None or (filter in fn):
             print(fn, size)
 
+
 def disabled_test_list_cans():
     """Used for debugging"""
     list_cans_on_s3_for_a_day("2019-10-27", "header_field_manipulation")
@@ -84,6 +90,7 @@ def disabled_test_list_cans():
     list_cans_on_s3_for_a_day("2019-10-30", "header_field_manipulation")
     list_cans_on_s3_for_a_day("2019-10-31", "header_field_manipulation")
     assert 0
+
 
 def log_obj(o):
     log.info(ujson.dumps(o, sort_keys=True, ensure_ascii=False, indent=2))
@@ -142,10 +149,7 @@ def test_telegram(cans):
     can = cans["telegram"]
     for msm in load_can(can):
         scores = fp.score_measurement(msm, [])
-        if (
-            msm["report_id"]
-            == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0"
-        ):
+        if msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
             assert scores == {
                 "blocking_general": 1.5,
                 "blocking_global": 0.0,
@@ -159,10 +163,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
             }, msm
 
-        elif (
-            msm["report_id"]
-            == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r"
-        ):
+        elif msm["report_id"] == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r":
             assert scores == {
                 "blocking_general": 1.0,
                 "blocking_global": 0.0,
@@ -176,10 +177,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
                 "msg": "Telegam failure: connection_reset",
             }
-        elif (
-            msm["report_id"]
-            == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM"
-        ):
+        elif msm["report_id"] == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM":
             assert scores == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
@@ -193,10 +191,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 10,
                 "msg": "Telegam failure: generic_timeout_error",
             }
-        elif (
-            msm["report_id"]
-            == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz"
-        ):
+        elif msm["report_id"] == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz":
             assert scores == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
@@ -217,10 +212,7 @@ def test_whatsapp(cans):
     debug = False
     for msm in load_can(can):
         scores = fp.score_measurement(msm, [])
-        if (
-            msm["report_id"]
-            == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX"
-        ):
+        if msm["report_id"] == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
             assert scores == {
                 "blocking_general": 0.8,
                 "blocking_global": 0.0,
@@ -229,10 +221,7 @@ def test_whatsapp(cans):
                 "blocking_local": 0.0,
             }, msm
 
-        if (
-            msm["report_id"]
-            == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr"
-        ):
+        if msm["report_id"] == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr":
             # The probe is reporting a false positive: due to the empty client headers
             # it hits https://www.whatsapp.com/unsupportedbrowser
             print_msm(msm)
@@ -256,16 +245,10 @@ def test_facebook_messenger(cans):
     debug = False
     for msm in load_can(can):
         scores = fp.score_measurement(msm, [])
-        if (
-            msm["report_id"]
-            != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC"
-        ):
+        if msm["report_id"] != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
             continue
 
-        if (
-            msm["report_id"]
-            == "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC"
-        ):
+        if msm["report_id"] == "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
             # not blocked
             assert scores == {
                 "blocking_general": 0.0,
@@ -291,10 +274,7 @@ def test_facebook_messenger_bug(cans):
     can = cans["facebook_messenger"]
     for msm in load_can(can):
         scores = fp.score_measurement(msm, [])
-        if (
-            msm["report_id"]
-            != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO"
-        ):
+        if msm["report_id"] != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO":
             continue
 
         assert scores == {
@@ -314,18 +294,12 @@ def test_facebook_messenger_newer(cans):
         scores = fp.score_measurement(msm, [])
         rid = msm["report_id"]
 
-        if (
-            rid
-            == "20191029T101630Z_AS56040_bBOkNtg65fMfH0iOHiG8lMk4UmERxjfJL20ki33lKlyKjS0FkP"
-        ):
+        if rid == "20191029T101630Z_AS56040_bBOkNtg65fMfH0iOHiG8lMk4UmERxjfJL20ki33lKlyKjS0FkP":
             # TCP really blocked
             assert scores["blocking_general"] >= 1.0
             continue
 
-        elif (
-            rid
-            == "20191029T020948Z_AS50010_ZUPoP3hOdwazqZnzPurdWgfLvoMcDL1qyOHHFtEtISjNWMgkrX"
-        ):
+        elif rid == "20191029T020948Z_AS50010_ZUPoP3hOdwazqZnzPurdWgfLvoMcDL1qyOHHFtEtISjNWMgkrX":
             # DNS returns mostly 0.0.0.0 - but one connection succeeds
             assert scores["blocking_general"] >= 1.0
             continue
@@ -353,3 +327,90 @@ def test_facebook_messenger_newer(cans):
 
     # Everything around DNS looks broken but TCP is OK
     # https://explorer.ooni.org/measurement/20191029T213318Z_AS1257_DA3tEqiSVtfOllWDIXcw6KVJdit0TX9Tiv8y2Xganhlx2iWzzh
+
+
+def test_score_measurement_hhfm_large(cans):
+    debug = False
+    for d in range(26, 30):
+        can = cans["hhfm_2019_10_{}".format(d)]
+        for msm in load_can(can):
+            rid = msm["report_id"]
+            scores = fp.score_measurement(msm, [])
+            if rid == "20191028T115649Z_AS28573_eIrzDM4njwMjxBi0ODrerI5N03zM7qQoCvl4xpapTccdW0kCRg":
+                # Missing the "requests" field
+                assert scores["blocking_general"] == 0, scores
+
+            elif rid == "20191027T103751Z_AS0_A7vlqt3Ju8pmWflPxJ3E9NyrWJX47yYzQFJcSw63RBDtDm5ulf":
+                assert scores["blocking_general"] == 0, scores
+
+            elif rid == "20191027T143046Z_AS35540_5j5W6Q9Iz2pvVNaBtn2heKVHRDzuPtKNcLfrIhVHTmrgA7kWaT":
+                assert scores["blocking_general"] == 0, scores
+
+            elif rid == "20191027T192636Z_AS55430_DXpEUz925f3BS7UWyMPnXL8g8OtyDIF3FArF2z9h1ILMtrc":
+                assert scores["blocking_general"] == 0, scores
+
+            elif rid == "20191027T002012Z_AS45595_p2qNg0FmL4d2kIuLQXEn36MbraErPPA5i64eE1e6nLfGluHpLk":
+                # Client bug?
+                assert scores["blocking_general"] == 0, scores
+
+            elif rid == "20191027T192636Z_AS55430_DXpEUz925f3BS7UWyMPnXL8g8OtyDIF3FArF2z9h1ILMtrcbyb":
+                # Success - response code 200
+                assert scores["blocking_general"] == 0, scores
+
+            elif rid == "20191029T231841Z_AS1257_sGsZRCxZ8obOSLCVCLppeUSfu1La481EQ6E6MGkGBTgffJBs6t":
+                # x-tele2-subid was injected
+                assert scores["blocking_general"] > 0, scores
+                assert scores["msg"] == "1 unexpected header change"
+
+            elif rid == "20191029T071035Z_AS45629_wwVlbw7hc1jJaP5tBfzICM8S4dBhPJK29V97YzJLpthft1Zo6z":
+                # Proxy injecting 3 headers
+                assert scores["blocking_general"] > 0, scores
+
+            elif debug and scores["blocking_general"] == 1.1:
+                url = "https://explorer.ooni.org/measurement/{}".format(rid)
+                print(msm["test_start_time"], msm["probe_cc"], url, msm["test_keys"]["requests"][0].get("failure", None))
+                print_msm(msm)
+                print(scores)
+
+
+def disabled_test_score_measurement_hhfm_stats(cans):
+
+    can = cans["hhfm_2019_10_27"]
+    # Distribution of request->failure values in this can
+    #
+    # connection_refused 599
+    # connection_refused_error 144
+    # connection_reset 67
+    # None 29
+    # eof_error 18
+    # generic_timeout_error 4
+    # response_never_received 4
+    # network_unreachable 2
+    # connect_error 1
+    # Total 868
+
+    d = Counter()  # CC:failure type -> count
+    s = Counter()  # failure type -> count
+    for n, msm in enumerate(load_can(can)):
+        rid = msm["report_id"]
+        # scores = fp.score_measurement(msm, [])
+        cc = msm["probe_cc"]
+        fm = msm["test_keys"]["requests"][0].get("failure", "*************")
+        if fm is None:
+            print_msm(msm)
+        url = "https://explorer.ooni.org/measurement/{}".format(rid)
+        print(url)
+        print(
+            msm["probe_cc"],
+            msm["test_keys"]["requests"][0].get("failure", None),
+        )
+
+        d.update(("{}:{}".format(cc, fm),))
+        s.update((fm,))
+
+    #for i, c in d.most_common(120):
+    #    print(i, c)
+    for i, c in s.most_common(120):
+        print(i, c)
+    print("Total", sum(s.values()))
+    assert 0
