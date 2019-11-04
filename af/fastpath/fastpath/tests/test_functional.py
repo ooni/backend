@@ -60,6 +60,10 @@ def cans():
         dash_2019_10_28="2019-10-28/dash.0.tar.lz4",
         dash_2019_10_29="2019-10-29/dash.0.tar.lz4",
         hirl_2019_10_26="2019-10-26/http_invalid_request_line.0.tar.lz4",
+        meek_2019_10_26="2019-10-26/meek_fronted_requests_test.0.tar.lz4",
+        meek_2019_10_27="2019-10-27/meek_fronted_requests_test.0.tar.lz4",
+        meek_2019_10_28="2019-10-28/meek_fronted_requests_test.0.tar.lz4",
+        meek_2019_10_29="2019-10-29/meek_fronted_requests_test.0.tar.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -585,3 +589,40 @@ def test_score_dash(cans):
                 expected.pop(rid)
 
     assert len(expected) == 0, expected.keys()
+
+
+def test_score_meek_fronted_requests_test(cans):
+    debug = 0
+    for d in range(26, 30):
+        can = cans["meek_2019_10_{}".format(d)]
+        for msm in load_can(can):
+            rid = msm["report_id"]
+            inp = msm["input"]
+            scores = fp.score_measurement(msm, [])
+            if rid == "20191026T110224Z_AS3352_2Iqv4PvPItJ2Z3D46wVRHzesBpdDJZ8xDKH7VKqNTebaiGopDY":
+                # response: None
+                assert scores["blocking_general"] == 1.0
+
+            elif rid == "20191026T000021Z_AS137_0KaXWBZgn8W6iMfKKhjHJPoPPovChlwxr8dDOh4LxTzHDOKLOq":
+                # One response: 404
+                assert scores["blocking_general"] == 1.0
+
+            elif rid == "20191026T000034Z_AS42668_vpZnPVKEym0dRgYSxyeZulPvnLtxrh6HXzyMx5tE2f4x26CBwX":
+                # 403 hitting cloudfront
+                # Content-Type: text/html
+                # Date: Sat, 26 Oct 2019 01:01:21 GMT
+                # Server: CloudFront
+                # Via: 1.1 60858c13889b9be849ae025edc06577d.cloudfront.net (CloudFront)
+                # X-Amz-Cf-Pop: ARN53
+                # X-Cache: Error from cloudfront
+                assert scores["blocking_general"] == 1.0
+
+            elif rid == "20191026T001625Z_AS19108_G9uGTtyJCiOzeCm4jHsP6r8WRZ8cWx07wvcjwAVmrTshJ8WYwA":
+                # requests: is empty
+                assert scores["accuracy"] == 0
+
+            elif debug:
+                print("https://explorer.ooni.org/measurement/{}".format(rid))
+                print_msm(msm)
+                print(scores)
+                assert 0

@@ -824,6 +824,44 @@ def score_dash(msm) -> dict:
     return scores
 
 
+def score_meek_fronted_requests_test(msm) -> dict:
+    """Calculate measurement scoring for Meek
+    Returns a scores dict
+    """
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    tk = msm["test_keys"]
+    requests = tk.get("requests", [])
+
+    if len(requests) == 0:
+        # requests is empty: usually "success" is missing.
+        scores["blocking_general"] = 1.0
+        scores["accuracy"] = 0
+        return scores
+
+    success = tk.get("success", None)
+
+    for r in requests:
+        resp = r.get("response", {})
+        if resp is None:
+            # Error during probing?
+            scores["blocking_general"] = 1.0
+            if success != None:
+                log.info("Client bug: success != None")
+            return scores
+
+        if resp.get("code", 0) != 200:
+            # A failed response is enough
+            scores["blocking_general"] = 1.0
+            if success != False:
+                log.info("Client bug: success != False")
+            return scores
+
+        server = resp.get("headers", {}).get("Server", "")
+        if not server.startswith("ECAcc "):
+            scores["blocking_general"] += 0.5
+
+    return scores
+
 
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
@@ -851,6 +889,8 @@ def score_measurement(msm, matches) -> dict:
         return score_tcp_connect(msm)
     if tn == "dash":
         return score_dash(msm)
+    if tn == "meek_fronted_requests_test":
+        return score_meek_fronted_requests_test(msm)
 
     log.debug("Unsupported test name %s", tn)
     return {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
