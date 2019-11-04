@@ -123,7 +123,7 @@ def _print_msm_node(n, depth=0):
             v = n[k]
             if k == "body":
                 print("{}{}".format(ind, "body: ..."))
-            #elif k == "tor_log":
+            # elif k == "tor_log":
             #    print("{}{}".format(ind, "tor_log: ..."))
             elif isinstance(v, list) or isinstance(v, dict):
                 print("{}{}:".format(ind, k))
@@ -328,7 +328,6 @@ def test_facebook_messenger_newer(cans):
         elif scores["blocking_general"] > 0:
             blocked_cnt += 1
             if debug:
-                print(msm["probe_cc"], msm["software_name"], msm["software_version"])
                 print_msm(msm)
                 print(scores)
 
@@ -389,7 +388,9 @@ def test_score_measurement_hhfm_large(cans):
 
             elif debug and scores["blocking_general"] == 1.1:
                 url = "https://explorer.ooni.org/measurement/{}".format(rid)
-                print(msm["test_start_time"], msm["probe_cc"], url, msm["test_keys"]["requests"][0].get("failure", None))
+                print(
+                    msm["test_start_time"], msm["probe_cc"], url, msm["test_keys"]["requests"][0].get("failure", None)
+                )
                 print_msm(msm)
                 print(scores)
 
@@ -421,15 +422,12 @@ def disabled_test_score_measurement_hhfm_stats(cans):
             print_msm(msm)
         url = "https://explorer.ooni.org/measurement/{}".format(rid)
         print(url)
-        print(
-            msm["probe_cc"],
-            msm["test_keys"]["requests"][0].get("failure", None),
-        )
+        print(msm["probe_cc"], msm["test_keys"]["requests"][0].get("failure", None))
 
         d.update(("{}:{}".format(cc, fm),))
         s.update((fm,))
 
-    #for i, c in d.most_common(120):
+    # for i, c in d.most_common(120):
     #    print(i, c)
     for i, c in s.most_common(120):
         print(i, c)
@@ -465,16 +463,16 @@ def test_score_vanilla_tor(cans):
             if rid == "20191029T012425Z_AS45194_So00Y296Ve6q1TvjOtKqsvH1ieiVF566PlcUUOw4Ia37HGPwPL":
                 # timeout
                 assert scores["blocking_general"] > 0
-                blocked_cnt +=1
+                blocked_cnt += 1
                 total_score += scores["blocking_general"]
 
             elif scores["blocking_general"] > 0:
-                blocked_cnt +=1
+                blocked_cnt += 1
                 total_score += scores["blocking_general"]
-                #print("https://explorer.ooni.org/measurement/{}".format(rid))
-                #print_msm(msm)
-                #print(scores)
-                #assert 0
+                # print("https://explorer.ooni.org/measurement/{}".format(rid))
+                # print_msm(msm)
+                # print(scores)
+                # assert 0
 
     p = blocked_cnt * 100 / cnt
     assert 0.35 < p < 0.36, p
@@ -555,24 +553,19 @@ def test_score_tcp_connect(cans):
 def test_score_dash(cans):
     # rid -> blocking_general, accuracy
     expected = {
-        "20191026T015105Z_AS4837_7vwBtbVmZZqwZhdTHnqHan0Nwa7bi7TeJ789htG3RB91C3eyU1":
-        (0.1, 0.0, "blocking_general"),
-        "20191026T022317Z_AS17380_ZJGnXdvHl4j1M4xTeskrGhC8SW1KT4buJEjxCsTagCGO2NZeAD":
-        (0.1, 0.0, "json_parse_error"),
-        "20191026T032159Z_AS20057_xLjBSrTyZjOn6C7pa5BPyUxyBhzWHbSooKQjUY9zcWADnkakIR":
-        (0.1, 0.0, "eof_error"),
-        "20191026T051350Z_AS44244_9yjPG1UbgIjtAFg9LiTUxVhq7hGuG3tG4yMnvt6gRJTaFdQme6":
-        (0.1, 0.0, "json_processing_error"),
-        "20191026T071332Z_AS7713_caK9GNyp9ZhN7zL9cg2dg0zGhs44CwHmxZtOyK7B6rBKRaGGMF":
-        (0.1, 0.0, "http_request_failed"),
-        "20191026T093003Z_AS4837_yHZ0f8Oxyhus9vBKAUa0tA2XMSObIO0frShG6YBieBzY9RiSBg":
-        (0.1, 0.0, "connect_error"),
-        "20191026T165434Z_AS0_qPbZHZF8VXUWgzlvqT9Jd7ARuHSl2Dq4tPcEq580rgYZGmV5Um":
-        (0.1, 0.0, "generic_timeout_error"),
-        "20191028T160112Z_AS1640_f4zyjjp5vFcwZkAKPrTokayPRdcXPfdEMRbdo1LmIaLZRile6P":
-        (0.1, 0.0, "broken_pipe"),
-        "20191029T094043Z_AS49048_qGQxBh6lv26TOfuWfhGcUtz2LZWwboXlfbh058CSF1fOmEUv6Z":
-        (0.1, 0.0, "connection_refused"),
+        "20191026T015105Z_AS4837_7vwBtbVmZZqwZhdTHnqHan0Nwa7bi7TeJ789htG3RB91C3eyU1": (0.1, 0.0, "blocking_general"),
+        "20191026T022317Z_AS17380_ZJGnXdvHl4j1M4xTeskrGhC8SW1KT4buJEjxCsTagCGO2NZeAD": (0.1, 0.0, "json_parse_error"),
+        "20191026T032159Z_AS20057_xLjBSrTyZjOn6C7pa5BPyUxyBhzWHbSooKQjUY9zcWADnkakIR": (0.1, 0.0, "eof_error"),
+        "20191026T051350Z_AS44244_9yjPG1UbgIjtAFg9LiTUxVhq7hGuG3tG4yMnvt6gRJTaFdQme6": (
+            0.1,
+            0.0,
+            "json_processing_error",
+        ),
+        "20191026T071332Z_AS7713_caK9GNyp9ZhN7zL9cg2dg0zGhs44CwHmxZtOyK7B6rBKRaGGMF": (0.1, 0.0, "http_request_failed"),
+        "20191026T093003Z_AS4837_yHZ0f8Oxyhus9vBKAUa0tA2XMSObIO0frShG6YBieBzY9RiSBg": (0.1, 0.0, "connect_error"),
+        "20191026T165434Z_AS0_qPbZHZF8VXUWgzlvqT9Jd7ARuHSl2Dq4tPcEq580rgYZGmV5Um": (0.1, 0.0, "generic_timeout_error"),
+        "20191028T160112Z_AS1640_f4zyjjp5vFcwZkAKPrTokayPRdcXPfdEMRbdo1LmIaLZRile6P": (0.1, 0.0, "broken_pipe"),
+        "20191029T094043Z_AS49048_qGQxBh6lv26TOfuWfhGcUtz2LZWwboXlfbh058CSF1fOmEUv6Z": (0.1, 0.0, "connection_refused"),
     }
     for d in range(26, 30):
         can = cans["dash_2019_10_{}".format(d)]
