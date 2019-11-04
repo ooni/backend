@@ -53,6 +53,10 @@ def cans():
         tor_2019_10_27="2019-10-27/vanilla_tor.0.tar.lz4",
         tor_2019_10_28="2019-10-28/vanilla_tor.0.tar.lz4",
         tor_2019_10_29="2019-10-29/vanilla_tor.0.tar.lz4",
+        ndt_2018_10_26="2018-10-26/ndt.0.tar.lz4",
+        tcp_connect_2018_10_26="2018-10-26/tcp_connect.0.tar.lz4",
+        dash_2018_10_26="2018-10-26/dash.0.tar.lz4",
+        hirl_2018_10_26="2018-10-26/http_invalid_request_line.0.tar.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -468,6 +472,7 @@ def test_score_vanilla_tor(cans):
 
 
 def test_score_web_connectivity(cans):
+    debug = 0
     can = cans["web_conn_30"]
     blocked = (
         "20191029T180431Z_AS50289_5IKNXzKJUvzKQqnlzU5r91F9KiCl1LfRlEBllZVbDHcDQg5TEt",
@@ -488,9 +493,49 @@ def test_score_web_connectivity(cans):
         elif rid in nonblocked:
             assert bl < 0.3
 
-        # else:
-        #     if bl > 0:
-        #         print("https://explorer.ooni.org/measurement/{}".format(rid))
-        #         print_msm(msm)
-        #         print(scores)
-        #         assert 0
+        elif debug and bl > 0:
+            print("https://explorer.ooni.org/measurement/{}".format(rid))
+            print_msm(msm)
+            print(scores)
+            assert 0
+
+
+def test_score_ndt(cans):
+    debug = 0
+    can = cans["ndt_2018_10_26"]
+    for msm in load_can(can):
+        scores = fp.score_measurement(msm, [])
+        assert scores == {}  # no scoring yet
+
+
+def test_score_tcp_connect(cans):
+    # tcp_connect msmts are identified by (report_id / input)
+    debug = 0
+    can = cans["tcp_connect_2018_10_26"]
+    for msm in load_can(can):
+        rid = msm["report_id"]
+        inp = msm["input"]
+        scores = fp.score_measurement(msm, [])
+        if rid == "20181026T000102Z_AS51570_2EslrKCu0NhDQiCIheVDvilWchWShK6GTC7Go6i31VQrGfXRLM":
+            if inp == "109.105.109.165:22":
+                # generic_timeout_error
+                assert scores["blocking_general"] == 0.8
+
+            elif inp == "obfs4 83.212.101.3:50000":
+                # connection_refused_error
+                assert scores["blocking_general"] == 0.8
+
+            elif inp == "178.209.52.110:22":
+                # connect_error
+                assert scores["blocking_general"] == 0.8
+
+            elif inp == "obfs4 178.209.52.110:443":
+                # tcp_timed_out_error
+                assert scores["blocking_general"] == 0.8
+
+        elif debug and scores["blocking_general"] > 0.7:
+            print("https://explorer.ooni.org/measurement/{}".format(rid))
+            print_msm(msm)
+            print(scores)
+            assert 0
+

@@ -733,6 +733,51 @@ def score_web_connectivity(msm, matches) -> dict:
     return scores
 
 
+@metrics.timer("score_ndt")
+def score_ndt(msm) -> dict:
+    """Calculate measurement scoring for NDT
+    Returns a scores dict
+    """
+    # TODO: this is just a stub - add NDT scoring where possible
+    return {}
+
+
+@metrics.timer("score_tcp_connect")
+def score_tcp_connect(msm) -> dict:
+    """Calculate measurement scoring for tcp connect
+    Returns a scores dict
+    """
+    # TODO: review scores
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    tk = msm["test_keys"]
+    assert msm["input"]
+    conn_result = tk.get("connection", None)
+
+    if conn_result == "success":
+        return scores
+
+    if conn_result == "generic_timeout_error":
+        scores["blocking_general"] = 0.8
+        return scores
+
+    if conn_result == "connection_refused_error":
+        scores["blocking_general"] = 0.8
+        return scores
+
+    if conn_result == "connect_error":
+        scores["blocking_general"] = 0.8
+        return scores
+
+    if conn_result == "tcp_timed_out_error":
+        scores["blocking_general"] = 0.8
+        return scores
+
+    scores["blocking_general"] = 1.0
+    return scores
+
+
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
     """Calculate measurement scoring. Returns a scores dict
@@ -751,9 +796,12 @@ def score_measurement(msm, matches) -> dict:
         return score_measurement_whatsapp(msm)
     if tn == "vanilla_tor":
         return score_vanilla_tor(msm)
-
     if tn == "web_connectivity":
         return score_web_connectivity(msm, matches)
+    if tn == "ndt":
+        return score_ndt(msm)
+    if tn == "tcp_connect":
+        return score_tcp_connect(msm)
 
     log.debug("Unsupported test name %s", tn)
     return {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
