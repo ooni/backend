@@ -776,6 +776,53 @@ def score_tcp_connect(msm) -> dict:
     return scores
 
 
+def score_dash(msm) -> dict:
+    """Calculate measurement scoring for DASH
+    (Dynamic Adaptive Streaming over HTTP)
+    Returns a scores dict
+    """
+    # TODO: review scores
+    # TODO: any blocking scoring based on performance?
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    failure = msm["test_keys"].get("failure", None)
+    if failure == None:
+        pass
+    elif failure == "connection_aborted":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "json_parse_error":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "eof_error":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "json_processing_error":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "http_request_failed":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "connect_error":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "generic_timeout_error":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "broken_pipe":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif failure == "connection_refused":
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    elif "ssl_error" in failure:
+        scores["blocking_general"] = 0.1
+        scores["accuracy"] = 0.0
+    else:
+        scores["msg"] = "Probe error"
+        scores["accuracy"] = 0.0
+
+    return scores
+
 
 
 @metrics.timer("score_measurement")
@@ -802,6 +849,8 @@ def score_measurement(msm, matches) -> dict:
         return score_ndt(msm)
     if tn == "tcp_connect":
         return score_tcp_connect(msm)
+    if tn == "dash":
+        return score_dash(msm)
 
     log.debug("Unsupported test name %s", tn)
     return {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}

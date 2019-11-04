@@ -55,8 +55,11 @@ def cans():
         tor_2019_10_29="2019-10-29/vanilla_tor.0.tar.lz4",
         ndt_2018_10_26="2018-10-26/ndt.0.tar.lz4",
         tcp_connect_2018_10_26="2018-10-26/tcp_connect.0.tar.lz4",
-        dash_2018_10_26="2018-10-26/dash.0.tar.lz4",
-        hirl_2018_10_26="2018-10-26/http_invalid_request_line.0.tar.lz4",
+        dash_2019_10_26="2019-10-26/dash.0.tar.lz4",
+        dash_2019_10_27="2019-10-27/dash.0.tar.lz4",
+        dash_2019_10_28="2019-10-28/dash.0.tar.lz4",
+        dash_2019_10_29="2019-10-29/dash.0.tar.lz4",
+        hirl_2019_10_26="2019-10-26/http_invalid_request_line.0.tar.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -140,6 +143,10 @@ def print_msm(msm):
 def load_can(can):
     for msm_jstr, msm in s3feeder.load_multiple(can.as_posix(), touch=False):
         msm = msm or ujson.loads(msm_jstr)
+        if msm.get("report_id", None) is None:
+            # Missing or empty report_id
+            # https://github.com/ooni/probe-engine/pull/104
+            continue
         yield msm
 
 
@@ -472,6 +479,7 @@ def test_score_vanilla_tor(cans):
 
 
 def test_score_web_connectivity(cans):
+    # TODO: more thorough testing
     debug = 0
     can = cans["web_conn_30"]
     blocked = (
@@ -539,3 +547,41 @@ def test_score_tcp_connect(cans):
             print(scores)
             assert 0
 
+
+def test_score_dash(cans):
+    # rid -> blocking_general, accuracy
+    expected = {
+        "20191026T015105Z_AS4837_7vwBtbVmZZqwZhdTHnqHan0Nwa7bi7TeJ789htG3RB91C3eyU1":
+        (0.1, 0.0, "blocking_general"),
+        "20191026T022317Z_AS17380_ZJGnXdvHl4j1M4xTeskrGhC8SW1KT4buJEjxCsTagCGO2NZeAD":
+        (0.1, 0.0, "json_parse_error"),
+        "20191026T032159Z_AS20057_xLjBSrTyZjOn6C7pa5BPyUxyBhzWHbSooKQjUY9zcWADnkakIR":
+        (0.1, 0.0, "eof_error"),
+        "20191026T051350Z_AS44244_9yjPG1UbgIjtAFg9LiTUxVhq7hGuG3tG4yMnvt6gRJTaFdQme6":
+        (0.1, 0.0, "json_processing_error"),
+        "20191026T071332Z_AS7713_caK9GNyp9ZhN7zL9cg2dg0zGhs44CwHmxZtOyK7B6rBKRaGGMF":
+        (0.1, 0.0, "http_request_failed"),
+        "20191026T093003Z_AS4837_yHZ0f8Oxyhus9vBKAUa0tA2XMSObIO0frShG6YBieBzY9RiSBg":
+        (0.1, 0.0, "connect_error"),
+        "20191026T165434Z_AS0_qPbZHZF8VXUWgzlvqT9Jd7ARuHSl2Dq4tPcEq580rgYZGmV5Um":
+        (0.1, 0.0, "generic_timeout_error"),
+        "20191028T160112Z_AS1640_f4zyjjp5vFcwZkAKPrTokayPRdcXPfdEMRbdo1LmIaLZRile6P":
+        (0.1, 0.0, "broken_pipe"),
+        "20191029T094043Z_AS49048_qGQxBh6lv26TOfuWfhGcUtz2LZWwboXlfbh058CSF1fOmEUv6Z":
+        (0.1, 0.0, "connection_refused"),
+    }
+    for d in range(26, 30):
+        can = cans["dash_2019_10_{}".format(d)]
+        for msm in load_can(can):
+            # input is not set or set to None
+            assert msm.get("input", None) is None
+            rid = msm["report_id"]
+            scores = fp.score_measurement(msm, [])
+
+            if rid in expected:
+                exp_bs, exp_acc, exp_fail = expected[rid]
+                assert scores["blocking_general"] == exp_bs
+                assert scores["accuracy"] == exp_acc
+                expected.pop(rid)
+
+    assert len(expected) == 0, expected.keys()
