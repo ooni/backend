@@ -3,6 +3,7 @@ Simulate feeding from the collectors or cans on S3 using a local can
 """
 # Format with black -t py37 -l 120
 
+from datetime import date, timedelta
 from collections import Counter
 from pathlib import Path
 import logging
@@ -15,23 +16,24 @@ import pytest  # debdeps: python3-pytest
 import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
 
-# from fastpath.utils import fingerprints
-
 log = logging.getLogger()
+
+# The fixtures download cans from S3 to a local directory
+#
+# Use credentials from ~/.aws/config in the block:
+# [ooni-data-private]
+# aws_access_key_id = ...
+# aws_secret_access_key = ...
+#
+# Explore bucket from CLI:
+# AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
+
+BUCKET_NAME = "ooni-data-private"
 
 
 @pytest.fixture
 def cans():
-    """
-    Download interesting cans from S3 to a local directory
-
-    Uses credentials from ~/.aws/config in the block:
-    [ooni-data-private]
-    aws_access_key_id = ...
-    aws_secret_access_key = ...
-
-    Explore bucket from CLI:
-    AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
+    """Download interesting cans from S3 to a local directory
     """
     _cans = dict(
         web_conn_it="2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
@@ -64,6 +66,9 @@ def cans():
         meek_2019_10_27="2019-10-27/meek_fronted_requests_test.0.tar.lz4",
         meek_2019_10_28="2019-10-28/meek_fronted_requests_test.0.tar.lz4",
         meek_2019_10_29="2019-10-29/meek_fronted_requests_test.0.tar.lz4",
+        psiphon_2019_10_28="2019-10-28/psiphon.0.tar.lz4",
+        psiphon_2019_10_29="2019-10-29/psiphon.0.tar.lz4",
+        psiphon_2019_10_30="2019-10-30/psiphon.0.tar.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -72,12 +77,12 @@ def cans():
     if not to_dload:
         return _cans
 
-    bname = "ooni-data-private"
     boto3.setup_default_session(profile_name="ooni-data-private")
     s3 = boto3.client("s3")
     for fn in to_dload:
         s3fname = fn.as_posix().replace("testdata", "canned")
-        r = s3.list_objects_v2(Bucket=bname, Prefix=s3fname)
+        r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=s3fname)
+        assert r["KeyCount"] == 1, fn
         assert r["KeyCount"] == 1, r
         filedesc = r["Contents"][0]
         size = filedesc["Size"]
@@ -85,10 +90,50 @@ def cans():
 
         os.makedirs(os.path.dirname(fn), exist_ok=True)
         with open(fn, "wb") as f:
-            s3.download_fileobj(bname, s3fname, f)
+            s3.download_fileobj(BUCKET_NAME, s3fname, f)
         assert size == os.path.getsize(fn)
 
     return _cans
+
+
+def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
+    """Fetches cans from S3 and iterates over measurements.
+    Detect broken dloads.
+    """
+    boto3.setup_default_session(profile_name="ooni-data-private")
+    s3 = boto3.client("s3")
+    can_date = start_date
+    while can_date <= end_date:
+        # e.g. 2019-10-30/psiphon.0.tar.lz4
+        can_fname = "{}/{}.0.tar.lz4".format(can_date.strftime("%Y-%m-%d"), test_name)
+        can_date += timedelta(days=1)
+        can_local_file = Path("testdata") / can_fname
+
+        s3fname = "canned/" + can_fname
+        r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=s3fname)
+        if r["KeyCount"] != 1:
+            print("Can %s not found. Skipping." % s3fname)
+            continue
+
+        s3size = r["Contents"][0]["Size"]
+        assert s3size > 0
+        ready = can_local_file.is_file() and (can_local_file.stat().st_size == s3size)
+        if not ready:
+            # Download can
+            print("Downloading can %s of size %d MB" % (can_fname, s3size / 1024 / 1024))
+            can_local_file.parent.mkdir(exist_ok=True)
+            with can_local_file.open("wb") as f:
+                s3.download_fileobj(BUCKET_NAME, s3fname, f)
+            assert s3size == can_local_file.stat().st_size
+
+        print("Loading", s3fname)
+        for msm_jstr, msm in s3feeder.load_multiple(can_local_file.as_posix(), touch=False):
+            msm = msm or ujson.loads(msm_jstr)
+            if msm.get("report_id", None) is None:
+                # Missing or empty report_id
+                # https://github.com/ooni/probe-engine/pull/104
+                continue
+            yield can_fname, msm
 
 
 def list_cans_on_s3_for_a_day(day, filter=None):
@@ -619,3 +664,34 @@ def test_score_meek_fronted_requests_test(cans):
                 print_msm(msm)
                 print(scores)
                 assert 0
+
+
+def test_score_psiphon(cans):
+    for can_fn, msm in s3msmts("psiphon", start_date=date(2019, 9, 12)):
+        # The earliest can is canned/2019-09-12/psiphon.0.tar.lz4
+        rid = msm["report_id"]
+        if "resolver_ip" not in msm:
+            # Some msmts are missing this
+            continue
+
+        assert sorted(msm) == [
+            "data_format_version",
+            "measurement_start_time",
+            "probe_asn",
+            "probe_cc",
+            "probe_ip",
+            "report_id",
+            "resolver_ip",
+            "software_name",
+            "software_version",
+            "test_keys",
+            "test_name",
+            "test_runtime",
+            "test_start_time",
+            "test_version",
+        ], "https://explorer.ooni.org/measurement/{}".format(rid)
+        assert sorted(msm["test_keys"]) == ["bootstrap_time", "failure"]
+        # TODO: all msmts have empty failure. No scoring is done.
+        assert msm["test_keys"]["failure"] == ""
+        assert 0 < msm["test_keys"]["bootstrap_time"] < 100
+        scores = fp.score_measurement(msm, [])

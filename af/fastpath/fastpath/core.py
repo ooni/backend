@@ -863,6 +863,20 @@ def score_meek_fronted_requests_test(msm) -> dict:
     return scores
 
 
+def score_psiphon(msm) -> dict:
+    """Calculate measurement scoring for Psiphon
+    Returns a scores dict
+    """
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    rid = msm["report_id"]
+    tk = msm["test_keys"]
+    if "resolver_ip" not in tk:
+        log.debug("client_bug: no resolver_ip in %s", rid)
+        scores["accuracy"] = 0.0
+
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
     """Calculate measurement scoring. Returns a scores dict
@@ -891,6 +905,8 @@ def score_measurement(msm, matches) -> dict:
         return score_dash(msm)
     if tn == "meek_fronted_requests_test":
         return score_meek_fronted_requests_test(msm)
+    if tn == "psiphon":
+        return score_psiphon(msm)
 
     log.debug("Unsupported test name %s", tn)
     return {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
