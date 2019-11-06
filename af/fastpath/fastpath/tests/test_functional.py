@@ -670,18 +670,15 @@ def test_score_psiphon(cans):
     for can_fn, msm in s3msmts("psiphon", start_date=date(2019, 9, 12)):
         # The earliest can is canned/2019-09-12/psiphon.0.tar.lz4
         rid = msm["report_id"]
-        if "resolver_ip" not in msm:
-            # Some msmts are missing this
-            continue
-
-        assert sorted(msm) == [
+        mkeys = set(msm.keys())
+        mkeys.discard("resolver_ip") # Some msmts are missing this
+        assert sorted(mkeys) == [
             "data_format_version",
             "measurement_start_time",
             "probe_asn",
             "probe_cc",
             "probe_ip",
             "report_id",
-            "resolver_ip",
             "software_name",
             "software_version",
             "test_keys",
@@ -691,7 +688,7 @@ def test_score_psiphon(cans):
             "test_version",
         ], "https://explorer.ooni.org/measurement/{}".format(rid)
         assert sorted(msm["test_keys"]) == ["bootstrap_time", "failure"]
-        # TODO: all msmts have empty failure. No scoring is done.
+        # TODO: all msmts have empty test_keys->failure. No scoring is done.
         assert msm["test_keys"]["failure"] == ""
         assert 0 < msm["test_keys"]["bootstrap_time"] < 100
         scores = fp.score_measurement(msm, [])

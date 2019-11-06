@@ -389,6 +389,21 @@ def nonekeys(d, keys):
     return True
 
 
+def logbug(id: int, desc: str, msm: dict):
+    """Log unexpected measurement contents, possibly due to a bug in the probe
+    The id helps locating the call to logbug()
+    """
+    rid = msm.get("report_id", "")
+    url = "https://explorer.ooni.org/measurement/{}".format(rid) if rid else "no rid"
+    sname = msm.get("software_name", "unknown")
+    sversion = msm.get("software_version", "unknown")
+    if id > 0:
+        # unknown, possibly new bug
+        log.warn("client_bug %d: %s %s %s %s", id, sname, sversion, desc, url)
+    else:
+        log.info("known_client_bug: %s %s %s %s", sname, sversion, desc, url)
+
+
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm):
     tk = msm["test_keys"]
@@ -868,10 +883,9 @@ def score_psiphon(msm) -> dict:
     Returns a scores dict
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
-    rid = msm["report_id"]
     tk = msm["test_keys"]
-    if "resolver_ip" not in tk:
-        log.debug("client_bug: no resolver_ip in %s", rid)
+    if "resolver_ip" not in msm:
+        logbug(0, "no resolver_ip", msm)
         scores["accuracy"] = 0.0
 
     return scores
