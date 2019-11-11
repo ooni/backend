@@ -7,8 +7,9 @@ git clone --depth 1 https://github.com/ooni/pipeline.git
 echo "Create ooni_measurements database"
 psql -c 'create database ooni_measurements;' -U postgres
 
-echo "Create amsapi role"
+echo "Create amsapi and readonly roles"
 psql -U postgres ooni_measurements -c "CREATE ROLE amsapi;"
+psql -U postgres ooni_measurements -c "CREATE ROLE readonly;"
 
 echo "Creating database tables using SQL files:"
 ls pipeline/af/oometa/*.install.sql
