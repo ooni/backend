@@ -21,7 +21,7 @@ clean:
 	rm -rf measurements/static/dist venv
 
 venv:
-	virtualenv -p python3.5 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
+	virtualenv -p python3.7 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
 
 tox37:
 	tox -e py37 $(args)
