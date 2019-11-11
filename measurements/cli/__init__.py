@@ -9,6 +9,7 @@ from measurements.app import create_app
 
 cli = FlaskGroup(create_app=create_app)
 
+
 @cli.command()
 @with_appcontext
 def shell():
@@ -20,18 +21,21 @@ def shell():
         IPython = None
 
     if IPython is not None:
-        IPython.embed(banner1='', user_ns=current_app.make_shell_context())
+        IPython.embed(banner1="", user_ns=current_app.make_shell_context())
     else:
         import code
 
-        code.interact(banner='', local=current_app.make_shell_context())
+        code.interact(banner="", local=current_app.make_shell_context())
+
 
 @cli.command()
 @with_appcontext
 def create_tables():
     from measurements.database import Base
     from measurements import models
+
     Base.metadata.create_all(bind=current_app.db_engine)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     cli()
