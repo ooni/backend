@@ -309,28 +309,24 @@ def _merge_two_results(a, b):
     """Merge 2 measurements. Collect useful fields from traditional pipeline
     and fastpath
     """
+    if a["scores"] and b["scores"]:
+        # both a and b are fastpath: ignore b
+        return a
+
     if a["scores"]:
-        # a is fastpath
-        if b["scores"]:
-            # both fastpath, ignore b
-            return a
+        # merge in useful fields from traditional (b) into a
+        for f in ("anomaly", "confirmed"):
+            a[f] = b[f]
+        return a
 
-        else:
-            # merge in useful fields from traditional
-            for f in ("anomaly", "confirmed"):
-                a[f] = b[f]
-            return a
+    if b["scores"]:
+        # merge in useful fields from fastpath (b) into a
+        for f in ("scores", "measurement_url", "measurement_id"):
+            a[f] = b[f]
+        return a
 
-    else:
-        if b["scores"]:
-            # merge in useful fields from fastpath
-            for f in ("scores", "measurement_url", "measurement_id"):
-                a[f] = b[f]
-            return a
-
-        else:
-            # both trad, ignore b
-            return a
+    # both traditional, ignore b
+    return a
 
 
 def _merge_results(tmpresults):
