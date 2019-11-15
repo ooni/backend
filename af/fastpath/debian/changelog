@@ -1,5 +1,5 @@
-fastpath (0.3) UNRELEASED; urgency=medium
+fastpath (0.5) UNRELEASED; urgency=medium
 
-  * v 0.3
+  * Log to stdout, fix queue.close
 
- -- Federico Ceratto <federico@debian.org>  Wed, 30 Oct 2019 16:15:15 +0000
+ -- Federico Ceratto <federico@debian.org>  Fri, 15 Nov 2019 19:05:20 +0000
