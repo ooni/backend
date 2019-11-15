@@ -27,6 +27,13 @@ import time
 import ujson  # debdeps: python3-ujson
 import lz4.frame as lz4frame  # debdeps: python3-lz4
 
+try:
+    from systemd.journal import JournalHandler  # debdeps: python3-systemd
+    no_journal_handler = False
+except ImportError:
+    # this will be the case on macOS for example
+    no_journal_handler = True
+
 # Feeds measurements from Collectors over SSH
 import fastpath.sshfeeder as sshfeeder
 
@@ -63,6 +70,7 @@ def setup():
     ap.add_argument("--start-day", type=lambda d: parse_date(d))
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
+    ap.add_argument("--stdout", action="store_true", help="Log to stdout")
     ap.add_argument(
         "--update",
         action="store_true",
@@ -73,20 +81,17 @@ def setup():
         "--stop-after", type=int, help="Stop after feeding N measurements", default=None
     )
     conf = ap.parse_args()
-    if conf.devel:
-        root = Path(os.getcwd())
+
+    if conf.devel or conf.stdout or no_journal_handler:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
+
     else:
-        try:
-            from systemd.journal import JournalHandler  # debdeps: python3-systemd
-            log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
-        except:
-            # this will be the case on macOS for example
-            pass
-        root = Path("/")
+        log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
         log.setLevel(logging.DEBUG)
 
+    # Run inside current directory in devel mode
+    root = Path(os.getcwd()) if conf.devel else Path("/")
     conf.conffile = root / "etc/fastpath.conf"
     log.info("Using conf file %r", conf.conffile)
     cp = ConfigParser()
