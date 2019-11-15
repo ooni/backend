@@ -35,6 +35,7 @@ COMMENT ON COLUMN fastpath.filename IS 'File served by the fastpath host contain
 
 COMMENT ON COLUMN fastpath.scores IS 'Scoring metadata';
 
+-- Skip grants during tests on Travis CI
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'amsapi') THEN
@@ -43,7 +44,13 @@ BEGIN
 END
 $$;
 
-GRANT SELECT ON tasks TO reader;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'reader') THEN
+        GRANT SELECT ON tasks TO reader;
+    END IF;
+END
+$$;
 
 GRANT SELECT ON fastpath TO readonly;
 
