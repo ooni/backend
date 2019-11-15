@@ -23,9 +23,12 @@ local_monitor_metrics:
 builddeb:
 	dpkg-buildpackage -us -uc -b
 
+ver := $(shell dpkg-parsechangelog --show-field Version)
+
 beta_deploydeb:
-	rsync -avp ../fastpath_*_all.deb  $(shell cat .betahost):/tmp/
-	ssh $(shell cat .betahost) sudo dpkg -i /tmp/fastpath_*_all.deb
+	echo "deploy $(ver)"
+	rsync -avp ../fastpath_$(ver)_all.deb  $(shell cat .betahost):/tmp/
+	ssh $(shell cat .betahost) sudo dpkg -i /tmp/fastpath_$(ver)_all.deb
 
 beta_quickdeploy:
 	rsync -ap fastpath/*.py $(shell cat .betahost):/usr/lib/python3.7/dist-packages/fastpath/
