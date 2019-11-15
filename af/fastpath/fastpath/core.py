@@ -496,8 +496,9 @@ def msm_processor(queue):
 def shut_down(queue):
     log.info("Shutting down workers")
     [queue.put(None) for n in range(NUM_WORKERS)]
-    queue.close()
-    queue.join_thread()
+    # FIXME
+    #queue.close()
+    #queue.join_thread()
 
 
 def core():
