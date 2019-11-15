@@ -103,16 +103,17 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
     boto3.setup_default_session(profile_name="ooni-data-private")
     s3 = boto3.client("s3")
     can_date = start_date
+    tpl = "{}/{}.00.tar.lz4" if test_name == "web_connectivity" else "{}/{}.0.tar.lz4"
     while can_date <= end_date:
         # e.g. 2019-10-30/psiphon.0.tar.lz4
-        can_fname = "{}/{}.0.tar.lz4".format(can_date.strftime("%Y-%m-%d"), test_name)
+        can_fname = tpl.format(can_date.strftime("%Y-%m-%d"), test_name)
         can_date += timedelta(days=1)
         can_local_file = Path("testdata") / can_fname
 
         s3fname = "canned/" + can_fname
         r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=s3fname)
         if r["KeyCount"] != 1:
-            print("Can %s not found. Skipping." % s3fname)
+            log.info("Can %s not found. Skipping." % s3fname)
             continue
 
         s3size = r["Contents"][0]["Size"]
@@ -120,13 +121,13 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
         ready = can_local_file.is_file() and (can_local_file.stat().st_size == s3size)
         if not ready:
             # Download can
-            print("Downloading can %s of size %d MB" % (can_fname, s3size / 1024 / 1024))
+            log.debug("Downloading can %s of size %d MB" % (can_fname, s3size / 1024 / 1024))
             can_local_file.parent.mkdir(exist_ok=True)
             with can_local_file.open("wb") as f:
                 s3.download_fileobj(BUCKET_NAME, s3fname, f)
             assert s3size == can_local_file.stat().st_size
 
-        print("Loading", s3fname)
+        log.debug("Loading %s", s3fname)
         for msm_jstr, msm in s3feeder.load_multiple(can_local_file.as_posix(), touch=False):
             msm = msm or ujson.loads(msm_jstr)
             if msm.get("report_id", None) is None:
@@ -526,9 +527,7 @@ def test_score_vanilla_tor(cans):
 
 
 def test_score_web_connectivity(cans):
-    # TODO: more thorough testing
-    debug = 0
-    can = cans["web_conn_30"]
+    debug = 1
     blocked = (
         "20191029T180431Z_AS50289_5IKNXzKJUvzKQqnlzU5r91F9KiCl1LfRlEBllZVbDHcDQg5TEt",
         "20191029T180509Z_AS50289_CqU5a3scgi1JJ8cWEYEMSqLUzseS0uIbnWcnGSKKlW1BMbnLc5",
@@ -538,9 +537,18 @@ def test_score_web_connectivity(cans):
         "20191029T180452Z_AS50289_IIuYcQRCGA9S2cj5zFABEOvMbyXSKBExWywVgZkpe5l1uAqyT5",
         "20191029T180525Z_AS50289_UfjRU99n2edoDn9PeWnqyGxHVorOAxBFwZj3WPQ24sl2ii4gC2",
     )
-    for msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+
+    # In this msmt the probe follows a redirect and lands on a page with a
+    # title in russian, while the probe gets title " - "
+    # https://explorer.ooni.org/measurement/20191101T071829Z_AS0_sq5lk0Y4jhCECrgk2pAgMWlgOczBLDkIb2OE9QnHf1OEOmwOBz?input=http://www.pravda.ru
+
+    # The probe uses:
+    # (body_length_match or headers_match or title_match) and (status_code_match != false)
+
+    for can_fn, msm in s3msmts("web_connectivity", start_date=date(2019, 11, 1)):
         rid = msm["report_id"]
+        inp = msm["input"]
+        scores = fp.score_measurement(msm, [])
         bl = sum(scores[k] for k in scores if k.startswith("blocking_"))
         if rid in blocked:
             assert bl > 0
@@ -549,7 +557,7 @@ def test_score_web_connectivity(cans):
             assert bl < 0.3
 
         elif debug and bl > 0:
-            print("https://explorer.ooni.org/measurement/{}".format(rid))
+            print("https://explorer.ooni.org/measurement/{}?input={}".format(rid, inp))
             print_msm(msm)
             print(scores)
             assert 0
@@ -671,7 +679,7 @@ def test_score_psiphon(cans):
         # The earliest can is canned/2019-09-12/psiphon.0.tar.lz4
         rid = msm["report_id"]
         mkeys = set(msm.keys())
-        mkeys.discard("resolver_ip") # Some msmts are missing this
+        mkeys.discard("resolver_ip")  # Some msmts are missing this
         assert sorted(mkeys) == [
             "data_format_version",
             "measurement_start_time",

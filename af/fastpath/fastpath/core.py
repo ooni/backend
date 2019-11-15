@@ -393,15 +393,16 @@ def logbug(id: int, desc: str, msm: dict):
     """Log unexpected measurement contents, possibly due to a bug in the probe
     The id helps locating the call to logbug()
     """
+    # TODO: use assertions for unknown bugs
     rid = msm.get("report_id", "")
     url = "https://explorer.ooni.org/measurement/{}".format(rid) if rid else "no rid"
     sname = msm.get("software_name", "unknown")
     sversion = msm.get("software_version", "unknown")
     if id > 0:
         # unknown, possibly new bug
-        log.warn("client_bug %d: %s %s %s %s", id, sname, sversion, desc, url)
+        log.warn("probe_bug %d: %s %s %s %s", id, sname, sversion, desc, url)
     else:
-        log.info("known_client_bug: %s %s %s %s", sname, sversion, desc, url)
+        log.info("known_probe_bug: %s %s %s %s", sname, sversion, desc, url)
 
 
 @metrics.timer("score_measurement_facebook_messenger")
@@ -723,19 +724,30 @@ def score_web_connectivity(msm, matches) -> dict:
     Returns a scores dict
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    tk = msm["test_keys"]
 
     for m in matches:
         l = "blocking_" + m["locality"]
         scores[l] += 1.0
 
-    # Feature extraction
+    # "title_match" is often missing from the raw msmt
+    # e.g. 20190912T145602Z_AS9908_oXVmdAo2BZ2Z6uXDdatwL9cN5oiCllrzpGWKY49PlM4vEB03X7
+    tm = tk.get("title_match", None)
+    if tm not in (True, False, None):
+        logbug(1, "incorrect title_match", msm)
+        scores["accuracy"] = 0.0
+        return scores
 
-    if msm.get("title_match", True) is False:
+    if tm is False:
         scores["blocking_general"] += 0.5
+        # TODO: scan HTML body for title instead
 
-    if "body_proportion" in msm["test_keys"]:
-        # body_proportion can be missing or can be None
-        delta = abs((msm["test_keys"]["body_proportion"] or 1.0) - 1.0)
+    # body_proportion can be missing
+    if "body_proportion" in tk:
+        bp = tk["body_proportion"]
+        assert isinstance(bp, float), "pbug 2"
+        scores["accuracy"] = 0.0
+        delta = abs((tk["body_proportion"] or 1.0) - 1.0)
         scores["blocking_general"] += delta
 
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
@@ -899,31 +911,44 @@ def score_measurement(msm, matches) -> dict:
     # unclassified locality is stored in "blocking_general"
 
     tn = msm["test_name"]
-    if tn == "telegram":
-        return score_measurement_telegram(msm)
-    if tn == "facebook_messenger":
-        return score_measurement_facebook_messenger(msm)
-    if tn == "http_header_field_manipulation":
-        return score_measurement_hhfm(msm)
-    if tn == "whatsapp":
-        return score_measurement_whatsapp(msm)
-    if tn == "vanilla_tor":
-        return score_vanilla_tor(msm)
-    if tn == "web_connectivity":
-        return score_web_connectivity(msm, matches)
-    if tn == "ndt":
-        return score_ndt(msm)
-    if tn == "tcp_connect":
-        return score_tcp_connect(msm)
-    if tn == "dash":
-        return score_dash(msm)
-    if tn == "meek_fronted_requests_test":
-        return score_meek_fronted_requests_test(msm)
-    if tn == "psiphon":
-        return score_psiphon(msm)
+    try:
+        if tn == "telegram":
+            return score_measurement_telegram(msm)
+        if tn == "facebook_messenger":
+            return score_measurement_facebook_messenger(msm)
+        if tn == "http_header_field_manipulation":
+            return score_measurement_hhfm(msm)
+        if tn == "whatsapp":
+            return score_measurement_whatsapp(msm)
+        if tn == "vanilla_tor":
+            return score_vanilla_tor(msm)
+        if tn == "web_connectivity":
+            return score_web_connectivity(msm, matches)
+        if tn == "ndt":
+            return score_ndt(msm)
+        if tn == "tcp_connect":
+            return score_tcp_connect(msm)
+        if tn == "dash":
+            return score_dash(msm)
+        if tn == "meek_fronted_requests_test":
+            return score_meek_fronted_requests_test(msm)
+        if tn == "psiphon":
+            return score_psiphon(msm)
 
-    log.debug("Unsupported test name %s", tn)
-    return {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+        log.debug("Unsupported test name %s", tn)
+        scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+        scores["accuracy"] = 0.0
+        return scores
+
+    except AssertionError as e:
+        # unknown / new client bugs are often catched by assertions
+        if str(e).startswith("pbug "):  # suspected probe bug
+            logbug(0, str(e)[4:], msm)
+            scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+            scores["accuracy"] = 0.0
+            return scores
+
+        raise
 
 
 @metrics.timer("trivial_id")
