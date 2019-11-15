@@ -1,5 +1,11 @@
-fastpath (0.5) UNRELEASED; urgency=medium
+fastpath (0.6) unstable; urgency=medium
+
+  * Improve old file deletion
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 15 Nov 2019 19:48:51 +0000
+
+fastpath (0.5) unstable; urgency=medium
 
   * Log to stdout, fix queue.close
 
- -- Federico Ceratto <federico@debian.org>  Fri, 15 Nov 2019 19:05:20 +0000
+ -- Federico Ceratto <federico@debian.org>  Fri, 15 Nov 2019 19:48:10 +0000

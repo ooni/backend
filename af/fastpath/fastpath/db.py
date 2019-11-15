@@ -7,10 +7,10 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 
 """
 
-from random import randrange
 import logging
 import os
 import time
+import random
 
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import Json
@@ -30,6 +30,7 @@ DB_USER = "shovel"
 DB_NAME = "metadb"
 DB_PASSWORD = "yEqgNr2eXvgG255iEBxVeP"  # This is already made public
 FREE_SPACE_GB = 10.2
+
 
 def _ping():
     q = "SELECT pg_postmaster_start_time();"
@@ -134,20 +135,27 @@ def trim_old_measurements(conf):
     if free_gb > FREE_SPACE_GB:
         return
 
+    log.debug("Starting file trimming: %d GB over threshold", FREE_SPACE_GB - free_gb)
     q = "SELECT tid FROM fastpath ORDER BY test_start_time LIMIT 500;"
     with conn.cursor() as cur:
         cur.execute(q)
+
+        row_cnt = file_cnt = 0
         for row in cur.fetchall():
+            row_cnt += 1
             tid = row[0]
             f = conf.msmtdir / (tid + ".json.lz4")
             try:
                 f.unlink()
+                file_cnt += 1
             except FileNotFoundError:
                 pass
             sql = "DELETE FROM fastpath WHERE tid = %s"
             cur.execute(sql, (tid,))
             conn.commit()
-            log.debug("Deleted %s", f)
+
+        log.debug("Deleted %d files", file_cnt)
+        metrics.incr("deleted_files", file_cnt)
 
         count_q = "SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='fastpath'"
         cur.execute(count_q)
@@ -156,4 +164,5 @@ def trim_old_measurements(conf):
 
 
 # Skew processes to run at different times
-trim_old_measurements._next_run = time.time() + randrange(2, 30)
+random.seed(os.getpid())
+trim_old_measurements._next_run = time.time() + random.randrange(2, 30)
