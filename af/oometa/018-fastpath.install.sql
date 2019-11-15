@@ -4,9 +4,7 @@
 BEGIN;
 
 SELECT
-    _v.register_patch ('017-fastpath',
-        ARRAY['016-ooexpl_wc_confirmed'],
-        NULL);
+    _v.register_patch ('018-fastpath', ARRAY['017-ooexpl_wc_input_counts'], NULL);
 
 CREATE TABLE fastpath (
     "tid" TEXT PRIMARY KEY,
@@ -37,9 +35,16 @@ COMMENT ON COLUMN fastpath.filename IS 'File served by the fastpath host contain
 
 COMMENT ON COLUMN fastpath.scores IS 'Scoring metadata';
 
-GRANT SELECT ON fastpath TO amsapi;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'amsapi') THEN
+        GRANT SELECT ON fastpath TO amsapi;
+    END IF;
+END
+$$;
+
+GRANT SELECT ON tasks TO reader;
 
 GRANT SELECT ON fastpath TO readonly;
 
 COMMIT;
-
