@@ -52,6 +52,12 @@ BEGIN
 END
 $$;
 
-GRANT SELECT ON fastpath TO readonly;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'readonly') THEN
+        GRANT SELECT ON fastpath TO readonly;
+    END IF;
+END
+$$;
 
 COMMIT;
