@@ -176,8 +176,8 @@ class Software(Base):
 
 class Fastpath(Base):
     __tablename__ = "fastpath"
-    tid = Column(String, primary_key=True) #nn
-    report_id = Column(String) #nn
+    tid = Column(String, primary_key=True)  # nn
+    report_id = Column(String)  # nn
     input = Column(String)
     probe_cc = Column(String(2), nullable=False)
     probe_asn = Column(Integer, nullable=False)

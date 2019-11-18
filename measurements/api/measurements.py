@@ -1,4 +1,3 @@
-
 import http.client
 import json
 import math
@@ -29,9 +28,9 @@ from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
 from measurements.models import Report, Input, Measurement, Autoclaved, Fastpath
 
-MSM_ID_PREFIX = 'temp-id'
-FASTPATH_MSM_ID_PREFIX = 'temp-fid-'
-RE_MSM_ID = re.compile('^{}-(\d+)$'.format(MSM_ID_PREFIX))
+MSM_ID_PREFIX = "temp-id"
+FASTPATH_MSM_ID_PREFIX = "temp-fid-"
+RE_MSM_ID = re.compile("^{}-(\d+)$".format(MSM_ID_PREFIX))
 FASTPATH_SERVER = "fastpath.ooni.nu"
 FASTPATH_PORT = 8000
 
@@ -40,29 +39,29 @@ class QueryTimeoutError(HTTPException):
     code = 504
     description = (
         "The database query timed out.",
-        "Try changing the query parameters."
+        "Try changing the query parameters.",
     )
 
+
 def get_version():
-    return jsonify({
-        "version": __version__
-    })
+    return jsonify({"version": __version__})
+
 
 def list_files(
-        probe_asn=None,
-        probe_cc=None,
-        test_name=None,
-        since=None,
-        until=None,
-        since_index=None,
-        order_by='index',
-        order='desc',
-        offset=0,
-        limit=100
-    ):
+    probe_asn=None,
+    probe_cc=None,
+    test_name=None,
+    since=None,
+    until=None,
+    since_index=None,
+    order_by="index",
+    order="desc",
+    offset=0,
+    limit=100,
+):
 
     if probe_asn is not None:
-        if probe_asn.startswith('AS'):
+        if probe_asn.startswith("AS"):
             probe_asn = probe_asn[2:]
         probe_asn = int(probe_asn)
 
@@ -82,8 +81,8 @@ def list_files(
         since_index = int(since_index)
         report_no = max(0, since_index - REPORT_INDEX_OFFSET)
 
-    if order_by in ('index', 'idx'):
-        order_by = 'report_no'
+    if order_by in ("index", "idx"):
+        order_by = "report_no"
 
     q = current_app.db_session.query(
         Report.textname,
@@ -91,7 +90,7 @@ def list_files(
         Report.probe_cc,
         Report.probe_asn,
         Report.report_no,
-        Report.test_name
+        Report.test_name,
     )
 
     # XXX maybe all of this can go into some sort of function.
@@ -108,49 +107,45 @@ def list_files(
     if since_index:
         q = q.filter(Report.report_no > report_no)
 
-    q = q.order_by(text('{} {}'.format(order_by, order)))
+    q = q.order_by(text("{} {}".format(order_by, order)))
     count = q.count()
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
 
     q = q.limit(limit).offset(offset)
     next_args = request.args.to_dict()
-    next_args['offset'] = "%s" % (offset + limit)
-    next_args['limit'] = "%s" % limit
+    next_args["offset"] = "%s" % (offset + limit)
+    next_args["limit"] = "%s" % limit
     next_url = urljoin(
-        current_app.config['BASE_URL'],
-        '/api/v1/files?%s' % urlencode(next_args)
+        current_app.config["BASE_URL"], "/api/v1/files?%s" % urlencode(next_args)
     )
     if current_page >= pages:
         next_url = None
 
     metadata = {
-        'offset': offset,
-        'limit': limit,
-        'count': count,
-        'pages': pages,
-        'current_page': current_page,
-        'next_url': next_url
+        "offset": offset,
+        "limit": limit,
+        "count": count,
+        "pages": pages,
+        "current_page": current_page,
+        "next_url": next_url,
     }
     results = []
     for row in q:
         download_url = urljoin(
-            current_app.config['BASE_URL'],
-            '/files/download/%s' % row.textname
+            current_app.config["BASE_URL"], "/files/download/%s" % row.textname
         )
-        results.append({
-            'download_url': download_url,
-            'probe_cc': row.probe_cc,
-            'probe_asn': "AS{}".format(row.probe_asn),
-            'test_name': row.test_name,
-            'index': int(row.report_no) + REPORT_INDEX_OFFSET,
-            'test_start_time': row.test_start_time
-        })
-    return jsonify({
-        'metadata': metadata,
-        'results': results
-    })
-
+        results.append(
+            {
+                "download_url": download_url,
+                "probe_cc": row.probe_cc,
+                "probe_asn": "AS{}".format(row.probe_asn),
+                "test_name": row.test_name,
+                "index": int(row.report_no) + REPORT_INDEX_OFFSET,
+                "test_start_time": row.test_start_time,
+            }
+        )
+    return jsonify({"metadata": metadata, "results": results})
 
 
 def get_one_fastpath_measurement(measurement_id, download):
@@ -180,12 +175,11 @@ def get_one_fastpath_measurement(measurement_id, download):
         log.debug("Decompressing LZ4 data")
         blob = lz4framed.decompress(blob)
         response = make_response(blob)
-        response.headers.set('Content-Type', 'application/json')
+        response.headers.set("Content-Type", "application/json")
         log.debug("Sending JSON response")
         return response
     except Exception:
         raise BadRequest("No measurement found")
-
 
 
 def get_measurement(measurement_id, download=None):
@@ -206,25 +200,29 @@ def get_measurement(measurement_id, download=None):
         raise BadRequest("Invalid measurement_id")
     msm_no = int(m.group(1))
 
-    q = current_app.db_session.query(
-            Measurement.report_no.label('report_no'),
-            Measurement.frame_off.label('frame_off'),
-            Measurement.frame_size.label('frame_size'),
-            Measurement.intra_off.label('intra_off'),
-            Measurement.intra_size.label('intra_size'),
-            Report.textname.label('textname'),
-            Report.report_no.label('r_report_no'),
-            Report.autoclaved_no.label('r_autoclaved_no'),
-            Autoclaved.filename.label('a_filename'),
-            Autoclaved.autoclaved_no.label('a_autoclaved_no'),
-
-    ).filter(Measurement.msm_no == msm_no)\
-        .join(Report, Report.report_no == Measurement.report_no)\
+    q = (
+        current_app.db_session.query(
+            Measurement.report_no.label("report_no"),
+            Measurement.frame_off.label("frame_off"),
+            Measurement.frame_size.label("frame_size"),
+            Measurement.intra_off.label("intra_off"),
+            Measurement.intra_size.label("intra_size"),
+            Report.textname.label("textname"),
+            Report.report_no.label("r_report_no"),
+            Report.autoclaved_no.label("r_autoclaved_no"),
+            Autoclaved.filename.label("a_filename"),
+            Autoclaved.autoclaved_no.label("a_autoclaved_no"),
+        )
+        .filter(Measurement.msm_no == msm_no)
+        .join(Report, Report.report_no == Measurement.report_no)
         .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
+    )
     try:
         msmt = q.one()
     except MultipleResultsFound:
-        current_app.logger.warning("Duplicate rows for measurement_id: %s" % measurement_id)
+        current_app.logger.warning(
+            "Duplicate rows for measurement_id: %s" % measurement_id
+        )
         msmt = q.first()
     except NoResultFound:
         # XXX we should actually return a 404 here
@@ -232,25 +230,34 @@ def get_measurement(measurement_id, download=None):
 
     # Usual size of LZ4 frames is 256kb of decompressed text.
     # Largest size of LZ4 frame was ~55Mb compressed and ~56Mb decompressed. :-/
-    range_header = "bytes={}-{}".format(msmt.frame_off, msmt.frame_off + msmt.frame_size - 1)
-    r = requests.get(urljoin(current_app.config['AUTOCLAVED_BASE_URL'], msmt.a_filename),
-            headers={"Range": range_header, REQID_HDR: request_id()})
+    range_header = "bytes={}-{}".format(
+        msmt.frame_off, msmt.frame_off + msmt.frame_size - 1
+    )
+    r = requests.get(
+        urljoin(current_app.config["AUTOCLAVED_BASE_URL"], msmt.a_filename),
+        headers={"Range": range_header, REQID_HDR: request_id()},
+    )
     r.raise_for_status()
     blob = r.content
     if len(blob) != msmt.frame_size:
-        raise RuntimeError('Failed to fetch LZ4 frame', len(blob), msmt.frame_size)
-    blob = lz4framed.decompress(blob)[msmt.intra_off:msmt.intra_off+msmt.intra_size]
-    if len(blob) != msmt.intra_size or blob[:1] != b'{' or blob[-1:] != b'}':
-        raise RuntimeError('Failed to decompress LZ4 frame to measurement.json', len(blob), msmt.intra_size, blob[:1], blob[-1:])
+        raise RuntimeError("Failed to fetch LZ4 frame", len(blob), msmt.frame_size)
+    blob = lz4framed.decompress(blob)[msmt.intra_off : msmt.intra_off + msmt.intra_size]
+    if len(blob) != msmt.intra_size or blob[:1] != b"{" or blob[-1:] != b"}":
+        raise RuntimeError(
+            "Failed to decompress LZ4 frame to measurement.json",
+            len(blob),
+            msmt.intra_size,
+            blob[:1],
+            blob[-1:],
+        )
     # There is no replacement of `measurement_id` with `msm_no` or anything
     # else to keep sanity. Maybe it'll happen as part of orchestration update.
     # Also, blob is not decoded intentionally to save CPU
-    filename = "ooni-msmt-{}-{}".format(measurement_id, msmt.textname.replace('/', '-'))
+    filename = "ooni-msmt-{}-{}".format(measurement_id, msmt.textname.replace("/", "-"))
     response = make_response(blob)
-    response.headers.set('Content-Type', 'application/json')
+    response.headers.set("Content-Type", "application/json")
     if download is not None:
-        response.headers.set('Content-Disposition',
-                'attachment', filename=filename)
+        response.headers.set("Content-Disposition", "attachment", filename=filename)
     return response
 
 
@@ -265,9 +272,7 @@ def input_cte(input_, domain, test_name):
 
     where_or = []
     if input_:
-        where_or.append(
-            text('input.input LIKE :i').bindparams(i='%{}%'.format(input_)),
-        )
+        where_or.append(text("input.input LIKE :i").bindparams(i="%{}%".format(input_)))
 
     else:
         domain_filter = "{}%".format(domain)
@@ -294,14 +299,18 @@ def input_cte(input_, domain, test_name):
         .select_from(sql.table("input"))
     )
 
-    return url_q.cte('input_cte')
+    return url_q.cte("input_cte")
 
 
 def log_query(log, q):
     import sqlparse  # debdeps: python3-sqlparse
-    sql = str(q.statement.compile(dialect=postgresql.dialect(),
-            compile_kwargs={"literal_binds": True}))
-    sql = sqlparse.format(sql, reindent=True, keyword_case='upper')
+
+    sql = str(
+        q.statement.compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    sql = sqlparse.format(sql, reindent=True, keyword_case="upper")
     log.info("\n--- query ---\n\n%s\n\n-------------", sql)
 
 
@@ -344,21 +353,21 @@ def _merge_results(tmpresults):
 
 
 def list_measurements(
-        report_id=None,
-        probe_asn=None,
-        probe_cc=None,
-        test_name=None,
-        since=None,
-        until=None,
-        since_index=None,
-        order_by='test_start_time',
-        order='desc',
-        offset=0,
-        limit=100,
-        failure=None,
-        anomaly=None,
-        confirmed=None
-    ):
+    report_id=None,
+    probe_asn=None,
+    probe_cc=None,
+    test_name=None,
+    since=None,
+    until=None,
+    since_index=None,
+    order_by="test_start_time",
+    order="desc",
+    offset=0,
+    limit=100,
+    failure=None,
+    anomaly=None,
+    confirmed=None,
+):
     """Search for measurements using only the database. Provide pagination.
     """
     # FIXME: list_measurements and get_measurement will be simplified and
@@ -372,7 +381,7 @@ def list_measurements(
     domain = request.args.get("domain")
 
     if probe_asn is not None:
-        if probe_asn.startswith('AS'):
+        if probe_asn.startswith("AS"):
             probe_asn = probe_asn[2:]
         probe_asn = int(probe_asn)
 
@@ -381,20 +390,20 @@ def list_measurements(
     # all.
     # TODO: treat it as an error?
     if failure is not None:
-        if set(failure) == set(['true', 'false']):
+        if set(failure) == set(["true", "false"]):
             failure = None
         else:
-            failure = set(failure) == set(['true'])
+            failure = set(failure) == set(["true"])
     if anomaly is not None:
-        if set(anomaly) == set(['true', 'false']):
+        if set(anomaly) == set(["true", "false"]):
             anomaly = None
         else:
-            anomaly = set(anomaly) == set(['true'])
+            anomaly = set(anomaly) == set(["true"])
     if confirmed is not None:
-        if set(confirmed) == set(['true', 'false']):
+        if set(confirmed) == set(["true", "false"]):
             confirmed = None
         else:
-            confirmed = set(confirmed) == set(['true'])
+            confirmed = set(confirmed) == set(["true"])
 
     try:
         if since is not None:
@@ -408,36 +417,30 @@ def list_measurements(
     except ValueError:
         raise BadRequest("Invalid until")
 
-    if order.lower() not in ('asc', 'desc'):
+    if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
     ## Create SQL query
-    c_anomaly = func.coalesce(Measurement.anomaly, false())\
-                    .label('anomaly')
-    c_confirmed = func.coalesce(Measurement.confirmed, false())\
-                    .label('confirmed')
-    c_msm_failure = func.coalesce(Measurement.msm_failure, false())\
-                    .label('msm_failure')
+    c_anomaly = func.coalesce(Measurement.anomaly, false()).label("anomaly")
+    c_confirmed = func.coalesce(Measurement.confirmed, false()).label("confirmed")
+    c_msm_failure = func.coalesce(Measurement.msm_failure, false()).label("msm_failure")
     cols = [
-        Measurement.input_no.label('m_input_no'),
-        Measurement.measurement_start_time.label('measurement_start_time'),
-        Report.test_start_time.label('test_start_time'),
-        func.concat(MSM_ID_PREFIX, "-", Measurement.msm_no).label('measurement_id'),
-        Measurement.report_no.label('m_report_no'),
-
+        Measurement.input_no.label("m_input_no"),
+        Measurement.measurement_start_time.label("measurement_start_time"),
+        Report.test_start_time.label("test_start_time"),
+        func.concat(MSM_ID_PREFIX, "-", Measurement.msm_no).label("measurement_id"),
+        Measurement.report_no.label("m_report_no"),
         c_anomaly,
         c_confirmed,
         c_msm_failure,
         func.coalesce("{}").label("scores"),
-
-        Measurement.exc.label('exc'),
-        Measurement.residual_no.label('residual_no'),
-
-        Report.report_id.label('report_id'),
-        Report.probe_cc.label('probe_cc'),
-        Report.probe_asn.label('probe_asn'),
-        Report.test_name.label('test_name'),
-        Report.report_no.label('report_no'),
+        Measurement.exc.label("exc"),
+        Measurement.residual_no.label("residual_no"),
+        Report.report_id.label("report_id"),
+        Report.probe_cc.label("probe_cc"),
+        Report.probe_asn.label("probe_asn"),
+        Report.test_name.label("test_name"),
+        Report.report_no.label("report_no"),
     ]
 
     cte = input_cte(input_=input_, domain=domain, test_name=test_name)
@@ -445,11 +448,11 @@ def list_measurements(
     if cte is not None:
         cols.append(cte)
     else:
-        cols.append(func.coalesce(Input.input, None).label('input'))
+        cols.append(func.coalesce(Input.input, None).label("input"))
 
     q = current_app.db_session.query(*cols)
     if cte is not None:
-        q = q.join(cte, sql.text('input_cte.input_no = measurement.input_no'))
+        q = q.join(cte, sql.text("input_cte.input_no = measurement.input_no"))
     else:
         q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
     q = q.join(Report, Report.report_no == Measurement.report_no)
@@ -473,48 +476,49 @@ def list_measurements(
     if anomaly is not None:
         q = q.filter(c_anomaly == anomaly)
     if failure is True:
-        q = q.filter(or_(
-            Measurement.exc != None,
-            Measurement.residual_no != None,
-            c_msm_failure == True,
-        ))
+        q = q.filter(
+            or_(
+                Measurement.exc != None,
+                Measurement.residual_no != None,
+                c_msm_failure == True,
+            )
+        )
     if failure is False:
-        q = q.filter(and_(
-            Measurement.exc == None,
-            Measurement.residual_no == None,
-            c_msm_failure == False
-        ))
+        q = q.filter(
+            and_(
+                Measurement.exc == None,
+                Measurement.residual_no == None,
+                c_msm_failure == False,
+            )
+        )
 
     ## Create a query for fastpath
 
     fpcols = [
-        func.coalesce(0).label('m_input_no'),
+        func.coalesce(0).label("m_input_no"),
         # We use test_start_time here as the batch pipeline has many NULL measurement_start_times
         Fastpath.measurement_start_time.label("test_start_time"),
         Fastpath.measurement_start_time.label("measurement_start_time"),
-        func.concat(FASTPATH_MSM_ID_PREFIX, Fastpath.tid).label('measurement_id'),
-        func.coalesce(0).label('m_report_no'),
-
-        func.coalesce(false()).label('anomaly'),
-        func.coalesce(false()).label('confirmed'),
-        func.coalesce(false()).label('msm_failure'),
+        func.concat(FASTPATH_MSM_ID_PREFIX, Fastpath.tid).label("measurement_id"),
+        func.coalesce(0).label("m_report_no"),
+        func.coalesce(false()).label("anomaly"),
+        func.coalesce(false()).label("confirmed"),
+        func.coalesce(false()).label("msm_failure"),
         cast(Fastpath.scores.label("scores"), String),
-
-        func.coalesce([0, ]).label('exc'),
-        func.coalesce(0).label('residual_no'),
-
+        func.coalesce([0]).label("exc"),
+        func.coalesce(0).label("residual_no"),
         Fastpath.report_id.label("report_id"),
         Fastpath.probe_cc.label("probe_cc"),
         Fastpath.probe_asn.label("probe_asn"),
         Fastpath.test_name.label("test_name"),
-        func.coalesce(0).label('report_no'),
+        func.coalesce(0).label("report_no"),
     ]
     if cte is None:
         fpcols.append(Fastpath.input.label("input"))
         assert len(fpcols) == len(cols)
     else:
         fpcols.append(Fastpath.input.label("input_cte_input"))
-        fpcols.append(func.coalesce(0).label('input_cte_input_no'))
+        fpcols.append(func.coalesce(0).label("input_cte_input_no"))
         assert len(fpcols) == len(cols) + 1
 
     fpq = current_app.db_session.query(*fpcols)
@@ -535,13 +539,13 @@ def list_measurements(
         fpq = fpq.filter(Fastpath.input == input_)
 
     if order_by is not None:
-        q = q.order_by(text('{} {}'.format(order_by, order)))
+        q = q.order_by(text("{} {}".format(order_by, order)))
     q = q.limit(limit).offset(offset)
     # Assemble the query
 
     try:
         if order_by is not None:
-            fpq  = fpq.order_by(text('{} {}'.format(order_by, order)))
+            fpq = fpq.order_by(text("{} {}".format(order_by, order)))
         fpq = fpq.limit(limit).offset(offset)
         q = q.union(fpq)
     except:
@@ -550,7 +554,7 @@ def list_measurements(
         raise
 
     if order_by is not None:
-        q = q.order_by(text('{} {}'.format(order_by, order)))
+        q = q.order_by(text("{} {}".format(order_by, order)))
 
     query_str = str(q.statement.compile(dialect=postgresql.dialect()))
 
@@ -564,25 +568,29 @@ def list_measurements(
             tmpresults = []
             for row in q:
                 url = urljoin(
-                    current_app.config['BASE_URL'],
-                    '/api/v1/measurement/%s' % row.measurement_id
+                    current_app.config["BASE_URL"],
+                    "/api/v1/measurement/%s" % row.measurement_id,
                 )
-                tmpresults.append({
-                    'measurement_url': url,
-                    'measurement_id': row.measurement_id,
-                    'report_id': row.report_id,
-                    'probe_cc': row.probe_cc,
-                    'probe_asn': "AS{}".format(row.probe_asn),
-                    'test_name': row.test_name,
-                    'measurement_start_time': row.measurement_start_time,
-                    'input': row.input,
-                    'anomaly': row.anomaly,
-                    'confirmed': row.confirmed,
-                    'failure': (row.exc != None
-                                or row.residual_no != None
-                                or row.msm_failure),
-                    'scores': json.loads(row.scores),
-                })
+                tmpresults.append(
+                    {
+                        "measurement_url": url,
+                        "measurement_id": row.measurement_id,
+                        "report_id": row.report_id,
+                        "probe_cc": row.probe_cc,
+                        "probe_asn": "AS{}".format(row.probe_asn),
+                        "test_name": row.test_name,
+                        "measurement_start_time": row.measurement_start_time,
+                        "input": row.input,
+                        "anomaly": row.anomaly,
+                        "confirmed": row.confirmed,
+                        "failure": (
+                            row.exc != None
+                            or row.residual_no != None
+                            or row.msm_failure
+                        ),
+                        "scores": json.loads(row.scores),
+                    }
+                )
         except OperationalError as exc:
             if isinstance(exc.orig, QueryCanceledError):
                 capture_exception(QueryTimeoutError())
@@ -604,31 +612,28 @@ def list_measurements(
             next_url = None
         else:
             # XXX this is too intensive. find a workaround
-            #count_start_time = time.time()
-            #count = q.count()
-            #pages = math.ceil(count / limit)
-            #current_page = math.ceil(offset / limit) + 1
-            #query_time += time.time() - count_start_time
+            # count_start_time = time.time()
+            # count = q.count()
+            # pages = math.ceil(count / limit)
+            # current_page = math.ceil(offset / limit) + 1
+            # query_time += time.time() - count_start_time
             next_args = request.args.to_dict()
-            next_args['offset'] = "%s" % (offset + limit)
-            next_args['limit'] = "%s" % limit
+            next_args["offset"] = "%s" % (offset + limit)
+            next_args["limit"] = "%s" % limit
             next_url = urljoin(
-                current_app.config['BASE_URL'],
-                '/api/v1/measurements?%s' % urlencode(next_args)
+                current_app.config["BASE_URL"],
+                "/api/v1/measurements?%s" % urlencode(next_args),
             )
 
     query_time = time.time() - iter_start_time
     metadata = {
-        'offset': offset,
-        'limit': limit,
-        'count': count,
-        'pages': pages,
-        'current_page': current_page,
-        'next_url': next_url,
-        'query_time': query_time
+        "offset": offset,
+        "limit": limit,
+        "count": count,
+        "pages": pages,
+        "current_page": current_page,
+        "next_url": next_url,
+        "query_time": query_time,
     }
 
-    return jsonify({
-        'metadata': metadata,
-        'results': results[:limit]
-    })
+    return jsonify({"metadata": metadata, "results": results[:limit]})

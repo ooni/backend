@@ -8,7 +8,7 @@ import logging
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format="%(relativeCreated)6d %(levelname).1s %(filename)s:%(lineno)s %(message)s"
+    format="%(relativeCreated)6d %(levelname).1s %(filename)s:%(lineno)s %(message)s",
 )
 
 from measurements.app import create_app

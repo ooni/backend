@@ -10,19 +10,26 @@ from flask import request
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 CACHE_DEFAULT_TIMEOUT = None
-CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
+CACHE_CONFIG = {"CACHE_TYPE": "simple"}
 
 APP_ENV = os.environ.get("APP_ENV", "development")
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres@localhost:5432/ooni_measurements")
-DATABASE_STATEMENT_TIMEOUT = int(os.environ.get("DATABASE_STATEMENT_TIMEOUT", "0")) # to kill long-running statements ASAP
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://postgres@localhost:5432/ooni_measurements"
+)
+DATABASE_STATEMENT_TIMEOUT = int(
+    os.environ.get("DATABASE_STATEMENT_TIMEOUT", "0")
+)  # to kill long-running statements ASAP
 
 BASE_URL = os.environ.get("BASE_URL", "https://api.ooni.io/")
 
-AUTOCLAVED_BASE_URL = os.environ.get("AUTOCLAVED_BASE_URL",
-                                      "http://datacollector.infra.ooni.io/ooni-public/autoclaved/")
+AUTOCLAVED_BASE_URL = os.environ.get(
+    "AUTOCLAVED_BASE_URL", "http://datacollector.infra.ooni.io/ooni-public/autoclaved/"
+)
 
-CENTRIFUGATION_BASE_URL = os.environ.get("CENTRIFUGATION_BASE_URL",
-                                "http://datacollector.infra.ooni.io/ooni-public/centrifugation/")
+CENTRIFUGATION_BASE_URL = os.environ.get(
+    "CENTRIFUGATION_BASE_URL",
+    "http://datacollector.infra.ooni.io/ooni-public/centrifugation/",
+)
 
 PROMETHEUS_PORT = int(os.environ.get("PROMETHEUS_PORT", "8080"))
 
@@ -36,6 +43,7 @@ S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", None)
 REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "635830"))
 
 REQID_HDR = "X-Request-ID"
+
 
 def request_id():
     if request:
