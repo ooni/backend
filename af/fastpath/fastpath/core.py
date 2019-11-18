@@ -356,7 +356,7 @@ def match_fingerprints(measurement):
     return matches
 
 
-def truekeys(d, keys):
+def all_keys_true(d, keys):
     """Check for values set to True in a dict"""
     if isinstance(keys, str):
         keys = (keys,)
@@ -367,7 +367,7 @@ def truekeys(d, keys):
     return True
 
 
-def falsekeys(d, keys):
+def all_keys_false(d, keys):
     """Check for values set to True in a dict"""
     if isinstance(keys, str):
         keys = (keys,)
@@ -378,7 +378,7 @@ def falsekeys(d, keys):
     return True
 
 
-def nonekeys(d, keys):
+def all_keys_none(d, keys):
     """Check for values set to None in a dict"""
     if isinstance(keys, str):
         keys = (keys,)
@@ -447,7 +447,7 @@ def score_measurement_facebook_messenger(msm):
         "facebook_star_reachable",
         "facebook_stun_dns_consistent",
     )
-    if truekeys(tk, trues) and falsekeys(tk, "facebook_tcp_blocking"):
+    if all_keys_true(tk, trues) and all_keys_false(tk, "facebook_tcp_blocking"):
         score = 0
 
     else:
@@ -692,7 +692,7 @@ def score_vanilla_tor(msm):
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
 
     nks = ("error", "success", "tor_log", "tor_progress_summary", "tor_progress_tag")
-    if msm["software_name"] == "ooniprobe" and nonekeys(tk, nks):
+    if msm["software_name"] == "ooniprobe" and all_keys_none(tk, nks):
         if tk["tor_progress"] == 0:
             # client bug?
             scores["msg"] = "Client bug"
