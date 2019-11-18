@@ -63,6 +63,26 @@ def parse_date(d):
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
+def setup_dirs(conf, root):
+    """Setup directories creating them if needed
+    """
+    conf.vardir = root / "var/lib/fastpath"
+    conf.cachedir = conf.vardir / "cache"
+    conf.s3cachedir = conf.cachedir / "s3"
+    conf.dfdir = conf.vardir / "dataframes"
+    conf.outdir = conf.vardir / "output"
+    conf.msmtdir = conf.outdir / "measurements"
+    for p in (
+        conf.vardir,
+        conf.cachedir,
+        conf.s3cachedir,
+        conf.dfdir,
+        conf.outdir,
+        conf.msmtdir,
+    ):
+        p.mkdir(parents=True, exist_ok=True)
+
+
 def setup():
     os.environ["TZ"] = "UTC"
     global conf
@@ -101,21 +121,7 @@ def setup():
         conf.collector_hostnames = cp["DEFAULT"]["collectors"].split()
         log.info("collectors: %s", conf.collector_hostnames)
 
-    conf.vardir = root / "var/lib/fastpath"
-    conf.cachedir = conf.vardir / "cache"
-    conf.s3cachedir = conf.cachedir / "s3"
-    conf.dfdir = conf.vardir / "dataframes"
-    conf.outdir = conf.vardir / "output"
-    conf.msmtdir = conf.outdir / "measurements"
-    for p in (
-        conf.vardir,
-        conf.cachedir,
-        conf.s3cachedir,
-        conf.dfdir,
-        conf.outdir,
-        conf.msmtdir,
-    ):
-        p.mkdir(parents=True, exist_ok=True)
+    setup_dirs(conf, root)
 
 
 def per_s(name, item_count, t0):
@@ -1019,6 +1025,7 @@ def msm_processor(queue):
         msm_tup = queue.get()
 
         if msm_tup is None:
+            log.info("Worker with PID %d exiting", os.getpid())
             return
 
         with metrics.timer("full_run"):
