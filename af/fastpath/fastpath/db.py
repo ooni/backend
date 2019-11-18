@@ -40,9 +40,12 @@ def _ping():
         log.info("Database start time: %s", row[0])
 
 
-def setup():
+def setup(conf) -> None:
     global conn, _autocommit_conn
-    dsn = f"host={DB_HOST} user={DB_USER} dbname={DB_NAME} password={DB_PASSWORD}"
+    if conf.db_uri:
+        dsn = conf.db_uri
+    else:
+        dsn = f"host={DB_HOST} user={DB_USER} dbname={DB_NAME} password={DB_PASSWORD}"
     log.info("Connecting to database: %r", dsn)
     conn = psycopg2.connect(dsn)
     _autocommit_conn = psycopg2.connect(dsn)

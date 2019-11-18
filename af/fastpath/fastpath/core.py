@@ -71,6 +71,7 @@ def setup():
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
+    ap.add_argument("--db-uri", help="Database DSN or URI. The string is logged!")
     ap.add_argument(
         "--update",
         action="store_true",
@@ -466,7 +467,7 @@ def writeout_measurement(msm_jstr, fn, update):
 def msm_processor(queue):
     """Measurement processor worker
     """
-    db.setup()
+    db.setup(conf)
     while True:
         msm_tup = queue.get()
 
