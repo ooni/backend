@@ -3,11 +3,13 @@ Simulate feeding from the collectors or cans on S3 using a local can
 """
 # Format with black -t py37 -l 120
 
-from datetime import date, timedelta
 from collections import Counter
+from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 import logging
 import os
+import time
 
 import ujson
 import boto3  # debdeps: python3-boto3
@@ -69,6 +71,7 @@ def cans():
         psiphon_2019_10_28="2019-10-28/psiphon.0.tar.lz4",
         psiphon_2019_10_29="2019-10-29/psiphon.0.tar.lz4",
         psiphon_2019_10_30="2019-10-30/psiphon.0.tar.lz4",
+        big2858="2019-10-30/20191030T032301Z-BR-AS28573-web_connectivity-20191030T032303Z_AS28573_VzW6UrXrs21YjYWvlk1hyzRqnKlmKNsSntSBGqFCnzFVxVSLQf-0.2.0-probe.json.lz4",
     )
     for k, v in _cans.items():
         _cans[k] = Path("testdata") / v
@@ -137,19 +140,25 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
             yield can_fname, msm
 
 
-def list_cans_on_s3_for_a_day(day, filter=None):
+def list_cans_on_s3_for_a_day(day, filter=None, bysize=False):
     s3 = s3feeder.create_s3_client()
     fns = s3feeder.list_cans_on_s3_for_a_day(s3, day)
-    for fn, size in sorted(fns):
+    if bysize:
+        fns = sorted(fns, key=lambda i: i[1])
+    else:
+        fns = sorted(fns)
+
+    for fn, size in fns:
+        size = size / float(2 ** 20)
         if filter is None or (filter in fn):
-            print(fn, size)
+            print(f"{fn:<160} {size} MB")
 
 
 def disabled_test_list_cans():
     """Used for debugging"""
-    f = "psiphon"
-    for d in range(26, 31):
-        list_cans_on_s3_for_a_day("2019-10-{}".format(d), filter=f)
+    f = None  # "psiphon"
+    for d in range(30, 31):
+        list_cans_on_s3_for_a_day("2019-10-{}".format(d), filter=f, bysize=1)
     assert 0
 
 
@@ -191,13 +200,15 @@ def print_msm(msm):
 
 
 def load_can(can):
+    cnt = 0
     for msm_jstr, msm in s3feeder.load_multiple(can.as_posix(), touch=False):
         msm = msm or ujson.loads(msm_jstr)
         if msm.get("report_id", None) is None:
             # Missing or empty report_id
             # https://github.com/ooni/probe-engine/pull/104
             continue
-        yield msm
+        yield cnt, msm
+        cnt += 1
 
 
 # TODO mock out metrics
@@ -205,16 +216,15 @@ def load_can(can):
 
 def setup_module(module):
     fp.conf.devel = True
+    fp.conf.update = False
     fp.conf.interact = False
-    fp.conf.vardir = Path("var/lib/fastpath")
-    fp.conf.cachedir = fp.conf.vardir / "cache"
-    fp.conf.s3cachedir = fp.conf.cachedir / "s3"
-    fp.conf.sshcachedir = fp.conf.cachedir / "ssh"
+    fp.setup_dirs(fp.conf, Path(os.getcwd()))
+    fp.setup_fingerprints()
 
 
 def test_telegram(cans):
     can = cans["telegram"]
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         if msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
             assert scores == {
@@ -277,7 +287,7 @@ def test_telegram(cans):
 def test_whatsapp(cans):
     can = cans["whatsapp"]
     debug = False
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         if msm["report_id"] == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
             assert scores == {
@@ -310,7 +320,7 @@ def test_whatsapp(cans):
 def test_facebook_messenger(cans):
     can = cans["facebook_messenger"]
     debug = False
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         if msm["report_id"] != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
             continue
@@ -339,7 +349,7 @@ def test_facebook_messenger(cans):
 @pytest.mark.skip(reason="Client bug in checking Facebook ASN")
 def test_facebook_messenger_bug(cans):
     can = cans["facebook_messenger"]
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         if msm["report_id"] != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO":
             continue
@@ -357,7 +367,7 @@ def test_facebook_messenger_newer(cans):
     can = cans["facebook_messenger2"]  # from 2019-10-29
     blocked_cnt = 0
     debug = False
-    for tot, msm in enumerate(load_can(can)):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         rid = msm["report_id"]
 
@@ -377,7 +387,7 @@ def test_facebook_messenger_newer(cans):
                 print_msm(msm)
                 print(scores)
 
-    ratio = blocked_cnt / (tot + 1) * 100
+    ratio = blocked_cnt / (msm_n + 1) * 100
     assert ratio > 7.656
     assert ratio < 7.657
 
@@ -399,7 +409,7 @@ def test_score_measurement_hhfm_large(cans):
     debug = False
     for d in range(26, 30):
         can = cans["hhfm_2019_10_{}".format(d)]
-        for msm in load_can(can):
+        for msm_n, msm in load_can(can):
             rid = msm["report_id"]
             scores = fp.score_measurement(msm, [])
             if rid == "20191028T115649Z_AS28573_eIrzDM4njwMjxBi0ODrerI5N03zM7qQoCvl4xpapTccdW0kCRg":
@@ -487,7 +497,7 @@ def test_score_vanilla_tor_2018(cans):
         "20181026T003600Z_AS4134_SIts9rD3mrpgIrxrBy6NY7LHJGsBm2dbV4Q8rOHnFEQVESMqB1",
         "20181026T154843Z_AS57963_GKCdB85BgIqr5frZ2Z8qOXVZgdpNGajLRXSidMeRVWg8Qvto3e",
     )
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         rid = msm["report_id"]
         if rid in timeouts:
@@ -502,7 +512,7 @@ def test_score_vanilla_tor(cans):
 
     for d in range(26, 30):
         can = cans["tor_2019_10_{}".format(d)]
-        for msm in load_can(can):
+        for msm_n, msm in load_can(can):
             scores = fp.score_measurement(msm, [])
             rid = msm["report_id"]
             cnt += 1
@@ -527,7 +537,7 @@ def test_score_vanilla_tor(cans):
 
 
 def test_score_web_connectivity(cans):
-    debug = 1
+    debug = 0
     blocked = (
         "20191029T180431Z_AS50289_5IKNXzKJUvzKQqnlzU5r91F9KiCl1LfRlEBllZVbDHcDQg5TEt",
         "20191029T180509Z_AS50289_CqU5a3scgi1JJ8cWEYEMSqLUzseS0uIbnWcnGSKKlW1BMbnLc5",
@@ -563,10 +573,92 @@ def test_score_web_connectivity(cans):
             assert 0
 
 
+def test_score_web_connectivity_with_workers(cans):
+    # Run worker processes on a big can
+    # Mock out database interactions but write output json
+    # files
+    can = cans["big2858"]
+    expected_cnt = 2858
+
+    assert tuple(fp.conf.msmtdir.glob("*")) == ()
+    import fastpath.portable_queue as queue
+    import multiprocessing as mp
+
+    fp.db.setup = MagicMock()
+    fp.db.trim_old_measurements = MagicMock()
+    fp.db._autocommit_conn = MagicMock()
+
+    m1 = MagicMock(name="mycursor")
+    mctx = MagicMock(name="mock_ctx")
+
+    # By mocking SQL execute() each workers logs its queries in a dedicated
+    # file. We then collect the files to inspect if all inputs were processed.
+    def mock_execute(query, *a, **kw):
+        try:
+            pid = os.getpid()
+            wl = fp.conf.outdir / f"{pid}.wlog"
+            if wl.is_file():
+                log.debug("Loading %s", wl)
+                d = ujson.load(wl.open())
+            else:
+                d = dict(inserted_tids=[], other_queries=[])
+            if "INSERT INTO fastpath" in query:
+                query_args = a[0]
+                assert len(query_args) == 11
+                tid = query_args[0]
+                d["inserted_tids"].append(tid)
+            elif "SELECT pg_notify('fastpath" in query:
+                pass
+            else:
+                d["other_queries"].append(query)
+            ujson.dump(d, wl.open("w"))
+        except Exception as e:
+            log.exception(e)
+
+    mctx.execute = mock_execute
+    m1.__enter__ = MagicMock(name="myenter", return_value=mctx)
+    fp.db._autocommit_conn.cursor = MagicMock(name="curgen", return_value=m1)
+
+    workers = [mp.Process(target=fp.msm_processor, args=(queue,)) for n in range(4)]
+    [t.start() for t in workers]
+    for w in workers:
+        wl = fp.conf.outdir / f"{w.pid}.wlog"
+        if wl.is_file():
+            wl.unlink()
+        assert w.is_alive()
+
+    for msm_n, msm in load_can(can):
+        queue.put((None, msm))
+    assert msm_n == expected_cnt - 1
+
+    for w in workers:
+        # each worker will receive one terminator message and quit
+        queue.put(None)
+
+    while any(w.is_alive() for w in workers):
+        log.debug("waiting...")
+        time.sleep(0.1)
+
+    assert len(tuple(fp.conf.msmtdir.glob("*"))) == expected_cnt
+
+    all_inserted_tids = set()
+    for w in workers:
+        wl = fp.conf.outdir / f"{w.pid}.wlog"
+        assert wl.is_file(), "The worker did not create a logfile"
+        d = ujson.load(wl.open())
+        wl.unlink()
+        s = set(d["inserted_tids"])
+        assert len(s) == len(d["inserted_tids"]), "Duplicate INSERT INTO"
+        dup = all_inserted_tids & s
+        assert len(dup) == 0, f"{dup} inserted by different workers"
+        all_inserted_tids = all_inserted_tids | s
+
+    assert len(all_inserted_tids) == expected_cnt
+
+
 def test_score_ndt(cans):
-    debug = 0
     can = cans["ndt_2018_10_26"]
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
         assert scores == {}  # no scoring yet
 
@@ -575,7 +667,7 @@ def test_score_tcp_connect(cans):
     # tcp_connect msmts are identified by (report_id / input)
     debug = 0
     can = cans["tcp_connect_2018_10_26"]
-    for msm in load_can(can):
+    for msm_n, msm in load_can(can):
         rid = msm["report_id"]
         inp = msm["input"]
         scores = fp.score_measurement(msm, [])
@@ -622,7 +714,7 @@ def test_score_dash(cans):
     }
     for d in range(26, 30):
         can = cans["dash_2019_10_{}".format(d)]
-        for msm in load_can(can):
+        for msm_n, msm in load_can(can):
             # input is not set or set to None
             assert msm.get("input", None) is None
             rid = msm["report_id"]
@@ -641,9 +733,8 @@ def test_score_meek_fronted_requests_test(cans):
     debug = 0
     for d in range(26, 30):
         can = cans["meek_2019_10_{}".format(d)]
-        for msm in load_can(can):
+        for msm_n, msm in load_can(can):
             rid = msm["report_id"]
-            inp = msm["input"]
             scores = fp.score_measurement(msm, [])
             if rid == "20191026T110224Z_AS3352_2Iqv4PvPItJ2Z3D46wVRHzesBpdDJZ8xDKH7VKqNTebaiGopDY":
                 # response: None
