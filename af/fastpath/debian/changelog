@@ -1,3 +1,9 @@
+fastpath (0.7) unstable; urgency=medium
+
+  * Improve metrics
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 19 Nov 2019 12:18:21 +0000
+
 fastpath (0.6) unstable; urgency=medium
 
   * Improve old file deletion

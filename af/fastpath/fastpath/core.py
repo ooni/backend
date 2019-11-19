@@ -333,9 +333,12 @@ def match_fingerprints(measurement):
                 # fp: {"body_match": "...", "locality": "..."}
                 tb = time.time()
                 bm = fp["body_match"]
-                if bm in body:
+                idx = body.find(bm)
+                if idx != -1:
                     matches.append(fp)
-                    log.debug("matched body fp %s %r", msm_cc, bm)
+                    log.debug("matched body fp %s %r at pos %d", msm_cc, bm, idx)
+                    # Used for statistics
+                    metrics.gauge("fingerprint_body_match_location", idx)
 
                 per_s("fingerprints_bytes", len(body), tb)
 
@@ -1004,14 +1007,17 @@ def writeout_measurement(msm_jstr, fn, update):
             try:
                 os.chmod(f.name, 0o644)
                 os.link(f.name, final_fname)
+                metrics.incr("msmt_output_file_created")
             except FileExistsError:
                 if update:
                     # update access time - used for cache cleanup
                     # no need to overwrite the file
                     os.utime(final_fname)
+                    metrics.incr("msmt_output_file_updated")
                 else:
                     log.info("Refusing to overwrite %s", final_fname)
                     metrics.incr("report_id_input_file_collision")
+                    metrics.incr("msmt_output_file_skipped")
                     os.utime(final_fname)
 
     metrics.incr("wrote_uncompressed_bytes", len(msm_jstr))
