@@ -15,7 +15,10 @@ jobs:
             cd af/fastpath
             apt-get build-dep -y --no-install-recommends .
             basever=$(dpkg-parsechangelog --show-field Version)
-            ver="${basever}.PR$CIRCLE_PR_NUMBER.$CIRCLE_BUILD_NUM"
+            # CIRCLE_PR_NUMBER is broken
+            ver="${basever}.PR${CIRCLE_PULL_REQUEST##*/}.${CIRCLE_BUILD_NUM}"
+            dch -v ${ver} "PR version"
+            dch -r ${ver} "PR version"
             dpkg-buildpackage -uc -b
             mv ../*.deb /tmp/debs/
             pname="fastpath"
