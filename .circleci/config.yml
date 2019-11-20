@@ -7,22 +7,25 @@ jobs:
       - checkout
       #- restore_cache:
       #    key: foo-0001
-      - run: mkdir -p debs
+      - run: mkdir -p /tmp/debs
       - run:
           command: |
             apt-get update
+            apt-get install -y --no-install-recommends curl
             cd af/fastpath
             apt-get build-dep -y --no-install-recommends .
             basever=$(dpkg-parsechangelog --show-field Version)
             ver="${basever}.PR$CIRCLE_PR_NUMBER.$CIRCLE_BUILD_NUM"
             dpkg-buildpackage -uc -b
-            mv ../*.deb ~/debs/
+            mv ../*.deb /tmp/debs/
+            fn=fastpath_${ver}_all.deb
+            curl -T /tmp/debs/$debfn -u$BTUSER:$BINTRAY_API_KEY "https://api.bintray.com/content/$BTUSER/foo/$fn;deb_distribution=unstable;deb_component=main;deb_architecture=amd64;publish=1"
       # - save_cache:
       #     key: foo-0001
       #     paths:
       #       - ~/cache
       - store_artifacts:
-          path: debs/
+          path: /tmp/debs/
           destination: debs
       - store_test_results:
-          path: debs/
+          path: /tmp/debs/
