@@ -1,0 +1,28 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: debian:stable
+    steps:
+      - checkout
+      #- restore_cache:
+      #    key: foo-0001
+      - run: mkdir -p debs
+      - run:
+          command: |
+            apt-get update
+            apt-get build-dep -y --no-install-recommends .
+            cd af/fastpath
+            basever=$(dpkg-parsechangelog --show-field Version)
+            ver="${basever}.PR$CIRCLE_PR_NUMBER.$CIRCLE_BUILD_NUM"
+            dpkg-buildpackage -uc -b
+            mv ../*.deb ~/debs/
+      # - save_cache:
+      #     key: foo-0001
+      #     paths:
+      #       - ~/cache
+      - store_artifacts:
+          path: debs/
+          destination: debs
+      - store_test_results:
+          path: debs/
