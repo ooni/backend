@@ -18,8 +18,9 @@ jobs:
             ver="${basever}.PR$CIRCLE_PR_NUMBER.$CIRCLE_BUILD_NUM"
             dpkg-buildpackage -uc -b
             mv ../*.deb /tmp/debs/
-            fn=fastpath_${ver}_all.deb
-            curl -T /tmp/debs/$debfn -u$BTUSER:$BINTRAY_API_KEY "https://api.bintray.com/content/ooni/foo/$fn;deb_distribution=unstable;deb_component=main;deb_architecture=amd64;publish=1"
+            pname="fastpath"
+            fn=$pname_${ver}_all.deb
+            curl --show-error -f -T fastpath_0.7_all.deb -u$BTUSER:$BINTRAY_API_KEY "https://api.bintray.com/content/federicoceratto/foo/$pname/$ver/$fn;deb_distribution=unstable;deb_component=main;deb_architecture=amd64;publish=1"
       # - save_cache:
       #     key: foo-0001
       #     paths:
