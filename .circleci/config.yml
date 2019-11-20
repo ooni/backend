@@ -20,7 +20,7 @@ jobs:
             mv ../*.deb /tmp/debs/
             pname="fastpath"
             fn=$pname_${ver}_all.deb
-            curl --show-error -f -T fastpath_0.7_all.deb -u$BTUSER:$BINTRAY_API_KEY "https://api.bintray.com/content/federicoceratto/foo/$pname/$ver/$fn;deb_distribution=unstable;deb_component=main;deb_architecture=amd64;publish=1"
+            curl --show-error -f -T $fn -u$BTUSER:$BINTRAY_API_KEY "https://api.bintray.com/content/federicoceratto/foo/$pname/$ver/$fn;deb_distribution=unstable;deb_component=main;deb_architecture=amd64;publish=1"
       # - save_cache:
       #     key: foo-0001
       #     paths:
