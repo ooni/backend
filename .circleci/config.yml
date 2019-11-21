@@ -10,10 +10,10 @@ jobs:
       - run: mkdir -p /tmp/debs
       - run:
           command: |
-            apt-get update
-            apt-get install -y --no-install-recommends curl devscripts
+            apt-get update -q
+            apt-get install -qy --no-install-recommends curl devscripts
             cd af/fastpath
-            apt-get build-dep -y --no-install-recommends .
+            apt-get build-dep -qy --no-install-recommends .
             basever=$(dpkg-parsechangelog --show-field Version)
             # CIRCLE_PR_NUMBER is broken
             ver="${basever}.PR${CIRCLE_PULL_REQUEST##*/}.${CIRCLE_BUILD_NUM}"
