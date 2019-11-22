@@ -1,0 +1,36 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: debian:stable
+    steps:
+      - checkout
+      #- restore_cache:
+      #    key: foo-0001
+      - run: mkdir -p /tmp/debs
+      - run:
+          command: |
+            apt-get update -q
+            apt-get install -qy --no-install-recommends curl devscripts
+            cd af/fastpath
+            apt-get build-dep -qy --no-install-recommends .
+            basever=$(dpkg-parsechangelog --show-field Version)
+            # CIRCLE_PR_NUMBER is broken
+            ver="${basever}.PR${CIRCLE_PULL_REQUEST##*/}.${CIRCLE_BUILD_NUM}"
+            dch -v ${ver} "PR version"
+            dch -r ${ver} "PR version"
+            dpkg-buildpackage -uc -b
+            mv ../*.deb /tmp/debs/
+            pname="fastpath"
+            fn=${pname}_${ver}_all.deb
+            curl --show-error -f -T /tmp/debs/$fn -u$BTUSER:$BINTRAY_API_KEY "https://api.bintray.com/content/ooni/internal-pull-requests/${pname}/${ver}/${fn};deb_distribution=unstable;deb_component=main;deb_architecture=amd64;publish=1"
+
+      # - save_cache:
+      #     key: foo-0001
+      #     paths:
+      #       - ~/cache
+      - store_artifacts:
+          path: /tmp/debs/
+          destination: debs
+      - store_test_results:
+          path: /tmp/debs/
