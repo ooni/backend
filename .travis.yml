@@ -23,3 +23,4 @@ before_script:
 - scripts/travis_init_db.sh
 script:
 - make APP_ENV=production test
+- docker build .
