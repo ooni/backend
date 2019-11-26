@@ -268,8 +268,7 @@ def input_cte(input_, domain, test_name):
         raise BadRequest("Must pick either domain or input")
 
     if not input_ and not domain:
-        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
-        return q
+        return None
 
     where_or = []
     if input_:
@@ -351,6 +350,7 @@ def _merge_results(tmpresults):
             resultsmap[k] = _merge_two_results(resultsmap[k], r)
 
     return tuple(resultsmap.values())
+
 
 def list_measurements(
     report_id=None,
@@ -457,7 +457,7 @@ def list_measurements(
         q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
     q = q.join(Report, Report.report_no == Measurement.report_no)
 
-    q = input_filter(q, input_=input_, domain=domain, test_name=test_name)
+    q.join(Report, Report.report_no == Measurement.report_no)
     if report_id:
         q = q.filter(Report.report_id == report_id)
     if probe_cc:
@@ -562,7 +562,7 @@ def list_measurements(
     iter_start_time = time.time()
 
     with configure_scope() as scope:
-        scope.set_extra("sql_query", str(q))
+        scope.set_extra("sql_query", query_str)
 
         try:
             tmpresults = []
