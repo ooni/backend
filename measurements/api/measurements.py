@@ -260,14 +260,10 @@ def get_measurement(measurement_id, download=None):
         response.headers.set("Content-Disposition", "attachment", filename=filename)
     return response
 
-<<<<<<< HEAD
-def input_filter(q, input_, domain, test_name):
-=======
 
 def input_cte(input_, domain, test_name):
     """Given a domain or an input_, build a WHERE filter
     """
->>>>>>> 4e0400cc755c70798495bfcc45411fa31aee7d2e
     if input_ and domain:
         raise BadRequest("Must pick either domain or input")
 
@@ -277,22 +273,6 @@ def input_cte(input_, domain, test_name):
 
     where_or = []
     if input_:
-<<<<<<< HEAD
-        where_or.append(Input.input.like('%{}%'.format(input_)))
-
-    if domain:
-        domain_filter = '{}%'.format(domain)
-        where_or.append(
-            text('input.input LIKE :domain_filter').bindparams(domain_filter=domain_filter)
-        )
-        if test_name in [None, 'web_connectivity', 'http_requests']:
-            where_or.append(text('input.input LIKE :http_filter').bindparams(http_filter='http://{}'.format(domain_filter)))
-            where_or.append(text('input.input LIKE :https_filter').bindparams(https_filter='https://{}'.format(domain_filter)))
-
-    q = q.join(Input, Measurement.input_no == Input.input_no)
-    q = q.filter(or_(*where_or))
-    return q
-=======
         where_or.append(text("input.input LIKE :i").bindparams(i="%{}%".format(input_)))
 
     else:
@@ -372,8 +352,6 @@ def _merge_results(tmpresults):
 
     return tuple(resultsmap.values())
 
->>>>>>> 4e0400cc755c70798495bfcc45411fa31aee7d2e
-
 def list_measurements(
     report_id=None,
     probe_asn=None,
@@ -442,21 +420,10 @@ def list_measurements(
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
-<<<<<<< HEAD
-
-    c_anomaly = func.coalesce(Measurement.anomaly, false())\
-                    .label('anomaly')
-    c_confirmed = func.coalesce(Measurement.confirmed, false())\
-                    .label('confirmed')
-    c_msm_failure = func.coalesce(Measurement.msm_failure, false())\
-                    .label('msm_failure')
-
-=======
     ## Create SQL query
     c_anomaly = func.coalesce(Measurement.anomaly, false()).label("anomaly")
     c_confirmed = func.coalesce(Measurement.confirmed, false()).label("confirmed")
     c_msm_failure = func.coalesce(Measurement.msm_failure, false()).label("msm_failure")
->>>>>>> 4e0400cc755c70798495bfcc45411fa31aee7d2e
     cols = [
         Measurement.input_no.label("m_input_no"),
         Measurement.measurement_start_time.label("measurement_start_time"),
@@ -466,22 +433,6 @@ def list_measurements(
         c_anomaly,
         c_confirmed,
         c_msm_failure,
-<<<<<<< HEAD
-
-        Measurement.exc.label('exc'),
-        Measurement.residual_no.label('residual_no'),
-
-        Report.report_id.label('report_id'),
-        Report.probe_cc.label('probe_cc'),
-        Report.probe_asn.label('probe_asn'),
-        Report.test_name.label('test_name'),
-        Report.report_no.label('report_no'),
-        func.coalesce(Input.input, None).label('input')
-    ]
-
-    q = current_app.db_session.query(*cols)\
-            .join(Report, Report.report_no == Measurement.report_no)
-=======
         func.coalesce("{}").label("scores"),
         Measurement.exc.label("exc"),
         Measurement.residual_no.label("residual_no"),
@@ -505,7 +456,6 @@ def list_measurements(
     else:
         q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
     q = q.join(Report, Report.report_no == Measurement.report_no)
->>>>>>> 4e0400cc755c70798495bfcc45411fa31aee7d2e
 
     q = input_filter(q, input_=input_, domain=domain, test_name=test_name)
     if report_id:
@@ -606,14 +556,11 @@ def list_measurements(
     if order_by is not None:
         q = q.order_by(text("{} {}".format(order_by, order)))
 
-<<<<<<< HEAD
-=======
     query_str = str(q.statement.compile(dialect=postgresql.dialect()))
 
     # Run the query, generate the results list
     iter_start_time = time.time()
 
->>>>>>> 4e0400cc755c70798495bfcc45411fa31aee7d2e
     with configure_scope() as scope:
         scope.set_extra("sql_query", str(q))
 
