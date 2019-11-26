@@ -21,7 +21,13 @@ clean:
 	rm -rf measurements/static/dist venv
 
 venv:
-	virtualenv -p python3.5 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
+	virtualenv -p python3.7 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
+
+tox37:
+	tox -e py37 $(args)
+
+tox37-coverage:
+	tox -e py37 -- --cov --cov-report=term-missing $(args)
 
 dev:
 	$(PYTHON_WITH_ENV) -m measurements run -p 3000 --reload
@@ -33,10 +39,10 @@ shell:
 	$(PYTHON_WITH_ENV) -m measurements shell
 
 test-unit:
-	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m unit
+	$(PYTHON_WITH_ENV) -m coverage run -m pytest -m unit
 
 test-functional:
-	$(PYTHON_WITH_ENV) -m coverage run -m pytest --strict -m functional
+	$(PYTHON_WITH_ENV) -m coverage run -m pytest -m functional
 
 test: test-unit test-functional
 	$(PYTHON_WITH_ENV) -m coverage report -m

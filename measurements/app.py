@@ -22,16 +22,17 @@ from measurements.database import init_db
 
 APP_DIR = os.path.dirname(__file__)
 
+
 class FlaskJSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime.datetime):
             if o.tzinfo:
                 # eg: '2015-09-25T23:14:42.588601+00:00'
-                return o.isoformat('T')
+                return o.isoformat("T")
             else:
                 # No timezone present - assume UTC.
                 # eg: '2015-09-25T23:14:42.588601Z'
-                return o.isoformat('T') + 'Z'
+                return o.isoformat("T") + "Z"
 
         if isinstance(o, datetime.date):
             return o.isoformat()
@@ -44,26 +45,32 @@ class FlaskJSONEncoder(json.JSONEncoder):
 
         return json.JSONEncoder.default(self, o)
 
-def init_app(app):
+
+def init_app(app, testmode=False):
     # We load configurations first from the config file (where some options
     # are overridable via environment variables) or from the config file
     # pointed to by the MEASUREMENTS_CONFIG environment variable.
     # The later overrides the former.
-    app.config.from_object('measurements.config')
-    app.config.from_envvar('MEASUREMENTS_CONFIG', silent=True)
+    app.config.from_object("measurements.config")
+    app.config.from_envvar("MEASUREMENTS_CONFIG", silent=True)
 
-    app.logger.addHandler(logging.StreamHandler())
+    # Prevent messy duplicate logs during testing
+    if not testmode:
+        app.logger.addHandler(logging.StreamHandler())
 
-    if app.config['APP_ENV'] == 'production':
+    if app.config["APP_ENV"] == "production":
         app.logger.setLevel(logging.WARNING)
-    elif app.config['APP_ENV'] == 'development':
+    elif app.config["APP_ENV"] == "development":
         app.logger.setLevel(logging.DEBUG)
         # Set the jinja templates to reload when in development
         app.jinja_env.auto_reload = True
-        app.config['TEMPLATES_AUTO_RELOAD'] = True
-        app.config['DEBUG'] = True
-    elif app.config['APP_ENV'] not in ('testing', 'staging'): # known envs according to Readme.md
-        raise RuntimeError('Unexpected APP_ENV', app.config['APP_ENV'])
+        app.config["TEMPLATES_AUTO_RELOAD"] = True
+        app.config["DEBUG"] = True
+    elif app.config["APP_ENV"] not in (
+        "testing",
+        "staging",
+    ):  # known envs according to Readme.md
+        raise RuntimeError("Unexpected APP_ENV", app.config["APP_ENV"])
 
     for key in app.config.keys():
         SECRET_SUBSTRINGS = ["_SECRET_", "DATABASE_URL"]
@@ -72,10 +79,10 @@ def init_app(app):
             continue
         app.logger.debug("{}: {}".format(key, app.config[key]))
 
-    if app.config['APP_ENV'] == 'production':
+    if app.config["APP_ENV"] == "production":
         sentry_sdk.init(
             dsn="https://dcb077b34ac140d58a7c37609cea0cf9@sentry.io/1367288",
-            integrations=[FlaskIntegration()]
+            integrations=[FlaskIntegration()],
         )
 
     md = Misaka(fenced_code=True)
@@ -83,10 +90,12 @@ def init_app(app):
 
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+
 def check_config(config):
     pass
 
-def create_app(*args, **kw):
+
+def create_app(*args, testmode=False, **kw):
     from measurements import views
 
     if sys.version_info[0] < 3:
@@ -96,7 +105,7 @@ def create_app(*args, **kw):
     app.json_encoder = FlaskJSONEncoder
 
     # Order matters
-    init_app(app)
+    init_app(app, testmode=testmode)
     check_config(app.config)
 
     init_db(app)
