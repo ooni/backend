@@ -31,9 +31,9 @@ RUN set -x \
 COPY package.json /tmp/package.json
 COPY yarn.lock /tmp/yarn.lock
 
-# Install NPM dependencies
+# Install global yarn dependencies
 RUN set -x \
-    && npm install -g gulp-cli
+    && yarn global add gulp-cli
 
 RUN set -x \
     && cd /tmp \
