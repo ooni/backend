@@ -36,221 +36,41 @@ pages_blueprint = Blueprint(
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
-
-def _latest_reports():
-    q = current_app.db_session.query(Report).order_by("textname DESC").limit(10)
-    return q
-
-
 @pages_blueprint.route("/")
 def index():
-    return render_template("index.html", latest_reports=_latest_reports())
-
+    return render_template("index.html")
 
 @pages_blueprint.route("/stats")
 def stats():
-    return render_template("stats.html")
-
+    return redirect("https://explorer.ooni.org", 301)
 
 @pages_blueprint.route("/files")
 def files_index():
-    return render_template("files/index.html")
-
-
-def _calendarized_count():
-    DT_FRMT = "%Y-%m-%d"
-    one_day = timedelta(days=1)
-
-    q = (
-        current_app.db_session.query(
-            func.count(func.date_trunc("day", Report.test_start_time)),
-            func.date_trunc("day", Report.test_start_time),
-        )
-        .group_by(func.date_trunc("day", Report.test_start_time))
-        .order_by(Report.test_start_time)
-    )
-    if q.first() is None:
-        raise StopIteration
-
-    _, first_date = q.first()
-    count_map = {}
-    for count, day in q:
-        count_map[day] = count
-    last_date = day
-    start = first_date
-
-    # here we pad up the days to the first week
-    pad_from = first_date - timedelta(days=first_date.weekday())
-    current_month = pad_from.month
-    week = []
-    month = []
-    while pad_from <= first_date:
-        week.append([pad_from, -1])
-        pad_from += one_day
-
-    while start <= last_date:
-        if start.month != current_month:
-            current_month = start.month
-            month.append(week)
-            yield month
-            month = []
-            pad_from = start - timedelta(days=start.weekday())
-            week = []
-            while pad_from < start:
-                week.append([pad_from, -2])
-                pad_from += one_day
-
-        count = count_map.get(start.strftime(DT_FRMT), 0)
-        week.append([start, count])
-        if len(week) == 7:
-            month.append(week)
-            week = []
-
-        start += one_day
-
-    while len(week) < 7:
-        week.append([start, -1])
-        start += one_day
-
-    if len(week) > 0:
-        month.append(week)
-
-    yield month
-
-
-def _report_dates():
-    q = (
-        current_app.db_session.query(
-            func.count(func.date_trunc("day", Report.test_start_time)),
-            func.date_trunc("day", Report.test_start_time),
-        )
-        .filter(Report.test_start_time <= datetime.now())
-        .group_by(func.date_trunc("day", Report.test_start_time))
-        .order_by(desc(func.date_trunc("day", Report.test_start_time)))
-    )
-    for row in q:
-        count, day = row
-        yield {"count": count, "date": day.strftime("%Y-%m-%d")}
-
+    return redirect("https://explorer.ooni.org/search", 301)
 
 @pages_blueprint.route("/files/by_date")
 def files_by_date():
-    view = request.args.get("view", "list")
-    if view == "calendar":
-        return render_template("files/by_date_calendar.html")
-        # XXX this is actually not used
-        # calendar_count=_calendarized_count())
-    else:
-        return render_template("files/by_date_list.html", report_dates=_report_dates())
-
-
-def _files_on_date(date, order_by, order):
-    q = (
-        current_app.db_session.query(Report)
-        .filter(func.date_trunc("day", Report.test_start_time) == date)
-        .order_by("%s %s" % (order_by, order))
-    )
-    return q
-
+    return redirect("https://explorer.ooni.org/search", 301)
 
 @pages_blueprint.route("/files/by_date/<date>")
 def files_on_date(date):
     if not DAY_REGEXP.match(date):
         raise BadRequest("Invalid date format")
 
-    order_by = request.args.get("order_by", "test_start_time")
-    order = request.args.get("order", "desc")
-    if order.lower() not in ("desc", "asc"):
-        raise BadRequest("order must be desc or asc")
-
-    if order_by not in (
-        "test_start_time",
-        "probe_cc",
-        "report_id",
-        "test_name",
-        "probe_asn",
-    ):
-        raise BadRequest()
-    return render_template(
-        "files/list.html",
-        report_files=_files_on_date(date, order_by=order_by, order=order),
-        by="date",
-        order=order,
-        order_by=order_by,
-        current_date=date,
-    )
-
-
-def _files_by_country():
-    results = []
-    q = (
-        current_app.db_session.query(func.count(Report.probe_cc), Report.probe_cc)
-        .group_by(Report.probe_cc)
-        .order_by(Report.probe_cc)
-    )
-    for row in q:
-        count, alpha_2 = row
-        country = "Unknown"
-        if alpha_2 != "ZZ":
-            try:
-                c = lookup_country(alpha_2)
-                country = c.name
-            except KeyError:
-                country = "Unknown (%s)" % alpha_2
-        results.append({"count": count, "alpha2": alpha_2, "country": country})
-    results.sort(key=operator.itemgetter("country"))
-    return results
-
+    since = date
+    until = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    return redirect("https://explorer.ooni.org/search?until={}&since={}".format(until, since), 301)
 
 @pages_blueprint.route("/files/by_country")
 def files_by_country():
-    view = request.args.get("view", "list")
-    if view == "flag":
-        return render_template(
-            "files/by_country_flag.html", report_countries=_files_by_country()
-        )
-    else:
-        return render_template(
-            "files/by_country_list.html", report_countries=_files_by_country()
-        )
-
-
-def _files_in_country(country_code, order_by, order):
-    q = (
-        current_app.db_session.query(Report)
-        .filter(Report.probe_cc == country_code)
-        .order_by("%s %s" % (order_by, order))
-    )
-    return q
-
+    return redirect("https://explorer.ooni.org/search", 301)
 
 @pages_blueprint.route("/files/by_country/<country_code>")
 def files_in_country(country_code):
     if len(country_code) != 2:
         raise BadRequest("Country code must be two characters")
     country_code = country_code.upper()
-
-    order_by = request.args.get("order_by", "test_start_time")
-    order = request.args.get("order", "desc")
-    if order.lower() not in ("desc", "asc"):
-        raise BadRequest()
-    if order_by not in (
-        "test_start_time",
-        "probe_cc",
-        "report_id",
-        "test_name",
-        "probe_asn",
-    ):
-        raise BadRequest()
-    return render_template(
-        "files/list.html",
-        report_files=_files_in_country(country_code, order_by=order_by, order=order),
-        by="country",
-        order=order,
-        order_by=order_by,
-        current_country=country_code,
-    )
-
+    return redirect("https://explorer.ooni.org/search?probe_cc={}".format(country_code), 301)
 
 def decompress_autoclaved(
     autoclaved_filename, frame_off, total_frame_size, intra_off, report_size
@@ -385,5 +205,7 @@ def backward_compatible_download(date, report_file):
 @pages_blueprint.route("/<date>")
 def backward_compatible_by_date(date):
     if DAY_REGEXP.match(date):
-        return redirect("/files/by_date/%s" % date)
+        since = date
+        until = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        return redirect("https://explorer.ooni.org/search?until={}&since={}".format(until, since), 301)
     raise NotFound

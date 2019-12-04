@@ -27,54 +27,6 @@
       <p>Join the OONI data analyst community and help uncover internet censorship worldwide!</p>
       <a class='btn btn-default read-the-docs' href="/api/">READ THE API DOCS</a>
 
-      <h2 style="padding-top: 40px">Latest Measurements</h2>
-
-      <table class="table table-striped">
-      <thead>
-      <tr>
-        <th>
-          ASN
-        </th>
-        <th>
-          Country code
-        </th>
-
-        <th>
-          Test Start Time
-        </th>
-        <th>
-          Test Name
-        </th>
-        <th></th>
-      </tr>
-      </thead>
-      <tbody>
-      {% for report_file in latest_reports %}
-        <tr>
-          <td>
-            AS{{ report_file.probe_asn }}
-          </td>
-
-          <td>
-            {{ report_file.probe_cc }}
-          </td>
-
-          <td>
-            {{ report_file.test_start_time }}
-          </td>
-          <td>
-            {{ report_file.test_name }}
-          </td>
-          <td>
-            <a href="/files/download/{{ report_file.textname }}">Download</a>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-      </table>
-
-      <a class="btn btn-default" href="/files">MORE MEASUREMENTS</a>
-
   </div>
 </div>
 {% endblock %}
