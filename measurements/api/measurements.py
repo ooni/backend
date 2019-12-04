@@ -107,11 +107,11 @@ def list_files(
     if since_index:
         q = q.filter(Report.report_no > report_no)
 
-    q = q.order_by(text("{} {}".format(order_by, order)))
     count = q.count()
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
 
+    q = q.order_by(text("{} {}".format(order_by, order)))
     q = q.limit(limit).offset(offset)
     next_args = request.args.to_dict()
     next_args["offset"] = "%s" % (offset + limit)
