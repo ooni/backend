@@ -1,4 +1,4 @@
-Source: fastpath
+Source: detector
 Section: python
 Priority: optional
 Maintainer: Federico Ceratto <federico@debian.org>
@@ -16,7 +16,7 @@ Build-Depends: debhelper-compat (= 12),
  python3-ujson
 Standards-Version: 4.1.3
 
-Package: fastpath
+Package: detector
 Architecture: all
 Depends: ${misc:Depends},
  ${python3:Depends},
@@ -33,5 +33,5 @@ Suggests:
  bpython3,
  python3-pytest,
  python3-pytest-benchmark
-Description: OONI Fastpath
- OONI Fastpath
+Description: OONI Event Detector
+ OONI Event Detector

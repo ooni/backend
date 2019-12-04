@@ -1,0 +1,36 @@
+[Unit]
+Description=OONI Detector Webapp
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/detector --webapp
+Restart=on-abort
+Type=simple
+RestartSec=2s
+WorkingDirectory=/var/lib/detector
+
+User=fastpath
+Group=fastpath
+ReadOnlyDirectories=/
+ReadWriteDirectories=/proc/self
+
+StandardOutput=syslog+console
+StandardError=syslog+console
+
+PermissionsStartOnly=true
+LimitNOFILE=65536
+
+# Hardening
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+SystemCallFilter=~@clock @debug @cpu-emulation @keyring @module @mount @obsolete @raw-io @reboot @swap
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+
+[Install]
+WantedBy=multi-user.target
