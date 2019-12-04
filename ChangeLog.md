@@ -1,3 +1,13 @@
+# ooni-api 1.2.0 [2019-12-04]
+
+Removed:
+
+* Removed the files and stats pages
+
+Changed:
+
+* Improved the performance of the count() in the list_files endpoint
+
 # ooni-api 1.1.7 [2019-09-12]
 
 Changed:
