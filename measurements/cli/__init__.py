@@ -1,5 +1,4 @@
 import os
-import click
 from flask import current_app
 from flask.cli import FlaskGroup, with_appcontext
 
