@@ -2,6 +2,7 @@
 # Web frameworks
 Flask==1.0.2
 Flask-Cors==3.0.6
+Flask-Limiter==1.0.1
 Flask-Misaka==0.4.1
 Flask-Script==2.0.6
 Werkzeug==0.15.6

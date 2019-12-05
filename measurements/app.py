@@ -8,16 +8,15 @@ import datetime
 import sys
 import os
 
-from flask import Flask, json
+from flask import Flask, json, request
 from flask_misaka import Misaka
 from flask_cors import CORS
+import flask_limiter
 
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
 from decimal import Decimal
-from sqlalchemy.types import Float
-from measurements import config
 from measurements.database import init_db
 
 APP_DIR = os.path.dirname(__file__)
@@ -94,6 +93,22 @@ def init_app(app, testmode=False):
 def check_config(config):
     pass
 
+def extract_client_ipaddr_for_throttling():
+    # TODO: move addrs to an external config file /etc/ooniapi.conf ?
+    prometheus_ipaddr = "37.218.245.43"
+    ams_explorer_ipaddr = "37.218.242.149"
+    real_ipaddrs = request.headers.getlist("X-Real-IP")
+    if not real_ipaddrs:
+        # no throttling from localhost connections
+        return None
+
+    ipaddr = real_ipaddrs[0]
+    if ipaddr in (prometheus_ipaddr, ams_explorer_ipaddr):
+        # no throttling
+        return None
+
+    return ipaddr
+
 
 def create_app(*args, testmode=False, **kw):
     from measurements import views
@@ -109,6 +124,14 @@ def create_app(*args, testmode=False, **kw):
     check_config(app.config)
 
     init_db(app)
+
+    # Setup throttling
+    app.limiter = flask_limiter.Limiter(
+        app=app,
+        key_func=extract_client_ipaddr_for_throttling,
+        headers_enabled=True,
+        default_limits=["5500 per day", "400 per hour"],
+    )
 
     views.register(app)
 

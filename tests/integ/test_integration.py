@@ -1,4 +1,3 @@
-# -*- coding: future_fstrings -*-
 """
 Integration test for API
 
@@ -178,12 +177,60 @@ def api(client, subpath):
     return response.json
 
 
+def test_redirects_and_rate_limit(client):
+    # Simulate a forwarded client with a different ipaddr
+    # In production the API sits behind Nginx
+    headers={"X-Real-IP": "1.2.3.4"}
+    limit = 400 - 1
+    resp = client.get("/stats", headers=headers)
+    assert resp.status_code == 301
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
+
+    # Second GET: expect rate limiting decrease
+    resp = client.get("/stats", headers=headers)
+    assert resp.status_code == 301
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 1
+
+    resp = client.get("/files", headers=headers)
+    assert resp.status_code == 301
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
+
+    resp = client.get("/files/by_date", headers=headers)
+    assert resp.status_code == 301
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
+
+
+def test_redirects_and_rate_limit_for_explorer(client):
+    # Special ipaddr: no rate limiting. No header is set by the server
+    headers={"X-Real-IP": "37.218.242.149"}
+    resp = client.get("/stats", headers=headers)
+    assert resp.status_code == 301
+    assert "X-RateLimit-Remaining" not in resp.headers
+
+    resp = client.get("/stats", headers=headers)
+    assert resp.status_code == 301
+    assert "X-RateLimit-Remaining" not in resp.headers
+
+
 def test_list_measurements(client):
     # A single measurement from 2017
     rid = "20171125T172144Z_AS45595_qutf6uDIgFxgJK6ROMElwgHJZxhibiBapLomWzzoNQhsP5KGW2"
     inp = "https://www.facebook.com"
     response = api(client, f"measurements?report_id={rid}&input={inp}")
     assert response["metadata"]["count"] == 1, jd(response)
+
+
+def test_list_measurements_search(client):
+    # Explorer is called with:
+    # https://explorer.ooni.org/search?until=2019-12-05&domain=malaysia.msn.com&probe_cc=MM
+    # ...leading to an API call to:
+    # api.ooni.io/api/v1/measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50
+    response = api(
+        client,
+        f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50",
+    )
+    assert len(response["results"]) == 50, jd(response)
+    # assert response["metadata"]["count"] == 1, jd(response)
 
 
 def test_list_measurements_duplicate(client):
