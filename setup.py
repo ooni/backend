@@ -88,7 +88,7 @@ setup(
     url="https://ooni.torproject.org",
     license="BSD 2 clause",
     description="Open Observatory of Network Interference Backend",
-    long_description=readme + '\n\n' + changelog,
+    long_description="ooni backend infrastructure",
     scripts=["bin/oonib", "bin/oonibadmin", "bin/archive_oonib_reports"],
     packages=find_packages(),
     data_files=data_files,
