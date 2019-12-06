@@ -122,6 +122,7 @@ Configure bouncer and collector endpoints
 
 The bouncer and collector are HTTP applications ("protocols" in twisted terminology) that can be configured to run on top of plain TCP, TLS, or onion service endpoints.
 Here is an example of the relevant part of the configuration::
+
     bouncer_endpoints:
     - {type: tls, port: 10443, cert: "private/fullchain.pem", privkey: "private/privkey.pem"}
     - {type: tcp, port: 10080}
@@ -188,7 +189,7 @@ This can be specified like follows::
             - {address: 'https://web-connectivity.ooni.io', type: 'https'}
             - {address: 'http://web-connectivity.ooni.io', type: 'http'}
             - {address: 'https://xxxxxxxxx.cloudfront.net', type: 'cloudfront', front: 'a0.awsstatic.com'}
-      
+
 Also collectors can have a set of alternate addresses. These can be
 specified inside of the `collector-alternate` key under the collector
 address like so::
