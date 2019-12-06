@@ -180,7 +180,7 @@ def api(client, subpath):
 def test_redirects_and_rate_limit(client):
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
-    headers={"X-Real-IP": "1.2.3.4"}
+    headers = {"X-Real-IP": "1.2.3.4"}
     limit = 400 - 1
     resp = client.get("/stats", headers=headers)
     assert resp.status_code == 301
@@ -202,7 +202,7 @@ def test_redirects_and_rate_limit(client):
 
 def test_redirects_and_rate_limit_for_explorer(client):
     # Special ipaddr: no rate limiting. No header is set by the server
-    headers={"X-Real-IP": "37.218.242.149"}
+    headers = {"X-Real-IP": "37.218.242.149"}
     resp = client.get("/stats", headers=headers)
     assert resp.status_code == 301
     assert "X-RateLimit-Remaining" not in resp.headers
@@ -407,3 +407,19 @@ def test_get_measurement_joined_multi(app, client, shared_rid_input_multi):
     for f in ("probe_asn", "probe_cc", "report_id", "input", "test_name"):
         # (measurement_start_time differs in the timezone letter)
         assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
+
+
+@pytest.mark.get_measurement
+def test_bug_355_confirmed(app, client):
+    p = "measurements?probe_cc=IQ&limit=50&confirmed=true"
+    response = api(client, p)
+    for r in response["results"]:
+        assert r["confirmed"] == True, r
+
+
+@pytest.mark.get_measurement
+def test_bug_355_anomaly(app, client):
+    p = "measurements?probe_cc=IQ&limit=50&anomaly=true"
+    response = api(client, p)
+    for r in response["results"]:
+        assert r["anomaly"] == True, r
