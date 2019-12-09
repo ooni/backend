@@ -1,3 +1,9 @@
+# ooni-api 1.2.1 [2019-12-09]
+
+Fixes:
+
+* Exclude fastpath measurements when filtering by confirmed
+
 # ooni-api 1.2.0 [2019-12-04]
 
 Removed:
@@ -7,6 +13,10 @@ Removed:
 Changed:
 
 * Improved the performance of the count() in the list_files endpoint
+
+Added:
+
+* Support for querying fastpath measurements
 
 # ooni-api 1.1.7 [2019-09-12]
 
