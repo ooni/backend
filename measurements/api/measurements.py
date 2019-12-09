@@ -17,7 +17,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import func, or_, and_, false, text, select, sql, column
-from sqlalchemy import String, cast
+from sqlalchemy import String, cast, Float
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
@@ -501,7 +501,9 @@ def list_measurements(
         Fastpath.measurement_start_time.label("measurement_start_time"),
         func.concat(FASTPATH_MSM_ID_PREFIX, Fastpath.tid).label("measurement_id"),
         func.coalesce(0).label("m_report_no"),
-        func.coalesce(false()).label("anomaly"),
+        func.coalesce(
+            (cast(cast(Fastpath.scores["blocking_general"], String), Float) > 0.5)
+        ).label("anomaly"),
         func.coalesce(false()).label("confirmed"),
         func.coalesce(false()).label("msm_failure"),
         cast(Fastpath.scores.label("scores"), String),
@@ -537,7 +539,15 @@ def list_measurements(
         fpq = fpq.filter(Fastpath.test_name == test_name)
     if input_:
         fpq = fpq.filter(Fastpath.input == input_)
-
+    # TODO, we don't support filtering by confirmed filter in the fastpath, so
+    # we exclude all the fastpath measurements when filtering by confirmed is
+    # set
+    if confirmed is not None:
+        fpq = fpq.filter(False)
+    if anomaly is not None:
+        fpq = fpq.filter(
+            cast(cast(Fastpath.scores["blocking_general"], String), Float) > 0.5
+        )
     if order_by is not None:
         q = q.order_by(text("{} {}".format(order_by, order)))
     q = q.limit(limit).offset(offset)

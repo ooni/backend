@@ -6,9 +6,11 @@ They require a readonly user and connectivity to the database.
 
 Examples using database with port forwarding:
 
-DATABASE_URL=postgresql://readonly@localhost:5433/metadb tox -qq -e integ -s --show-capture=no tests/integ/test_integration.py
+DATABASE_URL=postgresql://readonly@localhost:5433/metadb tox -qq -e integ -- -s --show-capture=no tests/integ/test_integration.py
 
-DATABASE_URL=postgresql://readonly@localhost:5433/metadb tox -qq -e integ --  -f -x -s --show-capture=no
+DATABASE_URL=postgresql://readonly@localhost:5433/metadb tox -qq -e integ -- -s --show-capture=no -f -x
+
+The options after the double dash "--" are passed to pytest.
 
 Use --show-capture=no to avoid multiple log chunks
 Use -s to show logs in real time
