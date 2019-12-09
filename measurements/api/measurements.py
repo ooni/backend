@@ -539,6 +539,9 @@ def list_measurements(
         fpq = fpq.filter(Fastpath.test_name == test_name)
     if input_:
         fpq = fpq.filter(Fastpath.input == input_)
+    # TODO, we don't support filtering by confirmed filter in the fastpath, so
+    # we exclude all the fastpath measurements when filtering by confirmed is
+    # set
     if confirmed is not None:
         fpq = fpq.filter(False)
     if anomaly is not None:
