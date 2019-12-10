@@ -539,6 +539,18 @@ def list_measurements(
         fpq = fpq.filter(Fastpath.test_name == test_name)
     if input_:
         fpq = fpq.filter(Fastpath.input == input_)
+    elif domain:
+        if test_name in [None, "web_connectivity", "http_requests"]:
+            fpq = fpq.filter(
+                or_(
+                    Fastpath.input.startswith(domain),
+                    Fastpath.input.startswith("http://" + domain),
+                    Fastpath.input.startswith("https://" + domain),
+                )
+            )
+        else:
+            fpq = fpq.filter(Fastpath.input.startswith(domain))
+
     # TODO, we don't support filtering by confirmed filter in the fastpath, so
     # we exclude all the fastpath measurements when filtering by confirmed is
     # set
