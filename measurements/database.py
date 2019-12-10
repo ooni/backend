@@ -65,7 +65,8 @@ def init_query_logging(app):
         conn, cursor, statement, parameters, context, executemany
     ):
         conn.info.setdefault("query_start_time", []).append(time.time())
-        app.logger.debug("Starting query: %s", cursor.mogrify(statement, parameters))
+        query = cursor.mogrify(statement, parameters).decode()
+        app.logger.debug("Starting query: ---- %s ----", query)
 
     @event.listens_for(Engine, "after_cursor_execute")
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
