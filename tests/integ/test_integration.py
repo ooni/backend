@@ -5,8 +5,9 @@ Warning: this test runs against a real database
 See README.adoc
 """
 
-import os
+from datetime import datetime
 import json
+import os
 
 import pytest
 
@@ -423,3 +424,14 @@ def test_bug_355_anomaly(app, client):
     response = api(client, p)
     for r in response["results"]:
         assert r["anomaly"] == True, r
+
+
+def test_bug_142_twitter(app, client):
+    # we can assume there's always enough data
+    ts = datetime.utcnow().date().strftime("%Y-%m-%d")
+    p = "measurements?domain=twitter.com&until=%s&limit=50" % ts
+    response = api(client, p)
+    rows = tuple(response["results"])
+    assert len(rows) == 50
+    for r in rows:
+        assert "twitter" in r["input"], r
