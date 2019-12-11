@@ -1,3 +1,9 @@
+# ooni-api 1.2.2 [2019-12-11]
+
+Fixes:
+
+* Issue in filtering by domain on fastpath
+
 # ooni-api 1.2.1 [2019-12-09]
 
 Fixes:
