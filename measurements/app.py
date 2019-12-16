@@ -15,6 +15,7 @@ import flask_limiter
 
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
+from sentry_sdk.integrations.logging import ignore_logger
 
 from decimal import Decimal
 from measurements.database import init_db
@@ -83,6 +84,10 @@ def init_app(app, testmode=False):
             dsn="https://dcb077b34ac140d58a7c37609cea0cf9@sentry.io/1367288",
             integrations=[FlaskIntegration()],
         )
+        # We ignore flask-limiter logs due to:
+        # https://github.com/ooni/api/issues/145
+        # & https://github.com/alisaifee/flask-limiter/issues/186
+        ignore_logger("flask-limiter")
 
     md = Misaka(fenced_code=True)
     md.init_app(app)
