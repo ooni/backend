@@ -186,3 +186,9 @@ class Fastpath(Base):
     measurement_start_time = Column(DateTime)
     filename = Column(String)
     scores = Column(JSON)
+
+class Domain_input(Base):
+    __tablename__ = "domain_input"
+    domain = Column(String, primary_key=True)
+    input = Column(String)
+    input_no = Column(Integer)

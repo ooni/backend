@@ -435,3 +435,19 @@ def test_bug_142_twitter(app, client):
     assert len(rows) == 50
     for r in rows:
         assert "twitter" in r["input"], r
+
+
+def test_slow_inexistent_domain(app, client):
+    # time-unbounded query, filtering by a domain never monitored
+    p = "measurements?domain=meow.com&until=2019-12-11&limit=50"
+    response = api(client, p)
+    rows = tuple(response["results"])
+    assert len(rows) == 0
+
+
+def test_slow_domain(app, client):
+    # time-unbounded query, filtering by a popular domain
+    p = "measurements?domain=twitter.com&until=2019-12-11&limit=50"
+    response = api(client, p)
+    rows = tuple(response["results"])
+    assert rows

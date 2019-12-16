@@ -26,7 +26,14 @@ from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
-from measurements.models import Report, Input, Measurement, Autoclaved, Fastpath
+from measurements.models import (
+    Autoclaved,
+    Domain_input,
+    Fastpath,
+    Input,
+    Measurement,
+    Report,
+)
 
 MSM_ID_PREFIX = "temp-id"
 FASTPATH_MSM_ID_PREFIX = "temp-fid-"
@@ -270,33 +277,23 @@ def input_cte(input_, domain, test_name):
     if not input_ and not domain:
         return None
 
-    where_or = []
     if input_:
-        where_or.append(text("input.input LIKE :i").bindparams(i="%{}%".format(input_)))
-
-    else:
-        domain_filter = "{}%".format(domain)
-        where_or.append(
-            text("input.input LIKE :domain_filter").bindparams(
-                domain_filter=domain_filter
+        # FIXME: bug on left "%"
+        where_or = [text("input.input LIKE :i").bindparams(i="%{}%".format(input_))]
+        url_q = (
+            select(
+                [column("input").label("input"), column("input_no").label("input_no")]
             )
+            .where(or_(*where_or))
+            .select_from(sql.table("input"))
         )
-        if test_name in [None, "web_connectivity", "http_requests"]:
-            where_or.append(
-                text("input.input LIKE :http_filter").bindparams(
-                    http_filter="http://{}".format(domain_filter)
-                )
-            )
-            where_or.append(
-                text("input.input LIKE :https_filter").bindparams(
-                    https_filter="https://{}".format(domain_filter)
-                )
-            )
+        return url_q.cte("input_cte")
 
+    # Filter by domain using the domain_input table
     url_q = (
         select([column("input").label("input"), column("input_no").label("input_no")])
-        .where(or_(*where_or))
-        .select_from(sql.table("input"))
+        .where(column("domain") == domain)
+        .select_from(sql.table("domain_input"))
     )
 
     return url_q.cte("input_cte")
@@ -540,16 +537,7 @@ def list_measurements(
     if input_:
         fpq = fpq.filter(Fastpath.input == input_)
     elif domain:
-        if test_name in [None, "web_connectivity", "http_requests"]:
-            fpq = fpq.filter(
-                or_(
-                    Fastpath.input.startswith(domain),
-                    Fastpath.input.startswith("http://" + domain),
-                    Fastpath.input.startswith("https://" + domain),
-                )
-            )
-        else:
-            fpq = fpq.filter(Fastpath.input.startswith(domain))
+        raise NotImplementedError
 
     # TODO, we don't support filtering by confirmed filter in the fastpath, so
     # we exclude all the fastpath measurements when filtering by confirmed is
