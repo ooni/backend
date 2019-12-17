@@ -494,73 +494,96 @@ def list_measurements(
     fpcols = [
         func.coalesce(0).label("m_input_no"),
         # We use test_start_time here as the batch pipeline has many NULL measurement_start_times
-        Fastpath.measurement_start_time.label("test_start_time"),
-        Fastpath.measurement_start_time.label("measurement_start_time"),
-        func.concat(FASTPATH_MSM_ID_PREFIX, Fastpath.tid).label("measurement_id"),
+        sql.text("measurement_start_time as test_start_time"),
+        sql.text("measurement_start_time"),
+        func.concat(FASTPATH_MSM_ID_PREFIX, sql.text("tid")).label("measurement_id"),
         func.coalesce(0).label("m_report_no"),
         func.coalesce(
-            (cast(cast(Fastpath.scores["blocking_general"], String), Float) > 0.5)
+            (cast(cast(sql.text("scores->>'blocking_general'"), String), Float) > 0.5)
         ).label("anomaly"),
         func.coalesce(false()).label("confirmed"),
         func.coalesce(false()).label("msm_failure"),
-        cast(Fastpath.scores.label("scores"), String),
+        cast(sql.text("scores"), String),
         func.coalesce([0]).label("exc"),
         func.coalesce(0).label("residual_no"),
-        Fastpath.report_id.label("report_id"),
-        Fastpath.probe_cc.label("probe_cc"),
-        Fastpath.probe_asn.label("probe_asn"),
-        Fastpath.test_name.label("test_name"),
+        sql.text("report_id"),
+        sql.text("probe_cc"),
+        sql.text("probe_asn"),
+        sql.text("test_name"),
         func.coalesce(0).label("report_no"),
     ]
     if cte is None:
-        fpcols.append(Fastpath.input.label("input"))
+        fpcols.append(sql.text("input"))
         assert len(fpcols) == len(cols)
     else:
-        fpcols.append(Fastpath.input.label("input_cte_input"))
+        fpcols.append(sql.text("input as input_cte_input"))
         fpcols.append(func.coalesce(0).label("input_cte_input_no"))
         assert len(fpcols) == len(cols) + 1
 
-    fpq = current_app.db_session.query(*fpcols)
-
+    where_clause = []
+    query_params = {}
     if since is not None:
-        fpq = fpq.filter(Fastpath.measurement_start_time > since)
+        query_params["since"] = since
+        where_clause.append(sql.text("measurement_start_time > :since"))
     if until is not None:
-        fpq = fpq.filter(Fastpath.measurement_start_time <= until)
+        query_params["until"] = until
+        where_clause.append(sql.text("measurement_start_time <= :until"))
     if report_id:
-        fpq = fpq.filter(Fastpath.report_id == report_id)
+        query_params["report_id"] = report_id
+        where_clause.append(sql.text("report_id = :report_id"))
     if probe_cc:
-        fpq = fpq.filter(Fastpath.probe_cc == probe_cc)
+        query_params["probe_cc"] = probe_cc
+        where_clause.append(sql.text("probe_cc = :probe_cc"))
     if probe_asn is not None:
-        fpq = fpq.filter(Fastpath.probe_asn == probe_asn)
+        query_params["probe_asn"] = probe_asn
+        where_clause.append(sql.text("probe_asn = :probe_asn"))
     if test_name is not None:
-        fpq = fpq.filter(Fastpath.test_name == test_name)
-    if input_:
-        fpq = fpq.filter(Fastpath.input == input_)
-    elif domain:
-        raise NotImplementedError
+        query_params["test_name"] = test_name
+        where_clause.append(sql.text("test_name = :test_name"))
 
     # TODO, we don't support filtering by confirmed filter in the fastpath, so
     # we exclude all the fastpath measurements when filtering by confirmed is
     # set
     if confirmed is not None:
-        fpq = fpq.filter(False)
+        where_clause.append(sql.text("false"))
     if anomaly is not None:
-        fpq = fpq.filter(
-            cast(cast(Fastpath.scores["blocking_general"], String), Float) > 0.5
-        )
+        where_clause.append(sql.text("scores->>'blocking_general' > 0.5"))
+    # Assemble the query
     if order_by is not None:
         q = q.order_by(text("{} {}".format(order_by, order)))
     q = q.limit(limit).offset(offset)
     # Assemble the query
 
+    fpq_table = sql.table("fastpath")
+
+    if input_:
+        query_params["input"] = input_
+        where_clause.append(sql.text("input = :input"))
+    elif domain:
+        query_params["domain"] = input_
+        where_clause.append(sql.text("domain = :domain"))
+        fpq_table  = fpq_table.join(
+                sql.table("domain_input"),
+                sql.text("domain_input.input = domain_input.input"),
+            )
+
+    s = (
+        select(fpcols)
+        .where(
+            and_(*where_clause)
+        )
+        .select_from(fpq_table)
+    )
+    if order_by is not None:
+        s = s.order_by(text("{} {}".format(order_by, order)))
+    s = s.limit(limit).offset(offset)
+
+    fpq = current_app.db_session.query(s, query_params)
     try:
-        if order_by is not None:
-            fpq = fpq.order_by(text("{} {}".format(order_by, order)))
-        fpq = fpq.limit(limit).offset(offset)
         q = q.union(fpq)
     except:
         log_query(log, q)
-        log_query(log, fpq)
+        # log_query(log, fpq)
         raise
 
     if order_by is not None:
