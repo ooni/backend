@@ -578,7 +578,7 @@ def list_measurements(
         s = s.order_by(text("{} {}".format(order_by, order)))
     s = s.limit(limit).offset(offset)
 
-    fpq = current_app.db_session.query(s, query_params)
+    fpq = current_app.db_session.execute(s, query_params)
     try:
         q = q.union(fpq)
     except:
