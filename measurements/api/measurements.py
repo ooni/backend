@@ -17,6 +17,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import func, or_, and_, false, text, select, sql, column
+from sqlalchemy.sql import literal_column
 from sqlalchemy import String, cast, Float
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.exc import OperationalError
@@ -28,8 +29,6 @@ from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
 from measurements.models import (
     Autoclaved,
-    Domain_input,
-    Fastpath,
     Input,
     Measurement,
     Report,
@@ -268,39 +267,12 @@ def get_measurement(measurement_id, download=None):
     return response
 
 
-def input_cte(input_, domain, test_name):
-    """Given a domain or an input_, build a WHERE filter
-    """
-    if input_ and domain:
-        raise BadRequest("Must pick either domain or input")
-
-    if not input_ and not domain:
-        return None
-
-    if input_:
-        # FIXME: bug on left "%"
-        where_or = [text("input.input LIKE :i").bindparams(i="%{}%".format(input_))]
-        url_q = (
-            select(
-                [column("input").label("input"), column("input_no").label("input_no")]
-            )
-            .where(or_(*where_or))
-            .select_from(sql.table("input"))
-        )
-        return url_q.cte("input_cte")
-
-    # Filter by domain using the domain_input table
-    url_q = (
-        select([column("input").label("input"), column("input_no").label("input_no")])
-        .where(column("domain") == domain)
-        .select_from(sql.table("domain_input"))
-    )
-
-    return url_q.cte("input_cte")
-
-
 def log_query(log, q):
     import sqlparse  # debdeps: python3-sqlparse
+
+    if "Select" in repr(type(q)): # UGLY
+        log.info("\n--- query ---\n\n%s\n\n-------------", q)
+        return
 
     sql = str(
         q.statement.compile(
@@ -364,6 +336,7 @@ def list_measurements(
     failure=None,
     anomaly=None,
     confirmed=None,
+    category_code=None,
 ):
     """Search for measurements using only the database. Provide pagination.
     """
@@ -417,185 +390,189 @@ def list_measurements(
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
-    ## Create SQL query
-    c_anomaly = func.coalesce(Measurement.anomaly, false()).label("anomaly")
-    c_confirmed = func.coalesce(Measurement.confirmed, false()).label("confirmed")
-    c_msm_failure = func.coalesce(Measurement.msm_failure, false()).label("msm_failure")
+    ## Create measurement+report colums for SQL query
     cols = [
-        Measurement.input_no.label("m_input_no"),
-        Measurement.measurement_start_time.label("measurement_start_time"),
-        Report.test_start_time.label("test_start_time"),
-        func.concat(MSM_ID_PREFIX, "-", Measurement.msm_no).label("measurement_id"),
-        Measurement.report_no.label("m_report_no"),
-        c_anomaly,
-        c_confirmed,
-        c_msm_failure,
+        #sql.text("measurement.input_no"),
+        literal_column("report.test_start_time").label("test_start_time"),
+        literal_column("measurement.measurement_start_time").label("measurement_start_time"),
+        func.concat( MSM_ID_PREFIX, "-", sql.text("measurement.msm_no")).label("measurement_id"),
+        literal_column("measurement.report_no").label("m_report_no"),
+        func.coalesce(sql.text("measurement.anomaly"), false()).label("anomaly"),
+        func.coalesce(sql.text("measurement.confirmed"), false()).label("confirmed"),
+        func.coalesce(sql.text("measurement.msm_failure"), false()).label( "msm_failure"),
         func.coalesce("{}").label("scores"),
-        Measurement.exc.label("exc"),
-        Measurement.residual_no.label("residual_no"),
-        Report.report_id.label("report_id"),
-        Report.probe_cc.label("probe_cc"),
-        Report.probe_asn.label("probe_asn"),
-        Report.test_name.label("test_name"),
-        Report.report_no.label("report_no"),
+        literal_column("measurement.exc").label("exc"),
+        literal_column("measurement.residual_no").label("residual_no"),
+        literal_column("report.report_id").label("report_id"),
+        literal_column("report.probe_cc").label("probe_cc"),
+        literal_column("report.probe_asn").label("probe_asn"),
+        literal_column("report.test_name").label("test_name"),
+        literal_column("report.report_no").label("report_no"),
+        literal_column("domain_input.input").label("input"),
     ]
 
-    cte = input_cte(input_=input_, domain=domain, test_name=test_name)
-
-    if cte is not None:
-        cols.append(cte)
-    else:
-        cols.append(func.coalesce(Input.input, None).label("input"))
-
-    q = current_app.db_session.query(*cols)
-    if cte is not None:
-        q = q.join(cte, sql.text("input_cte.input_no = measurement.input_no"))
-    else:
-        q = q.outerjoin(Input, Measurement.input_no == Input.input_no)
-    q = q.join(Report, Report.report_no == Measurement.report_no)
-
-    q.join(Report, Report.report_no == Measurement.report_no)
-    if report_id:
-        q = q.filter(Report.report_id == report_id)
-    if probe_cc:
-        q = q.filter(Report.probe_cc == probe_cc)
-    if probe_asn is not None:
-        q = q.filter(Report.probe_asn == probe_asn)
-    if test_name is not None:
-        q = q.filter(Report.test_name == test_name)
-    if since is not None:
-        q = q.filter(Measurement.measurement_start_time > since)
-    if until is not None:
-        q = q.filter(Measurement.measurement_start_time <= until)
-
-    if confirmed is not None:
-        q = q.filter(c_confirmed == confirmed)
-    if anomaly is not None:
-        q = q.filter(c_anomaly == anomaly)
-    if failure is True:
-        q = q.filter(
-            or_(
-                Measurement.exc != None,
-                Measurement.residual_no != None,
-                c_msm_failure == True,
-            )
-        )
-    if failure is False:
-        q = q.filter(
-            and_(
-                Measurement.exc == None,
-                Measurement.residual_no == None,
-                c_msm_failure == False,
-            )
-        )
-
-    ## Create a query for fastpath
-
+    ## Create fastpath columns for query
     fpcols = [
-        func.coalesce(0).label("m_input_no"),
+        #func.coalesce(0).label("m_input_no"),
         # We use test_start_time here as the batch pipeline has many NULL measurement_start_times
-        sql.text("measurement_start_time as test_start_time"),
-        sql.text("measurement_start_time"),
+        literal_column("measurement_start_time").label("test_start_time"),
+        literal_column("measurement_start_time").label("measurement_start_time"),
         func.concat(FASTPATH_MSM_ID_PREFIX, sql.text("tid")).label("measurement_id"),
         func.coalesce(0).label("m_report_no"),
-        func.coalesce(
-            (cast(cast(sql.text("scores->>'blocking_general'"), String), Float) > 0.5)
-        ).label("anomaly"),
+        func.coalesce( (cast(cast(sql.text("scores->>'blocking_general'"), String), Float) > 0.5)).label("anomaly"),
         func.coalesce(false()).label("confirmed"),
         func.coalesce(false()).label("msm_failure"),
-        cast(sql.text("scores"), String),
+        cast(sql.text("scores"), String).label("scores"),
         func.coalesce([0]).label("exc"),
         func.coalesce(0).label("residual_no"),
-        sql.text("report_id"),
-        sql.text("probe_cc"),
-        sql.text("probe_asn"),
-        sql.text("test_name"),
+        literal_column("report_id"),
+        literal_column("probe_cc"),
+        literal_column("probe_asn"),
+        literal_column("test_name"),
         func.coalesce(0).label("report_no"),
+        literal_column("fastpath.input").label("input")
     ]
-    if cte is None:
-        fpcols.append(sql.text("input"))
-        assert len(fpcols) == len(cols)
-    else:
-        fpcols.append(sql.text("input as input_cte_input"))
-        fpcols.append(func.coalesce(0).label("input_cte_input_no"))
-        assert len(fpcols) == len(cols) + 1
+    assert len(cols) == len(fpcols)
 
-    where_clause = []
+    mrwhere = []
+    fpwhere = []
     query_params = {}
+
+    # Populate WHERE clauses and query_params dict
+
+    if failure is True:
+        mrwhere.append(sql.text("measurement.exc IS NOT NULL"))
+        mrwhere.append(sql.text("measurement.residual_no IS NOT NULL"))
+        mrwhere.append(sql.text("measurement.msm_failure IS TRUE"))
+
+    if failure is False:
+        mrwhere.append(sql.text("measurement.exc is NULL"))
+        mrwhere.append(sql.text("measurement.residual_no is NULL"))
+        mrwhere.append(sql.text("measurement.msm_failure is FALSE"))
+
     if since is not None:
         query_params["since"] = since
-        where_clause.append(sql.text("measurement_start_time > :since"))
+        mrwhere.append(sql.text("measurement.measurement_start_time > :since"))
+        fpwhere.append(sql.text("measurement_start_time > :since"))
+
     if until is not None:
         query_params["until"] = until
-        where_clause.append(sql.text("measurement_start_time <= :until"))
+        mrwhere.append(sql.text("measurement.measurement_start_time <= :until"))
+        fpwhere.append(sql.text("measurement_start_time <= :until"))
+
     if report_id:
         query_params["report_id"] = report_id
-        where_clause.append(sql.text("report_id = :report_id"))
+        mrwhere.append(sql.text("report.report_id = :report_id"))
+        fpwhere.append(sql.text("report_id = :report_id"))
+
     if probe_cc:
         query_params["probe_cc"] = probe_cc
-        where_clause.append(sql.text("probe_cc = :probe_cc"))
+        mrwhere.append(sql.text("report.probe_cc = :probe_cc"))
+        fpwhere.append(sql.text("probe_cc = :probe_cc"))
+
     if probe_asn is not None:
         query_params["probe_asn"] = probe_asn
-        where_clause.append(sql.text("probe_asn = :probe_asn"))
+        mrwhere.append(sql.text("report.probe_asn = :probe_asn"))
+        fpwhere.append(sql.text("probe_asn = :probe_asn"))
+
     if test_name is not None:
         query_params["test_name"] = test_name
-        where_clause.append(sql.text("test_name = :test_name"))
+        mrwhere.append(sql.text("report.test_name = :test_name"))
+        fpwhere.append(sql.text("test_name = :test_name"))
 
     # TODO, we don't support filtering by confirmed filter in the fastpath, so
     # we exclude all the fastpath measurements when filtering by confirmed is
     # set
     if confirmed is not None:
-        where_clause.append(sql.text("false"))
+        query_params["confirmed"] = confirmed
+        # TODO: coalesce false() ?
+        mrwhere.append(sql.text("measurement.confirmed = :confirmed"))
+        fpwhere.append(sql.text("false"))
+
     if anomaly is not None:
-        where_clause.append(sql.text("scores->>'blocking_general' > 0.5"))
-    # Assemble the query
-    if order_by is not None:
-        q = q.order_by(text("{} {}".format(order_by, order)))
-    q = q.limit(limit).offset(offset)
-    # Assemble the query
+        # TODO: coalesce false() ?
+        query_params["anomaly"] = anomaly
+        mrwhere.append(sql.text("measurement.anomaly = :anomaly"))
+        fpwhere.append(sql.text("scores->>'blocking_general' > 0.5"))
 
     fpq_table = sql.table("fastpath")
-
-    if input_:
-        query_params["input"] = input_
-        where_clause.append(sql.text("input = :input"))
-    elif domain:
-        query_params["domain"] = input_
-        where_clause.append(sql.text("domain = :domain"))
-        fpq_table  = fpq_table.join(
-                sql.table("domain_input"),
-                sql.text("domain_input.input = domain_input.input"),
-            )
-
-    s = (
-        select(fpcols)
-        .where(
-            and_(*where_clause)
-        )
-        .select_from(fpq_table)
+    mr_table = sql.table("measurement").join(
+        sql.table("report"), sql.text("measurement.report_no = report.report_no"),
     )
-    if order_by is not None:
-        s = s.order_by(text("{} {}".format(order_by, order)))
-    s = s.limit(limit).offset(offset)
 
-    fpq = current_app.db_session.execute(s, query_params)
-    try:
-        q = q.union(fpq)
-    except:
-        log_query(log, q)
-        # log_query(log, fpq)
-        raise
+    # Create CTE block and add columns and clauses based on the filters:
+    # input_, domain and test_name
+    if input_ or domain or category_code:
+        # join in domain_input
+        mr_table = mr_table.join(
+            sql.table("domain_input"),
+            sql.text("domain_input.input_no = measurement.input_no")
+        )
+        fpq_table = fpq_table.join(
+            sql.table("domain_input"),
+            sql.text("domain_input.input = fastpath.input")
+        )
 
-    if order_by is not None:
-        q = q.order_by(text("{} {}".format(order_by, order)))
+        if input_:
+            # input_ overrides domain and category_code
+            query_params["input"] = input_
+            mrwhere.append(sql.text("domain_input.input = :input"))
+            fpwhere.append(sql.text("domain_input.input = :input"))
 
-    query_str = str(q.statement.compile(dialect=postgresql.dialect()))
+        else:
+            # both domain and category_code can be set at the same time
+            if domain:
+                query_params["domain"] = domain
+                mrwhere.append(sql.text("domain_input.domain = :domain"))
+                fpwhere.append(sql.text("domain_input.domain = :domain"))
+
+            if category_code:
+                query_params["category_code"] = category_code
+                mr_table = mr_table.join(
+                    sql.table("citizenlab"),
+                    sql.text("citizenlab.url = domain_input.input")
+                )
+                fpq_table = fpq_table.join(
+                    sql.table("citizenlab"),
+                    sql.text("citizenlab.url = domain_input.input")
+                )
+                mrwhere.append(sql.text("citizenlab.category_code = :category_code"))
+                fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
+
+    else:
+        # TODO: add primary key on domain_input
+        mr_table = mr_table.outerjoin(
+            sql.table("domain_input"),
+            sql.text("domain_input.input_no = measurement.input_no")
+        )
+
+    assert len(cols) == len(fpcols)
+    mr_query = select(cols).where(and_(*mrwhere)).select_from(mr_table)
+    fp_query = select(fpcols).where(and_(*fpwhere)).select_from(fpq_table)
+    #if order_by is not None:
+    #    mr_query = mr_query.order_by(text("{} {}".format(order_by, order)))
+    #    fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
+
+    log_query(log, mr_query)
+    log_query(log, fp_query)
+
+    assert len(mr_query.columns) == len(fp_query.columns), "{} {}".format(mr_query.columns, fp_query.columns)
+
+    query = sql.union(
+        mr_query.limit(limit).offset(offset),
+        fp_query.limit(limit).offset(offset)
+    )
+    log.info(query)
+
+    #query_str = str(query.statement.compile(dialect=postgresql.dialect()))
+    #log.error(query_str)
 
     # Run the query, generate the results list
     iter_start_time = time.time()
+    q = current_app.db_session.execute(query, query_params)
 
     with configure_scope() as scope:
-        scope.set_extra("sql_query", query_str)
+        #scope.set_extra("sql_query", query_str)
 
         try:
             tmpresults = []
