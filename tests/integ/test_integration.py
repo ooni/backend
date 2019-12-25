@@ -5,7 +5,7 @@ Warning: this test runs against a real database
 See README.adoc
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 
@@ -20,6 +20,11 @@ from measurements.api.measurements import FASTPATH_MSM_ID_PREFIX
 
 def jd(o):
     return json.dumps(o, indent=2, sort_keys=True)
+
+
+@pytest.fixture()
+def log(app):
+    return app.logger
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -242,15 +247,29 @@ def test_list_measurements_duplicate(client):
     assert response["metadata"]["count"] == 1, jd(response)
 
 
-def test_list_measurements_pagination(client):
-    # Ensure answers stay consistent
+def test_list_measurements_pagination_old(client, log):
+    # Ensure answers stay consistent across calls - using old data
     # https://github.com/ooni/api/issues/49
+    url = "measurements?probe_cc=RU&test_name=web_connectivity&limit=100&offset=5000&since=2018-12-24&until=2018-12-25"
     j = None
-    for n in range(5):
-        new = api(
-            client,
-            f"measurements?probe_cc=IR&test_name=web_connectivity&limit=100&offset=5000",
-        )
+    for n in range(3):
+        log.info(f"{'-' * 20} Cycle {n} {'-' * 20}")
+        new = api(client, url)
+        del new["metadata"]["query_time"]
+        if j is not None:
+            assert j == new
+        j = new
+
+def test_list_measurements_pagination_new(client, log):
+    # Ensure answers stay consistent across calls - using fresh data
+    # https://github.com/ooni/api/issues/49
+    since = (datetime.utcnow().date() - timedelta(days=1)).strftime("%Y-%m-%d")
+    until = datetime.utcnow().date().strftime("%Y-%m-%d")
+    url = f"measurements?probe_cc=RU&test_name=web_connectivity&limit=100&offset=5000&since={since}&until={until}"
+    j = None
+    for n in range(3):
+        log.info(f"{'-' * 20} Cycle {n} {'-' * 20}")
+        new = api(client, url)
         del new["metadata"]["query_time"]
         if j is not None:
             assert j == new
@@ -445,9 +464,15 @@ def test_slow_inexistent_domain(app, client):
     assert len(rows) == 0
 
 
-def test_slow_domain(app, client):
+def test_slow_domain_unbounded(app, client):
     # time-unbounded query, filtering by a popular domain
     p = "measurements?domain=twitter.com&until=2019-12-11&limit=50"
     response = api(client, p)
     rows = tuple(response["results"])
     assert rows
+
+
+def test_slow_domain_bounded(app, client):
+    p = "measurements?domain=twitter.com&since=2019-12-8&until=2019-12-11&limit=50"
+    response = api(client, p)
+    assert len(response["results"]) == 48

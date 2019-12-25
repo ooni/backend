@@ -270,7 +270,7 @@ def get_measurement(measurement_id, download=None):
 def log_query(log, q):
     import sqlparse  # debdeps: python3-sqlparse
 
-    if "Select" in repr(type(q)): # UGLY
+    if "Select" in repr(type(q)):  # UGLY
         log.info("\n--- query ---\n\n%s\n\n-------------", q)
         return
 
@@ -341,7 +341,7 @@ def list_measurements(
     """Search for measurements using only the database. Provide pagination.
     """
     # FIXME: list_measurements and get_measurement will be simplified and
-    # made faster by https://github.com/ooni/pipeline/issues/48
+    # made faster by OOID: https://github.com/ooni/pipeline/issues/48
 
     log = current_app.logger
 
@@ -392,14 +392,20 @@ def list_measurements(
 
     ## Create measurement+report colums for SQL query
     cols = [
-        #sql.text("measurement.input_no"),
+        # sql.text("measurement.input_no"),
         literal_column("report.test_start_time").label("test_start_time"),
-        literal_column("measurement.measurement_start_time").label("measurement_start_time"),
-        func.concat( MSM_ID_PREFIX, "-", sql.text("measurement.msm_no")).label("measurement_id"),
+        literal_column("measurement.measurement_start_time").label(
+            "measurement_start_time"
+        ),
+        func.concat(MSM_ID_PREFIX, "-", sql.text("measurement.msm_no")).label(
+            "measurement_id"
+        ),
         literal_column("measurement.report_no").label("m_report_no"),
         func.coalesce(sql.text("measurement.anomaly"), false()).label("anomaly"),
         func.coalesce(sql.text("measurement.confirmed"), false()).label("confirmed"),
-        func.coalesce(sql.text("measurement.msm_failure"), false()).label( "msm_failure"),
+        func.coalesce(sql.text("measurement.msm_failure"), false()).label(
+            "msm_failure"
+        ),
         func.coalesce("{}").label("scores"),
         literal_column("measurement.exc").label("exc"),
         literal_column("measurement.residual_no").label("residual_no"),
@@ -413,26 +419,22 @@ def list_measurements(
 
     ## Create fastpath columns for query
     fpcols = [
-        #func.coalesce(0).label("m_input_no"),
+        # func.coalesce(0).label("m_input_no"),
         # We use test_start_time here as the batch pipeline has many NULL measurement_start_times
         literal_column("measurement_start_time").label("test_start_time"),
         literal_column("measurement_start_time").label("measurement_start_time"),
         func.concat(FASTPATH_MSM_ID_PREFIX, sql.text("tid")).label("measurement_id"),
-        func.coalesce(0).label("m_report_no"),
-        func.coalesce( (cast(cast(sql.text("scores->>'blocking_general'"), String), Float) > 0.5)).label("anomaly"),
+        func.coalesce(
+            (cast(cast(sql.text("scores->>'blocking_general'"), String), Float) > 0.5)
+        ).label("anomaly"),
         func.coalesce(false()).label("confirmed"),
-        func.coalesce(false()).label("msm_failure"),
         cast(sql.text("scores"), String).label("scores"),
-        func.coalesce([0]).label("exc"),
-        func.coalesce(0).label("residual_no"),
         literal_column("report_id"),
         literal_column("probe_cc"),
         literal_column("probe_asn"),
         literal_column("test_name"),
-        func.coalesce(0).label("report_no"),
-        literal_column("fastpath.input").label("input")
+        literal_column("fastpath.input").label("input"),
     ]
-    assert len(cols) == len(fpcols)
 
     mrwhere = []
     fpwhere = []
@@ -493,24 +495,22 @@ def list_measurements(
         # TODO: coalesce false() ?
         query_params["anomaly"] = anomaly
         mrwhere.append(sql.text("measurement.anomaly = :anomaly"))
-        fpwhere.append(sql.text("scores->>'blocking_general' > 0.5"))
+        # fpwhere.append(sql.text("scores->>'blocking_general' > 0.5"))
+        fpwhere.append(sql.text("false"))
 
     fpq_table = sql.table("fastpath")
     mr_table = sql.table("measurement").join(
         sql.table("report"), sql.text("measurement.report_no = report.report_no"),
     )
 
-    # Create CTE block and add columns and clauses based on the filters:
-    # input_, domain and test_name
     if input_ or domain or category_code:
         # join in domain_input
         mr_table = mr_table.join(
             sql.table("domain_input"),
-            sql.text("domain_input.input_no = measurement.input_no")
+            sql.text("domain_input.input_no = measurement.input_no"),
         )
         fpq_table = fpq_table.join(
-            sql.table("domain_input"),
-            sql.text("domain_input.input = fastpath.input")
+            sql.table("domain_input"), sql.text("domain_input.input = fastpath.input")
         )
 
         if input_:
@@ -530,49 +530,86 @@ def list_measurements(
                 query_params["category_code"] = category_code
                 mr_table = mr_table.join(
                     sql.table("citizenlab"),
-                    sql.text("citizenlab.url = domain_input.input")
+                    sql.text("citizenlab.url = domain_input.input"),
                 )
                 fpq_table = fpq_table.join(
                     sql.table("citizenlab"),
-                    sql.text("citizenlab.url = domain_input.input")
+                    sql.text("citizenlab.url = domain_input.input"),
                 )
                 mrwhere.append(sql.text("citizenlab.category_code = :category_code"))
                 fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
     else:
-        # TODO: add primary key on domain_input
-        mr_table = mr_table.outerjoin(
+        mr_table = mr_table.join(
             sql.table("domain_input"),
-            sql.text("domain_input.input_no = measurement.input_no")
+            sql.text("domain_input.input_no = measurement.input_no"),
         )
 
-    assert len(cols) == len(fpcols)
-    mr_query = select(cols).where(and_(*mrwhere)).select_from(mr_table)
-    fp_query = select(fpcols).where(and_(*fpwhere)).select_from(fpq_table)
-    #if order_by is not None:
-    #    mr_query = mr_query.order_by(text("{} {}".format(order_by, order)))
-    #    fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
+    # We runs SELECTs on the measurement-report (mr) tables and faspath independently
+    # from each other and then merge them.
+    # An ORDER BY + LIMIT on "limit+offset" is applied in each SELECT as a speedup.
+    # During a merge we can find that a measurement is:
+    # - only in fastpath:       get_measurement will pick the JSON msmt from the fastpath host
+    # - in both selects:        pick `scores` from fastpath and the msmt from the can
+    # - only in "mr":           the msmt from the can
+    #
+    # This implements a failover mechanism where new msmts are loaded from fastpath
+    # but can fall back to the traditional pipeline.
 
-    log_query(log, mr_query)
-    log_query(log, fp_query)
-
-    assert len(mr_query.columns) == len(fp_query.columns), "{} {}".format(mr_query.columns, fp_query.columns)
-
-    query = sql.union(
-        mr_query.limit(limit).offset(offset),
-        fp_query.limit(limit).offset(offset)
+    mr_query = (
+        select(cols).where(and_(*mrwhere)).select_from(mr_table).limit(offset + limit)
     )
-    log.info(query)
+    fp_query = (
+        select(fpcols)
+        .where(and_(*fpwhere))
+        .select_from(fpq_table)
+        .limit(offset + limit)
+    )
+    assert order_by  # TODO: is this always true? Was it a bug?
+    if order_by is not None:
+        mr_query = mr_query.order_by(text("{} {}".format(order_by, order)))
+        fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
 
-    #query_str = str(query.statement.compile(dialect=postgresql.dialect()))
-    #log.error(query_str)
+    mr_query = mr_query.alias("mr")
+    fp_query = fp_query.alias("fp")
+
+    j = fp_query.join(
+        mr_query,
+        sql.text("fp.input = mr.input AND fp.report_id = mr.report_id"),
+        full=True,
+    )
+
+    def coal(colname):
+        return func.coalesce(
+            literal_column(f"fp.{colname}"), literal_column(f"mr.{colname}")
+        ).label(colname)
+
+    merger = [
+        coal("test_start_time"),
+        coal("measurement_start_time"),
+        coal("measurement_id"),
+        func.coalesce(literal_column("mr.m_report_no"), 0).label("m_report_no"),
+        coal("anomaly"),
+        coal("confirmed"),
+        func.coalesce(literal_column("mr.msm_failure"), false()),
+        func.coalesce(literal_column("fp.scores"), "{}").label("scores"),
+        func.coalesce(literal_column("mr.exc"), [0]).label("exc"),
+        func.coalesce(literal_column("mr.residual_no"), 0).label("residual_no"),
+        coal("report_id"),
+        coal("probe_cc"),
+        coal("probe_asn"),
+        coal("test_name"),
+        coal("input"),
+    ]
+    query = select(merger).select_from(j).offset(offset).limit(limit)
+    log.info(query)
 
     # Run the query, generate the results list
     iter_start_time = time.time()
     q = current_app.db_session.execute(query, query_params)
 
     with configure_scope() as scope:
-        #scope.set_extra("sql_query", query_str)
+        scope.set_extra("sql_query", query)
 
         try:
             tmpresults = []
