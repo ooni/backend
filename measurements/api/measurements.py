@@ -340,7 +340,7 @@ def list_measurements(
 ):
     """Search for measurements using only the database. Provide pagination.
     """
-    # FIXME: list_measurements and get_measurement will be simplified and
+    # TODO: list_measurements and get_measurement will be simplified and
     # made faster by OOID: https://github.com/ooni/pipeline/issues/48
 
     log = current_app.logger

@@ -224,6 +224,21 @@ def test_list_measurements(client):
     inp = "https://www.facebook.com"
     response = api(client, f"measurements?report_id={rid}&input={inp}")
     assert response["metadata"]["count"] == 1, jd(response)
+    r = response["results"][0]
+    assert r == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": True,
+        "input": "https://www.facebook.com",
+        "measurement_id": "temp-id-138911420",
+        "measurement_start_time": "2017-11-25T17:21:44Z",
+        "measurement_url": "https://api.ooni.io/api/v1/measurement/temp-id-138911420",
+        "probe_asn": "AS45595",
+        "probe_cc": "PK",
+        "report_id": "20171125T172144Z_AS45595_qutf6uDIgFxgJK6ROMElwgHJZxhibiBapLomWzzoNQhsP5KGW2",
+        "scores": {},
+        "test_name": "web_connectivity",
+    }
 
 
 def test_list_measurements_search(client):
@@ -260,6 +275,7 @@ def test_list_measurements_pagination_old(client, log):
             assert j == new
         j = new
 
+
 def test_list_measurements_pagination_new(client, log):
     # Ensure answers stay consistent across calls - using fresh data
     # https://github.com/ooni/api/issues/49
@@ -284,6 +300,33 @@ def test_list_measurements_fastpath(client, fastpath_rid_input):
     response = api(client, p)
     # This has collisions with data in the traditional pipeline
     assert response["metadata"]["count"] > 0, jd(response)
+
+
+def test_list_measurements_probe_asn(app, client):
+    p = "measurements?probe_asn=AS3352&since=2019-12-8&until=2019-12-11&limit=50"
+    response = api(client, p)
+    assert len(response["results"]) == 50
+    for r in response["results"]:
+        assert r["probe_asn"] == "AS3352"
+
+
+# category_code support: briefly tested by adding this to
+# measurements/openapi/measurements.yml
+# - name: category_code
+#   in: query
+#   type: string
+#   minLength: 3
+#   description: The category code to search measurements for
+#
+# def test_list_measurements_category_code(app, client):
+#     p = "measurements?category_code=HACK&since=2019-12-8&until=2019-12-11&limit=50"
+#     response = api(client, p)
+#     assert len(response["results"]) == 50
+#     for r in response["results"]:
+#         print(r)
+
+
+## get_measurement ##
 
 
 def test_get_measurement(client):
@@ -431,18 +474,21 @@ def test_get_measurement_joined_multi(app, client, shared_rid_input_multi):
 
 @pytest.mark.get_measurement
 def test_bug_355_confirmed(app, client):
-    p = "measurements?probe_cc=IQ&limit=50&confirmed=true"
+    # Use RU to have enough msmt
+    p = "measurements?probe_cc=RU&limit=50&confirmed=true&since=2019-12-23&until=2019-12-24"
     response = api(client, p)
     for r in response["results"]:
         assert r["confirmed"] == True, r
+    assert len(response["results"]) == 50
 
 
 @pytest.mark.get_measurement
 def test_bug_355_anomaly(app, client):
-    p = "measurements?probe_cc=IQ&limit=50&anomaly=true"
+    p = "measurements?probe_cc=RU&limit=50&anomaly=true&since=2019-12-23&until=2019-12-24"
     response = api(client, p)
     for r in response["results"]:
         assert r["anomaly"] == True, r
+    assert len(response["results"]) == 50
 
 
 def test_bug_142_twitter(app, client):
