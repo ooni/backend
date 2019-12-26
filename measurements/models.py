@@ -172,23 +172,3 @@ class Software(Base):
     software_version = Column(String)
 
     reports = relationship("Report", back_populates="software")
-
-
-class Fastpath(Base):
-    __tablename__ = "fastpath"
-    tid = Column(String, primary_key=True)  # nn
-    report_id = Column(String)  # nn
-    input = Column(String)
-    probe_cc = Column(String(2), nullable=False)
-    probe_asn = Column(Integer, nullable=False)
-    test_name = Column(String)
-    test_start_time = Column(DateTime, nullable=False)
-    measurement_start_time = Column(DateTime)
-    filename = Column(String)
-    scores = Column(JSON)
-
-class Domain_input(Base):
-    __tablename__ = "domain_input"
-    domain = Column(String, primary_key=True)
-    input = Column(String)
-    input_no = Column(Integer)
