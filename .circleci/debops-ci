@@ -47,7 +47,6 @@ def detect_changed_packages() -> List[Path]:
     DCH = "debian/changelog"
     commit = run2("git merge-base master HEAD")
     changes = run2(f"git diff --name-only {commit}")
-    changes += "af/fastpath\n"
     pkgs = set()
     for c in changes.splitlines():
         c = Path(c)
