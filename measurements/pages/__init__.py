@@ -36,21 +36,26 @@ pages_blueprint = Blueprint(
 
 DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
 
+
 @pages_blueprint.route("/")
 def index():
     return render_template("index.html")
+
 
 @pages_blueprint.route("/stats")
 def stats():
     return redirect("https://explorer.ooni.org", 301)
 
+
 @pages_blueprint.route("/files")
 def files_index():
     return redirect("https://explorer.ooni.org/search", 301)
 
+
 @pages_blueprint.route("/files/by_date")
 def files_by_date():
     return redirect("https://explorer.ooni.org/search", 301)
+
 
 @pages_blueprint.route("/files/by_date/<date>")
 def files_on_date(date):
@@ -58,19 +63,28 @@ def files_on_date(date):
         raise BadRequest("Invalid date format")
 
     since = date
-    until = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-    return redirect("https://explorer.ooni.org/search?until={}&since={}".format(until, since), 301)
+    until = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime(
+        "%Y-%m-%d"
+    )
+    return redirect(
+        "https://explorer.ooni.org/search?until={}&since={}".format(until, since), 301
+    )
+
 
 @pages_blueprint.route("/files/by_country")
 def files_by_country():
     return redirect("https://explorer.ooni.org/search", 301)
+
 
 @pages_blueprint.route("/files/by_country/<country_code>")
 def files_in_country(country_code):
     if len(country_code) != 2:
         raise BadRequest("Country code must be two characters")
     country_code = country_code.upper()
-    return redirect("https://explorer.ooni.org/search?probe_cc={}".format(country_code), 301)
+    return redirect(
+        "https://explorer.ooni.org/search?probe_cc={}".format(country_code), 301
+    )
+
 
 def decompress_autoclaved(
     autoclaved_filename, frame_off, total_frame_size, intra_off, report_size
@@ -206,6 +220,11 @@ def backward_compatible_download(date, report_file):
 def backward_compatible_by_date(date):
     if DAY_REGEXP.match(date):
         since = date
-        until = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-        return redirect("https://explorer.ooni.org/search?until={}&since={}".format(until, since), 301)
+        until = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
+        return redirect(
+            "https://explorer.ooni.org/search?until={}&since={}".format(until, since),
+            301,
+        )
     raise NotFound
