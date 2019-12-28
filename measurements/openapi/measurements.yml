@@ -93,7 +93,7 @@ paths:
           items:
             type: string
           description: |
-            Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
+            Measurements that require special attention (it's likely to be a case of blocking), however it has not necessarily been confirmed
 
         - name: failure
           in: query
@@ -239,7 +239,7 @@ paths:
           description: 'Number of records to return (default: 100)'
       responses:
         '200':
-          description: List of files that match the requested criterial with pagination
+          description: List of files that match the requested criteria with pagination
           schema:
             $ref: "#/definitions/FileList"
 
@@ -402,7 +402,7 @@ definitions:
   Anomaly:
     type: boolean
     description: |-
-        Measurements that require special attention (it's likely to be a case of blocking), however it has not nessarily been confirmed
+        Measurements that require special attention (it's likely to be a case of blocking), however it has not necessarily been confirmed
 
   MeasurementFailure:
     type: boolean

@@ -135,7 +135,7 @@ criteria.
 
    `report_id=[string]` - the report ID of the requested measurement
 
-   `input=[string]` - the input for the requsted measurement
+   `input=[string]` - the input for the requested measurement
 
    `probe_cc=[string]` - the two letter country code.
 
