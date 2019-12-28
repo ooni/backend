@@ -1,3 +1,9 @@
+analysis (0.2) unstable; urgency=medium
+
+  * extended DB metrics gathering
+
+ -- Federico Ceratto <federico@debian.org>  Sat, 28 Dec 2019 17:05:12 +0000
+
 analysis (0.1) unstable; urgency=medium
 
   * analysis tools

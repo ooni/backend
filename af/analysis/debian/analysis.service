@@ -10,6 +10,8 @@ Type=simple
 RestartSec=2s
 WorkingDirectory=/var/lib/analysis
 
+WatchdogSec=600s
+
 User=fastpath
 Group=fastpath
 ReadOnlyDirectories=/
@@ -25,7 +27,8 @@ LimitNOFILE=65536
 
 # Hardening
 CapabilityBoundingSet=CAP_SETUID CAP_SETGID
-SystemCallFilter=~@clock @debug @cpu-emulation @keyring @module @mount @obsolete @raw-io @reboot @swap
+SystemCallFilter=~@cpu-emulation @debug @keyring @module @mount @obsolete @raw-io @resources @clock @debug @keyring @mount @privileged @reboot @setuid @swap @memlock
+
 NoNewPrivileges=yes
 PrivateDevices=yes
 PrivateTmp=yes

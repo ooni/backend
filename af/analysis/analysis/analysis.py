@@ -40,7 +40,9 @@ Outputs:
 
 from argparse import ArgumentParser, Namespace
 from configparser import ConfigParser
+from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Thread
 from urllib.parse import urlencode
 import os
 import time
@@ -49,11 +51,12 @@ import sys
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
+    import sdnotify  # debdeps: python3-sdnotify
 
-    no_journal_handler = False
+    no_systemd = False
 except ImportError:
     # this will be the case on macOS for example
-    no_journal_handler = True
+    no_systemd = True
 
 from bottle import template  # debdeps: python3-bottle
 from sqlalchemy import create_engine  # debdeps: python3-sqlalchemy-ext
@@ -942,9 +945,138 @@ def generate_slow_query_summary(conf):
         fi = conf.output_directory / f"db_slow_queries_{role}.html"
         log.info("Writing %s", fi)
         fi.write_text(html)
+        conn.close()
 
     log.info("Writing metrics to node exporter")
     prom.write_to_textfile(node_exporter_path, prom_reg)
+
+
+@metrics.timer("monitor_measurement_creation")
+def monitor_measurement_creation(conf):
+    """Monitor measurements created by fastpath and traditional pipeline
+    to detect and alert on inconsistencies
+
+    Runs in a dedicated thread and writes in its own .prom file
+
+    This is the most important function, therefore it pings the SystemD watchdog
+    """
+    log.info("Started monitor_measurement_creation thread")
+    # TODO: switch to OOID
+
+    INTERVAL = 60 * 5  # half of the watchdog interval in the analysis.service file
+    nodeexp_path = "/run/nodeexp/db_metrics.prom"
+    if no_systemd == False:
+        watchdog = sdnotify.SystemdNotifier()
+
+    prom_reg = prom.CollectorRegistry()
+    gauge_family = prom.Gauge(
+        "measurements_flow",
+        "Measurements being created",
+        labelnames=["type"],
+        registry=prom_reg,
+    )
+    queries = dict(
+        fastpath_count="""SELECT COUNT(*)
+            FROM fastpath
+            WHERE measurement_start_time > %(since)s
+            AND measurement_start_time <= %(until)s
+        """,
+        pipeline_count="""SELECT COUNT(*)
+            FROM measurement
+            WHERE measurement_start_time > %(since)s
+            AND measurement_start_time <= %(until)s
+        """,
+        pipeline_not_fastpath_count="""SELECT COUNT(*)
+        FROM measurement
+        LEFT OUTER JOIN input ON input.input_no = measurement.input_no
+        JOIN report ON report.report_no = measurement.report_no
+        WHERE NOT EXISTS (
+            SELECT
+            FROM fastpath fp
+            WHERE measurement_start_time > %(since_ext)s
+            AND measurement_start_time <= %(until_ext)s
+            AND fp.report_id = report.report_id
+            AND fp.test_name = report.test_name
+            AND fp.input = input.input
+        )
+        AND measurement_start_time > %(since)s
+        AND measurement_start_time <= %(until)s
+        """,
+        fastpath_not_pipeline_count="""SELECT COUNT(*)
+        FROM fastpath fp
+        WHERE NOT EXISTS (
+            SELECT
+            FROM measurement
+            LEFT OUTER JOIN input ON input.input_no = measurement.input_no
+            JOIN report ON report.report_no = measurement.report_no
+            WHERE measurement_start_time > %(since_ext)s
+            AND measurement_start_time <= %(until_ext)s
+            AND fp.report_id = report.report_id
+            AND fp.test_name = report.test_name
+            AND fp.input = input.input
+        )
+        AND measurement_start_time > %(since)s
+        AND measurement_start_time <= %(until)s
+        """,
+    )
+
+    # test connection and notify systemd
+    conn, _ = setup_database_connections(conf.standby)
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1")
+    conn.close()
+    if no_systemd == False:
+        watchdog.notify("READY=1")
+
+    cycle_seconds = 0
+
+    while True:
+        try:
+            log.info("Gathering fastpath count")
+            conn, dbengine = setup_database_connections(conf.standby)
+            delta = timedelta(minutes=5)
+            now = datetime.utcnow()
+            since = now - delta
+            with conn.cursor() as cur:
+                sql = queries["fastpath_count"]
+                cur.execute(sql, dict(since=since, until=now))
+                new_fp_msmt_count = cur.fetchone()[0]
+
+            gauge_family.labels("fastpath_new_5m").set(new_fp_msmt_count)
+            prom.write_to_textfile(nodeexp_path, prom_reg)
+
+            if cycle_seconds == 0:
+                log.info("Running extended DB metrics gathering")
+                today = datetime.utcnow().date()
+                with conn.cursor() as cur:
+                    for age_in_days in range(3):
+                        d1 = timedelta(days=1)
+                        end = today - timedelta(days=age_in_days) + d1
+                        times = dict(
+                            until_ext=end + d1 + d1 + d1,
+                            until=end,
+                            since=end - d1,
+                            since_ext=end - d1 - d1 - d1 - d1,
+                        )
+                        for query_name, sql in queries.items():
+                            cur.execute(sql, times)
+                            val = cur.fetchone()[0]
+                            log.info("%s %s %s %d", times["since"], times["until"], query_name, val)
+                            gauge_family.labels(f"{query_name}_{age_in_days}_days_ago").set(val)
+
+                prom.write_to_textfile(nodeexp_path, prom_reg)
+
+            cycle_seconds = (cycle_seconds + INTERVAL) % 3600
+
+        except Exception as e:
+            log.error(e, exc_info=True)
+
+        finally:
+            conn.close()
+            if no_systemd == False:
+                watchdog.notify("STATUS=Running")
+            log.debug("Done")
+            time.sleep(INTERVAL)
 
 
 def main():
@@ -955,7 +1087,7 @@ def main():
         cp.read_file(f)
 
     conf = parse_args()
-    if conf.devel or conf.stdout or no_journal_handler:
+    if conf.devel or conf.stdout or no_systemd:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
 
@@ -971,6 +1103,10 @@ def main():
     )
     os.makedirs(conf.output_directory, exist_ok=True)
 
+    t = Thread(target=monitor_measurement_creation, args=(conf, ))
+    t.start()
+
+    log.info("Starting generate_slow_query_summary loop")
     while True:
         generate_slow_query_summary(conf)
         time.sleep(3600)
