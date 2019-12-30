@@ -52,9 +52,7 @@ def init_db(app):
         session.execute("set application_name = :reqid", {"reqid": reqid})
 
 
-QUERY_TIME_THRESHOLD = (
-    60.0
-)  # Time in seconds after which we will start logging warnings for too long queries
+QUERY_TIME_THRESHOLD = 60.0  # Time in seconds after which we will start logging warnings for too long queries
 
 
 def init_query_logging(app):

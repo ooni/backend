@@ -98,6 +98,7 @@ def init_app(app, testmode=False):
 def check_config(config):
     pass
 
+
 def extract_client_ipaddr_for_throttling():
     # TODO: move addrs to an external config file /etc/ooniapi.conf ?
     prometheus_ipaddr = "37.218.245.43"
