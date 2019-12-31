@@ -427,14 +427,13 @@ def list_measurements(
     # Populate WHERE clauses and query_params dict
 
     if failure is True:
+        # residual_no is never NULL, msm_failure is always NULL
         mrwhere.append(sql.text("measurement.exc IS NOT NULL"))
-        mrwhere.append(sql.text("measurement.residual_no IS NOT NULL"))
-        mrwhere.append(sql.text("measurement.msm_failure IS TRUE"))
+        # TODO: add failure column to fastpath
 
-    if failure is False:
-        mrwhere.append(sql.text("measurement.exc is NULL"))
-        mrwhere.append(sql.text("measurement.residual_no is NULL"))
-        mrwhere.append(sql.text("measurement.msm_failure is FALSE"))
+    elif failure is False:
+        # on success measurement.exc is NULL
+        mrwhere.append(sql.text("measurement.exc IS NULL"))
 
     if since is not None:
         query_params["since"] = since
@@ -575,9 +574,8 @@ def list_measurements(
         func.coalesce(literal_column("mr.m_report_no"), 0).label("m_report_no"),
         coal("anomaly"),
         coal("confirmed"),
-        func.coalesce(literal_column("mr.msm_failure"), false()),
         func.coalesce(literal_column("fp.scores"), "{}").label("scores"),
-        func.coalesce(literal_column("mr.exc"), [0]).label("exc"),
+        column("exc"),
         func.coalesce(literal_column("mr.residual_no"), 0).label("residual_no"),
         coal("report_id"),
         coal("probe_cc"),
@@ -614,11 +612,7 @@ def list_measurements(
                         "input": row.input,
                         "anomaly": row.anomaly,
                         "confirmed": row.confirmed,
-                        "failure": (
-                            row.exc != None
-                            or row.residual_no != None
-                            or row.msm_failure
-                        ),
+                        "failure": (row.exc is not None),
                         "scores": json.loads(row.scores),
                     }
                 )

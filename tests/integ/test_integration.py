@@ -310,6 +310,47 @@ def test_list_measurements_probe_asn(app, client):
         assert r["probe_asn"] == "AS3352"
 
 
+def test_list_measurements_failure_true_pipeline(app, client):
+    p = "measurements?failure=true&since=2019-12-8&until=2019-12-11&limit=50"
+    response = api(client, p)
+    assert len(response["results"]) == 50
+    for r in response["results"]:
+        assert r["failure"] == True
+
+    assert r["measurement_id"] == "temp-id-364655453"
+
+
+def test_list_measurements_failure_false_pipeline(app, client):
+    p = "measurements?failure=false&since=2019-12-8&until=2019-12-11&limit=50"
+    response = api(client, p)
+    assert len(response["results"]) == 50
+    for r in response["results"]:
+        assert r["failure"] == False, r
+
+    assert r["measurement_id"] == "temp-id-364945591"
+
+
+@pytest.mark.skip(reason="no way of currently testing this")
+def test_list_measurements_failure_true_fastpath(app, client):
+    since = datetime.utcnow().date()
+    until = since + timedelta(days=1)
+    p = f"measurements?failure=true&since={since}&until={until}&limit=50"
+    response = api(client, p)
+    assert len(response["results"]) == 50
+    for r in response["results"]:
+        assert r["failure"] == True, r
+
+
+def test_list_measurements_failure_false_fastpath(app, client):
+    since = datetime.utcnow().date()
+    until = since + timedelta(days=1)
+    p = f"measurements?failure=false&since={since}&until={until}&limit=50"
+    response = api(client, p)
+    assert len(response["results"]) == 50
+    for r in response["results"]:
+        assert r["failure"] == False, r
+
+
 # category_code support: briefly tested by adding this to
 # measurements/openapi/measurements.yml
 # - name: category_code
