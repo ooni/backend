@@ -267,22 +267,6 @@ def get_measurement(measurement_id, download=None):
     return response
 
 
-def log_query(log, q):
-    import sqlparse  # debdeps: python3-sqlparse
-
-    if "Select" in repr(type(q)):  # UGLY
-        log.info("\n--- query ---\n\n%s\n\n-------------", q)
-        return
-
-    sql = str(
-        q.statement.compile(
-            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
-        )
-    )
-    sql = sqlparse.format(sql, reindent=True, keyword_case="upper")
-    log.info("\n--- query ---\n\n%s\n\n-------------", sql)
-
-
 def _merge_two_results(a, b):
     """Merge 2 measurements. Collect useful fields from traditional pipeline
     and fastpath
