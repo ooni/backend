@@ -15,8 +15,7 @@ from flask import current_app, request, make_response
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
-from sqlalchemy.dialects import postgresql
-from sqlalchemy import func, or_, and_, false, text, select, sql, column
+from sqlalchemy import func, and_, false, text, select, sql, column
 from sqlalchemy.sql import literal_column
 from sqlalchemy import String, cast, Float
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
@@ -29,7 +28,6 @@ from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
 from measurements.models import (
     Autoclaved,
-    Input,
     Measurement,
     Report,
 )
