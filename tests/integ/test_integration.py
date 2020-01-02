@@ -464,6 +464,12 @@ def test_get_measurement(client):
     assert len(response["test_keys"]["requests"][0]["response"]["body"]) == 72089
 
 
+def test_get_measurement_missing_pipeline(client):
+    url = "measurement/temp-id-999999999999999999"
+    response = client.get(f"/api/v1/{url}")
+    assert response.status_code == 404
+
+
 @pytest.mark.get_measurement
 def test_get_measurement_nonfastpath(client, nonfastpath_rid_input):
     """Simulate Explorer behavior

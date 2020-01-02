@@ -11,7 +11,7 @@ import lz4framed
 
 from sentry_sdk import configure_scope, capture_exception
 
-from flask import current_app, request, make_response
+from flask import current_app, request, make_response, abort
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
@@ -26,11 +26,6 @@ from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
-from measurements.models import (
-    Autoclaved,
-    Measurement,
-    Report,
-)
 
 MSM_ID_PREFIX = "temp-id"
 FASTPATH_MSM_ID_PREFIX = "temp-fid-"
@@ -226,41 +221,43 @@ def get_measurement(measurement_id, download=None):
         raise BadRequest("Invalid measurement_id")
     msm_no = int(m.group(1))
 
-    q = (
-        current_app.db_session.query(
-            Measurement.report_no.label("report_no"),
-            Measurement.frame_off.label("frame_off"),
-            Measurement.frame_size.label("frame_size"),
-            Measurement.intra_off.label("intra_off"),
-            Measurement.intra_size.label("intra_size"),
-            Report.textname.label("textname"),
-            Report.report_no.label("r_report_no"),
-            Report.autoclaved_no.label("r_autoclaved_no"),
-            Autoclaved.filename.label("a_filename"),
-            Autoclaved.autoclaved_no.label("a_autoclaved_no"),
+    cols = [
+        literal_column("measurement.report_no"),
+        literal_column("frame_off"),
+        literal_column("frame_size"),
+        literal_column("intra_off"),
+        literal_column("intra_size"),
+        literal_column("textname"),
+        literal_column("report.autoclaved_no"),
+        literal_column("autoclaved.filename"),
+    ]
+    table = (
+        sql.table("measurement")
+        .join(
+            sql.table("report"), sql.text("measurement.report_no = report.report_no"),
         )
-        .filter(Measurement.msm_no == msm_no)
-        .join(Report, Report.report_no == Measurement.report_no)
-        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
+        .join(
+            sql.table("autoclaved"),
+            sql.text("autoclaved.autoclaved_no = report.autoclaved_no"),
+        )
     )
-    try:
-        msmt = q.one()
-    except MultipleResultsFound:
-        current_app.logger.warning(
-            "Duplicate rows for measurement_id: %s" % measurement_id
-        )
-        msmt = q.first()
-    except NoResultFound:
-        # XXX we should actually return a 404 here
-        raise BadRequest("No measurement found")
+    where = sql.text("measurement.msm_no = :msm_no")
+    query = select(cols).where(where).select_from(table)
+    query_params = dict(msm_no=msm_no)
+    q = current_app.db_session.execute(query, query_params)
+
+    msmt = q.fetchone()
+    if msmt is None:
+        abort(404)
 
     # Usual size of LZ4 frames is 256kb of decompressed text.
     # Largest size of LZ4 frame was ~55Mb compressed and ~56Mb decompressed. :-/
     range_header = "bytes={}-{}".format(
         msmt.frame_off, msmt.frame_off + msmt.frame_size - 1
     )
+    filename = msmt["autoclaved.filename"]
     r = requests.get(
-        urljoin(current_app.config["AUTOCLAVED_BASE_URL"], msmt.a_filename),
+        urljoin(current_app.config["AUTOCLAVED_BASE_URL"], filename),
         headers={"Range": range_header, REQID_HDR: request_id()},
     )
     r.raise_for_status()
