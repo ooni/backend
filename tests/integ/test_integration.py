@@ -25,9 +25,6 @@ def log(app):
     return app.logger
 
 
-# TODO: remove "app" fixture usage where not needed or replace it with "log"
-
-
 @pytest.fixture(autouse=True, scope="session")
 def db_safety_check():
     assert os.environ["DATABASE_URL"] == "postgresql://readonly@localhost:5433/metadb"
@@ -379,7 +376,7 @@ def test_list_measurements_fastpath(client, fastpath_rid_input):
     assert response["metadata"]["count"] > 0, jd(response)
 
 
-def test_list_measurements_probe_asn(app, client):
+def test_list_measurements_probe_asn(client):
     p = "measurements?probe_asn=AS3352&since=2019-12-8&until=2019-12-11&limit=50"
     response = api(client, p)
     assert len(response["results"]) == 50
@@ -387,7 +384,7 @@ def test_list_measurements_probe_asn(app, client):
         assert r["probe_asn"] == "AS3352"
 
 
-def test_list_measurements_failure_true_pipeline(app, client):
+def test_list_measurements_failure_true_pipeline(client):
     p = "measurements?failure=true&since=2019-12-8&until=2019-12-11&limit=50"
     response = api(client, p)
     assert len(response["results"]) == 50
@@ -397,7 +394,7 @@ def test_list_measurements_failure_true_pipeline(app, client):
     assert r["measurement_id"] == "temp-id-364655453"
 
 
-def test_list_measurements_failure_false_pipeline(app, client):
+def test_list_measurements_failure_false_pipeline(client):
     p = "measurements?failure=false&since=2019-12-8&until=2019-12-11&limit=50"
     response = api(client, p)
     assert len(response["results"]) == 50
@@ -408,7 +405,7 @@ def test_list_measurements_failure_false_pipeline(app, client):
 
 
 @pytest.mark.skip(reason="no way of currently testing this")
-def test_list_measurements_failure_true_fastpath(app, client):
+def test_list_measurements_failure_true_fastpath(client):
     since = datetime.utcnow().date()
     until = since + timedelta(days=1)
     p = f"measurements?failure=true&since={since}&until={until}&limit=50"
@@ -418,7 +415,7 @@ def test_list_measurements_failure_true_fastpath(app, client):
         assert r["failure"] == True, r
 
 
-def test_list_measurements_failure_false_fastpath(app, client):
+def test_list_measurements_failure_false_fastpath(client):
     since = datetime.utcnow().date()
     until = since + timedelta(days=1)
     p = f"measurements?failure=false&since={since}&until={until}&limit=50"
@@ -486,12 +483,11 @@ def test_get_measurement_nonfastpath(client, nonfastpath_rid_input):
 
 
 @pytest.mark.get_measurement
-def test_get_measurement_fastpath(app, client, fastpath_rid_input):
+def test_get_measurement_fastpath(log, client, fastpath_rid_input):
     """Simulate Explorer behavior
     Get a measurement from the fastpath table that has no match in the
     traditional pipeline
     """
-    log = app.logger
     # Get a real rid/inp directly from the database
     rid, inp = fastpath_rid_input
 
@@ -521,12 +517,11 @@ def test_get_measurement_fastpath(app, client, fastpath_rid_input):
 
 
 @pytest.mark.get_measurement
-def test_get_measurement_joined(app, client, shared_rid_input):
+def test_get_measurement_joined(log, client, shared_rid_input):
     """Simulate Explorer behavior
     Get a measurement that has an entry in the fastpath table and also
     in the traditional pipeline
     """
-    log = app.logger
     # Get a real rid/inp directly from the database
     rid, inp = shared_rid_input
 
@@ -556,12 +551,11 @@ def test_get_measurement_joined(app, client, shared_rid_input):
 
 
 @pytest.mark.get_measurement
-def test_get_measurement_joined_multi(app, client, shared_rid_input_multi):
+def test_get_measurement_joined_multi(log, client, shared_rid_input_multi):
     """Simulate Explorer behavior
     Get a measurement that has an entry in the fastpath table and also
     in the traditional pipeline
     """
-    log = app.logger
     # Get a real rid/inp directly from the database
     rid, inp = shared_rid_input_multi
 
@@ -591,7 +585,7 @@ def test_get_measurement_joined_multi(app, client, shared_rid_input_multi):
 
 
 @pytest.mark.get_measurement
-def test_bug_355_confirmed(app, client):
+def test_bug_355_confirmed(client):
     # Use RU to have enough msmt
     p = "measurements?probe_cc=RU&limit=50&confirmed=true&since=2019-12-23&until=2019-12-24"
     response = api(client, p)
@@ -601,7 +595,7 @@ def test_bug_355_confirmed(app, client):
 
 
 @pytest.mark.get_measurement
-def test_bug_355_anomaly(app, client):
+def test_bug_355_anomaly(client):
     p = "measurements?probe_cc=RU&limit=50&anomaly=true&since=2019-12-23&until=2019-12-24"
     response = api(client, p)
     for r in response["results"]:
@@ -609,7 +603,7 @@ def test_bug_355_anomaly(app, client):
     assert len(response["results"]) == 50
 
 
-def test_bug_142_twitter(app, client):
+def test_bug_142_twitter(client):
     # we can assume there's always enough data
     ts = datetime.utcnow().date().strftime("%Y-%m-%d")
     p = "measurements?domain=twitter.com&until=%s&limit=50" % ts
@@ -620,7 +614,7 @@ def test_bug_142_twitter(app, client):
         assert "twitter" in r["input"], r
 
 
-def test_slow_inexistent_domain(app, client):
+def test_slow_inexistent_domain(client):
     # time-unbounded query, filtering by a domain never monitored
     p = "measurements?domain=meow.com&until=2019-12-11&limit=50"
     response = api(client, p)
@@ -628,7 +622,7 @@ def test_slow_inexistent_domain(app, client):
     assert len(rows) == 0
 
 
-def test_slow_domain_unbounded(app, client):
+def test_slow_domain_unbounded(client):
     # time-unbounded query, filtering by a popular domain
     p = "measurements?domain=twitter.com&until=2019-12-11&limit=50"
     response = api(client, p)
@@ -636,7 +630,7 @@ def test_slow_domain_unbounded(app, client):
     assert rows
 
 
-def test_slow_domain_bounded(app, client):
+def test_slow_domain_bounded(client):
     p = "measurements?domain=twitter.com&since=2019-12-8&until=2019-12-11&limit=50"
     response = api(client, p)
     assert len(response["results"]) == 48
