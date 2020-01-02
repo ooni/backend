@@ -14,8 +14,6 @@ import pytest
 from measurements.api.measurements import FASTPATH_MSM_ID_PREFIX
 
 # The flask app is created in tests/conftest.py
-#
-#
 
 
 def jd(o):
@@ -25,6 +23,9 @@ def jd(o):
 @pytest.fixture()
 def log(app):
     return app.logger
+
+
+# TODO: remove "app" fixture usage where not needed or replace it with "log"
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -216,6 +217,82 @@ def test_redirects_and_rate_limit_for_explorer(client):
     resp = client.get("/stats", headers=headers)
     assert resp.status_code == 301
     assert "X-RateLimit-Remaining" not in resp.headers
+
+
+# # list_files # #
+
+
+def test_list_files_pagination(client):
+    url = "files?limit=1&since=2019-12-01&until=2019-12-02"
+    ret = api(client, url)
+    results = ret["results"]
+    assert len(results) == 1
+    assert sorted(results[0].keys()) == [
+        "download_url",
+        "index",
+        "probe_asn",
+        "probe_cc",
+        "test_name",
+        "test_start_time",
+    ]
+    assert ret["metadata"] == {
+        "count": 13273,
+        "current_page": 1,
+        "limit": 1,
+        "next_url": "https://api.ooni.io/api/v1/files?limit=1&since=2019-12-01&until=2019-12-02&offset=1",
+        "offset": 0,
+        "pages": 13273,
+    }
+    url = "files?limit=1&since=2019-12-01&until=2019-12-02&offset=1"
+    ret = api(client, url)
+    results = ret["results"]
+    assert len(results) == 1
+    assert ret["metadata"] == {
+        "count": 13273,
+        "current_page": 2,
+        "limit": 1,
+        "next_url": "https://api.ooni.io/api/v1/files?limit=1&since=2019-12-01&until=2019-12-02&offset=2",
+        "offset": 1,
+        "pages": 13273,
+    }
+
+
+def test_list_files_asn(client):
+    url = "files?limit=1&since=2019-12-01&until=2019-12-02&probe_asn=AS45595"
+    results = api(client, url)["results"]
+    assert len(results) == 1
+    assert results[0]["probe_asn"] == "AS45595"
+
+
+def test_list_files_asn_only_number(client):
+    url = "files?limit=1&since=2019-12-01&until=2019-12-02&probe_asn=45595"
+    results = api(client, url)["results"]
+    assert len(results) == 1
+    assert results[0]["probe_asn"] == "AS45595"
+
+
+def test_list_files_range_cc(client):
+    url = "files?limit=1000&since=2019-12-01&until=2019-12-02&probe_cc=IR"
+    ret = api(client, url)
+    results = ret["results"]
+    assert len(results) == 215
+    assert ret["metadata"] == {
+        "count": 215,
+        "current_page": 1,
+        "limit": 1000,
+        "next_url": None,
+        "offset": 0,
+        "pages": 1,
+    }
+
+
+def test_list_files_range_cc_asn(client):
+    url = "files?limit=1000&since=2019-12-01&until=2019-12-02&probe_cc=IR&probe_asn=AS44375"
+    results = api(client, url)["results"]
+    assert len(results) == 7
+
+
+# # list_measurements # #
 
 
 def test_list_measurements(client):

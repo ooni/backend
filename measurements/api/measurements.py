@@ -63,6 +63,7 @@ def list_files(
     offset=0,
     limit=100,
 ):
+    log = current_app.logger
 
     if probe_asn is not None:
         if probe_asn.startswith("AS"):
@@ -88,35 +89,53 @@ def list_files(
     if order_by in ("index", "idx"):
         order_by = "report_no"
 
-    q = current_app.db_session.query(
-        Report.textname,
-        Report.test_start_time,
-        Report.probe_cc,
-        Report.probe_asn,
-        Report.report_no,
-        Report.test_name,
-    )
+    cols = [
+        literal_column("textname"),
+        literal_column("test_start_time"),
+        literal_column("probe_cc"),
+        literal_column("probe_asn"),
+        literal_column("report_no"),
+        literal_column("test_name"),
+    ]
+    where = []
+    query_params = {}
 
     # XXX maybe all of this can go into some sort of function.
     if probe_cc:
-        q = q.filter(Report.probe_cc == probe_cc)
-    if probe_asn:
-        q = q.filter(Report.probe_asn == probe_asn)
-    if test_name:
-        q = q.filter(Report.test_name == test_name)
-    if since:
-        q = q.filter(Report.test_start_time > since)
-    if until:
-        q = q.filter(Report.test_start_time <= until)
-    if since_index:
-        q = q.filter(Report.report_no > report_no)
+        where.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
 
-    count = q.count()
+    if probe_asn:
+        where.append(sql.text("probe_asn = :probe_asn"))
+        query_params["probe_asn"] = probe_asn
+
+    if test_name:
+        where.append(sql.text("test_name = :test_name"))
+        query_params["test_name"] = test_name
+
+    if since:
+        where.append(sql.text("test_start_time > :since"))
+        query_params["since"] = since
+
+    if until:
+        where.append(sql.text("test_start_time <= :until"))
+        query_params["until"] = until
+
+    if since_index:
+        where.append(sql.text("report_no > :report_no"))
+        query_params["report_no"] = report_no
+
+    query = select(cols).where(and_(*where)).select_from("report")
+    query_cnt = query.with_only_columns([func.count()]).order_by(None)
+    log.debug(query_cnt)
+    count = current_app.db_session.execute(query_cnt, query_params).scalar()
+
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
 
-    q = q.order_by(text("{} {}".format(order_by, order)))
-    q = q.limit(limit).offset(offset)
+    query = query.order_by(text("{} {}".format(order_by, order)))
+    query = query.limit(limit).offset(offset)
+
     next_args = request.args.to_dict()
     next_args["offset"] = "%s" % (offset + limit)
     next_args["limit"] = "%s" % limit
@@ -135,6 +154,9 @@ def list_files(
         "next_url": next_url,
     }
     results = []
+
+    log.debug(query)
+    q = current_app.db_session.execute(query, query_params)
     for row in q:
         download_url = urljoin(
             current_app.config["BASE_URL"], "/files/download/%s" % row.textname
