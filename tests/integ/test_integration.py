@@ -48,12 +48,12 @@ def fastpath_dup_rid_input(app):
             return (row[0], row[1])
 
 
-def dbquery(app, sql, *a):
+def dbquery(app, sql, **query_params):
     """Access DB directly, returns row as tuple.
     """
     with app.app_context():
-        row = app.db_session.execute(sql, *a).fetchone()
-        return row
+        q = app.db_session.execute(sql, query_params)
+        return q.fetchone()
 
 
 @pytest.fixture()
@@ -133,14 +133,17 @@ def shared_rid_input(app):
     FROM fastpath
     WHERE input IS NOT NULL
     AND fastpath.report_id IS NOT NULL
+    AND test_name = 'web_connectivity'
     AND EXISTS (
         SELECT
         FROM report
         WHERE report.report_id = fastpath.report_id
+        AND report.test_start_time > :since
     )
     LIMIT 1
     """
-    rid, inp = dbquery(app, sql)[0:2]
+    since = datetime.utcnow() - timedelta(days=7)
+    rid, inp = dbquery(app, sql, since=since)[0:2]
     assert rid.strip()
     assert inp.strip()
     return rid, inp
@@ -516,8 +519,9 @@ def test_get_measurement_fastpath(log, client, fastpath_rid_input):
         assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
 
 
+# FIXME: test this with obfs4 as well
 @pytest.mark.get_measurement
-def test_get_measurement_joined(log, client, shared_rid_input):
+def test_get_measurement_joined_single(log, client, shared_rid_input):
     """Simulate Explorer behavior
     Get a measurement that has an entry in the fastpath table and also
     in the traditional pipeline
