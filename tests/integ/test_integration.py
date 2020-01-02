@@ -161,17 +161,22 @@ def shared_rid_input_multi(app):
         fastpath.input
     FROM fastpath
     WHERE input IS NOT NULL
+    AND fastpath.test_start_time > :since
     AND fastpath.report_id IS NOT NULL
+    AND test_name = 'web_connectivity'
     AND EXISTS (
         SELECT
         FROM report
         WHERE report.report_id = fastpath.report_id
+        AND report.test_name = 'web_connectivity'
+        AND report.test_start_time > :since
     )
     GROUP BY fastpath.report_id, fastpath.input
     HAVING count(*) > 1
     LIMIT 1
     """
-    rid, inp = dbquery(app, sql)[0:2]
+    since = datetime.utcnow() - timedelta(days=3)
+    rid, inp = dbquery(app, sql, since=since)[0:2]
     assert rid.strip()
     assert inp.strip()
     return rid, inp
