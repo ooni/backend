@@ -680,3 +680,110 @@ def test_files_download_missing_legacy(client):
     url = "files/download/without-slash-bogus-probe.json"
     response = client.get(url)
     assert response.status_code == 404
+
+
+## private API ##
+
+
+def privapi(client, subpath):
+    response = client.get(f"/api/_/{subpath}")
+    assert response.status_code == 200
+    assert response.is_json
+    return response.json
+
+# TODO: improve tests
+
+def test_private_api_asn_by_month(client):
+    url = "asn_by_month"
+    privapi(client, url)
+
+
+def test_private_api_countries_by_month(client):
+    url = "countries_by_month"
+    response = privapi(client, url)
+
+
+def test_private_api_runs_by_month(client):
+    url = "runs_by_month"
+    response = privapi(client, url)
+    assert len(response) == 24
+    assert sorted(response[0].keys()) == ["date", "value"]
+    assert len(response[0]["date"]) == 10
+    assert sum(i["value"] for i in response) > 6_000_000
+
+
+def test_private_api_reports_per_day(client):
+    url = "reports_per_day"
+    response = privapi(client, url)
+
+
+def test_private_api_test_names(client):
+    url = "test_names"
+    response = privapi(client, url)
+
+
+def test_private_api_countries(client):
+    url = "countries"
+    response = privapi(client, url)
+
+
+def test_private_api_test_coverage(client):
+    url = "test_coverage?probe_cc=US"
+    response = privapi(client, url)
+    print(response)
+    assert 0
+
+
+def test_private_api_website_networks(client):
+    url = "website_networks?probe_cc=US"
+    response = privapi(client, url)
+    print(response)
+    assert 0
+
+
+
+def test_private_api_website_stats(client):
+    url = "website_stats"
+    response = privapi(client, url)
+
+
+
+def test_private_api_website_urls(client):
+    url = "website_urls"
+    response = privapi(client, url)
+
+
+
+def test_private_api_vanilla_tor_stats(client):
+    url = "vanilla_tor_stats"
+    response = privapi(client, url)
+
+
+def test_private_api_im_networks(client):
+    url = "im_networks"
+    response = privapi(client, url)
+
+
+def test_private_api_im_stats(client):
+    url = "im_stats"
+    response = privapi(client, url)
+
+
+def test_private_api_network_stats(client):
+    url = "network_stats"
+    response = privapi(client, url)
+
+
+def test_private_api_country_overview(client):
+    url = "country_overview"
+    response = privapi(client, url)
+
+
+def test_private_api_global_overview(client):
+    url = "global_overview"
+    response = privapi(client, url)
+
+
+def test_private_api_global_overview_by_month(client):
+    url = "global_overview_by_month"
+    response = privapi(client, url)

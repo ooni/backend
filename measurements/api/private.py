@@ -37,7 +37,7 @@ def api_private_stats_by_month(orm_stat):
     # data for https://api.ooni.io/stats
     # Report.test_start_time protection against time travellers may be
     # implemented in a better way, but that sanity check is probably enough.
-    ## ooni_epoch = datetime(2012, 12, 1)
+    # ooni_epoch = datetime(2012, 12, 1)
 
     now = datetime.now()
     end_date = datetime(now.year, now.month, 1)
@@ -87,25 +87,27 @@ def api_private_countries_by_month():
 def api_private_runs_by_month():
     # The query takes ~6s on local SSD @ AMS on 2018-04-04.
     # It was taking ~20s when it was fetching all the table from DB and doing grouping locally.
+    # TODO: use-count-table
     now = datetime.now()
     end_date = datetime(now.year, now.month, 1)
     start_date = end_date - relativedelta(months=24)
-
-    r = (
-        current_app.db_session.query(
-            func.date_trunc("month", Report.test_start_time).label("test_start_month"),
-            func.count(),
-        )
-        .filter(Report.test_start_time >= start_date)
-        .filter(Report.test_start_time < end_date)
-        .group_by("test_start_month")
-    )
+    rawsql = """SELECT
+        date_trunc('month', report.test_start_time) AS test_start_month,
+        count(*) AS count_1
+        FROM report
+        WHERE report.test_start_time >= :start_date
+        AND report.test_start_time < :end_date
+        GROUP BY test_start_month
+    """
+    params = dict(start_date=start_date, end_date=end_date)
+    q = current_app.db_session.execute(rawsql, params)
+    delta = relativedelta(months=+1, days=-1)
     result = [
         {
-            "date": (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
+            "date": (bkt + delta).strftime("%Y-%m-%d"),
             "value": value,
         }
-        for bkt, value in sorted(r)
+        for bkt, value in sorted(q.fetchall())
     ]
     return jsonify(result)
 
@@ -164,6 +166,7 @@ def api_private_countries():
 
 # Deprecated endpoints for legacy OONI Explorer
 
+
 @api_private_blueprint.route("/blockpages", methods=["GET"])
 def api_private_blockpages():
     abort(404)
@@ -193,7 +196,10 @@ def api_private_measurement_count_by_country():
 def api_private_measurement_count_total():
     abort(404)
 
+
 # END endpoints for legacy explorer
+
+# BEGIN endpoints for new explorer
 
 
 def last_30days():
@@ -207,7 +213,6 @@ def last_30days():
         yield d.strftime("%Y-%m-%d")
 
 
-## BEGIN endpoints for new explorer
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
         sql.text("test_day >= current_date - interval '31 day'"),
