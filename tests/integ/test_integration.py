@@ -715,6 +715,10 @@ def test_private_api_runs_by_month(client):
 def test_private_api_reports_per_day(client):
     url = "reports_per_day"
     response = privapi(client, url)
+    assert len(response) == 2112
+    assert sorted(response[0].keys()) == ["count", "date"]
+    assert sum(i["count"] for i in response) > 6_000_000
+    assert response[0] == {'count': 1, 'date': '2003-11-06'}
 
 
 def test_private_api_test_names(client):

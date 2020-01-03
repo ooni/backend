@@ -20,7 +20,6 @@ from sqlalchemy import func, and_, or_, sql, select
 
 from werkzeug.exceptions import BadRequest
 
-from measurements.models import Report
 from measurements.models import TEST_NAMES, TEST_GROUPS, get_test_group_case
 from measurements.countries import lookup_country
 
@@ -88,6 +87,7 @@ def api_private_runs_by_month():
     # The query takes ~6s on local SSD @ AMS on 2018-04-04.
     # It was taking ~20s when it was fetching all the table from DB and doing grouping locally.
     # TODO: use-count-table
+    # FIXME: support fastpath
     now = datetime.now()
     end_date = datetime(now.year, now.month, 1)
     start_date = end_date - relativedelta(months=24)
@@ -103,10 +103,7 @@ def api_private_runs_by_month():
     q = current_app.db_session.execute(rawsql, params)
     delta = relativedelta(months=+1, days=-1)
     result = [
-        {
-            "date": (bkt + delta).strftime("%Y-%m-%d"),
-            "value": value,
-        }
+        {"date": (bkt + delta).strftime("%Y-%m-%d"), "value": value}
         for bkt, value in sorted(q.fetchall())
     ]
     return jsonify(result)
@@ -114,17 +111,17 @@ def api_private_runs_by_month():
 
 @api_private_blueprint.route("/reports_per_day")
 def api_private_reports_per_day():
-    q = (
-        current_app.db_session.query(
-            func.count(func.date_trunc("day", Report.test_start_time)),
-            func.date_trunc("day", Report.test_start_time),
-        )
-        .group_by(func.date_trunc("day", Report.test_start_time))
-        .order_by(func.date_trunc("day", Report.test_start_time))
-    )
-    result = []
-    for count, date in q:
-        result.append({"count": count, "date": date.strftime("%Y-%m-%d")})
+    # TODO: use-count-table
+    # FIXME: support fastpath
+    rawsql = """SELECT
+        count(date_trunc('day', report.test_start_time)) AS count_1,
+        date_trunc('day', report.test_start_time) AS date_trunc_2
+        FROM report
+        GROUP BY date_trunc('day', report.test_start_time)
+        ORDER BY date_trunc('day', report.test_start_time)
+    """
+    q = current_app.db_session.execute(rawsql)
+    result = [{"count": count, "date": date.strftime("%Y-%m-%d")} for count, date in q]
     return jsonify(result)
 
 
