@@ -6,6 +6,7 @@ See README.adoc
 """
 
 from datetime import datetime, timedelta
+from hashlib import shake_128
 import json
 import os
 
@@ -649,3 +650,33 @@ def test_slow_domain_bounded(client):
     p = "measurements?domain=twitter.com&since=2019-12-8&until=2019-12-11&limit=50"
     response = api(client, p)
     assert len(response["results"]) == 48
+
+
+## files_download ##
+
+
+def test_files_download_found(client):
+    url = "files/download/2019-06-06/20190606T115021Z-IE-AS5466-ndt-20190606T115024Z_AS5466_fBGQoRbWb034yaEVz25JzTTge72KzFhcXValcZmIaQ8HWqy4Y1-0.2.0-probe.json"
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.is_streamed
+    data = response.get_data()
+    assert shake_128(data).hexdigest(3) == "3e50c7"
+
+
+def test_files_download_found_legacy(client):
+    url = "files/download/20190606T115021Z-IE-AS5466-ndt-20190606T115024Z_AS5466_fBGQoRbWb034yaEVz25JzTTge72KzFhcXValcZmIaQ8HWqy4Y1-0.2.0-probe.json"
+    response = client.get(url)
+    assert response.status_code == 302
+
+
+def test_files_download_missing(client):
+    url = "files/download/2019-06-06/bogus-probe.json"
+    response = client.get(url)
+    assert response.status_code == 404
+
+
+def test_files_download_missing_legacy(client):
+    url = "files/download/without-slash-bogus-probe.json"
+    response = client.get(url)
+    assert response.status_code == 404
