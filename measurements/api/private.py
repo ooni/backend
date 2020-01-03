@@ -10,21 +10,18 @@ from dateutil.relativedelta import relativedelta
 
 from urllib.parse import urljoin, urlencode
 
-import json
 import math
-import requests
 
 
 from flask import Blueprint, current_app, request, abort
 from flask.json import jsonify
 
-from sqlalchemy import func, and_, or_, distinct, sql, select
+from sqlalchemy import func, and_, or_, sql, select
 
 from werkzeug.exceptions import BadRequest
 
-from measurements.models import Report, Measurement, Input
+from measurements.models import Report
 from measurements.models import TEST_NAMES, TEST_GROUPS, get_test_group_case
-from measurements.config import REQID_HDR, request_id
 from measurements.countries import lookup_country
 
 # prefix: /api/_
