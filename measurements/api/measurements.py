@@ -530,7 +530,11 @@ def list_measurements(
 
     # We runs SELECTs on the measurement-report (mr) tables and faspath independently
     # from each other and then merge them.
-    # An ORDER BY + LIMIT on "limit+offset" is applied in each SELECT as a speedup.
+    # The FULL OUTER JOIN query is using LIMIT and OFFSET based on the
+    # list_measurements arguments. To speed up the two nested queries,
+    # an ORDER BY + LIMIT on "limit+offset" is applied in each of them to trim
+    # away rows that would be removed anyways by the outer query.
+    #
     # During a merge we can find that a measurement is:
     # - only in fastpath:       get_measurement will pick the JSON msmt from the fastpath host
     # - in both selects:        pick `scores` from fastpath and the msmt from the can
