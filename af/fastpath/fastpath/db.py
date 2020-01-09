@@ -105,7 +105,7 @@ def upsert_summary(
     args = (
         tid,
         msm["report_id"],
-        msm["input"],
+        msm.get("input", None),
         msm["probe_cc"],
         asn,
         msm["test_name"],
@@ -139,7 +139,7 @@ def upsert_summary(
             )
             return
 
-        notification = {k: msm[k] for k in cols}
+        notification = {k: msm.get(k, None) for k in cols}
         notification["trivial_id"] = tid
         notification["scores"] = scores
         notification = ujson.dumps(notification)

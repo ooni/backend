@@ -1006,7 +1006,7 @@ def generate_filename(tid):
 
 
 @metrics.timer("writeout_measurement")
-def writeout_measurement(msm_jstr, fn, update):
+def writeout_measurement(msm_jstr, fn, update, tid):
     """Safely write measurement to disk
     """
     # Different processes might be trying to write the same file at the same
@@ -1032,7 +1032,7 @@ def writeout_measurement(msm_jstr, fn, update):
                     os.utime(final_fname)
                     metrics.incr("msmt_output_file_updated")
                 else:
-                    log.info("Refusing to overwrite %s", final_fname)
+                    log.info(f"{tid} Refusing to overwrite {final_fname}")
                     metrics.incr("report_id_input_file_collision")
                     metrics.incr("msmt_output_file_skipped")
                     os.utime(final_fname)
@@ -1057,8 +1057,9 @@ def msm_processor(queue):
                 if measurement is None:
                     measurement = ujson.loads(msm_jstr)
                 msm_jstr, tid = trivial_id(measurement)
+                log.debug(f"Processing {tid}")
                 fn = generate_filename(tid)
-                writeout_measurement(msm_jstr, fn, conf.update)
+                writeout_measurement(msm_jstr, fn, conf.update, tid)
                 if measurement.get("test_name", None) == "web_connectivity":
                     matches = match_fingerprints(measurement)
                 else:
