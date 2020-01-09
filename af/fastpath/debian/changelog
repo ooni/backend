@@ -1,3 +1,9 @@
+fastpath (0.8) UNRELEASED; urgency=medium
+
+  * Add anomaly and confirmed columns
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 09 Dec 2019 19:08:50 +0000
+
 fastpath (0.7) unstable; urgency=medium
 
   * Improve metrics

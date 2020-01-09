@@ -83,6 +83,9 @@ def buildpkg(p) -> List[Path]:
         # Running in CircleCI
         sudo = False
         comp = trim_compare(getenv("CIRCLE_COMPARE_URL", ""))  # show changes in VCS
+        if not comp:
+            # https://discuss.circleci.com/t/circle-compare-url-is-empty/24549/8
+            comp = getenv("CIRCLE_PULL_REQUESTS")
         if getenv("CIRCLE_PULL_REQUEST"):
             # This is a PR: build ~pr<N>-<N> version. CIRCLE_PR_NUMBER is broken
             pr_num = getenv("CIRCLE_PULL_REQUEST", "").rsplit("/", 1)[-1]
