@@ -20,6 +20,7 @@ TEST_NAMES = {
     "dns_consistency": "DNS Consistency",
     "http_host": "HTTP Host",
     "multi_protocol_traceroute": "Multi Protocol Traceroute",
+    "psiphon": "psiphon"
 }
 
 TEST_GROUPS = {
