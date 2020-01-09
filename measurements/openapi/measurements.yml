@@ -60,6 +60,8 @@ paths:
           - ndt
           - dash
           - telegram
+          - psiphon
+          - tor
         - name: since
           in: query
           type: string

@@ -3,6 +3,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+# Publised to Explorer in private.py
+
 TEST_NAMES = {
     "web_connectivity": "Web Connectivity",
     "facebook_messenger": "Facebook Messenger",
@@ -20,7 +22,8 @@ TEST_NAMES = {
     "dns_consistency": "DNS Consistency",
     "http_host": "HTTP Host",
     "multi_protocol_traceroute": "Multi Protocol Traceroute",
-    "psiphon": "psiphon"
+    "psiphon": "Psiphon",
+    "tor": "Tor",
 }
 
 TEST_GROUPS = {
@@ -33,6 +36,8 @@ TEST_GROUPS = {
         "meek_fronted_requests_test",
         "vanilla_tor",
         "tcp_connect",
+        "psiphon",
+        "tor",
     ],
     "legacy": [
         "http_requests",
