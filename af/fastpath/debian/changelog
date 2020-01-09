@@ -1,8 +1,14 @@
-fastpath (0.8) UNRELEASED; urgency=medium
+fastpath (0.9) unstable; urgency=medium
+
+  * Handle dict body
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Jan 2020 14:51:48 +0000
+
+fastpath (0.8) unstable; urgency=medium
 
   * Add anomaly and confirmed columns
 
- -- Federico Ceratto <federico@debian.org>  Mon, 09 Dec 2019 19:08:50 +0000
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Jan 2020 14:51:39 +0000
 
 fastpath (0.7) unstable; urgency=medium
 

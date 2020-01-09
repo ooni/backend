@@ -64,6 +64,27 @@ def test_match_fingerprints_match_zz():
     ], matches
 
 
+def test_match_fingerprints_dict_body():
+    fp.setup_fingerprints()
+    # from 20200108T054856Z-web_connectivity-20200109T102441Z_AS42610_613KNyjuQqiuloY1a391dhZccSDz9M1MD30P6EpUIWSByjcq4T-AS42610-RU-probe-0.2.0.json
+    msm = {
+        "probe_cc": "MY",
+        "test_keys": {
+            "requests": [
+                {
+                    "response": {
+                        "body": {
+                            "data": "q82BgAABAAEAAAAAA3d3dwdleGFtcGxlA2NvbQAAAQABwAwAAQABAAA/+AAEXbjYIg==",
+                            "format": "base64",
+                        }
+                    }
+                }
+            ]
+        },
+    }
+    assert fp.match_fingerprints(msm) == []
+
+
 def test_score_measurement_simple():
     msm = {
         "input": "foo",
@@ -73,8 +94,7 @@ def test_score_measurement_simple():
         "test_name": "web_connectivity",
         "test_start_time": "",
         "probe_cc": "IE",
-        "test_keys": {
-        },
+        "test_keys": {},
     }
     matches = []
     scores = fp.score_measurement(msm, matches)

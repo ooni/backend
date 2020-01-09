@@ -13,6 +13,7 @@ See README.adoc
 # debdeps: python3-setuptools
 
 from argparse import ArgumentParser, Namespace
+from base64 import b64decode
 from configparser import ConfigParser
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -329,12 +330,27 @@ def match_fingerprints(measurement):
 
         # Match HTTP body if found
         body = r["body"]
+
+        if isinstance(body, dict):
+            if "data" in body and body.get("format", "") == "base64":
+                log.debug("Decoding base64 body")
+                body = b64decode(body["data"])
+                # returns bytes. bm.encode() below is faster that decoding it
+
+            else:
+                logbug(2, "incorrect body of type dict", measurement)
+                body = None
+
         if body is not None:
             for fp in zzfps["body_match"] + ccfps.get("body_match", []):
                 # fp: {"body_match": "...", "locality": "..."}
                 tb = time.time()
                 bm = fp["body_match"]
-                idx = body.find(bm)
+                if isinstance(body, bytes):
+                    idx = body.find(bm.encode())
+                else:
+                    idx = body.find(bm)
+
                 if idx != -1:
                     matches.append(fp)
                     log.debug("matched body fp %s %r at pos %d", msm_cc, bm, idx)
@@ -1052,10 +1068,17 @@ def msm_processor(queue):
                 # Generate anomaly, confirmed and failure to keep consistency
                 # with the pipeline, allowing simple queries in the API and
                 # in manual analysis and keep compatibility with Explorer
-                anomaly = (scores.get("blocking_general", 0.0) > 0.5)
+                anomaly = scores.get("blocking_general", 0.0) > 0.5
                 failure = scores.get("accuracy", 1.0) < 0.5
                 db.upsert_summary(
-                    measurement, scores, anomaly, confirmed, failure, tid, fn, conf.update
+                    measurement,
+                    scores,
+                    anomaly,
+                    confirmed,
+                    failure,
+                    tid,
+                    fn,
+                    conf.update,
                 )
                 db.trim_old_measurements(conf)
             except Exception as e:
