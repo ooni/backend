@@ -400,7 +400,7 @@ def test_list_measurements_failure_true_pipeline(client):
     for r in response["results"]:
         assert r["failure"] == True
 
-    assert r["measurement_id"] == "temp-id-364655453"
+    assert r["measurement_id"] == "temp-id-364725640"
 
 
 def test_list_measurements_failure_false_pipeline(client):
@@ -410,7 +410,7 @@ def test_list_measurements_failure_false_pipeline(client):
     for r in response["results"]:
         assert r["failure"] == False, r
 
-    assert r["measurement_id"] == "temp-id-364945591"
+    assert r["measurement_id"] == "temp-id-364945592"
 
 
 @pytest.mark.skip(reason="no way of currently testing this")
@@ -691,16 +691,28 @@ def privapi(client, subpath):
     assert response.is_json
     return response.json
 
+
 # TODO: improve tests
+
 
 def test_private_api_asn_by_month(client):
     url = "asn_by_month"
-    privapi(client, url)
+    response = privapi(client, url)
+    assert len(response) > 5
+    r = response[0]
+    assert sorted(r.keys()) == ["date", "value"]
+    assert r["value"] > 10
+    assert r["value"] < 10 ** 6
 
 
 def test_private_api_countries_by_month(client):
     url = "countries_by_month"
     response = privapi(client, url)
+    assert len(response) > 5
+    r = response[0]
+    assert sorted(r.keys()) == ["date", "value"]
+    assert r["value"] > 10
+    assert r["value"] < 1000
 
 
 def test_private_api_runs_by_month(client):
@@ -715,79 +727,111 @@ def test_private_api_runs_by_month(client):
 def test_private_api_reports_per_day(client):
     url = "reports_per_day"
     response = privapi(client, url)
-    assert len(response) == 2112
+    assert len(response) > 2112
     assert sorted(response[0].keys()) == ["count", "date"]
     assert sum(i["count"] for i in response) > 6_000_000
-    assert response[0] == {'count': 1, 'date': '2003-11-06'}
+    assert response[0] == {"count": 1, "date": "2003-11-06"}
 
 
-def test_private_api_test_names(client):
+def test_private_api_test_names(client, log):
     url = "test_names"
     response = privapi(client, url)
+    assert response == {
+        "test_names": [
+            {"id": "web_connectivity", "name": "Web Connectivity"},
+            {"id": "facebook_messenger", "name": "Facebook Messenger"},
+            {"id": "telegram", "name": "Telegram"},
+            {"id": "whatsapp", "name": "WhatsApp"},
+            {"id": "http_invalid_request_line", "name": "HTTP Invalid Request Line"},
+            {
+                "id": "http_header_field_manipulation",
+                "name": "HTTP Header Field Manipulation",
+            },
+            {"id": "ndt", "name": "NDT"},
+            {"id": "dash", "name": "DASH"},
+            {"id": "bridge_reachability", "name": "Bridge Reachability"},
+            {"id": "meek_fronted_requests_test", "name": "Meek Fronted Requests"},
+            {"id": "vanilla_tor", "name": "Vanilla Tor"},
+            {"id": "tcp_connect", "name": "TCP Connect"},
+            {"id": "http_requests", "name": "HTTP Requests"},
+            {"id": "dns_consistency", "name": "DNS Consistency"},
+            {"id": "http_host", "name": "HTTP Host"},
+            {"id": "multi_protocol_traceroute", "name": "Multi Protocol Traceroute"},
+        ]
+    }
 
 
-def test_private_api_countries(client):
+def test_private_api_countries(client, log):
     url = "countries"
     response = privapi(client, url)
+    assert "countries" in response
+    assert len(response["countries"]) == 232
+    a = response["countries"][0]
+    assert a["name"] == "Andorra"
+    assert a["alpha_2"] == "AD"
+    assert a["count"] > 100
 
 
-def test_private_api_test_coverage(client):
-    url = "test_coverage?probe_cc=US"
+# def test_private_api_test_coverage(client, log):
+#     url = "test_coverage?probe_cc=US"
+#     response = privapi(client, url)
+
+
+# def test_private_api_website_networks(client, log):
+#     url = "website_networks?probe_cc=US"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_website_stats(client, log):
+#     url = "website_stats"
+#     response = privapi(client, url)
+
+
+def test_private_api_website_urls(client, log):
+    url = "website_urls?probe_cc=BR&probe_asn=AS8167"
     response = privapi(client, url)
-    print(response)
-    assert 0
+    r = response["metadata"]
+    assert r["total_count"] > 0
+    del r["total_count"]
+    assert r == {
+        "current_page": 1,
+        "limit": 10,
+        "next_url": "https://api.ooni.io/api/_/website_urls?probe_cc=BR&probe_asn=AS8167&offset=10&limit=10",
+        "offset": 0,
+    }
+    assert len(response["results"]) > 1
 
 
-def test_private_api_website_networks(client):
-    url = "website_networks?probe_cc=US"
-    response = privapi(client, url)
-    print(response)
-    assert 0
-
-
-
-def test_private_api_website_stats(client):
-    url = "website_stats"
-    response = privapi(client, url)
-
-
-
-def test_private_api_website_urls(client):
-    url = "website_urls"
-    response = privapi(client, url)
-
-
-
-def test_private_api_vanilla_tor_stats(client):
-    url = "vanilla_tor_stats"
-    response = privapi(client, url)
-
-
-def test_private_api_im_networks(client):
-    url = "im_networks"
-    response = privapi(client, url)
-
-
-def test_private_api_im_stats(client):
-    url = "im_stats"
-    response = privapi(client, url)
-
-
-def test_private_api_network_stats(client):
-    url = "network_stats"
-    response = privapi(client, url)
-
-
-def test_private_api_country_overview(client):
-    url = "country_overview"
-    response = privapi(client, url)
-
-
-def test_private_api_global_overview(client):
-    url = "global_overview"
-    response = privapi(client, url)
-
-
-def test_private_api_global_overview_by_month(client):
-    url = "global_overview_by_month"
-    response = privapi(client, url)
+# def test_private_api_vanilla_tor_stats(client):
+#     url = "vanilla_tor_stats"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_im_networks(client):
+#     url = "im_networks"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_im_stats(client):
+#     url = "im_stats"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_network_stats(client):
+#     url = "network_stats"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_country_overview(client):
+#     url = "country_overview"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_global_overview(client):
+#     url = "global_overview"
+#     response = privapi(client, url)
+#
+#
+# def test_private_api_global_overview_by_month(client):
+#     url = "global_overview_by_month"
+#     response = privapi(client, url)
