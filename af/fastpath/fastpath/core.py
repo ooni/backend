@@ -921,7 +921,28 @@ def score_psiphon(msm) -> dict:
     Returns a scores dict
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
-    tk = msm["test_keys"]
+    tk = msm.get("test_keys", {})
+
+    # https://github.com/ooni/spec/blob/master/nettests/ts-015-psiphon.md
+    failure = tk.get("failure", None)
+    bootstrap_time = tk.get("bootstrap_time", 0)
+
+    if failure is None:
+        if bootstrap_time == 0:
+            # should not happen
+            logbug(4, "invalid psiphon msmt", msm)
+            scores["accuracy"] = 0.0
+
+        else:
+            # success
+            scores["accuracy"] = 1.0
+
+    else:
+        # if bootstrap_time == 0: # there was an error bootstrapping Psiphon
+        # else: # there was an error when using Psiphon
+        scores["accuracy"] = 1.0
+        scores["blocking_general"] = 1.0
+
     if "resolver_ip" not in msm:
         logbug(0, "no resolver_ip", msm)
         scores["accuracy"] = 0.0
