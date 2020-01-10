@@ -622,10 +622,10 @@ def test_bug_355_anomaly(client):
 def test_bug_142_twitter(client):
     # we can assume there's always enough data
     ts = datetime.utcnow().date().strftime("%Y-%m-%d")
-    p = "measurements?domain=twitter.com&until=%s&limit=50" % ts
+    p = "measurements?domain=twitter.com&until=%s&limit=20" % ts
     response = api(client, p)
     rows = tuple(response["results"])
-    assert len(rows) == 50
+    assert len(rows) == 20
     for r in rows:
         assert "twitter" in r["input"], r
 
