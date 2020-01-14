@@ -1,5 +1,4 @@
 import operator
-import os
 import re
 from datetime import timedelta, datetime
 
@@ -12,19 +11,16 @@ from flask import (
     Blueprint,
     render_template,
     current_app,
-    request,
     redirect,
     Response,
     stream_with_context,
 )
 
-from sqlalchemy import func, or_, desc
-from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy import sql, select
+from sqlalchemy.sql import literal_column
 from werkzeug.exceptions import BadRequest, NotFound, HTTPException
 
-from measurements.models import Report, Measurement, Autoclaved
 from measurements.config import REQID_HDR, request_id
-from measurements.countries import lookup_country
 
 # Exporting it
 from .docs import api_docs_blueprint
@@ -142,49 +138,47 @@ def files_download(textname):
     if "/" not in textname:
         # This is for backward compatibility with the new pipeline.
         # See: https://github.com/TheTorProject/ooni-measurements/issues/44
-        q = current_app.db_session.query(Report.textname).filter(
-            Report.textname.endswith(textname)
-        )
-        first = q.first()
+        rawsql = """SELECT report.textname AS report_textname
+            FROM report
+            WHERE report.textname LIKE '%' || :textname
+        """
+        q = current_app.db_session.execute(rawsql, dict(textname=textname))
+
+        first = q.fetchone()
         if first is None:
             raise NotFound("No file with that filename found")
 
         return redirect("/files/download/%s" % first[0])
 
-    subquery = (
-        current_app.db_session.query(
-            Measurement.frame_off.label("frame_off"),
-            Measurement.frame_size.label("frame_size"),
-            Measurement.intra_off.label("intra_off"),
-            Measurement.intra_size.label("intra_size"),
-            func.row_number().over(order_by="frame_off, intra_off").label("row_number"),
-            func.count().over().label("total_count"),
-            func.sum(Measurement.intra_size + 1).over().label("report_size"),
-            Autoclaved.filename.label("filename"),
-        )
-        .filter(Report.textname == textname)
-        .join(Report, Report.report_no == Measurement.report_no)
-        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
-        .subquery()
-    )
+    rawsql = """
+    SELECT *
+    FROM (
+        SELECT
+            measurement.frame_off AS frame_off,
+            measurement.frame_size AS frame_size,
+            measurement.intra_off AS intra_off,
+            measurement.intra_size AS intra_size,
+            row_number() OVER (ORDER BY frame_off, intra_off) AS row_number,
+            count(*) OVER () AS total_count,
+            sum(measurement.intra_size + 1) OVER () AS report_size,
+            autoclaved.filename AS filename
+        FROM
+            measurement
+            JOIN report ON report.report_no = measurement.report_no
+            JOIN autoclaved ON autoclaved.autoclaved_no = report.autoclaved_no
+        WHERE
+            report.textname = :textname) AS anon_1
+    WHERE
+        anon_1.row_number = 1
+        OR anon_1.row_number = anon_1.total_count
+    """
+    q = current_app.db_session.execute(rawsql, dict(textname=textname))
 
-    q = current_app.db_session.query(
-        subquery.c.frame_off,
-        subquery.c.frame_size,
-        subquery.c.intra_off,
-        subquery.c.intra_size,
-        subquery.c.row_number,
-        subquery.c.total_count,
-        subquery.c.report_size,
-        subquery.c.filename,
-    ).filter(
-        or_(subquery.c.row_number == 1, subquery.c.row_number == subquery.c.total_count)
-    )
-
-    msmts = q.all()
+    msmts = q.fetchall()
     if len(msmts) == 0:
         current_app.logger.debug("Could not find %s" % textname)
         raise NotFound("No file with that filename found")
+
     msmts.sort(
         key=operator.attrgetter("frame_off")
     )  # at most two rows, but it could be single

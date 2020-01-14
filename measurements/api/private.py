@@ -10,21 +10,17 @@ from dateutil.relativedelta import relativedelta
 
 from urllib.parse import urljoin, urlencode
 
-import json
 import math
-import requests
 
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, abort
 from flask.json import jsonify
 
-from sqlalchemy import func, and_, or_, distinct, sql, select
+from sqlalchemy import func, and_, or_, sql, select
 
 from werkzeug.exceptions import BadRequest
 
-from measurements.models import Report, Measurement, Input
 from measurements.models import TEST_NAMES, TEST_GROUPS, get_test_group_case
-from measurements.config import REQID_HDR, request_id
 from measurements.countries import lookup_country
 
 # prefix: /api/_
@@ -40,7 +36,7 @@ def api_private_stats_by_month(orm_stat):
     # data for https://api.ooni.io/stats
     # Report.test_start_time protection against time travellers may be
     # implemented in a better way, but that sanity check is probably enough.
-    ## ooni_epoch = datetime(2012, 12, 1)
+    # ooni_epoch = datetime(2012, 12, 1)
 
     now = datetime.now()
     end_date = datetime(now.year, now.month, 1)
@@ -90,42 +86,42 @@ def api_private_countries_by_month():
 def api_private_runs_by_month():
     # The query takes ~6s on local SSD @ AMS on 2018-04-04.
     # It was taking ~20s when it was fetching all the table from DB and doing grouping locally.
+    # TODO: use-count-table
+    # FIXME: support fastpath
     now = datetime.now()
     end_date = datetime(now.year, now.month, 1)
     start_date = end_date - relativedelta(months=24)
-
-    r = (
-        current_app.db_session.query(
-            func.date_trunc("month", Report.test_start_time).label("test_start_month"),
-            func.count(),
-        )
-        .filter(Report.test_start_time >= start_date)
-        .filter(Report.test_start_time < end_date)
-        .group_by("test_start_month")
-    )
+    rawsql = """SELECT
+        date_trunc('month', report.test_start_time) AS test_start_month,
+        count(*) AS count_1
+        FROM report
+        WHERE report.test_start_time >= :start_date
+        AND report.test_start_time < :end_date
+        GROUP BY test_start_month
+    """
+    params = dict(start_date=start_date, end_date=end_date)
+    q = current_app.db_session.execute(rawsql, params)
+    delta = relativedelta(months=+1, days=-1)
     result = [
-        {
-            "date": (bkt + relativedelta(months=+1, days=-1)).strftime("%Y-%m-%d"),
-            "value": value,
-        }
-        for bkt, value in sorted(r)
+        {"date": (bkt + delta).strftime("%Y-%m-%d"), "value": value}
+        for bkt, value in sorted(q.fetchall())
     ]
     return jsonify(result)
 
 
 @api_private_blueprint.route("/reports_per_day")
 def api_private_reports_per_day():
-    q = (
-        current_app.db_session.query(
-            func.count(func.date_trunc("day", Report.test_start_time)),
-            func.date_trunc("day", Report.test_start_time),
-        )
-        .group_by(func.date_trunc("day", Report.test_start_time))
-        .order_by(func.date_trunc("day", Report.test_start_time))
-    )
-    result = []
-    for count, date in q:
-        result.append({"count": count, "date": date.strftime("%Y-%m-%d")})
+    # TODO: use-count-table
+    # FIXME: support fastpath
+    rawsql = """SELECT
+        count(date_trunc('day', report.test_start_time)) AS count_1,
+        date_trunc('day', report.test_start_time) AS date_trunc_2
+        FROM report
+        GROUP BY date_trunc('day', report.test_start_time)
+        ORDER BY date_trunc('day', report.test_start_time)
+    """
+    q = current_app.db_session.execute(rawsql)
+    result = [{"count": count, "date": date.strftime("%Y-%m-%d")} for count, date in q]
     return jsonify(result)
 
 
@@ -165,169 +161,42 @@ def api_private_countries():
     return jsonify({"countries": country_list})
 
 
-# XXX Everything below here are ghetto hax to support legacy OONI Explorer
+# Deprecated endpoints for legacy OONI Explorer
+
+
 @api_private_blueprint.route("/blockpages", methods=["GET"])
 def api_private_blockpages():
-    probe_cc = request.args.get("probe_cc")
-    if probe_cc is None:
-        raise BadRequest("missing probe_cc")
-
-    # Fastpath for blockpages
-    s = (
-        select([sql.text("SUM(confirmed_count) as confirmed_count")])
-        .where(sql.text("probe_cc = :probe_cc"))
-        .select_from(sql.table("ooexpl_wc_confirmed"))
-    )
-    confirmed_count = current_app.db_session.execute(
-        s, {"probe_cc": probe_cc}
-    ).fetchone()[0]
-    if confirmed_count == 0:
-        return jsonify({"results": []})
-
-    q = (
-        current_app.db_session.query(
-            Report.report_id.label("report_id"),
-            Report.probe_cc.label("probe_cc"),
-            Report.probe_asn.label("probe_asn"),
-            Report.test_start_time.label("test_start_time"),
-            Input.input.label("input"),
-        )
-        .join(Measurement, Measurement.report_no == Report.report_no)
-        .join(Input, Measurement.input_no == Input.input_no)
-        .filter(Measurement.confirmed == True)
-        .filter(Report.test_name == "web_connectivity")
-        .filter(Report.probe_cc == probe_cc)
-        .limit(100)
-    )
-
-    results = []
-    for row in q:
-        results.append(
-            {
-                "report_id": row.report_id,
-                "probe_cc": row.probe_cc,
-                "probe_asn": "AS{}".format(row.probe_asn),
-                "test_start_time": row.test_start_time,
-                "input": row.input,
-            }
-        )
-
-    return jsonify({"results": results})
+    abort(404)
 
 
 @api_private_blueprint.route("/website_measurements", methods=["GET"])
 def api_private_website_measurements():
-    input_ = request.args.get("input")
-    if input_ is None:
-        raise BadRequest("missing input")
-
-    q = (
-        current_app.db_session.query(
-            Report.report_id.label("report_id"),
-            Report.probe_cc.label("probe_cc"),
-            Report.probe_asn.label("probe_asn"),
-            Report.test_start_time.label("test_start_time"),
-            Input.input.label("input"),
-        )
-        .join(Measurement, Measurement.report_no == Report.report_no)
-        .join(Input, Measurement.input_no == Input.input_no)
-        .filter(Measurement.confirmed == True)
-        .filter(Report.test_name == "web_connectivity")
-        .filter(Input.input.contains(input_))
-        .limit(100)
-    )
-
-    results = []
-    for row in q:
-        results.append(
-            {
-                "report_id": row.report_id,
-                "probe_cc": row.probe_cc,
-                "probe_asn": "AS{}".format(row.probe_asn),
-                "test_start_time": row.test_start_time,
-                "input": row.input,
-            }
-        )
-
-    return jsonify({"results": results})
+    abort(404)
 
 
 @api_private_blueprint.route("/blockpage_detected", methods=["GET"])
 def api_private_blockpage_detected():
-    q = (
-        current_app.db_session.query(distinct(Report.probe_cc).label("probe_cc"))
-        .join(Measurement, Measurement.report_no == Report.report_no)
-        .filter(Measurement.confirmed == True)
-        .filter(Report.test_name == "web_connectivity")
-    )
-
-    results = []
-    for row in q:
-        results.append({"probe_cc": row.probe_cc})
-
-    return jsonify({"results": results})
+    abort(404)
 
 
 @api_private_blueprint.route("/blockpage_count", methods=["GET"])
 def api_private_blockpage_count():
-    probe_cc = request.args.get("probe_cc")
-    if probe_cc is None:
-        raise BadRequest("missing probe_cc")
-
-    s = sql.text(
-        """SELECT SUM(confirmed_count), SUM(msm_count), test_day
-    FROM ooexpl_wc_confirmed
-    WHERE probe_cc =  :probe_cc
-    GROUP BY test_day
-    ORDER BY test_day
-    ;"""
-    )
-    results = []
-    q = current_app.db_session.execute(s, {"probe_cc": probe_cc})
-    for confirmed_count, msm_count, test_day in q:
-        results.append(
-            {
-                "test_start_time": test_day,
-                "block_count": int(confirmed_count),
-                "total_count": int(msm_count),
-            }
-        )
-
-    return jsonify({"results": results})
+    abort(404)
 
 
 @api_private_blueprint.route("/measurement_count_by_country", methods=["GET"])
 def api_private_measurement_count_by_country():
-    """
-    Example:
-    {"results": [{"probe_cc": "UZ", "count": 1433} ...]
-    """
-    s = (
-        select([sql.text("SUM(count)"), sql.text("probe_cc")])
-        .group_by(sql.text("probe_cc"))
-        .order_by(sql.text("probe_cc"))
-        .select_from(sql.table("ooexpl_bucket_msm_count"))
-    )
-
-    q = current_app.db_session.execute(s)
-    results = []
-    for count, probe_cc in q:
-        results.append({"count": int(count), "probe_cc": probe_cc})
-    return jsonify({"results": results})
+    abort(404)
 
 
 @api_private_blueprint.route("/measurement_count_total", methods=["GET"])
 def api_private_measurement_count_total():
-    s = select([sql.text("SUM(count)")]).select_from(
-        sql.table("ooexpl_bucket_msm_count")
-    )
+    abort(404)
 
-    total_count = 0
-    row = current_app.db_session.execute(s).fetchone()
-    if row:
-        total_count = row[0]
 
-    return jsonify({"total": total_count})
+# END endpoints for legacy explorer
+
+# BEGIN endpoints for new explorer
 
 
 def last_30days():
@@ -341,9 +210,6 @@ def last_30days():
         yield d.strftime("%Y-%m-%d")
 
 
-## END endpoints for legacy explorer
-
-## BEGIN endpoints for new explorer
 def get_recent_network_coverage(probe_cc, test_groups):
     where_clause = [
         sql.text("test_day >= current_date - interval '31 day'"),

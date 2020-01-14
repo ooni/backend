@@ -11,12 +11,11 @@ import lz4framed
 
 from sentry_sdk import configure_scope, capture_exception
 
-from flask import current_app, request, make_response
+from flask import current_app, request, make_response, abort
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
-from sqlalchemy.dialects import postgresql
-from sqlalchemy import func, or_, and_, false, text, select, sql, column
+from sqlalchemy import func, and_, false, text, select, sql, column
 from sqlalchemy.sql import literal_column
 from sqlalchemy import String, cast, Float
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
@@ -27,12 +26,6 @@ from urllib.parse import urljoin, urlencode
 
 from measurements import __version__
 from measurements.config import REPORT_INDEX_OFFSET, REQID_HDR, request_id
-from measurements.models import (
-    Autoclaved,
-    Input,
-    Measurement,
-    Report,
-)
 
 MSM_ID_PREFIX = "temp-id"
 FASTPATH_MSM_ID_PREFIX = "temp-fid-"
@@ -65,6 +58,7 @@ def list_files(
     offset=0,
     limit=100,
 ):
+    log = current_app.logger
 
     if probe_asn is not None:
         if probe_asn.startswith("AS"):
@@ -90,35 +84,53 @@ def list_files(
     if order_by in ("index", "idx"):
         order_by = "report_no"
 
-    q = current_app.db_session.query(
-        Report.textname,
-        Report.test_start_time,
-        Report.probe_cc,
-        Report.probe_asn,
-        Report.report_no,
-        Report.test_name,
-    )
+    cols = [
+        literal_column("textname"),
+        literal_column("test_start_time"),
+        literal_column("probe_cc"),
+        literal_column("probe_asn"),
+        literal_column("report_no"),
+        literal_column("test_name"),
+    ]
+    where = []
+    query_params = {}
 
     # XXX maybe all of this can go into some sort of function.
     if probe_cc:
-        q = q.filter(Report.probe_cc == probe_cc)
-    if probe_asn:
-        q = q.filter(Report.probe_asn == probe_asn)
-    if test_name:
-        q = q.filter(Report.test_name == test_name)
-    if since:
-        q = q.filter(Report.test_start_time > since)
-    if until:
-        q = q.filter(Report.test_start_time <= until)
-    if since_index:
-        q = q.filter(Report.report_no > report_no)
+        where.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
 
-    count = q.count()
+    if probe_asn:
+        where.append(sql.text("probe_asn = :probe_asn"))
+        query_params["probe_asn"] = probe_asn
+
+    if test_name:
+        where.append(sql.text("test_name = :test_name"))
+        query_params["test_name"] = test_name
+
+    if since:
+        where.append(sql.text("test_start_time > :since"))
+        query_params["since"] = since
+
+    if until:
+        where.append(sql.text("test_start_time <= :until"))
+        query_params["until"] = until
+
+    if since_index:
+        where.append(sql.text("report_no > :report_no"))
+        query_params["report_no"] = report_no
+
+    query = select(cols).where(and_(*where)).select_from("report")
+    query_cnt = query.with_only_columns([func.count()]).order_by(None)
+    log.debug(query_cnt)
+    count = current_app.db_session.execute(query_cnt, query_params).scalar()
+
     pages = math.ceil(count / limit)
     current_page = math.ceil(offset / limit) + 1
 
-    q = q.order_by(text("{} {}".format(order_by, order)))
-    q = q.limit(limit).offset(offset)
+    query = query.order_by(text("{} {}".format(order_by, order)))
+    query = query.limit(limit).offset(offset)
+
     next_args = request.args.to_dict()
     next_args["offset"] = "%s" % (offset + limit)
     next_args["limit"] = "%s" % limit
@@ -137,6 +149,9 @@ def list_files(
         "next_url": next_url,
     }
     results = []
+
+    log.debug(query)
+    q = current_app.db_session.execute(query, query_params)
     for row in q:
         download_url = urljoin(
             current_app.config["BASE_URL"], "/files/download/%s" % row.textname
@@ -206,41 +221,43 @@ def get_measurement(measurement_id, download=None):
         raise BadRequest("Invalid measurement_id")
     msm_no = int(m.group(1))
 
-    q = (
-        current_app.db_session.query(
-            Measurement.report_no.label("report_no"),
-            Measurement.frame_off.label("frame_off"),
-            Measurement.frame_size.label("frame_size"),
-            Measurement.intra_off.label("intra_off"),
-            Measurement.intra_size.label("intra_size"),
-            Report.textname.label("textname"),
-            Report.report_no.label("r_report_no"),
-            Report.autoclaved_no.label("r_autoclaved_no"),
-            Autoclaved.filename.label("a_filename"),
-            Autoclaved.autoclaved_no.label("a_autoclaved_no"),
+    cols = [
+        literal_column("measurement.report_no"),
+        literal_column("frame_off"),
+        literal_column("frame_size"),
+        literal_column("intra_off"),
+        literal_column("intra_size"),
+        literal_column("textname"),
+        literal_column("report.autoclaved_no"),
+        literal_column("autoclaved.filename"),
+    ]
+    table = (
+        sql.table("measurement")
+        .join(
+            sql.table("report"), sql.text("measurement.report_no = report.report_no"),
         )
-        .filter(Measurement.msm_no == msm_no)
-        .join(Report, Report.report_no == Measurement.report_no)
-        .join(Autoclaved, Autoclaved.autoclaved_no == Report.autoclaved_no)
+        .join(
+            sql.table("autoclaved"),
+            sql.text("autoclaved.autoclaved_no = report.autoclaved_no"),
+        )
     )
-    try:
-        msmt = q.one()
-    except MultipleResultsFound:
-        current_app.logger.warning(
-            "Duplicate rows for measurement_id: %s" % measurement_id
-        )
-        msmt = q.first()
-    except NoResultFound:
-        # XXX we should actually return a 404 here
-        raise BadRequest("No measurement found")
+    where = sql.text("measurement.msm_no = :msm_no")
+    query = select(cols).where(where).select_from(table)
+    query_params = dict(msm_no=msm_no)
+    q = current_app.db_session.execute(query, query_params)
+
+    msmt = q.fetchone()
+    if msmt is None:
+        abort(404)
 
     # Usual size of LZ4 frames is 256kb of decompressed text.
     # Largest size of LZ4 frame was ~55Mb compressed and ~56Mb decompressed. :-/
     range_header = "bytes={}-{}".format(
         msmt.frame_off, msmt.frame_off + msmt.frame_size - 1
     )
+    filename = msmt["autoclaved.filename"]
     r = requests.get(
-        urljoin(current_app.config["AUTOCLAVED_BASE_URL"], msmt.a_filename),
+        urljoin(current_app.config["AUTOCLAVED_BASE_URL"], filename),
         headers={"Range": range_header, REQID_HDR: request_id()},
     )
     r.raise_for_status()
