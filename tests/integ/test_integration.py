@@ -7,6 +7,7 @@ See README.adoc
 
 from datetime import datetime, timedelta
 from hashlib import shake_128
+from urllib.parse import urlencode
 import json
 import os
 
@@ -335,6 +336,71 @@ def test_list_measurements_search(client):
     )
     assert len(response["results"]) == 50, jd(response)
     # assert response["metadata"]["count"] == 1, jd(response)
+
+
+# # Benchmark list_measurements against traditional pipeline data  # #
+
+# # Test slow list_measurements queries with order_by = None
+# tox -q -e integ -- --durations=40 -k test_list_measurements_slow
+
+# These are some of the parameters exposed by Explorer Search
+@pytest.mark.timeout(20)
+@pytest.mark.parametrize("probe_cc", ("YT", None))
+@pytest.mark.parametrize("since", ("2017-01-01", None))
+@pytest.mark.parametrize("test_name", ("web_connectivity", None))
+@pytest.mark.parametrize("anomaly", ("true", None))
+@pytest.mark.parametrize("domain", ("twitter.com", None))
+@pytest.mark.skip(reason="This is too slow")
+def test_list_measurements_slow_order_by_complete(
+    domain, anomaly, test_name, since, probe_cc, log, client
+):
+    d = dict(
+        probe_cc=probe_cc,
+        since=since,
+        test_name=test_name,
+        anomaly=anomaly,
+        domain=domain,
+        until="2019-12-05",
+    )
+    d = {k: v for k, v in d.items() if v is not None}
+    url = "measurements?" + urlencode(d)
+    response = api(client, url)
+
+
+@pytest.mark.parametrize(
+    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
+)
+def test_list_measurements_slow_order_by_group_1(f, log, client):
+    # filter on probe_cc or probe_asn or test_name
+    # order by --> "test_start_time"
+    url = f"measurements?until=2019-01-01&{f}"
+    log.info(url)
+    response = api(client, url)
+
+
+@pytest.mark.parametrize("f", ("anomaly=true", "domain=twitter.com"))
+def test_list_measurements_slow_order_by_group_2(f, log, client):
+    # anomaly or confirmed or failure or input or domain or category_code
+    # order by --> "measurement_start_time"
+    url = f"measurements?until=2019-01-01&{f}"
+    log.info(url)
+    response = api(client, url)
+
+
+# This is the hard case. When mixing one filter that applies to the
+# measurements table and one on the results table, there is no way to do
+# an order_by that avoids heavy scans
+
+
+@pytest.mark.parametrize("f1", ("probe_cc=YT", "test_name=web_connectivity"))
+@pytest.mark.parametrize("f2", ("anomaly=true", "domain=twitter.com"))
+def test_list_measurements_slow_order_by_group_3(f1, f2, log, client):
+    url = f"measurements?until=2019-01-01&{f1}&{f2}"
+    log.info(url)
+    response = api(client, url)
+
+
+# # end
 
 
 def test_list_measurements_duplicate(client):
