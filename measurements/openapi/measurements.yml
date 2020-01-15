@@ -108,9 +108,10 @@ paths:
         - name: order_by
           in: query
           type: string
-          description: 'By which key the results should be ordered by (default: `test_start_time`)'
+          description: 'By which key the results should be ordered by (default: `null`)'
           enum:
             - test_start_time
+            - measurement_start_time
             - input
             - probe_cc
             - probe_asn
