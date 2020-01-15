@@ -540,7 +540,7 @@ def list_measurements(
                 fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
     else:
-        mr_table = mr_table.join(
+        mr_table = mr_table.outerjoin(
             sql.table("domain_input"),
             sql.text("domain_input.input_no = measurement.input_no"),
         )
