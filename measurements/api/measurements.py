@@ -330,7 +330,7 @@ def list_measurements(
     since=None,
     until=None,
     since_index=None,
-    order_by="measurement_start_time",
+    order_by=None,
     order="desc",
     offset=0,
     limit=100,
@@ -569,8 +569,23 @@ def list_measurements(
         .select_from(fpq_table)
         .limit(offset + limit)
     )
-    assert order_by  # TODO: is this always true? Was it a bug?
-    if order_by is not None:
+
+    if order_by is None:
+        # Use test_start_time or measurement_start_time depending on other
+        # filters in order to avoid heavy joins.
+        # Filtering on anomaly, confirmed, msm_failure -> measurement_start_time
+        # Filtering on probe_cc, probe_asn, test_name -> test_start_time
+        # See test_list_measurements_slow_order_by_* tests
+        if probe_cc or probe_asn or test_name:
+            ob = "test_start_time"
+        elif anomaly or confirmed or failure or input_ or domain or category_code:
+            ob = "measurement_start_time"
+        else:
+            ob = "measurement_start_time"
+        mr_query = mr_query.order_by(text("{} {}".format(ob, order)))
+        fp_query = fp_query.order_by(text("{} {}".format(ob, order)))
+
+    else:
         mr_query = mr_query.order_by(text("{} {}".format(order_by, order)))
         fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
 
