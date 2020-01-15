@@ -23,7 +23,9 @@ from werkzeug.exceptions import BadRequest
 from measurements.models import TEST_NAMES, TEST_GROUPS, get_test_group_case
 from measurements.countries import lookup_country
 
-# prefix: /api/_
+# The private API is exposed under the prefix /api/_
+# e.g. https://api.ooni.io/api/_/test_names
+
 api_private_blueprint = Blueprint("api_private", "measurements")
 
 
