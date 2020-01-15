@@ -630,6 +630,38 @@ def test_bug_142_twitter(client):
         assert "twitter" in r["input"], r
 
 
+def test_bug_278_with_input_none(client):
+    url = "measurements?report_id=20190113T202156Z_AS327931_CgoC3KbgM6zKajvIIt1AxxybJ1HbjwwWJjsJnlxy9rpcGY54VH"
+    response = api(client, url)
+    assert response["metadata"]["count"] == 1, jd(response)
+    assert response["results"] == [
+        {
+            "anomaly": False,
+            "confirmed": False,
+            "failure": False,
+            "input": None,
+            "measurement_id": "temp-id-263478291",
+            "measurement_start_time": "2019-02-22T20:21:59Z",
+            "measurement_url": "https://api.ooni.io/api/v1/measurement/temp-id-263478291",
+            "probe_asn": "AS327931",
+            "probe_cc": "DZ",
+            "report_id": "20190113T202156Z_AS327931_CgoC3KbgM6zKajvIIt1AxxybJ1HbjwwWJjsJnlxy9rpcGY54VH",
+            "scores": {},
+            "test_name": "ndt",
+        }
+    ]
+
+
+def test_bug_278_with_input_not_none(client):
+    # Fetch web_connectivity by report_id only. Expect 25 hits where input
+    # is backfilled from domain_input
+    url = "measurements?report_id=20190221T235955Z_AS8346_GMKlfxcvS7Xcy2vPgzmOIxeJXnLdGmWVcZ18vrelaTQ4YDAUHo"
+    response = api(client, url)
+    assert response["metadata"]["count"] == 25, jd(response)
+    for r in response["results"]:
+        assert r["input"].startswith("http")
+
+
 def test_slow_inexistent_domain(client):
     # time-unbounded query, filtering by a domain never monitored
     p = "measurements?domain=meow.com&until=2019-12-11&limit=50"
