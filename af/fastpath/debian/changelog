@@ -1,3 +1,11 @@
+fastpath (0.10) unstable; urgency=medium
+
+  * Add Tor and Psiphon enum values
+  * Handle missing input msmt field
+  * Switch S3 bucket
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Jan 2020 15:40:40 +0000
+
 fastpath (0.9) unstable; urgency=medium
 
   * Handle dict body

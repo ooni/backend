@@ -29,8 +29,8 @@ import boto3  # debdeps: python3-boto3
 from fastpath.normalize import iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
 
-AWS_PROFILE = "ooni-data-private"
-BUCKET_NAME = "ooni-data-private"
+AWS_PROFILE = "ooni-data"
+BUCKET_NAME = "ooni-data"
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath.s3feeder")
@@ -64,7 +64,7 @@ def load_multiple(fn, touch=True) -> tuple:
                         yield (line, None)
 
                 elif m.name.endswith(".yaml"):
-                    continue # FIXME
+                    continue  # FIXME
                     bucket_tstamp = "FIXME"
                     for msm in iter_yaml_msmt_normalized(k, bucket_tstamp):
                         yield (None, msm)
@@ -104,8 +104,10 @@ def list_cans_on_s3_for_a_day(s3, day):
     prefix = f"{day}/"
     r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="canned/" + prefix)
     files = []
+    assert "Contents" in r
     for filedesc in r["Contents"]:
-        files.append((filedesc["Key"][len("canned/") :], filedesc["Size"]))
+        fname = filedesc["Key"][7:]  # trim away "canned/"
+        files.append((fname, filedesc["Size"]))
     return files
 
 

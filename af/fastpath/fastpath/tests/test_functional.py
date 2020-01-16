@@ -1,7 +1,7 @@
 """
 Simulate feeding from the collectors or cans on S3 using a local can
 """
-# Format with black -t py37 -l 120
+# Format with black -t py37 -l 110 --fast
 
 from collections import Counter
 from datetime import date, timedelta
@@ -23,20 +23,22 @@ log = logging.getLogger()
 # The fixtures download cans from S3 to a local directory
 #
 # Use credentials from ~/.aws/config in the block:
-# [ooni-data-private]
+# [ooni-data]
 # aws_access_key_id = ...
 # aws_secret_access_key = ...
 #
 # Explore bucket from CLI:
 # AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
 
-BUCKET_NAME = "ooni-data-private"
+# TODO: drop the boto3 code and use only s3feeder
+BUCKET_NAME = "ooni-data"
 
 
 @pytest.fixture
 def cans():
     """Download interesting cans from S3 to a local directory
     """
+    # TODO: move to the more flexible s3msmts where possible
     _cans = dict(
         web_conn_it="2018-05-07/20180501T071932Z-IT-AS198471-web_connectivity-20180506T090836Z_AS198471_gKqEpbg0Ny30ldGCQockbZMJSg9HhFiSizjey5e6JxSEHvzm7j-0.2.0-probe.json.lz4",
         web_conn_cn="2018-05-07/20180506T014008Z-CN-AS4134-web_connectivity-20180506T014010Z_AS4134_ZpxhAVt3iqCjT5bW5CfJspbqUcfO4oZfzDVjCWAu2UuVkibFsv-0.2.0-probe.json.lz4",
@@ -68,9 +70,6 @@ def cans():
         meek_2019_10_27="2019-10-27/meek_fronted_requests_test.0.tar.lz4",
         meek_2019_10_28="2019-10-28/meek_fronted_requests_test.0.tar.lz4",
         meek_2019_10_29="2019-10-29/meek_fronted_requests_test.0.tar.lz4",
-        psiphon_2019_10_28="2019-10-28/psiphon.0.tar.lz4",
-        psiphon_2019_10_29="2019-10-29/psiphon.0.tar.lz4",
-        psiphon_2019_10_30="2019-10-30/psiphon.0.tar.lz4",
         big2858="2019-10-30/20191030T032301Z-BR-AS28573-web_connectivity-20191030T032303Z_AS28573_VzW6UrXrs21YjYWvlk1hyzRqnKlmKNsSntSBGqFCnzFVxVSLQf-0.2.0-probe.json.lz4",
     )
     for k, v in _cans.items():
@@ -80,7 +79,7 @@ def cans():
     if not to_dload:
         return _cans
 
-    boto3.setup_default_session(profile_name="ooni-data-private")
+    boto3.setup_default_session(profile_name="ooni-data")
     s3 = boto3.client("s3")
     for fn in to_dload:
         s3fname = fn.as_posix().replace("testdata", "canned")
@@ -103,7 +102,7 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
     """Fetches cans from S3 and iterates over measurements.
     Detect broken dloads.
     """
-    boto3.setup_default_session(profile_name="ooni-data-private")
+    boto3.setup_default_session(profile_name="ooni-data")
     s3 = boto3.client("s3")
     can_date = start_date
     tpl = "{}/{}.00.tar.lz4" if test_name == "web_connectivity" else "{}/{}.0.tar.lz4"
@@ -766,28 +765,18 @@ def test_score_meek_fronted_requests_test(cans):
 
 
 def test_score_psiphon(cans):
-    for can_fn, msm in s3msmts("psiphon", start_date=date(2019, 9, 12)):
-        # The earliest can is canned/2019-09-12/psiphon.0.tar.lz4
+    for can_fn, msm in s3msmts("psiphon", date(2019, 12, 20), date(2020, 1, 10)):
+        assert msm["test_name"] == "psiphon"
         rid = msm["report_id"]
+        # test version 0.3.1 has different mkeys than before
         mkeys = set(msm.keys())
         mkeys.discard("resolver_ip")  # Some msmts are missing this
-        assert sorted(mkeys) == [
-            "data_format_version",
-            "measurement_start_time",
-            "probe_asn",
-            "probe_cc",
-            "probe_ip",
-            "report_id",
-            "software_name",
-            "software_version",
-            "test_keys",
-            "test_name",
-            "test_runtime",
-            "test_start_time",
-            "test_version",
-        ], "https://explorer.ooni.org/measurement/{}".format(rid)
-        assert sorted(msm["test_keys"]) == ["bootstrap_time", "failure"]
-        # TODO: all msmts have empty test_keys->failure. No scoring is done.
-        assert msm["test_keys"]["failure"] == ""
-        assert 0 < msm["test_keys"]["bootstrap_time"] < 100
+        assert len(mkeys) in (13, 15)
+        assert len(msm["test_keys"]) in (3, 6, 7)
+        assert 1 < msm["test_keys"]["bootstrap_time"] < 500
+        assert msm["test_keys"]["failure"] is None, msm
         scores = fp.score_measurement(msm, [])
+        if rid == "20200109T111813Z_AS30722_RZeO9Ix6ET2LJzqGcinrDp1iqrhaGGDCHSwlOoybq2N9kZITQt":
+            assert scores == {'blocking_general': 0.0, 'blocking_global': 0.0,
+                              'blocking_country': 0.0, 'blocking_isp': 0.0,
+                              'blocking_local': 0.0}

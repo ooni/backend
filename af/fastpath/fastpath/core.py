@@ -921,7 +921,28 @@ def score_psiphon(msm) -> dict:
     Returns a scores dict
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
-    tk = msm["test_keys"]
+    tk = msm.get("test_keys", {})
+
+    # https://github.com/ooni/spec/blob/master/nettests/ts-015-psiphon.md
+    failure = tk.get("failure", None)
+    bootstrap_time = tk.get("bootstrap_time", 0)
+
+    if failure is None:
+        if bootstrap_time == 0:
+            # should not happen
+            logbug(4, "invalid psiphon msmt", msm)
+            scores["accuracy"] = 0.0
+
+        else:
+            # success
+            scores["accuracy"] = 1.0
+
+    else:
+        # if bootstrap_time == 0: # there was an error bootstrapping Psiphon
+        # else: # there was an error when using Psiphon
+        scores["accuracy"] = 1.0
+        scores["blocking_general"] = 1.0
+
     if "resolver_ip" not in msm:
         logbug(0, "no resolver_ip", msm)
         scores["accuracy"] = 0.0
@@ -1006,7 +1027,7 @@ def generate_filename(tid):
 
 
 @metrics.timer("writeout_measurement")
-def writeout_measurement(msm_jstr, fn, update):
+def writeout_measurement(msm_jstr, fn, update, tid):
     """Safely write measurement to disk
     """
     # Different processes might be trying to write the same file at the same
@@ -1032,7 +1053,7 @@ def writeout_measurement(msm_jstr, fn, update):
                     os.utime(final_fname)
                     metrics.incr("msmt_output_file_updated")
                 else:
-                    log.info("Refusing to overwrite %s", final_fname)
+                    log.info(f"{tid} Refusing to overwrite {final_fname}")
                     metrics.incr("report_id_input_file_collision")
                     metrics.incr("msmt_output_file_skipped")
                     os.utime(final_fname)
@@ -1057,8 +1078,9 @@ def msm_processor(queue):
                 if measurement is None:
                     measurement = ujson.loads(msm_jstr)
                 msm_jstr, tid = trivial_id(measurement)
+                log.debug(f"Processing {tid}")
                 fn = generate_filename(tid)
-                writeout_measurement(msm_jstr, fn, conf.update)
+                writeout_measurement(msm_jstr, fn, conf.update, tid)
                 if measurement.get("test_name", None) == "web_connectivity":
                     matches = match_fingerprints(measurement)
                 else:
