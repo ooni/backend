@@ -728,6 +728,18 @@ def test_bug_278_with_input_not_none(client):
         assert r["input"].startswith("http")
 
 
+def test_list_measurements_external_order_by(client):
+    # The last order-by on the rows from pipeline + fastpath
+    today = datetime.utcnow().date()
+    until = today + timedelta(days=1)
+    url = f"measurements?until={until}&probe_cc=TR"
+    response = api(client, url)
+    last = max(r["measurement_start_time"] for r in response["results"])
+    # Ensure that the newest msmt is from today (hence fastpath)
+    assert last[:10] == str(today)
+    assert len(response["results"]) == 100, jd(response)
+
+
 def test_slow_inexistent_domain(client):
     # time-unbounded query, filtering by a domain never monitored
     p = "measurements?domain=meow.com&until=2019-12-11&limit=50"

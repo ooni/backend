@@ -577,17 +577,14 @@ def list_measurements(
         # Filtering on probe_cc, probe_asn, test_name -> test_start_time
         # See test_list_measurements_slow_order_by_* tests
         if probe_cc or probe_asn or test_name:
-            ob = "test_start_time"
+            order_by = "test_start_time"
         elif anomaly or confirmed or failure or input_ or domain or category_code:
-            ob = "measurement_start_time"
+            order_by = "measurement_start_time"
         else:
-            ob = "measurement_start_time"
-        mr_query = mr_query.order_by(text("{} {}".format(ob, order)))
-        fp_query = fp_query.order_by(text("{} {}".format(ob, order)))
+            order_by = "measurement_start_time"
 
-    else:
-        mr_query = mr_query.order_by(text("{} {}".format(order_by, order)))
-        fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
+    mr_query = mr_query.order_by(text("{} {}".format(order_by, order)))
+    fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
 
     mr_query = mr_query.alias("mr")
     fp_query = fp_query.alias("fp")
@@ -619,7 +616,10 @@ def list_measurements(
         coal("test_name"),
         coal("input"),
     ]
-    query = select(merger).select_from(j).offset(offset).limit(limit)
+    # Assemble the "external" query. Run a final order by followed by limit and
+    # offset
+    fob = text("{} {}".format(order_by, order))
+    query = select(merger).select_from(j).order_by(fob).offset(offset).limit(limit)
     log.info(query)
 
     # Run the query, generate the results list
