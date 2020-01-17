@@ -1,0 +1,32 @@
+Source: analysis
+Section: python
+Priority: optional
+Maintainer: Federico Ceratto <federico@debian.org>
+Build-Depends: debhelper-compat (= 12),
+ python3,
+ dh-systemd (>= 1.5),
+ dh-python,
+ python3-lz4,
+ python3-psycopg2,
+ python3-setuptools,
+Standards-Version: 4.4.4.1
+
+Package: analysis
+Architecture: all
+Depends: ${misc:Depends},
+ ${python3:Depends},
+ python3-bottle,
+ python3-matplotlib,
+ python3-pandas,
+ python3-prometheus-client,
+ python3-psycopg2,
+ python3-seaborn,
+ python3-sqlalchemy-ext,
+ python3-statsd,
+ python3-systemd,
+ nginx
+Suggests:
+ bpython3,
+ python3-pytest,
+Description: OONI Analysis tools
+ OONI Analysis tools
