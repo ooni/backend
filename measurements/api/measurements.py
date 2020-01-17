@@ -17,8 +17,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 
 from sqlalchemy import func, and_, false, text, select, sql, column
 from sqlalchemy.sql import literal_column
-from sqlalchemy import String, cast, Float
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+from sqlalchemy import String, cast
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
 
@@ -404,9 +403,7 @@ def list_measurements(
         literal_column("measurement.report_no").label("m_report_no"),
         func.coalesce(sql.text("measurement.anomaly"), false()).label("anomaly"),
         func.coalesce(sql.text("measurement.confirmed"), false()).label("confirmed"),
-        func.coalesce(sql.text("measurement.msm_failure"), false()).label(
-            "msm_failure"
-        ),
+        sql.text("measurement.exc IS NOT NULL AS failure"),
         func.coalesce("{}").label("scores"),
         literal_column("measurement.exc").label("exc"),
         literal_column("measurement.residual_no").label("residual_no"),
@@ -425,10 +422,9 @@ def list_measurements(
         literal_column("measurement_start_time").label("test_start_time"),
         literal_column("measurement_start_time").label("measurement_start_time"),
         func.concat(FASTPATH_MSM_ID_PREFIX, sql.text("tid")).label("measurement_id"),
-        func.coalesce(
-            (cast(cast(sql.text("scores->>'blocking_general'"), String), Float) > 0.5)
-        ).label("anomaly"),
-        func.coalesce(false()).label("confirmed"),
+        literal_column("anomaly").label("anomaly"),
+        literal_column("confirmed").label("confirmed"),
+        literal_column("msm_failure").label("failure"),
         cast(sql.text("scores"), String).label("scores"),
         literal_column("report_id"),
         literal_column("probe_cc"),
@@ -442,15 +438,6 @@ def list_measurements(
     query_params = {}
 
     # Populate WHERE clauses and query_params dict
-
-    if failure is True:
-        # residual_no is never NULL, msm_failure is always NULL
-        mrwhere.append(sql.text("measurement.exc IS NOT NULL"))
-        # TODO: add failure column to fastpath
-
-    elif failure is False:
-        # on success measurement.exc is NULL
-        mrwhere.append(sql.text("measurement.exc IS NULL"))
 
     if since is not None:
         query_params["since"] = since
@@ -482,21 +469,39 @@ def list_measurements(
         mrwhere.append(sql.text("report.test_name = :test_name"))
         fpwhere.append(sql.text("test_name = :test_name"))
 
-    # TODO, we don't support filtering by confirmed filter in the fastpath, so
-    # we exclude all the fastpath measurements when filtering by confirmed is
-    # set
-    if confirmed is not None:
-        query_params["confirmed"] = confirmed
-        # TODO: coalesce false() ?
-        mrwhere.append(sql.text("measurement.confirmed = :confirmed"))
-        fpwhere.append(sql.text("false"))
+    # Filter on anomaly, confirmed and failure:
+    # The database stores anomaly and confirmed as boolean + NULL and stores
+    # failures in different columns. This leads to many possible combinations
+    # but only a subset is used.
+    # On anomaly and confirmed: any value != TRUE is treated as FALSE
+    # See test_list_measurements_filter_flags_fastpath
 
-    if anomaly is not None:
-        # TODO: coalesce false() ?
-        query_params["anomaly"] = anomaly
-        mrwhere.append(sql.text("measurement.anomaly = :anomaly"))
-        # fpwhere.append(sql.text("scores->>'blocking_general' > 0.5"))
-        fpwhere.append(sql.text("false"))
+    if anomaly is True:
+        mrwhere.append(sql.text("measurement.anomaly IS TRUE"))
+        fpwhere.append(sql.text("fastpath.anomaly IS TRUE"))
+
+    elif anomaly is False:
+        mrwhere.append(sql.text("measurement.anomaly IS NOT TRUE"))
+        fpwhere.append(sql.text("fastpath.anomaly IS NOT TRUE"))
+
+    if confirmed is True:
+        mrwhere.append(sql.text("measurement.confirmed IS TRUE"))
+        fpwhere.append(sql.text("fastpath.confirmed IS TRUE"))
+
+    elif confirmed is False:
+        mrwhere.append(sql.text("measurement.confirmed IS NOT TRUE"))
+        fpwhere.append(sql.text("fastpath.confirmed IS NOT TRUE"))
+
+    if failure is True:
+        # residual_no is never NULL, msm_failure is always NULL
+        mrwhere.append(sql.text("measurement.exc IS NOT NULL"))
+        fpwhere.append(sql.text("fastpath.msm_failure IS TRUE"))
+
+    elif failure is False:
+        # on success measurement.exc is NULL
+        mrwhere.append(sql.text("measurement.exc IS NULL"))
+        fpwhere.append(sql.text("fastpath.msm_failure IS NOT TRUE"))
+
 
     fpq_table = sql.table("fastpath")
     mr_table = sql.table("measurement").join(
@@ -607,6 +612,7 @@ def list_measurements(
         func.coalesce(literal_column("mr.m_report_no"), 0).label("m_report_no"),
         coal("anomaly"),
         coal("confirmed"),
+        coal("failure"),
         func.coalesce(literal_column("fp.scores"), "{}").label("scores"),
         column("exc"),
         func.coalesce(literal_column("mr.residual_no"), 0).label("residual_no"),
@@ -648,7 +654,7 @@ def list_measurements(
                         "input": row.input,
                         "anomaly": row.anomaly,
                         "confirmed": row.confirmed,
-                        "failure": (row.exc is not None),
+                        "failure": row.failure,
                         "scores": json.loads(row.scores),
                     }
                 )

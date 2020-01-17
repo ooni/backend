@@ -3,6 +3,9 @@ Integration test for API
 
 Warning: this test runs against a real database
 See README.adoc
+
+Lint using:
+    black -t py37 -l 100 --fast  tests/integ/test_integration.py
 """
 
 from datetime import datetime, timedelta
@@ -331,8 +334,7 @@ def test_list_measurements_search(client):
     # ...leading to an API call to:
     # api.ooni.io/api/v1/measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50
     response = api(
-        client,
-        f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50",
+        client, f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50",
     )
     assert len(response["results"]) == 50, jd(response)
     # assert response["metadata"]["count"] == 1, jd(response)
@@ -449,6 +451,89 @@ def test_list_measurements_fastpath(client, fastpath_rid_input):
     response = api(client, p)
     # This has collisions with data in the traditional pipeline
     assert response["metadata"]["count"] > 0, jd(response)
+
+
+def today_range():
+    """Return since/until pair to extract fresh fastpath entries"""
+    since = datetime.utcnow().date()
+    until = since + timedelta(days=1)
+    return since, until
+
+
+@pytest.mark.parametrize("anomaly", (True, False))
+@pytest.mark.parametrize("confirmed", (True, False))
+@pytest.mark.parametrize("failure", (True, False))
+def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
+    """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
+
+    SELECT
+    COUNT(*), anomaly, confirmed, msm_failure AS failure
+FROM
+    fastpath
+WHERE
+    measurement_start_time > '2020-01-13T00:00:00'::timestamp
+    AND measurement_start_time <= '2020-01-14T00:00:00'::timestamp
+    GROUP BY anomaly, confirmed, failure
+    ORDER BY anomaly, confirmed, failure ASC;
+  54412 | f       | f         | f
+ 156477 | f       | f         | t
+  18679 | t       | f         | f
+   6820 | t       | f         | t
+    352 | t       | t         | f
+   2637 | t       | t         | t
+    """
+    since, until = today_range()
+    p = f"measurements?since={since}&until={until}&anomaly={anomaly}" + \
+        f"&confirmed={confirmed}&failure={failure}&limit=100"
+    p = p.lower()
+    log.info("Calling %s", p)
+    response = api(client, p)
+    for r in response["results"]:
+        assert r["anomaly"] == anomaly, r
+        assert r["confirmed"] == confirmed, r
+        assert r["failure"] == failure, r
+
+    i = anomaly * 4 + confirmed * 2 + failure * 1
+    thresholds = [10, 100, 0, 0, 10, 10, 0, 10]
+    assert len(response["results"]) >= thresholds[i]
+
+
+
+# Notice: the decorators must be in inversed order
+@pytest.mark.parametrize("failure", (True, False))
+@pytest.mark.parametrize("confirmed", (True, False))
+@pytest.mark.parametrize("anomaly", (True, False))
+def test_list_measurements_filter_flags_pipeline(anomaly, confirmed, failure, client, log):
+    """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
+
+    COUNT(*), anomaly, confirmed, measurement.exc IS NOT NULL AS failure
+    FROM measurement
+    WHERE
+        measurement.measurement_start_time > '2019-01-01T00:00:00'::timestamp
+        AND measurement.measurement_start_time <= '2019-02-01T00:00:00'::timestamp
+        GROUP BY anomaly, confirmed, failure
+        ORDER BY anomaly, confirmed, failure;
+    """
+
+    p = f"measurements?since=2019-01-01&until=2019-02-01&anomaly={anomaly}" + \
+        f"&confirmed={confirmed}&failure={failure}&limit=100"
+    p = p.lower()
+    log.info("Calling %s", p)
+    response = api(client, p)
+    for r in response["results"]:
+        assert r["anomaly"] == anomaly, r
+        assert r["confirmed"] == confirmed, r
+        assert r["failure"] == failure, r
+
+    if (anomaly, confirmed) == (False, True):
+        # confirmed implies anomaly
+        cnt = 0
+    elif (anomaly, confirmed, failure) == (True, True, True):
+        cnt = 1
+    else:
+        cnt = 100
+
+    assert len(response["results"]) == cnt
 
 
 def test_list_measurements_probe_asn(client):
@@ -853,10 +938,7 @@ def test_private_api_test_names(client, log):
             {"id": "telegram", "name": "Telegram"},
             {"id": "whatsapp", "name": "WhatsApp"},
             {"id": "http_invalid_request_line", "name": "HTTP Invalid Request Line"},
-            {
-                "id": "http_header_field_manipulation",
-                "name": "HTTP Header Field Manipulation",
-            },
+            {"id": "http_header_field_manipulation", "name": "HTTP Header Field Manipulation",},
             {"id": "ndt", "name": "NDT"},
             {"id": "dash", "name": "DASH"},
             {"id": "bridge_reachability", "name": "Bridge Reachability"},
