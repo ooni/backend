@@ -469,7 +469,12 @@ def list_measurements(
         mrwhere.append(sql.text("report.test_name = :test_name"))
         fpwhere.append(sql.text("test_name = :test_name"))
 
-    # anomaly and confirmed: any value != TRUE is treated as FALSE
+    # Filter on anomaly, confirmed and failure:
+    # The database stores anomaly and confirmed as boolean + NULL and stores
+    # failures in different columns. This leads to many possible combinations
+    # but only a subset is used.
+    # On anomaly and confirmed: any value != TRUE is treated as FALSE
+    # See test_list_measurements_filter_flags_fastpath
 
     if anomaly is True:
         mrwhere.append(sql.text("measurement.anomaly IS TRUE"))
