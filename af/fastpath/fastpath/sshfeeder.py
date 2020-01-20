@@ -22,8 +22,8 @@ import warnings
 
 warnings.filterwarnings(action="ignore", module=".*paramiko.*")
 
-import fastpath.normalize as normalize
-from fastpath.metrics import setup_metrics
+import fastpath.normalize as normalize  # noqa
+from fastpath.metrics import setup_metrics  # noqa
 
 log = logging.getLogger("fastpath")
 
@@ -45,44 +45,56 @@ for l in ("paramiko", "paramiko.transport"):
 
 class Source:
     def __init__(self, conf, hostname):
+        self.hostname = hostname
+        self._devel = conf.devel
+        self._vardir = conf.vardir
+        self._tryconnect()
+        self.new_downloads = []
+        self._archive_dir = ARCHIVE_DIR
+        self._old_fnames = OrderedDict()
+        self._scan_time = None
+        self._initial_backlog_minutes = 60 * 6  # too much?
+
+    def _tryconnect(self):
+        try:
+            self._connect()
+        except paramiko.ssh_exception.SSHException as e:
+            log.error(e, exc_info=True)
+
+    def _connect(self):
+        """Connect or reconnect over SSH. Set the .ssh attribute
+        """
         with open(pkey_password_file) as f:
             pkey_password = f.read().strip()
-        pkey_file = conf.vardir / pkey_filename_local_path
+        pkey_file = self._vardir / pkey_filename_local_path
         assert pkey_file.is_file(), "Missing SSH private key"
         log.info("Creating SSH client using %s", pkey_file)
         pkey = paramiko.Ed25519Key.from_private_key_file(
             pkey_file.as_posix(), password=pkey_password
         )
         log.info("Key loaded, creating SSH client")
-        ssh = paramiko.SSHClient()
-        kn = conf.vardir / "ssh/known_hosts"
+        self.ssh = paramiko.SSHClient()
+        kn = self._vardir / "ssh/known_hosts"
         log.info("Loading %s", kn)
         assert kn.is_file(), "Missing known_hosts"
-        ssh.load_host_keys(kn.as_posix())
+        self.ssh.load_host_keys(kn.as_posix())
         del kn
-        if conf.devel:
+        if self._devel:
             log.info("SSH TOFU in devel mode!")
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.hostname = hostname
-        self.ssh = ssh
+            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         log.info("Connecting to %s", self.hostname)
         # TODO: handle reconnections
         with metrics.timer("connect." + self.hostname):
-            ssh.connect(
-                hostname,
+            self.ssh.connect(
+                self.hostname,
                 username=ssh_username,
                 compress=True,
                 pkey=pkey,
                 look_for_keys=False,
                 allow_agent=False,
             )
-        self.sftp = ssh.open_sftp()
+        self.sftp = self.ssh.open_sftp()
         # assert self.sftp.get_channel().get_transport()._preferred_compression[1] == 'zlib'
-        self.new_downloads = []
-        self._archive_dir = ARCHIVE_DIR
-        self._old_fnames = OrderedDict()
-        self._scan_time = None
-        self._initial_backlog_minutes = 60 * 6  # too much?
 
     @metrics.timer("scan")
     def scan_new_files(self):
@@ -101,7 +113,12 @@ class Source:
 
         self._scan_time = time.time()
         find_cmd = FIND.format(self._archive_dir, backlog_minutes)
-        stdin, stdout, stderr = self.ssh.exec_command(find_cmd, timeout=10)
+        try:
+            stdin, stdout, stderr = self.ssh.exec_command(find_cmd, timeout=10)
+        except paramiko.ssh_exception.SSHException:
+            self._tryconnect()
+            stdin, stdout, stderr = self.ssh.exec_command(find_cmd, timeout=10)
+
         xc = stdout.channel.recv_exit_status()
         if xc == 0:
             for line in stdout.readlines():
@@ -215,4 +232,3 @@ def feed_measurements_from_collectors(conf, start_time=None):
         except Exception as e:
             log.exception(e)
             time.sleep(1)
-

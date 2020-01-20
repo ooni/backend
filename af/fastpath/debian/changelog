@@ -1,3 +1,9 @@
+fastpath (0.11) UNRELEASED; urgency=medium
+
+  * Retry SSH connections on failure
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 17 Jan 2020 19:25:13 +0000
+
 fastpath (0.10) unstable; urgency=medium
 
   * Add Tor and Psiphon enum values
