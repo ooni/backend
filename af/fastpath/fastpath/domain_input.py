@@ -7,8 +7,13 @@ Populate the domain_input table
 
 The tables are created in oometa/019-domain-and-citizenlab-table.install.sql
 
-The tables have few constraints: most of the validation is done hear and it is
-meant to be strict.
+The tables have few constraints on the database side: most of the validation
+is done here and it is meant to be strict.
+
+On fastpath host, run: domain_input_updater -h
+
+Local test run:
+python3 fastpath/domain_input.py --db-uri 'host=localhost user=shovel dbname=metadb' --dry-run
 """
 
 from argparse import ArgumentParser
@@ -84,7 +89,7 @@ def fetch_citizen_lab_lists():
 
 
 @metrics.timer("rebuild_citizenlab_table_from_citizen_lab_lists")
-def rebuild_citizenlab_table_from_citizen_lab_lists():
+def rebuild_citizenlab_table_from_citizen_lab_lists(conf):
     """Fetch lists from GitHub repository
     """
     ev = "INSERT INTO citizenlab (cc, domain, url, category_code) VALUES %s"
@@ -97,12 +102,15 @@ def rebuild_citizenlab_table_from_citizen_lab_lists():
         log.info("Inserting %d citizenlab table entries", len(test_items))
         execute_values(cur, ev, test_items)
 
-    db.conn.commit()
+    if conf.dry_run:
+        db.conn.rollback()
+    else:
+        db.conn.commit()
     log.info("citizenlab_table is ready")
 
 
 @metrics.timer("rebuild_domain_input_table")
-def rebuild_domain_input_table():
+def rebuild_domain_input_table(conf):
     """Load data from input table in large batches
     Validate input and write domain, input, input_no into domain_input
     """
@@ -116,6 +124,8 @@ def rebuild_domain_input_table():
         cur.execute("SELECT input, input_no FROM input")
         with open(csv_fname, "w", newline="") as csv_f:
             csv_writer = csv.writer(csv_f, delimiter="\t")
+            valid_cnt = 0
+            invalid_cnt = 0
             while True:
                 # Iterate across chunks of rows
                 rows = cur.fetchmany(10000)
@@ -127,15 +137,31 @@ def rebuild_domain_input_table():
                     domain = _extract_domain(input_)
                     if domain:
                         csv_writer.writerow([domain, input_, input_no])
+                        valid_cnt += 1
+                    else:
+                        log.debug("Ignoring input %r", input_)
+                        invalid_cnt += 1
 
             log.info("Filling domain_input with %d bytes", csv_f.tell())
+            log.info(
+                "Valid inputs: %d invalid: %d invalid percentage: %f",
+                valid_cnt,
+                invalid_cnt,
+                invalid_cnt * 100.0 / (valid_cnt + invalid_cnt),
+            )
 
         with open(csv_fname, newline="") as f:
             cur.copy_from(f, "domain_input", columns=("domain", "input", "input_no"))
 
-        unlink(csv_fname)
+        if conf.dry_run:
+            log.info("Leaving %s on disk", csv_fname)
+        else:
+            unlink(csv_fname)
 
-    db.conn.commit()
+    if conf.dry_run:
+        db.conn.rollback()
+    else:
+        db.conn.commit()
     log.info("domain_input is ready")
 
 
@@ -145,10 +171,13 @@ def main():
 
     ap = ArgumentParser(__doc__)
     ap.add_argument("--db-uri", help="Database DSN or URI. The string is logged!")
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Rollback instead of committing"
+    )
     conf = ap.parse_args()
     db.setup(conf)
-    rebuild_citizenlab_table_from_citizen_lab_lists()
-    rebuild_domain_input_table()
+    rebuild_citizenlab_table_from_citizen_lab_lists(conf)
+    rebuild_domain_input_table(conf)
 
 
 main()
