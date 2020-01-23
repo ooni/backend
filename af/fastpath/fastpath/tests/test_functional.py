@@ -780,3 +780,6 @@ def test_score_psiphon(cans):
             assert scores == {'blocking_general': 0.0, 'blocking_global': 0.0,
                               'blocking_country': 0.0, 'blocking_isp': 0.0,
                               'blocking_local': 0.0}
+
+
+# See test_score_tor() in test_unit.py

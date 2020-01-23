@@ -1,8 +1,14 @@
-fastpath (0.13) UNRELEASED; urgency=medium
+fastpath (0.14) unstable; urgency=medium
+
+  * Score Tor
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 23 Jan 2020 16:21:34 +0000
+
+fastpath (0.13) unstable; urgency=medium
 
   * Do not score title_match=False #360
 
- -- Federico Ceratto <federico@debian.org>  Mon, 20 Jan 2020 17:55:19 +0000
+ -- Federico Ceratto <federico@debian.org>  Thu, 23 Jan 2020 16:21:17 +0000
 
 fastpath (0.12) unstable; urgency=medium
 

@@ -951,6 +951,35 @@ def score_psiphon(msm) -> dict:
     return scores
 
 
+def score_tor(msm) -> dict:
+    """Calculate measurement scoring for Tor
+    https://github.com/ooni/spec/blob/master/nettests/ts-023-tor.md
+    Returns a scores dict
+    """
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    tk = msm.get("test_keys", {})
+
+    # targets -> <ipaddr:port>|<sha obfs4 fprint> -> failure
+    #                                             -> network_events
+    targets = tk.get("targets", {})
+    if not targets:
+        logbug(5, "missing Tor targets", msm)
+        scores["accuracy"] = 0.0
+        return scores
+
+    for d in targets.values():
+        if "failure" not in d or "network_events" not in d:
+            logbug(6, "missing Tor failure or network_events field", msm)
+            scores["accuracy"] = 0.0
+            return scores
+
+        if d["failure"] != None:
+            scores["blocking_general"] = 1.0
+
+
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
     """Calculate measurement scoring. Returns a scores dict
@@ -982,6 +1011,8 @@ def score_measurement(msm, matches) -> dict:
             return score_meek_fronted_requests_test(msm)
         if tn == "psiphon":
             return score_psiphon(msm)
+        if tn == "tor":
+            return score_tor(msm)
 
         log.debug("Unsupported test name %s", tn)
         scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
