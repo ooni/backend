@@ -764,9 +764,10 @@ def score_web_connectivity(msm, matches) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
-    if tm is False:
-        scores["blocking_general"] += 0.5
-        # TODO: scan HTML body for title instead
+    # Do not score title_match=False - see #360
+    # if tm is False:
+    #     scores["blocking_general"] += 0.5
+    #     # TODO: scan HTML body for title instead
 
     # body_proportion can be missing
     if "body_proportion" in tk:

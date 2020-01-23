@@ -1,3 +1,9 @@
+fastpath (0.13) UNRELEASED; urgency=medium
+
+  * Do not score title_match=False #360
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Jan 2020 17:55:19 +0000
+
 fastpath (0.12) unstable; urgency=medium
 
   * Install domain_input_updater executable
