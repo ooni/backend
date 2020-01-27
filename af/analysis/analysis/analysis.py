@@ -74,6 +74,7 @@ from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 # Imported from the fastpath package
 from fastpath import domain_input as domain_input_updater
 
+from analysis.counters_table_updater import counters_table_updater
 
 # Global conf
 conf = Namespace()
@@ -1179,6 +1180,9 @@ def main():
     t.start()
 
     Thread(target=domain_input_update_runner).start()
+
+    t = Thread(target=counters_table_updater, args=(conf, ))
+    t.start()
 
     log.info("Starting generate_slow_query_summary loop")
     while True:
