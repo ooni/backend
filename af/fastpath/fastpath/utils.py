@@ -261,7 +261,38 @@ fingerprints = {
             "body_match": "Доступ к сайту ограничен в соответствии с Федеральными законами",
             "locality": "country"
         },
-        {"body_match": "http://eais.rkn.gov.ru/", "locality": "country"},
+        # https://github.com/ooni/pipeline/issues/115
+        # https://explorer.ooni.org/measurement/20180315T230339Z_AS15378_1OT3ZGTyarLfiET0jYHJZigX2B1oQDdJKdrjkfzq5Zqr30Lvlp?input=http:%2F%2Fqha.com.ua%2F
+        {
+            "body_match": "распространение которой в Российской Федерации запрещено! Данный ресурс включен в ЕДИНЫЙ РЕЕСТР доменных имен, указателей страниц сайтов в сети «Интернет» и сетевых адресов, позволяющих идентифицировать",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20180315T100250Z_AS6789_KYIQLsidOroJuPSP8DNkM8WFYOwNEAKebucOYOHhr9bwel8Yl3?input=http:%2F%2Fqha.com.ua%2F
+        {
+            "header_name": "Location",
+            "header_prefix": "http://erblock.crimea.com/",
+            "locality": "country",
+        },
+        # https://explorer.ooni.org/measurement/20180315T160455Z_AS8359_t1zebVigtFmS7kxCOCe3P77uClvciZHmKIwutI13x3Wcpe5t9V?input=http:%2F%2Futronews.org
+        {
+            "body_match": "<iframe src=\"http://subblock.mts.ru/api",
+            "locality": "isp"
+        }
+        # https://explorer.ooni.org/measurement/20180315T174422Z_AS12688_7Iy8vwd6JYREOl2E6E1PJnNeCVGVKlORQNYhUJ2tKyiWjaEFkY?input=http:%2F%2Fmaidanua.org%2F
+        # {"dns_match": "62.33.207.196", "locality": "country"},
+        # {"dns_match": "62.33.207.197", "locality": "country"},
+        # https://explorer.ooni.org/measurement/20181229T072204Z_AS39289_xlYTdPez910QvwBFCYyD3sgv0hQq1WBgbhW3lMjIs3MVMUdGtg?input=http:%2F%2Fblackberry.com
+        {
+            # Using the Location header is a possible alternative
+            # "header_prefix": "http://89.185.75.227/451/",
+            # "header_name": "Location",
+            "body_match": "<h1>Доступ к запрашиваемому ресурсу закрыт.",
+            "locality": "country"
+        },
+        {
+            "body_match": "http://eais.rkn.gov.ru/",
+            "locality": "country"
+        },
         {
             "header_name": "Location",
             "header_prefix": "http://warning.rt.ru",
