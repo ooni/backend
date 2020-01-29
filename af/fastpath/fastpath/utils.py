@@ -189,13 +189,31 @@ fingerprints = {
         }
     ],
     "KR": [
-        {"body_match": "http://warning.or.kr", "locality": "country"},
+        # https://github.com/ooni/pipeline/issues/131
+        # https://explorer.ooni.org/measurement/20181204T023538Z_AS4766_Q7tnDXKYbZxJAArIYzQwgd4y91BDuYsPZvA0MrYvUZzEVX6Olz?input=http:%2F%2Fwww.torproject.org
+        {
+            "body_match": "cm/cheongshim/img/cheongshim_block.png",
+            "locality": "local"
+        },
+        {
+            "body_match": "http://warning.or.kr",
+            "locality": "country"
+        },
         {
             "header_full": "http://www.warning.or.kr",
             "header_name": "Location",
             "locality": "country",
         },
     ],
+    "KG": [
+        # https://github.com/ooni/pipeline/issues/122
+        # https://explorer.ooni.org/measurement/20180126T000430Z_AS8449_pk15Mr2LgOhNOk9NfI2EarhUAM64DZ3R85nh4Z3q2m56hflUGh?input=http:%2F%2Farchive.org
+        {
+            "header_name": "Location",
+            "header_full": "http://homeline.kg/access/blockpage.html",
+            "locality": "isp"
+        }
+    ]
     "MY": [
             # https://github.com/ooni/pipeline/issues/35#issue-169100725
             # https://explorer.ooni.org/measurement/20160802T205955Z_AS4788_3omRbM1JA9BYIMF5O5uiKEsdmUqy4kdunnKn7exzBlM2ebboDh?input=http:%2F%2Fwww.sarawakreport.org
