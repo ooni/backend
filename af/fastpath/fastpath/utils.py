@@ -17,7 +17,7 @@ fingerprints = {
             "body_match": "content=\"Access Denied - Afghan Wireless Communication Company",
             "locality": "isp",
         }
-    ]
+    ],
     "AR": [
         {
             "header_full": "1.1 FC-WSA-FibertelZone3.int.fibercorp.com.ar:80 (Cisco-WSA/10.1.0-204)",
@@ -60,6 +60,14 @@ fingerprints = {
             "header_name": "Location",
             "header_prefix": "https://192.168.88.1/sgerror.php",
             "locality": "local",
+        }
+    ],
+    "CO": [
+        # https://github.com/ooni/pipeline/issues/156
+        # https://explorer.ooni.org/measurement/20190114T112310Z_AS262928_N3ChIPo5QSMMZ3qgA25G9QHE55suubZbPPkAfmNLkmOXuh9ZXJ?input=http:%2F%2Fwww.eurogrand.com%2F
+        {
+            "body_match": "Esta página ha sido bloqueada por disposición del Ministerio de las TIC,",
+            "locality": "country"
         }
     ],
     "CY": [
