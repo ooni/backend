@@ -358,7 +358,15 @@ fingerprints = {
         {
             "body_match": "<title>Telekom\u00fcnikasyon \u0130leti\u015fim Ba\u015fkanl\u0131\u011f\u0131</title>",
             "locality": "country",
+        },
+        # https://github.com/ooni/pipeline/issues/117
+        # https://explorer.ooni.org/measurement/20180403T183403Z_AS9121_FfHjDmPkC0E5UoU3JMZoXJ2KRrMVyqdeTkHchmGEqAonEU64u4?input=http:%2F%2Fbeeg.com
+        {
+            "body_match": "class=\"yazi3_1\">After technical analysis and legal consideration based on the law nr. 5651, administration measure has been taken for this website",
+            "locality": "country"
         }
+        # https://explorer.ooni.org/measurement/20180403T183403Z_AS9121_FfHjDmPkC0E5UoU3JMZoXJ2KRrMVyqdeTkHchmGEqAonEU64u4?input=http:%2F%2Fbeeg.com
+        # {"dns_match": "195.175.254.2", "locality": "country"},
     ],
     "UA": [
         # https://github.com/ooni/pipeline/issues/121
