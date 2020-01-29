@@ -103,13 +103,19 @@ fingerprints = {
             "locality": "isp",
         }
     ],
-    # https://github.com/ooni/pipeline/issues/82#issue-260659726
-    # https://explorer.ooni.org/measurement/20170925T151843Z_AS12338_JMQ1OWOJQQ4WsPmSNRi6HsR5w5tMSX2IgNeXhLN5wUCB7051jX?input=http:%2F%2Fwww.ref1oct.eu%2F
     "ES": [
+        # https://github.com/ooni/pipeline/issues/82#issue-260659726
+        # https://explorer.ooni.org/measurement/20170925T151843Z_AS12338_JMQ1OWOJQQ4WsPmSNRi6HsR5w5tMSX2IgNeXhLN5wUCB7051jX?input=http:%2F%2Fwww.ref1oct.eu%2F
         {
             "body_match": "<title>Dominio-No-Disponible</title>",
             "locality": "global",
-        }
+        },
+        # https://explorer.ooni.org/measurement/20180523T140922Z_AS12430_ZRebsyxxswrlcQhz1wEs6apHw5Br7FWNc1LenCsVR6Rkl1OCSD?input=http:%2F%2Fwww.marijuana.com
+        {
+            "header_name": "Server",
+            "header_full": "V2R2C00-IAE/1.0",
+            "locality": "local",
+        },
     ],
     "FR": [
         {"body_match": 'xtpage = "page-blocage-terrorisme"', "locality": "country"},
@@ -196,7 +202,25 @@ fingerprints = {
         },
     ],
     "IR": [{"body_match": 'iframe src="http://10.10', "locality": "country"}],
-    "IT": [{"body_match": "GdF Stop Page", "locality": "country"}],
+    "IT": [
+        {
+            "body_match": "GdF Stop Page",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20170216T161517Z_AS203469_NhQfyO3SkGoX5gdyzo1VRQTrZv1HcQgzudlItMI4YxuSUfgLib?input=http:%2F%2Fwww.pokerstars.net
+        {
+            "header_name": "Server",
+            "header_full": "V2R2C00-IAE/1.0",
+            "locality": "local",
+        },
+        # The following is not necessarily a blockpage
+        # https://explorer.ooni.org/measurement/3N5bdjWAdVjZubaIyAxCCAg0HiZYWfT1YLgz6cI0zRq1XTjHzBmGg49AbRxOGILi?input=http:%2F%2Fwarc.jalb.de
+        {
+            "header_full": "WebProxy/1.0 Pre-Alpha"
+            "header_name": "Server",
+            "locality": "local",
+        }
+    ],
     "KE": [
         {
             "header_name": "Location",
