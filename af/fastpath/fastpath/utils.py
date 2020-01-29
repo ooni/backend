@@ -87,6 +87,14 @@ fingerprints = {
             "locality": "isp",
         }
     ],
+    # https://github.com/ooni/pipeline/issues/82#issue-260659726
+    # https://explorer.ooni.org/measurement/20170925T151843Z_AS12338_JMQ1OWOJQQ4WsPmSNRi6HsR5w5tMSX2IgNeXhLN5wUCB7051jX?input=http:%2F%2Fwww.ref1oct.eu%2F
+    "ES": [
+        {
+            "body_match": "<title>Dominio-No-Disponible</title>",
+            "locality": "global",
+        }
+    ],
     "FR": [
         {"body_match": 'xtpage = "page-blocage-terrorisme"', "locality": "country"},
         {
