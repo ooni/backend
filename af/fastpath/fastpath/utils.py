@@ -326,6 +326,20 @@ fingerprints = {
             "locality": "country",
         }
     ],
+    "UA": [
+        # https://github.com/ooni/pipeline/issues/121
+        # https://explorer.ooni.org/measurement/20180615T125414Z_AS35362_GaNRQSk6HlZ1Aa2ZD9UoGiIgu3KcLMM5M5yk5dEswhEkIprbnA?input=http:%2F%2Fvk.com%2Fminitrue
+        {
+            "body_match": "Відвідування даного ресурсу заборонено",
+            "locality": "country",
+        },
+        # https://explorer.ooni.org/measurement/20190228T101440Z_AS13188_LUWIsztkSQlApx6cliGdGzztCM6Hs2MFI3ybFEYuaIG5W8cQS6?input=http:%2F%2Freporter-crimea.ru
+        {
+            "header_prefix": "http://blocked.triolan.com.ua",
+            "header_name": "Location",
+            "locality": "isp"
+        }
+    ],
     "US": [
         {
             "header_full": "1.1 MLD-C-Barracuda.mld.org (http_scan_byf/3.5.16)",
