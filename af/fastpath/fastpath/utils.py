@@ -232,6 +232,8 @@ fingerprints = {
         }
     ],
     "QA": [
+        # https://explorer.ooni.org/measurement/bE35lS71t9vU2Swm2gxSdNPl9DWcaZpRizWrxyGEV7rh8srASwPnuwQIkdVoph0b?input=http:%2F%2Fanonym.to%2F
+        # https://github.com/ooni/pipeline/issues/66#issuecomment-307233015
         {
             "header_full": "http://www.vodafone.qa/alu.cfm",
             "header_name": "Location",
