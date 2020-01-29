@@ -188,7 +188,16 @@ fingerprints = {
             "locality": "country",
         },
     ],
-    "MY": [{"body_match": "Makluman/Notification", "locality": "country"}],
+    "MY": [
+            # https://github.com/ooni/pipeline/issues/35#issue-169100725
+            # https://explorer.ooni.org/measurement/20160802T205955Z_AS4788_3omRbM1JA9BYIMF5O5uiKEsdmUqy4kdunnKn7exzBlM2ebboDh?input=http:%2F%2Fwww.sarawakreport.org
+            # TODO check if this triggers false positives, which may be the case according to: https://github.com/ooni/pipeline/issues/35#issuecomment-237997890
+            {"body_match": "Makluman/Notification", "locality": "country"},
+
+            # TODO add support for DNS based fingerprints
+            # https://explorer.ooni.org/measurement/20160817T033110Z_AS4788_jk5ghw4QwieT2JOFiIqto9Z2LzCFhP05v3U0sCcaetBr50NxuU?input=http:%2F%2Fwww.sarawakreport.org%2Ftag%2F1mdb
+            # {"dns_match": "175.139.142.25", "locality": "country"},
+    ],
     "NO": [
         {
             "header_full": "http://block-no.altibox.net/",
