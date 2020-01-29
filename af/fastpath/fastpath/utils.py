@@ -213,7 +213,7 @@ fingerprints = {
             "header_full": "http://homeline.kg/access/blockpage.html",
             "locality": "isp"
         }
-    ]
+    ],
     "MY": [
             # https://github.com/ooni/pipeline/issues/35#issue-169100725
             # https://explorer.ooni.org/measurement/20160802T205955Z_AS4788_3omRbM1JA9BYIMF5O5uiKEsdmUqy4kdunnKn7exzBlM2ebboDh?input=http:%2F%2Fwww.sarawakreport.org
