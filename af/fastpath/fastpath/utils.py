@@ -141,10 +141,35 @@ fingerprints = {
         },
     ],
     "IN": [
+        # https://github.com/ooni/pipeline/issues/25#issue-154919607
+        # https://explorer.ooni.org/measurement/7AEt2OwqdZUzFMzyZd3bFwnCwXp7FqYCezpaoBWdkBIfxtLtX84mXBZnlPLaTUqI?input=http:%2F%2Fthepiratebay.se
         {
             "body_match": "The page you have requested has been blocked",
             "locality": "country",
-        }
+        },
+        # TODO: maybe we would like to support defining a fingerprint by regexp?
+        # https://github.com/ooni/pipeline/issues/25#issuecomment-487589504
+        # https://explorer.ooni.org/measurement/20170915T154832Z_AS55824_qEg9opZCyJqfZJ5qFHWMR390Y1uA6eHw7j6Fx1qtU5EPE4Jnp2?input=http:%2F%2Fwww.http-tunnel.com
+        {
+            "header_prefix": "1.1 ironport1.iitj.ac.in:80 (Cisco-WSA/",
+            "header_name": "Via",
+            "locality": "local",
+        },
+        # https://github.com/ooni/pipeline/issues/25#issuecomment-487589504
+        # https://explorer.ooni.org/measurement/20170331T050949Z_AS55824_HYIy5Ddu5UgfGq8UYBJ8aCkuz6EYAQUivivIYXDMCt6Dr6CCPU?input=http:%2F%2Fwww.babylon-x.com
+        {
+            "header_prefix": "1.1 ironport2.iitj.ac.in:80 (Cisco-WSA/",
+            "header_name": "Via",
+            "locality": "local",
+        },
+        # TODO this looks more like a captive portal, do we want to classify it differently?
+        # https://explorer.ooni.org/measurement/20180723T000524Z_AS135201_lOpTIwn8aK4gWsbfmV9v3hlTy3ZKVYHRIA8dNBAafTxmFa6hVP?input=http:%2F%2Fwww.xbox.com
+        # https://github.com/ooni/pipeline/issues/25#issuecomment-489452067
+        {
+            "header_full": "GoAhead-Webs",
+            "header_name": "Server",
+            "locality": "local",
+        },
     ],
     "IR": [{"body_match": 'iframe src="http://10.10', "locality": "country"}],
     "IT": [{"body_match": "GdF Stop Page", "locality": "country"}],
