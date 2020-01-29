@@ -10,6 +10,14 @@ fingerprints = {
             "locality": "country",
         }
     ],
+    "AF": [
+        # https://github.com/ooni/pipeline/issues/155#issue-437678102
+        # https://explorer.ooni.org/measurement/20171130T100203Z_AS38742_DmzL8KtUBadHNFU6wchlAgOy7MBwpDH75ZWdNzs0e55ArgFffx?input=http:%2F%2Fhowtogrowmarijuana.com
+        {
+            "body_match": "content=\"Access Denied - Afghan Wireless Communication Company",
+            "locality": "isp",
+        }
+    ]
     "AR": [
         {
             "header_full": "1.1 FC-WSA-FibertelZone3.int.fibercorp.com.ar:80 (Cisco-WSA/10.1.0-204)",
