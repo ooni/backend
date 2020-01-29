@@ -245,6 +245,12 @@ fingerprints = {
         }
     ],
     "RU": [
+        # https://explorer.ooni.org/measurement/fDYllw7vRf71n2l4g2V2ahIlPxmd6nrpsjWemcJDWX1UDN0AT5Z5uBh4HhAdFdGB?input=http:%2F%2Fthepiratebay.se%2F
+        # https://github.com/ooni/pipeline/issues/26
+        {
+            "body_match": "Доступ к сайту ограничен в соответствии с Федеральными законами",
+            "locality": "country"
+        },
         {"body_match": "http://eais.rkn.gov.ru/", "locality": "country"},
         {
             "header_name": "Location",
