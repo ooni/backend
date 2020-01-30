@@ -254,6 +254,15 @@ fingerprints = {
             "locality": "isp"
         }
     ],
+    "MX": [
+        # https://github.com/ooni/pipeline/issues/159
+        # https://explorer.ooni.org/measurement/20190306T161639Z_AS22908_1iCBIVT3AGu4mDvEtpl0ECfxp1oSw8UYXSg82JFQ1gOIqOvw8y?input=http:%2F%2Fwww.pornhub.com%2F
+        {
+            "header_name": "Server",
+            "header_full": "V2R2C00-IAE/1.0",
+            "locality": "local",
+        }
+    ],
     "MY": [
             # https://github.com/ooni/pipeline/issues/35#issue-169100725
             # https://explorer.ooni.org/measurement/20160802T205955Z_AS4788_3omRbM1JA9BYIMF5O5uiKEsdmUqy4kdunnKn7exzBlM2ebboDh?input=http:%2F%2Fwww.sarawakreport.org
@@ -290,6 +299,15 @@ fingerprints = {
             "locality": "isp",
         },
     ],
+    "PK": [
+        # https://github.com/ooni/pipeline/issues/160
+        # https://explorer.ooni.org/measurement/20180721T184612Z_AS45773_w5kQp1GbCQUbIv3VDzezjxNx1nCt3IaW7WpvrZTNvayksz9FBK?input=http:%2F%2Fwww.xbox.com
+        {
+            "header_name": "Server",
+            "header_full": "V2R2C00-IAE/1.0",
+            "locality": "local",
+        },
+    ]
     "PT": [
         {
             "header_full": "http://mobilegen.vodafone.pt/denied/dn",
@@ -382,6 +400,12 @@ fingerprints = {
         {
             "body_match": "<title>Telekom\u00fcnikasyon \u0130leti\u015fim Ba\u015fkanl\u0131\u011f\u0131</title>",
             "locality": "country",
+        },
+        # https://github.com/ooni/pipeline/issues/161
+        # https://explorer.ooni.org/measurement/20170210T045710Z_AS201411_Xu0QrPJeKuNvYdTpTs3Uv9u4usmdcNACeLPi3wtiqxzBtpOLMf?input=http:%2F%2Fwww.365gay.com
+        {
+            "body_match": "<p class=\"sub-message\">Bu <a href=\"https://www.goknet.com.tr/iletisim.html\">link</a>'e tıklayarak bize ulaşabilir, daha detaylı bilgi alabilirsiniz.</p>",
+            "locality": "isp",
         },
         # https://github.com/ooni/pipeline/issues/117
         # https://explorer.ooni.org/measurement/20180403T183403Z_AS9121_FfHjDmPkC0E5UoU3JMZoXJ2KRrMVyqdeTkHchmGEqAonEU64u4?input=http:%2F%2Fbeeg.com
