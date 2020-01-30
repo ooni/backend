@@ -42,6 +42,8 @@ fingerprints = {
             "body_match": "that is considered illegal according to Belgian legislation",
             "locality": "country",
         },
+        # https://github.com/ooni/pipeline/issues/168
+        # https://explorer.ooni.org/measurement/20171106T080745Z_AS5432_m0LkLhXH3oxwworJZUpHGmPeJV2Abk3TMxr2dz8wu04ziIUAGA?input=http:%2F%2Fguardster.com%2F
         {
             "header_full": "1.1 webfilter.stjohns.net (http_scan_byf/3.5.16)",
             "header_name": "Via",
@@ -376,6 +378,14 @@ fingerprints = {
         },
     ],
     "SA": [
+        # TODO maybe we would to classify this as knowing the vendor
+        # https://github.com/ooni/pipeline/issues/164
+        # https://explorer.ooni.org/measurement/20180717T084426Z_AS15505_0NtuQmtvJpAZG5I4V8QtVrS5PeUnqplLxvm3zDflzPm7ywFmX0?input=http:%2F%2Fwww.163.com
+        {
+            "header_name": "Location",
+            "header_prefix": "http://notify.bluecoat.com/notify-Notify",
+            "locality": "local"
+        },
         {
             "header_name": "Server",
             "header_prefix": "Protected by WireFilter",
