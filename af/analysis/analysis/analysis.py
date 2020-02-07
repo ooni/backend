@@ -953,8 +953,10 @@ def generate_slow_query_summary(conf):
 
 @metrics.timer("monitor_measurement_creation")
 def monitor_measurement_creation(conf):
-    """Monitor measurements created by fastpath and traditional pipeline
-    to detect and alert on inconsistencies
+    """Monitors measurements created by fastpath and traditional pipeline
+    to detect and alert on inconsistency.
+    Queries the fastpath and measurements DB tables and compare their rows
+    across different time ranges and generates metrics for Prometheus.
 
     Runs in a dedicated thread and writes in its own .prom file
 
@@ -1045,10 +1047,14 @@ def monitor_measurement_creation(conf):
             gauge_family.labels("fastpath_new_5m").set(new_fp_msmt_count)
             prom.write_to_textfile(nodeexp_path, prom_reg)
 
+            # The following queries are heavier
             if cycle_seconds == 0:
                 log.info("Running extended DB metrics gathering")
                 today = datetime.utcnow().date()
                 with conn.cursor() as cur:
+                    # Compare different days in the past: pipeline and fastpath
+                    # might be catching up on older data and we want to monitor
+                    # that.
                     for age_in_days in range(3):
                         d1 = timedelta(days=1)
                         end = today - timedelta(days=age_in_days) + d1
