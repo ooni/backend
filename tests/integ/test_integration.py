@@ -32,7 +32,7 @@ def log(app):
 
 @pytest.fixture(autouse=True, scope="session")
 def db_safety_check():
-    assert os.environ["DATABASE_URL"] == "postgresql://readonly@localhost:5433/metadb"
+    assert os.environ["DATABASE_URL"] == "postgresql://readonly@localhost:15432/metadb"
 
 
 @pytest.fixture()
