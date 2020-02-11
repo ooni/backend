@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import os
 
 from flask import request
+from prometheus_flask_exporter.multiprocess import GunicornPrometheusMetrics
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -44,6 +45,14 @@ REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "635830"))
 
 REQID_HDR = "X-Request-ID"
 
+# We do a lazy setup, and populate the app inside of create_app
+try:
+    metrics = GunicornPrometheusMetrics(app=None, group_by="endpoint")
+except ValueError:
+    from prometheus_flask_exporter import PrometheusMetrics
+    # In testing we should use the standard PrometheusMetrics due to:
+    # env prometheus_multiproc_dir is not set or not a directory
+    metrics = PrometheusMetrics(app=None, group_by="endpoint")
 
 def request_id():
     if request:

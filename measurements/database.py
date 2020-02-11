@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from hashlib import shake_128
 import os
 import time
 
@@ -14,8 +15,11 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy_utils import database_exists, create_database
 
-from measurements.config import request_id
+from measurements.config import request_id, metrics
 
+from prometheus_client import Summary
+
+query_time = Summary("query", "query", ["hash", ], registry=metrics.registry)
 Base = declarative_base()
 
 
@@ -52,11 +56,16 @@ def init_db(app):
         session.execute("set application_name = :reqid", {"reqid": reqid})
 
 
+def query_hash(q: str) -> str:
+    return shake_128(q.encode()).hexdigest(4)
+
+
 QUERY_TIME_THRESHOLD = 60.0  # Time in seconds after which we will start logging warnings for too long queries
 
 
 def init_query_logging(app):
-    """Set hooks to log queries"""
+    """Set hooks to log queries and generate metrics
+    """
 
     @event.listens_for(Engine, "before_cursor_execute")
     def before_cursor_execute(
@@ -69,7 +78,13 @@ def init_query_logging(app):
     @event.listens_for(Engine, "after_cursor_execute")
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         total_time = time.time() - conn.info["query_start_time"].pop(-1)
-        app.logger.debug("Query complete. Total time: %f", total_time)
+
+        # Send query execution time to Prometheus with a hash of the statement
+        # a label
+        qh = query_hash(statement)
+        query_time.labels(qh).observe(total_time)
+
+        app.logger.debug("Query %s complete. Total time: %f", qh, total_time)
 
         if total_time >= QUERY_TIME_THRESHOLD:
             app.logger.warning("Query: %s %r", statement, parameters)

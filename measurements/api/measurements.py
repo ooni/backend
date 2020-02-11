@@ -9,7 +9,7 @@ from dateutil.parser import parse as parse_date
 import requests
 import lz4framed
 
-from sentry_sdk import configure_scope, capture_exception
+import sentry_sdk as sentry
 
 from flask import current_app, request, make_response, abort
 from flask.json import jsonify
@@ -628,69 +628,73 @@ def list_measurements(
     query = select(merger).select_from(j).order_by(fob).offset(offset).limit(limit)
     log.info(query)
 
+    with sentry.configure_scope() as scope:
+        # Set query (without params) in Sentry scope for the rest of the API call
+        # https://github.com/getsentry/sentry-python/issues/184
+        scope.set_extra("sql_query", query)
+
     # Run the query, generate the results list
     iter_start_time = time.time()
     q = current_app.db_session.execute(query, query_params)
 
-    with configure_scope() as scope:
-        scope.set_extra("sql_query", query)
-
-        try:
-            tmpresults = []
-            for row in q:
-                url = urljoin(
-                    current_app.config["BASE_URL"],
-                    "/api/v1/measurement/%s" % row.measurement_id,
-                )
-                tmpresults.append(
-                    {
-                        "measurement_url": url,
-                        "measurement_id": row.measurement_id,
-                        "report_id": row.report_id,
-                        "probe_cc": row.probe_cc,
-                        "probe_asn": "AS{}".format(row.probe_asn),
-                        "test_name": row.test_name,
-                        "measurement_start_time": row.measurement_start_time,
-                        "input": row.input,
-                        "anomaly": row.anomaly,
-                        "confirmed": row.confirmed,
-                        "failure": row.failure,
-                        "scores": json.loads(row.scores),
-                    }
-                )
-        except OperationalError as exc:
-            if isinstance(exc.orig, QueryCanceledError):
-                capture_exception(QueryTimeoutError())
-                raise QueryTimeoutError()
-            raise exc
-
-        # For each report_id / input tuple, we want at most one entry from the
-        # traditional pipeline and one from fastpath, merged together
-        results = _merge_results(tmpresults)
-
-        pages = -1
-        count = -1
-        current_page = math.ceil(offset / limit) + 1
-
-        # We got less results than what we expected, we know the count and that we are done
-        if len(results) < limit:
-            count = offset + len(results)
-            pages = math.ceil(count / limit)
-            next_url = None
-        else:
-            # XXX this is too intensive. find a workaround
-            # count_start_time = time.time()
-            # count = q.count()
-            # pages = math.ceil(count / limit)
-            # current_page = math.ceil(offset / limit) + 1
-            # query_time += time.time() - count_start_time
-            next_args = request.args.to_dict()
-            next_args["offset"] = "%s" % (offset + limit)
-            next_args["limit"] = "%s" % limit
-            next_url = urljoin(
+    try:
+        tmpresults = []
+        for row in q:
+            url = urljoin(
                 current_app.config["BASE_URL"],
-                "/api/v1/measurements?%s" % urlencode(next_args),
+                "/api/v1/measurement/%s" % row.measurement_id,
             )
+            tmpresults.append(
+                {
+                    "measurement_url": url,
+                    "measurement_id": row.measurement_id,
+                    "report_id": row.report_id,
+                    "probe_cc": row.probe_cc,
+                    "probe_asn": "AS{}".format(row.probe_asn),
+                    "test_name": row.test_name,
+                    "measurement_start_time": row.measurement_start_time,
+                    "input": row.input,
+                    "anomaly": row.anomaly,
+                    "confirmed": row.confirmed,
+                    "failure": row.failure,
+                    "scores": json.loads(row.scores),
+                }
+            )
+    except OperationalError as exc:
+        if isinstance(exc.orig, QueryCanceledError):
+            # Timeout due to a slow query. Generate metric and do not feed it
+            # to Sentry.
+            raise QueryTimeoutError()
+
+        raise exc
+
+    # For each report_id / input tuple, we want at most one entry from the
+    # traditional pipeline and one from fastpath, merged together
+    results = _merge_results(tmpresults)
+
+    pages = -1
+    count = -1
+    current_page = math.ceil(offset / limit) + 1
+
+    # We got less results than what we expected, we know the count and that we are done
+    if len(results) < limit:
+        count = offset + len(results)
+        pages = math.ceil(count / limit)
+        next_url = None
+    else:
+        # XXX this is too intensive. find a workaround
+        # count_start_time = time.time()
+        # count = q.count()
+        # pages = math.ceil(count / limit)
+        # current_page = math.ceil(offset / limit) + 1
+        # query_time += time.time() - count_start_time
+        next_args = request.args.to_dict()
+        next_args["offset"] = "%s" % (offset + limit)
+        next_args["limit"] = "%s" % limit
+        next_url = urljoin(
+            current_app.config["BASE_URL"],
+            "/api/v1/measurements?%s" % urlencode(next_args),
+        )
 
     query_time = time.time() - iter_start_time
     metadata = {

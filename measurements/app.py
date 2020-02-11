@@ -19,9 +19,9 @@ from sentry_sdk.integrations.logging import ignore_logger
 
 from decimal import Decimal
 from measurements.database import init_db
+from measurements.config import metrics
 
 APP_DIR = os.path.dirname(__file__)
-
 
 class FlaskJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -129,6 +129,7 @@ def create_app(*args, testmode=False, **kw):
     init_app(app, testmode=testmode)
     check_config(app.config)
 
+    # Setup Database connector
     init_db(app)
 
     # Setup throttling
@@ -138,6 +139,12 @@ def create_app(*args, testmode=False, **kw):
         headers_enabled=True,
         default_limits=["5500 per day", "400 per hour"],
     )
+
+    # Lazy setup of the prometheus metrics collection
+    if testmode == False:
+        # TODO look into how we can improve the testing pattern or how we setup
+        # prometheus metrics collection to avoid having to disable them
+        metrics.init_app(app)
 
     views.register(app)
 
