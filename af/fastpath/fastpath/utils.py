@@ -46,11 +46,15 @@ fingerprints = {
         }
     ],
     "AU": [
+        # https://github.com/ooni/pipeline/issues/179
+        # https://explorer.ooni.org/measurement/20171106T070150Z_AS9426_z1R8gTMEhKzX69ZVymQrubL1f5FliuHXuFy6Z7TRomXpC5w1jr?input=http:%2F%2Fwww.rollitup.org
         {
-            "header_full": "1.1 ac2106-wsag2.wsmartwifi.com.au:80 (Cisco-WSA/10.1.1-235)",
-            "header_name": "Via",
+            "body_match": "<title>Notification: Policy: URL Filtering</title>",
+            #"header_full": "1.1 ac2106-wsag2.wsmartwifi.com.au:80 (Cisco-WSA/10.1.1-235)",
+            #"header_name": "Via",
             "locality": "local",
         },
+        # https://explorer.ooni.org/measurement/20171119T095401Z_AS1221_sSYzvupLp9kaEiQiBBS4nlqpHzsO59Eh5SIyp60Z83ah5uRXtM?input=http:%2F%2Fwww.twistedinternet.com
         {
             "header_name": "Location",
             "header_prefix": "https://go.telstra.com.au/broadbandprotect/networkprotectionstandard",
@@ -567,6 +571,8 @@ fingerprints = {
             "header_prefix": "http://1.2.3.50/ups/no_access",
             "locality": "isp",
         },
+        # https://github.com/ooni/pipeline/issues/179
+        # https://explorer.ooni.org/measurement/20180125T012951Z_AS0_gyX2DUR5Q1W5V7gAlvUwnnEAH5tbEkEexlUu5qO8ZphH2uEjk6?input=http:%2F%2F8thstreetlatinas.com
         {
             "header_name": "Location",
             "header_prefix": "http://www.webscanningservice.com/WebServicesAlertPage/WebURLAlert.aspx",
