@@ -120,11 +120,16 @@ fingerprints = {
         }
     ],
     "DE": [
+        # https://github.com/ooni/pipeline/issues/181
+        # https://explorer.ooni.org/measurement/20180312T143953Z_AS3320_Kumlzdy0NSKyLoB0bt9PHKXp4OKItFMuYqMCw4ouQJapQFVUNR?input=http:%2F%2Fwww.hackhull.com
+        # https://explorer.ooni.org/measurement/20170506T130315Z_AS47610_cpNzdaQAx60UxJxEdXh54qBxxEKLexnoPdNam8KDJ181yCbZir?input=http:%2F%2Fspys.ru
         {
-            "header_full": "1.1 s690-10.noc.rwth-aachen.de:80 (Cisco-WSA/10.1.1-230)",
-            "header_name": "Via",
+            "body_match": "<title>Notification: Policy: URL Filtering</title>",
+            #"header_full": "1.1 s690-10.noc.rwth-aachen.de:80 (Cisco-WSA/10.1.1-230)",
+            #"header_name": "Via",
             "locality": "local",
         },
+        # https://explorer.ooni.org/measurement/20190113T190405Z_AS60068_P7XDllvakD4djyFssTl9xVyVJI5bxSVl6mCxsGFsPLd94ohP8U?input=http:%2F%2Foccupystreams.org
         {
             "header_full": "https://blocked.netalerts.io",
             "header_name": "X-App-Url",
