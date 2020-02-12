@@ -1,10 +1,18 @@
 import csv
 
+# TODO
+# Below are measurements for failing transparent http proxies:
+# https://explorer.ooni.org/measurement/20170509T041918Z_AS5384_fSeP50M6LS3lUhIarj2WhbQNIQS8mKtvhuxEhwJOhgheEL7EsZ?input=http:%2F%2Fanonym.to
+# https://explorer.ooni.org/measurement/20180914T010619Z_AS11427_d3lligD9zAEneBLYeI8Mt2JUpVBC2y5zFZ1EG3XNLo1smBQa48?input=http:%2F%2Fmoqavemat.ir
+# though they don't not look like a blockpage
+
+# TODO(explorer error)
+# https://explorer.ooni.org/measurement/20170722T013346Z_AS14340_QXOwhyfxJUPRGWsCqanoOycTnbHcpU4CW3NBNXUMMbxbi3Q6I3?input=http:%2F%2Fwww.blubster.com
+#https://explorer.ooni.org/measurement/20181118T123404Z_AS7922_pgeD0Ka5ySsyl55RBYXO07V82WoH0uggCYFJsvlcp2d55Tju3i?input=http:%2F%2Fwww.acdi-cida.gc.ca
+
 # blocking locality: global > country > isp > local
 # unclassified locality is named "general"
 fingerprints = {
-    # TODO: https://explorer.ooni.org/measurement/20170509T041918Z_AS5384_fSeP50M6LS3lUhIarj2WhbQNIQS8mKtvhuxEhwJOhgheEL7EsZ?input=http:%2F%2Fanonym.to
-    # though it does not look like a blockpage
     "AE": [
         {
             "header_name": "Server",
@@ -67,13 +75,6 @@ fingerprints = {
         }
     ],
     "CA": [
-        # https://github.com/ooni/pipeline/issues/169
-        # https://explorer.ooni.org/measurement/20180724T151542Z_AS577_YiqZVd01jKCgmtm4Ixf6z2uzSBcFSsXkeN6NIDjHl1dtWZ6VrX?input=http:%2F%2Fwww.genderandaids.org
-        {
-            "header_name": "Server",
-            "header_full": "Barracuda/NGFirewall",
-            "locality": "local"
-        },
         # https://explorer.ooni.org/measurement/20171026T125929Z_AS0_nkYRKqxCJy1PZQ9yBcsFuG61hFzZRYeio3N21CEBwot7MiikfZ?input=http:%2F%2Fwww.schwarzreport.org
         # https://explorer.ooni.org/measurement/20181010T185819Z_AS5664_EeT6QJ84dSl7QaHu9Dwb5TcByIY2qiGrdtcyZlSFotmQlc53Hg?input=http:%2F%2Fwww.sportingbet.com
         # https://explorer.ooni.org/measurement/20170604T114135Z_AS852_pZtNoyGV6fO5K97OJwwhM3ShmlWnuxKHLGrWbjSi4omt9KvyIi?input=http:%2F%2Fwww.xroxy.com
@@ -482,30 +483,53 @@ fingerprints = {
             "header_prefix": "http://filter.esu9.org:8080/webadmin/deny/index.php",
             "locality": "country",
         },
+        # https://explorer.ooni.org/measurement/20170411T170124Z_AS46491_ntYaNL2kdnuHFhOpkSgje3aadGsvRW8oadtjIC71DuiX06z4yy?input=http:%2F%2Fwww.exgay.com
+        {
+            "header_name": "Location",
+            "header_prefix": "http://reporter.dublinschools.net/block/restricted.html",
+            "locality": "local",
+        },
+        # https://explorer.ooni.org/measurement/20170504T143706Z_AS16657_2LnvAcQgpCrjBG46Fb5EKr50PIL40W0ppwNcXp9WCCatbPboXK?input=http:%2F%2Fchinadaily.com.cn
+        # https://explorer.ooni.org/measurement/20170915T220312Z_AS22935_6FKfune3ZuFavfORPXNul209Ffwv3jL7RyjzMJppxYju2caAoE?input=http:%2F%2Fwww.breastenlargementmagazine.com
         {
             "header_name": "Location",
             "header_prefix": "http://ibossreporter.edutech.org/block/bp.html",
-            "locality": "country",
+            "locality": "local",
         },
+        # https://explorer.ooni.org/measurement/20170628T182856Z_AS25605_Lev8VClbbZplNkYfBGujzPiKFI7rHxERx9SNwOfuR1M8WCTBSZ?input=http:%2F%2Fwww.aceshigh.com
         {
             "header_name": "Location",
             "header_prefix": "http://alert.scansafe.net/alert/process",
-            "locality": "country",
+            "locality": "local",
         },
+        # https://explorer.ooni.io/measurement/20170722T013346Z_AS14340_QXOwhyfxJUPRGWsCqanoOycTnbHcpU4CW3NBNXUMMbxbi3Q6I3?input=http:%2F%2Fwww.blubster.com
         {
             "header_name": "Location",
             "header_prefix": "http://184.168.221.96:6080/php/urlblock.php",
-            "locality": "country",
+            "locality": "local",
         },
         {
             "header_name": "Location",
             "header_prefix": "https://gateway.wifast.com:443/wifidog/login/",
             "locality": "local",
         },
+        # https://explorer.ooni.org/measurement/20190205T191943Z_AS26638_QbFGhgqZ8sqXmCQrZNrNgB0RWB6EUfjFYPbKYOgaihiWLv5xNb?input=http:%2F%2Ftwitter.com%2F
         {
             "header_name": "Location",
             "header_prefix": "https://mpswebfilterwashbu.mpls.k12.mn.us:6082/php/uid.php",
             "locality": "local",
+        },
+        # https://explorer.ooni.org/measurement/20180406T152727Z_AS39942_lquPnt0vjeXydfleOdSkxyjst6VTiUWb58f3x5qlFKTSlTIQLG?input=http:%2F%2Fflirtylingerie.com%2F
+        # vendor: forcepoint
+        {
+            "body_match": "<title>Access to this site is blocked</title>",
+            "locality": "local"
+        },
+        # https://explorer.ooni.org/measurement/20171129T155619Z_AS11714_vJUMktHjy0cQGKqYqY3fgOQQLVNfnxb1V11fvP6jTXTbbTX60e?input=http:%2F%2Fwww.pandora.com
+        # vendor: netsweeper
+        {
+            "body_match": "It is a good idea to check to see if the NetSweeper restriction is coming from the cache of your web browser",
+            "locality": "local"
         },
     ],
     "VN": [
@@ -535,6 +559,21 @@ fingerprints = {
             "header_name": "Location",
             "header_prefix": "http://www.webscanningservice.com/WebServicesAlertPage/WebURLAlert.aspx",
             "locality": "isp",
+        },
+        # https://github.com/ooni/pipeline/issues/169
+        # https://explorer.ooni.org/measurement/20180724T151542Z_AS577_YiqZVd01jKCgmtm4Ixf6z2uzSBcFSsXkeN6NIDjHl1dtWZ6VrX?input=http:%2F%2Fwww.genderandaids.org
+        # https://github.com/ooni/pipeline/issues/171
+        # https://explorer.ooni.org/measurement/20171029T080350Z_AS209_xtJYWXrUShSnXnvStZUPWsVpqVhT0hOzR749tbJgzxF9OkR1Bn?input=http:%2F%2Fwww.vanguardnewsnetwork.com
+        {
+            "header_name": "Server",
+            "header_full": "Barracuda/NGFirewall",
+            "locality": "local"
+        },
+        # https://explorer.ooni.org/measurement/20180123T210247Z_AS7385_VLsJ9z4UYNZIMUK3Nc4cyaXctKPnnIsxIhuU97X4XWvSAubgZs?input=http:%2F%2Fwww.figleaves.com
+        {
+            "header_name": "Server",
+            "header_full": "BarracudaHTTP 4.0",
+            "locality": "local"
         },
     ],
 }
