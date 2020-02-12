@@ -71,14 +71,22 @@ fingerprints = {
         {
             "header_full": "1.1 webfilter.stjohns.net (http_scan_byf/3.5.16)",
             "header_name": "Via",
-            "locality": "general",
+            "locality": "local",
         },
     ],
     "BR": [
+        # https://github.com/ooni/pipeline/issues/180
+        # https://explorer.ooni.org/measurement/20171206T160707Z_AS10429_4pfvLyNqYHpbLQI9tIpuQr7CPgvOOGaZbbnm7gMIZKdBE4oXJ9?input=http:%2F%2Fcrackspider.net
         {
             "header_full": "1.1 wsa07.grupoamil.com.br:80 (Cisco-WSA/9.1.2-010)",
             "header_name": "Via",
-            "locality": "general",
+            "locality": "local",
+        },
+        # https://explorer.ooni.org/measurement/20181023T171547Z_AS262318_cr2e8wzvNXORo80y7pOT9iqxLDOaHAboXakfU8qnQkWh50K0cs?input=http:%2F%2Fwww.pandora.com
+        {
+            "header_full": "SonicWALL",
+            "header_name": "Server",
+            "locality": "local",
         }
     ],
     "CA": [
