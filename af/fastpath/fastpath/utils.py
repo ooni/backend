@@ -308,10 +308,11 @@ fingerprints = {
         }
     ],
     "PA": [
+        # https://github.com/ooni/pipeline/issues/170
+        # https://explorer.ooni.org/measurement/20170302T184253Z_AS11556_LrU69C7D1dqVTi05dMN0jPphf601DuAzMnFBrehfFvR4ccwfoe?input=http:%2F%2Flifestream.aol.com
         {
-            "header_full": "1.1 barracuda.tropigas.com.pa (http_scan_byf/3.3.1)",
-            "header_name": "Via",
-            "locality": "country",
+            "body_match": "<p>Redirecting you to Barracuda Web Filter.</p>",
+            "locality": "local",
         }
     ],
     "PH": [
