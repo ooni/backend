@@ -3,11 +3,20 @@ import csv
 # blocking locality: global > country > isp > local
 # unclassified locality is named "general"
 fingerprints = {
+    # TODO: https://explorer.ooni.org/measurement/20170509T041918Z_AS5384_fSeP50M6LS3lUhIarj2WhbQNIQS8mKtvhuxEhwJOhgheEL7EsZ?input=http:%2F%2Fanonym.to
+    # though it does not look like a blockpage
     "AE": [
         {
             "header_name": "Server",
             "header_prefix": "Protected by WireFilter",
             "locality": "country",
+        },
+        # https://github.com/ooni/pipeline/issues/163
+        # https://explorer.ooni.org/measurement/20170423T142350Z_AS0_5EG4lO5Z8KHN2jwbqB5hQqxlC44iXq2A2YCxoASGvY5Z05KrGL?input=http:%2F%2Fwww.foxnews.com
+        {
+            "header_name": "Location",
+            "header_prefix": "http://www.bluecoat.com/notify-NotifyUser1",
+            "locality": "country"
         }
     ],
     "AF": [
