@@ -170,10 +170,13 @@ fingerprints = {
     ],
     "FR": [
         {"body_match": 'xtpage = "page-blocage-terrorisme"', "locality": "country"},
+        # https://github.com/ooni/pipeline/issues/184
+        # https://explorer.ooni.org/measurement/20170213T143932Z_AS57584_U1gMCvIFLNWIKnSrpWTLrN9oewaHiT0DdKjLaT3MiMqnBk3J3U?input=http:%2F%2Fwww.23.org
         {
-            "header_full": "1.1 proxy2.rmc.local:80 (Cisco-WSA/9.1.1-074)",
-            "header_name": "Via",
-            "locality": "country",
+            #"header_full": "1.1 proxy2.rmc.local:80 (Cisco-WSA/9.1.1-074)",
+            #"header_name": "Via",
+            "body_match": "<title>Notification: Policy: URL Filtering</title>",
+            "locality": "local",
         },
     ],
     "GB": [
