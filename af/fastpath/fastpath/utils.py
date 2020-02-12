@@ -568,6 +568,8 @@ fingerprints = {
         },
     ],
     "VN": [
+        # https://github.com/ooni/pipeline/issues/186
+        # https://explorer.ooni.org/measurement/20130506T043500Z_IBzthJbAAPsdFZQLPrjMbAwlELzGqtabqMatKpBqqBSWnUyQnA?input=http:%2F%2Fwww.sos-reporters.net
         {
             "header_name": "Location",
             "header_prefix": "http://ezxcess.antlabs.com/login/index.ant?url",
