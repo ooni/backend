@@ -66,6 +66,22 @@ fingerprints = {
             "locality": "general",
         }
     ],
+    "CA": [
+        # https://github.com/ooni/pipeline/issues/169
+        # https://explorer.ooni.org/measurement/20180724T151542Z_AS577_YiqZVd01jKCgmtm4Ixf6z2uzSBcFSsXkeN6NIDjHl1dtWZ6VrX?input=http:%2F%2Fwww.genderandaids.org
+        {
+            "header_name": "Server",
+            "header_full": "Barracuda/NGFirewall",
+            "locality": "local"
+        },
+        # https://explorer.ooni.org/measurement/20171026T125929Z_AS0_nkYRKqxCJy1PZQ9yBcsFuG61hFzZRYeio3N21CEBwot7MiikfZ?input=http:%2F%2Fwww.schwarzreport.org
+        # https://explorer.ooni.org/measurement/20181010T185819Z_AS5664_EeT6QJ84dSl7QaHu9Dwb5TcByIY2qiGrdtcyZlSFotmQlc53Hg?input=http:%2F%2Fwww.sportingbet.com
+        # https://explorer.ooni.org/measurement/20170604T114135Z_AS852_pZtNoyGV6fO5K97OJwwhM3ShmlWnuxKHLGrWbjSi4omt9KvyIi?input=http:%2F%2Fwww.xroxy.com
+        {
+            "body_match": " <title>Notification: Policy: URL Filtering</title>",
+            "locality": "local"
+        }
+    ],
     "CH": [
         {
             "header_name": "Location",
