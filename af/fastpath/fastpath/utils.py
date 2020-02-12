@@ -211,6 +211,13 @@ fingerprints = {
         {
             "body_match": "www.gamingcommission.gov.gr/index.php/forbidden-access-black-list/",
             "locality": "country",
+        },
+        # https://github.com/ooni/pipeline/issues/187
+        # https://explorer.ooni.org/measurement/20140703T083044Z_xCnGLSGTjBtyHfCTRvswNcQAjkhIwkpDWJrXqyTCjeMVCECmnv?input=http:%2F%2Fwww.royalvegascasino.com%2F
+        {
+            "header_prefix": "http://1.2.3.50/ups/no_access",
+            "header_name": "Location",
+            "locality": "isp",
         }
     ],
     "ID": [
