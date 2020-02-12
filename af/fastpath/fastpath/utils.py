@@ -138,10 +138,13 @@ fingerprints = {
     ],
     "DK": [
         {"body_match": "lagt at blokere for adgang til siden.", "locality": "country"},
+        # https://github.com/ooni/pipeline/issues/182
+        # https://explorer.ooni.org/measurement/20171121T193103Z_AS41746_lcM0SY6VKKQ9SnL3SUrh6aiH2hgJUkCs1zGtWuEjYTgVHqW7Lz?input=http:%2F%2Fwww.wetplace.com
         {
-            "header_full": "1.1 dsbpx001.dsb.dk:25 (Cisco-WSA/9.1.1-074)",
-            "header_name": "Via",
-            "locality": "country",
+            #"header_full": "1.1 dsbpx001.dsb.dk:25 (Cisco-WSA/9.1.1-074)",
+            #"header_name": "Via",
+            "body_match": "<title>Notification: Policy: URL Filtering</title>",
+            "locality": "local",
         },
     ],
     "EG": [
