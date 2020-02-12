@@ -36,10 +36,13 @@ fingerprints = {
         }
     ],
     "AR": [
+        # https://github.com/ooni/pipeline/issues/178
+        # https://explorer.ooni.org/measurement/20170312T225529Z_AS0_hV7ESTIV4phKrhXxhO9NTxc5XrcXsgzPqZzEkYbrSjgPv9Xyor?input=http:%2F%2Fwww.erogeschichten.com
         {
-            "header_full": "1.1 FC-WSA-FibertelZone3.int.fibercorp.com.ar:80 (Cisco-WSA/10.1.0-204)",
-            "header_name": "Via",
-            "locality": "general",
+            "body_match": "<title>Notificación: política: filtrado de URL</title>",
+            #"header_full": "1.1 FC-WSA-FibertelZone3.int.fibercorp.com.ar:80 (Cisco-WSA/10.1.0-204)",
+            #"header_name": "Via",
+            "locality": "isp",
         }
     ],
     "AU": [
@@ -573,6 +576,8 @@ fingerprints = {
         # https://explorer.ooni.org/measurement/20180724T151542Z_AS577_YiqZVd01jKCgmtm4Ixf6z2uzSBcFSsXkeN6NIDjHl1dtWZ6VrX?input=http:%2F%2Fwww.genderandaids.org
         # https://github.com/ooni/pipeline/issues/171
         # https://explorer.ooni.org/measurement/20171029T080350Z_AS209_xtJYWXrUShSnXnvStZUPWsVpqVhT0hOzR749tbJgzxF9OkR1Bn?input=http:%2F%2Fwww.vanguardnewsnetwork.com
+        # https://explorer.ooni.org/measurement/20170814T120242Z_AS8447_g6CoCriPHXMWjXJHwZ9kjJmTusVWVPYEsOKOOhF1HLwrHR29hp?input=http:%2F%2Fwww.aleph.to
+        # https://explorer.ooni.org/measurement/20180215T142531Z_AS31543_HutYcy6eALgop44KgGsXAsaF2i7v4feM6DP5vb2hST8nZdmWta?input=http:%2F%2Fanonymizer.secuser.com
         {
             "header_name": "Server",
             "header_full": "Barracuda/NGFirewall",
