@@ -1,3 +1,9 @@
+analysis (0.3) unstable; urgency=medium
+
+  * Fix watchdog
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 12 Feb 2020 18:10:53 +0000
+
 analysis (0.2) unstable; urgency=medium
 
   * extended DB metrics gathering

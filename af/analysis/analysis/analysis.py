@@ -53,10 +53,10 @@ try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
     import sdnotify  # debdeps: python3-sdnotify
 
-    no_systemd = False
+    has_systemd = True
 except ImportError:
     # this will be the case on macOS for example
-    no_systemd = True
+    has_systemd = False
 
 from bottle import template  # debdeps: python3-bottle
 from sqlalchemy import create_engine  # debdeps: python3-sqlalchemy-ext
@@ -962,12 +962,12 @@ def monitor_measurement_creation(conf):
 
     This is the most important function, therefore it pings the SystemD watchdog
     """
-    log.info("Started monitor_measurement_creation thread")
+    log.info("MMC: Started monitor_measurement_creation thread")
     # TODO: switch to OOID
 
     INTERVAL = 60 * 5  # half of the watchdog interval in the analysis.service file
     nodeexp_path = "/run/nodeexp/db_metrics.prom"
-    if no_systemd == False:
+    if has_systemd:
         watchdog = sdnotify.SystemdNotifier()
 
     prom_reg = prom.CollectorRegistry()
@@ -1027,14 +1027,14 @@ def monitor_measurement_creation(conf):
     with conn.cursor() as cur:
         cur.execute("SELECT 1")
     conn.close()
-    if no_systemd == False:
+    if has_systemd:
         watchdog.notify("READY=1")
 
     cycle_seconds = 0
 
     while True:
         try:
-            log.info("Gathering fastpath count")
+            log.info("MMC: Gathering fastpath count")
             conn, dbengine = setup_database_connections(conf.standby)
             delta = timedelta(minutes=5)
             now = datetime.utcnow()
@@ -1049,7 +1049,7 @@ def monitor_measurement_creation(conf):
 
             # The following queries are heavier
             if cycle_seconds == 0:
-                log.info("Running extended DB metrics gathering")
+                log.info("MMC: Running extended DB metrics gathering")
                 today = datetime.utcnow().date()
                 with conn.cursor() as cur:
                     # Compare different days in the past: pipeline and fastpath
@@ -1067,7 +1067,7 @@ def monitor_measurement_creation(conf):
                         for query_name, sql in queries.items():
                             cur.execute(sql, times)
                             val = cur.fetchone()[0]
-                            log.info("%s %s %s %d", times["since"], times["until"], query_name, val)
+                            log.info("MMC: %s %s %s %d", times["since"], times["until"], query_name, val)
                             gauge_family.labels(f"{query_name}_{age_in_days}_days_ago").set(val)
 
                 prom.write_to_textfile(nodeexp_path, prom_reg)
@@ -1079,9 +1079,10 @@ def monitor_measurement_creation(conf):
 
         finally:
             conn.close()
-            if no_systemd == False:
+            if has_systemd:
+                log.debug("MMC: Pinging watchdog")
                 watchdog.notify("STATUS=Running")
-            log.debug("Done")
+            log.debug("MMC: Done")
             time.sleep(INTERVAL)
 
 
@@ -1093,7 +1094,7 @@ def main():
         cp.read_file(f)
 
     conf = parse_args()
-    if conf.devel or conf.stdout or no_systemd:
+    if conf.devel or conf.stdout or not has_systemd:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
 
