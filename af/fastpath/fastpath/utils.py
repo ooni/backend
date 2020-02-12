@@ -282,6 +282,15 @@ fingerprints = {
             "locality": "isp"
         }
     ],
+    "KW": [
+        # https://github.com/ooni/pipeline/issues/174
+        # https://explorer.ooni.org/measurement/20170804T144746Z_AS42961_nClauBGJlQ5BgV1lAVD72Gw8omqphSogfCSLAc55zTAdlcpzTA?input=http:%2F%2Fwww.radioislam.org
+        {
+            "header_name": "Location",
+            "header_prefix": "http://restrict.kw.zain.com",
+            "locality": "isp"
+        }
+    ],
     "MX": [
         # https://github.com/ooni/pipeline/issues/159
         # https://explorer.ooni.org/measurement/20190306T161639Z_AS22908_1iCBIVT3AGu4mDvEtpl0ECfxp1oSw8UYXSg82JFQ1gOIqOvw8y?input=http:%2F%2Fwww.pornhub.com%2F
@@ -570,6 +579,7 @@ fingerprints = {
             "locality": "local"
         },
         # https://explorer.ooni.org/measurement/20180123T210247Z_AS7385_VLsJ9z4UYNZIMUK3Nc4cyaXctKPnnIsxIhuU97X4XWvSAubgZs?input=http:%2F%2Fwww.figleaves.com
+        # https://explorer.ooni.org/measurement/20171203T130750Z_AS14434_iviy15O0b7YXVRoTMaqS4O0w1w9NfVaOL4l3KoV4Y9mJEq33X0?input=http:%2F%2Fcompany.wizards.com%2F
         {
             "header_name": "Server",
             "header_full": "BarracudaHTTP 4.0",
