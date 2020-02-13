@@ -965,7 +965,7 @@ def monitor_measurement_creation(conf):
     log.info("MMC: Started monitor_measurement_creation thread")
     # TODO: switch to OOID
 
-    INTERVAL = 60 * 5  # half of the watchdog interval in the analysis.service file
+    INTERVAL = 60 * 5
     nodeexp_path = "/run/nodeexp/db_metrics.prom"
     if has_systemd:
         watchdog = sdnotify.SystemdNotifier()
@@ -1033,6 +1033,10 @@ def monitor_measurement_creation(conf):
     cycle_seconds = 0
 
     while True:
+        if has_systemd:
+            watchdog.notify("WATCHDOG=1")
+            watchdog.notify("STATUS=Running")
+
         try:
             log.info("MMC: Gathering fastpath count")
             conn, dbengine = setup_database_connections(conf.standby)
@@ -1079,11 +1083,15 @@ def monitor_measurement_creation(conf):
 
         finally:
             conn.close()
-            if has_systemd:
-                log.debug("MMC: Pinging watchdog")
-                watchdog.notify("STATUS=Running")
             log.debug("MMC: Done")
-            time.sleep(INTERVAL)
+            if has_systemd:
+                watchdog.notify("STATUS=MMC Sleeping")
+
+            endtime = time.time() + INTERVAL
+            while time.time() < endtime:
+                if has_systemd:
+                    watchdog.notify("WATCHDOG=1")
+                time.sleep(10)
 
 
 def main():
