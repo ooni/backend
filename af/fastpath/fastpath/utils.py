@@ -302,13 +302,15 @@ fingerprints = {
             "locality": "local",
         }
     ],
-    "KE": [
-        {
-            "header_name": "Location",
-            "header_prefix": "http://159.89.232.4/alert",
-            "locality": "country",
-        }
-    ],
+    # https://github.com/ooni/pipeline/issues/192
+    # https://explorer.ooni.org/measurement/20180611T174527Z_AS33771_xGoXddliTIGLP3NJUBkEnEL1ukvMZKs7YvbB7RNFb3tW4OKZR7?input=http:%2F%2Fprotectionline.org%2F
+    #"KE": [
+    #    {
+    #        "header_name": "Location",
+    #        "header_prefix": "http://159.89.232.4/alert",
+    #        "locality": "country",
+    #    }
+    #],
     "KR": [
         # https://github.com/ooni/pipeline/issues/131
         # https://explorer.ooni.org/measurement/20181204T023538Z_AS4766_Q7tnDXKYbZxJAArIYzQwgd4y91BDuYsPZvA0MrYvUZzEVX6Olz?input=http:%2F%2Fwww.torproject.org
