@@ -501,7 +501,18 @@ fingerprints = {
         {
             "header_full": "http://196.1.211.6:8080/alert/",
             "header_name": "Location",
-            "locality": "country",
+            "locality": "isp",
+        },
+        # https://explorer.ooni.org/measurement/20181221T173618Z_AS33788_NH383fTiPbg28uZGbH9Huk4jEPJZ00IBUNrqZWLoEpbl9sx3VQ?input=http:%2F%2Fwww.pokerstars.com
+        {
+            "header_prefix": "http://196.29.164.27/ntc/ntcblock.html",
+            "header_name": "Location",
+            "locality": "isp"
+        }
+        # https://explorer.ooni.org/measurement/20181223T053338Z_AS37211_SNSyW5GQvxWDuQ2tQpJNZKqK5IyQFfXAVgTQynYjVzUvZn2FDK?input=http:%2F%2Fwww.bglad.com
+        {
+            "body_match": "<title>gateprotect Content Filter Message</title>",
+            "locality": "local"
         }
     ],
     "SG": [
