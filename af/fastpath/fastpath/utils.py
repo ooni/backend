@@ -383,11 +383,14 @@ fingerprints = {
         }
     ],
     "PH": [
+        # https://explorer.ooni.org/measurement/20180114T101054Z_AS0_SptN5g552QQ9wpfhEBsOTeuOkrpYOQgCBc4JQXNy9GFGxarbEf?input=http:%2F%2Fhightimes.com
         {
             "header_name": "Location",
             "header_prefix": "http://surfalert.globe.com.ph/usedpromo?dest_url",
             "locality": "isp",
         },
+        # TODO this is actually a captive portal like scenario
+        # https://explorer.ooni.org/measurement/20171014T140144Z_AS10139_gQG3LIHnMZH3IsSJuPmMlLM8qDj3kKfHxJJGyPblDQ1AOFFyBX?input=http:%2F%2Fwww.bittorrent.com
         {
             "header_full": "http://cube.sunbroadband.ph:8020/balanceToOffer/init",
             "header_name": "Location",
@@ -402,7 +405,7 @@ fingerprints = {
             "header_full": "V2R2C00-IAE/1.0",
             "locality": "local",
         },
-    ]
+    ],
     "PT": [
         {
             "header_full": "http://mobilegen.vodafone.pt/denied/dn",
