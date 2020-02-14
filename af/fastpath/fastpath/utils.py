@@ -250,6 +250,19 @@ fingerprints = {
             "locality": "isp",
         }
     ],
+    "HU": [
+        # https://github.com/ooni/pipeline/issues/223
+        # https://explorer.ooni.org/measurement/20190905T104808Z_AS50261_Y03a7meiLbuSNLjxa55pvOAYug9r0yjsFjlmfe64MzbDuGJ2UM?input=http://www.realbeer.com/
+        {
+            "body_match": "<title>Oops! Website blocked!</title>",
+            "locality": "local"
+        },
+        # https://explorer.ooni.org/measurement/20190904T091911Z_AS1955_V5wcmlVrMPVZzi9sQcgAiopUjZr8umfv8XY3zHY8rOQvbTssHU?input=http://guardster.com/
+        {
+            "body_match": "<title>Web Page Blocked</title>",
+            "locality": "local"
+        }
+    ],
     "ID": [
         {
             "header_name": "Location",
