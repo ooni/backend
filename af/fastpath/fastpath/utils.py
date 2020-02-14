@@ -428,6 +428,20 @@ fingerprints = {
             "locality": "local",
         },
     ],
+    "PL": [
+        # https://github.com/ooni/pipeline/issues/224
+        # https://explorer.ooni.org/measurement/20190911T110527Z_AS6830_kkm1ZGUCJI4dSrRV4xl6QwG77o7EeI2PDKbwt9SPL9BBJHUsTr?input=http://www.eurogrand.com/
+        {
+            "header_full": "http://www.finanse.mf.gov.pl/inne-podatki/podatek-od-gier-gry-hazardowe/komunikat",
+            "header_name": "Location",
+            "locality": "country"
+        },
+        {
+            "header_prefix": "http://80.50.144.142/UserCheck/PortalMain",
+            "header_name": "Location",
+            "locality": "isp"
+        }
+    ],
     "PT": [
         {
             "header_full": "http://mobilegen.vodafone.pt/denied/dn",
