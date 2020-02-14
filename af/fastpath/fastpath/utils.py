@@ -243,8 +243,9 @@ fingerprints = {
             "header_prefix": "http://internet-positif.org",
             "locality": "country",
         },
+        # https://explorer.ooni.org/measurement/20170826T071505Z_AS24526_40Tlz7tR7m0UVaTRZi5EUtsuAjHnYuAgDlNjkec64t70Tujbo9?input=http:%2F%2Fwww.budweiser.com
         {
-            "body_match": "If you find, site that you want to access does not include any of the above categories, please email to",
+            "body_match": '<title>Blocked Page Bina Nusantara Networks</title>'
             "locality": "isp",
         },
     ],
