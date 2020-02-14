@@ -48,6 +48,10 @@ def init_db(app):
     Base.query = app.db_session.query_property()
     init_query_logging(app)
 
+    # Set query duration limits (in milliseconds)
+    app.db_session.execute("SET statement_timeout = 30000")
+    app.db_session.execute("SET idle_in_transaction_session_timeout = 60000")
+
     @event.listens_for(app.db_session, "after_begin")
     def after_begin(session, transaction, connection):
         reqid = request_id()
