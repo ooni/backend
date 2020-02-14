@@ -1021,6 +1021,7 @@ def monitor_measurement_creation(conf):
         AND measurement_start_time <= %(until)s
         """,
     )
+    sql_replication_delay = "SELECT now() - pg_last_xact_replay_timestamp()"
 
     # test connection and notify systemd
     conn, _ = setup_database_connections(conf.standby)
@@ -1049,6 +1050,13 @@ def monitor_measurement_creation(conf):
                 new_fp_msmt_count = cur.fetchone()[0]
 
             gauge_family.labels("fastpath_new_5m").set(new_fp_msmt_count)
+
+            log.info("MMC: Gathering database replica status")
+            with conn.cursor() as cur:
+                cur.execute(sql_replication_delay)
+                delay = cur.fetchone()[0]
+                gauge_family.labels("replication_delay").set(delay)
+
             prom.write_to_textfile(nodeexp_path, prom_reg)
 
             # The following queries are heavier
