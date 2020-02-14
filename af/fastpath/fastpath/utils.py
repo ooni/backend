@@ -180,31 +180,48 @@ fingerprints = {
         },
     ],
     "GB": [
+        # https://github.com/ooni/pipeline/issues/188
+        # https://explorer.ooni.org/measurement/20160401T061018Z_ehdZlDMzbUsYhYSGSWalmqKnqGIynfVHQhKvocrcKEmFeynXHd?input=Trans500.com
         {
             "header_name": "Location",
             "header_prefix": "http://blocked.nb.sky.com",
             "locality": "isp",
         },
+        # https://explorer.ooni.org/measurement/20181118T215552Z_AS12576_LXCqBnsH90yHeMcE6LNDYwOl6IHnop0dTroWxA5NE7AhJ8vFn9?input=http:%2F%2Fwww.globalfire.tv
         {
             "header_full": "http://ee.co.uk/help/my-account/corporate-content-lock",
             "header_name": "Location",
-            "locality": "local",
+            "locality": "isp",
         },
+        # https://explorer.ooni.org/measurement/20181120T092944Z_AS199335_6V7Di7t3qUP7qVBYDlOHo9nxgle5NMQIDGHV50wtmCLuZTVPzU?input=http:%2F%2Fwww.microsofttranslator.com
         {
             "header_name": "Location",
             "header_prefix": "http://Filter7external.schoolsbroadband.co.uk/access",
-            "locality": "local",
+            "locality": "isp",
         },
+        # http://localhost:3100/measurement/20170605T124503Z_AS0_eVo3z6wXAYDVrAZDsgqiM7pPlLuKR7l4zNF8oEUrGmZ62HWU4l?input=http:%2F%2Frockettube.com
+        {
+            "header_name": "Location",
+            "header_prefix": "https://account.nowtv.com/broadband-buddy/blocked-pages/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20180127T090022Z_AS5378_NK5M8lt6WbL1LOdiIooPX5PXla2DQDlAkGIK4HimIWbUpoMlj8?input=http:%2F%2Fwww.imageshack.us
         {
             "header_full": "www.vodafone.co.uk/contentcontrolpage/vfb-category-blocklist.html",
             "header_name": "Location",
             "locality": "isp",
         },
+        # https://explorer.ooni.org/measurement/20190203T142614Z_AS60339_PIMtdDSw9QEc2C9hDgA8tx5LZDrdmUP8ZFsSkdGRX2QNnisqaM?input=http:%2F%2Fwww.peacefire.org%2Fcircumventor%2Fsimple-circumventor-instructions.html
         {
             "header_full": "http://three.co.uk/mobilebroadband_restricted",
             "header_name": "Location",
             "locality": "isp",
         },
+        # https://explorer.ooni.org/measurement/20170404T062436Z_AS60339_QJa9jOkZrduHeY2fH5oQmChKFtqwM1RzB3RG2AAjE1IMDMXp59?input=http:%2F%2Fwww.naughty.com
+        {
+            "body_match": '<a href="https://smobile.three.co.uk/837/">Age Validation</a>',
+            "locality": "isp"
+        }
     ],
     "GF": [{"body_match": 'xtpage = "page-blocage-terrorisme"', "locality": "country"}],
     "GR": [
