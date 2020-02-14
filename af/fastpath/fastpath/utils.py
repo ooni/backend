@@ -496,10 +496,12 @@ fingerprints = {
         }
     ],
     "SG": [
+        # https://github.com/ooni/pipeline/issues/195
+        # https://explorer.ooni.org/measurement/20170905T231542Z_AS9874_3TJ6zyJeL17MVkTArLLsVfDxuMEPzfWB2rm4UbxiDuwtSiuNf3?input=http:%2F%2Fwww.playboy.com
         {
             "header_full": "http://www.starhub.com:80/personal/broadband/value-added-services/safesurf/mda-blocked.html",
             "header_name": "Location",
-            "locality": "country",
+            "locality": "isp",
         }
     ],
     "TR": [
