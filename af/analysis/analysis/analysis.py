@@ -1054,7 +1054,7 @@ def monitor_measurement_creation(conf):
             log.info("MMC: Gathering database replica status")
             with conn.cursor() as cur:
                 cur.execute(sql_replication_delay)
-                delay = cur.fetchone()[0]
+                delay = cur.fetchone()[0].total_seconds()
                 gauge_family.labels("replication_delay").set(delay)
 
             prom.write_to_textfile(nodeexp_path, prom_reg)
