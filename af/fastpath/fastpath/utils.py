@@ -99,6 +99,8 @@ fingerprints = {
         }
     ],
     "CH": [
+        # https://github.com/ooni/pipeline/issues/191
+        # https://explorer.ooni.org/measurement/43xnHPgN3gi0kt6EhmF2VbIOfQSV5CN9TXicU0A5ChlYejSGjT24Y1noM2DJgdk8?input=http:%2F%2Fwww.wetplace.com
         {
             "header_name": "Location",
             "header_prefix": "https://192.168.88.1/sgerror.php",
