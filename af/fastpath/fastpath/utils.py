@@ -150,6 +150,8 @@ fingerprints = {
         },
     ],
     "EG": [
+        # https://github.com/ooni/pipeline/issues/193
+        # https://explorer.ooni.org/measurement/20171126T053414Z_AS36992_8F2afEp0cM9V7Who1mEJUpqX2fGVbvgoZ2DfVGi3Nv3lQzypzV?input=http:%2F%2Fkh-press.com
         {
             "header_name": "Location",
             "header_prefix": "http://notification.etisalat.com.eg/etisalat/notification/redirectionactions.html?",
