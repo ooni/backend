@@ -107,6 +107,15 @@ fingerprints = {
             "locality": "local",
         }
     ],
+    "CL": [
+        # https://github.com/ooni/pipeline/issues/196
+        # https://explorer.ooni.org/measurement/20170413T224353Z_AS0_Izup11aUZt39zCD1TSFUC1uvOmg7tO1bhwRHWEYsk2WgNrgObZ?input=http:%2F%2Fshareaza.com%2F
+        {
+            "header_full": "Kerio Control Embedded Web Server",
+            "header_name": "Server",
+            "locality": "local",
+        }
+    ],
     "CO": [
         # https://github.com/ooni/pipeline/issues/156
         # https://explorer.ooni.org/measurement/20190114T112310Z_AS262928_N3ChIPo5QSMMZ3qgA25G9QHE55suubZbPPkAfmNLkmOXuh9ZXJ?input=http:%2F%2Fwww.eurogrand.com%2F
@@ -613,16 +622,6 @@ fingerprints = {
         }
     ],
     "ZZ": [
-        {
-            "header_full": "Kerio Control Embedded Web Server",
-            "header_name": "Server",
-            "locality": "local",
-        },
-        {
-            "header_name": "Location",
-            "header_prefix": "https://account.nowtv.com/broadband-buddy/blocked-pages/?domain=",
-            "locality": "isp",
-        },
         {
             "header_name": "Location",
             "header_prefix": "http://1.2.3.50/ups/no_access",
