@@ -443,6 +443,17 @@ fingerprints = {
         }
     ],
     "PT": [
+        # https://github.com/ooni/pipeline/issues/225
+        # https://explorer.ooni.org/measurement/20190911T103335Z_AS2860_4aKH0micNlcrjnWcRknF9ghAykfMdxMkWGhXWracX2FIBY6UQb?input=http://www.roxypalace.com/
+        {
+            "body_match": "<title>Bloqueado por ordem judicial</title>",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20180910T235247Z_AS3243_LpUldhcfbVGUIyfOxF6TFfLNT1wSAMwHy54LBz6owWe0cofJIK?input=http://www.luckynugget.com
+        {
+            "body_match": "<title>Acesso bloqueado por entidade judici&aacute;ria</title>",
+            "locality": "isp"
+        }
         {
             "header_full": "http://mobilegen.vodafone.pt/denied/dn",
             "header_name": "Location",
