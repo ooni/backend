@@ -612,7 +612,7 @@ def score_measurement_telegram(msm):
 
 @metrics.timer("score_measurement_hhfm")
 def score_measurement_hhfm(msm):
-    """Calculated http_header_field_manipulation
+    """Calculate http_header_field_manipulation
     """
     tk = msm["test_keys"]
     rid = msm["report_id"]
@@ -680,6 +680,40 @@ def score_measurement_hhfm(msm):
     # TODO: distinguish proxies lowercasing/fixing headers
     # or adding "benign" Via, Connection, X-BlueCoat-Via, X-Forwarded-For
     # headers?
+    return scores
+
+
+@metrics.timer("score_http_invalid_request_line")
+def score_http_invalid_request_line(msm):
+    """Calculate measurement scoring for http_invalid_request_line
+    """
+    # https://github.com/ooni/spec/blob/master/nettests/ts-007-http-invalid-request-line.md
+    tk = msm["test_keys"]
+    rid = msm["report_id"]
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    sent = tk.get("sent", [])
+    received = tk.get("received", [])
+
+    if not len(sent) and not len(received):
+        scores["accuracy"] = 0.0
+        return scores
+
+    # Compare sent and received HTTP headers
+    anomaly = False
+    for s, r in zip(sent, received):
+        if s != r:
+            anomaly = True
+
+    tampering = tk.get("tampering", False)
+    if tampering != anomaly:
+        scores["accuracy"] = 0.0
+        logbug(6, "Incorrect tampering flag", msm)
+        return scores
+
+    # Headers have been manipulated!
+    if anomaly:
+        scores["blocking_general"] = 1.0
+
     return scores
 
 
@@ -1106,6 +1140,8 @@ def score_measurement(msm, matches) -> dict:
             return score_measurement_facebook_messenger(msm)
         if tn == "http_header_field_manipulation":
             return score_measurement_hhfm(msm)
+        if tn == "http_invalid_request_line":
+            return score_http_invalid_request_line(msm)
         if tn == "whatsapp":
             return score_measurement_whatsapp(msm)
         if tn == "vanilla_tor":

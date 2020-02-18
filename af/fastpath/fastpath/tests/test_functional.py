@@ -64,7 +64,6 @@ def cans():
         dash_2019_10_27="2019-10-27/dash.0.tar.lz4",
         dash_2019_10_28="2019-10-28/dash.0.tar.lz4",
         dash_2019_10_29="2019-10-29/dash.0.tar.lz4",
-        hirl_2019_10_26="2019-10-26/http_invalid_request_line.0.tar.lz4",
         meek_2019_10_26="2019-10-26/meek_fronted_requests_test.0.tar.lz4",
         meek_2019_10_27="2019-10-27/meek_fronted_requests_test.0.tar.lz4",
         meek_2019_10_28="2019-10-28/meek_fronted_requests_test.0.tar.lz4",
@@ -901,3 +900,88 @@ def test_score_psiphon(cans):
 
 
 # See test_score_tor() in test_unit.py
+#
+
+
+def test_score_http_invalid_request_line_1():
+    # https://github.com/ooni/pipeline/issues/294
+    # https://explorer.ooni.org/measurement/20190411T192031Z_AS12353_JcA0e4AwUYYzR8aSXkoOiPGSiSmG8naeMOYnOPisECTr5bqelw
+    # AdGuard
+    fn = "fastpath/tests/data/mbx-1.json"
+    with open(fn) as f:
+        msm = ujson.load(f)
+    matches = []
+    scores = fp.score_measurement(msm, [])
+    assert scores == {
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
+def test_score_http_invalid_request_line_2():
+    # https://github.com/ooni/pipeline/issues/293
+    # https://explorer.ooni.org/measurement/20181223T053541Z_AS37211_Vjr633mrbpd5UwOkZXid7U8QnwdDILnDu63UTFd1gE7zR4gnhN
+    fn = "fastpath/tests/data/mbx-2.json"
+    with open(fn) as f:
+        msm = ujson.load(f)
+    matches = []
+    scores = fp.score_measurement(msm, [])
+    assert scores == {
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
+def test_score_http_invalid_request_line():
+    optional = frozenset(
+        (
+            "backend_version",
+            "bucket_date",
+            "id",
+            "input",
+            "input_hashes",
+            "options",
+            "probe_city",
+            "report_filename",
+            "resolver_asn",
+            "resolver_ip",
+            "resolver_network_name",
+            "test_helpers",
+        )
+    )
+    always_present = frozenset(
+        (
+            "annotations",
+            "data_format_version",
+            "measurement_start_time",
+            "probe_asn",
+            "probe_cc",
+            "probe_ip",
+            "report_id",
+            "software_name",
+            "software_version",
+            "test_keys",
+            "test_name",
+            "test_runtime",
+            "test_start_time",
+            "test_version",
+        )
+    )
+    allkeys = optional | always_present
+    for can_fn, msm in s3msmts("http_invalid_request_line", date(2019, 12, 3), date(2019, 12, 5)):
+        assert msm["test_name"] == "http_invalid_request_line"
+        for k in msm:
+            assert k in allkeys
+        for k in always_present:
+            assert k in msm
+        scores = fp.score_measurement(msm, [])
+        rid = msm["report_id"]
+        if rid == "20191203T020321Z_AS21502_wcb1ieBo7mO2vffn2FOlQW2oPw4QiaOoLiYGWoecyV5aQQaMGm":
+            # failure
+            assert scores["accuracy"] == 0.0
