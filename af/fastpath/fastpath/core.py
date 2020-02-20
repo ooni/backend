@@ -494,6 +494,26 @@ def score_measurement_facebook_messenger(msm):
     return scores
 
 
+def _extract_tcp_connect(tk):
+    # https://github.com/ooni/spec/blob/master/data-formats/df-005-tcpconnect.md
+    # NOTE: this is *NOT* ts-008-tcp-connect.md
+    # First the probe tests N TCP connections
+    tcp_connect = tk.get("tcp_connect", [])
+    accessible_endpoints = 0
+    unreachable_endpoints = 0
+    for entry in tcp_connect:
+        s = entry.get("status", {})
+        success = s.get("success", None)
+        if success is True:
+            accessible_endpoints += 1
+        elif success is False:
+            unreachable_endpoints += 1
+        else:
+            pass  # unknown
+
+    return accessible_endpoints, unreachable_endpoints
+
+
 @metrics.timer("score_measurement_telegram")
 def score_measurement_telegram(msm):
     """Calculate measurement scoring for Telegram.
@@ -511,19 +531,7 @@ def score_measurement_telegram(msm):
         # unknown
         web_blocking = None
 
-    # First the probe tests N TCP connections
-    tcp_connect = tk.get("tcp_connect", [])
-    accessible_endpoints = 0
-    unreachable_endpoints = 0
-    for entry in tcp_connect:
-        s = entry.get("status", {})
-        success = s.get("success", None)
-        if success is True:
-            accessible_endpoints += 1
-        elif success is False:
-            unreachable_endpoints += 1
-        else:
-            pass  # unknown
+    accessible_endpoints, unreachable_endpoints = _extract_tcp_connect(tk)
 
     # Then the probe tests N HTTP connections
     http_success_cnt = 0
@@ -660,39 +668,41 @@ def score_measurement_whatsapp(msm):
     """Calculate measurement scoring for Whatsapp.
     Returns a scores dict
     """
+    # https://github.com/ooni/spec/blob/master/nettests/ts-018-whatsapp.md
     # TODO: check data_format_version?
 
     score = 0
     tk = msm["test_keys"]
-    msg = ""
-    for req in msm.get("requests", []):
-        if "X-FB-TRIP-ID" not in req.get("response", {}).get("headers", {}):
-            score += 0.2
-            msg += "Missing HTTP header"
 
-    # del msm
-    if tk.get("registration_server_status", "ok") != "ok":
-        score += 0.2
-    if tk.get("whatsapp_web_failure", None) != None:
-        score += 0.2
-    if tk.get("whatsapp_endpoints_status", "ok") != "ok":
-        score += 0.2
-    if tk.get("whatsapp_web_status", "ok") != "ok":
-        # TODO: recalculate using HTML body title
-        score += 0.2
-    if tk.get("whatsapp_endpoints_dns_inconsistent", []) != []:
-        score += 0.2
-    if tk.get("whatsapp_endpoints_blocked", []) != []:
-        score += 0.2
+    # msg = ""
+    # for req in msm.get("requests", []):
+    #    if "X-FB-TRIP-ID" not in req.get("response", {}).get("headers", {}):
+    #        score += 0.2
+    #        msg += "Missing HTTP header"
 
-    registration_server_failure = tk.get("registration_server_failure", None)
-    if registration_server_failure is not None:
-        if registration_server_failure.startswith("unknown_failure"):
-            # Client error
-            # TODO: implement confidence = 0
-            score = 0
-        else:
-            score += 0.2
+    # Disabled due to bug in the probe https://github.com/ooni/probe-engine/issues/341
+    # if tk.get("registration_server_status", "ok") != "ok":
+    #     score += 0.2
+    # if tk.get("whatsapp_web_failure", None) != None:
+    #     score += 0.2
+    # if tk.get("whatsapp_endpoints_status", "ok") != "ok":
+    #     score += 0.2
+    # if tk.get("whatsapp_web_status", "ok") != "ok":
+    #     # TODO: recalculate using HTML body title
+    #     score += 0.2
+    # if tk.get("whatsapp_endpoints_dns_inconsistent", []) != []:
+    #     score += 0.2
+    # if tk.get("whatsapp_endpoints_blocked", []) != []:
+    #     score += 0.2
+
+    # registration_server_failure = tk.get("registration_server_failure", None)
+    # if registration_server_failure is not None:
+    #    if registration_server_failure.startswith("unknown_failure"):
+    #        # Client error
+    #        # TODO: implement confidence = 0
+    #        score = 0
+    #    else:
+    #        score += 0.2
 
     if (
         msm.get("software_name", "") == "ooniprobe"
@@ -705,7 +715,59 @@ def score_measurement_whatsapp(msm):
             score = 0
 
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
-    scores["blocking_general"] = score
+    wf = tk.get("whatsapp_web_failure", "")
+    if wf and "unknown_failure 'ascii' co" in wf:
+        assert msm["report_id"]
+        scores["accuracy"] = 0.0
+        return scores
+
+    if not tk.get("requests", []):
+        assert msm["report_id"]
+        scores["accuracy"] = 0.0
+        return scores
+
+    # TODO: carve out in a general function
+    webapp_accessible = None
+    registration_accessible = None
+    for b in tk.get("requests", []):
+        url = b.get("request", {}).get("url", "")
+        if url == "https://web.whatsapp.com/":
+            webapp_accessible = b.get("failure", True) in (None, "", False)
+            # TODO: handle cases where the certificate is invalid or the page
+            # has unexpected contents
+            # Also note bug https://github.com/ooni/probe-legacy/issues/60
+
+        # TODO: handle elif url == "http://web.whatsapp.com/":
+
+        elif url == "https://v.whatsapp.net/v2/register":
+            # In case of connection failure "response" might be empty
+            registration_accessible = b.get("failure", None) == None
+
+    if webapp_accessible is None or registration_accessible is None:
+        # bug e.g. 20190101T191128Z_AS34594_ZCyS8OE3SSvRwLeuiAeiklVZ8H91hEfY0Ook7ljgfotgpQklhv
+        scores["accuracy"] = 0.0
+        return scores
+
+    if webapp_accessible is not True or registration_accessible is not True:
+        scores["blocking_general"] = 1.0
+        return scores
+
+    accessible_endpoints, unreachable_endpoints = _extract_tcp_connect(tk)
+    if not accessible_endpoints and not unreachable_endpoints:
+        scores["accuracy"] = 0.0
+
+    elif accessible_endpoints > 0:
+        pass  # we call it OK
+
+    else:
+        scores["blocking_general"] = 1.0
+
+    scores["analysis"] = dict(
+        registration_server_accessible=registration_accessible,
+        whatsapp_web_accessible=webapp_accessible,
+        whatsapp_endpoints_accessible=accessible_endpoints > 0,
+    )
+
     return scores
 
 
@@ -801,6 +863,8 @@ def score_tcp_connect(msm) -> dict:
     """Calculate measurement scoring for tcp connect
     Returns a scores dict
     """
+    # https://github.com/ooni/spec/blob/master/nettests/ts-008-tcp-connect.md
+    # NOTE: this is *NOT* spec/blob/master/data-formats/df-005-tcpconnect.md
     # TODO: review scores
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     tk = msm["test_keys"]
@@ -826,6 +890,7 @@ def score_tcp_connect(msm) -> dict:
         scores["blocking_general"] = 0.8
         return scores
 
+    # TODO: add missing error type
     scores["blocking_general"] = 1.0
     return scores
 
@@ -975,7 +1040,6 @@ def score_tor(msm) -> dict:
 
         if d["failure"] != None:
             scores["blocking_general"] = 1.0
-
 
     return scores
 

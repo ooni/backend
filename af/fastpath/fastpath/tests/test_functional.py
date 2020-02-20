@@ -48,7 +48,6 @@ def cans():
         facebook_messenger="2019-08-29/facebook_messenger.0.tar.lz4",
         facebook_messenger2="2019-10-29/facebook_messenger.0.tar.lz4",
         # telegram="2019-08-29/20190829T105210Z-IR-AS31549-telegram-20190829T105214Z_AS31549_t32ZZ5av3B6yNruRIFhCnuT1dHTnwPk7vwIa9F0TAe064HG4tk-0.2.0-probe.json",
-        # whatsapp="2019-06-15/20190615T070248Z-ET-AS24757-whatsapp-20190615T070253Z_AS24757_gRi6dhAqgWa7Yp4tah4LX6Rl1j6c8kJuja3OgZranEpMicEj2p-0.2.0-probe.json",
         # fb="2019-06-27/20190627T214121Z-ET-AS24757-facebook_messenger-20190627T214126Z_AS24757_h8g9P5kTmmzyX1VyOjqcVonIbFNujm84l2leMCwC2gX3BI78fI-0.2.0-probe.json",
         hhfm_2019_10_26="2019-10-26/http_header_field_manipulation.0.tar.lz4",
         hhfm_2019_10_27="2019-10-27/http_header_field_manipulation.0.tar.lz4",
@@ -225,7 +224,8 @@ def test_telegram(cans):
     can = cans["telegram"]
     for msm_n, msm in load_can(can):
         scores = fp.score_measurement(msm, [])
-        if msm["report_id"] == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
+        rid = msm["report_id"]
+        if rid == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
             assert scores == {
                 "blocking_general": 1.5,
                 "blocking_global": 0.0,
@@ -239,7 +239,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
             }, msm
 
-        elif msm["report_id"] == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r":
+        elif rid == "20190829T205910Z_AS45184_0TVMQZLWjkfOdqA5b5nNF1XHrafTD4H01GnVTwvfzfiLyLc45r":
             assert scores == {
                 "blocking_general": 1.0,
                 "blocking_global": 0.0,
@@ -253,7 +253,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 0,
                 "msg": "Telegam failure: connection_reset",
             }
-        elif msm["report_id"] == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM":
+        elif rid == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM":
             assert scores == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
@@ -267,7 +267,7 @@ def test_telegram(cans):
                 "http_failure_cnt": 10,
                 "msg": "Telegam failure: generic_timeout_error",
             }
-        elif msm["report_id"] == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz":
+        elif rid == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz":
             assert scores == {
                 "blocking_general": 3.0,
                 "blocking_global": 0.0,
@@ -287,33 +287,58 @@ def test_whatsapp(cans):
     can = cans["whatsapp"]
     debug = False
     for msm_n, msm in load_can(can):
+        rid = msm["report_id"]
         scores = fp.score_measurement(msm, [])
-        if msm["report_id"] == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
-            assert scores == {
-                "blocking_general": 0.8,
-                "blocking_global": 0.0,
-                "blocking_country": 0.0,
-                "blocking_isp": 0.0,
-                "blocking_local": 0.0,
-            }, msm
+        if rid == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
+            # empty test_keys -> requests
+            log.error(scores)
+            assert scores == {'accuracy': 0.0,
+                  'blocking_country': 0.0,
+                  'blocking_general': 0.0,
+                  'blocking_global': 0.0,
+                  'blocking_isp': 0.0,
+                  'blocking_local': 0.0}
 
-        if msm["report_id"] == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr":
+        elif rid == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr":
             # The probe is reporting a false positive: due to the empty client headers
             # it hits https://www.whatsapp.com/unsupportedbrowser
-            print_msm(msm)
             assert scores == {
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
+                'analysis': {
+                    'registration_server_accessible': True,
+                    'whatsapp_endpoints_accessible': True,
+                    'whatsapp_web_accessible': True
+                },
             }, msm
+
+        # TODO: investigate
+        # rid == "20190829T021242Z_AS7575_4Us58f7iaQ6jshRAoGVCXggTqtuV5wLNlkp33GJJS4H8Wg7ssV":
+        # rid == "20190829T022402Z_AS9009_5zr5RWPkzRPEG0bhEFoWEEi6QB0arZ4qTO72b5iaKwdo6gzLEw":
 
         # To inspect the test dataset for false positives run this:
         if debug and scores["blocking_general"] > 0:
             print_msm(msm)
             print(scores)
             raise Exception("debug")
+
+
+def test_whatsapp_probe_bug(cans):
+    # https://github.com/ooni/probe-engine/issues/341
+    debug = False
+    for can_fn, msm in s3msmts("whatsapp", date(2020, 1, 1), date(2020, 1, 10)):
+        scores = fp.score_measurement(msm, [])
+        assert scores["blocking_general"] in (0.0, 1.0)
+        if "analysis" in scores:
+            assert scores["analysis"]["whatsapp_web_accessible"] in (True, False), ujson.dumps(msm, indent=1, sort_keys=True)
+            if debug and scores["blocking_general"] > 0:
+                print_msm(msm)
+                print(scores)
+                raise Exception("debug")
+
 
 
 def test_facebook_messenger(cans):
