@@ -271,7 +271,7 @@ fingerprints = {
         },
         # https://explorer.ooni.org/measurement/20170826T071505Z_AS24526_40Tlz7tR7m0UVaTRZi5EUtsuAjHnYuAgDlNjkec64t70Tujbo9?input=http:%2F%2Fwww.budweiser.com
         {
-            "body_match": '<title>Blocked Page Bina Nusantara Networks</title>'
+            "body_match": '<title>Blocked Page Bina Nusantara Networks</title>',
             "locality": "isp",
         },
     ],
@@ -321,7 +321,7 @@ fingerprints = {
         # The following is not necessarily a blockpage
         # https://explorer.ooni.org/measurement/3N5bdjWAdVjZubaIyAxCCAg0HiZYWfT1YLgz6cI0zRq1XTjHzBmGg49AbRxOGILi?input=http:%2F%2Fwarc.jalb.de
         {
-            "header_full": "WebProxy/1.0 Pre-Alpha"
+            "header_full": "WebProxy/1.0 Pre-Alpha",
             "header_name": "Server",
             "locality": "local",
         }
@@ -453,7 +453,7 @@ fingerprints = {
         {
             "body_match": "<title>Acesso bloqueado por entidade judici&aacute;ria</title>",
             "locality": "isp"
-        }
+        },
         {
             "header_full": "http://mobilegen.vodafone.pt/denied/dn",
             "header_name": "Location",
@@ -498,7 +498,7 @@ fingerprints = {
         {
             "body_match": "<iframe src=\"http://subblock.mts.ru/api",
             "locality": "isp"
-        }
+        },
         # https://explorer.ooni.org/measurement/20180315T174422Z_AS12688_7Iy8vwd6JYREOl2E6E1PJnNeCVGVKlORQNYhUJ2tKyiWjaEFkY?input=http:%2F%2Fmaidanua.org%2F
         # {"dns_match": "62.33.207.196", "locality": "country"},
         # {"dns_match": "62.33.207.197", "locality": "country"},
@@ -546,7 +546,7 @@ fingerprints = {
             "header_prefix": "http://196.29.164.27/ntc/ntcblock.html",
             "header_name": "Location",
             "locality": "isp"
-        }
+        },
         # https://explorer.ooni.org/measurement/20181223T053338Z_AS37211_SNSyW5GQvxWDuQ2tQpJNZKqK5IyQFfXAVgTQynYjVzUvZn2FDK?input=http:%2F%2Fwww.bglad.com
         {
             "body_match": "<title>gateprotect Content Filter Message</title>",
