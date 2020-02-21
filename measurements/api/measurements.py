@@ -601,10 +601,13 @@ def list_measurements(
             literal_column(f"fp.{colname}"), literal_column(f"mr.{colname}")
         ).label(colname)
 
+    # Merge data from mr_table and fastpath.
+    # Most of the time we prefer data from fastpath, using coal().
+    # For measurement_id, we prefer mr_table. See test_list_measurements_shared
     merger = [
         coal("test_start_time"),
         coal("measurement_start_time"),
-        coal("measurement_id"),
+        func.coalesce(literal_column("mr.measurement_id"), literal_column("fp.measurement_id")).label("measurement_id"),
         func.coalesce(literal_column("mr.m_report_no"), 0).label("m_report_no"),
         coal("anomaly"),
         coal("confirmed"),

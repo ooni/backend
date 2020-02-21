@@ -92,12 +92,12 @@ def fastpath_rid_input(app):
         return rid, inp
 
     sql = """
-    SELECT report_id, input FROM fastpath
+    SELECT report_id, input, test_start_time FROM fastpath
     WHERE input IS NOT NULL
     ORDER BY measurement_start_time DESC
     LIMIT 1
     """
-    rid, inp = dbquery(app, sql)[0:2]
+    rid, inp, test_start_time = dbquery(app, sql)[0:3]
     assert rid.strip()
     assert inp.strip()
 
@@ -109,7 +109,7 @@ def fastpath_rid_input(app):
     cnt = dbquery(app, check)[0]
     assert cnt == 0
 
-    return (rid, inp)
+    return (rid, inp, test_start_time)
 
 
 @pytest.fixture()
@@ -129,14 +129,14 @@ def nonfastpath_rid_input(app):
 
 @pytest.fixture()
 def shared_rid_input(app):
-    """Access DB directly. Get a random msmt
-    that has a match both in the measurement and fastpath tables
-    Returns (rid, input)
+    """Access DB directly. Get a random msmt that has a match both in the
+    measurement and fastpath tables. Returns (rid, input)
     """
     sql = """
     SELECT
         fastpath.report_id,
-        fastpath.input
+        fastpath.input,
+        test_start_time
     FROM fastpath
     WHERE input IS NOT NULL
     AND fastpath.report_id IS NOT NULL
@@ -149,11 +149,11 @@ def shared_rid_input(app):
     )
     LIMIT 1
     """
-    since = datetime.utcnow() - timedelta(days=7)
-    rid, inp = dbquery(app, sql, since=since)[0:2]
+    since = datetime.utcnow() - timedelta(days=3)
+    rid, inp, test_start_time = dbquery(app, sql, since=since)[0:3]
     assert rid.strip()
     assert inp.strip()
-    return rid, inp
+    return rid, inp, test_start_time
 
 
 @pytest.fixture()
@@ -409,9 +409,7 @@ def test_list_measurements_slow_order_by_complete(
     response = api(client, url)
 
 
-@pytest.mark.parametrize(
-    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
-)
+@pytest.mark.parametrize("f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity"))
 def test_list_measurements_slow_order_by_group_1(f, log, client):
     # filter on probe_cc or probe_asn or test_name
     # order by --> "test_start_time"
@@ -440,9 +438,6 @@ def test_list_measurements_slow_order_by_group_3(f1, f2, log, client):
     url = f"measurements?until=2019-01-01&{f1}&{f2}"
     log.info(url)
     response = api(client, url)
-
-
-# # end
 
 
 def test_list_measurements_duplicate(client):
@@ -486,7 +481,7 @@ def test_list_measurements_pagination_new(client, log):
 def test_list_measurements_fastpath(client, fastpath_rid_input):
     """Get a fresh msmt from fastpath
     """
-    rid, inp = fastpath_rid_input
+    rid, inp, test_start_time = fastpath_rid_input
     p = f"measurements?report_id={rid}&input={inp}"
     response = api(client, p)
     # This has collisions with data in the traditional pipeline
@@ -523,8 +518,10 @@ WHERE
    2637 | t       | t         | t
     """
     since, until = today_range()
-    p = f"measurements?since={since}&until={until}&anomaly={anomaly}" + \
-        f"&confirmed={confirmed}&failure={failure}&limit=100"
+    p = (
+        f"measurements?since={since}&until={until}&anomaly={anomaly}"
+        + f"&confirmed={confirmed}&failure={failure}&limit=100"
+    )
     p = p.lower()
     log.info("Calling %s", p)
     response = api(client, p)
@@ -536,7 +533,6 @@ WHERE
     i = anomaly * 4 + confirmed * 2 + failure * 1
     thresholds = [10, 100, 0, 0, 10, 10, 0, 10]
     assert len(response["results"]) >= thresholds[i]
-
 
 
 # Notice: the decorators must be in inversed order
@@ -555,8 +551,10 @@ def test_list_measurements_filter_flags_pipeline(anomaly, confirmed, failure, cl
         ORDER BY anomaly, confirmed, failure;
     """
 
-    p = f"measurements?since=2019-01-01&until=2019-02-01&anomaly={anomaly}" + \
-        f"&confirmed={confirmed}&failure={failure}&limit=100"
+    p = (
+        f"measurements?since=2019-01-01&until=2019-02-01&anomaly={anomaly}"
+        + f"&confirmed={confirmed}&failure={failure}&limit=100"
+    )
     p = p.lower()
     log.info("Calling %s", p)
     response = api(client, p)
@@ -623,6 +621,24 @@ def test_list_measurements_failure_false_fastpath(client):
     assert len(response["results"]) == 50
     for r in response["results"]:
         assert r["failure"] == False, r
+
+
+def test_list_measurements_shared(client, shared_rid_input, log):
+    # A msmt both in mr_table and fastpath should have measurement_id from
+    # mr_table and not from fastpath in order to use data from S3 and allow
+    # deleting JSON files on the fastpath host
+    rid, inp, test_start_time = shared_rid_input
+    since = test_start_time
+    until = since + timedelta(seconds=100)
+    url = f"measurements?since={since}&until={until}&input={inp}&limit=5"
+    response = api(client, url)
+    results = [r for r in response["results"] if r["report_id"] == rid and r["input"] == inp]
+    assert results
+    for r in results:
+        m = r["measurement_id"]
+        assert "temp-fid" not in m
+        assert "temp-id" in m
+
 
 
 # category_code support: briefly tested by adding this to
@@ -695,7 +711,7 @@ def test_get_measurement_fastpath(log, client, fastpath_rid_input):
     traditional pipeline
     """
     # Get a real rid/inp directly from the database
-    rid, inp = fastpath_rid_input
+    rid, inp, test_start_time = fastpath_rid_input
 
     # This has collisions with data from the traditional pipeline
     p = f"measurements?report_id={rid}&input={inp}"
@@ -730,7 +746,7 @@ def test_get_measurement_joined_single(log, client, shared_rid_input):
     in the traditional pipeline
     """
     # Get a real rid/inp directly from the database
-    rid, inp = shared_rid_input
+    rid, inp, _ = shared_rid_input
 
     # The rid/inp have entries both in fastpath and in the traditional pipeline
     p = f"measurements?report_id={rid}&input={inp}"
