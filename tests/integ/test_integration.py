@@ -813,6 +813,20 @@ def test_bug_278_with_input_not_none(client):
         assert r["input"].startswith("http")
 
 
+def test_bug_list_measurements_anomaly_coalesce(client):
+    # list_measurements coalesce was giving priority to mr_table over fastpath
+    url = "measurements?report_id=20200222T165239Z_AS24691_5WcQoZyep2HktNd8UvKf1Ka4C3WPyOc9AQP79zoJ7oPgyDwSWh"
+    response = api(client, url)
+    assert len(response["results"]) == 1
+    r = response["results"][0]
+    assert r["scores"]["blocking_general"] > 0.5
+    assert not r["scores"]["analysis"]["whatsapp_endpoints_accessible"]
+
+    assert not r["confirmed"]
+    assert not r["failure"]
+    assert r["anomaly"]
+
+
 def test_list_measurements_external_order_by(client):
     # The last order-by on the rows from pipeline + fastpath
     today = datetime.utcnow().date()
