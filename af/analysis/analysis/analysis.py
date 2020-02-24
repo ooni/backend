@@ -71,6 +71,10 @@ import seaborn as sns  # debdeps: python3-seaborn
 
 from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 
+# Imported from the fastpath package
+from fastpath import domain_input as domain_input_updater
+
+
 # Global conf
 conf = Namespace()
 
@@ -1079,8 +1083,16 @@ def monitor_measurement_creation(conf):
                         for query_name, sql in queries.items():
                             cur.execute(sql, times)
                             val = cur.fetchone()[0]
-                            log.info("MMC: %s %s %s %d", times["since"], times["until"], query_name, val)
-                            gauge_family.labels(f"{query_name}_{age_in_days}_days_ago").set(val)
+                            log.info(
+                                "MMC: %s %s %s %d",
+                                times["since"],
+                                times["until"],
+                                query_name,
+                                val,
+                            )
+                            gauge_family.labels(
+                                f"{query_name}_{age_in_days}_days_ago"
+                            ).set(val)
 
                 prom.write_to_textfile(nodeexp_path, prom_reg)
 
@@ -1100,6 +1112,27 @@ def monitor_measurement_creation(conf):
                 if has_systemd:
                     watchdog.notify("WATCHDOG=1")
                 time.sleep(10)
+
+
+def domain_input_update_runner():
+    """Runs domain_input_updater every 2 hours.
+    Spawn a domain_input_updater.run() thread for each run.
+    """
+    def _runner():
+        conf = Namespace(dry_run=False, db_uri=None)
+        with metrics.timer("domain_input_updater_runtime"):
+            log.info("domain_input_updater: starting")
+            try:
+                domain_input_updater.run(conf)
+                metrics.gauge("domain_input_updater_success", 1)
+                log.info("domain_input_updater: success")
+            except Exception as e:
+                metrics.gauge("domain_input_updater_success", 0)
+                log.error("domain_input_updater: failure %r", e)
+
+    while True:
+        Thread(target=_runner).start()
+        time.sleep(3600 * 2)
 
 
 def main():
@@ -1126,8 +1159,10 @@ def main():
     )
     os.makedirs(conf.output_directory, exist_ok=True)
 
-    t = Thread(target=monitor_measurement_creation, args=(conf, ))
+    t = Thread(target=monitor_measurement_creation, args=(conf,))
     t.start()
+
+    Thread(target=domain_input_update_runner).start()
 
     log.info("Starting generate_slow_query_summary loop")
     while True:

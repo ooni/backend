@@ -165,6 +165,12 @@ def rebuild_domain_input_table(conf):
     log.info("domain_input is ready")
 
 
+def run(conf) -> None:
+    db.setup(conf)
+    rebuild_citizenlab_table_from_citizen_lab_lists(conf)
+    rebuild_domain_input_table(conf)
+
+
 def main():
     logf = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=logf)
@@ -175,9 +181,8 @@ def main():
         "--dry-run", action="store_true", help="Rollback instead of committing"
     )
     conf = ap.parse_args()
-    db.setup(conf)
-    rebuild_citizenlab_table_from_citizen_lab_lists(conf)
-    rebuild_domain_input_table(conf)
+    run(conf)
 
 
-main()
+if __name__ == "__main__":
+    main()
