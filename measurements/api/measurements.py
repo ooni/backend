@@ -390,6 +390,8 @@ def list_measurements(
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
+    INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
+
     ## Create measurement+report colums for SQL query
     cols = [
         # sql.text("measurement.input_no"),
@@ -412,7 +414,7 @@ def list_measurements(
         literal_column("report.probe_asn").label("probe_asn"),
         literal_column("report.test_name").label("test_name"),
         literal_column("report.report_no").label("report_no"),
-        literal_column("domain_input.input").label("input"),
+        func.coalesce(sql.text("domain_input.input"), INULL).label("input"),
     ]
 
     ## Create fastpath columns for query
@@ -430,7 +432,7 @@ def list_measurements(
         literal_column("probe_cc"),
         literal_column("probe_asn"),
         literal_column("test_name"),
-        literal_column("fastpath.input").label("input"),
+        func.coalesce(sql.text("fastpath.input"), INULL).label("input"),
     ]
 
     mrwhere = []
