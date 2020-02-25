@@ -626,7 +626,6 @@ def list_measurements(
     # offset
     fob = text("{} {}".format(order_by, order))
     query = select(merger).select_from(j).order_by(fob).offset(offset).limit(limit)
-    log.info(query)
 
     with sentry.configure_scope() as scope:
         # Set query (without params) in Sentry scope for the rest of the API call
