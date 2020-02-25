@@ -283,40 +283,14 @@ def get_measurement(measurement_id, download=None):
     return response
 
 
-def _merge_two_results(a, b):
-    """Merge 2 measurements. Collect useful fields from traditional pipeline
-    and fastpath
-    """
-    if a["scores"] and b["scores"]:
-        # both a and b are fastpath: ignore b
-        return a
-
-    if a["scores"]:
-        # merge in useful fields from traditional (b) into a
-        for f in ("anomaly", "confirmed"):
-            a[f] = b[f]
-        return a
-
-    if b["scores"]:
-        # merge in useful fields from fastpath (b) into a
-        for f in ("scores", "measurement_url", "measurement_id"):
-            a[f] = b[f]
-        return a
-
-    # both traditional, ignore b
-    return a
-
-
 def _merge_results(tmpresults):
-    """Merge list_measurements() outputs from traditional pipeline and fastpath
+    """Trim list_measurements() outputs that share the same report_id/input
     """
     resultsmap = {}
     for r in tmpresults:
         k = (r["report_id"], r["input"])
         if k not in resultsmap:
             resultsmap[k] = r
-        else:
-            resultsmap[k] = _merge_two_results(resultsmap[k], r)
 
     return tuple(resultsmap.values())
 
@@ -669,9 +643,15 @@ def list_measurements(
 
         raise exc
 
-    # For each report_id / input tuple, we want at most one entry from the
-    # traditional pipeline and one from fastpath, merged together
+    # For each report_id / input tuple, we want at most one entry. Measurements
+    # from mr_table and fastpath has already been merged by the FULL OUTER JOIN
+    # but we have duplicate msmts sharing the same report_id / input.
     results = _merge_results(tmpresults)
+
+    # Replace the special value INULL for "input" with None
+    for i, r in enumerate(results):
+        if r["input"] == INULL:
+            results[i]["input"] = None
 
     pages = -1
     count = -1

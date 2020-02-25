@@ -38,7 +38,8 @@ def db_safety_check():
 @pytest.fixture()
 def fastpath_dup_rid_input(app):
     """
-    Access DB directly
+    Access DB directly. Fetch > 1 measurements from fastpath that share the same
+    report_id and input
     Returns (rid, input, count)
     """
     sql = """
@@ -185,6 +186,36 @@ def shared_rid_input_multi(app):
     assert rid.strip()
     assert inp.strip()
     return rid, inp
+
+
+@pytest.fixture()
+def shared_rid_multi_input_null(app):
+    """Access DB directly. Get a set of msmt that have a match both in the
+    measurement and fastpath tables and input = NULL.
+    Returns rid
+    """
+    sql = """
+    SELECT
+        fastpath.report_id
+    FROM fastpath
+    WHERE input IS NULL
+    AND fastpath.test_start_time > :since
+    AND fastpath.report_id IS NOT NULL
+    AND test_name != 'web_connectivity'
+    AND EXISTS (
+        SELECT
+        FROM report
+        WHERE report.report_id = fastpath.report_id
+        AND report.test_start_time > :since
+    )
+    GROUP BY fastpath.report_id, fastpath.input
+    HAVING count(*) > 1
+    LIMIT 1
+    """
+    since = datetime.utcnow() - timedelta(days=3)
+    rid = dbquery(app, sql, since=since)[0]
+    assert rid.strip()
+    return rid
 
 
 def api(client, subpath):
@@ -746,6 +777,42 @@ def test_get_measurement_joined_multi(log, client, shared_rid_input_multi):
 
     # Assure the correct msmt was received
     msm = api(client, relurl)
+    for f in ("probe_asn", "probe_cc", "report_id", "input", "test_name"):
+        # (measurement_start_time differs in the timezone letter)
+        assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
+
+
+@pytest.mark.get_measurement
+def test_get_measurement_joined_multi_input_null(log, client, shared_rid_multi_input_null):
+    """Simulate Explorer behavior
+    Get a measurement that has an entry in the fastpath table and also
+    in the traditional pipeline
+    """
+    # Get a real rid directly from the database
+    rid = shared_rid_multi_input_null
+    assert isinstance(rid, str)
+
+    # The rid has entries both in fastpath and in the traditional pipeline
+    p = f"measurements?report_id={rid}"
+    log.info("Calling API on %s", p)
+    response = api(client, p)
+    assert response["metadata"]["count"] > 0, jd(response)
+    assert len(response["results"]) == 1, jd(response)
+    pick = response["results"][0]
+    assert pick["input"] is None
+
+    url_substr = f"measurement/{FASTPATH_MSM_ID_PREFIX}"
+    assert url_substr in pick["measurement_url"]
+    assert "anomaly" in pick, pick.keys()
+    assert pick["scores"] != {}
+    assert "blocking_general" in pick["scores"]
+
+    url = pick["measurement_url"]
+    relurl = url[27:]
+    log.info("Calling API on %r", relurl)
+    msm = api(client, relurl)
+
+    # Assure the correct msmt was received
     for f in ("probe_asn", "probe_cc", "report_id", "input", "test_name"):
         # (measurement_start_time differs in the timezone letter)
         assert msm[f] == pick[f], "%r field: %r != %r" % (f, msm[f], pick[f])
