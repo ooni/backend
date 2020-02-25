@@ -21,4 +21,4 @@ config/secrets.env
 
 make.conf
 venv/
-.tox/
+.tox
