@@ -11,3 +11,5 @@ jobs:
       run: |
         docker build . --file Dockerfile --tag openobservatory/api:$(date '+%Y%m%d')-${GITHUB_SHA::8}
         docker push openobservatory/api:$(date '+%Y%m%d')-${GITHUB_SHA::8}
+    - name: Print the built image name
+      run: echo "Built and uploaded openobservatory/api:$(date '+%Y%m%d')-${GITHUB_SHA::8}"
