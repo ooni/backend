@@ -6,6 +6,7 @@ See README.adoc
 
 Lint using:
     black -t py37 -l 100 --fast  tests/integ/test_integration.py
+
 """
 
 from datetime import datetime, timedelta
@@ -246,6 +247,14 @@ def test_redirects_and_rate_limit(client):
     resp = client.get("/files/by_date", headers=headers)
     assert resp.status_code == 301
     assert int(resp.headers["X-RateLimit-Remaining"]) == limit
+
+    resp = client.get("/api/_/test_names", headers=headers)
+    assert resp.status_code == 200
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
+
+    resp = client.get("/api/_/test_names", headers=headers)
+    assert resp.status_code == 200
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 1
 
 
 def test_redirects_and_rate_limit_for_explorer(client):
