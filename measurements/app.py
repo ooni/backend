@@ -132,12 +132,14 @@ def create_app(*args, testmode=False, **kw):
     # Setup Database connector
     init_db(app)
 
-    # Setup throttling
+    # Setup rate limiting
+    # NOTE: the limits apply per-process. The number of processes is set in:
+    # https://github.com/ooni/sysadmin/blob/master/ansible/roles/ooni-measurements/tasks/main.yml
     app.limiter = flask_limiter.Limiter(
         app=app,
         key_func=extract_client_ipaddr_for_throttling,
         headers_enabled=True,
-        default_limits=["5500 per day", "400 per hour"],
+        default_limits=["1000 per month", "100 per hour"],
     )
 
     # Lazy setup of the prometheus metrics collection
