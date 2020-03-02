@@ -839,6 +839,11 @@ def score_web_connectivity(msm, matches) -> dict:
         delta = abs((tk["body_proportion"] or 1.0) - 1.0)
         scores["blocking_general"] += delta
 
+    if tk.get("http_experiment_failure", "").startswith("unknown_failure"):
+        # bug#351
+        log.debug("bug#351")
+        scores["accuracy"] = 0.0
+
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
     scores["blocking_general"] += (
         scores["blocking_country"]
