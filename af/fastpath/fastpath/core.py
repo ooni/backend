@@ -431,6 +431,20 @@ def logbug(id: int, desc: str, msm: dict):
         log.info("known_probe_bug: %s %s %s %s", sname, sversion, desc, url)
 
 
+def _detect_unknown_failure(tk):
+    """Any field ending with _failure can contain `unknown_failure ...`
+    due to failed msmt
+    """
+    for k in tk:
+        if k.endswith("_failure"):
+            v = tk[k] or ""
+            if v.startswith("unknown_failure"):
+                log.debug(f"unknown_failure in field {k}")
+                return True
+
+    return False
+
+
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm):
     tk = msm["test_keys"]
@@ -715,6 +729,10 @@ def score_measurement_whatsapp(msm):
             score = 0
 
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    # TODO: refactor
+    if _detect_unknown_failure(tk):
+        scores["accuracy"] = 0.0
+
     wf = tk.get("whatsapp_web_failure", "")
     if wf and "unknown_failure 'ascii' co" in wf:
         assert msm["report_id"]
@@ -839,9 +857,8 @@ def score_web_connectivity(msm, matches) -> dict:
         delta = abs((tk["body_proportion"] or 1.0) - 1.0)
         scores["blocking_general"] += delta
 
-    if tk.get("http_experiment_failure", "").startswith("unknown_failure"):
-        # bug#351
-        log.debug("bug#351")
+    # TODO: refactor
+    if _detect_unknown_failure(tk):
         scores["accuracy"] = 0.0
 
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
