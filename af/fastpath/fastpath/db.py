@@ -91,7 +91,7 @@ def upsert_summary(
         scores = excluded.scores,
         anomaly = excluded.anomaly,
         confirmed = excluded.confirmed,
-        msm_failure = excluded.msm_failure,
+        msm_failure = excluded.msm_failure
     """
     )
     sql_noupdate = " NOTHING"
