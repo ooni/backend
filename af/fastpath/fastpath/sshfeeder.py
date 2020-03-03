@@ -203,9 +203,11 @@ def log_ingestion_delay(msm_jstr, msm):
         now = datetime.datetime.utcnow()
         s = (now - st).total_seconds()
         if s < 0:
-            s = 0
-        metrics.gauge("ingestion_delay", s)
+            metrics.gauge("negative_ingestion_delay", -s)
+        else:
+            metrics.gauge("ingestion_delay", s)
     except:
+        log.warning("Failed to parse %r", msm.get("measurement_start_time", ""))
         pass
 
 
