@@ -1,3 +1,9 @@
+analysis (0.8) UNRELEASED; urgency=medium
+
+  * Coalesce NULL inputs used to compare entries in pipeline and fastpath
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 03 Mar 2020 20:07:44 +0000
+
 analysis (0.7) unstable; urgency=medium
 
   * Run domain_input_updater every 2 hours
