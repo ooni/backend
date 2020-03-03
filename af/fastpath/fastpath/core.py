@@ -426,7 +426,7 @@ def logbug(id: int, desc: str, msm: dict):
     sversion = msm.get("software_version", "unknown")
     if id > 0:
         # unknown, possibly new bug
-        log.warn("probe_bug %d: %s %s %s %s", id, sname, sversion, desc, url)
+        log.warning("probe_bug %d: %s %s %s %s", id, sname, sversion, desc, url)
     else:
         log.info("known_probe_bug: %s %s %s %s", sname, sversion, desc, url)
 
@@ -850,12 +850,31 @@ def score_web_connectivity(msm, matches) -> dict:
     #     # TODO: scan HTML body for title instead
 
     # body_proportion can be missing
-    if "body_proportion" in tk:
-        bp = tk["body_proportion"]
-        assert isinstance(bp, float), "pbug 2"
+    # Commented out to use the same logic as traditional pipeline
+    # TODO: enable it after doing statistics on body proportion
+    # http://www3.cs.stonybrook.edu/~phillipa/papers/JLFG14.pdf
+    # if "body_proportion" in tk:
+    #    bp = tk["body_proportion"]
+    #    delta = abs((tk["body_proportion"] or 1.0) - 1.0)
+    #    scores["blocking_general"] += delta
+
+    # TODO: refactor to apply to all test types
+    blocking_types = ("tcp_ip", "dns", "http-diff", "http-failure")
+    if "blocking" not in tk:
+        logbug(7, "missing blocking field", msm)
         scores["accuracy"] = 0.0
-        delta = abs((tk["body_proportion"] or 1.0) - 1.0)
-        scores["blocking_general"] += delta
+
+    elif tk["blocking"] in blocking_types:
+        scores["blocking_general"] = 1.0
+        scores["analysis"] = {"blocking_type": tk["blocking"]}
+
+    elif tk["blocking"] in (None, False):
+        pass
+
+    else:
+        logbug(7, "unexpected value for blocking", msm)
+        scores["analysis"] = {"msg": "Unsupported blocking type"}
+        scores["accuracy"] = 0.0
 
     # TODO: refactor
     if _detect_unknown_failure(tk):

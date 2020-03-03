@@ -130,7 +130,9 @@ def test_score_tor():
         "blocking_local": 0.0,
     }
 
+
 # # Bug tests
+
 
 def test_bug_backend351():
     # https://api.ooni.io/api/v1/measurement/temp-id-386770148
@@ -141,6 +143,23 @@ def test_bug_backend351():
     assert scores == {
         "accuracy": 0.0,
         "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
+def test_bug_backend352():
+    # https://github.com/ooni/backend/issues/352
+    # https://explorer.ooni.org/measurement/20200302T130853Z_AS197207_WIN8WWfSysccyZSG06Z5AaMJjSzrvxaq7UOiTnasi52k9D77T3?input=https%3A%2F%2Ffa.wikipedia.org
+    with open("fastpath/tests/data/bug_352.json") as f:
+        msm = ujson.load(f)
+    matches = []
+    scores = fp.score_measurement(msm, matches)
+    assert scores == {
+        "analysis": {"blocking_type": "dns"},
+        "blocking_general": 1.0,
         "blocking_global": 0.0,
         "blocking_country": 0.0,
         "blocking_isp": 0.0,

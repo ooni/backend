@@ -1,3 +1,9 @@
+fastpath (0.20) unstable; urgency=medium
+
+  * Handle blocking types in web_connectivity #352
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 02 Mar 2020 17:39:49 +0000
+
 fastpath (0.19) unstable; urgency=medium
 
   * Allow importing domain_input_updater

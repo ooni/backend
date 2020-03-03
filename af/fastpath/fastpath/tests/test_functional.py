@@ -560,7 +560,7 @@ def test_score_vanilla_tor(cans):
     assert 0.003 < avg < 0.004
 
 
-def test_score_web_connectivity(cans):
+def test_score_web_connectivity_simple(cans):
     debug = 0
     blocked = (
         "20191029T180431Z_AS50289_5IKNXzKJUvzKQqnlzU5r91F9KiCl1LfRlEBllZVbDHcDQg5TEt",
