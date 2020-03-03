@@ -134,9 +134,8 @@ def upsert_summary(
         cur.execute(tpl, args)
         if cur.rowcount == 0 and not update:
             metrics.incr("report_id_input_db_collision")
-            log.info(
-                "report_id / input collision %r %r", msm["report_id"], msm["input"]
-            )
+            inp = msm.get("input", "<no input>")
+            log.info(f"report_id / input collision {msm['report_id']} {inp}")
             return
 
         notification = {k: msm.get(k, None) for k in cols}
