@@ -1,0 +1,17 @@
+name: Fastpath CI
+on:
+  push:
+    # Run only on changes on fastpath
+    paths:
+      - 'af/fastpath/*'
+
+jobs:
+  build:
+    name: Greeting
+    # This job runs on Linux
+    runs-on: debian-buster
+    steps:
+      - name: Install deps
+        run: cd af/fastpath && apt-get build-dep -qy --no-install-recommends .
+      - name: Run tests
+        run: cd af/fastpath && pytest-3 -s --show-capture=no
