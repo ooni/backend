@@ -131,7 +131,12 @@ def upsert_summary(
     )
 
     with _autocommit_conn.cursor() as cur:
-        cur.execute(tpl, args)
+        try:
+            cur.execute(tpl, args)
+        except psycopg2.ProgrammingError:
+            log.error("upsert syntax error in %r", tpl, exc_info=True)
+            return
+
         if cur.rowcount == 0 and not update:
             metrics.incr("report_id_input_db_collision")
             inp = msm.get("input", "<no input>")
