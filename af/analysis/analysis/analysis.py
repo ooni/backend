@@ -1003,7 +1003,7 @@ def monitor_measurement_creation(conf):
             AND measurement_start_time <= %(until_ext)s
             AND fp.report_id = report.report_id
             AND fp.test_name = report.test_name
-            AND COALESCE(fp.input, '') = COALESCE(input.input, ''))
+            AND COALESCE(fp.input, '') = COALESCE(input.input, '')
         )
         AND measurement_start_time > %(since)s
         AND measurement_start_time <= %(until)s
@@ -1019,7 +1019,7 @@ def monitor_measurement_creation(conf):
             AND measurement_start_time <= %(until_ext)s
             AND fp.report_id = report.report_id
             AND fp.test_name = report.test_name
-            AND COALESCE(fp.input, '') = COALESCE(input.input, ''))
+            AND COALESCE(fp.input, '') = COALESCE(input.input, '')
         )
         AND measurement_start_time > %(since)s
         AND measurement_start_time <= %(until)s
