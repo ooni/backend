@@ -292,12 +292,14 @@ def test_whatsapp(cans):
         if rid == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
             # empty test_keys -> requests
             log.error(scores)
-            assert scores == {'accuracy': 0.0,
-                  'blocking_country': 0.0,
-                  'blocking_general': 0.0,
-                  'blocking_global': 0.0,
-                  'blocking_isp': 0.0,
-                  'blocking_local': 0.0}
+            assert scores == {
+                "accuracy": 0.0,
+                "blocking_country": 0.0,
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
 
         elif rid == "20190829T002541Z_AS29119_kyaEYabRxQW6q41n4kPH9aX5cvFEXNheCj1fguSf4js3JydUbr":
             # The probe is reporting a false positive: due to the empty client headers
@@ -308,10 +310,10 @@ def test_whatsapp(cans):
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
-                'analysis': {
-                    'registration_server_accessible': True,
-                    'whatsapp_endpoints_accessible': True,
-                    'whatsapp_web_accessible': True
+                "analysis": {
+                    "registration_server_accessible": True,
+                    "whatsapp_endpoints_accessible": True,
+                    "whatsapp_web_accessible": True,
                 },
             }, msm
 
@@ -333,12 +335,13 @@ def test_whatsapp_probe_bug(cans):
         scores = fp.score_measurement(msm, [])
         assert scores["blocking_general"] in (0.0, 1.0)
         if "analysis" in scores:
-            assert scores["analysis"]["whatsapp_web_accessible"] in (True, False), ujson.dumps(msm, indent=1, sort_keys=True)
+            assert scores["analysis"]["whatsapp_web_accessible"] in (True, False), ujson.dumps(
+                msm, indent=1, sort_keys=True
+            )
             if debug and scores["blocking_general"] > 0:
                 print_msm(msm)
                 print(scores)
                 raise Exception("debug")
-
 
 
 def test_facebook_messenger(cans):
@@ -469,7 +472,10 @@ def test_score_measurement_hhfm_large(cans):
             elif debug and scores["blocking_general"] == 1.1:
                 url = "https://explorer.ooni.org/measurement/{}".format(rid)
                 print(
-                    msm["test_start_time"], msm["probe_cc"], url, msm["test_keys"]["requests"][0].get("failure", None)
+                    msm["test_start_time"],
+                    msm["probe_cc"],
+                    url,
+                    msm["test_keys"]["requests"][0].get("failure", None),
                 )
                 print_msm(msm)
                 print(scores)
@@ -561,40 +567,91 @@ def test_score_vanilla_tor(cans):
 
 
 def test_score_web_connectivity_simple(cans):
-    debug = 0
-    blocked = (
-        "20191029T180431Z_AS50289_5IKNXzKJUvzKQqnlzU5r91F9KiCl1LfRlEBllZVbDHcDQg5TEt",
-        "20191029T180509Z_AS50289_CqU5a3scgi1JJ8cWEYEMSqLUzseS0uIbnWcnGSKKlW1BMbnLc5",
-    )
-    nonblocked = (
-        "20191029T180447Z_AS50289_yWeX5dJzPeh9Pk3TddqG2eO3BvLGT2SOWmOK0lhR7aRV0XX1RC",
-        "20191029T180452Z_AS50289_IIuYcQRCGA9S2cj5zFABEOvMbyXSKBExWywVgZkpe5l1uAqyT5",
-        "20191029T180525Z_AS50289_UfjRU99n2edoDn9PeWnqyGxHVorOAxBFwZj3WPQ24sl2ii4gC2",
-    )
+    # (rid, inp) -> scores: exact match on scores
+    expected = {
+        (
+            "20191104T000516Z_AS52871_uFya6RnctQPrBVEdxE9uUpOxia9frBkNXkP9ZNmhQPEFoKqJ0l",
+            "https://100ko.wordpress.com/",
+        ): {
+            # unknown_failure
+            "scores": {
+                "accuracy": 0.0,
+                "analysis": {"blocking_type": "http-failure"},
+                "blocking_country": 0.0,
+                "blocking_general": 1.0,
+                "blocking_global": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+        },
+        (
+            "20191104T032906Z_AS8402_fY9b9V3jLtosTMNJbub1xNvuKBpZwPXTp7df9NLw6Sp4QOnXIz",
+            "http://www.ohchr.org/",
+        ): {
+            "scores": {
+                "blocking_country": 0.0,
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+        },
+        (
+            "20191101T015523Z_AS0_muvGSfWmgRobU77ZL980XGRTyJ80HC0ubQ5YaPaYiotxiXL6po",
+            "http://www.newnownext.com/franchise/the-backlot/",
+        ): {
+            "scores": {
+                "analysis": {"blocking_type": "http-diff"},
+                "blocking_country": 0.0,
+                "blocking_general": 1.0,
+                "blocking_global": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+        },
+        (
+            "20191101T071829Z_AS0_sq5lk0Y4jhCECrgk2pAgMWlgOczBLDkIb2OE9QnHf1OEOmwOBz",
+            "http://www.lingeriebowl.com",
+        ): {
+            "scores": {
+                "analysis": {"blocking_type": "dns"},
+                "blocking_country": 0.0,
+                "blocking_general": 1.0,
+                "blocking_global": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+        },
+        ("20191101T071829Z_AS0_sq5lk0Y4jhCECrgk2pAgMWlgOczBLDkIb2OE9QnHf1OEOmwOBz", "http://www.pravda.ru"): {
+            # In this msmt title_match is false due to the probe following a redirect.
+            # The probe uses:
+            # (body_length_match or headers_match or title_match) and (status_code_match != false)
+            "scores": {
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+        },
+    }
 
-    # In this msmt the probe follows a redirect and lands on a page with a
-    # title in russian, while the probe gets title " - "
-    # https://explorer.ooni.org/measurement/20191101T071829Z_AS0_sq5lk0Y4jhCECrgk2pAgMWlgOczBLDkIb2OE9QnHf1OEOmwOBz?input=http://www.pravda.ru
-
-    # The probe uses:
-    # (body_length_match or headers_match or title_match) and (status_code_match != false)
 
     for can_fn, msm in s3msmts("web_connectivity", start_date=date(2019, 11, 1)):
         rid = msm["report_id"]
         inp = msm["input"]
         scores = fp.score_measurement(msm, [])
-        bl = sum(scores[k] for k in scores if k.startswith("blocking_"))
-        if rid in blocked:
-            assert bl > 0
 
-        elif rid in nonblocked:
-            assert bl < 0.3
+        if (rid, inp) not in expected:
+            # log.warning(f"https://explorer.ooni.org/measurement/{rid}?input={inp}")
+            # log.warning((rid, inp, scores))
+            continue
 
-        elif debug and bl > 0:
-            print("https://explorer.ooni.org/measurement/{}?input={}".format(rid, inp))
-            print_msm(msm)
-            print(scores)
-            assert 0
+        exp = expected.pop((rid, inp))
+        if "scores" in exp:
+            assert scores == exp["scores"]
+
+    assert len(expected) == 0, "Not all expected measurements were tested"
 
 
 def test_score_web_connectivity_with_workers(cans):
@@ -722,19 +779,51 @@ def test_score_tcp_connect(cans):
 def test_score_dash(cans):
     # rid -> blocking_general, accuracy
     expected = {
-        "20191026T015105Z_AS4837_7vwBtbVmZZqwZhdTHnqHan0Nwa7bi7TeJ789htG3RB91C3eyU1": (0.1, 0.0, "blocking_general"),
-        "20191026T022317Z_AS17380_ZJGnXdvHl4j1M4xTeskrGhC8SW1KT4buJEjxCsTagCGO2NZeAD": (0.1, 0.0, "json_parse_error"),
-        "20191026T032159Z_AS20057_xLjBSrTyZjOn6C7pa5BPyUxyBhzWHbSooKQjUY9zcWADnkakIR": (0.1, 0.0, "eof_error"),
+        "20191026T015105Z_AS4837_7vwBtbVmZZqwZhdTHnqHan0Nwa7bi7TeJ789htG3RB91C3eyU1": (
+            0.1,
+            0.0,
+            "blocking_general",
+        ),
+        "20191026T022317Z_AS17380_ZJGnXdvHl4j1M4xTeskrGhC8SW1KT4buJEjxCsTagCGO2NZeAD": (
+            0.1,
+            0.0,
+            "json_parse_error",
+        ),
+        "20191026T032159Z_AS20057_xLjBSrTyZjOn6C7pa5BPyUxyBhzWHbSooKQjUY9zcWADnkakIR": (
+            0.1,
+            0.0,
+            "eof_error",
+        ),
         "20191026T051350Z_AS44244_9yjPG1UbgIjtAFg9LiTUxVhq7hGuG3tG4yMnvt6gRJTaFdQme6": (
             0.1,
             0.0,
             "json_processing_error",
         ),
-        "20191026T071332Z_AS7713_caK9GNyp9ZhN7zL9cg2dg0zGhs44CwHmxZtOyK7B6rBKRaGGMF": (0.1, 0.0, "http_request_failed"),
-        "20191026T093003Z_AS4837_yHZ0f8Oxyhus9vBKAUa0tA2XMSObIO0frShG6YBieBzY9RiSBg": (0.1, 0.0, "connect_error"),
-        "20191026T165434Z_AS0_qPbZHZF8VXUWgzlvqT9Jd7ARuHSl2Dq4tPcEq580rgYZGmV5Um": (0.1, 0.0, "generic_timeout_error"),
-        "20191028T160112Z_AS1640_f4zyjjp5vFcwZkAKPrTokayPRdcXPfdEMRbdo1LmIaLZRile6P": (0.1, 0.0, "broken_pipe"),
-        "20191029T094043Z_AS49048_qGQxBh6lv26TOfuWfhGcUtz2LZWwboXlfbh058CSF1fOmEUv6Z": (0.1, 0.0, "connection_refused"),
+        "20191026T071332Z_AS7713_caK9GNyp9ZhN7zL9cg2dg0zGhs44CwHmxZtOyK7B6rBKRaGGMF": (
+            0.1,
+            0.0,
+            "http_request_failed",
+        ),
+        "20191026T093003Z_AS4837_yHZ0f8Oxyhus9vBKAUa0tA2XMSObIO0frShG6YBieBzY9RiSBg": (
+            0.1,
+            0.0,
+            "connect_error",
+        ),
+        "20191026T165434Z_AS0_qPbZHZF8VXUWgzlvqT9Jd7ARuHSl2Dq4tPcEq580rgYZGmV5Um": (
+            0.1,
+            0.0,
+            "generic_timeout_error",
+        ),
+        "20191028T160112Z_AS1640_f4zyjjp5vFcwZkAKPrTokayPRdcXPfdEMRbdo1LmIaLZRile6P": (
+            0.1,
+            0.0,
+            "broken_pipe",
+        ),
+        "20191029T094043Z_AS49048_qGQxBh6lv26TOfuWfhGcUtz2LZWwboXlfbh058CSF1fOmEUv6Z": (
+            0.1,
+            0.0,
+            "connection_refused",
+        ),
     }
     for d in range(26, 30):
         can = cans["dash_2019_10_{}".format(d)]
@@ -802,9 +891,13 @@ def test_score_psiphon(cans):
         assert msm["test_keys"]["failure"] is None, msm
         scores = fp.score_measurement(msm, [])
         if rid == "20200109T111813Z_AS30722_RZeO9Ix6ET2LJzqGcinrDp1iqrhaGGDCHSwlOoybq2N9kZITQt":
-            assert scores == {'blocking_general': 0.0, 'blocking_global': 0.0,
-                              'blocking_country': 0.0, 'blocking_isp': 0.0,
-                              'blocking_local': 0.0}
+            assert scores == {
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
 
 
 # See test_score_tor() in test_unit.py
