@@ -140,8 +140,11 @@ def fetch_cans(s3, conf, files):
         _cb.count += bytes_count
         _cb.total_count += bytes_count
         metrics.gauge("s3_download_percentage", _cb.total_count / _cb.total_size * 100)
-        speed = _cb.count / 131_072 / (time.time() - _cb.start_time)
-        metrics.gauge("s3_download_speed_avg_Mbps", speed)
+        try:
+            speed = _cb.count / 131_072 / (time.time() - _cb.start_time)
+            metrics.gauge("s3_download_speed_avg_Mbps", speed)
+        except ZeroDivisionError:
+            pass
 
     _cb.total_size = sum(t[2] for t in to_dload)
     _cb.total_count = 0
