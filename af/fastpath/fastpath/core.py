@@ -1219,7 +1219,8 @@ def msm_processor(queue):
                 rid = measurement.get("report_id", None)
                 inp = measurement.get("input", None)
                 msm_jstr, tid = trivial_id(measurement)
-                sshfeeder.log_ingestion_delay(measurement)  # TODO: log only when using SSH
+                # TODO: log only when using SSH
+                sshfeeder.log_ingestion_delay(measurement)
                 log.debug(f"Processing {tid} {rid} {inp}")
                 fn = generate_filename(tid)
                 writeout_measurement(msm_jstr, fn, conf.update, tid)
@@ -1234,6 +1235,10 @@ def msm_processor(queue):
                 # in manual analysis and keep compatibility with Explorer
                 anomaly = scores.get("blocking_general", 0.0) > 0.5
                 failure = scores.get("accuracy", 1.0) < 0.5
+                if anomaly or failure or confirmed:
+                    log.debug(
+                        f"Storing {tid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
+                    )
                 db.upsert_summary(
                     measurement,
                     scores,
