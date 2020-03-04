@@ -10,11 +10,12 @@ run the fastpath many times on the same files from the collectors
 """
 
 from collections import OrderedDict
+from typing import Iterator, Optional, Tuple
 import datetime
 import io
+import logging
 import os
 import time
-import logging
 
 import paramiko
 
@@ -24,6 +25,7 @@ warnings.filterwarnings(action="ignore", module=".*paramiko.*")
 
 import fastpath.normalize as normalize  # noqa
 from fastpath.metrics import setup_metrics  # noqa
+from fastpath.mytypes import MsmtTup
 
 log = logging.getLogger("fastpath")
 
@@ -183,7 +185,7 @@ class Source:
             log.exception(e)
             metrics.incr("unhandled_exception")
 
-    def fetch_measurements(self):
+    def fetch_measurements(self) -> Iterator[MsmtTup]:
         """Fetch new reports
             :yields: (string of JSON, None) or (None, msmt dict)
         """

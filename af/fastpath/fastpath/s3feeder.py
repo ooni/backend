@@ -15,6 +15,7 @@ AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16
 
 """
 
+from typing import Iterator
 import logging
 import os
 import time
@@ -28,6 +29,7 @@ import boto3  # debdeps: python3-boto3
 
 from fastpath.normalize import iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
+from fastpath.mytypes import MsmtTup
 
 AWS_PROFILE = "ooni-data"
 BUCKET_NAME = "ooni-data"
@@ -40,7 +42,7 @@ for l in ("urllib3", "botocore", "s3transfer"):
     logging.getLogger(l).setLevel(logging.INFO)
 
 
-def load_multiple(fn, touch=True) -> tuple:
+def load_multiple(fn, touch=True) -> Iterator[MsmtTup]:
     """Load contents of cans. Decompress tar archives if found.
     Yields measurements one by one as:
         (string of JSON, None) or (None, msmt dict)
@@ -59,6 +61,7 @@ def load_multiple(fn, touch=True) -> tuple:
                     break
                 log.debug("Loading nested %s", m.name)
                 k = tf.extractfile(m)
+                assert k is not None
                 if m.name.endswith(".json"):
                     for line in k:
                         yield (line, None)

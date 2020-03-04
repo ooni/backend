@@ -8,7 +8,7 @@ import multiprocessing as mp
 # Queue.qsize() is not reliable - and absent under OSX
 # Implement a queue as a singleton with locking around the queue size
 
-_q = mp.Queue()
+_q = mp.Queue()  # type: mp.queues.Queue
 _size = mp.Value("i", 0)
 
 

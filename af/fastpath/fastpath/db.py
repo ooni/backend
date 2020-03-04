@@ -130,6 +130,7 @@ def upsert_summary(
         "measurement_start_time",
     )
 
+    assert _autocommit_conn
     with _autocommit_conn.cursor() as cur:
         try:
             cur.execute(tpl, args)
@@ -146,8 +147,8 @@ def upsert_summary(
         notification = {k: msm.get(k, None) for k in cols}
         notification["trivial_id"] = tid
         notification["scores"] = scores
-        notification = ujson.dumps(notification)
-        q = f"SELECT pg_notify('fastpath', '{notification}');"
+        notification_json = ujson.dumps(notification)
+        q = f"SELECT pg_notify('fastpath', '{notification_json}');"
         cur.execute(q)
 
 

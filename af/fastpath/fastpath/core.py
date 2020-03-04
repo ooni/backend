@@ -18,6 +18,7 @@ from configparser import ConfigParser
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Iterator, Dict, Any
 import hashlib
 import logging
 import multiprocessing as mp
@@ -46,6 +47,7 @@ import fastpath.s3feeder as s3feeder
 import fastpath.db as db
 
 from fastpath.metrics import setup_metrics
+from fastpath.mytypes import MsmtTup
 import fastpath.portable_queue as queue
 
 import fastpath.utils
@@ -239,7 +241,7 @@ expected_colnames = {
 
 
 @metrics.timer("load_s3_reports")
-def load_s3_reports(day) -> dict:
+def load_s3_reports(day) -> Iterator[MsmtTup]:
     # TODO: move this into s3feeder
     t0 = time.time()
     path = conf.s3cachedir / str(day)
@@ -264,8 +266,8 @@ def load_s3_reports(day) -> dict:
         remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
         metrics.gauge("load_s3_reports_eta", remaining)
         metrics.gauge("load_s3_reports_remaining_files", len(files) - fcnt)
-        remaining = timedelta(seconds=remaining)
-        log.info("load_s3_reports remaining time: %s", remaining)
+        remaining_td = timedelta(seconds=remaining)
+        log.info("load_s3_reports remaining time: %s", remaining_td)
 
 
 def prepare_for_json_normalize(report):
@@ -283,7 +285,7 @@ def prepare_for_json_normalize(report):
         pass
 
 
-def fetch_measurements(start_day, end_day) -> dict:
+def fetch_measurements(start_day, end_day) -> Iterator[MsmtTup]:
     """Fetch measurements from S3 and the collectors
     """
     # no --start-day or --end-day   -> Run over SSH
@@ -829,7 +831,7 @@ def score_web_connectivity(msm, matches) -> dict:
     """Calculate measurement scoring for web connectivity
     Returns a scores dict
     """
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
     tk = msm["test_keys"]
 
     for m in matches:
@@ -943,7 +945,7 @@ def score_dash(msm) -> dict:
     """
     # TODO: review scores
     # TODO: any blocking scoring based on performance?
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
     failure = msm["test_keys"].get("failure", None)
     if failure == None:
         pass
