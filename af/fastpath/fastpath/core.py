@@ -257,11 +257,14 @@ def load_s3_reports(day) -> Iterator[MsmtTup]:
 
     fcnt = 0
     for e in sorted(files, key=lambda f: f.name):
-        log.debug("Ingesting %s", e.name)
-        fn = os.path.join(path, e.name)
         fcnt += 1
-        for measurement_tup in s3feeder.load_multiple(fn):
-            yield measurement_tup
+        log.info(f"Ingesting [{fcnt}/{len(files)}] {e.name}")
+        fn = os.path.join(path, e.name)
+        try:
+            for measurement_tup in s3feeder.load_multiple(fn):
+                yield measurement_tup
+        except:
+            log.error(f"ERROR Ingesting [{fcnt}/{len(files)}] {e.name}", exc_info=True)
 
         remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
         metrics.gauge("load_s3_reports_eta", remaining)
@@ -306,6 +309,7 @@ def fetch_measurements(start_day, end_day) -> Iterator[MsmtTup]:
             day += timedelta(days=1)
 
         if end_day:
+            log.info("Reached {end_day}, exiting")
             return
 
     ## Fetch measurements from collectors: backlog and then realtime ##
@@ -1206,7 +1210,6 @@ def msm_processor(queue):
     db.setup(conf)
     while True:
         msm_tup = queue.get()
-
         if msm_tup is None:
             log.info("Worker with PID %d exiting", os.getpid())
             return
@@ -1294,6 +1297,7 @@ def core():
             measurement_cnt += 1
             while queue.qsize() >= 500:
                 time.sleep(0.1)
+            assert measurement_tup is not None
             queue.put(measurement_tup)
             metrics.gauge("queue_size", queue.qsize())
 
@@ -1314,6 +1318,8 @@ def core():
         log.exception(e)
 
     finally:
+        log.info("Shutting down workers")
+        time.sleep(1)
         shut_down(queue)
         clean_caches()
 
