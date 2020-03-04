@@ -1216,9 +1216,11 @@ def msm_processor(queue):
                 msm_jstr, measurement = msm_tup
                 if measurement is None:
                     measurement = ujson.loads(msm_jstr)
+                rid = measurement.get("report_id", None)
+                inp = measurement.get("input", None)
                 msm_jstr, tid = trivial_id(measurement)
-                log.debug(f"Processing {tid}")
                 sshfeeder.log_ingestion_delay(measurement)  # TODO: log only when using SSH
+                log.debug(f"Processing {tid} {rid} {inp}")
                 fn = generate_filename(tid)
                 writeout_measurement(msm_jstr, fn, conf.update, tid)
                 if measurement.get("test_name", None) == "web_connectivity":

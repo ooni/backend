@@ -134,6 +134,7 @@ def upsert_summary(
     with _autocommit_conn.cursor() as cur:
         try:
             cur.execute(tpl, args)
+            # log.debug(cur.query.decode())
         except psycopg2.ProgrammingError:
             log.error("upsert syntax error in %r", tpl, exc_info=True)
             return
