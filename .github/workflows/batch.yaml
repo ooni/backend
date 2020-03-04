@@ -1,4 +1,5 @@
 name: Traditional Batch pipeline CI
+on: [push]
 jobs:
   build:
     name: Tox based end to end tests
