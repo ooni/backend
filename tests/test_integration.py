@@ -49,7 +49,8 @@ def pg_container(docker_client):
     # TODO ensure this doesn't run into an infinite loop, though it hasn't been a problem up until now.
     while True:
         exit_code, output = pg_container.exec_run(
-            "psql -U {} -c 'select 1'".format(METADB_PG_USER)
+            "psql -U {} -c 'select 1'".format(METADB_PG_USER),
+            environment={"PGPASSWORD": METADB_PG_USER}
         )
         if exit_code == 0:
             break
@@ -65,7 +66,8 @@ def pg_container(docker_client):
 
 def pg_install_tables(container):
     _, socket = container.exec_run(
-        cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True
+        cmd="psql -U {}".format(METADB_PG_USER), stdin=True, socket=True,
+        environment={"PGPASSWORD": METADB_PG_USER}
     )
     # This is to support multiple versions of docker and python.
     # See: https://github.com/docker/docker-py/issues/2255#issuecomment-475270012
