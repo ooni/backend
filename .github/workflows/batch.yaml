@@ -1,11 +1,13 @@
 name: Traditional Batch pipeline CI
 on: [push]
 jobs:
-  build:
-    name: Tox based end to end tests
+  test:
+    name: Tox tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v1
       - name: Set up Python
         uses: actions/setup-python@v1
         with:
