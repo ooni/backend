@@ -14,3 +14,4 @@ remote_syslog.pid
 af/oometa/tsv/
 af/oometa/tsvdump.dir/
 /testdata/
+.tox/
