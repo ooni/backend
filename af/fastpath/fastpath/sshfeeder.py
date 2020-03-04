@@ -198,7 +198,7 @@ class Source:
                 yield item
 
 
-def log_ingestion_delay(msm_jstr, msm):
+def log_ingestion_delay(msm):
     try:
         st = msm["measurement_start_time"]
         st = datetime.datetime.strptime(st, "%Y-%m-%d %H:%M:%S")
@@ -226,7 +226,6 @@ def feed_measurements_from_collectors(conf, start_time=None):
             for source in sources:
                 log.debug("Checking %s", source.hostname)
                 for i in source.fetch_measurements():
-                    log_ingestion_delay(*i)
                     yield i
                     throttle = False
 

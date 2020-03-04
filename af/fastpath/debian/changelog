@@ -1,3 +1,9 @@
+fastpath (0.21) UNRELEASED; urgency=medium
+
+  * Improve type checking and log_ingestion_delay
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 04 Mar 2020 14:57:26 +0000
+
 fastpath (0.20) unstable; urgency=medium
 
   * Handle blocking types in web_connectivity #352
