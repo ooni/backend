@@ -42,7 +42,7 @@ def pg_container(docker_client):
         "postgres:9.6",
         name=METADB_NAME,
         hostname=METADB_NAME,
-        environment={"POSTGRES_USER": METADB_PG_USER},
+        environment={"POSTGRES_USER": METADB_PG_USER, "POSTGRES_PASSWORD": METADB_PG_USER},
         ports={"5432/tcp": PG_EXT_PORT},
         detach=True,
     )
@@ -141,8 +141,8 @@ def run_centrifugation(client, bucket_date, pipeline_ctx):
         bucket_date
     )
     centrifugation_cmd += " --end {}T00:00:00".format(end_bucket_date)
-    centrifugation_cmd += " --autoclaved-root /data/autoclaved --postgres 'host={} user={}'".format(
-        METADB_NAME, METADB_PG_USER
+    centrifugation_cmd += " --autoclaved-root /data/autoclaved --postgres 'host={} user={} password={}'".format(
+        METADB_NAME, METADB_PG_USER, METADB_PG_USER
     )
 
     print("running shovel: {}".format(centrifugation_cmd))
@@ -201,7 +201,7 @@ def generate_report_files(dst_dir):
 
 def pg_conn():
     return psycopg2.connect(
-        "host={} user={} port={}".format("localhost", METADB_PG_USER, PG_EXT_PORT)
+        "host={} user={} password={} port={}".format("localhost", METADB_PG_USER, METADB_PG_USER, PG_EXT_PORT)
     )
 
 
