@@ -264,7 +264,7 @@ def load_s3_measurements(day) -> Iterator[MsmtTup]:
             for measurement_tup in s3feeder.load_multiple(fn):
                 yield measurement_tup
         except:
-            log.error(f"ERROR Ingesting [{fcnt}/{len(files)}] {e.name}", exc_info=True)
+            log.error(f"Ingesting [{fcnt}/{len(files)}] {e.name}", exc_info=True)
 
         remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
         metrics.gauge("load_s3_measurements_eta", remaining)
