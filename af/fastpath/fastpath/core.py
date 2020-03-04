@@ -240,8 +240,8 @@ expected_colnames = {
 }
 
 
-@metrics.timer("load_s3_reports")
-def load_s3_reports(day) -> Iterator[MsmtTup]:
+@metrics.timer("load_s3_measurements")
+def load_s3_measurements(day) -> Iterator[MsmtTup]:
     # TODO: move this into s3feeder
     t0 = time.time()
     path = conf.s3cachedir / str(day)
@@ -267,10 +267,10 @@ def load_s3_reports(day) -> Iterator[MsmtTup]:
             log.error(f"ERROR Ingesting [{fcnt}/{len(files)}] {e.name}", exc_info=True)
 
         remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
-        metrics.gauge("load_s3_reports_eta", remaining)
-        metrics.gauge("load_s3_reports_remaining_files", len(files) - fcnt)
+        metrics.gauge("load_s3_measurements_eta", remaining)
+        metrics.gauge("load_s3_measurements_remaining_files", len(files) - fcnt)
         remaining_td = timedelta(seconds=remaining)
-        log.info("load_s3_reports remaining time: %s", remaining_td)
+        log.info("load_s3_measurements remaining time: %s", remaining_td)
 
 
 def prepare_for_json_normalize(report):
@@ -303,7 +303,7 @@ def fetch_measurements(start_day, end_day) -> Iterator[MsmtTup]:
         while day < (end_day or today):
             log.info("Processing %s", day)
             s3feeder.fetch_cans_for_a_day_with_cache(conf, day)
-            for measurement_tup in load_s3_reports(day):
+            for measurement_tup in load_s3_measurements(day):
                 yield measurement_tup
 
             day += timedelta(days=1)
