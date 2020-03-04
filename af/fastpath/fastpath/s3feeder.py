@@ -58,6 +58,7 @@ def load_multiple(fn, touch=True) -> Iterator[MsmtTup]:
             while True:
                 m = tf.next()
                 if m is None:
+                    # end of tarball
                     break
                 log.debug("Loading nested %s", m.name)
                 k = tf.extractfile(m)
@@ -171,6 +172,8 @@ def fetch_cans(s3, conf, files):
 def fetch_cans_for_a_day_with_cache(conf, day):
     s3 = create_s3_client()
     fns = list_cans_on_s3_for_a_day(s3, day)
-    # can_name = "2020-03-02/web_connectivity.44.tar.lz4"
-    # fns = [(name, size) for name, size in fns if name == can_name]
+    #can_names = [
+    #    "2020-03-02/web_connectivity.44.tar.lz4",
+    #]
+    #fns = [(name, size) for name, size in fns if name in can_names]
     fetch_cans(s3, conf, fns)
