@@ -34,11 +34,6 @@ from oonipl.pg import PGCopyFrom, pg_quote, pg_binquote, pg_uniquote
 from oonipl.sim import sim_shi4_mm3_layout, sim_shi4_mm3_text
 from oonipl.utils import dclass
 
-from oonipl.metrics import setup_metrics
-
-# Send metrics to the docker0 interface ipaddr
-metrics = setup_metrics(host="172.17.0.1", name="centrifugation")
-
 # It does NOT take into account metadata tables right now:
 # - autoclaved: it's not obvious if anything can be updated there
 # - report & measurement: have significant amount of metadata and may be actually updated eventually
@@ -176,7 +171,6 @@ def dns_ttl(ttl):
 ########################################################################
 
 
-@metrics.timer("load_autoclaved_index")
 def load_autoclaved_index(autoclaved_index):
     """
     Loads the autoclaved index file and return the list of compressed
@@ -270,7 +264,6 @@ def create_temp_table(pgconn, table, definition):
         c.execute(create_table.format(table=table, definition=definition))
 
 
-@metrics.timer("copy_meta_from_index")
 def copy_meta_from_index(pgconn, ingest, reingest, autoclaved_index, bucket):
     # Writing directly to `report` table is impossible as part of `report`
     # table is parsed from data files, same is true for `measurement` table.
@@ -619,7 +612,6 @@ def load_global_duplicate_reports(pgconn):
         DUPLICATE_REPORTS.update(_[0] for _ in c)
 
 
-@metrics.timer("delete_data_to_reprocess")
 def delete_data_to_reprocess(pgconn, bucket):
     # Everything in *_meta is either ingested from scratch or re-ingested.
     # Some other rows in SOME tables (depending on code_ver) should also be deleted.
@@ -790,7 +782,6 @@ def prepare_destination(pgconn, stconn, bucket_code_ver, bucket_date):
     return report, msm, msm_exc, badmeta, ver_feeders, sink_list, feeder_list
 
 
-@metrics.timer("copy_data_from_autoclaved")
 def copy_data_from_autoclaved(pgconn, stconn, in_root, bucket, bucket_code_ver):
     TrappedException = None if FLAG_FAIL_FAST else Exception
 
@@ -928,7 +919,6 @@ def iter_autoclaved_datum(pgconn, autoclaved_root, bucket):
                                 "Short LZ4 frame", filename, frame_off, intra_off
                             )
                         datum = ujson.loads(datum)
-                        metrics.incr('iter_autoclaved_datum')
                         yield code_ver, autoclaved_no, report_no, msm_no, datum
                 for _ in iter(functools.partial(fd.read, 4096), ""):
                     pass  # skip till EOF
@@ -937,8 +927,6 @@ def iter_autoclaved_datum(pgconn, autoclaved_root, bucket):
                 print "Processed {}: {:.1f} MiB, {:.1f} s, {:.1f} MiB/s".format(
                     filename, size_mib, real, size_mib / real
                 )
-                metrics.incr("processed_data_MB", size_mib)
-                metrics.gauge("processing_data_speed_MBps", size_mib / real)
                 db_cksum = (
                     file_size,
                     file_crc32,
@@ -2000,7 +1988,6 @@ class HttpRequestFPFeeder(HttpRequestFeeder):
     # It may become part of `http_request` and `http_control` tables, but it also
     # brings nice notion of clear separation between basic data features (headers,
     # body hashsums and such) and derived features (matching fingerprints).
-    @metrics.timer("fingerprints.init")
     def __init__(self, pgconn):
         """Initializes self._fps_by_cc
         """
@@ -2233,7 +2220,6 @@ DATA_TABLES = (
 )
 
 
-@metrics.timer("update_explorer_metrics")
 def update_explorer_metrics(pgconn, bucket):
     with pgconn.cursor() as c:
         c.execute(
