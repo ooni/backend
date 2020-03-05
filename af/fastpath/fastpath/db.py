@@ -120,6 +120,7 @@ def upsert_summary(
     )
 
     # Send notification using pg_notify
+    # TODO: do not send notifications during manual run or in devel mode
     cols = (
         "report_id",
         "input",
