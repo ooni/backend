@@ -117,7 +117,11 @@ class Source:
         find_cmd = FIND.format(self._archive_dir, backlog_minutes)
         try:
             stdin, stdout, stderr = self.ssh.exec_command(find_cmd, timeout=10)
-        except paramiko.ssh_exception.SSHException:
+        except (paramiko.ssh_exception.SSHException, AttributeError):
+            # handle: AttributeError: 'NoneType' object has no attribute 'open_session'
+            self.error("Broken SSH connection. Retrying.")
+            # We retry only once here. On failure we'll try again on the new
+            # call to scan_new_files
             self._tryconnect()
             stdin, stdout, stderr = self.ssh.exec_command(find_cmd, timeout=10)
 
