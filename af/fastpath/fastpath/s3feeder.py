@@ -144,6 +144,7 @@ def fetch_cans(s3, conf, files):
         _cb.count += bytes_count
         _cb.total_count += bytes_count
         metrics.gauge("s3_download_percentage", _cb.total_count / _cb.total_size * 100)
+        log.debug("s3_download_percentage %d", _cb.total_count / _cb.total_size * 100)
         try:
             speed = _cb.count / 131_072 / (time.time() - _cb.start_time)
             metrics.gauge("s3_download_speed_avg_Mbps", speed)
@@ -158,11 +159,15 @@ def fetch_cans(s3, conf, files):
         # TODO: handle missing file
         log.info("Downloading can %s size %d MB" % (fn, size / 1024 / 1024))
         diskf.parent.mkdir(parents=True, exist_ok=True)
+        tmpf = diskf.with_suffix(".s3tmp")
         metrics.gauge("fetching", 1)
         _cb.start_time = None
-        with diskf.open("wb") as f:
+        with tmpf.open("wb") as f:
             s3.download_fileobj(BUCKET_NAME, s3fname, f, Callback=_cb)
+            f.flush()
+            os.fsync(f.fileno())
         metrics.gauge("fetching", 0)
+        tmpf.rename(diskf)
         assert size == diskf.stat().st_size
 
     metrics.gauge("s3_download_speed_avg_Mbps", 0)
@@ -173,7 +178,7 @@ def fetch_cans_for_a_day_with_cache(conf, day):
     s3 = create_s3_client()
     fns = list_cans_on_s3_for_a_day(s3, day)
     #can_names = [
-    #    "2020-03-02/web_connectivity.44.tar.lz4",
+    #    "2020-03-03/web_connectivity.14.tar.lz4",
     #]
     #fns = [(name, size) for name, size in fns if name in can_names]
     fetch_cans(s3, conf, fns)
