@@ -657,7 +657,7 @@ def list_measurements(
         if isinstance(exc.orig, QueryCanceledError):
             # Timeout due to a slow query. Generate metric and do not feed it
             # to Sentry.
-            raise QueryTimeoutError()
+            abort(504)
 
         raise exc
 
