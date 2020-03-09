@@ -915,6 +915,16 @@ def test_list_measurements_external_order_by(client):
     assert len(response["results"]) == 100, jd(response)
 
 
+def test_list_measurements_bug_probe1034(client):
+    url = "measurements?report_id=blah"
+    r = client.get(f"/api/v1/{url}", headers={"user-agent": "okhttp"})
+    assert r.status_code == 200
+    assert r.is_json
+    response = r.json
+    assert "results" in response
+    assert len(response["results"]) == 1, repr(response)
+
+
 def test_slow_inexistent_domain(client):
     # time-unbounded query, filtering by a domain never monitored
     p = "measurements?domain=meow.com&until=2019-12-11&limit=50"

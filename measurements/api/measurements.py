@@ -319,6 +319,25 @@ def list_measurements(
 
     log = current_app.logger
 
+    ## Workaround for https://github.com/ooni/probe/issues/1034
+    user_agent = request.headers.get("User-Agent")
+    if user_agent.startswith("okhttp"):
+        bug_probe1034_response = jsonify(
+            {
+                "metadata": {
+                    "count": 1,
+                    "current_page": 1,
+                    "limit": 100,
+                    "next_url": None,
+                    "offset": 0,
+                    "pages": 1,
+                    "query_time": 0.001,
+                },
+                "results": [{"measurement_url": ""}],
+            }
+        )
+        return bug_probe1034_response
+
     ## Prepare query parameters
 
     input_ = request.args.get("input")
@@ -477,7 +496,6 @@ def list_measurements(
         # on success measurement.exc is NULL
         mrwhere.append(sql.text("measurement.exc IS NULL"))
         fpwhere.append(sql.text("fastpath.msm_failure IS NOT TRUE"))
-
 
     fpq_table = sql.table("fastpath")
     mr_table = sql.table("measurement").join(
