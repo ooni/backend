@@ -120,33 +120,13 @@ def list_files(
         query_params["report_no"] = report_no
 
     query = select(cols).where(and_(*where)).select_from("report")
-    query_cnt = query.with_only_columns([func.count()]).order_by(None)
-    log.debug(query_cnt)
-    count = current_app.db_session.execute(query_cnt, query_params).scalar()
-
-    pages = math.ceil(count / limit)
+    count = -1
+    pages = -1
     current_page = math.ceil(offset / limit) + 1
 
     query = query.order_by(text("{} {}".format(order_by, order)))
     query = query.limit(limit).offset(offset)
 
-    next_args = request.args.to_dict()
-    next_args["offset"] = "%s" % (offset + limit)
-    next_args["limit"] = "%s" % limit
-    next_url = urljoin(
-        current_app.config["BASE_URL"], "/api/v1/files?%s" % urlencode(next_args)
-    )
-    if current_page >= pages:
-        next_url = None
-
-    metadata = {
-        "offset": offset,
-        "limit": limit,
-        "count": count,
-        "pages": pages,
-        "current_page": current_page,
-        "next_url": next_url,
-    }
     results = []
 
     log.debug(query)
@@ -165,6 +145,28 @@ def list_files(
                 "test_start_time": row.test_start_time,
             }
         )
+    # We got less results than what we expected, we know the count and that we are done
+    if len(results) < limit:
+        count = offset + len(results)
+        pages = math.ceil(count / limit)
+        next_url = None
+    else:
+        next_args = request.args.to_dict()
+        next_args["offset"] = "%s" % (offset + limit)
+        next_args["limit"] = "%s" % limit
+        next_url = urljoin(
+            current_app.config["BASE_URL"], "/api/v1/files?%s" % urlencode(next_args)
+        )
+
+    metadata = {
+        "offset": offset,
+        "limit": limit,
+        "count": count,
+        "pages": pages,
+        "current_page": current_page,
+        "next_url": next_url,
+    }
+
     return jsonify({"metadata": metadata, "results": results})
 
 
