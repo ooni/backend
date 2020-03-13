@@ -1059,6 +1059,22 @@ def monitor_measurement_creation(conf):
             with conn.cursor() as cur:
                 cur.execute(sql_replication_delay)
                 delay = cur.fetchone()[0].total_seconds()
+
+            log.info("MMC: Comparing active and standby xlog location")
+            active_conn, master_dbengine = setup_database_connections(conf.active)
+            with active_conn.cursor() as cur:
+                cur.execute("SELECT pg_current_xlog_location()")
+                active_xlog_location = cur.fetchone()[0]
+
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_last_xlog_receive_location()")
+                standby_xlog_location = cur.fetchone()[0]
+
+            gauge_family.labels("raw_replication_delay").set(delay)
+
+            if active_xlog_location == standby_xlog_location:
+                gauge_family.labels("replication_delay").set(0)
+            else:
                 gauge_family.labels("replication_delay").set(delay)
 
             prom.write_to_textfile(nodeexp_path, prom_reg)

@@ -1,3 +1,9 @@
+analysis (0.9) unstable; urgency=medium
+
+  * Fix replication delay
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 13 Mar 2020 12:54:34 +0000
+
 analysis (0.8) unstable; urgency=medium
 
   * Coalesce NULL inputs used to compare entries in pipeline and fastpath
