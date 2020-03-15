@@ -1349,8 +1349,8 @@ def shut_down(queue):
     log.info("Shutting down workers")
     [queue.put(None) for n in range(NUM_WORKERS)]
     # FIXME
-    # queue.close()
-    # queue.join_thread()
+    #queue.close()
+    #queue.join_thread()
 
 
 def core():
@@ -1411,6 +1411,10 @@ def core():
         log.info("Shutting down workers")
         time.sleep(1)
         shut_down(queue)
+        time.sleep(1)
+        log.info("Join")
+        [w.join() for w in workers]
+        log.info("Join done")
         clean_caches()
 
 
