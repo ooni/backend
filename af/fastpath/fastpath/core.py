@@ -94,6 +94,7 @@ def setup():
     ap.add_argument("--start-day", type=lambda d: parse_date(d))
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
+    ap.add_argument("--nossh", action="store_true", help="Do not start SSH feeder")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
     ap.add_argument("--db-uri", help="Database DSN or URI. The string is logged!")
     ap.add_argument(
@@ -311,6 +312,10 @@ def fetch_measurements(start_day, end_day) -> Iterator[MsmtTup]:
         if end_day:
             log.info("Reached {end_day}, exiting")
             return
+
+    if conf.nossh:
+        log.info("Not fetching over SSH")
+        return
 
     ## Fetch measurements from collectors: backlog and then realtime ##
     log.info("Starting fetching over SSH")
