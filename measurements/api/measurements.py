@@ -35,10 +35,7 @@ FASTPATH_PORT = 8000
 
 class QueryTimeoutError(HTTPException):
     code = 504
-    description = (
-        "The database query timed out.",
-        "Try changing the query parameters.",
-    )
+    description = "The database query timed out.\nTry changing the query parameters."
 
 
 def get_version():
@@ -712,3 +709,98 @@ def list_measurements(
     }
 
     return jsonify({"metadata": metadata, "results": results[:limit]})
+
+
+def get_aggregated(
+    axis_x=None,
+    axis_y=None,
+
+    category_code=None,
+    domain=None,
+    input=None,
+
+    probe_asn=None,
+    probe_cc=None,
+    since=None,
+    test_name=None,
+    until=None,
+):
+    """Aggregate counters data
+    """
+    log = current_app.logger
+
+    dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
+
+    # Assemble query
+    cols = [
+        sql.text("SUM(anomaly_count)"),
+        sql.text("SUM(confirmed_count)"),
+        sql.text("SUM(failure_count)"),
+        sql.text("SUM(measurement_count)"),
+    ]
+    table = sql.table("counters")
+    where = []
+    query_params = {}
+
+    if domain:
+        # Join in domain_input table and filter by domain
+        table = table.join(
+            sql.table("domain_input"),
+            sql.text("counters.input = domain_input.input"),
+        )
+        where.append(sql.text("domain = :domain"))
+        query_params["domain"] = domain
+
+    if probe_cc:
+        where.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
+
+    if probe_asn is not None:
+        if probe_asn.startswith("AS"):
+            probe_asn = probe_asn[2:]
+        probe_asn = int(probe_asn)
+        where.append(sql.text("probe_asn = :probe_asn"))
+        query_params["probe_asn"] = probe_asn
+
+    if since:
+        since = parse_date(since)
+        where.append(sql.text("measurement_start_day > :since"))
+        query_params["since"] = since
+
+    if until:
+        until = parse_date(until)
+        where.append(sql.text("measurement_start_day <= :until"))
+        query_params["until"] = until
+
+    if axis_x:
+        cols.append(column(axis_x))
+
+    if axis_y:
+        cols.append(column(axis_y))
+
+    # Assemble query
+    where_expr = and_(*where)
+    query = select(cols).where(where_expr).select_from(table)
+
+    # Add group-by
+    if axis_x:
+        query = query.group_by(column(axis_x)).order_by(column(axis_x))
+
+    if axis_y:
+        query = query.group_by(column(axis_y)).order_by(column(axis_y))
+
+    try:
+        q = current_app.db_session.execute(query, query_params)
+
+        if dimension_cnt == 2:
+            r = [dict(row) for row in q]
+
+        elif (axis_x or axis_y):
+            r = [dict(row) for row in q]
+
+        else:
+            r = dict(q.fetchone())
+
+        return jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})

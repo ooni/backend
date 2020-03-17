@@ -249,6 +249,133 @@ paths:
         default:
           description: Default response
 
+  /aggregation:
+    get:
+      summary: ''
+      description: ''
+      operationId: 'measurements.api.get_aggregated'
+      parameters:
+        - name: input
+          in: query
+          type: string
+          minLength: 3
+          description: The input (for example a URL or IP address) to search measurements for
+
+        - name: domain
+          in: query
+          type: string
+          minLength: 3
+          description: The domain to search measurements for
+
+        - name: probe_cc
+          in: query
+          type: string
+          description: The two letter country code
+
+        - name: probe_asn
+          in: query
+          type: string
+          description: the Autonomous system number in the format "ASXXX"
+
+        - name: test_name
+          in: query
+          type: string
+          description: The name of the test
+          enum:
+          - web_connectivity
+          - http_requests
+          - dns_consistency
+          - http_invalid_request_line
+          - bridge_reachability
+          - tcp_connect
+          - http_header_field_manipulation
+          - http_host
+          - multi_protocol_traceroute
+          - meek_fronted_requests_test
+          - whatsapp
+          - vanilla_tor
+          - facebook_messenger
+          - ndt
+          - dash
+          - telegram
+          - psiphon
+          - tor
+
+        - name: since
+          in: query
+          type: string
+          description: >-
+            The start date of when measurements were run (ex.
+            "2016-10-20T10:30:00")
+
+        - name: until
+          in: query
+          type: string
+          description: >-
+            The end date of when measurement were run (ex.
+            "2016-10-20T10:30:00")
+
+        - name: confirmed
+          in: query
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
+          description: |
+            Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).
+
+        - name: anomaly
+          in: query
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
+          description: |
+            Measurements that require special attention (it's likely to be a case of blocking), however it has not necessarily been confirmed
+
+        - name: failure
+          in: query
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
+          description: |
+            There was an error in the measurement (the control request failed, there was a bug, etc.).
+            Default is to consider it both true or false (`failure=true,false`)
+
+        - name: axis_x
+          in: query
+          type: string
+          description: |
+            The dimension on the x axis e.g. measurement_start_day
+
+        - name: axis_y
+          in: query
+          type: string
+          description: |
+            The dimension on the y axis e.g. probe_cc
+
+      responses:
+        '200':
+          description: Returns aggregated counters
+          #schema:
+          #  $ref: "#/definitions/MeasurementList"
+
+        default:
+          description: Default response
+
+      x-code-samples:
+        - lang: 'curl'
+          source: |
+            curl "https://api.ooni.io/api/v1/aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01"
+        - lang: 'curl'
+          source: |
+            curl "https://api.ooni.io/api/v1/aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day"
+        - lang: 'curl'
+          source: |
+            curl "https://api.ooni.io/api/v1/aggregation?since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
+
+
   /version:
     get:
       summary: ''

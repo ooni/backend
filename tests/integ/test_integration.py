@@ -26,6 +26,11 @@ def jd(o):
     return json.dumps(o, indent=2, sort_keys=True)
 
 
+def fjd(o):
+    # non-indented JSON dump
+    return json.dumps(o, sort_keys=True)
+
+
 @pytest.fixture()
 def log(app):
     return app.logger
@@ -1143,3 +1148,47 @@ def test_private_api_website_urls(client, log):
 # def test_private_api_global_overview_by_month(client):
 #     url = "global_overview_by_month"
 #     response = privapi(client, url)
+
+
+# # aggregation # #
+
+
+def test_aggregation_no_axis(client, log):
+    # 0-dimensional data
+    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01"
+    r = api(client, url)
+    assert r == {"dimension_count": 0, "result": {"cnt": 350}, "v": 0}, fjd(r)
+
+
+def test_aggregation_x_axis_only(client, log):
+    # 1 dimension: X
+    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day"
+    r = api(client, url)
+    exp = {
+        "dimension_count": 1,
+        "result": [
+            {"cnt": 5, "measurement_start_day": "2020-01-02"},
+            {"cnt": 37, "measurement_start_day": "2020-01-04"},
+            {"cnt": 46, "measurement_start_day": "2020-01-08"},
+            {"cnt": 26, "measurement_start_day": "2020-01-13"},
+            {"cnt": 20, "measurement_start_day": "2020-01-16"},
+            {"cnt": 87, "measurement_start_day": "2020-01-20"},
+            {"cnt": 6, "measurement_start_day": "2020-01-21"},
+            {"cnt": 87, "measurement_start_day": "2020-01-23"},
+            {"cnt": 11, "measurement_start_day": "2020-01-26"},
+            {"cnt": 25, "measurement_start_day": "2020-01-27"},
+        ],
+        "v": 0,
+    }
+    assert r == exp, fjd(r)
+
+
+def test_aggregation_x_axis_y_axis(client, log):
+    # 2 dimensions
+    url = "aggregation?since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
+    r = api(client, url)
+    assert r["dimension_count"] == 2
+    assert len(r["result"]) == 2139
+    # TODO
+    # exp = {}
+    # assert r == exp, fjd(r)
