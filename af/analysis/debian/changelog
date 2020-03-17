@@ -1,8 +1,8 @@
-analysis (0.8) UNRELEASED; urgency=medium
+analysis (0.8) unstable; urgency=medium
 
   * Coalesce NULL inputs used to compare entries in pipeline and fastpath
 
- -- Federico Ceratto <federico@debian.org>  Tue, 03 Mar 2020 20:07:44 +0000
+ -- Federico Ceratto <federico@debian.org>  Tue, 17 Mar 2020 22:15:59 +0000
 
 analysis (0.7) unstable; urgency=medium
 
