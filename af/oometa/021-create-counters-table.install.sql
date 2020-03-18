@@ -14,10 +14,10 @@ CREATE TABLE counters (
     "probe_cc" CHARACTER (2) NOT NULL,
     "probe_asn" INTEGER NOT NULL,
     "input" TEXT,
-    "anomaly" BOOLEAN,
-    "confirmed" BOOLEAN,
-    "failure" BOOLEAN,
-    "count" INTEGER NOT NULL
+    "anomaly_count" INTEGER,
+    "confirmed_count" INTEGER,
+    "failure_count" INTEGER,
+    "measurement_count" INTEGER
 );
 
 CREATE INDEX counters_brin_multi_idx ON counters
@@ -27,14 +27,11 @@ CREATE INDEX counters_brin_multi_idx ON counters
     probe_cc,
     probe_asn,
     input,
-    CAST(anomaly AS char),
-    CAST(confirmed AS char),
-    CAST(failure AS char)
+    anomaly_count,
+    confirmed_count,
+    failure_count,
+    measurement_count
   )
   WITH (pages_per_range = 32);
 
-
 COMMIT;
-
-
-

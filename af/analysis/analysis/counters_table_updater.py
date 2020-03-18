@@ -23,32 +23,49 @@ metrics = setup_metrics(name="analysis")
 def _populate_counters_table(cur):
     log.info("Populating counters table from historical data")
     sql = """
-    INSERT INTO counters (measurement_start_day, test_name, probe_cc, probe_asn, input, anomaly, confirmed, failure, count)
+    INSERT INTO counters (measurement_start_day, test_name, probe_cc, probe_asn, input, anomaly_count, confirmed_count, failure_count, measurement_count)
     SELECT
-        date_trunc('day', measurement_start_time) AS measurement_start_day,
+        measurement_start_day,
         test_name::text,
         probe_cc,
         probe_asn,
         input,
-        anomaly,
-        confirmed,
-        measurement.exc IS NOT NULL AS failure,
-        COUNT(*) AS count
-    FROM
-        measurement
-        JOIN input ON input.input_no = measurement.input_no
-        JOIN report ON report.report_no = measurement.report_no
-    WHERE
-        measurement_start_time < CURRENT_DATE
+        sum(CASE WHEN anomaly IS TRUE THEN count END) AS anomaly_count,
+        sum(CASE WHEN confirmed IS TRUE THEN count END) AS confirmed_count,
+        sum(CASE WHEN failure IS TRUE THEN count END) AS failure_count,
+        sum(count) AS measurement_count
+    FROM (
+        SELECT
+            date_trunc('day', measurement_start_time) AS measurement_start_day,
+            test_name::text,
+            probe_cc,
+            probe_asn,
+            input,
+            anomaly,
+            confirmed,
+            measurement.exc IS NOT NULL AS failure,
+            COUNT(*) AS count
+        FROM
+            measurement
+            JOIN input ON input.input_no = measurement.input_no
+            JOIN report ON report.report_no = measurement.report_no
+        WHERE
+            measurement_start_time < CURRENT_DATE
+        GROUP BY
+            measurement_start_day,
+            test_name,
+            probe_cc,
+            probe_asn,
+            input,
+            anomaly,
+            confirmed,
+            failure) sub
     GROUP BY
         measurement_start_day,
-        test_name,
+        test_name::text,
         probe_cc,
         probe_asn,
-        input,
-        anomaly,
-        confirmed,
-        failure;
+        input
     """
     cur.execute(sql)
     log.info("Populated with %d rows", cur.rowcount)
@@ -81,30 +98,47 @@ def _update_counters_table(conf):
 
     log.info("Regenerating today's data")
     sql = """
-    INSERT INTO counters (measurement_start_day, test_name, probe_cc, probe_asn, input, anomaly, confirmed, failure, count)
+    INSERT INTO counters (measurement_start_day, test_name, probe_cc, probe_asn, input, anomaly_count, confirmed_count, failure_count, measurement_count)
     SELECT
-        date_trunc('day', measurement_start_time) AS measurement_start_day,
+        measurement_start_day,
         test_name::text,
         probe_cc,
         probe_asn,
         input,
-        anomaly,
-        confirmed,
-        msm_failure AS failure,
-        COUNT(*) AS count
-    FROM
-        fastpath
-    WHERE
-        date_trunc('day', measurement_start_time) = CURRENT_DATE
+        sum(CASE WHEN anomaly IS TRUE THEN count END) AS anomaly_count,
+        sum(CASE WHEN confirmed IS TRUE THEN count END) AS confirmed_count,
+        sum(CASE WHEN failure IS TRUE THEN count END) AS failure_count,
+        sum(count) AS measurement_count
+    FROM (
+        SELECT
+            date_trunc('day', measurement_start_time) AS measurement_start_day,
+            test_name::text,
+            probe_cc,
+            probe_asn,
+            input,
+            anomaly,
+            confirmed,
+            msm_failure AS failure,
+            COUNT(*) AS count
+        FROM
+            fastpath
+        WHERE
+            date_trunc('day', measurement_start_time) = CURRENT_DATE
+        GROUP BY
+            measurement_start_day,
+            test_name,
+            probe_cc,
+            probe_asn,
+            input,
+            anomaly,
+            confirmed,
+            failure) sub
     GROUP BY
         measurement_start_day,
-        test_name,
+        test_name::text,
         probe_cc,
         probe_asn,
-        input,
-        anomaly,
-        confirmed,
-        failure;
+        input
     """
     cur.execute(sql)
     log.info("Inserted: %d", cur.rowcount)
