@@ -21,7 +21,7 @@ metrics = setup_metrics(name="analysis")
 
 @metrics.timer("populate_counters_table")
 def _populate_counters_table(cur):
-    log.info("Populating counters table from historical data")
+    log.info("CTU: Populating counters table from historical data")
     sql = """
     INSERT INTO counters (measurement_start_day, test_name, probe_cc, probe_asn, input, anomaly_count, confirmed_count, failure_count, measurement_count)
     SELECT
@@ -68,7 +68,7 @@ def _populate_counters_table(cur):
         input
     """
     cur.execute(sql)
-    log.info("Populated with %d rows", cur.rowcount)
+    log.info("CTU: Populated with %d rows", cur.rowcount)
 
 
 def _table_is_empty(cur):
@@ -85,18 +85,18 @@ def connect_db(c):
 
 @metrics.timer("update_counters_table")
 def _update_counters_table(conf):
-    log.info("Started update_counters_table thread")
+    log.info("CTU: Started update_counters_table thread")
     conn = connect_db(conf.active)
     cur = conn.cursor()
     if _table_is_empty(cur):
         _populate_counters_table(cur)
 
-    log.info("Deleting today's data")
+    log.info("CTU: Deleting today's data")
     sql = "DELETE FROM counters WHERE measurement_start_day = CURRENT_DATE"
     cur.execute(sql)
-    log.info("Deleted: %d", cur.rowcount)
+    log.info("CTU: Deleted: %d", cur.rowcount)
 
-    log.info("Regenerating today's data")
+    log.info("CTU: Regenerating today's data")
     sql = """
     INSERT INTO counters (measurement_start_day, test_name, probe_cc, probe_asn, input, anomaly_count, confirmed_count, failure_count, measurement_count)
     SELECT
@@ -141,11 +141,11 @@ def _update_counters_table(conf):
         input
     """
     cur.execute(sql)
-    log.info("Inserted: %d", cur.rowcount)
+    log.info("CTU: Inserted: %d", cur.rowcount)
 
     conn.commit()
     conn.close()
-    log.info("Done")
+    log.info("CTU: Done")
 
 
 def counters_table_updater(conf):
