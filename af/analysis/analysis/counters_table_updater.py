@@ -74,7 +74,7 @@ def _populate_counters_table(cur):
 def _table_is_empty(cur):
     cur.execute("SELECT input FROM counters LIMIT 1")
     result = cur.fetchone()
-    return len(result) == 0
+    return result is None or len(result) == 0
 
 
 def connect_db(c):
