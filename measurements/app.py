@@ -11,7 +11,7 @@ import os
 from flask import Flask, json, request
 from flask_misaka import Misaka
 from flask_cors import CORS
-import flask_limiter
+from rate_limit_quotas import FlaskLimiter
 
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
@@ -22,6 +22,7 @@ from measurements.database import init_db
 from measurements.config import metrics
 
 APP_DIR = os.path.dirname(__file__)
+
 
 class FlaskJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -135,12 +136,15 @@ def create_app(*args, testmode=False, **kw):
     # Setup rate limiting
     # NOTE: the limits apply per-process. The number of processes is set in:
     # https://github.com/ooni/sysadmin/blob/master/ansible/roles/ooni-measurements/tasks/main.yml
-    app.limiter = flask_limiter.Limiter(
-        app=app,
-        key_func=extract_client_ipaddr_for_throttling,
-        headers_enabled=True,
-        default_limits=["1000 per month", "100 per hour"],
+    limits = dict(
+        ipaddr_per_month=6000,
+        token_per_month=6000,
+        ipaddr_per_week=2000,
+        token_per_week=2000,
+        ipaddr_per_day=400,
+        token_per_day=500,
     )
+    app.limiter = FlaskLimiter(limits=limits, app=app,)
 
     # Lazy setup of the prometheus metrics collection
     if testmode == False:

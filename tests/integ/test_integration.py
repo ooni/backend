@@ -14,6 +14,7 @@ from hashlib import shake_128
 from urllib.parse import urlencode
 import json
 import os
+import time
 
 import pytest
 
@@ -226,35 +227,23 @@ def api(client, subpath):
     return response.json
 
 
-def test_redirects_and_rate_limit(client):
+def test_redirects_and_rate_limit_basic(client):
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
     headers = {"X-Real-IP": "1.2.3.4"}
-    limit = 400 - 1
-    resp = client.get("/stats", headers=headers)
-    assert resp.status_code == 301
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
-
-    # Second GET: expect rate limiting decrease
-    resp = client.get("/stats", headers=headers)
-    assert resp.status_code == 301
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 1
-
-    resp = client.get("/files", headers=headers)
-    assert resp.status_code == 301
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
-
-    resp = client.get("/files/by_date", headers=headers)
-    assert resp.status_code == 301
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
-
-    resp = client.get("/api/_/test_names", headers=headers)
-    assert resp.status_code == 200
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit
-
-    resp = client.get("/api/_/test_names", headers=headers)
-    assert resp.status_code == 200
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 1
+    paths = (
+        "/stats",
+        "/files",
+        "/files/by_date",
+        "/api/_/test_names",
+        "/api/_/test_names",
+    )
+    previous_remaining = 400
+    for p in paths:
+        resp = client.get(p, headers=headers)
+        remaining = float(resp.headers["X-RateLimit-Remaining"])
+        assert remaining < previous_remaining
+        previous_remaining = remaining
 
 
 def test_redirects_and_rate_limit_for_explorer(client):
@@ -267,6 +256,19 @@ def test_redirects_and_rate_limit_for_explorer(client):
     resp = client.get("/stats", headers=headers)
     assert resp.status_code == 301
     assert "X-RateLimit-Remaining" not in resp.headers
+
+
+def test_redirects_and_rate_limit_spin(client):
+    # Simulate a forwarded client with a different ipaddr
+    # In production the API sits behind Nginx
+    limit = 400
+    headers = {"X-Real-IP": "1.2.3.4"}
+    t1 = time.monotonic() + 0.2
+    while time.monotonic() < t1:
+        resp = client.get("/stats", headers=headers)
+    delta = time.monotonic() - t1
+    assert 0 < delta < 0.3
+    assert 0 < limit - float(resp.headers["X-RateLimit-Remaining"]) < 0.3
 
 
 # # list_files # #
