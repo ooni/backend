@@ -40,6 +40,7 @@ Outputs:
 
 from argparse import ArgumentParser, Namespace
 from configparser import ConfigParser
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Thread
@@ -87,6 +88,17 @@ log = logging.getLogger("analysis")
 metrics = setup_metrics(name="analysis")
 
 node_exporter_path = "/run/nodeexp/analysis.prom"
+
+
+@contextmanager
+def database_connection(c):
+    conn = psycopg2.connect(
+        dbname=c["dbname"], user=c["dbuser"], host=c["dbhost"], password=c["dbpassword"]
+    )
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def setup_database_connections(c):
@@ -1062,10 +1074,10 @@ def monitor_measurement_creation(conf):
                 delay = cur.fetchone()[0].total_seconds()
 
             log.info("MMC: Comparing active and standby xlog location")
-            active_conn, master_dbengine = setup_database_connections(conf.active)
-            with active_conn.cursor() as cur:
-                cur.execute("SELECT pg_current_xlog_location()")
-                active_xlog_location = cur.fetchone()[0]
+            with database_connection(conf.active) as active_conn:
+                with active_conn.cursor() as cur:
+                    cur.execute("SELECT pg_current_xlog_location()")
+                    active_xlog_location = cur.fetchone()[0]
 
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_last_xlog_receive_location()")
@@ -1135,6 +1147,7 @@ def domain_input_update_runner():
     """Runs domain_input_updater every 2 hours.
     Spawn a domain_input_updater.run() thread for each run.
     """
+
     def _runner():
         conf = Namespace(dry_run=False, db_uri=None)
         with metrics.timer("domain_input_updater_runtime"):
@@ -1181,7 +1194,7 @@ def main():
 
     Thread(target=domain_input_update_runner).start()
 
-    t = Thread(target=counters_table_updater, args=(conf, ))
+    t = Thread(target=counters_table_updater, args=(conf,))
     t.start()
 
     log.info("Starting generate_slow_query_summary loop")
