@@ -8,7 +8,7 @@ SELECT
         ARRAY['020-new-test-names'],
         NULL);
 
-CREATE TABLE counters (
+CREATE UNLOGGED TABLE counters (
     "measurement_start_day" DATE,
     "test_name" TEXT,
     "probe_cc" CHARACTER (2) NOT NULL,
