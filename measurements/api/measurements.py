@@ -628,9 +628,9 @@ def list_measurements(
 
     # Run the query, generate the results list
     iter_start_time = time.time()
-    q = current_app.db_session.execute(query, query_params)
 
     try:
+        q = current_app.db_session.execute(query, query_params)
         tmpresults = []
         for row in q:
             url = urljoin(
