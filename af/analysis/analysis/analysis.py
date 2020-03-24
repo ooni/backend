@@ -944,7 +944,7 @@ def generate_slow_query_summary(conf):
         rows = dbengine.execute(sql)
         rows = [dict(r) for r in rows]
         for r in rows:
-            queryid = r.pop("queryid")
+            queryid = r["queryid"]
             gauge_family.labels(role, queryid).set(r["total_seconds"])
             calls_cnt.labels(role, queryid).set(r["calls"])
             expr = expr_tpl % ("db_total_query_time", role, queryid)
@@ -954,8 +954,9 @@ def generate_slow_query_summary(conf):
             expr = expr_tpl % ("db_total_query_count", role, queryid)
             url = gen_prometheus_url(expr)
             r["calls"] = html_anchor(url, r["calls"])
+            r["mean_s"] = "%.3f" % r["mean_s"]
 
-        colnames = ["calls", "mean_s", "total_seconds", "query"]
+        colnames = ["queryid", "calls", "mean_s", "total_seconds", "query"]
         tbl = to_table(colnames, rows)
         html = to_html(tbl)
 
