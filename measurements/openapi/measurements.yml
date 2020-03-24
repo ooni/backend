@@ -7,7 +7,7 @@ info:
     email: contact@openobservatory.org
     url: 'https://api.ooni.io/'
   x-logo:
-    url: 'https://ooni.torproject.org/images/ooni-header-mascot-2x.png'
+    url: 'https://ooni.org/images/ooni-header-mascot-2x.png'
     backgroundColor: '#FFF'
 basePath: '/api/v1'
 paths:
