@@ -866,7 +866,14 @@ def parse_args():
 
 
 def to_html(c):
-    return f"""<html><body>{c}</body></html>
+    return f"""<html>
+        <head>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.3.0/milligram.css">
+        </head>
+        <body>
+            {c}
+        </body>
+    </html>
     """
 
 
