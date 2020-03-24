@@ -138,17 +138,12 @@ def files_download(textname):
     if "/" not in textname:
         # This is for backward compatibility with the new pipeline.
         # See: https://github.com/TheTorProject/ooni-measurements/issues/44
-        rawsql = """SELECT report.textname AS report_textname
-            FROM report
-            WHERE report.textname LIKE '%' || :textname
-        """
-        q = current_app.db_session.execute(rawsql, dict(textname=textname))
-
-        first = q.fetchone()
-        if first is None:
-            raise NotFound("No file with that filename found")
-
-        return redirect("/files/download/%s" % first[0])
+        #
+        # It handles cases where the download path does not include the
+        # bucket_date (ex. /files/download/2020-01-01/reportfile.json vs
+        # /files/download/reportfile.json) and will redirect to
+        # https://ooni.org/data
+        return redirect('https://ooni.org/data/', code=301)
 
     rawsql = """
     SELECT *
