@@ -46,5 +46,5 @@ def test_pages_index(client):
 
 
 def test_pages_download_file_404(client):
-    resp = client.get(url_for("pages.files_download", textname="DOES_NOT_EXIST"))
+    resp = client.get(url_for("pages.files_download", textname="/2019-01-01/DOES_NOT_EXIST"))
     assert resp.status_code == 404
