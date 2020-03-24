@@ -946,8 +946,9 @@ def generate_slow_query_summary(conf):
     expr_tpl = """delta(%s{db_role="%s",queryid="%s"}[1h])"""
 
     for role in ("active", "standby"):
-        log.info("Connecting")
+        log.info("Main: Connecting")
         conn, dbengine = setup_database_connections(getattr(conf, role))
+        log.debug("Main: Connected, running query")
         rows = dbengine.execute(sql)
         rows = [dict(r) for r in rows]
         for r in rows:
@@ -968,11 +969,11 @@ def generate_slow_query_summary(conf):
         html = to_html(tbl)
 
         fi = conf.output_directory / f"db_slow_queries_{role}.html"
-        log.info("Writing %s", fi)
+        log.info("Main: Writing %s", fi)
         fi.write_text(html)
         conn.close()
 
-    log.info("Writing metrics to node exporter")
+    log.info("Main: Writing metrics to node exporter")
     prom.write_to_textfile(node_exporter_path, prom_reg)
 
 
