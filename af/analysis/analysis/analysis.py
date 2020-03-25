@@ -65,6 +65,7 @@ import matplotlib  # debdeps: python3-matplotlib
 import pandas as pd  # debdeps: python3-pandas
 import prometheus_client as prom  # debdeps: python3-prometheus-client
 import psycopg2  # debdeps: python3-psycopg2
+from psycopg2.extras import RealDictCursor
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -1084,6 +1085,33 @@ def monitor_measurement_creation(conf):
 
             log.info("MMC: Comparing active and standby xlog location")
             with database_connection(conf.active) as active_conn:
+                # This whole block runs against the active DB
+                # Replication deltas
+                log.info("MMC: Generating replication_deltas")
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Thanks to
+                    # https://blog.dataegret.com/2017/04/deep-dive-into-postgres-stats.html
+                    sql = """SELECT
+                        (pg_xlog_location_diff(pg_current_xlog_location(),sent_location) / 1024)::bigint as pending,
+                        (pg_xlog_location_diff(sent_location,write_location) / 1024)::bigint as write,
+                        (pg_xlog_location_diff(write_location,flush_location) / 1024)::bigint as flush,
+                        (pg_xlog_location_diff(flush_location,replay_location) / 1024)::bigint as replay,
+                        (pg_xlog_location_diff(pg_current_xlog_location(),replay_location))::bigint / 1024 as total_lag
+                        FROM pg_stat_replication"""
+                    cur.execute(sql)
+                    gauges = prom.Gauge(
+                        "replication_deltas",
+                        "Deltas between xlog values",
+                        labelnames=["type"],
+                        registry=prom_reg,
+                    )
+                    d = cur.fetchone()
+                    assert d
+                    for k, v in d.items():
+                        gauges.labels(k).set(v)
+                # End of replication deltas
+
+                # Extract active_xlog_location to compare active VS standby
                 with active_conn.cursor() as cur:
                     cur.execute("SELECT pg_current_xlog_location()")
                     active_xlog_location = cur.fetchone()[0]
@@ -1098,6 +1126,7 @@ def monitor_measurement_creation(conf):
                 gauge_family.labels("replication_delay").set(0)
             else:
                 gauge_family.labels("replication_delay").set(delay)
+
 
             prom.write_to_textfile(nodeexp_path, prom_reg)
 
