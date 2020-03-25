@@ -1004,6 +1004,12 @@ def monitor_measurement_creation(conf):
         labelnames=["type"],
         registry=prom_reg,
     )
+    replication_deltas_gauge = prom.Gauge(
+        "replication_deltas",
+        "Deltas between xlog values",
+        labelnames=["type"],
+        registry=prom_reg,
+    )
     queries = dict(
         fastpath_count="""SELECT COUNT(*)
             FROM fastpath
@@ -1088,7 +1094,7 @@ def monitor_measurement_creation(conf):
                 # This whole block runs against the active DB
                 # Replication deltas
                 log.info("MMC: Generating replication_deltas")
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with active_conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Thanks to
                     # https://blog.dataegret.com/2017/04/deep-dive-into-postgres-stats.html
                     sql = """SELECT
@@ -1099,16 +1105,10 @@ def monitor_measurement_creation(conf):
                         (pg_xlog_location_diff(pg_current_xlog_location(),replay_location))::bigint / 1024 as total_lag
                         FROM pg_stat_replication"""
                     cur.execute(sql)
-                    gauges = prom.Gauge(
-                        "replication_deltas",
-                        "Deltas between xlog values",
-                        labelnames=["type"],
-                        registry=prom_reg,
-                    )
                     d = cur.fetchone()
                     assert d
                     for k, v in d.items():
-                        gauges.labels(k).set(v)
+                        replication_deltas_gauge.labels(k).set(v)
                 # End of replication deltas
 
                 # Extract active_xlog_location to compare active VS standby
