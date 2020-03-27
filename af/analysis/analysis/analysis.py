@@ -1091,6 +1091,9 @@ def monitor_measurement_creation(conf):
             watchdog.notify("STATUS=Running")
 
         try:
+            # Clear gauges
+            stat_activity_gauge._metrics.clear()
+
             log.info("MMC: Gathering fastpath count")
             conn, dbengine = setup_database_connections(conf.standby)
             delta = timedelta(minutes=5)
