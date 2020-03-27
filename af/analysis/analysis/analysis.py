@@ -978,7 +978,7 @@ def generate_slow_query_summary(conf):
     prom.write_to_textfile(node_exporter_path, prom_reg)
 
 
-def _generate_stat_activity_gauge(stat_activity_gauge, conn) -> None:
+def _generate_stat_activity_gauge(stat_activity_gauge, conn, db_role: str) -> None:
     """Gather pg_stat_activity counts"""
     stat_activity_sql = """SELECT state, usename, count(*)
     FROM pg_stat_activity GROUP BY state, usename"""
@@ -986,7 +986,7 @@ def _generate_stat_activity_gauge(stat_activity_gauge, conn) -> None:
         # columns: state, usename, count
         cur.execute(stat_activity_sql)
         for r in cur:
-            m = stat_activity_gauge.labels(state=r[0], usename=r[1])
+            m = stat_activity_gauge.labels(db_role=db_role, state=r[0], usename=r[1])
             m.set(r[2])
 
 
@@ -1025,7 +1025,7 @@ def monitor_measurement_creation(conf):
     stat_activity_gauge = prom.Gauge(
         "stat_activity_count",
         "Active queries counts",
-        labelnames=["state", "usename"],
+        labelnames=["db_role", "state", "usename"],
         registry=prom_reg,
     )
 
@@ -1109,7 +1109,7 @@ def monitor_measurement_creation(conf):
                 delay = cur.fetchone()[0].total_seconds()
 
             log.info("MMC: Summarizing pg_stat_activity on standby")
-            _generate_stat_activity_gauge(stat_activity_gauge, conn)
+            _generate_stat_activity_gauge(stat_activity_gauge, conn, "standby")
 
             log.info("MMC: Comparing active and standby xlog location")
             with database_connection(conf.active) as active_conn:
@@ -1133,7 +1133,9 @@ def monitor_measurement_creation(conf):
                 # End of replication deltas
 
                 log.info("MMC: Summarizing pg_stat_activity on active")
-                _generate_stat_activity_gauge(stat_activity_gauge, active_conn)
+                _generate_stat_activity_gauge(
+                    stat_activity_gauge, active_conn, "active"
+                )
 
                 # Extract active_xlog_location to compare active VS standby
                 with active_conn.cursor() as cur:
@@ -1150,7 +1152,6 @@ def monitor_measurement_creation(conf):
                 gauge_family.labels("replication_delay").set(0)
             else:
                 gauge_family.labels("replication_delay").set(delay)
-
 
             prom.write_to_textfile(nodeexp_path, prom_reg)
 
