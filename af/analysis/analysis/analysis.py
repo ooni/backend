@@ -978,6 +978,18 @@ def generate_slow_query_summary(conf):
     prom.write_to_textfile(node_exporter_path, prom_reg)
 
 
+def _generate_stat_activity_gauge(stat_activity_gauge, conn) -> None:
+    """Gather pg_stat_activity counts"""
+    stat_activity_sql = """SELECT state, usename, count(*)
+    FROM pg_stat_activity GROUP BY state, usename"""
+    with conn.cursor() as cur:
+        # columns: state, usename, count
+        cur.execute(stat_activity_sql)
+        for r in cur:
+            m = stat_activity_gauge.labels(state=r[0], usename=r[1])
+            m.set(r[2])
+
+
 @metrics.timer("monitor_measurement_creation")
 def monitor_measurement_creation(conf):
     """Monitors measurements created by fastpath and traditional pipeline
@@ -1010,6 +1022,13 @@ def monitor_measurement_creation(conf):
         labelnames=["type"],
         registry=prom_reg,
     )
+    stat_activity_gauge = prom.Gauge(
+        "stat_activity_count",
+        "Active queries counts",
+        labelnames=["state", "usename"],
+        registry=prom_reg,
+    )
+
     queries = dict(
         fastpath_count="""SELECT COUNT(*)
             FROM fastpath
@@ -1089,6 +1108,9 @@ def monitor_measurement_creation(conf):
                 cur.execute(sql_replication_delay)
                 delay = cur.fetchone()[0].total_seconds()
 
+            log.info("MMC: Summarizing pg_stat_activity on standby")
+            _generate_stat_activity_gauge(stat_activity_gauge, conn)
+
             log.info("MMC: Comparing active and standby xlog location")
             with database_connection(conf.active) as active_conn:
                 # This whole block runs against the active DB
@@ -1109,6 +1131,9 @@ def monitor_measurement_creation(conf):
                     for k, v in d.items():
                         replication_deltas_gauge.labels(k).set(v)
                 # End of replication deltas
+
+                log.info("MMC: Summarizing pg_stat_activity on active")
+                _generate_stat_activity_gauge(stat_activity_gauge, active_conn)
 
                 # Extract active_xlog_location to compare active VS standby
                 with active_conn.cursor() as cur:
