@@ -9,8 +9,6 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 
 from textwrap import dedent
 import logging
-import os
-import time
 
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import Json

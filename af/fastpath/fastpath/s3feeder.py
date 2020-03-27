@@ -15,7 +15,9 @@ AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16
 
 """
 
-from typing import Iterator
+from datetime import date, timedelta
+from typing import Generator
+from pathlib import Path
 import logging
 import os
 import time
@@ -42,14 +44,11 @@ for l in ("urllib3", "botocore", "s3transfer"):
     logging.getLogger(l).setLevel(logging.INFO)
 
 
-def load_multiple(fn, touch=True) -> Iterator[MsmtTup]:
+def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
     """Load contents of cans. Decompress tar archives if found.
     Yields measurements one by one as:
         (string of JSON, None) or (None, msmt dict)
     """
-    if touch:
-        os.utime(fn)  # update access time - used for cache cleanup
-
     # TODO: handle:
     # RuntimeError: LZ4F_decompress failed with code: ERROR_decompressionFailed
     if fn.endswith(".tar.lz4"):
@@ -81,10 +80,10 @@ def load_multiple(fn, touch=True) -> Iterator[MsmtTup]:
     elif fn.endswith(".yaml.lz4"):
         with lz4frame.open(fn) as f:
             raise Exception("Unsupported format: YAML")
-            bucket_tstamp = "FIXME"
-            for msm in iter_yaml_msmt_normalized(f, bucket_tstamp):
-                metrics.incr("yaml_normalization")
-                yield (None, msm)
+            # bucket_tstamp = "FIXME"
+            # for msm in iter_yaml_msmt_normalized(f, bucket_tstamp):
+            #     metrics.incr("yaml_normalization")
+            #     yield (None, msm)
 
     else:
         raise RuntimeError(fn)
@@ -92,16 +91,6 @@ def load_multiple(fn, touch=True) -> Iterator[MsmtTup]:
 
 def create_s3_client():
     return boto3.Session(profile_name=AWS_PROFILE).client("s3")
-
-
-def list_cans_on_s3(prefix):
-    # TODO list files based on date and return them
-    s3 = create_s3_client()
-    r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="canned/" + prefix)
-    for filedesc in r["Contents"]:
-        fn = filedesc["Key"]
-        size = filedesc["Size"]
-        print("%s size %d MB" % (fn, size / 1024 / 1024))
 
 
 def list_cans_on_s3_for_a_day(s3, day):
@@ -116,10 +105,11 @@ def list_cans_on_s3_for_a_day(s3, day):
 
 
 @metrics.timer("fetch_cans")
-def fetch_cans(s3, conf, files):
+def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
     """
     Download cans to a local directory
     fnames = [("2013-09-12/20130912T150305Z-MD-AS1547-http_", size), ... ]
+    yield each can file Path
     """
     # fn: can filename without path
     # diskf: File in the s3cachedir directory
@@ -144,7 +134,7 @@ def fetch_cans(s3, conf, files):
         _cb.count += bytes_count
         _cb.total_count += bytes_count
         metrics.gauge("s3_download_percentage", _cb.total_count / _cb.total_size * 100)
-        log.debug("s3_download_percentage %d", _cb.total_count / _cb.total_size * 100)
+        # log.debug("s3_download_percentage %d", _cb.total_count / _cb.total_size * 100)
         try:
             speed = _cb.count / 131_072 / (time.time() - _cb.start_time)
             metrics.gauge("s3_download_speed_avg_Mbps", speed)
@@ -169,16 +159,71 @@ def fetch_cans(s3, conf, files):
         metrics.gauge("fetching", 0)
         tmpf.rename(diskf)
         assert size == diskf.stat().st_size
+        yield diskf
 
     metrics.gauge("s3_download_speed_avg_Mbps", 0)
 
 
+# TODO: merge with stream_daily_cans, add caching to the latter to be used
+# during functional tests
 @metrics.timer("fetch_cans_for_a_day_with_cache")
 def fetch_cans_for_a_day_with_cache(conf, day):
     s3 = create_s3_client()
     fns = list_cans_on_s3_for_a_day(s3, day)
-    #can_names = [
-    #    "2020-03-03/web_connectivity.14.tar.lz4",
-    #]
-    #fns = [(name, size) for name, size in fns if name in can_names]
-    fetch_cans(s3, conf, fns)
+    list(fetch_cans(s3, conf, fns))
+
+
+def _calculate_etr(t0, now, start_day, day, stop_day, can_num, can_tot_count) -> int:
+    """Estimate total runtime in seconds.
+    stop_day is not included, can_num starts from 0
+    """
+    tot_days_count = (stop_day - start_day).days
+    elapsed = now - t0
+    days_done = (day - start_day).days
+    fraction_of_day_done = (can_num + 1) / float(can_tot_count)
+    etr = elapsed * tot_days_count / (days_done + fraction_of_day_done)
+    return etr
+
+
+def _update_eta(t0, start_day, day, stop_day, can_num, can_tot_count):
+    """Generate metric process_s3_measurements_eta expressed as epoch
+    """
+    try:
+        now = time.time()
+        etr = _calculate_etr(t0, now, start_day, day, stop_day, can_num, can_tot_count)
+        eta = t0 + etr
+        metrics.gauge("process_s3_measurements_eta", eta)
+    except:
+        pass
+
+
+def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None, None]:
+    """Stream cans from S3
+    """
+    today = date.today()
+    if not start_day or start_day >= today:
+        return
+
+    log.info("Fetching older cans from S3")
+    t0 = time.time()
+    day = start_day
+    s3 = create_s3_client()
+    # the last day is not included
+    stop_day = end_day if end_day < today else today
+    while day < stop_day:
+        log.info("Processing day %s", day)
+        cans_fns = list_cans_on_s3_for_a_day(s3, day)
+        for cn, can_f in enumerate(fetch_cans(s3, conf, cans_fns)):
+            try:
+                _update_eta(t0, start_day, day, stop_day, cn, len(cans_fns))
+                log.info("can %s ready", can_f.name)
+                for msmt_tup in load_multiple(can_f.as_posix()):
+                    yield msmt_tup
+            except Exception as e:
+                log.error(str(e), exc_info=True)
+
+        day += timedelta(days=1)
+
+    if end_day:
+        log.info("Reached {end_day}, stream_cans finished")
+        return

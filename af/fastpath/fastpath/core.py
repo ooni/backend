@@ -106,6 +106,10 @@ def setup():
     ap.add_argument(
         "--stop-after", type=int, help="Stop after feeding N measurements", default=None
     )
+    ap.add_argument("--no-write-msmt", action="store_true",
+                    help="Do not write measurement on disk")
+    ap.add_argument("--no-write-to-db", action="store_true",
+                    help="Do not insert measurement in database")
     conf = ap.parse_args()
 
     if conf.devel or conf.stdout or no_journal_handler:
@@ -241,39 +245,6 @@ expected_colnames = {
 }
 
 
-@metrics.timer("load_s3_measurements")
-def load_s3_measurements(day) -> Iterator[MsmtTup]:
-    # TODO: move this into s3feeder
-    t0 = time.time()
-    path = conf.s3cachedir / str(day)
-    log.info("Scanning %s", path.absolute())
-    files = []
-    with os.scandir(path) as d:
-        for e in d:
-            if not e.is_file():
-                continue
-            if e.name == "index.json.gz":
-                continue
-            files.append(e)
-
-    fcnt = 0
-    for e in sorted(files, key=lambda f: f.name):
-        fcnt += 1
-        log.info(f"Ingesting [{fcnt}/{len(files)}] {e.name}")
-        fn = os.path.join(path, e.name)
-        try:
-            for measurement_tup in s3feeder.load_multiple(fn):
-                yield measurement_tup
-        except:
-            log.error(f"Ingesting [{fcnt}/{len(files)}] {e.name}", exc_info=True)
-
-        remaining = (time.time() - t0) * (len(files) - fcnt) / fcnt
-        metrics.gauge("load_s3_measurements_eta", remaining)
-        metrics.gauge("load_s3_measurements_remaining_files", len(files) - fcnt)
-        remaining_td = timedelta(seconds=remaining)
-        log.info("load_s3_measurements remaining time: %s", remaining_td)
-
-
 def prepare_for_json_normalize(report):
     try:
         d = report["test_keys"]["control"]["tcp_connect"]
@@ -296,22 +267,9 @@ def fetch_measurements(start_day, end_day) -> Iterator[MsmtTup]:
     # --start-day                   -> Run on old cans, then over SSH
     # --start-day and --end-day     -> Run on old cans
     # --start-day and --end-day  with the same date     -> NOP
-    today = date.today()
-    if start_day and start_day < today:
-        # TODO: fetch day N+1 while processing day N
-        log.info("Fetching older cans from S3")
-        day = start_day
-        while day < (end_day or today):
-            log.info("Processing %s", day)
-            s3feeder.fetch_cans_for_a_day_with_cache(conf, day)
-            for measurement_tup in load_s3_measurements(day):
-                yield measurement_tup
 
-            day += timedelta(days=1)
-
-        if end_day:
-            log.info("Reached {end_day}, exiting")
-            return
+    for measurement_tup in s3feeder.stream_cans(conf, start_day, end_day):
+        yield measurement_tup
 
     if conf.nossh:
         log.info("Not fetching over SSH")
@@ -1295,7 +1253,11 @@ def file_trimmer(conf):
 def msm_processor(queue):
     """Measurement processor worker
     """
-    db.setup(conf)
+    if conf.no_write_to_db:
+        log.warning("not writing to database")
+    else:
+        db.setup(conf)
+
     while True:
         msm_tup = queue.get()
         if msm_tup is None:
@@ -1314,7 +1276,8 @@ def msm_processor(queue):
                 sshfeeder.log_ingestion_delay(measurement)
                 log.debug(f"Processing {tid} {rid} {inp}")
                 fn = generate_filename(tid)
-                writeout_measurement(msm_jstr, fn, conf.update, tid)
+                if not conf.no_write_msmt:
+                    writeout_measurement(msm_jstr, fn, conf.update, tid)
                 if measurement.get("test_name", None) == "web_connectivity":
                     matches = match_fingerprints(measurement)
                 else:
@@ -1330,16 +1293,17 @@ def msm_processor(queue):
                     log.debug(
                         f"Storing {tid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
                     )
-                db.upsert_summary(
-                    measurement,
-                    scores,
-                    anomaly,
-                    confirmed,
-                    failure,
-                    tid,
-                    fn,
-                    conf.update,
-                )
+                if not conf.no_write_to_db:
+                    db.upsert_summary(
+                        measurement,
+                        scores,
+                        anomaly,
+                        confirmed,
+                        failure,
+                        tid,
+                        fn,
+                        conf.update,
+                    )
             except Exception as e:
                 log.exception(e)
                 metrics.incr("unhandled_exception")
@@ -1366,7 +1330,10 @@ def core():
     scores = None
 
     # Spawn file trimmer process
-    mp.Process(target=file_trimmer, args=(conf,)).start()
+    if conf.no_write_msmt:
+        log.warning("Not trimming old measurement on disk")
+    else:
+        mp.Process(target=file_trimmer, args=(conf,)).start()
 
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module

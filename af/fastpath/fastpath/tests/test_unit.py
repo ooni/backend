@@ -2,7 +2,10 @@
 # Fastpath - unit tests
 #
 
+from datetime import date
+
 import fastpath.core as fp
+import fastpath.s3feeder as s3feeder
 import ujson
 
 
@@ -165,3 +168,24 @@ def test_bug_backend352():
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
     }
+
+
+def test_s3feeder_eta():
+    t0 = 1588200000
+    now = t0 + 3600
+    start_day = date(2020, 1, 1)
+    day = date(2020, 1, 1)
+    stop_day = date(2020, 1, 2)
+
+    etr = s3feeder._calculate_etr(t0, now, start_day, day, stop_day, 0, 4)
+    assert etr / 3600 == 4
+    etr = s3feeder._calculate_etr(t0, now, start_day, day, stop_day, 3, 4)
+    assert etr / 3600 == 1
+    etr = s3feeder._calculate_etr(
+        t0, now, start_day, date(2020, 1, 2), date(2020, 1, 5), -1, 9
+    )
+    assert etr / 3600 == 4.0
+    etr = s3feeder._calculate_etr(
+        t0, now, start_day, date(2020, 1, 4), date(2020, 1, 5), 9, 10
+    )
+    assert etr / 3600 == 1.0
