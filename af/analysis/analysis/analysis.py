@@ -931,7 +931,7 @@ def generate_slow_query_summary(conf):
         LIMIT 16;
     """
     prom_reg = prom.CollectorRegistry()
-    gauge_family = prom.Gauge(
+    total_query_time_g = prom.Gauge(
         "db_total_query_time",
         "DB cumulative query time",
         labelnames=["db_role", "queryid"],
@@ -954,7 +954,7 @@ def generate_slow_query_summary(conf):
         rows = [dict(r) for r in rows]
         for r in rows:
             queryid = r["queryid"]
-            gauge_family.labels(role, queryid).set(r["total_seconds"])
+            total_query_time_g.labels(role, queryid).set(r["total_seconds"])
             calls_cnt.labels(role, queryid).set(r["calls"])
             expr = expr_tpl % ("db_total_query_time", role, queryid)
             url = gen_prometheus_url(expr)
@@ -1266,7 +1266,7 @@ def main():
     log.info("Starting generate_slow_query_summary loop")
     while True:
         generate_slow_query_summary(conf)
-        time.sleep(3600)
+        time.sleep(5 * 60)
 
     # # Update confirmed_stats table. The update is idempotent. The table is used
     # # in the next steps.
