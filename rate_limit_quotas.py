@@ -85,9 +85,6 @@ class Limiter:
                 b = self._ipaddr_buckets[n]
                 b[ipaddr] = b.get(ipaddr, limit) - elapsed
 
-        print([b[ipaddr] for b in self._ipaddr_buckets])
-        self.increment_quota_counters(1)
-
     def get_minimum_across_quotas(self, ipaddr=None, token=None) -> int:
         if ipaddr:
             iterable = zip(self._ipaddr_limits, self._ipaddr_buckets)
