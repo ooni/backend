@@ -30,7 +30,7 @@ DB_HOST = "hkgmetadb.infra.ooni.io"
 DB_USER = "shovel"
 DB_NAME = "metadb"
 DB_PASSWORD = "yEqgNr2eXvgG255iEBxVeP"  # This is already made public
-FREE_SPACE_GB = 10.2
+FREE_SPACE_GB = 5
 
 
 def _ping():
@@ -153,48 +153,35 @@ def upsert_summary(
         q = f"SELECT pg_notify('fastpath', '{notification_json}');"
         cur.execute(q)
 
-
 @metrics.timer("trim_old_measurements")
 def trim_old_measurements(conf):
-    """Trim old measurement rows from fastpath table
-    and delete files on disk
+    """Trim old measurement files on disk
     """
+    # TODO move this out of db.py
     t = time.time()
     if trim_old_measurements._next_run > t:
         return
 
-    trim_old_measurements._next_run = t + 10
+    trim_old_measurements._next_run = t + 3600
     s = os.statvfs(conf.msmtdir)
     free_gb = s.f_bavail * s.f_bsize / 2 ** 30
     if free_gb > FREE_SPACE_GB:
         return
 
     log.debug("Starting file trimming: %d GB over threshold", FREE_SPACE_GB - free_gb)
-    q = "SELECT tid FROM fastpath ORDER BY test_start_time LIMIT 500;"
-    with conn.cursor() as cur:
-        cur.execute(q)
-
-        row_cnt = file_cnt = 0
-        for row in cur.fetchall():
-            row_cnt += 1
-            tid = row[0]
-            f = conf.msmtdir / (tid + ".json.lz4")
-            try:
+    # Delete files older than 2 days, ignoring race conditions
+    time_threshold = time.time() - 3600 * 48
+    file_cnt = 0
+    for f in conf.msmtdir.glob("*.lz4"):
+        try:
+            if f.stat().st_mtime < time_threshold:
                 f.unlink()
                 file_cnt += 1
-            except FileNotFoundError:
-                pass
-            sql = "DELETE FROM fastpath WHERE tid = %s"
-            cur.execute(sql, (tid,))
-            conn.commit()
+        except FileNotFoundError:
+            pass  # Likely deleted by another worker process
 
-        log.debug("Deleted %d files", file_cnt)
-        metrics.incr("deleted_files", file_cnt)
-
-        count_q = "SELECT reltuples::BIGINT AS estimate FROM pg_class WHERE relname='fastpath'"
-        cur.execute(count_q)
-        row_count = cur.fetchone()[0]
-        metrics.gauge("fastpath_approx_row_cnt", row_count)
+    log.debug("Deleted %d files", file_cnt)
+    metrics.incr("deleted_files", file_cnt)
 
 
 # Skew processes to run at different times
