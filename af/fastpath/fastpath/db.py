@@ -11,7 +11,6 @@ from textwrap import dedent
 import logging
 import os
 import time
-import random
 
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import Json
@@ -30,7 +29,6 @@ DB_HOST = "hkgmetadb.infra.ooni.io"
 DB_USER = "shovel"
 DB_NAME = "metadb"
 DB_PASSWORD = "yEqgNr2eXvgG255iEBxVeP"  # This is already made public
-FREE_SPACE_GB = 5
 
 
 def _ping():
@@ -152,38 +150,3 @@ def upsert_summary(
         notification_json = ujson.dumps(notification)
         q = f"SELECT pg_notify('fastpath', '{notification_json}');"
         cur.execute(q)
-
-@metrics.timer("trim_old_measurements")
-def trim_old_measurements(conf):
-    """Trim old measurement files on disk
-    """
-    # TODO move this out of db.py
-    t = time.time()
-    if trim_old_measurements._next_run > t:
-        return
-
-    trim_old_measurements._next_run = t + 3600
-    s = os.statvfs(conf.msmtdir)
-    free_gb = s.f_bavail * s.f_bsize / 2 ** 30
-    if free_gb > FREE_SPACE_GB:
-        return
-
-    log.debug("Starting file trimming: %d GB over threshold", FREE_SPACE_GB - free_gb)
-    # Delete files older than 2 days, ignoring race conditions
-    time_threshold = time.time() - 3600 * 48
-    file_cnt = 0
-    for f in conf.msmtdir.glob("*.lz4"):
-        try:
-            if f.stat().st_mtime < time_threshold:
-                f.unlink()
-                file_cnt += 1
-        except FileNotFoundError:
-            pass  # Likely deleted by another worker process
-
-    log.debug("Deleted %d files", file_cnt)
-    metrics.incr("deleted_files", file_cnt)
-
-
-# Skew processes to run at different times
-random.seed(os.getpid())
-trim_old_measurements._next_run = time.time() + random.randrange(2, 30)

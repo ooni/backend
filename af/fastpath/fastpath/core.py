@@ -1240,6 +1240,53 @@ def writeout_measurement(msm_jstr, fn, update, tid):
     metrics.incr("wrote_uncompressed_bytes", len(msm_jstr))
 
 
+@metrics.timer("trim_old_measurements")
+def _trim_old_measurements(conf):
+    """Trim old measurement files on disk
+    """
+    s = os.statvfs(conf.msmtdir)
+    free_gb = s.f_bavail * s.f_bsize / 2 ** 30  # float
+    if free_gb > 20:
+        log.info("No trimming: %d GB free", free_gb)
+        return
+
+    # 4.89 GB free: keep only the last 24h;    10 GB free: keep 100h
+    # The globbing gets slower with larger backlogs but the quadratic behavior
+    # can become as aggressive as needed
+    keep_hours = free_gb ** 2
+    log.info(
+        "Starting file trimming: %.1f GB free, keeping the last %.2f hours"
+        % (free_gb, keep_hours)
+    )
+
+    assert keep_hours > 24  # temporary
+    # Delete files ignoring race conditions
+    time_threshold = time.time() - 3600 * keep_hours
+    file_cnt = 0
+    for f in conf.msmtdir.glob("*.lz4"):
+        try:
+            if f.stat().st_mtime < time_threshold:
+                f.unlink()
+                file_cnt += 1
+        except FileNotFoundError:
+            pass
+
+    log.debug("Deleted %d files", file_cnt)
+    metrics.incr("deleted_files", file_cnt)
+
+
+def file_trimmer(conf):
+    """Trim measurement files to free disk space.
+    Runs in a dedicated thread
+    """
+    while True:
+        try:
+            _trim_old_measurements(conf)
+        except Exception as e:
+            log.exception(e)
+        time.sleep(60 * 5)
+
+
 def msm_processor(queue):
     """Measurement processor worker
     """
@@ -1288,7 +1335,6 @@ def msm_processor(queue):
                     fn,
                     conf.update,
                 )
-                db.trim_old_measurements(conf)
             except Exception as e:
                 log.exception(e)
                 metrics.incr("unhandled_exception")
@@ -1313,6 +1359,9 @@ def core():
 
     t00 = time.time()
     scores = None
+
+    # Spawn file trimmer process
+    mp.Process(target=file_trimmer, args=(conf,)).start()
 
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module

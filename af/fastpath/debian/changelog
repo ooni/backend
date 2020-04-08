@@ -1,3 +1,9 @@
+fastpath (0.26) unstable; urgency=medium
+
+  * Improve file trimming
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 08 Apr 2020 10:46:56 +0100
+
 fastpath (0.25) unstable; urgency=medium
 
   * URL prioritization: populate citizenlab table
