@@ -1,12 +1,13 @@
+
+from csv import DictWriter
+from datetime import datetime, timedelta
+from dateutil.parser import parse as parse_date
+from io import StringIO
 import http.client
 import json
 import math
 import re
 import time
-
-from csv import DictWriter
-from dateutil.parser import parse as parse_date
-from io import StringIO
 
 import requests
 import lz4framed
@@ -606,7 +607,9 @@ def list_measurements(
     merger = [
         coal("test_start_time"),
         coal("measurement_start_time"),
-        func.coalesce(literal_column("mr.measurement_id"), literal_column("fp.measurement_id")).label("measurement_id"),
+        func.coalesce(
+            literal_column("mr.measurement_id"), literal_column("fp.measurement_id")
+        ).label("measurement_id"),
         func.coalesce(literal_column("mr.m_report_no"), 0).label("m_report_no"),
         coal("anomaly"),
         coal("confirmed"),
@@ -747,15 +750,15 @@ def get_aggregated(
     probe_cc=None,
     since=None,
     until=None,
-    format="JSON"
+    format="JSON",
 ):
     """Aggregate counters data
     """
-    # TODO:
-    # implement and test ETAGS
     log = current_app.logger
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
+
+    cacheable = until and parse_date(until) < datetime.now() - timedelta(hours=72)
 
     # Assemble query
     def coalsum(name):
@@ -774,8 +777,7 @@ def get_aggregated(
     if domain:
         # Join in domain_input table and filter by domain
         table = table.join(
-            sql.table("domain_input"),
-            sql.text("counters.input = domain_input.input"),
+            sql.table("domain_input"), sql.text("counters.input = domain_input.input"),
         )
         where.append(sql.text("domain = :domain"))
         query_params["domain"] = domain
@@ -783,8 +785,7 @@ def get_aggregated(
     if category_code:
         # Join in citizenlab table and filter by category_code
         table = table.join(
-            sql.table("citizenlab"),
-            sql.text("citizenlab.url = counters.input"),
+            sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
         )
         where.append(sql.text("category_code = :category_code"))
         query_params["category_code"] = category_code
@@ -833,7 +834,7 @@ def get_aggregated(
         if dimension_cnt == 2:
             r = [dict(row) for row in q]
 
-        elif (axis_x or axis_y):
+        elif axis_x or axis_y:
             r = [dict(row) for row in q]
 
         else:
@@ -842,6 +843,10 @@ def get_aggregated(
         if format == "CSV":
             return _convert_to_csv(r)
 
-        return jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
+        response = jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
+        if cacheable:
+            response.cache_control.max_age = 3600 * 24
+        return response
+
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})
