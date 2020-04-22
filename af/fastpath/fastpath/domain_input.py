@@ -50,6 +50,41 @@ VALID_URL = re.compile(
 
 URL_BAD_CHARS = {"\r", "\n", "\t", "\\"}
 
+# FIXME: temporarily hardcoded here for backend#361
+PRIORITIES = {
+    "NEWS": 100,
+    "POLR": 100,
+    "HUMR": 100,
+    "LGBT": 100,
+    "ANON": 100,
+    "GRP": 80,
+    "COMT": 80,
+    "MMED": 80,
+    "SRCH": 80,
+    "PUBH": 80,
+    "REL": 60,
+    "XED": 60,
+    "HOST": 60,
+    "ENV": 60,
+    "FILE": 40,
+    "CULTR": 40,
+    "IGO": 40,
+    "GOVT": 40,
+    "DATE": 30,
+    "HATE": 30,
+    "MILX": 30,
+    "PROV": 30,
+    "PORN": 30,
+    "GMB": 30,
+    "ALDR": 30,
+    "GAME": 20,
+    "MISC": 20,
+    "HACK": 20,
+    "ECON": 20,
+    "COMM": 20,
+    "CTRL": 20,
+}
+
 
 def _extract_domain(url: str) -> Optional[str]:
     if any(c in URL_BAD_CHARS for c in url):
@@ -59,12 +94,14 @@ def _extract_domain(url: str) -> Optional[str]:
     if m:
         return m.group(2)
 
+    return None
+
 
 @metrics.timer("fetch_citizen_lab_lists")
-def fetch_citizen_lab_lists():
+def fetch_citizen_lab_lists() -> List[Tuple[str, str, str, str, int]]:
     """Clone repository in a temporary directory and extract files
     """
-    out = []  # (cc or "ZZ", domain, url, category_code)
+    out = []  # (cc or "ZZ", domain, url, category_code, priority)
     with TemporaryDirectory() as tmpdir:
         cmd = ("git", "clone", "--depth", "1", HTTPS_GIT_URL, tmpdir)
         check_call(cmd, timeout=120)
@@ -83,7 +120,9 @@ def fetch_citizen_lab_lists():
                     if not domain:
                         log.debug("Ignoring", url)
                         continue
-                    out.append((cc, domain, url, item["category_code"]))
+                    category_code = item["category_code"]
+                    priority = PRIORITIES.get(category_code, 100)
+                    out.append((cc, domain, url, category_code, priority))
 
     return out
 
@@ -92,7 +131,7 @@ def fetch_citizen_lab_lists():
 def rebuild_citizenlab_table_from_citizen_lab_lists(conf):
     """Fetch lists from GitHub repository
     """
-    ev = "INSERT INTO citizenlab (cc, domain, url, category_code) VALUES %s"
+    ev = "INSERT INTO citizenlab (cc, domain, url, category_code, priority) VALUES %s"
 
     test_items = fetch_citizen_lab_lists()
 

@@ -1,3 +1,11 @@
+analysis (0.14) unstable; urgency=medium
+
+  * URL prioritization MVP
+    https://github.com/ooni/backend/issues/361
+    https://github.com/ooni/pipeline/pull/311
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 14 Apr 2020 22:09:35 +0100
+
 analysis (0.13) unstable; urgency=medium
 
   * More frequent DB metrics
