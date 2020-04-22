@@ -360,6 +360,15 @@ paths:
           description: |
             The dimension on the y axis e.g. probe_cc
 
+        - name: format
+          in: query
+          type: string
+          description: |
+            Output format, JSON (default) or CSV
+          enum:
+            - JSON
+            - CSV
+
       responses:
         '200':
           description: Returns aggregated counters

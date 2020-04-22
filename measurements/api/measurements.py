@@ -4,7 +4,9 @@ import math
 import re
 import time
 
+from csv import DictWriter
 from dateutil.parser import parse as parse_date
+from io import StringIO
 
 import requests
 import lz4framed
@@ -711,6 +713,29 @@ def list_measurements(
     return jsonify({"metadata": metadata, "results": results[:limit]})
 
 
+def _convert_to_csv(r) -> str:
+    """Convert aggregation result dict/list to CSV
+    """
+    csvf = StringIO()
+    if isinstance(r, dict):
+        # 0-dimensional data
+        fieldnames = sorted(r.keys())
+        writer = DictWriter(csvf, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(r)
+
+    else:
+        fieldnames = sorted(r[0].keys())
+        writer = DictWriter(csvf, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in r:
+            writer.writerow(row)
+
+    result = csvf.getvalue()
+    csvf.close()
+    return result
+
+
 def get_aggregated(
     axis_x=None,
     axis_y=None,
@@ -722,11 +747,11 @@ def get_aggregated(
     probe_cc=None,
     since=None,
     until=None,
+    format="JSON"
 ):
     """Aggregate counters data
     """
     # TODO:
-    # implement CSV and testformat
     # implement and test ETAGS
     log = current_app.logger
 
@@ -813,6 +838,9 @@ def get_aggregated(
 
         else:
             r = dict(q.fetchone())
+
+        if format == "CSV":
+            return _convert_to_csv(r)
 
         return jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
     except Exception as e:
