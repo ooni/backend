@@ -7,6 +7,8 @@ See README.adoc
 Lint using:
     black -t py37 -l 100 --fast  tests/integ/test_integration.py
 
+Test using:
+    tox -e integ -- -s --show-capture=no -k test_aggregation
 """
 
 from datetime import datetime, timedelta
@@ -645,7 +647,6 @@ def test_list_measurements_shared(client, shared_rid_input, log):
         assert "temp-id" in m
 
 
-
 # category_code support: briefly tested by adding this to
 # measurements/openapi/measurements.yml
 # - name: category_code
@@ -1157,38 +1158,179 @@ def test_aggregation_no_axis(client, log):
     # 0-dimensional data
     url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01"
     r = api(client, url)
-    assert r == {"dimension_count": 0, "result": {"cnt": 350}, "v": 0}, fjd(r)
+    expected = {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 13,
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 350,
+        },
+        "v": 0,
+    }
+
+    assert r == expected, fjd(r)
+
+
+def test_aggregation_no_axis_domain(client):
+    # 0-dimensional data
+    url = "aggregation?probe_cc=IE&domain=twitter.com&since=2020-01-01&until=2020-01-03"
+    r = api(client, url)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 0,
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 236,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
+def test_aggregation_no_axis_category_code(client):
+    # 0-dimensional data
+    url = "aggregation?probe_cc=IE&category_code=HACK&since=2020-01-01&until=2020-01-03"
+    r = api(client, url)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 45,
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 2538,
+        },
+        "v": 0,
+    }, fjd(r)
 
 
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
-    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-01-05&axis_x=measurement_start_day"
     r = api(client, url)
-    exp = {
+    expected = {
         "dimension_count": 1,
         "result": [
-            {"cnt": 5, "measurement_start_day": "2020-01-02"},
-            {"cnt": 37, "measurement_start_day": "2020-01-04"},
-            {"cnt": 46, "measurement_start_day": "2020-01-08"},
-            {"cnt": 26, "measurement_start_day": "2020-01-13"},
-            {"cnt": 20, "measurement_start_day": "2020-01-16"},
-            {"cnt": 87, "measurement_start_day": "2020-01-20"},
-            {"cnt": 6, "measurement_start_day": "2020-01-21"},
-            {"cnt": 87, "measurement_start_day": "2020-01-23"},
-            {"cnt": 11, "measurement_start_day": "2020-01-26"},
-            {"cnt": 25, "measurement_start_day": "2020-01-27"},
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 5,
+                "measurement_start_day": "2020-01-02",
+            },
+            {
+                "anomaly_count": 1,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 37,
+                "measurement_start_day": "2020-01-04",
+            },
         ],
         "v": 0,
     }
-    assert r == exp, fjd(r)
+    assert r == expected, fjd(r)
+
+
+def test_aggregation_x_axis_only_category_code(client):
+    # 1-dimensional data
+    url = "aggregation?probe_cc=IE&category_code=HACK&since=2020-01-01&until=2020-01-03&axis_x=measurement_start_day"
+    r = api(client, url)
+    expected = {
+        "dimension_count": 1,
+        "result": [
+            {
+                "anomaly_count": 32,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1302,
+                "measurement_start_day": "2020-01-02",
+            },
+            {
+                "anomaly_count": 13,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1236,
+                "measurement_start_day": "2020-01-03",
+            },
+        ],
+        "v": 0,
+    }
+    assert r == expected, fjd(r)
 
 
 def test_aggregation_x_axis_y_axis(client, log):
-    # 2 dimensions
+    # 2-dimensional data
     url = "aggregation?since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
     r = api(client, url)
+
+    assert "error" not in r
     assert r["dimension_count"] == 2
-    assert len(r["result"]) == 2139
-    # TODO
-    # exp = {}
-    # assert r == exp, fjd(r)
+    assert len(r["result"]) == 2140
+
+
+def test_aggregation_x_axis_y_axis_domain(client, log):
+    # 2-dimensional data: day vs ASN
+    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2020-01-01&until=2020-01-03&axis_x=measurement_start_day&axis_y=probe_asn"
+    r = api(client, url)
+    assert r == {
+        "dimension_count": 2,
+        "result": [
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 4,
+                "measurement_start_day": "2020-01-02",
+                "probe_asn": 3320,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 4,
+                "measurement_start_day": "2020-01-02",
+                "probe_asn": 13184,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2020-01-02",
+                "probe_asn": 200052,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 4,
+                "measurement_start_day": "2020-01-03",
+                "probe_asn": 3209,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 5,
+                "measurement_start_day": "2020-01-03",
+                "probe_asn": 3320,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2020-01-03",
+                "probe_asn": 9145,
+            },
+            {
+                "anomaly_count": 4,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 4,
+                "measurement_start_day": "2020-01-03",
+                "probe_asn": 29562,
+            },
+        ],
+        "v": 0,
+    }, fjd(r)

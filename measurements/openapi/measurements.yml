@@ -267,6 +267,11 @@ paths:
           minLength: 3
           description: The domain to search measurements for
 
+        - name: category_code
+          in: query
+          type: string
+          description: The category code from the citizenlab list
+
         - name: probe_cc
           in: query
           type: string

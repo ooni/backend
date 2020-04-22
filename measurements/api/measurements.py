@@ -714,29 +714,33 @@ def list_measurements(
 def get_aggregated(
     axis_x=None,
     axis_y=None,
-
     category_code=None,
     domain=None,
     input=None,
-
+    test_name=None,
     probe_asn=None,
     probe_cc=None,
     since=None,
-    test_name=None,
     until=None,
 ):
     """Aggregate counters data
     """
+    # TODO:
+    # implement CSV and testformat
+    # implement and test ETAGS
     log = current_app.logger
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
 
     # Assemble query
+    def coalsum(name):
+        return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
+
     cols = [
-        sql.text("SUM(anomaly_count)"),
-        sql.text("SUM(confirmed_count)"),
-        sql.text("SUM(failure_count)"),
-        sql.text("SUM(measurement_count)"),
+        coalsum("anomaly_count"),
+        coalsum("confirmed_count"),
+        coalsum("failure_count"),
+        coalsum("measurement_count"),
     ]
     table = sql.table("counters")
     where = []
@@ -750,6 +754,15 @@ def get_aggregated(
         )
         where.append(sql.text("domain = :domain"))
         query_params["domain"] = domain
+
+    if category_code:
+        # Join in citizenlab table and filter by category_code
+        table = table.join(
+            sql.table("citizenlab"),
+            sql.text("citizenlab.url = counters.input"),
+        )
+        where.append(sql.text("category_code = :category_code"))
+        query_params["category_code"] = category_code
 
     if probe_cc:
         where.append(sql.text("probe_cc = :probe_cc"))
