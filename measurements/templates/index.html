@@ -1,23 +1,19 @@
 {% extends 'base.html' %}
 
 {% block navbar %}
-
-<header>
-<div class="hero">
-  <img
-    src="{{ url_for('static', filename='dist/images/API-Horizontal-MonochromeInverted.png') }}"
-    srcset="{{ url_for('static', filename='dist/images/API-Horizontal-MonochromeInverted@2x.png') }} 2x"
-  />
-
-  {% include 'navbar-home.html' %}
-</header>
-
-</div>
-
 {% endblock %}
 
 {% block uncontained %}
-  <div class="container">
+  <div class="blue-bg-section">
+    <div class="container pt-4 pb-4">
+      <img
+        style="height: 50px;margin: 0 auto;display: block;"
+        src="{{ url_for('static', filename='dist/images/API-Horizontal-MonochromeInverted.png') }}"
+        srcset="{{ url_for('static', filename='dist/images/API-Horizontal-MonochromeInverted@2x.png') }} 2x"
+      />
+    </div>
+  </div>
+  <div class="container mt-4 pt-5 pb-4" style="min-height: 80vh">
     <div class="text-center">
       <h1>Welcome to the OONI API</h1>
       <p>Dynamically updated every day, the OONI API enables researchers and
@@ -32,8 +28,7 @@
     <a href="https://ooni.org/post/mining-ooni-data">ooni-data Amazon S3 bucket</a>.
         If in doubt <a href="https://ooni.org/about">contact the OONI team</a>.
     </p>
-      <a class='btn btn-default read-the-docs' href="/api/">READ THE API DOCS</a>
-
+    <a class='square-btn read-the-docs' href="/api/">READ THE API DOCS</a>
   </div>
 </div>
 {% endblock %}

@@ -13,8 +13,6 @@ ooni_measurements.db
 node_modules/
 package-lock.json
 
-measurements/static/dist/
-
 # Travis secrets
 secrets/id_rsa_travis
 secrets/secrets.env

@@ -8,8 +8,12 @@
   {% endblock %}
 
   {% block head_css %}
-    <link href="{{ url_for('static', filename='dist/css/main.css') }}"
-          rel="stylesheet">
+    <link href="https://ooni.org/css/bootstrap.min.b805712033614b1078c3d1d1c4f8144b2345a0a5fcb7b09ee27ab92454ddfc87.css"
+          rel="stylesheet" />
+    <link href="https://ooni.org/css/master.css"
+          rel="stylesheet" />
+    <link href="https://ooni.org/fonts/fonts.css"
+          rel="stylesheet" />
   {% endblock %}
 
   {% block head %}
@@ -23,9 +27,6 @@
 {% block body %}
 
   {% block navbar %}
-    <header>
-      {% include 'navbar.html' %}
-    </header>
   {% endblock %}
 
   {% block uncontained %}
@@ -39,13 +40,7 @@
   </div>
 
   {% block footer %}
-    <footer>
-      <div class="img-rounded nav-fixed-bottom">
-        <div class="container-fluid">
-          {% include 'footer.html' %}
-        </div>
-      </div>
-    </footer>
+    {% include 'footer.html' %}
   {% endblock %}
 
   {% block tail_js %}

@@ -3,8 +3,6 @@
 {% block title %}Documentation{% endblock%}
 
 {% block head_css %}
-  <link href="{{ url_for('static', filename='dist/css/apidocs.css') }}"
-        rel="stylesheet">
 {% endblock %}
 
 {% block body %}
@@ -12,6 +10,6 @@
   <redoc spec-url='/api/v1/swagger.json'>
     <h1 class="text-center">Loading...</h1>
   </redoc>
-  <script src="{{ url_for('static', filename='dist/js/redoc.js') }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"> </script>
 
 {% endblock %}
