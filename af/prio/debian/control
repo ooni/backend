@@ -1,0 +1,25 @@
+Source: prio
+Section: python
+Priority: optional
+Maintainer: Federico Ceratto <federico@openobservatory.org>
+Build-Depends: debhelper-compat (= 12),
+ python3,
+ dh-systemd (>= 1.5),
+ dh-python,
+ python3-psycopg2,
+ python3-setuptools,
+Standards-Version: 4.5.0
+
+Package: prio
+Architecture: all
+Depends: ${misc:Depends},
+ ${python3:Depends},
+ python3-bottle,
+ python3-prometheus-client,
+ python3-psycopg2,
+ python3-sdnotify,
+ python3-systemd
+Suggests:
+ python3-pytest,
+Description: OONI Prio
+ URL prioritization
