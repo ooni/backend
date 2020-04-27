@@ -1,0 +1,7 @@
+prio (0.1) unstable; urgency=medium
+
+  * URL prioritization MVP
+    https://github.com/ooni/backend/issues/361
+    https://github.com/ooni/pipeline/pull/311
+
+ -- Federico Ceratto <federico@openobservatory.org>  Tue, 14 Apr 2020 22:09:35 +0100
