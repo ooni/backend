@@ -1,10 +1,13 @@
+
+from csv import DictWriter
+from datetime import datetime, timedelta
+from dateutil.parser import parse as parse_date
+from io import StringIO
 import http.client
 import json
 import math
 import re
 import time
-
-from dateutil.parser import parse as parse_date
 
 import requests
 import lz4framed
@@ -35,10 +38,7 @@ FASTPATH_PORT = 8000
 
 class QueryTimeoutError(HTTPException):
     code = 504
-    description = (
-        "The database query timed out.",
-        "Try changing the query parameters.",
-    )
+    description = "The database query timed out.\nTry changing the query parameters."
 
 
 def get_version():
@@ -607,7 +607,9 @@ def list_measurements(
     merger = [
         coal("test_start_time"),
         coal("measurement_start_time"),
-        func.coalesce(literal_column("mr.measurement_id"), literal_column("fp.measurement_id")).label("measurement_id"),
+        func.coalesce(
+            literal_column("mr.measurement_id"), literal_column("fp.measurement_id")
+        ).label("measurement_id"),
         func.coalesce(literal_column("mr.m_report_no"), 0).label("m_report_no"),
         coal("anomaly"),
         coal("confirmed"),
@@ -712,3 +714,139 @@ def list_measurements(
     }
 
     return jsonify({"metadata": metadata, "results": results[:limit]})
+
+
+def _convert_to_csv(r) -> str:
+    """Convert aggregation result dict/list to CSV
+    """
+    csvf = StringIO()
+    if isinstance(r, dict):
+        # 0-dimensional data
+        fieldnames = sorted(r.keys())
+        writer = DictWriter(csvf, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(r)
+
+    else:
+        fieldnames = sorted(r[0].keys())
+        writer = DictWriter(csvf, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in r:
+            writer.writerow(row)
+
+    result = csvf.getvalue()
+    csvf.close()
+    return result
+
+
+def get_aggregated(
+    axis_x=None,
+    axis_y=None,
+    category_code=None,
+    domain=None,
+    input=None,
+    test_name=None,
+    probe_asn=None,
+    probe_cc=None,
+    since=None,
+    until=None,
+    format="JSON",
+):
+    """Aggregate counters data
+    """
+    log = current_app.logger
+
+    dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
+
+    cacheable = until and parse_date(until) < datetime.now() - timedelta(hours=72)
+
+    # Assemble query
+    def coalsum(name):
+        return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
+
+    cols = [
+        coalsum("anomaly_count"),
+        coalsum("confirmed_count"),
+        coalsum("failure_count"),
+        coalsum("measurement_count"),
+    ]
+    table = sql.table("counters")
+    where = []
+    query_params = {}
+
+    if domain:
+        # Join in domain_input table and filter by domain
+        table = table.join(
+            sql.table("domain_input"), sql.text("counters.input = domain_input.input"),
+        )
+        where.append(sql.text("domain = :domain"))
+        query_params["domain"] = domain
+
+    if category_code:
+        # Join in citizenlab table and filter by category_code
+        table = table.join(
+            sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
+        )
+        where.append(sql.text("category_code = :category_code"))
+        query_params["category_code"] = category_code
+
+    if probe_cc:
+        where.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
+
+    if probe_asn is not None:
+        if probe_asn.startswith("AS"):
+            probe_asn = probe_asn[2:]
+        probe_asn = int(probe_asn)
+        where.append(sql.text("probe_asn = :probe_asn"))
+        query_params["probe_asn"] = probe_asn
+
+    if since:
+        since = parse_date(since)
+        where.append(sql.text("measurement_start_day > :since"))
+        query_params["since"] = since
+
+    if until:
+        until = parse_date(until)
+        where.append(sql.text("measurement_start_day <= :until"))
+        query_params["until"] = until
+
+    if axis_x:
+        cols.append(column(axis_x))
+
+    if axis_y:
+        cols.append(column(axis_y))
+
+    # Assemble query
+    where_expr = and_(*where)
+    query = select(cols).where(where_expr).select_from(table)
+
+    # Add group-by
+    if axis_x:
+        query = query.group_by(column(axis_x)).order_by(column(axis_x))
+
+    if axis_y:
+        query = query.group_by(column(axis_y)).order_by(column(axis_y))
+
+    try:
+        q = current_app.db_session.execute(query, query_params)
+
+        if dimension_cnt == 2:
+            r = [dict(row) for row in q]
+
+        elif axis_x or axis_y:
+            r = [dict(row) for row in q]
+
+        else:
+            r = dict(q.fetchone())
+
+        if format == "CSV":
+            return _convert_to_csv(r)
+
+        response = jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
+        if cacheable:
+            response.cache_control.max_age = 3600 * 24
+        return response
+
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})
