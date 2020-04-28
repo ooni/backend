@@ -1,0 +1,27 @@
+name: Docgen
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Docgen
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - debian-buster
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install deps
+        run: sudo apt-get -y --no-install-recommends install python3-markdown
+      - name: Run docgen
+        run: ./build_docs.py
+      - name: Upload to github pages
+        if: success()
+        uses: crazy-max/ghaction-github-pages@v1
+        with:
+          target_branch: gh-pages
+          build_dir: build_docs_output
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
