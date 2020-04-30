@@ -137,12 +137,12 @@ def create_app(*args, testmode=False, **kw):
     # NOTE: the limits apply per-process. The number of processes is set in:
     # https://github.com/ooni/sysadmin/blob/master/ansible/roles/ooni-measurements/tasks/main.yml
     limits = dict(
-        ipaddr_per_month=60000,
-        token_per_month=60000,
-        ipaddr_per_week=20000,
-        token_per_week=20000,
-        ipaddr_per_day=4000,
-        token_per_day=5000,
+        ipaddr_per_month=6000,
+        token_per_month=6000,
+        ipaddr_per_week=2000,
+        token_per_week=2000,
+        ipaddr_per_day=400,
+        token_per_day=500,
     )
     app.limiter = FlaskLimiter(limits=limits, app=app,)
 

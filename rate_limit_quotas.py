@@ -131,7 +131,10 @@ class FlaskLimiter:
         raise Exception(f"Unable to detect IP address using {methods}")
 
     def _check_limits_callback(self):
-        """Check rate limits before processing a request"""
+        """Check rate limits before processing a request
+        Refresh quota counters when needed
+        """
+        self._limiter.refresh_quota_counters_if_needed()
         ipaddr = self._get_client_ipaddr()
         # token = request.headers.get("Token", None)
         # if token:
