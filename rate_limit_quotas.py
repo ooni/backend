@@ -16,7 +16,13 @@ Also provides a connector for Flask
 
 import time
 import ipaddress
-from typing import Dict
+from typing import Dict, List, Optional, Tuple, Union
+
+IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+IpAddrBucket = Dict[IpAddress, float]
+IpAddrBuckets = Tuple[IpAddrBucket, IpAddrBucket, IpAddrBucket]
+TokenBucket = Dict[str, float]
+TokenBuckets = Tuple[TokenBucket, TokenBucket, TokenBucket]
 
 
 class Limiter:
@@ -25,6 +31,7 @@ class Limiter:
         limits: dict,
         token_check_callback=None,
         ipaddr_methods=["X-Real-Ip", "socket"],
+        whitelisted_ipaddrs=Optional[List[str]],
     ):
         # Bucket sequence: month, week, day
         self._ipaddr_limits = [
@@ -35,11 +42,15 @@ class Limiter:
             limits.get(l, None)
             for l in ("token_per_month", "token_per_week", "token_per_day")
         ]
-        self._ipaddr_buckets = ({}, {}, {})  # type: Dict
-        self._token_buckets = ({}, {}, {})  # type: Dict
+        self._ipaddr_buckets = ({}, {}, {})  # type: IpAddrBuckets
+        self._token_buckets = ({}, {}, {})  # type: TokenBuckets
         self._token_check_callback = token_check_callback
         self._ipaddr_extraction_methods = ipaddr_methods
         self._last_quota_update_time = time.monotonic()
+        self._whitelisted_ipaddrs = set()
+        for ipa in whitelisted_ipaddrs or []:
+            self._whitelisted_ipaddrs.add(ipaddress.ip_address(ipa))
+
         self.increment_quota_counters(1)
         self.refresh_quota_counters_if_needed()
 
@@ -77,18 +88,27 @@ class Limiter:
 
         self._last_quota_update_time = t
 
-    def consume_quota(self, elapsed: float, ipaddr=None, token=None) -> None:
+    def consume_quota(self, elapsed: float, ipaddr: Optional[IpAddress]=None, token=None) -> None:
         """Consume quota in seconds
         """
+        assert ipaddr or token
         if ipaddr:
+            assert isinstance(ipaddr, ipaddress.IPv4Address)
             for n, limit in enumerate(self._ipaddr_limits):
                 b = self._ipaddr_buckets[n]
                 b[ipaddr] = b.get(ipaddr, limit) - elapsed
 
-    def get_minimum_across_quotas(self, ipaddr=None, token=None) -> int:
+        else:
+            raise NotImplementedError()
+
+    def get_minimum_across_quotas(self, ipaddr=None, token=None) -> float:
+        assert ipaddr or token
         if ipaddr:
             iterable = zip(self._ipaddr_limits, self._ipaddr_buckets)
             return min(bucket.get(ipaddr, limit) for limit, bucket in iterable)
+
+        else:
+            raise NotImplementedError()
 
     def is_quota_available(self, ipaddr=None, token=None) -> bool:
         """Check if all quota buckets for an ipaddr/token are > 0
@@ -101,6 +121,16 @@ class Limiter:
 
         return True
 
+    def is_ipaddr_whitelisted(self, ipaddr: IpAddress) -> bool:
+        return ipaddr in self._whitelisted_ipaddrs
+
+    def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[int, float]]:
+        """Returns a summary of daily quotas with the lowest values
+        """
+        li = sorted((val, ipa) for ipa, val in self._ipaddr_buckets[2].items())
+        li = li[:n]
+        return [(int(ipa.packed[0]), val) for val, ipa in li]
+
 
 # # Flask-specific code # #
 
@@ -109,12 +139,11 @@ import flask
 
 
 class FlaskLimiter:
-    def _get_client_ipaddr(self):
+    def _get_client_ipaddr(self) -> IpAddress:
         # https://github.com/alisaifee/flask-limiter/issues/41
         for m in self._limiter._ipaddr_extraction_methods:
             if m == "X-Forwarded-For":
                 raise NotImplementedError("X-Forwarded-For ")
-                # request.access_route:
 
             elif m == "X-Real-Ip":
                 ipaddr = request.headers.get("X-Real-Ip", None)
@@ -122,7 +151,7 @@ class FlaskLimiter:
                     return ipaddress.ip_address(ipaddr)
 
             elif m == "socket":
-                return request.remote_addr
+                return ipaddress.ip_address(request.remote_addr)
 
             else:
                 raise NotImplementedError(f"IP address method {m} is unknown")
@@ -153,9 +182,10 @@ class FlaskLimiter:
             assert response
             tdelta = time.monotonic() - self._request_start_time
             ipaddr = self._get_client_ipaddr()
-            self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
-            q = self._limiter.get_minimum_across_quotas(ipaddr=ipaddr)
-            response.headers.add("X-RateLimit-Remaining", q)
+            if not self._limiter.is_ipaddr_whitelisted(ipaddr):
+                self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
+                q = self._limiter.get_minimum_across_quotas(ipaddr=ipaddr)
+                response.headers.add("X-RateLimit-Remaining", q)
 
         except Exception as e:
             log.error(str(e), exc_info=True)
@@ -169,7 +199,7 @@ class FlaskLimiter:
         limits: dict,
         token_check_callback=None,
         ipaddr_methods=["X-Real-Ip", "socket"],
-        **kw,
+        whitelisted_ipaddrs=None,
     ):
         """
         """
@@ -177,6 +207,7 @@ class FlaskLimiter:
             limits,
             token_check_callback=token_check_callback,
             ipaddr_methods=ipaddr_methods,
+            whitelisted_ipaddrs=whitelisted_ipaddrs,
         )
         if app.extensions.get("limiter"):
             raise Exception("The Flask app already has an extension named 'limiter'")
@@ -184,3 +215,6 @@ class FlaskLimiter:
         app.before_request(self._check_limits_callback)
         app.after_request(self._after_request_callback)
         app.extensions["limiter"] = self
+
+    def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[int, float]]:
+        return self._limiter.get_lowest_daily_quotas_summary(n)

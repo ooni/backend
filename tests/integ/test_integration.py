@@ -279,6 +279,16 @@ def test_redirects_and_rate_limit_spin(client):
     assert 0 < limit - float(resp.headers["X-RateLimit-Remaining"]) < 0.3
 
 
+def test_redirects_and_rate_limit_summary(client):
+    url = "quotas_summary"
+    response = privapi(client, url)
+    assert response == []
+    response = privapi(client, url)
+    assert len(response) == 1
+    assert response[0][0] == 127  # first octet from 127.0.0.1
+    assert int(response[0][1]) == 399  # quota remaining in seconds
+
+
 # # list_files # #
 
 
