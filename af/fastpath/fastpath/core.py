@@ -1217,12 +1217,11 @@ def _trim_old_measurements(conf):
     # The globbing gets slower with larger backlogs but the quadratic behavior
     # can become as aggressive as needed
     keep_hours = free_gb ** 2
+    keep_hours = max(keep_hours, 24)  # safety
     log.info(
         "Starting file trimming: %.1f GB free, keeping the last %.2f hours"
         % (free_gb, keep_hours)
     )
-
-    assert keep_hours > 24  # temporary
     # Delete files ignoring race conditions
     time_threshold = time.time() - 3600 * keep_hours
     file_cnt = 0
