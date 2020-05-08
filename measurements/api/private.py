@@ -163,6 +163,14 @@ def api_private_countries():
     return jsonify({"countries": country_list})
 
 
+@api_private_blueprint.route("/quotas_summary", methods=["GET"])
+def api_private_quotas_summary():
+    """Summary on rate-limiting quotas.
+    [(first ipaddr octet, remaining daily quota), ... ]
+    """
+    return jsonify(current_app.limiter.get_lowest_daily_quotas_summary())
+
+
 # Deprecated endpoints for legacy OONI Explorer
 
 

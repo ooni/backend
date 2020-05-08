@@ -100,23 +100,6 @@ def check_config(config):
     pass
 
 
-def extract_client_ipaddr_for_throttling():
-    # TODO: move addrs to an external config file /etc/ooniapi.conf ?
-    prometheus_ipaddr = "37.218.245.43"
-    ams_explorer_ipaddr = "37.218.242.149"
-    real_ipaddrs = request.headers.getlist("X-Real-IP")
-    if not real_ipaddrs:
-        # no throttling from localhost connections
-        return None
-
-    ipaddr = real_ipaddrs[0]
-    if ipaddr in (prometheus_ipaddr, ams_explorer_ipaddr):
-        # no throttling
-        return None
-
-    return ipaddr
-
-
 def create_app(*args, testmode=False, **kw):
     from measurements import views
 
@@ -144,7 +127,10 @@ def create_app(*args, testmode=False, **kw):
         ipaddr_per_day=400,
         token_per_day=500,
     )
-    app.limiter = FlaskLimiter(limits=limits, app=app,)
+    # Whitelist Prometheus and AMS Explorer
+    # TODO: move addrs to an external config file /etc/ooniapi.conf ?
+    whitelist = ["37.218.245.43", "37.218.242.149"]
+    app.limiter = FlaskLimiter(limits=limits, app=app, whitelisted_ipaddrs=whitelist)
 
     # Lazy setup of the prometheus metrics collection
     if testmode == False:
