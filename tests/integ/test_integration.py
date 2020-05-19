@@ -1404,3 +1404,80 @@ def test_aggregation_x_axis_only_csv(client, log):
     """
     )
     assert r.replace("\r", "") == expected
+
+
+def test_aggregation_x_axis_category_code(client, log):
+    # 1d data over a special column: category_code
+    url = "aggregation?probe_cc=DE&since=2020-01-01&until=2020-01-03&axis_x=category_code"
+    r = api(client, url)
+    assert r["dimension_count"] == 1, fjd(r)
+    # shortened to save space
+    assert r["result"][:3] == [
+        {
+            "anomaly_count": 45,
+            "category_code": "ALDR",
+            "confirmed_count": 0,
+            "failure_count": 1,
+            "measurement_count": 261,
+        },
+        {
+            "anomaly_count": 80,
+            "category_code": "ANON",
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 423,
+        },
+        {
+            "anomaly_count": 21,
+            "category_code": "COMM",
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 107,
+        },
+    ], fjd(r)
+
+
+def test_aggregation_y_axis_category_code(client, log):
+    # 1d data over a special column: category_code
+    url = "aggregation?probe_cc=DE&since=2020-03-01&until=2020-03-02&axis_y=category_code"
+    r = api(client, url)
+    assert "dimension_count" in r, fjd(r)
+    assert r["dimension_count"] == 1, fjd(r)
+    # shortened to save space. The query should be identical to
+    # test_aggregation_x_axis_category_code
+    assert r["result"][:3] == [
+        {
+            "anomaly_count": 45,
+            "category_code": "ALDR",
+            "confirmed_count": 0,
+            "failure_count": 1,
+            "measurement_count": 261,
+        },
+        {
+            "anomaly_count": 80,
+            "category_code": "ANON",
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 423,
+        },
+        {
+            "anomaly_count": 21,
+            "category_code": "COMM",
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 107,
+        },
+    ], fjd(r)
+
+
+
+
+def test_aggregation_xy_axis_category_code(client, log):
+    # 2d data over a special column: category_code
+    url = "aggregation?since=2020-01-01&until=2020-01-03&axis_x=category_code&axis_y=category_code"
+    r = api(client, url)
+    assert "dimension_count" in r, fjd(r)
+    assert r["dimension_count"] == 2, fjd(r)
+    # shortened to save space. The query should be identical to
+    # test_aggregation_x_axis_category_code
+    assert r["result"][:3] == [], fjd(r)

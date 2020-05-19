@@ -812,10 +812,22 @@ def get_aggregated(
         query_params["until"] = until
 
     if axis_x:
+        # TODO: check if the value is a valid colum name
         cols.append(column(axis_x))
+        if axis_x == "category_code":
+            # Join in citizenlab table
+            table = table.join(
+                sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
+            )
 
     if axis_y:
+        # TODO: check if the value is a valid colum name
         cols.append(column(axis_y))
+        if axis_y == "category_code":
+            # Join in citizenlab table
+            table = table.join(
+                sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
+            )
 
     # Assemble query
     where_expr = and_(*where)
