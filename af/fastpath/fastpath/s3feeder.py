@@ -225,5 +225,5 @@ def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None
         day += timedelta(days=1)
 
     if end_day:
-        log.info("Reached {end_day}, stream_cans finished")
+        log.info(f"Reached {end_day}, streaming cans from S3 finished")
         return
