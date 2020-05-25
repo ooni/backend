@@ -222,6 +222,12 @@ def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None
             except Exception as e:
                 log.error(str(e), exc_info=True)
 
+            if not conf.keep_s3_cache:
+                try:
+                    can_f.unlink()
+                except FileNotFoundError:
+                    pass
+
         day += timedelta(days=1)
 
     if end_day:
