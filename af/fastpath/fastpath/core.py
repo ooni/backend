@@ -291,8 +291,12 @@ def match_fingerprints(measurement):
     zzfps = fingerprints["ZZ"]
     ccfps = fingerprints.get(msm_cc, {})
 
+    test_keys = measurement["test_keys"]
+    if test_keys is None:
+        return []
+
     matches = []
-    for req in measurement["test_keys"].get("requests", ()):
+    for req in test_keys.get("requests", ()):
         r = req.get("response", None)
         if r is None:
             continue
