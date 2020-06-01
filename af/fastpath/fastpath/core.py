@@ -110,6 +110,8 @@ def setup():
                     help="Do not write measurement on disk")
     ap.add_argument("--no-write-to-db", action="store_true",
                     help="Do not insert measurement in database")
+    ap.add_argument("--keep-s3-cache", action="store_true",
+                    help="Keep files downloaded from S3 in the local cache")
     conf = ap.parse_args()
 
     if conf.devel or conf.stdout or no_journal_handler:
@@ -291,8 +293,12 @@ def match_fingerprints(measurement):
     zzfps = fingerprints["ZZ"]
     ccfps = fingerprints.get(msm_cc, {})
 
+    test_keys = measurement["test_keys"]
+    if test_keys is None:
+        return []
+
     matches = []
-    for req in measurement["test_keys"].get("requests", ()):
+    for req in test_keys.get("requests", ()):
         r = req.get("response", None)
         if r is None:
             continue
