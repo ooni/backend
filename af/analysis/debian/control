@@ -16,6 +16,7 @@ Architecture: all
 Depends: ${misc:Depends},
  ${python3:Depends},
  python3-bottle,
+ python3-jinja2,
  python3-matplotlib,
  python3-pandas,
  python3-prometheus-client,
