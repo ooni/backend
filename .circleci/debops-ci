@@ -194,7 +194,7 @@ def main():
             print(p.as_posix())
     elif args.action == "upload":
         for fn in extra:
-            upload(Path(fn), args)
+            upload(Path(fn), args, args.repo)
     elif args.action == "delete_from_bintray":
         delete_bintray_package(args, extra)
     elif args.action == "build":
