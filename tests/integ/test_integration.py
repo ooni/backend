@@ -1164,6 +1164,20 @@ def test_private_api_website_urls(client, log):
 #     response = privapi(client, url)
 
 
+def test_private_api_check_report_id(client, log):
+    rid = "20190315T014026Z_AS7490_gkD1xwJpW3fFxCCjkJC5MNa2MuTktXJVWJ9dHb1sFFVTmVTa9v"
+    url = f"check_report_id?report_id={rid}"
+    response = privapi(client, url)
+    assert response == {"v": 0, "found": True}
+
+
+def test_private_api_check_report_id_not_found(client, log):
+    rid = "foo"
+    url = f"check_report_id?report_id={rid}"
+    response = privapi(client, url)
+    assert response == {"v": 0, "found": False}
+
+
 # # aggregation # #
 
 
@@ -1468,8 +1482,6 @@ def test_aggregation_y_axis_category_code(client, log):
             "measurement_count": 107,
         },
     ], fjd(r)
-
-
 
 
 def test_aggregation_xy_axis_category_code(client, log):

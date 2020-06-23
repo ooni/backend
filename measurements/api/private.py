@@ -171,6 +171,26 @@ def api_private_quotas_summary():
     return jsonify(current_app.limiter.get_lowest_daily_quotas_summary())
 
 
+@api_private_blueprint.route("/check_report_id", methods=["GET"])
+def check_report_id(report_id: str):
+    """Check if a report_id exists either in the fastpath table or in the
+    report table. Used by https://github.com/ooni/probe/issues/1034
+    """
+    report_id = request.args.get("report_id")
+    rawsql = """SELECT COALESCE (
+        (SELECT 1 FROM fastpath WHERE report_id = :rid LIMIT 1),
+        (SELECT 1 FROM report WHERE report_id = :rid LIMIT 1)
+    )"""
+    try:
+        q = current_app.db_session.execute(rawsql, dict(report_id=report_id))
+        found = q.fetchone() is not None
+        response = jsonify(dict(v=0, found=found))
+        response.cache_control.max_age = 5
+        return response
+    except Exception as e:
+        return jsonify(dict(v=0, error=str(e)))
+
+
 # Deprecated endpoints for legacy OONI Explorer
 
 
