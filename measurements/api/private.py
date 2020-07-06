@@ -172,7 +172,7 @@ def api_private_quotas_summary():
 
 
 @api_private_blueprint.route("/check_report_id", methods=["GET"])
-def check_report_id(report_id: str):
+def check_report_id():
     """Check if a report_id exists either in the fastpath table or in the
     report table. Used by https://github.com/ooni/probe/issues/1034
     """
@@ -182,8 +182,8 @@ def check_report_id(report_id: str):
         (SELECT 1 FROM report WHERE report_id = :rid LIMIT 1)
     )"""
     try:
-        q = current_app.db_session.execute(rawsql, dict(report_id=report_id))
-        found = q.fetchone() is not None
+        q = current_app.db_session.execute(rawsql, dict(rid=report_id))
+        found = q.fetchone()[0] is not None
         response = jsonify(dict(v=0, found=found))
         response.cache_control.max_age = 5
         return response
