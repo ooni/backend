@@ -1,0 +1,10 @@
+[Unit]
+Description=Update tables daily
+Requires=ooni-update-daily.service
+
+[Timer]
+Unit=ooni-update-daily.service
+OnCalendar=*-*-* 00:00
+
+[Install]
+WantedBy=timers.target

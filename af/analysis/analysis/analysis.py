@@ -11,17 +11,12 @@ Creates and updates unlogged tables.
 Shows confirmed correlated by country, ASN, input URL over time.
 
 Inputs: Database tables:
-    confirmed_stats
-    msm_count_by_day_by_country
     countries
-    interesting_inputs
 
 Outputs:
     Files in /var/lib/analysis
-    Node exporter / prometheus metrics
     Dedicated unlogged database tables and charts
         tables:
-            currently_blocked
 
 
 """
@@ -43,7 +38,6 @@ from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from threading import Thread
 from urllib.parse import urlencode
 import os
 import time
@@ -61,8 +55,10 @@ except ImportError:
 
 from bottle import template  # debdeps: python3-bottle
 from sqlalchemy import create_engine  # debdeps: python3-sqlalchemy-ext
-import pandas as pd  # debdeps: python3-pandas python3-jinja2
-import prometheus_client as prom  # debdeps: python3-prometheus-client
+
+# TODO: move pandas / seaborn related stuff in a dedicated script
+#import pandas as pd  # debdeps: python3-pandas python3-jinja2
+#import prometheus_client as prom  # debdeps: python3-prometheus-client
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -70,16 +66,17 @@ import matplotlib  # debdeps: python3-matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import seaborn as sns  # debdeps: python3-seaborn
+#import seaborn as sns  # debdeps: python3-seaborn
 
 from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 
-# Imported from the fastpath package
-from fastpath import domain_input as domain_input_updater
+from analysis.citizenlab_test_lists_updater import update_citizenlab_test_lists
 
-from analysis.counters_table_updater import counters_table_updater
+from analysis.counters_table_updater import (
+    update_all_counters_tables,
+    update_tables_daily,
+)
 
-from analysis.url_prioritization_updater import url_prioritization_updater
 
 # Global conf
 conf = Namespace()
@@ -90,8 +87,6 @@ conn = None
 
 log = logging.getLogger("analysis")
 metrics = setup_metrics(name="analysis")
-
-node_exporter_path = "/run/nodeexp/analysis.prom"
 
 
 def setup_database_connection(c):
@@ -175,35 +170,6 @@ def query(q):
     with metrics.timer("query.unnamed"):
         r = pd.read_sql_query(q, conn)
     return r
-
-
-@metrics.timer("populate_interesting_inputs")
-def populate_interesting_inputs():
-    ## Used only once to create a persistent list of targets
-    dbengine.execute(
-        """
-        CREATE UNLOGGED TABLE interesting_inputs (
-            test_name  ootest NOT NULL ,
-            input text NOT NULL,
-            weight integer DEFAULT 1,
-            PRIMARY KEY (test_name, input)
-        )"""
-    )
-    insert_into(
-        "interesting_inputs",
-        """
-        INSERT INTO interesting_inputs
-        SELECT
-            test_name,
-            input,
-        COUNT(*) as cnt
-        FROM measurement
-        JOIN input ON input.input_no = measurement.input_no
-        JOIN report ON report.report_no = measurement.report_no
-        WHERE measurement_start_time > current_date - interval '2 days'
-        GROUP BY test_name, input
-    """,
-    )
 
 
 @metrics.timer("populate_countries")
@@ -495,64 +461,61 @@ def coverage_variance():
     ## Total number of datapoints and variance across countries per day
 
 
-# TODO: drop interesting_inputs table
-
-
-@metrics.timer("summarize_core_density")
-def summarize_core_density_UNUSED():
-    ## Core density
-    ## Measure coverage of citizenlab inputs on well-monitored countries
-    core = query(
-        """
-    SELECT
-    date_trunc('day', measurement_start_time) as day,
-    probe_cc,
-    concat(test_name, '::', input) as target,
-    COUNT(*) as msm_count
-    FROM measurement
-    JOIN report ON report.report_no = measurement.report_no
-    JOIN input ON input.input_no = measurement.input_no
-    WHERE measurement_start_time >= current_date - interval '2 days'
-    AND measurement_start_time < current_date - interval '1 days'
-    AND (test_name, input) IN (
-    SELECT
-        test_name,
-        input
-    FROM interesting_inputs
-    )
-    AND probe_cc IN (
-    SELECT
-        probe_cc
-    FROM
-        countries
-    WHERE
-        msm_count > 2000
-    )
-    GROUP BY
-    probe_cc,
-    day,
-    target
-    """
-    )
-
-    day_slice = core.pivot_table(
-        index="probe_cc", columns="target", values="msm_count", fill_value=0
-    )
-
-    log.info("Countries: ", day_slice.shape[0], "Targets:", day_slice.shape[1])
-    metrics.gauge("countries_with_high_msm_count_1_day", day_slice.shape[0])
-    metrics.gauge("targets_high_msm_countries_1_day", day_slice.shape[1])
-
-    area = day_slice.shape[0] * day_slice.shape[1]
-    log.info("Slice area:", area)
-
-    c1 = core["target"].count() / area
-    log.info("Coverage-1: cells with at least one datapoint", c1)
-    metrics.gauge("coverage_1_day_1dp", c1)
-
-    c5 = core[core["msm_count"] > 5]["target"].count() / area
-    log.info("Coverage-5: cells with at least 5 datapoints", c5)
-    metrics.gauge("coverage_1_day_5dp", c1)
+# @metrics.timer("summarize_core_density")
+# def summarize_core_density_UNUSED():
+#     ## Core density
+#     ## Measure coverage of citizenlab inputs on well-monitored countries
+#     core = query(
+#         """
+#     SELECT
+#     date_trunc('day', measurement_start_time) as day,
+#     probe_cc,
+#     concat(test_name, '::', input) as target,
+#     COUNT(*) as msm_count
+#     FROM measurement
+#     JOIN report ON report.report_no = measurement.report_no
+#     JOIN input ON input.input_no = measurement.input_no
+#     WHERE measurement_start_time >= current_date - interval '2 days'
+#     AND measurement_start_time < current_date - interval '1 days'
+#     AND (test_name, input) IN (
+#     SELECT
+#         test_name,
+#         input
+#     FROM interesting_inputs
+#     )
+#     AND probe_cc IN (
+#     SELECT
+#         probe_cc
+#     FROM
+#         countries
+#     WHERE
+#         msm_count > 2000
+#     )
+#     GROUP BY
+#     probe_cc,
+#     day,
+#     target
+#     """
+#     )
+#
+#     day_slice = core.pivot_table(
+#         index="probe_cc", columns="target", values="msm_count", fill_value=0
+#     )
+#
+#     log.info("Countries: ", day_slice.shape[0], "Targets:", day_slice.shape[1])
+#     metrics.gauge("countries_with_high_msm_count_1_day", day_slice.shape[0])
+#     metrics.gauge("targets_high_msm_countries_1_day", day_slice.shape[1])
+#
+#     area = day_slice.shape[0] * day_slice.shape[1]
+#     log.info("Slice area:", area)
+#
+#     c1 = core["target"].count() / area
+#     log.info("Coverage-1: cells with at least one datapoint", c1)
+#     metrics.gauge("coverage_1_day_1dp", c1)
+#
+#     c5 = core[core["msm_count"] > 5]["target"].count() / area
+#     log.info("Coverage-5: cells with at least 5 datapoints", c5)
+#     metrics.gauge("coverage_1_day_5dp", c1)
 
 
 @metrics.timer("plot_msmt_count_per_platform_over_time")
@@ -573,8 +536,7 @@ def plot_msmt_count_per_platform_over_time(conn):
 
 @metrics.timer("plot_coverage_per_platform")
 def plot_coverage_per_platform(conn):
-    """Measure how much each platform contributes to measurements
-    """
+    """Measure how much each platform contributes to measurements"""
     log.info("COV: plot_coverage_per_platform")
     # Consider only inputs that are listed on citizenlab
     sql = "SELECT UPPER(cc), COUNT(*) from citizenlab GROUP BY cc"
@@ -626,8 +588,7 @@ def plot_coverage_per_platform(conn):
 
 
 def coverage_generator(conf):
-    """Generate statistics on coverage
-    """
+    """Generate statistics on coverage"""
     log.info("COV: Started monitor_measurement_creation thread")
     while True:
         try:
@@ -975,10 +936,18 @@ def detect_blocking():
 def parse_args():
     ap = ArgumentParser("Analysis script " + __doc__)
     ap.add_argument(
-        "--no-update-confirmed-stats",
-        action="store_true",
-        help="Do not update confirmed_stats table",
+        "--update-counters", action="store_true", help="Update counters table"
     )
+    ap.add_argument(
+        "--update-citizenlab", action="store_true", help="Update citizenlab test lists"
+    )
+    ap.add_argument(
+        "--update-tables-daily", action="store_true", help="Run daily update"
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Dry run, supported only by some commands"
+    )
+    # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
     return ap.parse_args()
@@ -1123,7 +1092,6 @@ def monitor_measurement_creation(conf):
     # TODO: switch to OOID
 
     INTERVAL = 60 * 5
-    nodeexp_path = "/run/nodeexp/db_metrics.prom"
     if has_systemd:
         watchdog = sdnotify.SystemdNotifier()
 
@@ -1274,7 +1242,7 @@ def monitor_measurement_creation(conf):
             else:
                 gauge_family.labels("replication_delay").set(delay)
 
-            prom.write_to_textfile(nodeexp_path, prom_reg)
+            # prom.write_to_textfile(nodeexp_path, prom_reg)
 
             # The following queries are heavier
             if cycle_seconds == 0:
@@ -1307,7 +1275,7 @@ def monitor_measurement_creation(conf):
                                 f"{query_name}_{age_in_days}_days_ago"
                             ).set(val)
 
-                prom.write_to_textfile(nodeexp_path, prom_reg)
+                # prom.write_to_textfile(nodeexp_path, prom_reg)
 
             cycle_seconds = (cycle_seconds + INTERVAL) % 3600
 
@@ -1328,32 +1296,24 @@ def monitor_measurement_creation(conf):
 
 
 def domain_input_update_runner():
-    """Runs domain_input_updater every 2 hours.
-    Spawn a domain_input_updater.run() thread for each run.
-    """
-
-    def _runner():
-        conf = Namespace(dry_run=False, db_uri=None)
-        with metrics.timer("domain_input_updater_runtime"):
-            log.info("domain_input_updater: starting")
-            try:
-                domain_input_updater.run(conf)
-                metrics.gauge("domain_input_updater_success", 1)
-                log.info("domain_input_updater: success")
-            except Exception as e:
-                metrics.gauge("domain_input_updater_success", 0)
-                log.error("domain_input_updater: failure %r", e)
-
-    while True:
-        Thread(target=_runner).start()
-        time.sleep(3600 * 2)
+    """Runs domain_input_updater"""
+    conf = Namespace(dry_run=False, db_uri=None)
+    with metrics.timer("domain_input_updater_runtime"):
+        log.info("domain_input_updater: starting")
+        try:
+            domain_input_updater.run(conf)
+            metrics.gauge("domain_input_updater_success", 1)
+            log.info("domain_input_updater: success")
+        except Exception as e:
+            metrics.gauge("domain_input_updater_success", 0)
+            log.error("domain_input_updater: failure %r", e)
 
 
 def main():
     global conf
     log.info("Analysis starting")
     cp = ConfigParser()
-    with open("/etc/analysis.conf") as f:
+    with open("/etc/ooni/analysis.conf") as f:
         cp.read_file(f)
 
     conf = parse_args()
@@ -1368,30 +1328,30 @@ def main():
     for role in ("active", "standby"):
         setattr(conf, role, dict(cp[role]))
 
+    log.info("Logging started")
     conf.output_directory = (
         Path("./var/lib/analysis") if conf.devel else Path("/var/lib/analysis")
     )
     os.makedirs(conf.output_directory, exist_ok=True)
 
-    t = Thread(target=monitor_measurement_creation, args=(conf,))
-    t.start()
+    # monitor_measurement_creation(conf)
 
-    t = Thread(target=domain_input_update_runner)
-    t.start()
+    try:
+        if conf.update_counters:
+            update_all_counters_tables(conf)
 
-    t = Thread(target=counters_table_updater, args=(conf,))
-    t.start()
+        if conf.update_citizenlab:
+            update_citizenlab_test_lists(conf)
 
-    t = Thread(target=url_prioritization_updater, args=(conf,))
-    t.start()
+        if conf.update_tables_daily:
+            update_tables_daily(conf)
 
-    t = Thread(target=coverage_generator, args=(conf,))
-    t.start()
+    except Exception as e:
+        log.error(str(e), exc_info=e)
 
-    log.info("Starting generate_slow_query_summary loop")
-    while True:
-        generate_slow_query_summary(conf)
-        time.sleep(5 * 60)
+    # coverage_generator(conf)
+
+    # generate_slow_query_summary(conf)
 
     # # Update confirmed_stats table. The update is idempotent. The table is used
     # # in the next steps.

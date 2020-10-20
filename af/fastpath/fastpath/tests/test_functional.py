@@ -128,7 +128,7 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
             assert s3size == can_local_file.stat().st_size
 
         log.debug("Loading %s", s3fname)
-        for msm_jstr, msm in s3feeder.load_multiple(can_local_file.as_posix(), touch=False):
+        for msm_jstr, msm in s3feeder.load_multiple(can_local_file.as_posix()):
             msm = msm or ujson.loads(msm_jstr)
             if msm.get("report_id", None) is None:
                 # Missing or empty report_id
@@ -198,7 +198,7 @@ def print_msm(msm):
 
 def load_can(can):
     cnt = 0
-    for msm_jstr, msm in s3feeder.load_multiple(can.as_posix(), touch=False):
+    for msm_jstr, msm in s3feeder.load_multiple(can.as_posix()):
         msm = msm or ujson.loads(msm_jstr)
         if msm.get("report_id", None) is None:
             # Missing or empty report_id
@@ -520,6 +520,8 @@ def disabled_test_score_measurement_hhfm_stats(cans):
     assert 0
 
 
+## test_name: vanilla_tor
+
 def test_score_vanilla_tor_2018(cans):
     can = cans["tor_2018_10_26"]
     timeouts = (
@@ -564,6 +566,28 @@ def test_score_vanilla_tor(cans):
     avg = total_score / cnt
     assert 0.003 < avg < 0.004
 
+
+## test_name: tor
+# Also see test_score_tor() in test_unit.py
+
+def test_score_tor():
+    for can_fn, msm in s3msmts("tor", date(2020, 6, 1), date(2020, 6, 12)):
+        assert msm["test_name"] == "tor"
+        rid = msm["report_id"]
+        scores = fp.score_measurement(msm, [])
+        print(ujson.dumps(msm, sort_keys=True, indent=2))
+        break
+        if rid == "20200109T111813Z_AS30722_RZeO9Ix6ET2LJzqGcinrDp1iqrhaGGDCHSwlOoybq2N9kZITQt":
+            assert scores == {
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+    assert 0
+
+## test_name: web_connectivity
 
 def test_score_web_connectivity_simple(cans):
     # (rid, inp) -> scores: exact match on scores
@@ -898,9 +922,6 @@ def test_score_psiphon(cans):
                 "blocking_local": 0.0,
             }
 
-
-# See test_score_tor() in test_unit.py
-#
 
 
 def test_score_http_invalid_request_line_1():

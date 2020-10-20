@@ -9,7 +9,6 @@ case "$1" in
         adduser --system --quiet --ingroup fastpath --no-create-home --home /var/lib/fastpath fastpath
         mkdir -p /var/lib/fastpath/ssh/
         chown fastpath /var/lib/fastpath
-        mkdir -p /var/lib/detector
         if [ ! -f /var/lib/fastpath/ssh/id_ed25519 ]
         then
           logger "fastpath - Generating SSH key"
@@ -17,14 +16,6 @@ case "$1" in
           # the wrong host or somehow exposed by mistake
           ssh-keygen -t ed25519 -f /var/lib/fastpath/ssh/id_ed25519 -N "$(cat /etc/machine-id)"
         fi
-        # Enable Nginx site. The conf is deployed from debian/detector.conf by debian/install
-        if [ ! -f /etc/nginx/sites-enabled/detector.conf ]
-        then
-          ln -s -t /etc/nginx/sites-enabled/ /etc/nginx/sites-available/detector.conf
-          nginx -t
-          systemctl reload nginx
-        fi
-
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

@@ -5,13 +5,10 @@
 
 Feeds reports from cans on S3 or local disk
 
-Uses credentials from ~/.aws/config in the block:
-[ooni-data-private]
-aws_access_key_id = ...
-aws_secret_access_key = ...
+Uses credentials from /etc/ooni/fastpath.conf:
 
 Explore bucket from CLI:
-AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
+AWS_PROFILE=ooni-data aws s3 ls s3://ooni-data/canned/2019-07-16/
 
 """
 
@@ -33,7 +30,6 @@ from fastpath.normalize import iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
 from fastpath.mytypes import MsmtTup
 
-AWS_PROFILE = "ooni-data"
 BUCKET_NAME = "ooni-data"
 
 log = logging.getLogger("fastpath")
@@ -64,18 +60,18 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                 assert k is not None
                 if m.name.endswith(".json"):
                     for line in k:
-                        yield (line, None)
+                        yield (line, None, None)
 
                 elif m.name.endswith(".yaml"):
                     continue  # FIXME
                     bucket_tstamp = "FIXME"
                     for msm in iter_yaml_msmt_normalized(k, bucket_tstamp):
-                        yield (None, msm)
+                        yield (None, msm, None)
 
     elif fn.endswith(".json.lz4"):
         with lz4frame.open(fn) as f:
             for line in f:
-                yield (line, None)
+                yield (line, None, None)
 
     elif fn.endswith(".yaml.lz4"):
         with lz4frame.open(fn) as f:
@@ -89,8 +85,13 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
         raise RuntimeError(fn)
 
 
-def create_s3_client():
-    return boto3.Session(profile_name=AWS_PROFILE).client("s3")
+def create_s3_client(conf):
+    c = boto3.client(
+        "s3",
+        aws_access_key_id=conf.s3_access_key,
+        aws_secret_access_key=conf.s3_secret_key,
+    )
+    return c
 
 
 def list_cans_on_s3_for_a_day(s3, day):
@@ -113,18 +114,16 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
     """
     # fn: can filename without path
     # diskf: File in the s3cachedir directory
-    to_dload = set()
+    cans = set()  # (filename, filename on disk, size, download required)
     for fn, size in files:
         diskf = conf.s3cachedir / fn
         if diskf.exists() and size == diskf.stat().st_size:
             metrics.incr("cache_hit")
             diskf.touch(exist_ok=True)
+            cans.add((fn, diskf, size, False))
         else:
             metrics.incr("cache_miss")
-            to_dload.add((fn, diskf, size))
-
-    if not to_dload:
-        return
+            cans.add((fn, diskf, size, True))
 
     def _cb(bytes_count):
         if _cb.start_time is None:
@@ -141,10 +140,14 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
         except ZeroDivisionError:
             pass
 
-    _cb.total_size = sum(t[2] for t in to_dload)
+    _cb.total_size = sum(t[2] for t in cans if t[3])
     _cb.total_count = 0
 
-    for fn, diskf, size in to_dload:
+    for fn, diskf, size, dload_required in cans:
+        if not dload_required:
+            yield diskf  # already in local cache
+            continue
+
         s3fname = os.path.join("canned", fn)
         # TODO: handle missing file
         log.info("Downloading can %s size %d MB" % (fn, size / 1024 / 1024))
@@ -168,7 +171,7 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
 # during functional tests
 @metrics.timer("fetch_cans_for_a_day_with_cache")
 def fetch_cans_for_a_day_with_cache(conf, day):
-    s3 = create_s3_client()
+    s3 = create_s3_client(conf)
     fns = list_cans_on_s3_for_a_day(s3, day)
     list(fetch_cans(s3, conf, fns))
 
@@ -200,6 +203,7 @@ def _update_eta(t0, start_day, day, stop_day, can_num, can_tot_count):
 def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None, None]:
     """Stream cans from S3
     """
+    # TODO: implement new postcan format as well
     today = date.today()
     if not start_day or start_day >= today:
         return
@@ -207,7 +211,7 @@ def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None
     log.info("Fetching older cans from S3")
     t0 = time.time()
     day = start_day
-    s3 = create_s3_client()
+    s3 = create_s3_client(conf)
     # the last day is not included
     stop_day = end_day if end_day < today else today
     while day < stop_day:

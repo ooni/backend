@@ -119,6 +119,8 @@ def test_score_measurement_simple():
     }
 
 
+## test_name: tor
+
 def test_score_tor():
     fn = "fastpath/tests/data/tor.json"
     with open(fn) as f:

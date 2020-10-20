@@ -16,7 +16,6 @@ case "$1" in
           nginx -t
           systemctl reload nginx
         fi
-        chmod 1777 /run/nodeexp/
 
     ;;
 

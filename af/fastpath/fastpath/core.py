@@ -15,7 +15,7 @@ See README.adoc
 from argparse import ArgumentParser, Namespace
 from base64 import b64decode
 from configparser import ConfigParser
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Iterator, Dict, Any
@@ -25,6 +25,7 @@ import multiprocessing as mp
 import os
 import sys
 import time
+import yaml
 
 import ujson  # debdeps: python3-ujson
 import lz4.frame as lz4frame  # debdeps: python3-lz4
@@ -37,11 +38,11 @@ except ImportError:
     # this will be the case on macOS for example
     no_journal_handler = True
 
-# Feeds measurements from Collectors over SSH
-import fastpath.sshfeeder as sshfeeder
-
 # Feeds measurements from S3
 import fastpath.s3feeder as s3feeder
+
+# Feeds measurements from a local HTTP API
+from fastpath.localhttpfeeder import start_http_api
 
 # Push measurements into Postgres
 import fastpath.db as db
@@ -54,7 +55,7 @@ import fastpath.utils
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = 15
+NUM_WORKERS = 3
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
@@ -73,16 +74,11 @@ def setup_dirs(conf, root):
     conf.vardir = root / "var/lib/fastpath"
     conf.cachedir = conf.vardir / "cache"
     conf.s3cachedir = conf.cachedir / "s3"
-    conf.dfdir = conf.vardir / "dataframes"
-    conf.outdir = conf.vardir / "output"
-    conf.msmtdir = conf.outdir / "measurements"
+    # conf.outdir = conf.vardir / "output"
     for p in (
         conf.vardir,
         conf.cachedir,
         conf.s3cachedir,
-        conf.dfdir,
-        conf.outdir,
-        conf.msmtdir,
     ):
         p.mkdir(parents=True, exist_ok=True)
 
@@ -94,24 +90,27 @@ def setup():
     ap.add_argument("--start-day", type=lambda d: parse_date(d))
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
-    ap.add_argument("--nossh", action="store_true", help="Do not start SSH feeder")
+    ap.add_argument("--noapi", action="store_true", help="Do not start API feeder")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
-    ap.add_argument("--db-uri", help="Database DSN or URI. The string is logged!")
+    ap.add_argument("--db-uri", help="Database DSN or URI.")
     ap.add_argument(
         "--update",
         action="store_true",
         help="Update summaries and files instead of logging an error",
     )
-    ap.add_argument("--interact", action="store_true", help="Interactive mode")
     ap.add_argument(
         "--stop-after", type=int, help="Stop after feeding N measurements", default=None
     )
-    ap.add_argument("--no-write-msmt", action="store_true",
-                    help="Do not write measurement on disk")
-    ap.add_argument("--no-write-to-db", action="store_true",
-                    help="Do not insert measurement in database")
-    ap.add_argument("--keep-s3-cache", action="store_true",
-                    help="Keep files downloaded from S3 in the local cache")
+    ap.add_argument(
+        "--no-write-to-db",
+        action="store_true",
+        help="Do not insert measurement in database",
+    )
+    ap.add_argument(
+        "--keep-s3-cache",
+        action="store_true",
+        help="Keep files downloaded from S3 in the local cache",
+    )
     conf = ap.parse_args()
 
     if conf.devel or conf.stdout or no_journal_handler:
@@ -124,13 +123,17 @@ def setup():
 
     # Run inside current directory in devel mode
     root = Path(os.getcwd()) if conf.devel else Path("/")
-    conf.conffile = root / "etc/fastpath.conf"
-    log.info("Using conf file %r", conf.conffile)
+    conf.conffile = root / "etc/ooni/fastpath.conf"
+    log.info("Using conf file %s", conf.conffile)
     cp = ConfigParser()
     with open(conf.conffile) as f:
         cp.read_file(f)
         conf.collector_hostnames = cp["DEFAULT"]["collectors"].split()
         log.info("collectors: %s", conf.collector_hostnames)
+        conf.s3_access_key = cp["DEFAULT"]["s3_access_key"].strip()
+        conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
+        if conf.db_uri is None:
+            conf.db_uri = cp["DEFAULT"]["db_uri"].strip()
 
     setup_dirs(conf, root)
 
@@ -262,25 +265,20 @@ def prepare_for_json_normalize(report):
         pass
 
 
-def fetch_measurements(start_day, end_day) -> Iterator[MsmtTup]:
-    """Fetch measurements from S3 and the collectors
+def process_measurements_from_s3(queue):
+    """Pull measurements from S3 and place them in the queue
     """
-    # no --start-day or --end-day   -> Run over SSH
-    # --start-day                   -> Run on old cans, then over SSH
-    # --start-day and --end-day     -> Run on old cans
-    # --start-day and --end-day  with the same date     -> NOP
+    for measurement_tup in s3feeder.stream_cans(conf, conf.start_day, conf.end_day):
+        assert len(measurement_tup) == 3
+        msm_jstr, msm, msm_uid = measurement_tup
+        assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
+        assert msm is None or isinstance(msm, dict)
 
-    for measurement_tup in s3feeder.stream_cans(conf, start_day, end_day):
-        yield measurement_tup
-
-    if conf.nossh:
-        log.info("Not fetching over SSH")
-        return
-
-    ## Fetch measurements from collectors: backlog and then realtime ##
-    log.info("Starting fetching over SSH")
-    for measurement_tup in sshfeeder.feed_measurements_from_collectors(conf):
-        yield measurement_tup
+        while queue.qsize() >= 500:
+            time.sleep(0.1)
+        assert measurement_tup is not None
+        queue.put(measurement_tup)
+        metrics.gauge("queue_size", queue.qsize())
 
 
 @metrics.timer("match_fingerprints")
@@ -394,6 +392,7 @@ def logbug(id: int, desc: str, msm: dict):
     """Log unexpected measurement contents, possibly due to a bug in the probe
     The id helps locating the call to logbug()
     """
+    # Current highest logbug id: 7
     # TODO: use assertions for unknown bugs
     rid = msm.get("report_id", "")
     url = "https://explorer.ooni.org/measurement/{}".format(rid) if rid else "no rid"
@@ -800,7 +799,7 @@ def score_measurement_whatsapp(msm):
 
 @metrics.timer("score_vanilla_tor")
 def score_vanilla_tor(msm):
-    """Calculate measurement scoring for Tor
+    """Calculate measurement scoring for Tor (test_name: vanilla_tor)
     Returns a scores dict
     """
     tk = msm["test_keys"]
@@ -1067,7 +1066,7 @@ def score_psiphon(msm) -> dict:
 
 
 def score_tor(msm) -> dict:
-    """Calculate measurement scoring for Tor
+    """Calculate measurement scoring for Tor (test_name: tor)
     https://github.com/ooni/spec/blob/master/nettests/ts-023-tor.md
     Returns a scores dict
     """
@@ -1082,14 +1081,34 @@ def score_tor(msm) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
+    blocked_cnt = 0
+    not_run_cnt = 0
+    success_cnt = 0
     for d in targets.values():
         if "failure" not in d or "network_events" not in d:
             logbug(6, "missing Tor failure or network_events field", msm)
             scores["accuracy"] = 0.0
             return scores
 
-        if d["failure"] != None:
-            scores["blocking_general"] = 1.0
+        f = d["failure"]
+        # False: did not run: N/A
+        # None: success
+        # string: failed
+        if f is False:
+            not_run_cnt += 1
+        elif f == None:
+            success_cnt += 1
+        elif f == "":
+            # logbug(8
+            assert 0, d
+        else:
+            blocked_cnt += 1
+
+    if blocked_cnt + success_cnt:
+        scores["blocking_general"] = blocked_cnt / (blocked_cnt + success_cnt)
+
+    else:
+        scores["accuracy"] = 0.0
 
     return scores
 
@@ -1147,8 +1166,9 @@ def score_measurement(msm, matches) -> dict:
 
 
 @metrics.timer("trivial_id")
-def trivial_id(msm):
+def trivial_id(msm: dict) -> str:
     """Generate a trivial id of the measurement to allow upsert if needed
+    This is used for legacy (before measurement_uid) measurements
     - 32-bytes hexdigest
     - Deterministic / stateless with no DB interaction
     - Malicious/bugged msmts with collisions on report_id/input/test_name lead
@@ -1165,103 +1185,21 @@ def trivial_id(msm):
     VER = "00"
     msm_jstr = ujson.dumps(msm, sort_keys=True, ensure_ascii=False).encode()
     tid = VER + hashlib.shake_128(msm_jstr).hexdigest(15)
-    return msm_jstr, tid
+    return tid
 
 
-def generate_filename(tid):
-    """Generate filesystem-safe filename from a measurement
-    """
-    return tid + ".json.lz4"
-
-
-@metrics.timer("writeout_measurement")
-def writeout_measurement(msm_jstr, fn, update, tid):
-    """Safely write measurement to disk
-    """
-    # Different processes might be trying to write the same file at the same
-    # time due to naming collisions. Use a safe tmpfile and atomic link
-    # NamedTemporaryFile creates files with permissions 600
-    # but we want other users (Nginx) to be able to read the measurement
-
-    suffix = ".{}.tmp".format(os.getpid())
-    with NamedTemporaryFile(suffix=suffix, dir=conf.msmtdir) as f:
-        with lz4frame.open(f, "w") as lzf:
-            lzf.write(msm_jstr)
-            # os.fsync(lzf.fileno())
-
-            final_fname = conf.msmtdir.joinpath(fn)
-            try:
-                os.chmod(f.name, 0o644)
-                os.link(f.name, final_fname)
-                metrics.incr("msmt_output_file_created")
-            except FileExistsError:
-                if update:
-                    # update access time - used for cache cleanup
-                    # no need to overwrite the file
-                    os.utime(final_fname)
-                    metrics.incr("msmt_output_file_updated")
-                else:
-                    log.info(f"{tid} Refusing to overwrite {final_fname}")
-                    metrics.incr("report_id_input_file_collision")
-                    metrics.incr("msmt_output_file_skipped")
-                    os.utime(final_fname)
-
-    metrics.incr("wrote_uncompressed_bytes", len(msm_jstr))
-
-
-@metrics.timer("trim_old_measurements")
-def _trim_old_measurements(conf):
-    """Trim old measurement files on disk
-    """
-    s = os.statvfs(conf.msmtdir)
-    free_gb = s.f_bavail * s.f_bsize / 2 ** 30  # float
-    if free_gb > 20:
-        log.info("No trimming: %d GB free", free_gb)
-        return
-
-    # 4.89 GB free: keep only the last 24h;    10 GB free: keep 100h
-    # The globbing gets slower with larger backlogs but the quadratic behavior
-    # can become as aggressive as needed
-    keep_hours = free_gb ** 2
-    keep_hours = max(keep_hours, 24)  # safety
-    log.info(
-        "Starting file trimming: %.1f GB free, keeping the last %.2f hours"
-        % (free_gb, keep_hours)
-    )
-    # Delete files ignoring race conditions
-    time_threshold = time.time() - 3600 * keep_hours
-    file_cnt = 0
-    for f in conf.msmtdir.glob("*.lz4"):
-        try:
-            if f.stat().st_mtime < time_threshold:
-                f.unlink()
-                file_cnt += 1
-        except FileNotFoundError:
-            pass
-
-    log.debug("Deleted %d files", file_cnt)
-    metrics.incr("deleted_files", file_cnt)
-
-
-def file_trimmer(conf):
-    """Trim measurement files to free disk space.
-    Runs in a dedicated thread
-    """
-    while True:
-        try:
-            _trim_old_measurements(conf)
-        except Exception as e:
-            log.exception(e)
-        time.sleep(60 * 5)
+def unwrap_msmt(post):
+    fmt = post["format"].lower()
+    if fmt == "json":
+        return post["content"]
+    if fmt == "yaml":
+        return yaml.load(msmt, Loader=yaml.CLoader)
 
 
 def msm_processor(queue):
     """Measurement processor worker
     """
-    if conf.no_write_to_db:
-        log.warning("not writing to database")
-    else:
-        db.setup(conf)
+    db.setup(conf)
 
     while True:
         msm_tup = queue.get()
@@ -1271,18 +1209,14 @@ def msm_processor(queue):
 
         with metrics.timer("full_run"):
             try:
-                msm_jstr, measurement = msm_tup
+                msm_jstr, measurement, msmt_uid = msm_tup
                 if measurement is None:
                     measurement = ujson.loads(msm_jstr)
+                if sorted(measurement.keys()) == ["content", "format"]:
+                    measurement = unwrap_msmt(measurement)
                 rid = measurement.get("report_id", None)
                 inp = measurement.get("input", None)
-                msm_jstr, tid = trivial_id(measurement)
-                # TODO: log only when using SSH
-                sshfeeder.log_ingestion_delay(measurement)
-                log.debug(f"Processing {tid} {rid} {inp}")
-                fn = generate_filename(tid)
-                if not conf.no_write_msmt:
-                    writeout_measurement(msm_jstr, fn, conf.update, tid)
+                log.debug(f"Processing {msmt_uid} {rid} {inp}")
                 if measurement.get("test_name", None) == "web_connectivity":
                     matches = match_fingerprints(measurement)
                 else:
@@ -1296,19 +1230,31 @@ def msm_processor(queue):
                 failure = scores.get("accuracy", 1.0) < 0.5
                 if anomaly or failure or confirmed:
                     log.debug(
-                        f"Storing {tid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
+                        f"Storing {msmt_uid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
                     )
-                if not conf.no_write_to_db:
-                    db.upsert_summary(
-                        measurement,
-                        scores,
-                        anomaly,
-                        confirmed,
-                        failure,
-                        tid,
-                        fn,
-                        conf.update,
-                    )
+                sw_name = measurement.get("software_name", "unknown")
+                sw_version = measurement.get("software_version", "unknown")
+                platform = "unset"
+                if "annotations" in measurement and isinstance(
+                    measurement["annotations"], dict
+                ):
+                    platform = measurement["annotations"].get("platform", "unset")
+
+                if msmt_uid is None:
+                    msmt_uid = trivial_id(measurement)  # legacy measurement
+
+                db.upsert_summary(
+                    measurement,
+                    scores,
+                    anomaly,
+                    confirmed,
+                    failure,
+                    msmt_uid,
+                    sw_name,
+                    sw_version,
+                    platform,
+                    conf.update,
+                )
             except Exception as e:
                 log.exception(e)
                 metrics.incr("unhandled_exception")
@@ -1318,13 +1264,11 @@ def shut_down(queue):
     log.info("Shutting down workers")
     [queue.put(None) for n in range(NUM_WORKERS)]
     # FIXME
-    #queue.close()
-    #queue.join_thread()
+    # queue.close()
+    # queue.join_thread()
 
 
 def core():
-    measurement_cnt = 0
-
     # There are 3 main data sources, in order of age:
     # - cans on S3
     # - older report files on collectors (max 1 day of age)
@@ -1332,13 +1276,6 @@ def core():
     # Load json/yaml files and apply filters like canning
 
     t00 = time.time()
-    scores = None
-
-    # Spawn file trimmer process
-    if conf.no_write_msmt:
-        log.warning("Not trimming old measurement on disk")
-    else:
-        mp.Process(target=file_trimmer, args=(conf,)).start()
 
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module
@@ -1348,33 +1285,14 @@ def core():
     try:
         [t.start() for t in workers]
 
-        for measurement_tup in fetch_measurements(conf.start_day, conf.end_day):
-            assert len(measurement_tup) == 2
-            msm_jstr, msm = measurement_tup
-            assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(
-                msm_jstr
-            )
-            assert msm is None or isinstance(msm, dict)
+        if conf.noapi:
+            # Pull measurements from S3
+            process_measurements_from_s3(queue)
 
-            measurement_cnt += 1
-            while queue.qsize() >= 500:
-                time.sleep(0.1)
-            assert measurement_tup is not None
-            queue.put(measurement_tup)
-            metrics.gauge("queue_size", queue.qsize())
-
-            if conf.stop_after is not None and measurement_cnt >= conf.stop_after:
-                log.info(
-                    "Exiting with stop_after. Total runtime: %f", time.time() - t00
-                )
-                break
-
-            # Interact from CLI
-            if conf.devel and conf.interact:
-                import bpython  # debdeps: bpython3
-
-                bpython.embed(locals_=locals())
-                break
+        else:
+            # Start HTTP API
+            log.info("Starting HTTP API")
+            start_http_api(queue)
 
     except Exception as e:
         log.exception(e)
