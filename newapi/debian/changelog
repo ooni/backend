@@ -1,3 +1,9 @@
+ooni-api (0.2) unstable; urgency=medium
+
+  * Tweak query
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 20 Oct 2020 16:09:09 +0100
+
 ooni-api (0.1) unstable; urgency=medium
 
   * Initial version

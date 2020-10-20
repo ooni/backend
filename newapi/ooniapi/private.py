@@ -427,8 +427,11 @@ def api_private_website_test_urls():
     probe_asn = int(probe_asn.replace("AS", ""))
 
     # Count how many distinct inputs we have in this CC / ASN / period
+    # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
     s = sql.text(
-        """SELECT COUNT(DISTINCT(input)) as input_count
+        """
+        SET enable_bitmapscan = off;
+        SELECT COUNT(DISTINCT(input)) as input_count
         FROM counters
         WHERE measurement_start_day >= CURRENT_DATE - interval '31 day'
         AND measurement_start_day < CURRENT_DATE
