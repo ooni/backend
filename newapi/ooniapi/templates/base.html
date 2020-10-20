@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OONI API{% if self.title() %} - {% endif %}{% block title %}{% endblock %}</title>
+
+  {% block head_meta %}
+    <meta charset="UTF-8">
+  {% endblock %}
+
+  {% block head_css %}
+    <link href="/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="/css/master.css" rel="stylesheet" />
+    <link href="/fonts/fonts.css" rel="stylesheet" />
+  {% endblock %}
+
+  {% block head %}
+  {% endblock %}
+
+  {% block head_js %}
+  {% endblock %}
+
+</head>
+<body>
+{% block body %}
+
+  {% block navbar %}
+  {% endblock %}
+
+  {% block uncontained %}
+  {% endblock %}
+
+  <div class="container-fluid">
+
+    {% block content_fluid %}
+    {% endblock %}
+
+  </div>
+
+  {% block footer %}
+    {% include 'footer.html' %}
+  {% endblock %}
+
+  {% block tail_js %}
+  {% endblock %}
+
+{% endblock %}
+</body>
+</html>

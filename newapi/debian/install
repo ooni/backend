@@ -1,0 +1,3 @@
+debian/etc/ .
+debian/ooni-api-uploader.service /lib/systemd/system/
+debian/ooni-api-uploader.timer /lib/systemd/system/

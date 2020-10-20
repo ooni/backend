@@ -1,0 +1,11 @@
+[Unit]
+Description=Upload raw OONI measurements to S3
+Wants=ooni-api-uploader.timer
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ooni_api_uploader.py
+
+[Install]
+WantedBy=multi-user.target
+

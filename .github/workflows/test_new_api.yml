@@ -1,0 +1,72 @@
+name: OONI API tests
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-18.04
+
+    # Implemented based on:
+    # https://help.github.com/en/actions/configuring-and-managing-workflows/creating-postgresql-service-containers
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - name: Prepare ssh access
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y miredo
+          mkdir ~/.ssh
+          echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILZ+VlExGTsW1S607tT+4OVm0MayKZcsEDwaloA89oRo" > ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+          chmod 770 ~/.ssh
+          chmod 770 ~/
+
+      - name: Setup APT
+        run: |
+          sudo rm /etc/apt/sources.list.d/*
+          cat <<EOF | sudo tee /etc/apt/sources.list
+          deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main
+          deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
+          deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
+          deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
+          deb [trusted=yes] http://deb.debian.org/debian-security/ buster/updates main contrib non-free
+          EOF
+
+      - name: Show ssh access command
+        run: |
+          echo "Connect using:"
+          echo "  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null runner@$(ip address show dev teredo scope global | awk '/inet6/ {print $2}' | cut -d'/' -f1)"
+
+      - name: Allow extra time for debugging
+        if: ${{ always() }}
+        run: sleep 3600
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y postgresql-client
+
+      - name: Init the database
+        run: bash scripts/init_db.sh
+        env:
+          POSTGRES_HOST: 127.0.0.1
+          PGPASSWORD: postgres
+          PGPORT: 5432
+
+      - name: Run tests
+        run: pytest-3 -s --show-capture=no -s -vv -k test_list_me
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ooni_measurements

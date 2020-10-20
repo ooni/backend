@@ -1,6 +1,7 @@
 version: 2
 jobs:
-  build:
+  create_deb_package:
+    # Build .deb package
     docker:
       - image: debian:stable
     steps:
@@ -10,3 +11,36 @@ jobs:
             apt-get update -q
             apt-get install -y --no-install-recommends git python3 python3-requests
             ./.circleci/debops-ci ci
+
+  end_to_end_test:
+    # Deploy API + fastpath + database + ooniprobe
+
+    docker:
+      # Primary container image where all commands run
+      - image: debian:stable
+        environment:
+          TEST_DATABASE_URL: postgresql://root@localhost/metadb
+
+      # Service container image
+      - image: circleci/postgres:11
+        environment:
+          POSTGRES_HOST_AUTH_METHOD: trust
+
+    steps:
+      - run: whoami
+      - run: DEBIAN_FRONTEND=noninteractive apt-get update
+      - run: DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates
+      - run: echo "deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main" > /etc/apt/sources.list.d/bintray.list
+      - run: echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+      - run: DEBIAN_FRONTEND=noninteractive apt-get update
+      - run: DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y openssh-client ssl-cert
+      - run: mkdir -p /run/nodeexp/
+      - run: DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y fastpath analysis ooni-api
+
+workflows:
+  version: 2
+
+  my_workflows:
+    jobs:
+      - create_deb_package
+      - end_to_end_test

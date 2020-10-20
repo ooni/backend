@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Documentation{% endblock%}
+
+{% block head_css %}
+{% endblock %}
+
+{% block body %}
+
+  <redoc spec-url='/api/v1/swagger.json'>
+    <h1 class="text-center">Loading...</h1>
+  </redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"> </script>
+
+{% endblock %}
