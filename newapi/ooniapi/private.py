@@ -377,8 +377,11 @@ def api_private_website_stats():
     probe_cc = validate_probe_cc_query_param()
     probe_asn = validate_probe_asn_query_param()
 
+    # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
     s = sql.text(
-        """SELECT
+        """
+        SET enable_bitmapscan = off;
+        SELECT
              measurement_start_day,
              SUM(anomaly_count) as anomaly_count,
              SUM(confirmed_count) as confirmed_count,
