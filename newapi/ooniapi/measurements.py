@@ -15,7 +15,7 @@ import logging
 import math
 import time
 
-#import yaml
+# import yaml
 import lz4framed
 
 import ujson
@@ -66,11 +66,9 @@ def show_apidocs():
     return redirect("/apidocs")
 
 
-
 @api_msm_blueprint.route("/v1/files")
 def list_files():
-    """List files - unsupported
-    """
+    """List files - unsupported"""
     return cachedjson(24, msg="not implemented")
 
 
@@ -132,6 +130,7 @@ def get_measurement(measurement_id, download=None):
 
 # # Fetching measurement bodies
 
+
 def _fetch_autoclaved_measurement_body_from_s3(
     autoclaved_fn: str, frame_off: int, frame_size: int, intra_off: int, intra_size: int
 ) -> bytes:
@@ -165,7 +164,10 @@ def _fetch_autoclaved_measurement_body_from_s3(
     return blob
 
 
-def _fetch_jsonl_measurement_body_inner(s3path: str, linenum: int,) -> bytes:
+def _fetch_jsonl_measurement_body_inner(
+    s3path: str,
+    linenum: int,
+) -> bytes:
     log = current_app.logger
     REQID_HDR = "X-Request-ID"
     # TODO configure from file
@@ -284,8 +286,7 @@ def _fetch_autoclaved_measurement_body(report_id: str, input) -> dict:
 
 
 def _fetch_measurement_body(report_id, input: str) -> bytes:
-    """Fetch measurement body from either disk, jsonl or autoclaved on S3
-    """
+    """Fetch measurement body from either disk, jsonl or autoclaved on S3"""
     log.debug(f"Fetching body for {report_id} {input}")
     if report_id.count("_") == 5:
         # Look on disk and then from JSONL cans on S3
@@ -363,7 +364,7 @@ def get_measurement_meta():
         description: Returns measurement metadata, optionally including the raw measurement body
     """
 
-    #TODO: input can be '' or NULL in the fastpath table - fix it
+    # TODO: input can be '' or NULL in the fastpath table - fix it
     # TODO: see integ tests for TODO items
     param = request.args.get
     report_id = param("report_id")
@@ -423,9 +424,9 @@ def get_measurement_meta():
 
 # # Listing measurements
 
+
 def _merge_results(tmpresults):
-    """Trim list_measurements() outputs that share the same report_id/input
-    """
+    """Trim list_measurements() outputs that share the same report_id/input"""
     resultsmap = {}
     for r in tmpresults:
         k = (r["report_id"], r["input"])
@@ -619,9 +620,9 @@ def list_measurements():
             probe_asn = probe_asn[2:]
         probe_asn = int(probe_asn)
 
-    failure = (failure and failure.lower() == "true")
-    anomaly = (anomaly and anomaly.lower() == "true")
-    confirmed = (confirmed and confirmed.lower() == "true")
+    failure = failure and failure.lower() == "true"
+    anomaly = anomaly and anomaly.lower() == "true"
+    confirmed = confirmed and confirmed.lower() == "true"
 
     # Set reasonable since/until ranges if not specified. When looking up by
     # report_id a BTREE is used and since/until are not beneficial.
@@ -642,7 +643,6 @@ def list_measurements():
             since = parse_date(since)
     except ValueError:
         raise BadRequest("Invalid since")
-
 
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
@@ -783,7 +783,9 @@ def list_measurements():
             if row.input in (None, ""):
                 url = genurl("/api/v1/raw_measurement", report_id=row.report_id)
             else:
-                url = genurl("/api/v1/raw_measurement", report_id=row.report_id, input=row.input)
+                url = genurl(
+                    "/api/v1/raw_measurement", report_id=row.report_id, input=row.input
+                )
             tmpresults.append(
                 {
                     "measurement_url": url,
@@ -855,8 +857,7 @@ def list_measurements():
 
 
 def _convert_to_csv(r) -> str:
-    """Convert aggregation result dict/list to CSV
-    """
+    """Convert aggregation result dict/list to CSV"""
     csvf = StringIO()
     if isinstance(r, dict):
         # 0-dimensional data
@@ -1002,7 +1003,8 @@ def get_aggregated():
     if category_code:
         # Join in citizenlab table and filter by category_code
         table = table.join(
-            sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
+            sql.table("citizenlab"),
+            sql.text("citizenlab.url = counters.input"),
         )
         where.append(sql.text("category_code = :category_code"))
         query_params["category_code"] = category_code
@@ -1034,7 +1036,8 @@ def get_aggregated():
         if axis_x == "category_code":
             # Join in citizenlab table
             table = table.join(
-                sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
+                sql.table("citizenlab"),
+                sql.text("citizenlab.url = counters.input"),
             )
 
     if axis_y:
@@ -1043,7 +1046,8 @@ def get_aggregated():
             cols.append(column(axis_y))
             # Join in citizenlab table
             table = table.join(
-                sql.table("citizenlab"), sql.text("citizenlab.url = counters.input"),
+                sql.table("citizenlab"),
+                sql.text("citizenlab.url = counters.input"),
             )
 
     # Assemble query
