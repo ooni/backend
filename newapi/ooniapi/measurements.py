@@ -623,15 +623,8 @@ def list_measurements():
     anomaly = (anomaly and anomaly.lower() == "true")
     confirmed = (confirmed and confirmed.lower() == "true")
 
-    try:
-        if since is None:
-            if report_id is None:
-                since = date.today() - timedelta(days=30)
-        else:
-            since = parse_date(since)
-    except ValueError:
-        raise BadRequest("Invalid since")
-
+    # Set reasonable since/until ranges if not specified. When looking up by
+    # report_id a BTREE is used and since/until are not beneficial.
     try:
         if until is None:
             if report_id is None:
@@ -640,6 +633,16 @@ def list_measurements():
             until = parse_date(until)
     except ValueError:
         raise BadRequest("Invalid until")
+
+    try:
+        if since is None:
+            if report_id is None and until is not None:
+                since = until - timedelta(days=30)
+        else:
+            since = parse_date(since)
+    except ValueError:
+        raise BadRequest("Invalid since")
+
 
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
