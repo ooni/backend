@@ -775,6 +775,7 @@ def list_measurements():
     # Run the query, generate the results list
     iter_start_time = time.time()
 
+    # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
     current_app.db_session.execute("SET enable_seqscan=false;")
     try:
         q = current_app.db_session.execute(query, query_params)
@@ -1062,6 +1063,8 @@ def get_aggregated():
         query = query.group_by(column(axis_y)).order_by(column(axis_y))
 
     try:
+        # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
+        current_app.db_session.execute("SET enable_seqscan=false;")
         q = current_app.db_session.execute(query, query_params)
 
         if dimension_cnt == 2:
