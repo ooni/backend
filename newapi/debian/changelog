@@ -1,3 +1,9 @@
+ooni-api (0.6) unstable; urgency=medium
+
+  * Reject AS=0 or cc=ZZ submissions
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 03 Nov 2020 12:55:17 +0000
+
 ooni-api (0.5) unstable; urgency=medium
 
   * Hide ASN=0 from list_measurements

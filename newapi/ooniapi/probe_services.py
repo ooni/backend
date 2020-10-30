@@ -309,6 +309,22 @@ def receive_measurement(report_id):
         log.info("Unexpected report_id %r", report_id[:200])
         return jerror("Incorrect format")
 
+    try:
+        asn_i = int(asn)
+    except ValueError:
+        log.info("ASN value not parsable %r", asn)
+        return jerror("Incorrect format")
+
+    if asn_i == 0:
+        log.info("Discarding ASN == 0")
+        metrics.incr("receive_measurement_discard_asn_0")
+        return jsonify()
+
+    if cc.upper() == "ZZ":
+        log.info("Discarding CC == ZZ")
+        metrics.incr("receive_measurement_discard_cc_zz")
+        return jsonify()
+
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.utcnow()

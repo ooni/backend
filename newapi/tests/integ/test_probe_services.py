@@ -167,6 +167,8 @@ def test_bouncer_net_tests_bad_request2(client):
     assert resp.status_code == 400
 
 
+# # test collector
+
 def test_collector_open_report(client):
     j = {
         "data_format_version": "0.2.0",
