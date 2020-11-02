@@ -688,8 +688,13 @@ def list_measurements():
         fpwhere.append(sql.text("probe_cc = :probe_cc"))
 
     if probe_asn is not None:
+        if probe_asn == 0:
+            log.info("Refusing list_measurements with probe_asn set to 0")
+            abort(403)
         query_params["probe_asn"] = probe_asn
         fpwhere.append(sql.text("probe_asn = :probe_asn"))
+    else:
+        fpwhere.append(sql.text("probe_asn != 0"))
 
     if test_name is not None:
         query_params["test_name"] = test_name
