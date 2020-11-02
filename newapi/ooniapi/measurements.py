@@ -397,6 +397,7 @@ def get_measurement_meta():
         FROM fastpath
         WHERE fastpath.report_id = :report_id
         AND (fastpath.input IS NULL or fastpath.input = '')
+        AND probe_asn != 0
         """
     else:
         query += """
@@ -405,6 +406,7 @@ def get_measurement_meta():
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
         WHERE fastpath.input = :input
         AND fastpath.report_id = :report_id
+        AND probe_asn != 0
         """
     query_params = dict(input=input, report_id=report_id)
     q = current_app.db_session.execute(query, query_params)
