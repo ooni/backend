@@ -1050,13 +1050,17 @@ def get_aggregated():
 
     if axis_y:
         # TODO: check if the value is a valid colum name
-        if axis_y == "category_code" and axis_x != "category_code":
+        if axis_y == "category_code":
+            if axis_x != "category_code":
+                cols.append(column(axis_y))
+                # Join in citizenlab table
+                table = table.join(
+                    sql.table("citizenlab"),
+                    sql.text("citizenlab.url = counters.input"),
+                )
+        elif axis_y != axis_x:
+            # TODO: consider prohibiting axis_x == axis_y ?
             cols.append(column(axis_y))
-            # Join in citizenlab table
-            table = table.join(
-                sql.table("citizenlab"),
-                sql.text("citizenlab.url = counters.input"),
-            )
 
     # Assemble query
     where_expr = and_(*where)
