@@ -85,21 +85,30 @@ def buildpkg(p) -> List[Path]:
         comp = trim_compare(getenv("CIRCLE_COMPARE_URL", ""))  # show changes in VCS
         if not comp:
             # https://discuss.circleci.com/t/circle-compare-url-is-empty/24549/8
-            comp = getenv("CIRCLE_PULL_REQUESTS")
+            comp = getenv("CIRCLE_PULL_REQUEST")
+
         if getenv("CIRCLE_PULL_REQUEST"):
             # This is a PR: build ~pr<N>-<N> version. CIRCLE_PR_NUMBER is broken
             pr_num = getenv("CIRCLE_PULL_REQUEST", "").rsplit("/", 1)[-1]
             build_num = getenv("CIRCLE_BUILD_NUM")
             ver = f"{ver}~pr{pr_num}-{build_num}"
+            print(f"CircleCI Pull Request detected - using version {ver}")
             run2(f"dch -b -v {ver} {comp}", cwd=p)
             run2(f"dch -r {ver} {comp}", cwd=p)
             ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p).strip()
             assert ver == ver2, ver + " <--> " + ver2
+
+        elif getenv("CIRCLE_BRANCH") == "master":
+            # This is a build outside of a PR and in the mainline branch
+            print(f"CircleCI mainline build detected - using version {ver}")
+            run2(f"dch -b -v {ver} {comp}", cwd=p)
+            run2(f"dch -r {ver} {comp}", cwd=p)
+            ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p).strip()
+            assert ver == ver2, ver + " <--> " + ver2
+
         else:
-            run2(f"dch -b -v {ver} {comp}", cwd=p)
-            run2(f"dch -r {ver} {comp}", cwd=p)
-            ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p).strip()
-            assert ver == ver2, ver + " <--> " + ver2
+            # This is a build for a new branch but without a PR: ignore it
+            return []
 
     runi("apt-get build-dep -qy --no-install-recommends .", p, sudo=sudo)
     runi("fakeroot debian/rules build", p)
