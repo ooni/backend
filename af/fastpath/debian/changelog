@@ -1,3 +1,9 @@
+fastpath (0.33) unstable; urgency=medium
+
+  * Ignore CC=ZZ and ASN=0
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 02 Nov 2020 21:35:14 +0000
+
 fastpath (0.32) unstable; urgency=medium
 
   * Update conf management
