@@ -69,8 +69,7 @@ def parse_date(d):
 
 
 def setup_dirs(conf, root):
-    """Setup directories creating them if needed
-    """
+    """Setup directories creating them if needed"""
     conf.vardir = root / "var/lib/fastpath"
     conf.cachedir = conf.vardir / "cache"
     conf.s3cachedir = conf.cachedir / "s3"
@@ -139,8 +138,7 @@ def setup():
 
 
 def per_s(name, item_count, t0):
-    """Generate a gauge metric of items per second
-    """
+    """Generate a gauge metric of items per second"""
     delta = time.time() - t0
     if delta > 0:
         metrics.gauge(f"{name}_per_s", item_count / delta)
@@ -148,8 +146,7 @@ def per_s(name, item_count, t0):
 
 @metrics.timer("clean_caches")
 def clean_caches():
-    """Cleanup local caches.
-    """
+    """Cleanup local caches."""
     # Access times are updated on file load.
     # FIXME: use cache locations correctly
     now = time.time()
@@ -266,8 +263,7 @@ def prepare_for_json_normalize(report):
 
 
 def process_measurements_from_s3(queue):
-    """Pull measurements from S3 and place them in the queue
-    """
+    """Pull measurements from S3 and place them in the queue"""
     for measurement_tup in s3feeder.stream_cans(conf, conf.start_day, conf.end_day):
         assert len(measurement_tup) == 3
         msm_jstr, msm, msm_uid = measurement_tup
@@ -580,8 +576,7 @@ def score_measurement_telegram(msm):
 
 @metrics.timer("score_measurement_hhfm")
 def score_measurement_hhfm(msm):
-    """Calculate http_header_field_manipulation
-    """
+    """Calculate http_header_field_manipulation"""
     tk = msm["test_keys"]
     rid = msm["report_id"]
     del msm
@@ -653,8 +648,7 @@ def score_measurement_hhfm(msm):
 
 @metrics.timer("score_http_invalid_request_line")
 def score_http_invalid_request_line(msm):
-    """Calculate measurement scoring for http_invalid_request_line
-    """
+    """Calculate measurement scoring for http_invalid_request_line"""
     # https://github.com/ooni/spec/blob/master/nettests/ts-007-http-invalid-request-line.md
     tk = msm["test_keys"]
     rid = msm["report_id"]
@@ -1115,8 +1109,7 @@ def score_tor(msm) -> dict:
 
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
-    """Calculate measurement scoring. Returns a scores dict
-    """
+    """Calculate measurement scoring. Returns a scores dict"""
     # Blocking locality: global > country > ISP > local
     # unclassified locality is stored in "blocking_general"
 
@@ -1197,8 +1190,7 @@ def unwrap_msmt(post):
 
 
 def msm_processor(queue):
-    """Measurement processor worker
-    """
+    """Measurement processor worker"""
     db.setup(conf)
 
     while True:
@@ -1217,6 +1209,16 @@ def msm_processor(queue):
                 rid = measurement.get("report_id", None)
                 inp = measurement.get("input", None)
                 log.debug(f"Processing {msmt_uid} {rid} {inp}")
+                if measurement.get("probe_cc", "").upper() == "ZZ":
+                    log.debug(f"Ignoring measurement with probe_cc=ZZ")
+                    metrics.incr("discarded_measurement")
+                    continue
+
+                if measurement.get("probe_asn", "").upper() == "AS0":
+                    log.debug(f"Ignoring measurement with ASN 0")
+                    metrics.incr("discarded_measurement")
+                    continue
+
                 if measurement.get("test_name", None) == "web_connectivity":
                     matches = match_fingerprints(measurement)
                 else:
