@@ -397,6 +397,7 @@ def get_measurement_meta():
         FROM fastpath
         WHERE fastpath.report_id = :report_id
         AND (fastpath.input IS NULL or fastpath.input = '')
+        AND probe_asn != 0
         """
     else:
         query += """
@@ -405,6 +406,7 @@ def get_measurement_meta():
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
         WHERE fastpath.input = :input
         AND fastpath.report_id = :report_id
+        AND probe_asn != 0
         """
     query_params = dict(input=input, report_id=report_id)
     q = current_app.db_session.execute(query, query_params)
@@ -688,8 +690,13 @@ def list_measurements():
         fpwhere.append(sql.text("probe_cc = :probe_cc"))
 
     if probe_asn is not None:
+        if probe_asn == 0:
+            log.info("Refusing list_measurements with probe_asn set to 0")
+            abort(403)
         query_params["probe_asn"] = probe_asn
         fpwhere.append(sql.text("probe_asn = :probe_asn"))
+    else:
+        fpwhere.append(sql.text("probe_asn != 0"))
 
     if test_name is not None:
         query_params["test_name"] = test_name
@@ -1043,13 +1050,17 @@ def get_aggregated():
 
     if axis_y:
         # TODO: check if the value is a valid colum name
-        if axis_y == "category_code" and axis_x != "category_code":
+        if axis_y == "category_code":
+            if axis_x != "category_code":
+                cols.append(column(axis_y))
+                # Join in citizenlab table
+                table = table.join(
+                    sql.table("citizenlab"),
+                    sql.text("citizenlab.url = counters.input"),
+                )
+        elif axis_y != axis_x:
+            # TODO: consider prohibiting axis_x == axis_y ?
             cols.append(column(axis_y))
-            # Join in citizenlab table
-            table = table.join(
-                sql.table("citizenlab"),
-                sql.text("citizenlab.url = counters.input"),
-            )
 
     # Assemble query
     where_expr = and_(*where)
