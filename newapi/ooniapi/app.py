@@ -54,7 +54,6 @@ def validate_conf(app, conffile):
     """Fail early if the app configuration looks incorrect
     """
     conf_keys = (
-        "AUTOCLAVED_BASE_URL",
         "BASE_URL",
         "COLLECTORS",
         "DATABASE_STATEMENT_TIMEOUT",
