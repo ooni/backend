@@ -50,11 +50,12 @@ HTMLTPL = dedent(
     </style>
     </head>
     <body>
-    <div id="document">
+    <div id="content">
     """
 )
 
 conf = None
+
 
 def load_conf():
     confp = ConfigParser()
@@ -177,29 +178,25 @@ def generate_header_path(inputf: Path) -> str:
         s.append(item)
     last = "link:[{}]\n".format(inputf.name)
     s.append(last)
-    # out = " ➤ ".join(s)
     out = " -> ".join(s)
     return out
 
 
-def generate_header_path_markdown(inputf: Path) -> str:
+def generate_header_path_html(inputf: Path) -> str:
     s = []
-    # [I'm a relative reference to a repository file](../blob/master/LICENSE)
     backticker = "/".join([".."] * len(inputf.parents))
     if backticker:
         backticker += "/"
     pc = len(inputf.parents)
 
     for depth, x in enumerate(reversed(inputf.parents)):
-        item = "[{}]({}{})".format(x.name, backticker, str(x))
-
         backticker = "/".join([".."] * (pc - depth - 1))
-        item = "[{}]({})".format(x.name, backticker)
-
+        item = "<a href='{}/index.html'>{}</a>".format(backticker, x.name)
         s.append(item)
+
     last = "[{}](.)".format(inputf.name)
     s.append(last)
-    out = " ➤ ".join(s)
+    out = " » ".join(s)
     return out
 
 
@@ -211,11 +208,6 @@ def generate_view_badge(f: Path):
 def generate_edit_badge(f: Path):
     url = generate_github_link("edit", f)
     return generate_badge(url, "edit")
-
-
-# TODO mypy
-# TODO fix links
-# TODO remove footer
 
 
 def generate_python_adoc(inputf: Path, pdoc: List):
@@ -241,17 +233,14 @@ def generate_html_begin(orig_source_f):
 
 def wrap_page(orig_source_f, content):
     begin = generate_html_begin(orig_source_f)
+    header = generate_header_path_html(orig_source_f)
     end = "</div></body></html>"
-    return begin + content + end
+    return begin + header + content + end
 
 
 def generate_python_markdown(inputf: Path, pdoc: List):
     lines = []
-    lines.append(generate_header_path_markdown(inputf))
-    print(lines)
     for content, lineno in pdoc:
-        # gh_b = generate_github_link("blob", inputf, lineno)
-        # f.write(gh_b)
         lines.append(generate_view_badge(inputf))
         lines.append(generate_edit_badge(inputf))
         lines.append("\n" + content + "\n")
@@ -265,11 +254,18 @@ def create_index_html(basedir: Path):
         if d.is_dir():
             create_index_html(d)
 
-    out = generate_html_begin(basedir) + "<ul>"
-    for f in basedir.iterdir():
-        if f.is_dir() or f.suffix == ".html":
-            out += "<li><a href='{}'>{}</a></li>".format(f.name, f.with_suffix("").name)
-    footer = """</ul></div></body></html>"""
+    out = generate_html_begin(basedir)
+    out += generate_header_path_html(basedir)
+    out += "<ul>"
+    for f in sorted(basedir.iterdir()):
+        n = f.with_suffix("").name
+        if f.is_dir():
+            out += "<li><a href='{}/index.html'>» {}</a></li>".format(f.name, n)
+        elif f.suffix == ".html":
+            out += "<li><a href='{}'>{}</a></li>".format(f.name, n)
+
+    footer = conf.get("footer", "")
+    footer = "</ul></div>" + footer + "</body></html>"
     out += footer
     indexf = basedir / "index.html"
     indexf.write_text(out)
