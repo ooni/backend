@@ -50,7 +50,14 @@ HTMLTPL = dedent(
     </style>
     </head>
     <body>
-    <div id="content">
+    <div class="header">
+      <div class="row">
+        <div class="column">
+          <h1>Pipeline Documentaiton</h1>
+        </div>
+      </div>
+    </div>
+    <div class="container" id="content">
     """
 )
 
