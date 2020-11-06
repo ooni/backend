@@ -48,7 +48,7 @@ def list_collectors():
             "type": "cloudfront",
         },
         {"address": "httpo://guegdifjy7bjpequ.onion", "type": "onion"},
-        {"address": "https://mia-pg.ooni.org:443", "type": "https"},
+        {"address": "https://ams-pg.ooni.org:443", "type": "https"},
         {
             "address": "https://dkyhjv0wpi2dk.cloudfront.net",
             "front": "dkyhjv0wpi2dk.cloudfront.net",
