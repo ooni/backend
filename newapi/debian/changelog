@@ -1,3 +1,9 @@
+ooni-api (0.7) unstable; urgency=medium
+
+  * Fix collector name
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 06 Nov 2020 13:02:10 +0000
+
 ooni-api (0.6) unstable; urgency=medium
 
   * Reject AS=0 or cc=ZZ submissions
