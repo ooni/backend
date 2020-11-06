@@ -119,7 +119,6 @@ def render_adoc(orig_source_f: Path, infile: StringIO):
     outfile.parent.mkdir(parents=True, exist_ok=True)
     print(outfile)
     ad = asciidocapi.AsciiDocAPI()
-    # ad.options('--no-header-footer')
     ad.attributes["author"] = conf.get("author", "")
     infile.seek(0)
     with outfile.open("w") as outf:
@@ -241,7 +240,8 @@ def generate_html_begin(orig_source_f):
 def wrap_page(orig_source_f, content):
     begin = generate_html_begin(orig_source_f)
     header = generate_header_path_html(orig_source_f)
-    end = "</div></body></html>"
+    footer = conf.get("footer", "")
+    end = "</div>" + footer + "</body></html>"
     return begin + header + content + end
 
 
