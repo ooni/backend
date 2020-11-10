@@ -489,6 +489,7 @@ def list_measurements():
         - telegram
         - psiphon
         - tor
+        - riseupvpn
       - name: since
         in: query
         type: string
@@ -938,6 +939,7 @@ def get_aggregated():
         - telegram
         - psiphon
         - tor
+        - riseupvpn
       - name: since
         in: query
         type: string
