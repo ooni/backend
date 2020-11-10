@@ -2,6 +2,9 @@ paramiko
 statsd
 ujson
 lz4
+# pip install --global-option='--with-libyaml' pyyaml
 pyyaml
 boto3
+gunicorn
+psycopg2-binary
 # systemd <- This is an optional requirement on linux
