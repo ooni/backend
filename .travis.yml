@@ -1,9 +1,0 @@
-sudo: required
-services: docker
-language: python
-python:
-  - "2.7"
-install: pip install tox-travis
-script:
-  - tox -v -e unitcov
-  - tox -v -- -s
