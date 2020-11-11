@@ -13,10 +13,15 @@ debdeps: python3-markdown
 from configparser import ConfigParser
 from io import StringIO
 from pathlib import Path
+from subprocess import check_call
+from tempfile import NamedTemporaryFile
 from textwrap import dedent
 from typing import List
 import ast
+import base64
 import sys
+import zlib
+
 
 try:
     # debdeps: asciidoc-base (>= 9.0.0)
@@ -30,11 +35,15 @@ except ImportError:
 try:
     # debdeps: python3-markdown
     import markdown
+    from markdown.extensions.toc import TocExtension
+    from markdown.extensions.codehilite import CodeHiliteExtension
+    from markdown.extensions.fenced_code import FencedCodeExtension
 
     markdown_available = True
 except ImportError:
     markdown_available = False
 
+# debdeps: python3-blockdiag
 
 HTMLTPL = dedent(
     """
@@ -88,8 +97,7 @@ def _scan_ast(i, skipfirst=True):
 
 
 def extract_python_doc(inputf) -> List:
-    """Extract documentation strings from a Python file
-    """
+    """Extract documentation strings from a Python file"""
     a = ast.parse(inputf.read_text())
     out = []
 
@@ -117,7 +125,6 @@ def extract_python_doc(inputf) -> List:
 def render_adoc(orig_source_f: Path, infile: StringIO):
     outfile = conf.outdir / orig_source_f.with_suffix(".html")
     outfile.parent.mkdir(parents=True, exist_ok=True)
-    print(outfile)
     ad = asciidocapi.AsciiDocAPI()
     ad.attributes["author"] = conf.get("author", "")
     infile.seek(0)
@@ -129,7 +136,14 @@ def render_markdown(orig_source_f: Path, inp: str):
     outfile = conf.outdir / orig_source_f.with_suffix(".html")
     outfile.parent.mkdir(parents=True, exist_ok=True)
     print(outfile)
-    content = markdown.markdown(inp)
+    content = markdown.markdown(
+        inp,
+        extensions=[
+            TocExtension(baselevel=3),
+            CodeHiliteExtension(),
+            FencedCodeExtension(),
+        ],
+    )
     html = wrap_page(orig_source_f, content)
     outfile.write_text(html)
 
@@ -200,10 +214,11 @@ def generate_header_path_html(inputf: Path) -> str:
         item = "<a href='{}/index.html'>{}</a>".format(backticker, x.name)
         s.append(item)
 
-    last = "[{}](.)".format(inputf.name)
+    # last = "[{}](.)".format(inputf.name)
+    last = "<a href=''>{}</a>".format(inputf.name)
     s.append(last)
     out = " » ".join(s)
-    return out
+    return """<div id="pagepath">""" + out + "</div>"
 
 
 def generate_view_badge(f: Path):
@@ -255,6 +270,74 @@ def generate_python_markdown(inputf: Path, pdoc: List):
     return "\n".join(lines)
 
 
+def render_blockdiag(diag: str) -> str:
+    """Render blockdiag to SVG"""
+    print("Rendering blockdiag")
+    inp = NamedTemporaryFile("w")
+    inp.write(diag)
+    inp.flush()
+    out = NamedTemporaryFile("r")
+    cmd = ["/usr/bin/blockdiag3", "-T", "svg", "-o", out.name, inp.name]
+    check_call(cmd)
+    svg = out.read()
+    _, _, svg = svg.split("\n", 2)
+    return svg
+
+
+def process_diagrams(md: str) -> str:
+    """Extract diagrams and replace them with SVG/PNG images"""
+    out = ""
+    for block in md.split("\nblockdiag {"):
+        try:
+            diag, post = block.split("\n}", 1)
+            diag = "blockdiag {\n" + diag + "\n}\n"
+            # url = generate_kroki_url(diag, "blockdiag")
+            # exp = "https://kroki.io/blockdiag/svg/eNpdzDEKQjEQhOHeU4zpPYFoYesRxGJ9bwghMSsbUYJ4d10UCZbDfPynolOek0Q8FsDeNCestoisNLmy-Qg7R3Blcm5hPcr0ITdaB6X15fv-_YdJixo2CNHI2lmK3sPRA__RwV5SzV80ZAegJjXSyfMFptc71w=="
+            # assert url == exp, url
+            # url = f"""<img src="{url}">"""
+            # out += url
+            svg = render_blockdiag(diag)
+            out += f"\n<div>{svg}</div>"
+            out += post
+
+        except ValueError as e:
+            out += block
+
+    return out
+
+
+# assert process_diagrams("") == ""
+# svg = process_diagrams("a\nblockdiag {\n}\nb")
+# assert svg == """a
+# <svg viewBox="0 0 256 120" xmlns="http://www.w3.org/2000/svg" xmlns:inkspace="http://www.inkscape.org/namespaces/inkscape" xmlns:xlink="http://www.w3.org/1999/xlink">
+#   <defs id="defs_block">
+#     <filter height="1.504" id="filter_blur" inkspace:collect="always" width="1.1575" x="-0.07875" y="-0.252">
+#       <feGaussianBlur id="feGaussianBlur3780" inkspace:collect="always" stdDeviation="4.2" />
+#     </filter>
+#   </defs>
+#   <title>blockdiag</title>
+#   <desc>blockdiag {
+#
+# }
+# </desc>
+# </svg>
+#
+# b""", svg
+
+
+def generate_kroki_url(content, method: str) -> str:
+    """Generate URL for https://kroki.io/"""
+    # FIXME: Broken
+    if method != "blockdiag":
+        raise NotImplementedError
+
+    baseurl = "https://kroki.io/graphviz/svg/"
+    content = content.encode()
+    path = base64.urlsafe_b64encode(zlib.compress(content, 9))
+    path = path.decode()
+    return baseurl + path
+
+
 def create_index_html(basedir: Path):
     """Recursively create index.html files"""
     for d in basedir.iterdir():
@@ -295,7 +378,9 @@ def main():
     elif markup_format == "markdown":
         print("Rendering MarkDown files")
         for f in glob_ext(ignored, "md"):
-            # render_markdown ...
+            md = f.read_text()
+            md = process_diagrams(md)
+            render_markdown(f, md)
             pass
 
     print("Rendering Python files")
@@ -306,13 +391,14 @@ def main():
                 continue
 
             if markup_format == "asciidoc":
-                assert 0
+                raise NotImplementedError
                 adocf = generate_python_adoc(pyfile, pdoc)
                 render_adoc(pyfile, adocf)
 
             elif markup_format == "markdown":
-                f = generate_python_markdown(pyfile, pdoc)
-                render_markdown(pyfile, f)
+                md = generate_python_markdown(pyfile, pdoc)
+                md = process_diagrams(md)
+                render_markdown(pyfile, md)
 
         except Exception as e:
             print(e)
