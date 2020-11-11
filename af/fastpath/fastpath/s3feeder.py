@@ -86,12 +86,18 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
 
 
 def create_s3_client(conf):
-    c = boto3.client(
+    if conf.s3_access_key == '' and conf.s3_access_key == '':
+        from botocore import UNSIGNED
+        from botocore.config import Config
+        return boto3.client(
+            "s3",
+            config=Config(signature_version=UNSIGNED)
+        )
+    return boto3.client(
         "s3",
         aws_access_key_id=conf.s3_access_key,
         aws_secret_access_key=conf.s3_secret_key,
     )
-    return c
 
 
 def list_cans_on_s3_for_a_day(s3, day):
