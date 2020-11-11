@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Install deps
-        run: sudo apt-get -y --no-install-recommends install python3-markdown
+        run: sudo apt-get -y --no-install-recommends install python3-markdown python3-blockdiag
       - name: Run docgen
         run: ./build_docs.py
       - name: Upload to github pages
