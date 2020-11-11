@@ -15,3 +15,5 @@ af/oometa/tsv/
 af/oometa/tsvdump.dir/
 /testdata/
 .tox/
+af/fastpath/var/
+af/fastpath/etc/
