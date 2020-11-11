@@ -666,11 +666,12 @@ def score_http_invalid_request_line(msm):
         if s != r:
             anomaly = True
 
-    tampering = tk.get("tampering", False)
-    if tampering != anomaly:
-        scores["accuracy"] = 0.0
-        logbug(6, "Incorrect tampering flag", msm)
-        return scores
+    # We ignore the tampering flag due to: https://github.com/ooni/probe/issues/1278
+    # tampering = tk.get("tampering", False)
+    # if tampering != anomaly:
+    #     scores["accuracy"] = 0.0
+    #     logbug(6, "Incorrect tampering flag", msm)
+    #     return scores
 
     # Headers have been manipulated!
     if anomaly:
