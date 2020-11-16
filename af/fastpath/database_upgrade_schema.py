@@ -246,6 +246,12 @@ GRANT SELECT ON TABLE public.citizenlab TO amsapi;
 GRANT SELECT ON TABLE public.counters TO readonly;
 GRANT SELECT ON TABLE public.counters TO amsapi;
 
+GRANT SELECT ON TABLE public.counters_asn_noinput TO readonly;
+GRANT SELECT ON TABLE public.counters_asn_noinput TO amsapi;
+
+GRANT SELECT ON TABLE public.counters_noinput TO readonly;
+GRANT SELECT ON TABLE public.counters_noinput TO amsapi;
+
 GRANT SELECT ON TABLE public.fastpath TO readonly;
 GRANT SELECT ON TABLE public.fastpath TO amsapi;
 GRANT SELECT ON TABLE public.fastpath TO "oomsm-beta";
