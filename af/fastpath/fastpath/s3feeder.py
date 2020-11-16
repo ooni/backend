@@ -2,10 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-
-Feeds reports from cans on S3 or local disk
-
-Uses credentials from /etc/ooni/fastpath.conf:
+Feeds reports from cans on public S3 bucke or local disk
 
 Explore bucket from CLI:
 AWS_PROFILE=ooni-data aws s3 ls s3://ooni-data/canned/2019-07-16/
@@ -25,6 +22,8 @@ import lz4.frame as lz4frame  # debdeps: python3-lz4
 # lz4frame appears faster than executing lz4cat: 2.4s vs 3.9s on a test file
 
 import boto3  # debdeps: python3-boto3
+from botocore import UNSIGNED as botoSigUNSIGNED
+from botocore.config import Config as botoConfig
 
 from fastpath.normalize import iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
@@ -86,18 +85,7 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
 
 
 def create_s3_client(conf):
-    if conf.s3_access_key == '' and conf.s3_access_key == '':
-        from botocore import UNSIGNED
-        from botocore.config import Config
-        return boto3.client(
-            "s3",
-            config=Config(signature_version=UNSIGNED)
-        )
-    return boto3.client(
-        "s3",
-        aws_access_key_id=conf.s3_access_key,
-        aws_secret_access_key=conf.s3_secret_key,
-    )
+    return boto3.client("s3", config=botoConfig(signature_version=botoSigUNSIGNED))
 
 
 def list_cans_on_s3_for_a_day(s3, day):
@@ -195,8 +183,7 @@ def _calculate_etr(t0, now, start_day, day, stop_day, can_num, can_tot_count) ->
 
 
 def _update_eta(t0, start_day, day, stop_day, can_num, can_tot_count):
-    """Generate metric process_s3_measurements_eta expressed as epoch
-    """
+    """Generate metric process_s3_measurements_eta expressed as epoch"""
     try:
         now = time.time()
         etr = _calculate_etr(t0, now, start_day, day, stop_day, can_num, can_tot_count)
@@ -207,8 +194,7 @@ def _update_eta(t0, start_day, day, stop_day, can_num, can_tot_count):
 
 
 def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None, None]:
-    """Stream cans from S3
-    """
+    """Stream cans from S3"""
     # TODO: implement new postcan format as well
     today = date.today()
     if not start_day or start_day >= today:
