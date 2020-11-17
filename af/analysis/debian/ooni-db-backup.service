@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up database tables
+Wants=ooni-db-backup.timer
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/analysis --backup-db
+
+[Install]
+WantedBy=multi-user.target
+

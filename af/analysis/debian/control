@@ -19,14 +19,15 @@ Depends: ${misc:Depends},
  python3-jinja2,
  python3-matplotlib,
  python3-pandas,
- python3-prometheus-client,
  python3-psycopg2,
  python3-sdnotify,
  python3-seaborn,
+ python3-smart-open,
  python3-sqlalchemy-ext,
  python3-statsd,
  python3-systemd,
- nginx
+ nginx,
+ zstd
 Suggests:
  bpython3,
  python3-pytest,
