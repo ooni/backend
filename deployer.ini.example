@@ -1,0 +1,13 @@
+[environment]
+badges_path = /var/www/package_badges
+deb_packages = ooni-api fastpath analysis detector
+stages = test prod
+
+[stage:alpha]
+hosts = localhost
+
+[stage:test]
+hosts = ams-pg-test.ooni.org
+
+[stage:prod]
+hosts = ams-pg.ooni.org
