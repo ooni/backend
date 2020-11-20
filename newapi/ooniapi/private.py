@@ -166,7 +166,7 @@ def api_private_test_names():
         "vanilla_tor": "Vanilla Tor",
         "web_connectivity": "Web Connectivity",
         "whatsapp": "WhatsApp",
-        "riseupvpn": "RiseUp VPN",
+        "riseupvpn": "RiseupVPN",
     }
     test_names = [{"id": k, "name": v} for k, v in TEST_NAMES.items()]
     return cachedjson(1, test_names=test_names)
