@@ -6,6 +6,10 @@ OONI infrastructure.
 The documentation is meant for core contributors, external contributors and researcher
 that want to extract data or reuse software components in their own projects.
 
+This file is [rendered here](https://ooni.github.io/pipeline/README.html)
+
+You can also explore the [documentation tree](https://ooni.github.io/pipeline/)
+
 ## Table of contents
 
 [TOC]
@@ -116,6 +120,18 @@ Update the [api](https://github.com/ooni/api/blob/master/newapi/ooniapi/measurem
 ### Adding new fingerprints
 
 TODO
+
+### API runbook
+
+Monitor the [API](https://mon.ooni.nu/grafana/d/CkdDBscGz/ams-pg-api?orgId=1) and 
+[fastpath](https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1) dashboards.
+
+Follow Nginx or API logs with:
+```bash
+sudo journalctl -f -u nginx --no-hostname
+# The API logs contain SQL queries, exceptions etc
+sudo journalctl -f --identifier gunicorn3 --no-hostname
+```
 
 ### Fastpath runbook
 
