@@ -179,7 +179,7 @@ sudo journalctl -f -u fastpath
 
 #### Monitoring dashboard
 
-https://mon.ooni.nu/grafana/d/0NwR3eUWz/fastpath?orgId=1&from=now-7d&to=now
+[https://mon.ooni.nu/grafana/d/0NwR3eUWz/fastpath?orgId=1&from=now-7d&to=now](https://mon.ooni.nu/grafana/d/0NwR3eUWz/fastpath?orgId=1&from=now-7d&to=now)
 
 ### Analysis runbook
 
@@ -207,8 +207,7 @@ sudo journalctl -f --identifier analysis
 
 #### Monitoring dashboard
 
-https://mon.ooni.nu/grafana/d/0NwR3eUWz/fastpath?orgId=1&from=now-7d&to=now
-
+[https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&refresh=5m&from=now-7d&to=now](https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&refresh=5m&from=now-7d&to=now)
 
 ### Deploy new host
 
