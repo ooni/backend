@@ -164,9 +164,7 @@ def generate_github_link_unused(action, f, lineno):
 
 
 def generate_badge(url, text):
-    tpl = """
-<a href="{url}" class="button button-outline button-small">{text}</a>
-    """
+    tpl = """<a href="{url}" class="button button-outline button-small">{text}</a>"""
     return tpl.format(url=url, text=text)
 
 
