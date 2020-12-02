@@ -16,11 +16,7 @@ from subprocess import PIPE
 from tempfile import NamedTemporaryFile
 import subprocess
 import sys
-
-import apt_pkg
-
-apt_pkg.init_system()
-
+from packaging import version
 
 def find_conf():
     p = Path.cwd()
@@ -135,10 +131,11 @@ def print_status(conf):
                     tpl += "   {:15}"
                 else:
                     prev = versions[-1]
-                    compare = apt_pkg.version_compare(prev, ver)
-                    if compare > 0:
+                    prev_ver = version.parse(prev)
+                    next_ver = version.parse(ver)
+                    if prev_ver < next_ver:
                         tpl += " \033[0;32m►►\033[0m  {:15}"
-                    elif compare == 0:
+                    elif prev_ver == next_ver:
                         tpl += "     {:15}"
                     else:
                         tpl += " \033[0;31m⚠\033[0m   {:15}"
