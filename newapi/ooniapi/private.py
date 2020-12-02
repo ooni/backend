@@ -167,6 +167,8 @@ def api_private_test_names():
         "web_connectivity": "Web Connectivity",
         "whatsapp": "WhatsApp",
         "riseupvpn": "RiseupVPN",
+        "dnscheck": "DNS Check",
+        "urlgetter": "URL Getter",
     }
     test_names = [{"id": k, "name": v} for k, v in TEST_NAMES.items()]
     return cachedjson(1, test_names=test_names)

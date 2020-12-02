@@ -490,6 +490,8 @@ def list_measurements():
         - psiphon
         - tor
         - riseupvpn
+        - dnscheck
+        - urlgetter
       - name: since
         in: query
         type: string
@@ -940,6 +942,8 @@ def get_aggregated():
         - psiphon
         - tor
         - riseupvpn
+        - dnscheck
+        - urlgetter
       - name: since
         in: query
         type: string

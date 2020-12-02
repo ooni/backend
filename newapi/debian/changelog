@@ -1,3 +1,9 @@
+ooni-api (0.13) unstable; urgency=medium
+
+  * add dnscheck, urlgetter experiment names
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 02 Dec 2020 16:12:30 +0000
+
 ooni-api (0.12) unstable; urgency=medium
 
   * Add reactive test-lists
