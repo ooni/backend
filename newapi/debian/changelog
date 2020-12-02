@@ -1,3 +1,9 @@
+ooni-api (0.11) unstable; urgency=medium
+
+  * Add check-in API
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 25 Nov 2020 19:43:08 +0000
+
 ooni-api (0.10) unstable; urgency=medium
 
   * Add riseupvpn test name

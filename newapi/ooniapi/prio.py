@@ -73,7 +73,7 @@ def generate_test_list(country_code: str, category_codes: str, limit: int):
     global test_items, last_update_time
     log = current_app.logger
 
-    if last_update_time < time.time() - 100:  # conf.refresh_interval:
+    if last_update_time < time.time() - 600:  # conf.refresh_interval:
         last_update_time = time.time()
         try:
             test_items = update_url_prioritization()

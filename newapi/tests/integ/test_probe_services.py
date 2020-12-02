@@ -64,6 +64,19 @@ def test_index(client):
 #     assert True
 
 
+def test_check_in(client):
+    j = dict(
+        probe_cc="US",
+        on_wifi=True,
+        charging=True,
+        web_connectivity=dict(category_codes="NEWS"),
+    )
+    c = postj(client, "/api/v1/check-in", **j)
+    assert c["v"] == 1
+    urls = c["tests"]["web_connectivity"]["urls"]
+    assert len(urls) == 100, urls
+
+
 def test_list_collectors(client):
     c = getjson(client, "/api/v1/collectors")
     assert len(c) == 6
@@ -76,7 +89,7 @@ def test_list_collectors(client):
 #     assert True
 
 
-#def test_register(client):
+# def test_register(client):
 #    j = {
 #        "password": "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw",
 #        "platform": "miniooni",
@@ -160,14 +173,15 @@ def test_bouncer_net_tests_bad_request1(client):
     resp = client.post("/bouncer/net-tests")
     assert resp.status_code == 400
 
+
 def test_bouncer_net_tests_bad_request2(client):
-    j = {
-        "net-tests": []}
+    j = {"net-tests": []}
     resp = client.post("/bouncer/net-tests", json=j)
     assert resp.status_code == 400
 
 
 # # test collector
+
 
 def test_collector_open_report(client):
     j = {

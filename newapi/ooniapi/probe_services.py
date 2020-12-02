@@ -19,6 +19,8 @@ from flask.json import jsonify
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson
 
+from ooniapi.prio import generate_test_list
+
 probe_services_blueprint = Blueprint("ps_api", "probe_services")
 
 
@@ -27,6 +29,82 @@ def req_json():
     # if request.is_json():
     #    return request.json
     return ujson.loads(request.data)
+
+
+@probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
+def check_in():
+    """Probe Services: check-in. Probes ask for tests to be run or otherwise
+    go back to sleep
+    ---
+    parameters:
+      - in: body
+        name: probe self-description
+        required: false
+        schema:
+          type: object
+          properties:
+            probe_cc:
+              type: string
+              description: Two letter, uppercase country code
+            probe_asn:
+              type: string
+            platform:
+              type: string
+            software_version:
+              type: string
+            on_wifi:
+              type: boolean
+            charging:
+              type: boolean
+            run_type:
+              type: string
+            web_connectivity:
+              type: object
+              properties:
+                category_codes::
+                  type: string
+                  description: Comma separated list of URL categories, all uppercase
+
+    responses:
+      '200':
+        description: TODO
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                v:
+                  type: int
+                tests:
+                  type: object
+                  properties:
+                    web_connectivity:
+                      type: object
+
+    """
+    log = current_app.logger
+    limit = 100
+    try:
+        data = req_json()
+        probe_cc = data.get("probe_cc", "").upper()
+        category_codes = param("category_codes") or ""
+        run_type = param("run_type") or "timed"
+    except:
+        probe_cc = "ZZ"
+        category_codes = ""
+
+    try:
+        test_items = generate_test_list(probe_cc, category_codes, limit)
+    except:
+        test_items = []
+
+    resp = dict(
+        v=1,
+        tests={
+            "web_connectivity": {"urls": test_items},
+        },
+    )
+    return jsonify(resp)
 
 
 @probe_services_blueprint.route("/api/v1/collectors")
