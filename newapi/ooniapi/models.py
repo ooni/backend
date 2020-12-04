@@ -17,12 +17,17 @@ TEST_GROUPS = {
         "tcp_connect",
         "psiphon",
         "tor",
+        "riseupvpn",
     ],
     "legacy": [
         "http_requests",
         "dns_consistency",
         "http_host",
         "multi_protocol_traceroute",
+    ],
+    "experimental": [
+        "urlgetter",
+        "dnscheck",
     ],
 }
 

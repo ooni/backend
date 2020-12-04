@@ -1,3 +1,9 @@
+ooni-api (0.14) unstable; urgency=medium
+
+  * Fix get_recent_test_coverage
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 04 Dec 2020 16:21:51 +0000
+
 ooni-api (0.13) unstable; urgency=medium
 
   * add dnscheck, urlgetter experiment names

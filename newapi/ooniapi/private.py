@@ -299,9 +299,13 @@ def get_recent_test_coverage(probe_cc):
     q = current_app.db_session.execute(s, {"probe_cc": probe_cc})
     coverage_map = {k: {} for k in TEST_GROUPS.keys()}
     for count, measurement_start_day, test_group in q:
-        coverage_map[test_group][measurement_start_day.strftime("%Y-%m-%d")] = int(
-            count
-        )
+        ts = measurement_start_day.strftime("%Y-%m-%d")
+        count = int(count)
+        try:
+            coverage_map[test_group][ts] = count
+        except KeyError as e:
+            # test_group='unknown' for missing test name in TEST_GROUPS
+            log.error(e, exc_info=1)
 
     test_coverage = []
     for test_group, coverage in coverage_map.items():
@@ -492,11 +496,15 @@ def api_private_website_test_urls():
     # Create next_url
     if len(results) >= limit:
         args = dict(
-            limit=limit, offset=offset + limit, probe_asn=probe_asn, probe_cc=probe_cc,
+            limit=limit,
+            offset=offset + limit,
+            probe_asn=probe_asn,
+            probe_cc=probe_cc,
         )
         # TODO: remove BASE_URL?
         next_url = urljoin(
-            current_app.config["BASE_URL"], "/api/_/website_urls?%s" % urlencode(args),
+            current_app.config["BASE_URL"],
+            "/api/_/website_urls?%s" % urlencode(args),
         )
         metadata["next_url"] = next_url
 
@@ -609,8 +617,7 @@ def api_private_im_networks():
 
 
 def isomid(d) -> str:
-    """Returns 2020-08-01T00:00:00+00:00
-    """
+    """Returns 2020-08-01T00:00:00+00:00"""
     return f"{d}T00:00:00+00:00"
 
 
