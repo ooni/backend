@@ -136,7 +136,7 @@ def test_bouncer_net_tests(client):
     expected = {
         "net-tests": [
             {
-                "collector": "httpo://jehhrikjjqrlpufu.onion",
+                "collector": "httpo://guegdifjy7bjpequ.onion",
                 "collector-alternate": [
                     {"type": "https", "address": "https://ams-pg.ooni.org"},
                     {
