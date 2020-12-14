@@ -248,7 +248,7 @@ def test_collector_close_report(client):
 
 
 def test_url_prioritization(client):
-    c = getjson(client, "/api/v1/test-list/urls")
+    c = getjson(client, "/api/v1/test-list/urls?limit=100")
     assert "metadata" in c
     assert c["metadata"] == {
         "count": 100,
@@ -262,7 +262,7 @@ def test_url_prioritization(client):
 
 
 def test_url_prioritization_category_code(client):
-    c = getjson(client, "/api/v1/test-list/urls?category_codes=NEWS")
+    c = getjson(client, "/api/v1/test-list/urls?category_codes=NEWS&limit=100")
     assert "metadata" in c
     assert c["metadata"] == {
         "count": 100,
@@ -278,7 +278,7 @@ def test_url_prioritization_category_code(client):
 
 
 def test_url_prioritization_category_codes(client):
-    c = getjson(client, "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US")
+    c = getjson(client, "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US&limit=100")
     assert "metadata" in c
     assert c["metadata"] == {
         "count": 100,
@@ -293,7 +293,7 @@ def test_url_prioritization_category_codes(client):
     assert len(set(r["url"] for r in c["results"])) == 100
 
 
-def test_url_prioritization_country_code(client):
+def test_url_prioritization_country_code_limit(client):
     c = getjson(client, "/api/v1/test-list/urls?country_code=US&limit=999")
     assert "metadata" in c
     assert c["metadata"] == {
@@ -307,3 +307,17 @@ def test_url_prioritization_country_code(client):
         assert r["country_code"] in ("XX", "US")
 
     assert len(set(r["url"] for r in c["results"])) == 999
+
+
+def test_url_prioritization_country_code_nolimit(client):
+    c = getjson(client, "/api/v1/test-list/urls?country_code=US")
+    assert "metadata" in c
+    xx_cnt = 0
+    for r in c["results"]:
+        assert r["country_code"] in ("XX", "US")
+        if r["country_code"] == "XX":
+            xx_cnt += 1
+
+    assert xx_cnt > 1200
+    us_cnt = c["metadata"]["count"] - xx_cnt
+    assert us_cnt > 40

@@ -1,3 +1,9 @@
+ooni-api (0.15) unstable; urgency=medium
+
+  * Bump up test-list/urls limit
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 14 Dec 2020 12:28:54 +0000
+
 ooni-api (0.14) unstable; urgency=medium
 
   * Fix get_recent_test_coverage

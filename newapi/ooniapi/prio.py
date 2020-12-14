@@ -207,7 +207,7 @@ def list_test_urls():
         category_codes = tuple(category_codes)
         limit = int(param("limit") or -1)
         if limit == -1:
-            limit = 100
+            limit = 9999
     except Exception as e:
         log.error(e, exc_info=1)
         return jsonify({})
