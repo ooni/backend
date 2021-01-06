@@ -2,6 +2,8 @@
 
 Source for https://api.ooni.io/
 
+File bugs with the API inside of: https://github.com/ooni/backend/issues/new
+
 ## Local development
 
 ### Requirements
