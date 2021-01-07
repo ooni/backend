@@ -1,3 +1,9 @@
+ooni-api (0.17) unstable; urgency=medium
+
+  * Improve check-in. [skip 0.16 as an experiment]
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 07 Jan 2021 19:00:37 +0000
+
 ooni-api (0.15) unstable; urgency=medium
 
   * Bump up test-list/urls limit

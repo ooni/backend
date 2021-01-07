@@ -31,10 +31,17 @@ def req_json():
     return ujson.loads(request.data)
 
 
+def generate_report_id(test_name, cc: str, asn_i: int) -> str:
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    cid = "1"  # collector id  TODO read from conf
+    rand = b64encode(urandom(12), b"oo").decode()
+    rid = f"{ts}_{test_name}_{cc}_{asn_i}_n{cid}_{rand}"
+    return rid
+
+
 @probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
 def check_in():
-    """Probe Services: check-in. Probes ask for tests to be run or otherwise
-    go back to sleep
+    """Probe Services: check-in. Probes ask for tests to be run
     ---
     parameters:
       - in: body
@@ -58,16 +65,37 @@ def check_in():
               type: boolean
             run_type:
               type: string
+              description: timed or manual
+
             web_connectivity:
               type: object
               properties:
                 category_codes::
-                  type: string
-                  description: Comma separated list of URL categories, all uppercase
+                  description: List/array of URL categories, all uppercase
+                  type: array
+                  items:
+                    type: string
+        description: probe_asn and probe_cc are not provided if unknown
+        example:
+            {
+              "charging": true,
+              "on_wifi": true,
+              "platform": "linux",
+              "probe_asn": "AS1234",
+              "probe_cc": "RU",
+              "run_type": "timed",
+              "software_version": "1.2.3",
+              "web_connectivity": {
+                "category_codes:": [
+                  "NEWS", "POLR"
+                ]
+              }
+            }
 
     responses:
       '200':
-        description: TODO
+        description: Give a URL test list to a probe running web_connectivity
+          tests; additional data for other tests;
         content:
           application/json:
             schema:
@@ -75,14 +103,26 @@ def check_in():
               properties:
                 v:
                   type: int
+                probe_cc:
+                  type: string
+                  description: probe CC inferred from GeoIP or None
+                probe_asn:
+                  type: string
+                  description: probe ASN inferred from GeoIP or None
                 tests:
                   type: object
                   properties:
                     web_connectivity:
                       type: object
-
+                      report_id:
+                        type: string
     """
+
+    # TODO: Implement throttling
+    # TODO: Add geoip
+    # TODO: Generate report ids for various tests
     log = current_app.logger
+    param = request.args.get
     limit = 100
     try:
         data = req_json()
@@ -104,6 +144,38 @@ def check_in():
             "web_connectivity": {"urls": test_items},
         },
     )
+
+    # get asn, asn_i, probe_cc, network name
+    test_names = (
+        "bridge_reachability",
+        "dash",
+        "dns_consistency",
+        "dnscheck",
+        "facebook_messenger",
+        "http_header_field_manipulation",
+        "http_host",
+        "http_invalid_request_line",
+        "http_requests",
+        "meek_fronted_requests_test",
+        "multi_protocol_traceroute",
+        "ndt",
+        "psiphon",
+        "riseupvpn",
+        "tcp_connect",
+        "telegram",
+        "tor",
+        "urlgetter",
+        "vanilla_tor",
+        "web_connectivity",
+        "whatsapp",
+    )
+    cc = "RU"
+    asn_i = 123
+    for tn in test_names:
+        rid = generate_report_id(tn, cc, asn_i)
+        resp["tests"].setdefault(tn, {})
+        resp["tests"][tn]["report_id"] = rid
+
     return jsonify(resp)
 
 
@@ -225,7 +297,7 @@ def invalidpath():
 
 @probe_services_blueprint.route("/bouncer/net-tests", methods=["POST"])
 def bouncer_net_tests():
-    """Probe Services: TODO
+    """Probe Services: (legacy)
     ---
     parameters:
       - in: body
@@ -356,10 +428,7 @@ def open_report():
     if len(cc) != 2:
         cc = "ZZ"
     test_name = data.get("test_name", "").lower().replace("_", "")
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    cid = "1"  # collector id  TODO read from conf
-    rand = b64encode(urandom(12), b"oo").decode()
-    rid = f"{ts}_{test_name}_{cc}_{asn_i}_n{cid}_{rand}"
+    rid = generate_report_id(test_name, cc, asn_i)
     return jsonify(
         backend_version="1.3.5", supported_formats=["yaml", "json"], report_id=rid
     )
