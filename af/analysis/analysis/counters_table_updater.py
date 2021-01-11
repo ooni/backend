@@ -72,7 +72,7 @@ def connect_db(c):
 
 def query(metric, cur, sql, **kw):
     """Run and log query"""
-    log.info("Running: %s", sql)
+    log.info("Running: %s %s", sql, kw)
     cur.execute(sql, kw)
     log.info("Inserted: %d", cur.rowcount)
     metrics.gauge("update_counters_table.rowcount", cur.rowcount)
@@ -218,9 +218,10 @@ def update_all_counters_tables(conf):
     """
     log.info("Started update_all_counters_tables")
     metrics.gauge("update_all_counters_tables.running", 1)
-    start = datetime.now() - timedelta(minutes=10)
+    start = datetime.now() - timedelta(minutes=20)
+    end = datetime.now() - timedelta(minutes=10)
     msm_uid_start = start.strftime("%Y%m%d%H%M")
-    msm_uid_end = datetime.utcnow().strftime("%Y%m%d%H%M")
+    msm_uid_end = end.strftime("%Y%m%d%H%M")
     conn = connect_db(conf.active)
     # transaction, commit on context exiting
     with conn:
