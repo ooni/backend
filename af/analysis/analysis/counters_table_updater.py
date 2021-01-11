@@ -1,5 +1,10 @@
 """
-Updates `counters` table
+Updates counters* tables at frequent intervals:
+ - counters
+ - counters_asn_noinput
+ - counters_noinput
+
+Update global and country stats materialized views every day.
 
 Runs in a dedicated thread
 
