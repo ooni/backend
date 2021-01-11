@@ -65,11 +65,18 @@ def connect_db(c):
 # # Update counters tables using upsert # #
 
 
+def query(metric, cur, sql, **kw):
+    """Run and log query"""
+    log.info("Running: %s", sql)
+    cur.execute(sql, kw)
+    log.info("Inserted: %d", cur.rowcount)
+    metrics.gauge("update_counters_table.rowcount", cur.rowcount)
+
+
 @metrics.timer("update_counters_table")
 def update_counters_table(conn, msm_uid_start, msm_uid_end):
     # transaction, commit on context exiting
     with conn:
-        cur = conn.cursor()
         log.info("Upserting into counters table")
         sql = """
     INSERT INTO counters
@@ -100,17 +107,20 @@ def update_counters_table(conn, msm_uid_start, msm_uid_end):
     failure_count  = counters.failure_count + EXCLUDED.failure_count,
     measurement_count  = counters.measurement_count + EXCLUDED.measurement_count
     """
-        d = dict(msm_uid_start=msm_uid_start, msm_uid_end=msm_uid_end)
-        cur.execute(sql, d)
-        log.info("Inserted: %d", cur.rowcount)
-        metrics.gauge("update_counters_table.rowcount", cur.rowcount)
+        cur = conn.cursor()
+        query(
+            "update_counters_table.rowcount",
+            cur,
+            sql,
+            msm_uid_start=msm_uid_start,
+            msm_uid_end=msm_uid_end,
+        )
 
 
 @metrics.timer("update_counters_asn_noinput_table")
 def update_counters_asn_noinput_table(conn, msm_uid_start, msm_uid_end):
     # transaction, commit on context exiting
     with conn:
-        cur = conn.cursor()
         log.info("Upserting into counters_asn_noinput table")
         sql = """
     INSERT INTO counters_asn_noinput
@@ -139,17 +149,20 @@ def update_counters_asn_noinput_table(conn, msm_uid_start, msm_uid_end):
     failure_count  = counters_asn_noinput.failure_count + EXCLUDED.failure_count,
     measurement_count  = counters_asn_noinput.measurement_count + EXCLUDED.measurement_count
     """
-        d = dict(msm_uid_start=msm_uid_start, msm_uid_end=msm_uid_end)
-        cur.execute(sql, d)
-        log.info("Inserted: %d", cur.rowcount)
-        metrics.gauge("update_counters_asn_noinput_table.rowcount", cur.rowcount)
+        cur = conn.cursor()
+        query(
+            "update_counters_asn_noinput_table.rowcount",
+            cur,
+            sql,
+            msm_uid_start=msm_uid_start,
+            msm_uid_end=msm_uid_end,
+        )
 
 
 @metrics.timer("update_counters_noinput_table")
 def update_counters_noinput_table(conn, msm_uid_start, msm_uid_end):
     # transaction, commit on context exiting
     with conn:
-        cur = conn.cursor()
         log.info("Upserting into counters_noinput table")
         sql = """
     INSERT INTO counters_noinput
@@ -176,10 +189,14 @@ def update_counters_noinput_table(conn, msm_uid_start, msm_uid_end):
     failure_count = counters_noinput.failure_count + EXCLUDED.failure_count,
     measurement_count  = counters_noinput.measurement_count + EXCLUDED.measurement_count
     """
-        d = dict(msm_uid_start=msm_uid_start, msm_uid_end=msm_uid_end)
-        cur.execute(sql, d)
-        log.info("Inserted: %d", cur.rowcount)
-        metrics.gauge("update_counters_noinput_table.rowcount", cur.rowcount)
+        cur = conn.cursor()
+        query(
+            "update_counters_noinput_table.rowcount",
+            cur,
+            sql,
+            msm_uid_start=msm_uid_start,
+            msm_uid_end=msm_uid_end,
+        )
 
 
 @metrics.timer("update_all_counters_tables")
