@@ -78,6 +78,41 @@ def query(metric, cur, sql, **kw):
     metrics.gauge("update_counters_table.rowcount", cur.rowcount)
 
 
+@metrics.timer("update_counters_hourly_software_table")
+def update_counters_hourly_software_table(conn, msm_uid_start, msm_uid_end):
+    # transaction, commit on context exiting
+    sql = """
+    INSERT INTO counters_hourly_software
+    SELECT
+        date_trunc('hour', measurement_start_time) AS measurement_start_hour,
+        platform,
+        software_name,
+        COUNT(*) AS measurement_count
+    FROM
+        fastpath
+    WHERE measurement_uid > %(msm_uid_start)s
+    AND measurement_uid < %(msm_uid_end)s
+    GROUP BY
+        measurement_start_hour,
+        platform,
+        software_name
+    ON CONFLICT (measurement_start_hour, platform, software_name)
+    DO UPDATE SET
+            measurement_count = counters_hourly_software.measurement_count + EXCLUDED.measurement_count;
+    """
+    with conn:
+        log.info("Upserting into counters_hourly_software table")
+        cur = conn.cursor()
+        query(
+            "update_counters_hourly_software_table.rowcount",
+            cur,
+            sql,
+            msm_uid_start=msm_uid_start,
+            msm_uid_end=msm_uid_end,
+        )
+
+
+
 @metrics.timer("update_counters_table")
 def update_counters_table(conn, msm_uid_start, msm_uid_end):
     # transaction, commit on context exiting
@@ -224,6 +259,9 @@ def update_all_counters_tables(conf):
     msm_uid_end = end.strftime("%Y%m%d%H%M")
     conn = connect_db(conf.active)
     # transaction, commit on context exiting
+    with conn:
+        update_counters_hourly_software_table(conn, msm_uid_start, msm_uid_end)
+
     with conn:
         update_counters_table(conn, msm_uid_start, msm_uid_end)
 
