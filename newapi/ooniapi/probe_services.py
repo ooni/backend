@@ -53,12 +53,17 @@ def check_in():
             probe_cc:
               type: string
               description: Two letter, uppercase country code
+              example: IT
             probe_asn:
               type: string
+              description: ASN: two uppercase letters followed by number
+              example: AS1234
             platform:
               type: string
+              example: android
             software_version:
               type: string
+              example: 0.0.1
             on_wifi:
               type: boolean
             charging:
@@ -66,31 +71,18 @@ def check_in():
             run_type:
               type: string
               description: timed or manual
+              example: timed
 
             web_connectivity:
               type: object
               properties:
-                category_codes::
+                category_codes:
                   description: List/array of URL categories, all uppercase
                   type: array
                   items:
                     type: string
+                    example: NEWS
         description: probe_asn and probe_cc are not provided if unknown
-        example:
-            {
-              "charging": true,
-              "on_wifi": true,
-              "platform": "linux",
-              "probe_asn": "AS1234",
-              "probe_cc": "RU",
-              "run_type": "timed",
-              "software_version": "1.2.3",
-              "web_connectivity": {
-                "category_codes:": [
-                  "NEWS", "POLR"
-                ]
-              }
-            }
 
     responses:
       '200':
