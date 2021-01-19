@@ -56,7 +56,7 @@ def check_in():
               example: IT
             probe_asn:
               type: string
-              description: ASN: two uppercase letters followed by number
+              description: ASN, two uppercase letters followed by number
               example: AS1234
             platform:
               type: string
