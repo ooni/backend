@@ -120,21 +120,30 @@ def check_in():
 
     # TODO: Implement throttling
     # TODO: Add geoip
-    # TODO: Generate report ids for various tests
-    log = current_app.logger
-    param = request.args.get
-    limit = 100
-    try:
-        data = req_json()
-        probe_cc = data.get("probe_cc", "").upper()
-        category_codes = param("category_codes") or ""
-        run_type = param("run_type") or "timed"
-    except:
-        probe_cc = "ZZ"
-        category_codes = ""
+    data = req_json()
+    probe_cc = data.get("probe_cc", "ZZ").upper()
+    asn = data.get("probe_asn", "AS0")
+    # run_type = data.get("run_type", "timed")
+    charging = data.get("charging", True)
+    url_limit = 100 if charging else 20
+
+    if "web_connectivity" not in data:
+        category_codes = ()
+    else:
+        category_codes = data["web_connectivity"].get("category_codes", ())
+        if isinstance(category_codes, str):
+            category_codes = category_codes.split(",")
+
+    assert asn.startswith("AS")
+    asn_i = int(asn[2:])
+    assert probe_cc.isalpha()
+    assert len(probe_cc) == 2
+    category_codes = tuple(category_codes)
+    for c in category_codes:
+        assert c.isalpha()
 
     try:
-        test_items = generate_test_list(probe_cc, category_codes, limit)
+        test_items = generate_test_list(probe_cc, category_codes, url_limit)
     except:
         test_items = []
 
@@ -169,10 +178,9 @@ def check_in():
         "web_connectivity",
         "whatsapp",
     )
-    cc = "RU"
-    asn_i = 123
     for tn in test_names:
-        rid = generate_report_id(tn, cc, asn_i)
+        stn = tn.replace("_", "")
+        rid = generate_report_id(stn, probe_cc, asn_i)
         resp["tests"].setdefault(tn, {})
         resp["tests"][tn]["report_id"] = rid
 

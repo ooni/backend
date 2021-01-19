@@ -64,17 +64,82 @@ def test_index(client):
 #     assert True
 
 
+## Test /api/v1/check-in
+
+
 def test_check_in(client):
     j = dict(
         probe_cc="US",
+        probe_asn="AS1234",
+        on_wifi=True,
+        charging=False,
+    )
+    c = postj(client, "/api/v1/check-in", **j)
+    assert c["v"] == 1
+    urls = c["tests"]["web_connectivity"]["urls"]
+    assert len(urls) == 20, urls
+
+    webc_rid = c["tests"]["web_connectivity"]["report_id"]
+    ts, stn, cc, asn_i, _coll, _rand = webc_rid.split("_")
+    assert int(asn_i) == 1234
+    assert stn == "webconnectivity"
+    assert cc == "US"
+
+
+def test_check_in_url_category_news(client):
+    j = dict(
         on_wifi=True,
         charging=True,
-        web_connectivity=dict(category_codes="NEWS"),
+        web_connectivity=dict(category_codes=["NEWS"]),
     )
     c = postj(client, "/api/v1/check-in", **j)
     assert c["v"] == 1
     urls = c["tests"]["web_connectivity"]["urls"]
     assert len(urls) == 100, urls
+    for ui in urls:
+        assert ui["category_code"] == "NEWS"
+
+    webc_rid = c["tests"]["web_connectivity"]["report_id"]
+    ts, stn, cc, asn_i, _coll, _rand = webc_rid.split("_")
+    assert int(asn_i) == 0
+    assert stn == "webconnectivity"
+    assert cc == "ZZ"
+
+
+def test_check_in_url_category_code_passed_as_string(client):
+    # category_codes should be sent as an array, but comma-separated string
+    # is handled anyways
+    j = dict(
+        web_connectivity=dict(category_codes="NEWS,HUMR"),
+    )
+    c = postj(client, "/api/v1/check-in", **j)
+    assert c["v"] == 1
+    urls = c["tests"]["web_connectivity"]["urls"]
+    assert len(urls) == 100, urls
+    for ui in urls:
+        assert ui["category_code"] in ("NEWS", "HUMR")
+
+
+def test_check_in_url_prioritization_category_codes(client):
+    c = getjson(
+        client,
+        "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US&limit=100",
+    )
+    assert "metadata" in c
+    assert c["metadata"] == {
+        "count": 100,
+        "current_page": -1,
+        "limit": -1,
+        "next_url": "",
+        "pages": 1,
+    }
+    for r in c["results"]:
+        assert r["category_code"] in ("NEWS", "HUMR")
+
+    assert len(set(r["url"] for r in c["results"])) == 100
+
+
+## Test /api/v1/collectors
 
 
 def test_list_collectors(client):
@@ -278,7 +343,10 @@ def test_url_prioritization_category_code(client):
 
 
 def test_url_prioritization_category_codes(client):
-    c = getjson(client, "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US&limit=100")
+    c = getjson(
+        client,
+        "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US&limit=100",
+    )
     assert "metadata" in c
     assert c["metadata"] == {
         "count": 100,
