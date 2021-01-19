@@ -58,12 +58,6 @@ def test_index(client):
 # # Follow the order in ooniapi/probe_services.py
 
 
-# @pytest.mark.skip(reason="TODO")
-# def test_(client):
-#     c = getjson(client, "/")
-#     assert True
-
-
 ## Test /api/v1/check-in
 
 
