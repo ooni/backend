@@ -292,7 +292,8 @@ def match_fingerprints(measurement):
         return []
 
     matches = []
-    for req in test_keys.get("requests", ()):
+    requests = test_keys.get("requests", ()) or ()
+    for req in requests:
         r = req.get("response", None)
         if r is None:
             continue
@@ -521,7 +522,8 @@ def score_measurement_telegram(msm):
     http_success_cnt = 0
     http_failure_cnt = 0
     web_failure = None
-    for request in tk.get("requests", []):
+    requests = tk.get("requests", ()) or ()
+    for request in requests:
         if "request" not in request:
             # client bug
             continue
@@ -742,7 +744,8 @@ def score_measurement_whatsapp(msm):
         scores["accuracy"] = 0.0
         return scores
 
-    if not tk.get("requests", []):
+    requests = tk.get("requests", ()) or ()
+    if not requests:
         assert msm["report_id"]
         scores["accuracy"] = 0.0
         return scores
@@ -750,7 +753,7 @@ def score_measurement_whatsapp(msm):
     # TODO: carve out in a general function
     webapp_accessible = None
     registration_accessible = None
-    for b in tk.get("requests", []):
+    for b in requests:
         url = b.get("request", {}).get("url", "")
         if url == "https://web.whatsapp.com/":
             webapp_accessible = b.get("failure", True) in (None, "", False)
@@ -993,7 +996,7 @@ def score_meek_fronted_requests_test(msm) -> dict:
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     tk = msm["test_keys"]
-    requests = tk.get("requests", [])
+    requests = tk.get("requests", ()) or ()
 
     if len(requests) == 0:
         # requests is empty: usually "success" is missing.

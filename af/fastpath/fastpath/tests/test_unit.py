@@ -132,6 +132,26 @@ def test_bug_backend352():
         "blocking_local": 0.0,
     }
 
+def test_bug_requests_None():
+    # caused traceback:
+    #File "/usr/lib/python3.7/dist-packages/fastpath/core.py", line 295, in match_fingerprints
+    #for req in test_keys.get("requests", ()):
+    #TypeError: 'NoneType' object is not iterable
+    with open("fastpath/tests/data/requests_none.json") as f:
+        msm = ujson.load(f)
+    matches = []
+    scores = fp.score_measurement(msm, matches)
+    assert scores == {
+        "analysis": {"blocking_type": "dns"},
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
+
 
 def test_s3feeder_eta():
     t0 = 1588200000
