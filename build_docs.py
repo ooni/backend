@@ -66,7 +66,7 @@ HTMLTPL = dedent(
         </div>
       </div>
     </div>
-    <div class="container" id="content">
+    <div class="container">
     """
 )
 
@@ -139,7 +139,7 @@ def render_markdown(orig_source_f: Path, inp: str):
     content = markdown.markdown(
         inp,
         extensions=[
-            TocExtension(baselevel=3),
+            TocExtension(baselevel=3, permalink=' #'),
             CodeHiliteExtension(),
             FencedCodeExtension(),
         ],

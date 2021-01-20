@@ -17,9 +17,10 @@ You can also explore the [documentation tree](https://ooni.github.io/pipeline/)
 ## Architecture
 
 The backend infrastructure provides multiple functions:
- * Provide APIs for data consumers
- * Instruct probes on what measurements to perform
- * Receive measurements from probes, process them and store them in the database and on S3
+
+* Provide APIs for data consumers
+* Instruct probes on what measurements to perform
+* Receive measurements from probes, process them and store them in the database and on S3
 
 ## Data flow
 
@@ -60,7 +61,7 @@ Mounted under /api/v1/
 
 ### Private entry points
 
-Not for public consumption. Mounted under /api/_ and used exclusively by Explorer
+Not for public consumption. Mounted under `/api/_` and used exclusively by Explorer
 
 [Sources](https://github.com/ooni/api/blob/master/newapi/ooniapi/private.py)
 
@@ -69,9 +70,6 @@ Not for public consumption. Mounted under /api/_ and used exclusively by Explore
 [Documentation](af/fastpath/fastpath/core.html)
 
 ## Database
-
-
-
 
 ## Operations
 
@@ -107,13 +105,17 @@ deploy ooni-api prod
 
 Update [database_upgrade_schema](https://github.com/ooni/pipeline/blob/master/af/fastpath/database_upgrade_schema.py)
 
+```
 ALTER TYPE ootest ADD VALUE '<test_name>';
+```
 
-Update [fastpath](https://github.com/ooni/pipeline/blob/master/af/fastpath/fastpath/core.py) and integ tests
+Update [fastpath](https://github.com/ooni/pipeline/blob/master/af/fastpath/fastpath/core.py)
+by adding a new test to the `score_measurement` function and adding relevant
+integration tests.
 
-Create PR
+Create a [Pull Request](https://github.com/ooni/pipeline/compare)
 
-Run fastpath manually from S3 on test stage
+Run fastpath manually from S3 on the testing stage see: [rerun fastpath manually](#rerun-fastpath-manually)
 
 Update the [api](https://github.com/ooni/api/blob/master/newapi/ooniapi/measurements.py#L491)
 
@@ -179,7 +181,7 @@ sudo journalctl -f -u fastpath
 
 #### Monitoring dashboard
 
-[https://mon.ooni.nu/grafana/d/0NwR3eUWz/fastpath?orgId=1&from=now-7d&to=now](https://mon.ooni.nu/grafana/d/0NwR3eUWz/fastpath?orgId=1&from=now-7d&to=now)
+[https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&refresh=5m&from=now-7d&to=now](https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&refresh=5m&from=now-7d&to=now)
 
 ### Analysis runbook
 
@@ -196,8 +198,9 @@ sudo apt-get install analysis=<version>
 ```
 
 #### Run manually
-
-`sudo systemctl restart ooni-update-counters.service`
+```
+sudo systemctl restart ooni-update-counters.service
+```
 
 #### Log monitoring
 
@@ -213,12 +216,16 @@ sudo journalctl -f --identifier analysis
 
 Deploy host from https://cloud.digitalocean.com/projects/
 
-Create DNS "A" record <name>.ooni.org at https://ap.www.namecheap.com/
+Create DNS "A" record `<name>.ooni.org` at https://ap.www.namecheap.com/
 
 On the sysadmin repo, ansible directory, add the host to the inventory
 
-Run the deploy with the root SSH user::
-  ./play deploy-<foo>.yml -l <name>.ooni.org --diff -u root
+Run the deploy with the root SSH user
+```
+./play deploy-<foo>.yml -l <name>.ooni.org --diff -u root
+```
 
-Update prometheus::
+Update prometheus
+```
 ./play deploy-prometheus.yml -t prometheus-conf --diff
+```
