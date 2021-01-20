@@ -1,0 +1,146 @@
+{
+  "annotations": {
+    "engine_name": "libmeasurement_kit",
+    "engine_version": "0.10.8",
+    "engine_version_full": "v0.10.8",
+    "flavor": "full",
+    "network_type": "wifi",
+    "platform": "android"
+  },
+  "data_format_version": "0.2.0",
+  "id": "29b60d42-8549-4bc0-bfe3-c2001e1d3521",
+  "input": "https://fa.wikipedia.org",
+  "input_hashes": [],
+  "measurement_start_time": "2020-03-02 13:08:54",
+  "options": [],
+  "probe_asn": "AS197207",
+  "probe_cc": "IR",
+  "probe_city": null,
+  "probe_ip": "127.0.0.1",
+  "report_id": "20200302T130853Z_AS197207_WIN8WWfSysccyZSG06Z5AaMJjSzrvxaq7UOiTnasi52k9D77T3",
+  "software_name": "ooniprobe-android",
+  "software_version": "2.3.0-beta.1",
+  "test_helpers": {
+    "backend": {
+      "address": "https://wcth.ooni.io",
+      "type": "https"
+    }
+  },
+  "test_keys": {
+    "accessible": false,
+    "agent": "redirect",
+    "blocking": "dns",
+    "body_length_match": null,
+    "body_proportion": 0,
+    "client_resolver": "172.253.14.1",
+    "control": {
+      "dns": {
+        "addrs": [
+          "dyna.wikimedia.org",
+          "91.198.174.192"
+        ],
+        "failure": null
+      },
+      "http_request": {
+        "body_length": 125665,
+        "failure": null,
+        "headers": {
+          "Accept-Ranges": "bytes",
+          "Age": "79097",
+          "Backend-Timing": "D=124467 t=1583075460135180",
+          "Cache-Control": "private, s-maxage=0, max-age=0, must-revalidate",
+          "Content-Type": "text/html; charset=UTF-8",
+          "Content-language": "fa",
+          "Date": "Sun, 01 Mar 2020 15:11:00 GMT",
+          "Last-Modified": "Sun, 01 Mar 2020 15:04:43 GMT",
+          "P3P": "CP=\"See https://fa.wikipedia.org/wiki/Special:CentralAutoLogin/P3P for more info.\"",
+          "Server": "mw1252.eqiad.wmnet",
+          "Server-Timing": "cache;desc=\"hit-front\"",
+          "Set-Cookie": "WMF-Last-Access=02-Mar-2020;Path=/;HttpOnly;secure;Expires=Fri, 03 Apr 2020 12:00:00 GMT",
+          "Strict-Transport-Security": "max-age=106384710; includeSubDomains; preload",
+          "Vary": "Accept-Encoding,Cookie,Authorization",
+          "X-ATS-Timestamp": "1583075460",
+          "X-Cache": "cp3064 miss, cp3056 hit/352",
+          "X-Cache-Status": "hit-front",
+          "X-Client-IP": "37.218.245.117",
+          "X-Content-Type-Options": "nosniff",
+          "X-Powered-By": "PHP/7.2.26-1+0~20191218.33+debian9~1.gbpb5a340+wmf1",
+          "X-Varnish": "411109470 895104936"
+        },
+        "status_code": 200,
+        "title": "  "
+      },
+      "tcp_connect": {}
+    },
+    "control_failure": null,
+    "dns_consistency": "inconsistent",
+    "dns_experiment_failure": null,
+    "headers_match": null,
+    "http_experiment_failure": "connect_error",
+    "queries": [
+      {
+        "answers": [
+          {
+            "answer_type": "CNAME",
+            "hostname": "fa.wikipedia.org",
+            "ttl": null
+          },
+          {
+            "answer_type": "A",
+            "ipv4": "10.10.34.36",
+            "ttl": null
+          }
+        ],
+        "engine": "system",
+        "failure": null,
+        "hostname": "fa.wikipedia.org",
+        "query_type": "A",
+        "resolver_hostname": null,
+        "resolver_port": null
+      }
+    ],
+    "requests": [
+      {
+        "failure": "connect_error",
+        "request": {
+          "body": "",
+          "headers": {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US;q=0.8,en;q=0.5",
+            "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+          },
+          "method": "GET",
+          "tor": {
+            "exit_ip": null,
+            "exit_name": null,
+            "is_tor": false
+          },
+          "url": "https://fa.wikipedia.org/"
+        },
+        "response": {
+          "body": null,
+          "headers": {}
+        }
+      }
+    ],
+    "retries": null,
+    "socksproxy": null,
+    "status_code_match": null,
+    "tcp_connect": [
+      {
+        "ip": "10.10.34.36",
+        "port": 443,
+        "status": {
+          "blocked": null,
+          "failure": "generic_timeout_error",
+          "success": false
+        }
+      }
+    ],
+    "title_match": null
+  },
+  "test_name": "web_connectivity",
+  "test_runtime": 23.89874506,
+  "test_start_time": "2020-03-02 13:08:47",
+  "test_version": "0.0.1"
+}
