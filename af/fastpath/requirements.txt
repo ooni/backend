@@ -1,4 +1,3 @@
-paramiko
 statsd
 ujson
 lz4
