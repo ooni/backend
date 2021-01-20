@@ -61,12 +61,16 @@ def check_in():
             platform:
               type: string
               example: android
+            software_name:
+              type: string
+              example: ooniprobe
             software_version:
               type: string
               example: 0.0.1
             on_wifi:
               type: boolean
             charging:
+              description: set only on devices with battery; true when charging
               type: boolean
             run_type:
               type: string
