@@ -10,16 +10,8 @@ import ujson
 
 
 def test_trivial_id():
-    msm_jstr, tid = fp.trivial_id(dict(a="🐱"))
-    assert len(tid) == 32
+    tid = fp.trivial_id(dict(a="🐱"))
     assert tid == "00d1cb49bba274be952c9f701f1e13b8"
-
-
-def test_trivial_id_2():
-    with open("fastpath/tests/data/report_real.json") as f:
-        msm = ujson.load(f)
-    msm_jstr, tid = fp.trivial_id(msm)
-    assert tid == "00b236a79311d1239838bb7431955592"
 
 
 def test_match_fingerprints_no_match():
@@ -40,31 +32,6 @@ def test_match_fingerprints_match_country():
     }
     matches = fp.match_fingerprints(msm)
     assert matches == [{"body_match": "Makluman/Notification", "locality": "country"}]
-
-
-def test_match_fingerprints_match_zz():
-    fp.setup_fingerprints()
-    msm = {
-        "probe_cc": "IE",
-        "test_keys": {
-            "requests": [
-                {
-                    "response": {
-                        "body": "",
-                        "headers": {"Server": "Kerio Control Embedded Web Server"},
-                    }
-                }
-            ]
-        },
-    }
-    matches = fp.match_fingerprints(msm)
-    assert matches == [
-        {
-            "header_full": "Kerio Control Embedded Web Server",
-            "header_name": "server",
-            "locality": "local",
-        }
-    ], matches
 
 
 def test_match_fingerprints_dict_body():
@@ -102,24 +69,17 @@ def test_score_measurement_simple():
     matches = []
     scores = fp.score_measurement(msm, matches)
     assert scores == {
-        "input": "foo",
-        "measurement_start_time": "",
-        "probe_asn": "1",
-        "probe_cc": "IE",
-        "report_id": "123",
-        "test_name": "web_connectivity",
-        "test_start_time": "",
-        "scores": {
-            "blocking_general": 0.0,
-            "blocking_global": 0.0,
-            "blocking_country": 0.0,
-            "blocking_isp": 0.0,
-            "blocking_local": 0.0,
-        },
+        "accuracy": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
     }
 
 
 ## test_name: tor
+
 
 def test_score_tor():
     fn = "fastpath/tests/data/tor.json"
@@ -146,12 +106,13 @@ def test_bug_backend351():
     matches = []
     scores = fp.score_measurement(msm, matches)
     assert scores == {
-        "accuracy": 0.0,
-        "blocking_general": 0.0,
+        "blocking_general": 1.0,
         "blocking_global": 0.0,
         "blocking_country": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
+        "analysis": {"blocking_type": "http-failure"},
+        "accuracy": 0.0,
     }
 
 
