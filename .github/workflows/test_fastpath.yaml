@@ -1,0 +1,22 @@
+name: Test Fastpath
+on: [push, pull_request]
+
+# Run only local tests
+
+jobs:
+  build:
+    name: Test Fastpath
+    runs-on: ubuntu-latest
+    container: debian:10
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install deps
+        run: |
+          apt-get update
+          apt-get -y --no-install-recommends install python3-boto3 python3-lz4 python3-psycopg2 python3-setuptools \
+          python3-statsd python3-systemd python3-ujson nginx python3-pytest python3-yaml python3-gunicorn
+      - name: Run tests
+        run: |
+          cd af/fastpath
+          PYTHONPATH=. pytest-3 -v fastpath/tests/test_unit.py
+        #--doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
