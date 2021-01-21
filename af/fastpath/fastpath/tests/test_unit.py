@@ -167,6 +167,27 @@ def test_bug_test_keys_None():
     }
 
 
+def test_bug_various_keys_missing():
+    msm = {
+        "data_format_version": "0.2.0",
+        "input": "http://mail.google.com",
+        "measurement_start_time": "2021-01-21 09:28:29",
+        "report_id": "20210121T092829Z_webconnectivity_US_8075_n1_K8Vv8aSpoYfW3wqf",
+        "test_name": "web_connectivity",
+        "test_start_time": "2021-01-21 09:28:28",
+    }
+    matches = []
+    scores = fp.score_measurement(msm, matches)
+    assert scores == {
+        "accuracy": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 def test_s3feeder_eta():
     t0 = 1588200000
     now = t0 + 3600

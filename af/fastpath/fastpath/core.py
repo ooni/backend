@@ -836,7 +836,7 @@ def score_web_connectivity(msm, matches) -> dict:
     Returns a scores dict
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
-    tk = msm["test_keys"]
+    tk = msm.get("test_keys", None)
     if tk is None:
         logbug(9, "test_keys is None", msm)
         scores["accuracy"] = 0.0
