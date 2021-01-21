@@ -19,4 +19,4 @@ jobs:
         run: |
           cd af/fastpath
           PYTHONPATH=. pytest-3 -v --junitxml=junit/test-results.xml --cov=fastpath --cov-report=xml --cov-report=html \
-            fastpath/tests/test_unit.py
+            --cov-report=term fastpath/tests/test_unit.py fastpath/tests/test_functional.py

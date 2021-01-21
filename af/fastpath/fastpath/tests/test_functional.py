@@ -127,7 +127,7 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
             assert s3size == can_local_file.stat().st_size
 
         log.debug("Loading %s", s3fname)
-        for msm_jstr, msm in s3feeder.load_multiple(can_local_file.as_posix()):
+        for msm_jstr, msm, _ in s3feeder.load_multiple(can_local_file.as_posix()):
             msm = msm or ujson.loads(msm_jstr)
             if msm.get("report_id", None) is None:
                 # Missing or empty report_id
@@ -197,7 +197,7 @@ def print_msm(msm):
 
 def load_can(can):
     cnt = 0
-    for msm_jstr, msm in s3feeder.load_multiple(can.as_posix()):
+    for msm_jstr, msm, _ in s3feeder.load_multiple(can.as_posix()):
         msm = msm or ujson.loads(msm_jstr)
         if msm.get("report_id", None) is None:
             # Missing or empty report_id
@@ -574,17 +574,17 @@ def test_score_tor():
         assert msm["test_name"] == "tor"
         rid = msm["report_id"]
         scores = fp.score_measurement(msm, [])
-        print(ujson.dumps(msm, sort_keys=True, indent=2))
-        break
-        if rid == "20200109T111813Z_AS30722_RZeO9Ix6ET2LJzqGcinrDp1iqrhaGGDCHSwlOoybq2N9kZITQt":
+        if rid == "20200601T000014Z_AS8339_RC9uUMBtq5AkMLx6xDtTxEciPvd171jQaYx1i3dDbhH27PemEx":
             assert scores == {
-                "blocking_general": 0.0,
+                "blocking_general": 0.05714285714285714,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
             }
-    assert 0
+        # TODO: review tests
+        break
+
 
 ## test_name: web_connectivity
 
@@ -676,14 +676,16 @@ def test_score_web_connectivity_simple(cans):
     assert len(expected) == 0, "Not all expected measurements were tested"
 
 
-def test_score_web_connectivity_with_workers(cans):
+@pytest.mark.skip(reason="FIXME")
+def test_score_web_connectivity_with_workers(cans, tmp_path):
     # Run worker processes on a big can
     # Mock out database interactions but write output json
     # files
     can = cans["big2858"]
     expected_cnt = 2858
+    outdir = tmp_path
 
-    assert tuple(fp.conf.msmtdir.glob("*")) == ()
+    assert tuple(tmp_path.glob("*")) == ()
     import fastpath.portable_queue as queue
     import multiprocessing as mp
 
@@ -699,7 +701,7 @@ def test_score_web_connectivity_with_workers(cans):
     def mock_execute(query, *a, **kw):
         try:
             pid = os.getpid()
-            wl = fp.conf.outdir / f"{pid}.wlog"
+            wl = outdir / f"{pid}.wlog"
             if wl.is_file():
                 log.debug("Loading %s", wl)
                 d = ujson.load(wl.open())
@@ -725,7 +727,7 @@ def test_score_web_connectivity_with_workers(cans):
     workers = [mp.Process(target=fp.msm_processor, args=(queue,)) for n in range(4)]
     [t.start() for t in workers]
     for w in workers:
-        wl = fp.conf.outdir / f"{w.pid}.wlog"
+        wl = outdir / f"{w.pid}.wlog"
         if wl.is_file():
             wl.unlink()
         assert w.is_alive()
@@ -742,11 +744,11 @@ def test_score_web_connectivity_with_workers(cans):
         log.debug("waiting...")
         time.sleep(0.1)
 
-    assert len(tuple(fp.conf.msmtdir.glob("*"))) == expected_cnt
+    assert len(tuple(tmp_path.glob("*"))) == expected_cnt, tmp_path
 
     all_inserted_tids = set()
     for w in workers:
-        wl = fp.conf.outdir / f"{w.pid}.wlog"
+        wl = outdir / f"{w.pid}.wlog"
         assert wl.is_file(), "The worker did not create a logfile"
         d = ujson.load(wl.open())
         wl.unlink()
@@ -914,6 +916,7 @@ def test_score_psiphon(cans):
         scores = fp.score_measurement(msm, [])
         if rid == "20200109T111813Z_AS30722_RZeO9Ix6ET2LJzqGcinrDp1iqrhaGGDCHSwlOoybq2N9kZITQt":
             assert scores == {
+                "accuracy": 1.0,
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
