@@ -77,8 +77,8 @@ def cans():
     if not to_dload:
         return _cans
 
-    boto3.setup_default_session(profile_name="ooni-data")
-    s3 = boto3.client("s3")
+    s3 = s3feeder.create_s3_client()
+
     for fn in to_dload:
         s3fname = fn.as_posix().replace("testdata", "canned")
         r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=s3fname)
@@ -100,8 +100,7 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
     """Fetches cans from S3 and iterates over measurements.
     Detect broken dloads.
     """
-    boto3.setup_default_session(profile_name="ooni-data")
-    s3 = boto3.client("s3")
+    s3 = s3feeder.create_s3_client()
     can_date = start_date
     tpl = "{}/{}.00.tar.lz4" if test_name == "web_connectivity" else "{}/{}.0.tar.lz4"
     while can_date <= end_date:
