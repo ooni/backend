@@ -55,8 +55,7 @@ def upsert_summary(
     platform: str,
     update: bool,
 ) -> None:
-    """Insert a row in the fastpath_scores table. Overwrite an existing one.
-    """
+    """Insert a row in the fastpath_scores table. Overwrite an existing one."""
     sql_base_tpl = dedent(
         """\
     INSERT INTO fastpath (measurement_uid, report_id, domain, input, probe_cc, probe_asn, test_name,
@@ -90,9 +89,17 @@ def upsert_summary(
 
     tpl = sql_base_tpl + (sql_update if update else sql_noupdate)
 
+    # TODO: remove msmt parsing from upsert_summary
     asn = int(msm["probe_asn"][2:])  # AS123
+    test_name = msm.get("test_name", None)
     input_ = msm.get("input", None)
-    domain = None if input_ is None else urlparse(input_).netloc
+
+    if test_name == "meek_fronted_requests_test" and isinstance(input_, list):
+        domain = None if input_ is None else urlparse(input_[0]).netloc
+        input_ = ":".join(input_)
+    else:
+        domain = None if input_ is None else urlparse(input_).netloc
+
     args = (
         measurement_uid,
         msm["report_id"],
@@ -100,7 +107,7 @@ def upsert_summary(
         input_,
         msm["probe_cc"],
         asn,
-        msm["test_name"],
+        test_name,
         msm["test_start_time"],
         msm["measurement_start_time"],
         platform,
