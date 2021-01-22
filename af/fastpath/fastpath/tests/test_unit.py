@@ -115,6 +115,22 @@ def test_score_meek():
     }
 
 
+def test_score_meek2():
+    # msmt from legacy probes having a list as "input"
+    fn = "fastpath/tests/data/meek2.json"
+    with open(fn) as f:
+        msm = ujson.load(f)
+    matches = []
+    scores = fp.score_measurement(msm, matches)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # Bug tests
 
 
