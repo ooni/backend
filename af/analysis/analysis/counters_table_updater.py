@@ -15,7 +15,6 @@ Runs in a dedicated thread
 from datetime import datetime, timedelta
 
 import logging
-import time
 
 import psycopg2
 
@@ -253,10 +252,18 @@ def update_all_counters_tables(conf):
     """
     log.info("Started update_all_counters_tables")
     metrics.gauge("update_all_counters_tables.running", 1)
-    start = datetime.now() - timedelta(minutes=20)
-    end = datetime.now() - timedelta(minutes=10)
-    msm_uid_start = start.strftime("%Y%m%d%H%M")
+
+    fn = conf.output_directory / "counters_table_updater.last_msm_uid_end"
+    try:
+        msm_uid_start = fn.read_text().strip()
+    except FileNotFoundError:
+        log.warn("%s not found, defaulting to utcnow", fn)
+        msm_uid_start = datetime.utcnow().strftime("%Y%m%d%H%M")
+
+    end = datetime.utcnow() - timedelta(minutes=10)
     msm_uid_end = end.strftime("%Y%m%d%H%M")
+    fn.write_text(msm_uid_end)
+
     conn = connect_db(conf.active)
     # transaction, commit on context exiting
     with conn:
