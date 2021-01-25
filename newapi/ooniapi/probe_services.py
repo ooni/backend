@@ -489,7 +489,7 @@ def receive_measurement(report_id):
 
     data = request.data
     h = sha512(data).hexdigest()[:16]
-    ts = now.strftime("%Y%m%d%H%S%M.%f")
+    ts = now.strftime("%Y%m%d%H%M%S.%f")
     # msmt_uid is a unique id based on upload time, cc, testname and hash
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"

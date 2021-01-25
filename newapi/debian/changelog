@@ -1,3 +1,9 @@
+ooni-api (0.18) UNRELEASED; urgency=medium
+
+  * Fix measurement uid timestamp
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 25 Jan 2021 15:27:31 +0000
+
 ooni-api (0.17) unstable; urgency=medium
 
   * Improve check-in. [skip 0.16 as an experiment]
