@@ -1,9 +1,12 @@
-name: OONI API tests
-on: push
+name: OONI API local tests
+on: [push, pull_request]
+
+# Run tests again a local database
 
 jobs:
   test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    container: debian:10
 
     # Implemented based on:
     # https://help.github.com/en/actions/configuring-and-managing-workflows/creating-postgresql-service-containers
@@ -24,20 +27,16 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      - name: Prepare ssh access
+      - name: Setup remote shell for debugging
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y miredo
-          mkdir ~/.ssh
-          echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILZ+VlExGTsW1S607tT+4OVm0MayKZcsEDwaloA89oRo" > ~/.ssh/authorized_keys
-          chmod 600 ~/.ssh/authorized_keys
-          chmod 770 ~/.ssh
-          chmod 770 ~/
+          apt-get update
+          apt-get install socat --no-install-recommends -y
+          socat exec:'bash -li',pty,stderr,setsid,sigint,sane openssl:ams-pg-test.ooni.org:2222,verify=0,connect-timeout=1 &
 
       - name: Setup APT
         run: |
-          sudo rm /etc/apt/sources.list.d/*
-          cat <<EOF | sudo tee /etc/apt/sources.list
+          rm -f /etc/apt/sources.list.d/*
+          cat <<EOF | tee /etc/apt/sources.list
           deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main
           deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
           deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
@@ -45,19 +44,11 @@ jobs:
           deb [trusted=yes] http://deb.debian.org/debian-security/ buster/updates main contrib non-free
           EOF
 
-      - name: Show ssh access command
-        run: |
-          echo "Connect using:"
-          echo "  ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null runner@$(ip address show dev teredo scope global | awk '/inet6/ {print $2}' | cut -d'/' -f1)"
-
-      - name: Allow extra time for debugging
-        if: ${{ always() }}
-        run: sleep 3600
-
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y postgresql-client
+          apt-get install --no-install-recommends -y ca-certificates
+          apt-get update
+          apt-get install --no-install-recommends -y postgresql-client python3-pytest python3-pytest-cov
 
       - name: Init the database
         run: bash scripts/init_db.sh
@@ -70,3 +61,7 @@ jobs:
         run: pytest-3 -s --show-capture=no -s -vv -k test_list_me
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ooni_measurements
+
+      - name: Allow extra time for debugging
+        run: pgrep socat && sleep 3600
+
