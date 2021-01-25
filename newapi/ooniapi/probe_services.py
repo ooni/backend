@@ -148,6 +148,8 @@ def check_in():
         tests={
             "web_connectivity": {"urls": test_items},
         },
+        conf={
+        }
     )
 
     # get asn, asn_i, probe_cc, network name
