@@ -65,8 +65,7 @@ def fastpath_dup_rid_input(app):
 
 
 def dbquery(app, sql, **query_params):
-    """Access DB directly, returns row as tuple.
-    """
+    """Access DB directly, returns row as tuple."""
     with app.app_context():
         q = app.db_session.execute(sql, query_params)
         return q.fetchone()
@@ -394,7 +393,8 @@ def test_list_measurements_search(client):
     # ...leading to an API call to:
     # api.ooni.io/api/v1/measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50
     response = api(
-        client, f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50",
+        client,
+        f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50",
     )
     assert len(response["results"]) == 50, jd(response)
     # assert response["metadata"]["count"] == 1, jd(response)
@@ -499,8 +499,7 @@ def test_list_measurements_pagination_new(client, log):
 
 
 def test_list_measurements_fastpath(client, fastpath_rid_input):
-    """Get a fresh msmt from fastpath
-    """
+    """Get a fresh msmt from fastpath"""
     rid, inp, test_start_time = fastpath_rid_input
     p = f"measurements?report_id={rid}&input={inp}"
     response = api(client, p)
@@ -521,21 +520,21 @@ def today_range():
 def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
-    SELECT
-    COUNT(*), anomaly, confirmed, msm_failure AS failure
-FROM
-    fastpath
-WHERE
-    measurement_start_time > '2020-01-13T00:00:00'::timestamp
-    AND measurement_start_time <= '2020-01-14T00:00:00'::timestamp
-    GROUP BY anomaly, confirmed, failure
-    ORDER BY anomaly, confirmed, failure ASC;
-  54412 | f       | f         | f
- 156477 | f       | f         | t
-  18679 | t       | f         | f
-   6820 | t       | f         | t
-    352 | t       | t         | f
-   2637 | t       | t         | t
+        SELECT
+        COUNT(*), anomaly, confirmed, msm_failure AS failure
+    FROM
+        fastpath
+    WHERE
+        measurement_start_time > '2020-01-13T00:00:00'::timestamp
+        AND measurement_start_time <= '2020-01-14T00:00:00'::timestamp
+        GROUP BY anomaly, confirmed, failure
+        ORDER BY anomaly, confirmed, failure ASC;
+      54412 | f       | f         | f
+     156477 | f       | f         | t
+      18679 | t       | f         | f
+       6820 | t       | f         | t
+        352 | t       | t         | f
+       2637 | t       | t         | t
     """
     since, until = today_range()
     p = (
@@ -1073,7 +1072,10 @@ def test_private_api_test_names(client, log):
             {"id": "telegram", "name": "Telegram"},
             {"id": "whatsapp", "name": "WhatsApp"},
             {"id": "http_invalid_request_line", "name": "HTTP Invalid Request Line"},
-            {"id": "http_header_field_manipulation", "name": "HTTP Header Field Manipulation",},
+            {
+                "id": "http_header_field_manipulation",
+                "name": "HTTP Header Field Manipulation",
+            },
             {"id": "ndt", "name": "NDT"},
             {"id": "dash", "name": "DASH"},
             {"id": "bridge_reachability", "name": "Bridge Reachability"},
