@@ -683,6 +683,35 @@ def test_list_measurements_shared(client, shared_rid_input, log):
 #         print(r)
 
 
+def notest_list_measurements_paging_1(client):
+    url = "measurements?test_name=dnscheck&since=2020-12-03&until=2020-12-05"
+    resp = api(client, url)
+    meta = resp["metadata"]
+    assert meta["count"] == 0
+    assert meta["current_page"] == 1
+    assert meta["next_url"] == None
+
+
+def test_list_measurements_paging_2(client):
+    url = "measurements?test_name=dnscheck&since=2020-12-03&until=2020-12-04"
+    for pagenum in range(1, 9):
+        resp = api(client, url)
+        meta = resp["metadata"]
+        if pagenum < 8:
+            assert meta["current_page"] == pagenum, url
+            assert meta["offset"] == (pagenum - 1) * 100, url
+            assert meta["count"] == -1, (url, meta)
+            assert meta["next_url"].startswith("https://api.ooni.io/api/v1/")
+        else:
+            assert meta["current_page"] == pagenum, url
+            assert meta["offset"] == 700, url
+            assert meta["count"] == 763, (url, meta) # is this ok?
+            assert meta["next_url"] is None
+            break
+
+        url = meta["next_url"].split("/", 5)[-1]
+
+
 ## get_measurement ##
 
 

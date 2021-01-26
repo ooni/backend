@@ -821,9 +821,7 @@ def list_measurements():
 
         raise exc
 
-    # For each report_id / input tuple, we want at most one entry. Measurements
-    # from mr_table and fastpath has already been merged by the FULL OUTER JOIN
-    # but we have duplicate msmts sharing the same report_id / input.
+    # For each report_id / input tuple, we want at most one entry.
     results = _merge_results(tmpresults)
 
     # Replace the special value INULL for "input" with None
@@ -837,7 +835,7 @@ def list_measurements():
 
     # We got less results than what we expected, we know the count and that
     # we are done
-    if len(results) < limit:
+    if len(tmpresults) < limit:
         count = offset + len(results)
         pages = math.ceil(count / limit)
         next_url = None
