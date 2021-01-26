@@ -31,6 +31,11 @@ TEST_GROUPS = {
     ],
 }
 
+TEST_NAMES = []
+for v in TEST_GROUPS.values():
+    assert isinstance(v, list)
+    TEST_NAMES.extend(v)
+
 
 def get_test_group_case():
     """

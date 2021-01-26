@@ -1584,3 +1584,20 @@ def test_aggregation_xy_axis_category_code(client, log):
     # shortened to save space. The query should be identical to
     # test_aggregation_x_axis_category_code
     assert r["result"][:3] == [], fjd(r)
+
+
+def test_aggregation_tor(client):
+    r = api(client, "aggregation?probe_cc=BY&since=2020-10-10T10:30:00&test_name=tor")
+    assert r == {
+        "dimension_count": 0, "result": {
+            "anomaly_count": 365,
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 407
+        }, "v": 0
+    }
+
+
+def test_aggregation_test_name(client):
+    r = client.get(f"/api/v1/aggregation?test_name=BOGUS")
+    assert r.status_code == 400

@@ -37,6 +37,7 @@ from ooniapi import __version__
 from ooniapi.config import REPORT_INDEX_OFFSET
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson
+from ooniapi.models import TEST_NAMES
 
 from flask import Blueprint
 
@@ -1041,6 +1042,11 @@ def get_aggregated():
         until = parse_date(until)
         where.append(sql.text("measurement_start_day <= :until"))
         query_params["until"] = until
+
+    if test_name:
+        assert test_name in TEST_NAMES
+        where.append(sql.text("test_name = :test_name"))
+        query_params["test_name"] = test_name
 
     if axis_x:
         # TODO: check if the value is a valid colum name
