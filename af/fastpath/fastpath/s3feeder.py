@@ -18,6 +18,7 @@ import time
 import tarfile
 
 import lz4.frame as lz4frame  # debdeps: python3-lz4
+import ujson
 
 # lz4frame appears faster than executing lz4cat: 2.4s vs 3.9s on a test file
 
@@ -29,7 +30,8 @@ from fastpath.normalize import iter_yaml_msmt_normalized
 from fastpath.metrics import setup_metrics
 from fastpath.mytypes import MsmtTup
 
-BUCKET_NAME = "ooni-data"
+CAN_BUCKET_NAME = "ooni-data"
+MC_BUCKET_NAME = "ooni-data-eu-fra"
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath.s3feeder")
@@ -42,7 +44,7 @@ for l in ("urllib3", "botocore", "s3transfer"):
 def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
     """Load contents of cans. Decompress tar archives if found.
     Yields measurements one by one as:
-        (string of JSON, None) or (None, msmt dict)
+        (string of JSON, None, None) or (None, msmt dict, None)
     """
     # TODO: handle:
     # RuntimeError: LZ4F_decompress failed with code: ERROR_decompressionFailed
@@ -80,23 +82,83 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
             #     metrics.incr("yaml_normalization")
             #     yield (None, msm)
 
+    elif fn.endswith(".tar.gz"):
+        # minican with missing gzipping :(
+        tf = tarfile.open(fn)
+        while True:
+            m = tf.next()
+            if m is None:
+                # end of tarball
+                tf.close()
+                break
+            log.debug("Loading %s", m.name)
+            k = tf.extractfile(m)
+            assert k is not None
+            if not m.name.endswith(".post"):
+                log.error("Unexpected filename")
+                continue
+
+            try:
+                j = ujson.loads(k.read())
+            except Exception:
+                log.error(repr(k[:100]), exc_info=1)
+
+            fmt = j.get("format", "")
+            if fmt == "json":
+                msm = j.get("content", {})
+                yield (None, msm, None)
+
+            elif fmt == "yaml":
+                log.info("Skipping YAML")
+
+            else:
+                log.info("Ignoring invalid post")
+
     else:
-        raise RuntimeError(fn)
+        raise RuntimeError(f"Unexpected [mini]can filename '{fn}'")
 
 
 def create_s3_client():
     return boto3.client("s3", config=botoConfig(signature_version=botoSigUNSIGNED))
 
 
-def list_cans_on_s3_for_a_day(s3, day):
+def list_cans_on_s3_for_a_day(s3, day: date):
+    """List legacy cans."""
     prefix = f"{day}/"
-    r = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix="canned/" + prefix)
-    files = []
-    assert "Contents" in r
-    for filedesc in r["Contents"]:
-        fname = filedesc["Key"][7:]  # trim away "canned/"
-        files.append((fname, filedesc["Size"]))
+    r = s3.list_objects_v2(Bucket=CAN_BUCKET_NAME, Prefix="canned/" + prefix)
+
+    if ("Contents" in r) ^ (day <= date(2020, 10, 21)):
+        # The last day with cans is 2020-10-21
+        log.warn("%d can files found!", len(r.get("Contents", [])))
+
+    fs = r.get("Contents", [])
+    files = [(f["Key"], f["Size"]) for f in fs]
     return files
+
+
+def list_minicans_on_s3_for_a_day(s3, day: date):
+    """List minicans."""
+    # s3cmd ls s3://ooni-data-eu-fra/raw/20210202
+    tstamp = day.strftime("%Y%m%d")
+    prefix = f"raw/{tstamp}/"
+    cont_token = None
+    files = []
+    # list_objects_v2 returns 1000 objects max and needs a token (!= None)
+    while True:
+        kw = {} if cont_token is None else dict(ContinuationToken=cont_token)
+        r = s3.list_objects_v2(Bucket=MC_BUCKET_NAME, Prefix=prefix, **kw)
+
+        cont_token = r.get("NextContinuationToken", None)
+        if ("Contents" in r) ^ (day >= date(2020, 10, 20)):
+            # The first day with minicans is 2020-10-20
+            log.warn("%d minican files found!", len(r.get("Contents", [])))
+
+        for f in r.get("Contents", []):
+            if f["Key"].endswith(".tar.gz"):
+                files.append((f["Key"], f["Size"]))
+
+        if cont_token is None:
+            return files
 
 
 @metrics.timer("fetch_cans")
@@ -108,16 +170,16 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
     """
     # fn: can filename without path
     # diskf: File in the s3cachedir directory
-    cans = set()  # (filename, filename on disk, size, download required)
-    for fn, size in files:
-        diskf = conf.s3cachedir / fn
+    cans = set()  # (s3fname, filename on disk, size, download required)
+    for s3fname, size in files:
+        diskf = conf.s3cachedir / s3fname.split("/", 1)[1]
         if diskf.exists() and size == diskf.stat().st_size:
             metrics.incr("cache_hit")
             diskf.touch(exist_ok=True)
-            cans.add((fn, diskf, size, False))
+            cans.add((s3fname, diskf, size, False))
         else:
             metrics.incr("cache_miss")
-            cans.add((fn, diskf, size, True))
+            cans.add((s3fname, diskf, size, True))
 
     def _cb(bytes_count):
         if _cb.start_time is None:
@@ -137,20 +199,20 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
     _cb.total_size = sum(t[2] for t in cans if t[3])
     _cb.total_count = 0
 
-    for fn, diskf, size, dload_required in cans:
+    for s3fname, diskf, size, dload_required in cans:
         if not dload_required:
             yield diskf  # already in local cache
             continue
 
-        s3fname = os.path.join("canned", fn)
         # TODO: handle missing file
-        log.info("Downloading can %s size %d MB" % (fn, size / 1024 / 1024))
+        log.info("Downloading can %s size %d MB" % (s3fname, size / 1024 / 1024))
         diskf.parent.mkdir(parents=True, exist_ok=True)
         tmpf = diskf.with_suffix(".s3tmp")
         metrics.gauge("fetching", 1)
         _cb.start_time = None
         with tmpf.open("wb") as f:
-            s3.download_fileobj(BUCKET_NAME, s3fname, f, Callback=_cb)
+            bucket_name = CAN_BUCKET_NAME if "canned/" in s3fname else MC_BUCKET_NAME
+            s3.download_fileobj(bucket_name, s3fname, f, Callback=_cb)
             f.flush()
             os.fsync(f.fileno())
         metrics.gauge("fetching", 0)
@@ -163,11 +225,11 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
 
 # TODO: merge with stream_daily_cans, add caching to the latter to be used
 # during functional tests
-@metrics.timer("fetch_cans_for_a_day_with_cache")
-def fetch_cans_for_a_day_with_cache(conf, day):
-    s3 = create_s3_client()
-    fns = list_cans_on_s3_for_a_day(s3, day)
-    list(fetch_cans(s3, conf, fns))
+# @metrics.timer("fetch_cans_for_a_day_with_cache")
+# def fetch_cans_for_a_day_with_cache(conf, day):
+#     s3 = create_s3_client()
+#     fns = list_cans_on_s3_for_a_day(s3, day)
+#     list(fetch_cans(s3, conf, fns))
 
 
 def _calculate_etr(t0, now, start_day, day, stop_day, can_num, can_tot_count) -> int:
@@ -209,6 +271,8 @@ def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None
     while day < stop_day:
         log.info("Processing day %s", day)
         cans_fns = list_cans_on_s3_for_a_day(s3, day)
+        minicans_fns = list_minicans_on_s3_for_a_day(s3, day)
+        cans_fns.extend(minicans_fns)
         for cn, can_f in enumerate(fetch_cans(s3, conf, cans_fns)):
             try:
                 _update_eta(t0, start_day, day, stop_day, cn, len(cans_fns))
