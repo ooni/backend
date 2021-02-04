@@ -1199,7 +1199,10 @@ def unwrap_msmt(post):
 
 def msm_processor(queue):
     """Measurement processor worker"""
-    db.setup(conf)
+    if conf.no_write_to_db:
+        log.info("Skipping DB connection setup")
+    else:
+        db.setup(conf)
 
     while True:
         msm_tup = queue.get()
@@ -1252,6 +1255,9 @@ def msm_processor(queue):
 
                 if msmt_uid is None:
                     msmt_uid = trivial_id(measurement)  # legacy measurement
+
+                if conf.no_write_to_db:
+                    continue
 
                 db.upsert_summary(
                     measurement,
