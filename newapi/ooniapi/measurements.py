@@ -213,13 +213,15 @@ def _unwrap_post(post: dict) -> dict:
     fmt = post.get("format", "")
     if fmt == "json":
         return post.get("content", {})
-    if fmt == "yaml":
-        return yaml.load(msm, Loader=yaml.CLoader)
     raise Exception("Unexpected format")
 
 
 def _fetch_measurement_body_on_disk(report_id, input: str) -> bytes:
-    """Fetch raw POST from disk, extract msmt"""
+    """Fetch raw POST from disk, extract msmt
+    This is used only for msmts that have been processed by the fastpath
+    but are not uploaded to S3 yet.
+    YAML msmts not supported: requires implementing normalization here
+    """
     query = """SELECT measurement_uid
     FROM fastpath
     WHERE report_id = :report_id
