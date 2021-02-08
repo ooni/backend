@@ -3,12 +3,17 @@
 #
 
 from datetime import datetime
+from itertools import groupby
+import functools
+import hashlib
 import logging
 import re
-import hashlib
+import string
 import uuid
 
-import lz4.frame as lz4frame  # debdeps: python3-lz4
+import ujson
+import yaml
+from yaml import CLoader
 
 
 log = logging.getLogger("normalize")
@@ -123,15 +128,13 @@ test_categories = {
     "tcpt": {"http_filtering_bypass", "http_invalid_request_line", "http_trix"},
 }
 
-regexps = {
-    "ipv4": "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})",
-    "hostname": "([a-zA-Z0-9](?:(?:[a-zA-Z0-9-]*|(?<!-)\.(?![-.]))*[a-zA-Z0-9]+)?)",
-}
+regexps = dict(
+    ipv4=r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})",
+    hostname=r"([a-zA-Z0-9](?:(?:[a-zA-Z0-9-]*|(?<!-)\.(?![-.]))*[a-zA-Z0-9]+)?)",
+)
 
 
 ## Simhash generation
-
-from itertools import groupby
 
 simhash_re = re.compile(r"[\w\u4e00-\u9fcc]+")
 
@@ -187,7 +190,7 @@ def normalize_body(body):
     return body.replace("\0", "")
 
 
-def regex_or_empty_string(pattern, source):
+def match(pattern, source):
     found = re.search(pattern, source)
     if found:
         return found.group(1)
@@ -301,35 +304,33 @@ def normalize_httpt(entry):
 
 def _normalize_answer(ans):
     try:
-        ttl = regex_or_empty_string("ttl=(\d+)", ans[0])
+        ttl = match(r"ttl=(\d+)", ans[0])
     except Exception:
         log.error("Failed to parse ttl in %s" % ans[0])
         ttl = None
 
-    answer_type = regex_or_empty_string("type=([A-Z]+)", ans[0])
+    answer_type = match("type=([A-Z]+)", ans[0])
 
     na = dict(ttl=ttl, answer_type=answer_type)
 
     if answer_type == "A":
-        na["ipv4"] = regex_or_empty_string("address=" + regexps["ipv4"], ans[1])
+        na["ipv4"] = match("address=" + regexps["ipv4"], ans[1])
 
     elif answer_type == "MX":
-        na["hostname"] = regex_or_empty_string("address=" + regexps["ipv4"], ans[1])
-        na["preference"] = regex_or_empty_string("preference=(\d+)", ans[1])
+        na["hostname"] = match("address=" + regexps["ipv4"], ans[1])
+        na["preference"] = match(r"preference=(\d+)", ans[1])
 
     elif answer_type in ["PTR", "CNAME"]:
-        na["hostname"] = regex_or_empty_string("name=" + regexps["hostname"], ans[1])
+        na["hostname"] = match("name=" + regexps["hostname"], ans[1])
 
     elif answer_type == "SOA":
-        na["responsible_name"] = regex_or_empty_string(
-            "rname=" + regexps["hostname"], ans[1]
-        )
-        na["hostname"] = regex_or_empty_string("mname=" + regexps["hostname"], ans[1])
-        na["serial_number"] = regex_or_empty_string("serial=(\d+)", ans[1])
-        na["refresh_interval"] = regex_or_empty_string("refresh=(\d+)", ans[1])
-        na["retry_interval"] = regex_or_empty_string("retry=(\d+)", ans[1])
-        na["minimum_ttl"] = regex_or_empty_string("minimum=(\d+)", ans[1])
-        na["expiration_limit"] = regex_or_empty_string("expire=(\d+)", ans[1])
+        na["responsible_name"] = match("rname=" + regexps["hostname"], ans[1])
+        na["hostname"] = match("mname=" + regexps["hostname"], ans[1])
+        na["serial_number"] = match(r"serial=(\d+)", ans[1])
+        na["refresh_interval"] = match(r"refresh=(\d+)", ans[1])
+        na["retry_interval"] = match(r"retry=(\d+)", ans[1])
+        na["minimum_ttl"] = match(r"minimum=(\d+)", ans[1])
+        na["expiration_limit"] = match(r"expire=(\d+)", ans[1])
 
     return na
 
@@ -340,15 +341,9 @@ def normalize_dnst(entry):
     errors = entry["test_keys"].pop("tampering", None)
     if errors:
         entry["test_keys"]["errors"] = errors
-        entry["test_keys"]["successful"] = map(
-            lambda e: e[0], filter(lambda e: e[1] is False, errors.items())
-        )
-        entry["test_keys"]["failed"] = map(
-            lambda e: e[0], filter(lambda e: e[1] is not True, errors.items())
-        )
-        entry["test_keys"]["inconsistent"] = map(
-            lambda e: e[0], filter(lambda e: e[1] is True, errors.items())
-        )
+        entry["test_keys"]["successful"] = [e[0] for e in errors if e[1] is False]
+        entry["test_keys"]["failed"] = [e[0] for e in errors if e[1] is not True]
+        entry["test_keys"]["inconsistent"] = [e[0] for e in errors if e[1] is True]
     elif entry["test_name"] == "dns_consistency":
         entry["test_keys"]["errors"] = {}
         entry["test_keys"]["successful"] = []
@@ -358,9 +353,7 @@ def normalize_dnst(entry):
     queries = []
     for query in entry["test_keys"].pop("queries", []):
         try:
-            query["hostname"] = regex_or_empty_string(
-                "\[Query\('(.+)'", query.pop("query")
-            )
+            query["hostname"] = match(r"\[Query\('(.+)'", query.pop("query"))
         except:
             query["hostname"] = None
 
@@ -397,8 +390,7 @@ def normalize_process(entry):
 
 
 def normalize_entry(entry, bucket_date, perma_fname, esha):
-    """Autoclaving
-    """
+    """Autoclaving"""
     hashuuid = esha[:16]  # sha1 is 20 bytes
 
     if isinstance(entry.get("report"), dict):
@@ -418,9 +410,10 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
     for key in schema:
         entry[key] = entry.get(key, None)
 
-    if entry.get("data_format_version", "0.1.0") == "0.2.0":
+    if entry.get("data_format_version", "") == "0.2.0":
         if entry["test_keys"] is None:
             entry = nest_test_keys(entry)
+
         return entry
 
     ts = entry.pop("start_time", 0)
@@ -563,7 +556,8 @@ def generate_report_id(header):
     #   else str(probe_city)
     # )  # u'Reykjav\xedk' in bucket 2014-02-20
     # probe_city = probe_city.decode() #encode("utf-8")
-    value_to_hash += probe_city.encode("utf-8")
+    if probe_city is not None:
+        value_to_hash += probe_city.encode("utf-8")
     report_id += "".join(
         string.ascii_letters[b % len(string.ascii_letters)]
         for b in hashlib.sha512(value_to_hash).digest()
@@ -571,104 +565,47 @@ def generate_report_id(header):
     return report_id
 
 
-def iter_yaml_lz4_reports(fn):
-    """Iterate YAML reports from a lz4 file
-    """
-    assert str(fn).endswith("lz4")
-
-    fd = lz4frame.open(fn)
-    blobgen = stream_yaml_blobs(fd)
-
-    off, header = next(blobgen)
-    headsha = hashlib.sha1(header)
-    # XXX: bad header kills whole bucket
-    header = yaml.load(header, Loader=CLoader)
-    if not header.get("report_id"):
-        header["report_id"] = generate_report_id(header)
-
-    for off, entry in blobgen:
-        entry_len = len(entry)
-        esha = headsha.copy()
-        esha.update(entry)
-        esha = esha.digest()
-        try:
-            entry = yaml.load(entry, Loader=CLoader)
-            if not entry:  # e.g. '---\nnull\n...\n'
-                continue
-            if "test_start_time" in entry and "test_start_time" in header:
-                header.pop("test_start_time")
-            entry.update(header)
-            yield off, entry_len, esha, entry, None
-        except Exception as exc:
-            yield off, entry_len, esha, None, exc
-
-    fd.close()
-
-
 ## Entry points
 
 
-def iter_yaml_msmt_normalized(data, bucket_tstamp):
-    """Yields normalized measurements from a YAML bytestream
-    """
+def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
+    """Yields normalized measurements from a YAML bytestream"""
     assert bucket_tstamp.startswith("20")
     assert len(bucket_tstamp) == 10
+    assert len(report_fn.split("/")) == 2, report_fn
     # Taken from autoclaving.py stream_yaml_reports
     blobgen = stream_yaml_blobs(data)
 
     off, header = next(blobgen)
     headsha = hashlib.sha1(header)
     # XXX: bad header kills whole bucket
-    header = yaml.load(header, Loader=CLoader)
+    header = yaml.safe_load(header)
     # Generates report_id if needed
     if not header.get("report_id"):
         header["report_id"] = generate_report_id(header)
 
-    report_filename = "2015-07-01/20150701T002642Z-BG-AS31250-http_invalid_request_line-4GDkLs6AzKBFD0OsxYE6DvyYvF8Bs5liFah4juh9CSicvDX73c7NaeGHOzeSFmUp-0.1.0-probe.yaml"
     for off, entry in blobgen:
         esha = headsha.copy()
         esha.update(entry)
         esha = esha.digest()
-        try:
-            entry = yaml.load(entry, Loader=CLoader)
-            if not entry:  # e.g. '---\nnull\n...\n'
-                continue
-            if "test_start_time" in entry and "test_start_time" in header:
-                header.pop("test_start_time")
-            entry.update(header)
-            yield normalize_entry(entry, bucket_tstamp, report_filename, esha)
-        except Exception as exc:
-            yield normalize_entry(entry, bucket_tstamp, report_filename, esha)
+        entry = yaml.safe_load(entry)
 
+        if not entry:  # e.g. '---\nnull\n...\n'
+            continue
+        if "test_start_time" in entry and "test_start_time" in header:
+            header.pop("test_start_time")
+        entry.update(header)
+        out = normalize_entry(entry, bucket_tstamp, report_fn, esha)
+        yield out
 
-# def _iter_yaml_msmt(data):
-#     """Yields measurements 5-tuples from a YAML BytesIO
-#     """
-#     # Taken from autoclaving.py stream_yaml_reports
-#     blobgen = stream_yaml_blobs(data)
-#
-#     # This is the header of a report
-#     off, header = next(blobgen)
-#     headsha = hashlib.sha1(header)
-#     # XXX: bad header kills whole bucket
-#     header = yaml.load(header, Loader=CLoader)
-#     # Generates report_id if needed
-#     if not header.get("report_id"):
-#         header["report_id"] = generate_report_id(header)
-#
-#     # Iterate over measurements
-#     for off, entry in blobgen:
-#         entry_len = len(entry)
-#         esha = headsha.copy()
-#         esha.update(entry)
-#         esha = esha.digest()
-#         try:
-#             entry = yaml.load(entry, Loader=CLoader)
-#             if not entry:  # e.g. '---\nnull\n...\n'
-#                 continue
-#             if "test_start_time" in entry and "test_start_time" in header:
-#                 header.pop("test_start_time")
-#             entry.update(header)
-#             yield off, entry_len, esha, entry, None
-#         except Exception as exc:
-#             yield off, entry_len, esha, None, exc
+        # try:
+        #    if not entry:  # e.g. '---\nnull\n...\n'
+        #        continue
+        #    if "test_start_time" in entry and "test_start_time" in header:
+        #        header.pop("test_start_time")
+        #    entry.update(header)
+        #    out = normalize_entry(entry, bucket_tstamp, report_fn, esha)
+        #    yield out
+        # except Exception as exc:
+        #    out = normalize_entry(entry, bucket_tstamp, report_fn, esha)
+        #    yield out

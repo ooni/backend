@@ -28,7 +28,6 @@ import time
 import yaml
 
 import ujson  # debdeps: python3-ujson
-import lz4.frame as lz4frame  # debdeps: python3-lz4
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
@@ -1115,6 +1114,22 @@ def score_tor(msm) -> dict:
     return scores
 
 
+def score_http_requests(msm) -> dict:
+    """Calculates measurement scoring for legacy test http_requests
+    Returns a scores dict
+    """
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    return scores
+
+
+def score_dns_consistency(msm) -> dict:
+    """Calculates measurement scoring for legacy test dns_consistency
+    Returns a scores dict
+    """
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm, matches) -> dict:
     """Calculate measurement scoring. Returns a scores dict"""
@@ -1149,6 +1164,10 @@ def score_measurement(msm, matches) -> dict:
             return score_psiphon(msm)
         if tn == "tor":
             return score_tor(msm)
+        if tn == "http_requests":
+            return score_http_requests(msm)
+        if tn == "dns_consistency":
+            return score_dns_consistency(msm)
 
         log.debug("Unsupported test name %s", tn)
         scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
@@ -1194,7 +1213,7 @@ def unwrap_msmt(post):
     if fmt == "json":
         return post["content"]
     if fmt == "yaml":
-        return yaml.load(msmt, Loader=yaml.CLoader)
+        return yaml.safe_load(msmt)
 
 
 def msm_processor(queue):

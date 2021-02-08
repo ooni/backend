@@ -17,6 +17,7 @@ import tarfile
 import ujson
 
 import fastpath.normalize as norm
+from fastpath.s3feeder import create_s3_client
 
 log = logging.getLogger()
 
@@ -58,9 +59,8 @@ def cans():
     if not to_dload:
         return _cans
 
-    bname = "ooni-data-private"
-    boto3.setup_default_session(profile_name="ooni-data-private")
-    s3 = boto3.client("s3")
+    bname = "ooni-data"
+    s3 = create_s3_client()
     for fn in to_dload:
         s3fname = fn.as_posix().replace("testdata", "canned")
         r = s3.list_objects_v2(Bucket=bname, Prefix=s3fname)
@@ -78,7 +78,7 @@ def cans():
 
 
 @pytest.fixture(scope="session", params=["2015-07-01"])
-#@pytest.fixture(scope="session", params=["2015-07-01", "2015-07-02"])
+# @pytest.fixture(scope="session", params=["2015-07-01", "2015-07-02"])
 def autoclaved_io(request):
     ## Fetch autoclaved reports to compare the outputs of normalization
     bucket_date = request.param
@@ -155,9 +155,7 @@ def autoclaved_io(request):
         for name, rawblob in extract_yaml_reports(tarball_name):
             log.info("RAW Found YAML: %s", name)
             autoclaved_json = fetch_autoclaved_json(name)
-            autoclaved_msmts = [
-                ujson.loads(m) for m in autoclaved_json.splitlines()
-            ]
+            autoclaved_msmts = [ujson.loads(m) for m in autoclaved_json.splitlines()]
             log.info("AC Autoclaved msmts: %d", len(autoclaved_msmts))
             data.append((name, bucket_date, rawblob, autoclaved_msmts))
             # break # speedup tests
@@ -246,32 +244,56 @@ def test_normalize_yaml_brokenframe(cans):
         entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
 
 
-@pytest.mark.skip(reason="Broken")
+# from datetime import date
+# from test_functional import s3msmts
+# def test_normalize_yaml_2013():
+#    cans = s3msmts("http_requests", date(2013, 12, 1), date(2013, 12, 2))
+# def test_normalize_yaml_2016
+
+
 def test_normalize_yaml_2016(cans):
     can = cans["yaml16"]
-    for n, r in enumerate(norm.iter_yaml_lz4_reports(can)):
-        off, entry_len, esha, entry, exc = r
-        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
-        assert hash(entry) == "e83a742b"
-        break
+    canfn = can.as_posix()
+    assert canfn.startswith("testdata/2016-07-07/20160706T000046Z-GB")
+    day = canfn.split("/")[1]
+    rfn = canfn.split("/", 1)[1][:-4]  # remove testdata/ and .lz4
+    with lz4frame.open(can) as f:
+        for n, entry in enumerate(norm.iter_yaml_msmt_normalized(f, day, rfn)):
+            ujson.dumps(entry)  # ensure it's serializable
+            if n == 0:
+                with open("fastpath/tests/data/yaml16_0.json") as f:
+                    exp = ujson.load(f)
+                assert entry == exp
+            elif n > 20:
+                break
 
 
 def test_normalize_yaml_dns_consistency_2017(cans):
     can = cans["yaml17"]
-    for n, r in enumerate(norm.iter_yaml_lz4_reports(can)):
-        off, entry_len, esha, entry, exc = r
-        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
-        assert hash(entry) == "685b9af4"
-        break
+    canfn = can.as_posix()
+    day = canfn.split("/")[1]
+    rfn = canfn.split("/", 1)[1][:-4]  # remove testdata/ and .lz4
+    # s3://ooni-data/autoclaved/jsonl.tar.lz4/2017-12-21/20171220T153044Z-BE-AS5432-dns_consistency-mnKRlHuqk8Eo6XMJt5ZkVQrgReaEXPEWaO9NafgXxSVIhAswTXT7QJc6zhsuttpK-0.1.0-probe.yaml.lz4
+    # lz4cat <fn> | head -n1 | jq -S . > fastpath/tests/data/yaml17_0.json
+    with lz4frame.open(can) as f:
+        for n, entry in enumerate(norm.iter_yaml_msmt_normalized(f, day, rfn)):
+            ujson.dumps(entry)  # ensure it's serializable
+            if n == 0:
+                with open("fastpath/tests/data/yaml17_0.json") as f:
+                    exp = ujson.load(f)
+                assert entry == exp
+            elif n > 20:
+                break
 
 
 def test_normalize_yaml_dns_consistency_2018(cans):
     can = cans["yaml18"]
-    for n, r in enumerate(norm.iter_yaml_lz4_reports(can)):
-        off, entry_len, esha, entry, exc = r
-        entry = norm.normalize_entry(entry, "2018-05-07", "??", esha)
-        assert hash(entry) == "c9d0b754"
-        break
+    canfn = can.as_posix()
+    day = canfn.split("/")[1]
+    rfn = canfn.split("/", 1)[1][:-4]  # remove testdata/ and .lz4
+    with lz4frame.open(can) as f:
+        for n, entry in enumerate(norm.iter_yaml_msmt_normalized(f, day, rfn)):
+            ujson.dumps(entry)  # ensure it's serializable
 
 
 def test_simhash():

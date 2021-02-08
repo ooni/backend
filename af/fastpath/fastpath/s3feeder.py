@@ -64,9 +64,10 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                         yield (line, None, None)
 
                 elif m.name.endswith(".yaml"):
-                    continue  # FIXME
-                    bucket_tstamp = "FIXME"
-                    for msm in iter_yaml_msmt_normalized(k, bucket_tstamp):
+                    bucket_tstamp = fn.split("/")[-2]
+                    rfn = f"{bucket_tstamp}/" + fn.split("/")[-1]
+                    for msm in iter_yaml_msmt_normalized(k, bucket_tstamp, rfn):
+                        metrics.incr("yaml_normalization")
                         yield (None, msm, None)
 
     elif fn.endswith(".json.lz4"):
@@ -76,11 +77,11 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
 
     elif fn.endswith(".yaml.lz4"):
         with lz4frame.open(fn) as f:
-            raise Exception("Unsupported format: YAML")
-            # bucket_tstamp = "FIXME"
-            # for msm in iter_yaml_msmt_normalized(f, bucket_tstamp):
-            #     metrics.incr("yaml_normalization")
-            #     yield (None, msm)
+            bucket_tstamp = fn.split("/")[-2]
+            rfn = f"{bucket_tstamp}/" + fn.split("/")[-1]
+            for msm in iter_yaml_msmt_normalized(f, bucket_tstamp, rfn):
+                metrics.incr("yaml_normalization")
+                yield (None, msm, None)
 
     elif fn.endswith(".tar.gz"):
         # minican with missing gzipping :(
@@ -113,6 +114,9 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
 
             else:
                 log.info("Ignoring invalid post")
+
+    elif fn.endswith("/index.json.gz"):
+        pass
 
     else:
         raise RuntimeError(f"Unexpected [mini]can filename '{fn}'")
@@ -276,7 +280,7 @@ def stream_cans(conf, start_day: date, end_day: date) -> Generator[MsmtTup, None
         for cn, can_f in enumerate(fetch_cans(s3, conf, cans_fns)):
             try:
                 _update_eta(t0, start_day, day, stop_day, cn, len(cans_fns))
-                log.info("can %s ready", can_f.name)
+                #log.info("can %s ready", can_f.name)
                 for msmt_tup in load_multiple(can_f.as_posix()):
                     yield msmt_tup
             except Exception as e:

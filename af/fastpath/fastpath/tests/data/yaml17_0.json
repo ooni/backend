@@ -1,0 +1,109 @@
+{
+  "backend_version": null,
+  "bucket_date": "2017-12-21",
+  "data_format_version": "0.2.0",
+  "id": "a21a8550-f6c8-1544-4c9a-e457edaa9b26",
+  "input": "google.com",
+  "input_hashes": [
+    "37e60e13536f6afe47a830bfb6b371b5cf65da66d7ad65137344679b24fdccd1"
+  ],
+  "measurement_start_time": "2017-12-20 22:07:12",
+  "options": [
+    "-f",
+    "37e60e13536f6afe47a830bfb6b371b5cf65da66d7ad65137344679b24fdccd1"
+  ],
+  "probe_asn": "AS5432",
+  "probe_cc": "BE",
+  "probe_city": null,
+  "probe_ip": "127.0.0.1",
+  "report_filename": "2017-12-21/20171220T153044Z-BE-AS5432-dns_consistency-mnKRlHuqk8Eo6XMJt5ZkVQrgReaEXPEWaO9NafgXxSVIhAswTXT7QJc6zhsuttpK-0.1.0-probe.yaml",
+  "report_id": "mnKRlHuqk8Eo6XMJt5ZkVQrgReaEXPEWaO9NafgXxSVIhAswTXT7QJc6zhsuttpK",
+  "software_name": "ooniprobe",
+  "software_version": "1.3.2",
+  "test_helpers": {
+    "backend": "37.218.247.110:57004"
+  },
+  "test_keys": {
+    "control_resolver": "37.218.247.110:57004",
+    "errors": {
+      "127.0.1.1": true
+    },
+    "failed": [],
+    "inconsistent": [
+      "127.0.1.1"
+    ],
+    "queries": [
+      {
+        "answers": [
+          {
+            "answer_type": "A",
+            "ipv4": "216.58.211.110",
+            "ttl": "299"
+          }
+        ],
+        "failure": null,
+        "hostname": "google.com",
+        "query_type": "A",
+        "resolver_hostname": "37.218.247.110",
+        "resolver_port": 57004
+      },
+      {
+        "answers": [
+          {
+            "answer_type": "A",
+            "ipv4": "216.58.212.238",
+            "ttl": "174"
+          }
+        ],
+        "failure": null,
+        "hostname": "google.com",
+        "query_type": "A",
+        "resolver_hostname": "127.0.1.1",
+        "resolver_port": 53
+      },
+      {
+        "answers": [
+          {
+            "answer_type": "PTR",
+            "hostname": "ams16s22-in-f14.1e100.net",
+            "ttl": "15118"
+          },
+          {
+            "answer_type": "PTR",
+            "hostname": "ams16s22-in-f238.1e100.net",
+            "ttl": "15118"
+          }
+        ],
+        "failure": null,
+        "hostname": "238.212.58.216.in-addr.arpa",
+        "query_type": "PTR",
+        "resolver_hostname": "127.0.1.1",
+        "resolver_port": 53
+      },
+      {
+        "answers": [
+          {
+            "answer_type": "PTR",
+            "hostname": "ams15s32-in-f14.1e100.net",
+            "ttl": "21599"
+          },
+          {
+            "answer_type": "PTR",
+            "hostname": "ams15s32-in-f14.1e100.net",
+            "ttl": "21599"
+          }
+        ],
+        "failure": null,
+        "hostname": "110.211.58.216.in-addr.arpa",
+        "query_type": "PTR",
+        "resolver_hostname": "37.218.247.110",
+        "resolver_port": 57004
+      }
+    ],
+    "successful": []
+  },
+  "test_name": "dns_consistency",
+  "test_runtime": 0.142168045,
+  "test_start_time": "2017-12-20 21:30:35",
+  "test_version": "0.6"
+}
