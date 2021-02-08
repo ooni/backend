@@ -1118,6 +1118,7 @@ def score_http_requests(msm) -> dict:
     """Calculates measurement scoring for legacy test http_requests
     Returns a scores dict
     """
+    # TODO: implement scoring
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     return scores
 
@@ -1126,6 +1127,7 @@ def score_dns_consistency(msm) -> dict:
     """Calculates measurement scoring for legacy test dns_consistency
     Returns a scores dict
     """
+    # TODO: implement scoring
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     return scores
 
