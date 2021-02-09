@@ -189,9 +189,29 @@ def list_test_urls():
         in: query
         type: string
         description: Comma separated list of URL categories, all uppercase
+      - name: limit
+        in: query
+        type: integer
+        description: Maximum number of URLs to return
     responses:
-      '200':
+      200:
         description: URL test list
+        schema:
+          type: object
+          properties:
+            metadata:
+              count:
+                type: integer
+            results:
+              items:
+                properties:
+                  category_code:
+                    type: string
+                  country_code:
+                    type: string
+                  url:
+                    type: string
+
     """
     global failover_test_items
     if failover_test_items == {}:  # initialize once
@@ -219,6 +239,7 @@ def list_test_urls():
         # failover_generate_test_list runs without any database interaction
         test_items = failover_generate_test_list(country_code, category_codes, limit)
 
+    # TODO: remove current_page / next_url / pages ?
     out = {
         "metadata": {
             "count": len(test_items),

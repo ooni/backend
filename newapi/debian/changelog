@@ -1,3 +1,9 @@
+ooni-api (0.21) unstable; urgency=medium
+
+  * Improve API docs
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Feb 2021 13:25:22 +0000
+
 ooni-api (0.20) unstable; urgency=medium
 
   * Support legacy tests in _fetch_measurement_body

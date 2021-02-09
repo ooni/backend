@@ -220,8 +220,23 @@ def list_test_helpers():
     """Probe Services: List test helpers
     ---
     responses:
-      '200':
-        description: List test helpers
+      200:
+        description: A single user item
+        schema:
+          type: object
+          properties:
+            dns:
+              type: object
+            http-return-json-headers:
+              type: object
+            ssl:
+              type: object
+            tcp-echo:
+              type: object
+            traceroute:
+              type: object
+            web-connectivity:
+              type: object
     """
     j = {
         "dns": [
@@ -445,9 +460,22 @@ def open_report():
 def receive_measurement(report_id):
     """Probe Services: Submit measurement
     ---
+    parameters:
+      - name: report_id
+        in: path
+        example: 20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a
+        type: string
+        minLength: 10
+        required: true
     responses:
-      '200':
+      200:
         description: Acknowledge
+        schema:
+          type: object
+          properties:
+            measurement_uid:
+              type: string
+          example: {"measurement_uid": "20210208220710.181572_MA_ndt_7888edc7748936bf"}
     """
     log = current_app.logger
     try:

@@ -363,6 +363,9 @@ def get_measurement_meta():
         in: query
         type: string
         description: The report_id to search measurements for
+        minLength: 3
+        required: True
+        example: 20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a
       - name: input
         in: query
         type: string
@@ -373,8 +376,50 @@ def get_measurement_meta():
         type: boolean
         description: Include JSON measurement data
     responses:
-      '200':
+      200:
         description: Returns measurement metadata, optionally including the raw measurement body
+        schema:
+          type: object
+          properties:
+            anomaly:
+              type: bool
+            category_code:
+              type: string
+            confirmed:
+              type: bool
+            failure:
+              type: bool
+            input:
+              type: string
+            measurement_start_time:
+              type: string
+            probe_asn:
+              type: integer
+            probe_cc:
+              type: string
+            raw_measurement:
+              type: string
+            report_id:
+              type: string
+            scores:
+              type: string
+            test_name:
+              type: string
+            test_start_time:
+              type: string
+          example: {
+            "anomaly": false,
+            "confirmed": false,
+            "failure": false,
+            "input": null,
+            "measurement_start_time": "2021-02-08T23:31:46Z",
+            "probe_asn": 36947,
+            "probe_cc": "DZ",
+            "report_id": "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a",
+            "scores": "{}",
+            "test_name": "ndt",
+            "test_start_time": "2021-02-08T23:31:43Z"
+          }
     """
 
     # TODO: input can be '' or NULL in the fastpath table - fix it
