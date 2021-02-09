@@ -292,6 +292,13 @@ def _fetch_measurement_body(report_id, input: str) -> bytes:
     """Fetch measurement body from either disk, jsonl or autoclaved on S3"""
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")
+    # The number of underscores can be:
+    # 1: Legacy measurement e.g.
+    # 20141101T220015Z_OzDkiPoJMVjHItj<redacted>
+    # 2: Legacy measurement e.g.
+    # 20201019T050625Z_AS8369_VVqkepmw<redacted>
+    # 5: Current format e.g.
+    # 20210124T210009Z_webconnectivity_VE_22313_n1_Ojb<redacted>
     if u_count == 5:
         # Look on disk and then from JSONL cans on S3
         body = _fetch_measurement_body_on_disk(report_id, input)
@@ -301,8 +308,6 @@ def _fetch_measurement_body(report_id, input: str) -> bytes:
     elif u_count == 2:
         body = _fetch_autoclaved_measurement_body(report_id, input)
     elif u_count == 1:
-        # Legacy measurement e.g.
-        # 20141101T220015Z_OzDkiPoJMVjHItjneYOuZgiQSkowBczRIkecwerbgMOMAqxDwt
         body = _fetch_autoclaved_measurement_body(report_id, input)
     else:
         raise BadRequest("Invalid report_id")
