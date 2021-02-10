@@ -55,6 +55,10 @@ def test_match_fingerprints_dict_body():
     assert fp.match_fingerprints(msm) == []
 
 
+# Follow the order in score_measurement
+
+# # test_name: web_connectivity
+
 def test_score_measurement_simple():
     msm = {
         "input": "foo",
@@ -77,7 +81,38 @@ def test_score_measurement_simple():
     }
 
 
-## test_name: tor
+def test_score_measurement_confirmed():
+    msm = {
+        "input": "foo",
+        "measurement_start_time": "",
+        "probe_asn": "1",
+        "report_id": "123",
+        "test_name": "web_connectivity",
+        "test_start_time": "",
+        "probe_cc": "IT",
+        "test_keys": {
+            "requests": [
+                {
+                    "response": {
+                        "body": "GdF Stop Page"
+                    }
+                }
+            ]
+        },
+    }
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "accuracy": 0.0,
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_country": 1.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "confirmed": True,
+    }
+
+
+# # test_name: tor
 
 
 def test_score_tor():
