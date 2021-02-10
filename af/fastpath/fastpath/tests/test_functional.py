@@ -221,7 +221,7 @@ def setup_module(module):
 def test_telegram(cans):
     can = cans["telegram"]
     for msm_n, msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         rid = msm["report_id"]
         if rid == "20190830T002837Z_AS209_3nMvNkLIqSZMLqRiaiQylAuHxu6qpK7rVJcAA9Dv2UpcNMhPH0":
             assert scores == {
@@ -286,7 +286,7 @@ def test_whatsapp(cans):
     debug = False
     for msm_n, msm in load_can(can):
         rid = msm["report_id"]
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         if rid == "20190830T002828Z_AS209_fDHPMTveZ66kGmktmW8JiGDgqAJRivgmBkZjAVRmFbH92OIlTX":
             # empty test_keys -> requests
             log.error(scores)
@@ -330,7 +330,7 @@ def test_whatsapp_probe_bug(cans):
     # https://github.com/ooni/probe-engine/issues/341
     debug = False
     for can_fn, msm in s3msmts("whatsapp", date(2020, 1, 1), date(2020, 1, 10)):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         assert scores["blocking_general"] in (0.0, 1.0)
         if "analysis" in scores:
             assert scores["analysis"]["whatsapp_web_accessible"] in (True, False), ujson.dumps(
@@ -346,7 +346,7 @@ def test_facebook_messenger(cans):
     can = cans["facebook_messenger"]
     debug = False
     for msm_n, msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         if msm["report_id"] != "20190829T105137Z_AS6871_TJfyRlEkm6BaCfszHr06nC0c9UsWjWt8mCxRBw1jr0TeqcHTiC":
             continue
 
@@ -375,7 +375,7 @@ def test_facebook_messenger(cans):
 def test_facebook_messenger_bug(cans):
     can = cans["facebook_messenger"]
     for msm_n, msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         if msm["report_id"] != "20190829T000015Z_AS137_6FCvPkYvOAPUqKgO8QdllyWXTPXUbUAVV3cA43E6drE0KAe4iO":
             continue
 
@@ -393,7 +393,7 @@ def test_facebook_messenger_newer(cans):
     blocked_cnt = 0
     debug = False
     for msm_n, msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         rid = msm["report_id"]
 
         if rid == "20191029T101630Z_AS56040_bBOkNtg65fMfH0iOHiG8lMk4UmERxjfJL20ki33lKlyKjS0FkP":
@@ -436,7 +436,7 @@ def test_score_measurement_hhfm_large(cans):
         can = cans["hhfm_2019_10_{}".format(d)]
         for msm_n, msm in load_can(can):
             rid = msm["report_id"]
-            scores = fp.score_measurement(msm, [])
+            scores = fp.score_measurement(msm)
             if rid == "20191028T115649Z_AS28573_eIrzDM4njwMjxBi0ODrerI5N03zM7qQoCvl4xpapTccdW0kCRg":
                 # Missing the "requests" field
                 assert scores["blocking_general"] == 0, scores
@@ -499,7 +499,7 @@ def disabled_test_score_measurement_hhfm_stats(cans):
     s = Counter()  # failure type -> count
     for n, msm in enumerate(load_can(can)):
         rid = msm["report_id"]
-        # scores = fp.score_measurement(msm, [])
+        # scores = fp.score_measurement(msm)
         cc = msm["probe_cc"]
         fm = msm["test_keys"]["requests"][0].get("failure", "*************")
         if fm is None:
@@ -528,7 +528,7 @@ def test_score_vanilla_tor_2018(cans):
         "20181026T154843Z_AS57963_GKCdB85BgIqr5frZ2Z8qOXVZgdpNGajLRXSidMeRVWg8Qvto3e",
     )
     for msm_n, msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         rid = msm["report_id"]
         if rid in timeouts:
             # Real timeout
@@ -543,7 +543,7 @@ def test_score_vanilla_tor(cans):
     for d in range(26, 30):
         can = cans["tor_2019_10_{}".format(d)]
         for msm_n, msm in load_can(can):
-            scores = fp.score_measurement(msm, [])
+            scores = fp.score_measurement(msm)
             rid = msm["report_id"]
             cnt += 1
             if rid == "20191029T012425Z_AS45194_So00Y296Ve6q1TvjOtKqsvH1ieiVF566PlcUUOw4Ia37HGPwPL":
@@ -573,7 +573,7 @@ def test_score_tor():
     for can_fn, msm in s3msmts("tor", date(2020, 6, 1), date(2020, 6, 12)):
         assert msm["test_name"] == "tor"
         rid = msm["report_id"]
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         if rid == "20200601T000014Z_AS8339_RC9uUMBtq5AkMLx6xDtTxEciPvd171jQaYx1i3dDbhH27PemEx":
             assert scores == {
                 "blocking_general": 0.05714285714285714,
@@ -662,7 +662,7 @@ def test_score_web_connectivity_simple(cans):
     for can_fn, msm in s3msmts("web_connectivity", start_date=date(2019, 11, 1)):
         rid = msm["report_id"]
         inp = msm["input"]
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
 
         if (rid, inp) not in expected:
             # log.warning(f"https://explorer.ooni.org/measurement/{rid}?input={inp}")
@@ -764,7 +764,7 @@ def test_score_web_connectivity_with_workers(cans, tmp_path):
 def test_score_ndt(cans):
     can = cans["ndt_2018_10_26"]
     for msm_n, msm in load_can(can):
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         assert scores == {}  # no scoring yet
 
 
@@ -775,7 +775,7 @@ def test_score_tcp_connect(cans):
     for msm_n, msm in load_can(can):
         rid = msm["report_id"]
         inp = msm["input"]
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         if rid == "20181026T000102Z_AS51570_2EslrKCu0NhDQiCIheVDvilWchWShK6GTC7Go6i31VQrGfXRLM":
             if inp == "109.105.109.165:22":
                 # generic_timeout_error
@@ -855,7 +855,7 @@ def test_score_dash(cans):
             # input is not set or set to None
             assert msm.get("input", None) is None
             rid = msm["report_id"]
-            scores = fp.score_measurement(msm, [])
+            scores = fp.score_measurement(msm)
 
             if rid in expected:
                 exp_bs, exp_acc, exp_fail = expected[rid]
@@ -872,7 +872,7 @@ def test_score_meek_fronted_requests_test(cans):
         can = cans["meek_2019_10_{}".format(d)]
         for msm_n, msm in load_can(can):
             rid = msm["report_id"]
-            scores = fp.score_measurement(msm, [])
+            scores = fp.score_measurement(msm)
             if rid == "20191026T110224Z_AS3352_2Iqv4PvPItJ2Z3D46wVRHzesBpdDJZ8xDKH7VKqNTebaiGopDY":
                 # response: None
                 assert scores["blocking_general"] == 1.0
@@ -913,7 +913,7 @@ def test_score_psiphon(cans):
         assert len(msm["test_keys"]) in (3, 6, 7)
         assert 1 < msm["test_keys"]["bootstrap_time"] < 500
         assert msm["test_keys"]["failure"] is None, msm
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         if rid == "20200109T111813Z_AS30722_RZeO9Ix6ET2LJzqGcinrDp1iqrhaGGDCHSwlOoybq2N9kZITQt":
             assert scores == {
                 "accuracy": 1.0,
@@ -934,7 +934,7 @@ def test_score_http_invalid_request_line_1():
     with open(fn) as f:
         msm = ujson.load(f)
     matches = []
-    scores = fp.score_measurement(msm, [])
+    scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_general": 1.0,
         "blocking_global": 0.0,
@@ -951,7 +951,7 @@ def test_score_http_invalid_request_line_2():
     with open(fn) as f:
         msm = ujson.load(f)
     matches = []
-    scores = fp.score_measurement(msm, [])
+    scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_general": 1.0,
         "blocking_global": 0.0,
@@ -1003,7 +1003,7 @@ def test_score_http_invalid_request_line():
             assert k in allkeys
         for k in always_present:
             assert k in msm
-        scores = fp.score_measurement(msm, [])
+        scores = fp.score_measurement(msm)
         rid = msm["report_id"]
         if rid == "20191203T020321Z_AS21502_wcb1ieBo7mO2vffn2FOlQW2oPw4QiaOoLiYGWoecyV5aQQaMGm":
             # failure

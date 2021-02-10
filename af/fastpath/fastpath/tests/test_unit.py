@@ -66,8 +66,7 @@ def test_score_measurement_simple():
         "probe_cc": "IE",
         "test_keys": {},
     }
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "accuracy": 0.0,
         "blocking_general": 0.0,
@@ -85,8 +84,7 @@ def test_score_tor():
     fn = "fastpath/tests/data/tor.json"
     with open(fn) as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_general": 0.0,
         "blocking_global": 0.0,
@@ -104,8 +102,7 @@ def test_score_meek():
     fn = "fastpath/tests/data/meek.json"
     with open(fn) as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_country": 0.0,
         "blocking_general": 1.0,
@@ -120,8 +117,7 @@ def test_score_meek2():
     fn = "fastpath/tests/data/meek2.json"
     with open(fn) as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_country": 0.0,
         "blocking_general": 0.0,
@@ -138,8 +134,7 @@ def test_bug_backend351():
     # https://api.ooni.io/api/v1/measurement/temp-id-386770148
     with open("fastpath/tests/data/bug_351.json") as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_general": 1.0,
         "blocking_global": 0.0,
@@ -156,8 +151,7 @@ def test_bug_backend352():
     # https://explorer.ooni.org/measurement/20200302T130853Z_AS197207_WIN8WWfSysccyZSG06Z5AaMJjSzrvxaq7UOiTnasi52k9D77T3?input=https%3A%2F%2Ffa.wikipedia.org
     with open("fastpath/tests/data/bug_352.json") as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "analysis": {"blocking_type": "dns"},
         "blocking_general": 1.0,
@@ -175,8 +169,7 @@ def test_bug_requests_None():
     # TypeError: 'NoneType' object is not iterable
     with open("fastpath/tests/data/requests_none.json") as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "analysis": {"blocking_type": "dns"},
         "blocking_general": 1.0,
@@ -190,8 +183,7 @@ def test_bug_requests_None():
 def test_bug_test_keys_None():
     with open("fastpath/tests/data/test_keys_none.json") as f:
         msm = ujson.load(f)
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "accuracy": 0.0,
         "blocking_general": 0.0,
@@ -210,9 +202,10 @@ def test_bug_various_keys_missing():
         "report_id": "20210121T092829Z_webconnectivity_US_8075_n1_K8Vv8aSpoYfW3wqf",
         "test_name": "web_connectivity",
         "test_start_time": "2021-01-21 09:28:28",
+        "probe_cc": "US",
+        "test_keys": {}
     }
-    matches = []
-    scores = fp.score_measurement(msm, matches)
+    scores = fp.score_measurement(msm)
     assert scores == {
         "accuracy": 0.0,
         "blocking_general": 0.0,

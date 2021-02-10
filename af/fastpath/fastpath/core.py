@@ -835,6 +835,8 @@ def score_web_connectivity(msm, matches) -> dict:
     Returns a scores dict
     """
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
+    if len(matches):
+        scores["confirmed"] = True
     tk = msm.get("test_keys", None)
     if tk is None:
         logbug(9, "test_keys is None", msm)
@@ -1133,8 +1135,8 @@ def score_dns_consistency(msm) -> dict:
 
 
 @metrics.timer("score_measurement")
-def score_measurement(msm, matches) -> dict:
-    """Calculate measurement scoring. Returns a scores dict"""
+def score_measurement(msm: dict) -> dict:
+    """Calculates measurement scoring. Returns a scores dict"""
     # Blocking locality: global > country > ISP > local
     # unclassified locality is stored in "blocking_general"
 
@@ -1153,6 +1155,7 @@ def score_measurement(msm, matches) -> dict:
         if tn == "vanilla_tor":
             return score_vanilla_tor(msm)
         if tn == "web_connectivity":
+            matches = match_fingerprints(msm)
             return score_web_connectivity(msm, matches)
         if tn == "ndt":
             return score_ndt(msm)
@@ -1251,17 +1254,14 @@ def msm_processor(queue):
                     metrics.incr("discarded_measurement")
                     continue
 
-                if measurement.get("test_name", None) == "web_connectivity":
-                    matches = match_fingerprints(measurement)
-                else:
-                    matches = []
-                confirmed = bool(len(matches))
-                scores = score_measurement(measurement, matches)
+                scores = score_measurement(measurement)
                 # Generate anomaly, confirmed and failure to keep consistency
-                # with the pipeline, allowing simple queries in the API and
-                # in manual analysis and keep compatibility with Explorer
+                # with the legacy pipeline, allowing simple queries in the API
+                # and in manual analysis; also keep compatibility with Explorer
                 anomaly = scores.get("blocking_general", 0.0) > 0.5
                 failure = scores.get("accuracy", 1.0) < 0.5
+                confirmed = scores.get("confirmed", False)
+
                 if anomaly or failure or confirmed:
                     log.debug(
                         f"Storing {msmt_uid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
