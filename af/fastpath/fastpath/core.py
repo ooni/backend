@@ -1120,8 +1120,22 @@ def score_http_requests(msm) -> dict:
     """Calculates measurement scoring for legacy test http_requests
     Returns a scores dict
     """
-    # TODO: implement scoring
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    tk = msm.get("test_keys", {})
+    body_length_match = tk.get("body_length_match", None)
+    headers_match = tk.get("headers_match", None)
+    if body_length_match is None or headers_match is None:
+        scores["accuracy"] = 0.0
+        return scores
+
+    reachable = bool(body_length_match) and bool(headers_match)
+    if not reachable:
+        scores["blocking_general"] = 1.0
+
+    # match tk -> requests -> N -> tor -> is_tor
+
+
+
     return scores
 
 
