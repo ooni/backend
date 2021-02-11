@@ -226,7 +226,7 @@ def check_report_id():
               type: string
               description: version number of this response
             found:
-              type: bool
+              type: boolean
               description: True if found
             error:
               type: string

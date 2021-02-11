@@ -382,13 +382,13 @@ def get_measurement_meta():
           type: object
           properties:
             anomaly:
-              type: bool
+              type: boolean
             category_code:
               type: string
             confirmed:
-              type: bool
+              type: boolean
             failure:
-              type: bool
+              type: boolean
             input:
               type: string
             measurement_start_time:
