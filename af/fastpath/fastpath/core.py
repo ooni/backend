@@ -286,7 +286,7 @@ def match_fingerprints(measurement):
     zzfps = fingerprints["ZZ"]
     ccfps = fingerprints.get(msm_cc, {})
 
-    test_keys = measurement["test_keys"]
+    test_keys = measurement.get("test_keys", None)
     if test_keys is None:
         return []
 
@@ -1124,17 +1124,82 @@ def score_http_requests(msm) -> dict:
     tk = msm.get("test_keys", {})
     body_length_match = tk.get("body_length_match", None)
     headers_match = tk.get("headers_match", None)
-    if body_length_match is None or headers_match is None:
+    rid = msm.get("report_id", None)
+    inp = msm.get("input", None)
+    failed = msm.get("control_failure", None) or msm.get("experiment_failure", None)
+    if failed or body_length_match is None or headers_match is None:
         scores["accuracy"] = 0.0
+        log.debug(f"Incorrect measurement t1 {rid} {inp}")
         return scores
 
     reachable = bool(body_length_match) and bool(headers_match)
     if not reachable:
         scores["blocking_general"] = 1.0
 
-    # match tk -> requests -> N -> tor -> is_tor
+    zzfps = fingerprints["ZZ"]
+    msm_cc = msm.get("probe_cc", None)
+    ccfps = fingerprints.get(msm_cc, {})
 
+    # Scan for fingerprint matches in the HTTP body and the HTTP headers
+    # One request is from the probe and one is over Tor. If the latter
+    # is blocked the msmt is failed.
+    tk = msm.get("test_keys", {})
+    for r in tk.get("requests", []):
+        is_tor = r.get("request", {}).get("tor", {}).get("is_tor", None)
+        body = r.get("response", {}).get("body", None)
+        if is_tor is None or body is None:
+            scores["accuracy"] = 0.0
+            log.debug(f"Incorrect measurement t2 {rid} {inp}")
+            return scores
 
+        if isinstance(body, dict):
+            # TODO: is this needed?
+            if "data" in body and body.get("format", "") == "base64":
+                log.debug("Decoding base64 body")
+                body = b64decode(body["data"])
+
+            else:
+                logbug(2, "incorrect body of type dict", measurement)
+                body = None
+
+        for fp in zzfps["body_match"] + ccfps.get("body_match", []):
+            bm = fp["body_match"]
+            if isinstance(body, bytes):
+                idx = body.find(bm.encode())
+            else:
+                idx = body.find(bm)
+
+            if idx != -1:
+                if is_tor:
+                    scores["accuracy"] = 0.0
+                    log.debug(f"Failed measurement t1 {rid} {inp}")
+                    return scores
+                scores["confirmed"] = True
+                log.debug("matched body fp %s %r at pos %d", msm_cc, bm, idx)
+
+        # Match HTTP headers if found
+        headers = r.get("headers", {})
+        headers = {h.lower(): v for h, v in headers.items()}
+        for fp in zzfps["header_full"] + ccfps.get("header_full", []):
+            name = fp["header_name"]
+            if name in headers and headers[name] == fp["header_full"]:
+                if is_tor:
+                    scores["accuracy"] = 0.0
+                    log.debug(f"Failed measurement t2 {rid} {inp}")
+                    return scores
+                scores["confirmed"] = True
+                log.debug("matched header full fp %s %r", msm_cc, fp["header_full"])
+
+        for fp in zzfps["header_prefix"] + ccfps.get("header_prefix", []):
+            name = fp["header_name"]
+            prefix = fp["header_prefix"]
+            if name in headers and headers[name].startswith(prefix):
+                if is_tor:
+                    scores["accuracy"] = 0.0
+                    log.debug(f"Failed measurement {rid} {inp}")
+                    return scores
+                scores["confirmed"] = True
+                log.debug("matched header prefix %s %r", msm_cc, prefix)
 
     return scores
 
