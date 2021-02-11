@@ -31,7 +31,7 @@ curl http://127.0.0.1:5000/api/v1/measurements?since=2019-01-01&until=2019-02-01
 ```bash
 docker build -t ooniapi .
 
-docker run --name ooniapirun --rm -i -t ooniapi gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125 --reuse-port
+docker run --name ooniapirun --rm  --net=host -i -t ooniapi gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
 ```
 
 ### Running the tests
