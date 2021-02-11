@@ -46,7 +46,7 @@ def check_in():
     parameters:
       - in: body
         name: probe self-description
-        required: false
+        required: true
         schema:
           type: object
           properties:
