@@ -11,9 +11,7 @@ import re
 import string
 import uuid
 
-import ujson
 import yaml
-from yaml import CLoader
 
 
 log = logging.getLogger("normalize")
@@ -479,9 +477,6 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
 
 ### Stream entries from YAML.lz4 files ####
 
-import yaml
-from yaml import CLoader
-
 
 class BlobSlicerError(RuntimeError):
     pass
@@ -493,10 +488,6 @@ class BrokenFrameError(BlobSlicerError):
 
 class TruncatedReportError(BlobSlicerError):
     pass
-
-
-import functools
-import string
 
 
 def stream_yaml_blobs(fd):
