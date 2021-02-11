@@ -162,6 +162,24 @@ def test_score_meek2():
     }
 
 
+# # test_name http_requests
+
+def test_score_http_requests():
+    # failed
+    fn = "fastpath/tests/data/http_requests_1.json"
+    with open(fn) as f:
+        msm = ujson.load(f)
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "accuracy": 0.0,
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # Bug tests
 
 
