@@ -200,10 +200,14 @@ def list_test_urls():
           type: object
           properties:
             metadata:
-              count:
-                type: integer
+              type: object
+              properties:
+                count:
+                  type: integer
             results:
+              type: array
               items:
+                type: object
                 properties:
                   category_code:
                     type: string
