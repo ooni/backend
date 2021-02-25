@@ -1,0 +1,32 @@
+#!/bin/bash
+# Create a nspawn chroot/container using Debian Buster
+# Mount the current directory into /root
+# Run ./spawnrunner setup
+#
+# You can run quoted commands as
+# ./spawnrunner bash -c 'echo "hi" > myfile'
+#
+# Test run example:
+# ./spawnrunner pytest-3 tests/integ/test_probe_services.py  -v -x
+#
+set -eux
+# use full path, change this if needed
+RDIR=~/ooni-api-dir
+# Overlay dir that will contain test outputs and caches
+OUTDIR=/tmp/out
+
+ch () {
+  sudo systemd-nspawn -q -D $RDIR \
+    --no-new-privileges=on \
+    --overlay "$(pwd):$OUTDIR:/root" \
+    --chdir=/root \
+    -- $@
+}
+
+mkdir -p $OUTDIR
+if [ ! -d $RDIR ]; then
+  sudo debootstrap buster $RDIR
+  ./spawnrunner ./build_runner.sh
+  #ch tox -e integ -vvv
+fi
+ch "$@"

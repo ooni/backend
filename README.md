@@ -34,6 +34,20 @@ docker build -t ooniapi .
 docker run --name ooniapirun --rm  --net=host -i -t ooniapi gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
 ```
 
+### Running The API using systemd-nspawn
+
+```bash
+cd newapi
+./spawnrunner gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
+```
+
+### Running tests using systemd-nspawn
+
+```bash
+cd newapi
+./spawnrunner pytest-3 tests/integ/test_probe_services.py
+```
+
 ### Running the tests
 
 Run the integration tests:
