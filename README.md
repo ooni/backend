@@ -66,7 +66,7 @@ Clone the API repository.
 Set up a local database or a port forwarding.
 
 ```bash
-ssh amsmetadb.ooni.nu  -L 0.0.0.0:15432:127.0.0.1:5432 -Snone -g -C
+ssh amsmetadb.ooni.nu  -L 0.0.0.0:5432:127.0.0.1:5432 -Snone -g -C
 ```
 
 Create a new test in tests/integ/test_integration.py and run it with:

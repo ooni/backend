@@ -43,6 +43,10 @@ def generate_report_id(test_name, cc: str, asn_i: int) -> str:
 def check_in():
     """Probe Services: check-in. Probes ask for tests to be run
     ---
+    produces:
+      - application/json
+    consumes:
+      - application/json
     parameters:
       - in: body
         name: probe self-description
@@ -92,26 +96,37 @@ def check_in():
       '200':
         description: Give a URL test list to a probe running web_connectivity
           tests; additional data for other tests;
-        content:
-          application/json:
-            schema:
+        schema:
+          type: object
+          properties:
+            v:
+              type: integer
+            probe_cc:
+              type: string
+              description: probe CC inferred from GeoIP or None
+            probe_asn:
+              type: string
+              description: probe ASN inferred from GeoIP or None
+            tests:
               type: object
               properties:
-                v:
-                  type: int
-                probe_cc:
-                  type: string
-                  description: probe CC inferred from GeoIP or None
-                probe_asn:
-                  type: string
-                  description: probe ASN inferred from GeoIP or None
-                tests:
+                web_connectivity:
                   type: object
                   properties:
-                    web_connectivity:
-                      type: object
-                      report_id:
-                        type: string
+                    report_id:
+                      type: string
+                    urls:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          category_code:
+                            type: string
+                          country_code:
+                            type: string
+                          url:
+                            type: string
+
     """
 
     # TODO: Implement throttling
@@ -219,25 +234,19 @@ def list_collectors():
 def list_test_helpers():
     """Probe Services: List test helpers
     ---
+    produces:
+      - application/json
     responses:
       200:
         description: A single user item
         schema:
           type: object
-          properties:
-            dns:
-              type: object
-            http-return-json-headers:
-              type: object
-            ssl:
-              type: object
-            tcp-echo:
-              type: object
-            traceroute:
-              type: object
-            web-connectivity:
-              type: object
     """
+    # TODO(bassosimone): document in the above Swagger the returned
+    # type once ooni/probe-cli can handle them okay. Currently, we
+    # have code assuming a generic dictionary and we'd like to merge
+    # https://github.com/ooni/probe-cli/pull/234 _before_ engaging
+    # in further refactoring for correctness.
     j = {
         "dns": [
             {"address": "37.218.241.93:57004", "type": "legacy"},
@@ -387,6 +396,10 @@ def bouncer_net_tests():
 def open_report():
     """Probe Services: Open report
     ---
+    produces:
+      - application/json
+    consumes:
+      - application/json
     parameters:
       - in: body
         name: open report data
@@ -415,19 +428,17 @@ def open_report():
     responses:
       '200':
         description: Open report confirmation
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                backend_version:
-                  type: string
-                report_id:
-                  type: string
-                supported_formats:
-                  type: array
-                  items:
-                    type: string
+        schema:
+          type: object
+          properties:
+            backend_version:
+              type: string
+            report_id:
+              type: string
+            supported_formats:
+              type: array
+              items:
+                type: string
     """
     log = current_app.logger
 
@@ -460,6 +471,10 @@ def open_report():
 def receive_measurement(report_id):
     """Probe Services: Submit measurement
     ---
+    produces:
+      - application/json
+    consumes:
+      - application/json
     parameters:
       - name: report_id
         in: path
@@ -467,6 +482,16 @@ def receive_measurement(report_id):
         type: string
         minLength: 10
         required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            content:
+              type: object
+            format:
+              type: string
+          type: object
     responses:
       200:
         description: Acknowledge

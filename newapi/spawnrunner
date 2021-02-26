@@ -18,6 +18,7 @@ OUTDIR=/tmp/out
 ch () {
   sudo systemd-nspawn -q -D $RDIR \
     --no-new-privileges=on \
+    --drop-capability=all \
     --overlay "$(pwd):$OUTDIR:/root" \
     --chdir=/root \
     -- $@

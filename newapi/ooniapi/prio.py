@@ -180,6 +180,8 @@ def list_test_urls():
     """Generate test URL list with prioritization
     https://orchestrate.ooni.io/api/v1/test-list/urls?country_code=IT
     ---
+    produces:
+      - application/json
     parameters:
       - name: country_code
         in: query

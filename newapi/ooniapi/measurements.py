@@ -358,6 +358,8 @@ def get_raw_measurement():
 def get_measurement_meta():
     """Get metadata on one measurement by measurement_id + input
     ---
+    produces:
+      - application/json
     parameters:
       - name: report_id
         in: query

@@ -208,6 +208,8 @@ def check_report_id():
     """Check if a report_id exists in the fastpath table
     Used by https://github.com/ooni/probe/issues/1034
     ---
+    produces:
+      - application/json
     parameters:
       - name: report_id
         in: query
@@ -223,7 +225,7 @@ def check_report_id():
           type: object
           properties:
             v:
-              type: string
+              type: integer
               description: version number of this response
             found:
               type: boolean
