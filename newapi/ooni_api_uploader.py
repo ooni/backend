@@ -13,7 +13,6 @@ import tarfile
 import yaml
 
 import ujson
-from systemd.journal import JournalHandler  # debdeps: python3-systemd
 import boto3
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import execute_values
@@ -21,7 +20,13 @@ import statsd  # debdeps: python3-statsd
 
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="ooni_api_uploader")
 log = logging.getLogger("ooni_api_uploader")
-log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni_api_uploader"))
+
+try:
+    from systemd.journal import JournalHandler  # debdeps: python3-systemd
+    log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni_api_uploader"))
+except ImportError:
+    pass
+
 log.setLevel(logging.DEBUG)
 
 
