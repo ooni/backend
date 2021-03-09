@@ -1072,6 +1072,10 @@ def get_aggregated():
         where.append(sql.text("domain = :domain"))
         query_params["domain"] = domain
 
+    if input:
+        where.append(sql.text("input = :input"))
+        query_params["input"] = input
+
     if category_code:
         # Join in citizenlab table and filter by category_code
         table = table.join(
