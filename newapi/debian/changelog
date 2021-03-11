@@ -1,3 +1,9 @@
+ooni-api (0.22) unstable; urgency=medium
+
+  * Fix aggregation input filter
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Mar 2021 13:51:02 +0000
+
 ooni-api (0.21) unstable; urgency=medium
 
   * Improve API docs

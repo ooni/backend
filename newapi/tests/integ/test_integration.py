@@ -8,7 +8,7 @@ Lint using:
     black -t py37 -l 100 --fast ooniapi/tests/integ/test_integration.py
 
 Test using:
-    tox -e integ -- -s --show-capture=no -k test_aggregation
+    pytest-3 -k test_aggregation
 """
 
 from datetime import datetime, timedelta
@@ -1601,3 +1601,16 @@ def test_aggregation_tor(client):
 def test_aggregation_test_name(client):
     r = client.get(f"/api/v1/aggregation?test_name=BOGUS")
     assert r.status_code == 400
+
+
+def test_aggregation_input(client):
+    url = "aggregation?since=2020-01-01&until=2020-01-03&input=https://ccc.de/"
+    r = api(client, url)
+    assert r == {
+        "dimension_count": 0, "result": {
+            "anomaly_count": 23,
+            "confirmed_count": 0,
+            "failure_count": 21,
+            "measurement_count": 319
+        }, "v": 0
+    }
