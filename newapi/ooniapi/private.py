@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta
 
 from urllib.parse import urljoin, urlencode
 
+import logging
 import math
 
 from flask import Blueprint, current_app, request, abort
@@ -30,6 +31,7 @@ api_private_blueprint = Blueprint("api_private", "measurements")
 
 # TODO: configure tags for HTTP caching across where useful
 
+log = logging.getLogger()
 
 def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
