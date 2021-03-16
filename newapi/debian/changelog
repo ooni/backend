@@ -1,3 +1,9 @@
+ooni-api (0.23) unstable; urgency=medium
+
+  * Fix undefined log call in private API endpoint
+
+ -- Arturo Filasto <arturo@openobservatory.org>  Tue, 16 Mar 2021 14:38:02 +0000
+
 ooni-api (0.22) unstable; urgency=medium
 
   * Fix aggregation input filter
