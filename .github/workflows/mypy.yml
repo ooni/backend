@@ -1,0 +1,32 @@
+name: Mypy test
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: debian:10
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - name: Setup APT
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y ca-certificates
+          rm -f /etc/apt/sources.list.d/*
+          cat <<EOF | tee /etc/apt/sources.list
+          deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main
+          deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
+          deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
+          deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
+          deb [trusted=yes] http://deb.debian.org/debian-security/ buster/updates main contrib non-free
+          EOF
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y mypy
+
+      - name: Run tests
+        run: cd newapi && mypy --ignore-missing-imports **/*.py

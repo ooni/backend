@@ -680,11 +680,11 @@ def test_list_measurements_shared(client, shared_rid_input, log):
 
 # category_code support: briefly tested by adding this to
 # measurements/openapi/measurements.yml
-# - name: category_code
-#   in: query
-#   type: string
-#   minLength: 3
-#   description: The category code to search measurements for
+## - name: category_code
+##   in: query
+##   type: string
+##   minLength: 3
+##   description: The category code to search measurements for
 #
 # def test_list_measurements_category_code(app, client):
 #     p = "measurements?category_code=HACK&since=2019-12-8&until=2019-12-11&limit=50"
@@ -1492,7 +1492,7 @@ def test_aggregation_x_axis_y_axis_domain(client, log):
     }, fjd(r)
 
 
-def test_aggregation_x_axis_only_csv(client, log):
+def test_aggregation_x_axis_only_csv_2d(client, log):
     # 2-dimensional data: day vs ASN
     url = "aggregation?probe_cc=DE&domain=twitter.com&since=2020-01-01&until=2020-01-03&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
     r = api(client, url)

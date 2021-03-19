@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date
 from dateutil.parser import parse as parse_date
 from io import StringIO
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 import gzip
 import http.client
 import json
@@ -216,7 +217,7 @@ def _unwrap_post(post: dict) -> dict:
     raise Exception("Unexpected format")
 
 
-def _fetch_measurement_body_on_disk(report_id, input: str) -> bytes:
+def _fetch_measurement_body_on_disk(report_id, input: str) -> Optional[bytes]:
     """Fetch raw POST from disk, extract msmt
     This is used only for msmts that have been processed by the fastpath
     but are not uploaded to S3 yet.
@@ -254,10 +255,10 @@ def _fetch_measurement_body_on_disk(report_id, input: str) -> bytes:
     except FileNotFoundError:
         return None
     body = _unwrap_post(post)
-    return ujson.dumps(body)
+    return ujson.dumps(body).encode()
 
 
-def _fetch_autoclaved_measurement_body(report_id: str, input) -> dict:
+def _fetch_autoclaved_measurement_body(report_id: str, input) -> Optional[bytes]:
     """fetch the measurement body using autoclavedlookup"""
     # uses_pg_index autoclavedlookup_idx
     # None/NULL input needs to be is treated as ""
@@ -288,7 +289,7 @@ def _fetch_autoclaved_measurement_body(report_id: str, input) -> dict:
     return body
 
 
-def _fetch_measurement_body(report_id, input: str) -> bytes:
+def _fetch_measurement_body(report_id, input: str) -> Optional[bytes]:
     """Fetch measurement body from either disk, jsonl or autoclaved on S3"""
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")

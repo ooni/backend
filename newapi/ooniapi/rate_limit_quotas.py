@@ -18,7 +18,7 @@ Also provides a connector for Flask
 
 import time
 import ipaddress
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Set
 
 from ooniapi.config import metrics
 
@@ -52,9 +52,9 @@ class Limiter:
         self._token_check_callback = token_check_callback
         self._ipaddr_extraction_methods = ipaddr_methods
         self._last_quota_update_time = time.monotonic()
-        self._whitelisted_ipaddrs = set()
-        self._unmetered_pages_globs = set()
-        self._unmetered_pages = set()
+        self._whitelisted_ipaddrs: Set[IpAddress] = set()
+        self._unmetered_pages_globs: Set[IpAddress] = set()
+        self._unmetered_pages: Set[IpAddress] = set()
         for p in unmetered_pages:
             if p.endswith("*"):
                 self._unmetered_pages_globs.add(p.rstrip("*"))
