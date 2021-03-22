@@ -226,6 +226,7 @@ def _fetch_measurement_body_on_disk(report_id, input: str) -> Optional[bytes]:
     query = """SELECT measurement_uid
     FROM fastpath
     WHERE report_id = :report_id
+    AND measurement_uid LIKE '20%'
     """
     if input is None:
         query += " AND input IS NULL"

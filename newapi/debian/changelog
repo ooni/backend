@@ -1,3 +1,9 @@
+ooni-api (0.24) unstable; urgency=medium
+
+  * Pick the right msmt in _fetch_measurement_body_on_disk
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 19 Mar 2021 18:21:20 +0100
+
 ooni-api (0.23) unstable; urgency=medium
 
   * Fix undefined log call in private API endpoint
