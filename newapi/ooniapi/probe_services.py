@@ -134,9 +134,19 @@ def check_in():
     data = req_json()
     probe_cc = data.get("probe_cc", "ZZ").upper()
     asn = data.get("probe_asn", "AS0")
-    # run_type = data.get("run_type", "timed")
+    run_type = data.get("run_type", "timed")
     charging = data.get("charging", True)
-    url_limit = 100 if charging else 20
+
+    # When the run_type is manual we want to preserve the
+    # old behavior where we test the whole list. Otherwise,
+    # we're running in the background and we don't want
+    # too many URLs, in particular when running on battery.
+    if run_type == "manual":
+        url_limit = 9999 # same as prio.py
+    elif charging:
+        url_limit = 100
+    else:
+        url_limit = 20
 
     if "web_connectivity" not in data:
         category_codes = ()
