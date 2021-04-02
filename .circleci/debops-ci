@@ -92,7 +92,8 @@ def detect_changed_packages() -> List[Path]:
     that have been changed in the current branch
     """
     DCH = "debian/changelog"
-    commit = run2("git merge-base master HEAD")
+    # TODO: find a cleaner method:
+    commit = run2("git merge-base remotes/origin/master HEAD")
     changes = run2(f"git diff --name-only {commit}")
     pkgs = set()
     for c in changes.splitlines():
