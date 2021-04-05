@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 
 TEST_GROUPS = {
     "websites": ["web_connectivity"],
-    "im": ["facebook_messenger", "telegram", "whatsapp"],
+    "im": ["facebook_messenger", "signal", "telegram", "whatsapp"],
     "middlebox": ["http_invalid_request_line", "http_header_field_manipulation"],
     "performance": ["ndt", "dash"],
     "circumvention": [

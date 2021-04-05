@@ -533,27 +533,28 @@ def list_measurements():
         type: string
         description: The name of the test
         enum:
-        - web_connectivity
-        - http_requests
-        - dns_consistency
-        - http_invalid_request_line
         - bridge_reachability
-        - tcp_connect
+        - dash
+        - dns_consistency
+        - dnscheck
+        - facebook_messenger
         - http_header_field_manipulation
         - http_host
-        - multi_protocol_traceroute
+        - http_invalid_request_line
+        - http_requests
         - meek_fronted_requests_test
-        - whatsapp
-        - vanilla_tor
-        - facebook_messenger
+        - multi_protocol_traceroute
         - ndt
-        - dash
-        - telegram
         - psiphon
-        - tor
         - riseupvpn
-        - dnscheck
+        - signal
+        - tcp_connect
+        - telegram
+        - tor
         - urlgetter
+        - vanilla_tor
+        - web_connectivity
+        - whatsapp
       - name: since
         in: query
         type: string
@@ -648,7 +649,7 @@ def list_measurements():
     test_name = param("test_name")
     since = param("since")
     until = param("until")
-    since_index = param("since_index")
+    since_index = param("since_index")  # unused
     order_by = param("order_by")
     order = param("order", "desc")
     offset = int(param("offset", 0))
@@ -983,27 +984,28 @@ def get_aggregated():
         type: string
         description: The name of the test
         enum:
-        - web_connectivity
-        - http_requests
-        - dns_consistency
-        - http_invalid_request_line
         - bridge_reachability
-        - tcp_connect
+        - dash
+        - dns_consistency
+        - dnscheck
+        - facebook_messenger
         - http_header_field_manipulation
         - http_host
-        - multi_protocol_traceroute
+        - http_invalid_request_line
+        - http_requests
         - meek_fronted_requests_test
-        - whatsapp
-        - vanilla_tor
-        - facebook_messenger
+        - multi_protocol_traceroute
         - ndt
-        - dash
-        - telegram
         - psiphon
-        - tor
         - riseupvpn
-        - dnscheck
+        - signal
+        - tcp_connect
+        - telegram
+        - tor
         - urlgetter
+        - vanilla_tor
+        - web_connectivity
+        - whatsapp
       - name: since
         in: query
         type: string

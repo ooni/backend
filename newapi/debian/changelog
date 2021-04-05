@@ -1,3 +1,9 @@
+ooni-api (0.25) unstable; urgency=medium
+
+  * Support Signal test
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 05 Apr 2021 19:23:24 +0100
+
 ooni-api (0.24) unstable; urgency=medium
 
   * Pick the right msmt in _fetch_measurement_body_on_disk

@@ -143,7 +143,7 @@ def api_private_countries_by_month():
 
 @api_private_blueprint.route("/test_names", methods=["GET"])
 def api_private_test_names():
-    """TODO
+    """Provides test names and descriptions to Explorer
     ---
     responses:
       '200':
@@ -153,6 +153,7 @@ def api_private_test_names():
         "bridge_reachability": "Bridge Reachability",
         "dash": "DASH",
         "dns_consistency": "DNS Consistency",
+        "dnscheck": "DNS Check",
         "facebook_messenger": "Facebook Messenger",
         "http_header_field_manipulation": "HTTP Header Field Manipulation",
         "http_host": "HTTP Host",
@@ -162,15 +163,15 @@ def api_private_test_names():
         "multi_protocol_traceroute": "Multi Protocol Traceroute",
         "ndt": "NDT",
         "psiphon": "Psiphon",
+        "riseupvpn": "RiseupVPN",
+        "signal": "Signal",
         "tcp_connect": "TCP Connect",
         "telegram": "Telegram",
         "tor": "Tor",
+        "urlgetter": "URL Getter",
         "vanilla_tor": "Vanilla Tor",
         "web_connectivity": "Web Connectivity",
         "whatsapp": "WhatsApp",
-        "riseupvpn": "RiseupVPN",
-        "dnscheck": "DNS Check",
-        "urlgetter": "URL Getter",
     }
     test_names = [{"id": k, "name": v} for k, v in TEST_NAMES.items()]
     return cachedjson(1, test_names=test_names)
