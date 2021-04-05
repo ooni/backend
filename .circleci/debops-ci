@@ -345,6 +345,7 @@ class S3:
 
     def init_archive(self, conf):
         """Initialize the archive"""
+        assert conf.bucket_name
         r, o = runc(f"s3cmd mb s3://{conf.bucket_name}")
         if r == 0:
             print("Bucket created")
@@ -465,6 +466,7 @@ class S3:
         runc(f"{put} {debfn} {baseuri}/main/binary-{conf.arch}/")
 
     def upload(self, debfn, conf, reponame):
+        assert conf.bucket_name
         tmpdir = Path(mkdtemp(prefix="debops-ci"))
 
         # --acl-public --no-progress
