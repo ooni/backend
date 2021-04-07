@@ -31,7 +31,8 @@ jobs:
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE
-          ./.circleci/debops-ci --show-commands ci --bucket-name federico-debpkg-test
+          # AWS user debci-s3
+          ./.circleci/debops-ci --show-commands ci --bucket-name ooni-debpkg-test
         env:
           DEB_GPG_KEY: ${{ secrets.DEB_GPG_KEY }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

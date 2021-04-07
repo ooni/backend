@@ -17,7 +17,7 @@ ci                - detect CircleCI PRs, build and upload packages
 delete_from_archive <filename> - delete filename from archive
 
 Features:
- - Implent CI/CD workflow using package archives
+ - Implement CI/CD workflow using package archives
  - Support adding packages to an existing S3 archive without requiring a
    local mirror
  - Support multiple packages in the same git repository
@@ -152,8 +152,17 @@ def _set_pkg_version_from_circleci(p, ver):
 
 
 def _set_pkg_version_from_github_actions(p, ver):
+    """When running in GitHub Actions, access env vars to set
+    the package version"""
     # FIXME
-    print(getenv("GITHUB_EVENT_PATH"))
+    print("Running in GitHub Actions")
+    gh_event_path = getenv("GITHUB_EVENT_PATH")
+    gh_ref = getenv("GITHUB_REF")
+    gh_run_number = getenv("GITHUB_RUN_NUMBER")
+    print(f"Event path: {gh_event_path} Ref: {gh_ref} Run #: {gh_run_number}")
+
+    return
+
     comp = trim_compare(getenv("CIRCLE_COMPARE_URL", ""))  # show changes in VCS
     if not comp:
         # https://discuss.circleci.com/t/circle-compare-url-is-empty/24549/8
@@ -226,7 +235,7 @@ def setup_gpg_key(keyfp, tmpdir):
         sys.exit(1)
 
     if "DEB_GPG_KEY" in os.environ:
-        gpg = gnupg.GPG(gnupghome=tmpdir)
+        gpg = gnupg.GPG(gnupghome=tmpdir.as_posix())
         import_result = gpg.import_keys(os.getenv("DEB_GPG_KEY"))
         assert import_result.count == 1
         fp = import_result.fingerprints[0]
@@ -284,6 +293,22 @@ def build() -> None:
     for pli in pkgs_lists:
         for p in pli:
             print(p)
+
+
+class DuplicatePkgError(Exception):
+    pass
+
+
+def check_duplicate_package(pkgblock, packages_text):
+    li = pkgblock.splitlines()
+    assert li[0].startswith("Package: "), li
+    pname = li[0].split(" ", 1)[1]
+    assert li[1].startswith("Version: "), li
+    pver = li[1].split(" ", 1)[1]
+
+    m = f"Package: {pname}\nVersion: {pver}"
+    if m in packages_text:
+        raise DuplicatePkgError()
 
 
 class Bintray:
@@ -435,6 +460,9 @@ class S3:
         # assert r == 0
         debfn = "fastpath_0.3_all.deb"
 
+        # Check for already uploaded package
+        check_duplicate_package(pkgblock, packages.read_text())
+
         # Append, then read whole file back
         with packages.open("a") as f:
             f.write(pkgblock)
@@ -450,13 +478,13 @@ class S3:
         rfdata = self.generate_release_file(conf, packagesf_sha, packagesf_size)
         # print(rfdata)
         release.write_text(rfdata)
-        #r, o = runc(f"gpg -a -s --clearsign -o {inrelease} {release}")
-        #if r != 0:
+        # r, o = runc(f"gpg -a -s --clearsign -o {inrelease} {release}")
+        # if r != 0:
         #    self.unlock(baseuri)
         #    print("Error during GPG signature")
         #    sys.exit(1)
         sig = gpg.sign(release.read_text(), keyid=gpgkeyfp)
-        assert sig.status == 'signature created'
+        assert sig.status == "signature created"
         inrelease.write_bytes(sig.data)
 
         # Upload InRelease and Packages
@@ -490,6 +518,9 @@ class S3:
 
         try:
             self._inner_upload(tmpdir, baseuri, pkgblock, gpg, gpgkeyfp)
+        except DuplicatePkgError:
+            print(f"Error: {debfn} is already in the archive. Not uploading.")
+            sys.exit(1)  # the unlock in the finally block is still executed
         finally:
             self.unlock(baseuri)
 
@@ -498,7 +529,6 @@ class S3:
     #  upload Packages.gz
     #  rm Packages.gz
 
-# TODO: prevent duplicate packages
 
 def main():
     global conf
