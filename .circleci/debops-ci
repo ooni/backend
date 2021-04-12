@@ -70,6 +70,10 @@ def run2(cmd, **kw):
         print(f"Running {cmd}\nKW: {kw}")
     p = run(cmd.split(), capture_output=True, **kw)
     if p.returncode != 0:
+        stdout = p.stdout.decode().strip()
+        print(f"--stdout--\n{stdout}\n----\n")
+        stderr = p.stderr.decode().strip()
+        print(f"--stderr--\n{stderr}\n----\n")
         raise Exception(f"'{cmd}' returned: {p.returncode}")
     return p.stdout.decode().strip()
 
@@ -168,20 +172,26 @@ def _set_pkg_version_from_github_actions(p, ver):
     comp = ""
     if pr_num is None:
         if gh_ref.endswith("/master"):
-            # not a PR
-            run2(f"dch -b -v {ver} {comp}", cwd=p)
-            run2(f"dch -r {ver} {comp}", cwd=p)
+            print(f"GitHub release build detected - using version {ver}")
+            run2(f"dch -b -v {ver} ''", cwd=p)
+            run2(f"dch --release ''", cwd=p)
             ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
             assert ver == ver2, ver + " <--> " + ver2
+            return True
+
+        else:
+            print("Not a PR or release build. Skipping.")
+            return False
 
     else:
         # This is a PR: build ~pr<N>-<N> version.
         ver = f"{ver}~pr{pr_num}-{gh_run_number}"
         print(f"GitHub Pull Request detected - using version {ver}")
-        run2(f"dch -b -v {ver} {comp}", cwd=p)
-        run2(f"dch -r {ver} {comp}", cwd=p)
+        run2(f"dch -b -v {ver} ''", cwd=p)
+        run2(f"dch --release ''", cwd=p)
         ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
         assert ver == ver2, ver + " <--> " + ver2
+        return True
 
 
 def buildpkg(p) -> List[Path]:
@@ -190,13 +200,17 @@ def buildpkg(p) -> List[Path]:
     ver = run2("dpkg-parsechangelog --show-field Version", cwd=p)
     assert ver, f"No version number found in {p}/debian/changelog"
     sudo = True
+    should_build = False
     if getenv("CIRCLECI"):
         # Running in CircleCI
         sudo = False
         _set_pkg_version_from_circleci(p, ver)
     elif getenv("GITHUB_EVENT_PATH"):
         sudo = False
-        _set_pkg_version_from_github_actions(p, ver)
+        should_build = _set_pkg_version_from_github_actions(p, ver)
+
+    if not should_build:
+        return []
 
     runi("apt-get build-dep -qy --no-install-recommends .", p, sudo=sudo)
     runi("fakeroot debian/rules build", p)
