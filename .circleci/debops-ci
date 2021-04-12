@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2021 Federico Ceratto <federico@openobservatory.org>
-#                                      <federico@debian.org>
-# Released under GPLv3 license
-
 """
 Builds deb packages and uploads them to S3-compatible storage or bintray.
 Works locally and on GitHub Actions and CircleCI
@@ -180,7 +176,7 @@ def _set_pkg_version_from_github_actions(p, ver):
             return True
 
         else:
-            print("Not a PR or release build. Skipping.")
+            print("Not a PR or release build. Skipping.")  # run by "on: push"
             return False
 
     else:
@@ -282,13 +278,10 @@ def ci(args) -> None:
     run2("apt-get install -qy --no-install-recommends devscripts")
 
     pkgs_lists = [buildpkg(pd) for pd in pkgdirs]
+    print(f"Processing {pkgs_lists}")
     for pli in pkgs_lists:
         for p in pli:
-            # Upload all builds to the test repository
-            # and master builds to master repository
-            backend.upload(p, args, DEFAULT_PR_REPO)
-            if not getenv("CIRCLE_PULL_REQUEST"):
-                backend.upload(p, args, DEFAULT_MASTER_REPO)
+            backend.upload(p, args)
 
 
 def build() -> None:
@@ -324,8 +317,9 @@ class Bintray:
         self._btuser = getenv("BINTRAY_USERNAME")
         assert self._btuser, "Missing BINTRAY_USERNAME"
 
-    def upload(self, fi, args, repo) -> None:
+    def upload(self, fi, args) -> None:
         """Upload to Bintray"""
+        # FIXME: specify repo
         assert repo, "Please specify a repository"
         assert fi.is_file()
         pname, pver, arch = fi.name.split("_")
@@ -403,7 +397,7 @@ class S3:
         tf = NamedTemporaryFile()
         # put = "s3cmd --acl-public --guess-mime-type --no-progress put"
         put = "s3cmd --guess-mime-type --no-progress put"
-        r2, o = runc(f"{put} --no-progress {tf.name} {baseuri}/.debrepos3.lock")
+        r2, o = runc(f"{put} {tf.name} {baseuri}/.debrepos3.lock")
         assert r2 == 0, repr(o)
 
         # Create empty InRelease
@@ -458,13 +452,11 @@ class S3:
 
         return "\n".join(out) + "\n"
 
-    def _inner_upload(self, tmpdir, baseuri, pkgblock: str, gpg, gpgkeyfp):
+    def _inner_upload(self, debfn, tmpdir, baseuri, pkgblock: str, gpg, gpgkeyfp):
         # Fetch existing Packages file
         packages = tmpdir / "Packages"
         uri = f"{baseuri}/main/binary-{conf.arch}/Packages {packages}"
-        r, o = runc(f"s3cmd --no-progress get {uri}")
-        # assert r == 0
-        debfn = "fastpath_0.3_all.deb"
+        run2(f"s3cmd --no-progress get {uri}")
 
         # Check for already uploaded package
         check_duplicate_package(pkgblock, packages.read_text())
@@ -495,23 +487,14 @@ class S3:
 
         # Upload InRelease and Packages
         put = "s3cmd --acl-public --guess-mime-type --no-progress put"
-        runc(f"{put} {inrelease} {baseuri}/InRelease")
-        runc(f"{put} {packages} {baseuri}/main/binary-{conf.arch}/Packages")
-        runc(f"{put} {debfn} {baseuri}/main/binary-{conf.arch}/")
+        run2(f"{put} {inrelease} {baseuri}/InRelease")
+        run2(f"{put} {packages} {baseuri}/main/binary-{conf.arch}/Packages")
+        run2(f"{put} {debfn} {baseuri}/main/binary-{conf.arch}/")
 
-    def upload(self, debfn, conf, reponame):
+    def upload(self, debfn, conf):
         assert conf.bucket_name
         tmpdir = Path(mkdtemp(prefix="debops-ci"))
 
-        # --acl-public --no-progress
-        #  weburl=$(s3cmd ws-info s3://{conf.bucket_name} | awk '/^Website/ {print $3}' | sed 's/http:/https:/')
-        #  echo "sudo add-apt-repository $weburl" > index.html
-        #  upload index.html
-        #  rm index.html
-        #  echo "" | gzip > Packages.gz
-        #  upload Packages.gz
-        #  rm Packages.gz
-        # }
         self.init_archive(conf)
         baseuri = f"s3://{conf.bucket_name}/dists/{conf.distro}"
 
@@ -523,7 +506,7 @@ class S3:
         self.lock(conf, baseuri)
 
         try:
-            self._inner_upload(tmpdir, baseuri, pkgblock, gpg, gpgkeyfp)
+            self._inner_upload(debfn, tmpdir, baseuri, pkgblock, gpg, gpgkeyfp)
         except DuplicatePkgError:
             print(f"Error: {debfn} is already in the archive. Not uploading.")
             sys.exit(1)  # the unlock in the finally block is still executed
@@ -562,7 +545,7 @@ def main():
         # bk = Bintray()
         bk = S3()
         for fn in extra:
-            bk.upload(Path(fn), args, args.repo)
+            bk.upload(Path(fn), args)
     elif args.action == "delete_from_archive":
         # TODO select backend
         # bk = Bintray()
