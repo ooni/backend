@@ -154,42 +154,34 @@ def _set_pkg_version_from_circleci(p, ver):
 def _set_pkg_version_from_github_actions(p, ver):
     """When running in GitHub Actions, access env vars to set
     the package version"""
-    # FIXME
-    print("Running in GitHub Actions")
-    gh_event_path = getenv("GITHUB_EVENT_PATH")
+    # GITHUB_REF syntax: refs/heads/<branch-name> or refs/pull/<PR#>/merge
     gh_ref = getenv("GITHUB_REF")
-    gh_run_number = getenv("GITHUB_RUN_NUMBER")
-    print(f"Event path: {gh_event_path} Ref: {gh_ref} Run #: {gh_run_number}")
+    try:
+        pr_num = int(gh_ref.split("/")[2])
+    except ValueError:
+        pr_num = None
 
-    return
+    gh_run_number = int(getenv("GITHUB_RUN_NUMBER"))
+    print(f"GitHub Actions PR #: {pr_num} Run #: {gh_run_number}")
+    print("SHA " + getenv("GITHUB_SHA"))
 
-    comp = trim_compare(getenv("CIRCLE_COMPARE_URL", ""))  # show changes in VCS
-    if not comp:
-        # https://discuss.circleci.com/t/circle-compare-url-is-empty/24549/8
-        comp = getenv("CIRCLE_PULL_REQUEST")
-
-    if getenv("CIRCLE_PULL_REQUEST"):
-        # This is a PR: build ~pr<N>-<N> version. CIRCLE_PR_NUMBER is broken
-        pr_num = getenv("CIRCLE_PULL_REQUEST", "").rsplit("/", 1)[-1]
-        build_num = getenv("CIRCLE_BUILD_NUM")
-        ver = f"{ver}~pr{pr_num}-{build_num}"
-        print(f"CircleCI Pull Request detected - using version {ver}")
-        run2(f"dch -b -v {ver} {comp}", cwd=p)
-        run2(f"dch -r {ver} {comp}", cwd=p)
-        ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
-        assert ver == ver2, ver + " <--> " + ver2
-
-    elif getenv("CIRCLE_BRANCH") == "master":
-        # This is a build outside of a PR and in the mainline branch
-        print(f"CircleCI mainline build detected - using version {ver}")
-        run2(f"dch -b -v {ver} {comp}", cwd=p)
-        run2(f"dch -r {ver} {comp}", cwd=p)
-        ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
-        assert ver == ver2, ver + " <--> " + ver2
+    comp = ""
+    if pr_num is None:
+        if gh_ref.endswith("/master"):
+            # not a PR
+            run2(f"dch -b -v {ver} {comp}", cwd=p)
+            run2(f"dch -r {ver} {comp}", cwd=p)
+            ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
+            assert ver == ver2, ver + " <--> " + ver2
 
     else:
-        # This is a build for a new branch but without a PR: ignore it
-        return []
+        # This is a PR: build ~pr<N>-<N> version.
+        ver = f"{ver}~pr{pr_num}-{gh_run_number}"
+        print(f"GitHub Pull Request detected - using version {ver}")
+        run2(f"dch -b -v {ver} {comp}", cwd=p)
+        run2(f"dch -r {ver} {comp}", cwd=p)
+        ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
+        assert ver == ver2, ver + " <--> " + ver2
 
 
 def buildpkg(p) -> List[Path]:
