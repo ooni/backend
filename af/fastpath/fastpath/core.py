@@ -1217,14 +1217,19 @@ def score_signal(msm) -> dict:
     """Calculates measurement scoring for Signal test
     Returns a scores dict
     """
+    # https://github.com/ooni/spec/blob/master/nettests/ts-029-signal.md
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
     tk = msm.get("test_keys", {})
     if tk.get("failed_operation", True) or tk.get("failure", True):
         scores["accuracy"] = 0.0
 
-    for c in tk.get("tcp_connect", []):
-        if c.get("status", {}).get("success", False) == False:
-            scores["blocking_general"] = 1.0
+    st = tk.get("signal_backend_status")
+    if st == "ok":
+        pass
+    elif st == "blocked":
+        scores["blocking_general"] = 1.0
+    else:
+        scores["accuracy"] = 0.0
 
     return scores
 

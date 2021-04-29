@@ -1059,14 +1059,13 @@ def test_score_signal():
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
             }
+        elif rid == "20210427T013254Z_signal_KZ_48716_n1_kmaSopBo0V1ho8ni":
+            assert scores == {
+                "blocking_general": 1.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
         # No failure was found
-        #elif scores.get("accuracy", 1) < 0.5:
-        #    assert 0, rid
-        #    assert scores == {
-        #        "accuracy": 0.0,
-        #        "blocking_general": 1.0,
-        #        "blocking_global": 0.0,
-        #        "blocking_country": 0.0,
-        #        "blocking_isp": 0.0,
-        #        "blocking_local": 0.0,
-        #    }
+        #elif "accuracy" in scores:
