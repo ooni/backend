@@ -140,7 +140,7 @@ def list_cans_on_s3_for_a_day(s3, day: date):
     return files
 
 
-def list_minicans_on_s3_for_a_day(s3, day: date):
+def list_minicans_on_s3_for_a_day(s3, day: date) -> list:
     """List minicans."""
     # s3cmd ls s3://ooni-data-eu-fra/raw/20210202
     tstamp = day.strftime("%Y%m%d")

@@ -1213,6 +1213,22 @@ def score_dns_consistency(msm) -> dict:
     return scores
 
 
+def score_signal(msm) -> dict:
+    """Calculates measurement scoring for Signal test
+    Returns a scores dict
+    """
+    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    tk = msm.get("test_keys", {})
+    if tk.get("failed_operation", True) or tk.get("failure", True):
+        scores["accuracy"] = 0.0
+
+    for c in tk.get("tcp_connect", []):
+        if c.get("status", {}).get("success", False) == False:
+            scores["blocking_general"] = 1.0
+
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm: dict) -> dict:
     """Calculates measurement scoring. Returns a scores dict"""
@@ -1252,6 +1268,8 @@ def score_measurement(msm: dict) -> dict:
             return score_http_requests(msm)
         if tn == "dns_consistency":
             return score_dns_consistency(msm)
+        if tn == "signal":
+            return score_signal(msm)
 
         log.debug("Unsupported test name %s", tn)
         scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}

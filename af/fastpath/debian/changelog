@@ -1,3 +1,9 @@
+fastpath (0.38) unstable; urgency=medium
+
+  * Add Signal scoring
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 28 Apr 2021 22:42:26 +0100
+
 fastpath (0.36) unstable; urgency=medium
 
   * Support minicans and YAML

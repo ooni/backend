@@ -28,7 +28,7 @@ log = logging.getLogger()
 # aws_secret_access_key = ...
 #
 # Explore bucket from CLI:
-# AWS_PROFILE=ooni-data-private aws s3 ls s3://ooni-data-private/canned/2019-07-16/
+# s3cmd ls s3://ooni-data-eu-fra
 
 # TODO: drop the boto3 code and use only s3feeder
 BUCKET_NAME = "ooni-data"
@@ -134,6 +134,41 @@ def s3msmts(test_name, start_date=date(2018, 1, 1), end_date=date(2019, 11, 4)):
                 # https://github.com/ooni/probe-engine/pull/104
                 continue
             yield can_fname, msm
+
+
+def minicans(test_name, start_date: date, end_date: date, end=None):
+    """Fetches minicans from S3 and iterates over measurements.
+    Detect broken dloads.
+    """
+    s3 = s3feeder.create_s3_client()
+    day = start_date
+    file_cnt = 0
+    while day <= end_date:
+        li = s3feeder.list_minicans_on_s3_for_a_day(s3, day)
+        for s3fname, s3size in li:
+            ctn = test_name.replace("_", "")
+            if f"/{ctn}/2" not in s3fname:
+                continue  # skip unwanted test names
+
+            # s3fname: raw/20210426/23/YE/ndt/2021042623_YE_ndt.n0.0.tar.gz
+            local_file = Path("testdata") / "mini" / s3fname
+            in_cache = local_file.is_file() and (local_file.stat().st_size == s3size)
+            if not in_cache:
+                # Download minican
+                log.debug("Downloading can %s of size %d KB" % (s3fname, s3size / 1024))
+                local_file.parent.mkdir(parents=True, exist_ok=True)
+                with local_file.open("wb") as f:
+                    s3.download_fileobj(s3feeder.MC_BUCKET_NAME, s3fname, f)
+                assert s3size == local_file.stat().st_size
+
+            log.debug("Loading %s", s3fname)
+            for msm_jstr, msm, _ in s3feeder.load_multiple(local_file.as_posix()):
+                msm = msm or ujson.loads(msm_jstr)
+                yield local_file.as_posix(), msm
+
+            file_cnt += 1
+            if end is not None and file_cnt == end:
+                return
 
 
 def list_cans_on_s3_for_a_day(day, filter=None, bysize=False):
@@ -1008,3 +1043,30 @@ def test_score_http_invalid_request_line():
         if rid == "20191203T020321Z_AS21502_wcb1ieBo7mO2vffn2FOlQW2oPw4QiaOoLiYGWoecyV5aQQaMGm":
             # failure
             assert scores["accuracy"] == 0.0
+
+
+def test_score_signal():
+    for can_fn, msm in minicans("signal", date(2021, 4, 27), date(2021, 4, 27), 100):
+        assert msm["test_name"] == "signal"
+        scores = fp.score_measurement(msm)
+        assert scores
+        rid = msm["report_id"]
+        if rid == "20210427T023145Z_signal_CN_24400_n1_ynto2TVYXtqxhtOo":
+            assert scores == {
+                "blocking_general": 1.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
+        # No failure was found
+        #elif scores.get("accuracy", 1) < 0.5:
+        #    assert 0, rid
+        #    assert scores == {
+        #        "accuracy": 0.0,
+        #        "blocking_general": 1.0,
+        #        "blocking_global": 0.0,
+        #        "blocking_country": 0.0,
+        #        "blocking_isp": 0.0,
+        #        "blocking_local": 0.0,
+        #    }
