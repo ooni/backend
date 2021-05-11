@@ -1,12 +1,24 @@
 version: 2
+# DEB_GPG_KEY is set to
+# gpg -a --export-secret-keys B5A08F01796E7F521861B449372D1FF271F2DD50 | base64 --wrap=0
+# because CircleCI cannot handle multiline env vars
 jobs:
-  build:
+  create_deb_package:
     docker:
       - image: debian:stable
     steps:
       - checkout
-      - run:
-          command: |
-            apt-get update -q
-            apt-get install -y --no-install-recommends git python3 python3-requests
-            ./.circleci/debops-ci ci
+      - run: echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+      - run: apt-get update -q
+      - run: apt-get install -q -y --no-install-recommends git python3 python3-requests s3cmd python3-gnupg
+      - run: |
+          export DEB_GPG_KEY=$(echo $DEB_GPG_KEY | base64 -d)
+          ./.circleci/debops-ci --show-commands ci --bucket-name ooni-internal-deb
+
+workflows:
+  version: 2
+
+  my_workflows:
+    jobs:
+      - create_deb_package:
+          context: ooni

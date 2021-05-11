@@ -121,7 +121,7 @@ def trim_compare(url: str) -> str:
     return url
 
 
-def _set_pkg_version_from_circleci(p, ver):
+def _set_pkg_version_from_circleci(p, ver) -> None:
     comp = trim_compare(getenv("CIRCLE_COMPARE_URL", ""))  # show changes in VCS
     if not comp:
         # https://discuss.circleci.com/t/circle-compare-url-is-empty/24549/8
@@ -137,18 +137,19 @@ def _set_pkg_version_from_circleci(p, ver):
         run2(f"dch -r {ver} {comp}", cwd=p)
         ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
         assert ver == ver2, ver + " <--> " + ver2
+        return True
 
-    elif getenv("CIRCLE_BRANCH") == "master":
+    if getenv("CIRCLE_BRANCH") == "master":
         # This is a build outside of a PR and in the mainline branch
         print(f"CircleCI mainline build detected - using version {ver}")
         run2(f"dch -b -v {ver} {comp}", cwd=p)
         run2(f"dch -r {ver} {comp}", cwd=p)
         ver2 = run2("dpkg-parsechangelog --show-field Version", cwd=p)
         assert ver == ver2, ver + " <--> " + ver2
+        return True
 
-    else:
-        # This is a build for a new branch but without a PR: ignore it
-        return []
+    # This is a build for a new branch but without a PR: ignore it
+    return False
 
 
 def _set_pkg_version_from_github_actions(p, ver):
@@ -200,7 +201,7 @@ def buildpkg(p) -> List[Path]:
     if getenv("CIRCLECI"):
         # Running in CircleCI
         sudo = False
-        _set_pkg_version_from_circleci(p, ver)
+        should_build = _set_pkg_version_from_circleci(p, ver)
     elif getenv("GITHUB_EVENT_PATH"):
         sudo = False
         should_build = _set_pkg_version_from_github_actions(p, ver)
@@ -304,8 +305,10 @@ def check_duplicate_package(pkgblock, packages_text):
     pname = li[0].split(" ", 1)[1]
     assert li[1].startswith("Version: "), li
     pver = li[1].split(" ", 1)[1]
+    assert li[2].startswith("Architecture: "), li
+    parch = li[2].split(" ", 1)[1]
 
-    m = f"Package: {pname}\nVersion: {pver}"
+    m = f"Package: {pname}\nVersion: {pver}\nArchitecture: {parch}"
     if m in packages_text:
         raise DuplicatePkgError()
 
@@ -376,11 +379,13 @@ class S3:
             print("Bucket created")
             runc(f"s3cmd ws-create s3://{conf.bucket_name}")
 
+        s3url = None
         r, out = runc(f"s3cmd ws-info s3://{conf.bucket_name}")
         for li in out.splitlines():
             if li.startswith("Website endpoint"):
                 s3url = li.split()[2]
                 break
+        assert s3url
 
         # Initialize distro if needed. Check for InRelease
         baseuri = f"s3://{conf.bucket_name}/dists/{conf.distro}"
@@ -397,7 +402,7 @@ class S3:
         tf = NamedTemporaryFile()
         # put = "s3cmd --acl-public --guess-mime-type --no-progress put"
         put = "s3cmd --guess-mime-type --no-progress put"
-        r2, o = runc(f"{put} {tf.name} {baseuri}/.debrepos3.lock")
+        r2, o = runc(f"{put} --no-progress {tf.name} {baseuri}/.debrepos3.lock")
         assert r2 == 0, repr(o)
 
         # Create empty InRelease
