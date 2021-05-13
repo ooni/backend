@@ -98,6 +98,15 @@ def fetch_citizen_lab_lists() -> List[dict]:
     return out
 
 
+def create_citizenlab_cc_idx(conn):
+    sql = """
+    CREATE INDEX IF NOT EXISTS citizenlab_cc_idx
+    ON citizenlab USING btree (cc)
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql)
+
+
 @metrics.timer("rebuild_citizenlab_table_from_citizen_lab_lists")
 def rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn):
     """Fetch lists from GitHub repository"""
@@ -129,4 +138,5 @@ def rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn):
 def update_citizenlab_test_lists(conf) -> None:
     log.info("update_citizenlab_test_lists")
     conn = connect_db(conf.active)
+    create_citizenlab_cc_idx(conn)
     rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn)

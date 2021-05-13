@@ -111,7 +111,6 @@ def update_counters_hourly_software_table(conn, msm_uid_start, msm_uid_end):
         )
 
 
-
 @metrics.timer("update_counters_table")
 def update_counters_table(conn, msm_uid_start, msm_uid_end):
     # transaction, commit on context exiting
@@ -154,6 +153,36 @@ def update_counters_table(conn, msm_uid_start, msm_uid_end):
             msm_uid_start=msm_uid_start,
             msm_uid_end=msm_uid_end,
         )
+
+
+def create_counters_test_list_matview(conn):
+    # transaction, commit on context exiting
+    sql = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS counters_test_list AS
+        SELECT probe_cc, input, SUM(measurement_count) AS msmt_cnt
+        FROM counters
+        WHERE measurement_start_day < CURRENT_DATE + interval '1 days'
+        AND measurement_start_day > CURRENT_DATE - interval '8 days'
+        AND test_name = 'web_connectivity'
+        GROUP BY 1, 2
+        WITH NO DATA;
+        CREATE INDEX IF NOT EXISTS counters_test_list_idx
+        ON counters_test_list USING btree (probe_cc);
+    """
+    with conn:
+        log.info("Create counters_test_list table")
+        cur = conn.cursor()
+        query("create_counters_test_list_matview.rowcount", cur, sql)
+
+
+@metrics.timer("refresh_counters_test_list_matview")
+def refresh_counters_test_list_matview(conn):
+    # transaction, commit on context exiting
+    with conn:
+        log.info("Refresh counters_test_list table")
+        sql = "REFRESH MATERIALIZED VIEW counters_test_list"
+        cur = conn.cursor()
+        query("refresh_counters_test_list_matview.rowcount", cur, sql)
 
 
 @metrics.timer("update_counters_asn_noinput_table")
@@ -271,6 +300,8 @@ def update_all_counters_tables(conf):
 
     with conn:
         update_counters_table(conn, msm_uid_start, msm_uid_end)
+        create_counters_test_list_matview(conn)
+        refresh_counters_test_list_matview(conn)
 
     with conn:
         update_counters_asn_noinput_table(conn, msm_uid_start, msm_uid_end)
