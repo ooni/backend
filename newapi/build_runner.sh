@@ -6,9 +6,10 @@ export DEBIAN_FRONTEND=noninteractive
 echo 'deb http://deb.debian.org/debian buster-backports main' > /etc/apt/sources.list.d/backports.list
 
 apt-get update
-apt-get install --no-install-recommends -y ca-certificates
-echo 'deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main' \
+apt-get install --no-install-recommends -y ca-certificates gnupg
+echo 'deb http://deb-ci.ooni.org unstable main' \
   > /etc/apt/sources.list.d/ooni.list
+apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
 apt-get update
 
 apt-get install locales -y

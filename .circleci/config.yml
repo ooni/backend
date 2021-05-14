@@ -35,9 +35,10 @@ jobs:
     steps:
       - run: whoami
       - run: DEBIAN_FRONTEND=noninteractive apt-get update
-      - run: DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates
-      - run: echo "deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main" > /etc/apt/sources.list.d/bintray.list
+      - run: DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates gnupg
+      - run: echo "deb http://deb-ci.ooni.org unstable main" > /etc/apt/sources.list.d/deb-ci.list
       - run: echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+      - run: apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
       - run: DEBIAN_FRONTEND=noninteractive apt-get update
       - run: DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y openssh-client ssl-cert
       - run: mkdir -p /run/nodeexp/

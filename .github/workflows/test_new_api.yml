@@ -37,7 +37,7 @@ jobs:
         run: |
           rm -f /etc/apt/sources.list.d/*
           cat <<EOF | tee /etc/apt/sources.list
-          deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main
+          deb http://deb-ci.ooni.org unstable main
           deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
           deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
           deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
@@ -46,7 +46,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt-get install --no-install-recommends -y ca-certificates
+          apt-get install --no-install-recommends -y ca-certificates gnupg
+          apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
           apt-get update
           apt-get install --no-install-recommends -y postgresql-client python3-pytest python3-pytest-cov
 
