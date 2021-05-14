@@ -1,0 +1,78 @@
+name: OONI API packaging and end to end testing
+on: pull_request
+
+jobs:
+  create_deb_package:
+    # Build .deb package
+    runs-on: "ubuntu-20.04"
+    container: debian:10
+    steps:
+      - name: Install git
+        run: |
+          apt-get update -q
+          apt-get install -y git
+
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install depedencies
+        run: |
+          echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+          apt-get update -q
+          apt-get install -y --no-install-recommends git python3 python3-requests python3-gnupg s3cmd
+
+      - name: Build the package
+        run: ./scripts/debops-ci --show-commands ci --bucket-name ooni-internal-deb
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DEB_GPG_KEY: ${{ secrets.DEB_GPG_KEY }}
+
+  end_to_end_test:
+    # Deploy API + fastpath + database + ooniprobe
+    needs: create_deb_package
+    runs-on: "ubuntu-20.04"
+    # Primary container image where all commands run
+    container: debian:10
+
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Install git
+        run: |
+          apt-get update -q
+          apt-get install -y git
+
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install depedencies
+        run: |
+          whoami
+          DEBIAN_FRONTEND=noninteractive apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates gnupg
+          echo "deb http://deb-ci.ooni.org unstable main" > /etc/apt/sources.list.d/deb-ci.list
+          echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+          apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
+          DEBIAN_FRONTEND=noninteractive apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y openssh-client ssl-cert
+          mkdir -p /run/nodeexp/
+
+      - name: Install fastpath analysis and ooni-api
+        run: DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y fastpath analysis ooni-api
