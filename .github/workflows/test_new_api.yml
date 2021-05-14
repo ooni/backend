@@ -49,7 +49,7 @@ jobs:
           apt-get install --no-install-recommends -y ca-certificates gnupg
           apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
           apt-get update
-          apt-get install --no-install-recommends -y postgresql-client python3-pytest python3-pytest-cov
+          apt-get install --no-install-recommends -y postgresql-client python3-pytest python3-pytest-cov git
 
       - name: Init the database
         run: bash scripts/init_db.sh
