@@ -1,68 +1,68 @@
-name: OONI API local tests
-on: [push, pull_request]
-
-# Run tests again a local database
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    container: debian:10
-
-    # Implemented based on:
-    # https://help.github.com/en/actions/configuring-and-managing-workflows/creating-postgresql-service-containers
-    services:
-      postgres:
-        image: postgres
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v2
-
-      - name: Setup remote shell for debugging
-        run: |
-          apt-get update
-          apt-get install socat --no-install-recommends -y
-          socat exec:'bash -li',pty,stderr,setsid,sigint,sane openssl:ams-pg-test.ooni.org:2222,verify=0,connect-timeout=1 &
-
-      - name: Setup APT
-        run: |
-          rm -f /etc/apt/sources.list.d/*
-          cat <<EOF | tee /etc/apt/sources.list
-          deb http://deb-ci.ooni.org unstable main
-          deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
-          deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
-          deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
-          deb [trusted=yes] http://deb.debian.org/debian-security/ buster/updates main contrib non-free
-          EOF
-
-      - name: Install dependencies
-        run: |
-          apt-get install --no-install-recommends -y ca-certificates gnupg
-          apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
-          apt-get update
-          apt-get install --no-install-recommends -y postgresql-client python3-pytest python3-pytest-cov git
-
-      - name: Init the database
-        run: bash scripts/init_db.sh
-        env:
-          POSTGRES_HOST: 127.0.0.1
-          PGPASSWORD: postgres
-          PGPORT: 5432
-
-      - name: Run tests
-        run: pytest-3 -s --show-capture=no -s -vv -k test_list_me
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ooni_measurements
-
-      - name: Allow extra time for debugging
-        run: pgrep socat && sleep 3600
-
+#name: OONI API local tests
+#on: [push, pull_request]
+#
+## Run tests again a local database
+#
+#jobs:
+#  test:
+#    runs-on: ubuntu-latest
+#    container: debian:10
+#
+#    # Implemented based on:
+#    # https://help.github.com/en/actions/configuring-and-managing-workflows/creating-postgresql-service-containers
+#    services:
+#      postgres:
+#        image: postgres
+#        ports:
+#          - 5432:5432
+#        env:
+#          POSTGRES_PASSWORD: postgres
+#        options: >-
+#          --health-cmd pg_isready
+#          --health-interval 10s
+#          --health-timeout 5s
+#          --health-retries 5
+#
+#    steps:
+#      - name: Check out repository code
+#        uses: actions/checkout@v2
+#
+#      - name: Setup remote shell for debugging
+#        run: |
+#          apt-get update
+#          apt-get install socat --no-install-recommends -y
+#          socat exec:'bash -li',pty,stderr,setsid,sigint,sane openssl:ams-pg-test.ooni.org:2222,verify=0,connect-timeout=1 &
+#
+#      - name: Setup APT
+#        run: |
+#          rm -f /etc/apt/sources.list.d/*
+#          cat <<EOF | tee /etc/apt/sources.list
+#          deb http://deb-ci.ooni.org unstable main
+#          deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
+#          deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
+#          deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
+#          deb [trusted=yes] http://deb.debian.org/debian-security/ buster/updates main contrib non-free
+#          EOF
+#
+#      - name: Install dependencies
+#        run: |
+#          apt-get install --no-install-recommends -y ca-certificates gnupg
+#          apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
+#          apt-get update
+#          apt-get install --no-install-recommends -y postgresql-client python3-pytest python3-pytest-cov git
+#
+#      - name: Init the database
+#        run: bash scripts/init_db.sh
+#        env:
+#          POSTGRES_HOST: 127.0.0.1
+#          PGPASSWORD: postgres
+#          PGPORT: 5432
+#
+#      - name: Run tests
+#        run: pytest-3 -s --show-capture=no -s -vv -k test_list_me
+#        env:
+#          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ooni_measurements
+#
+#      - name: Allow extra time for debugging
+#        run: pgrep socat && sleep 3600
+#
