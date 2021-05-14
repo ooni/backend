@@ -1,6 +1,0 @@
-2017-08-07 :
-- Added functions to assert that user (loading patch) is either superuser, or
-  is not superuser, or is one of listed users.
-
-2010-08-22 :
-- Initial release to github.com : http://github.com/depesz/Versioning
