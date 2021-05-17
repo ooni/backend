@@ -246,6 +246,7 @@ def list_test_urls():
         test_items = failover_generate_test_list(country_code, category_codes, limit)
 
     # TODO: remove current_page / next_url / pages ?
+    metrics.gauge("test-list-urls-count", len(test_items))
     out = {
         "metadata": {
             "count": len(test_items),

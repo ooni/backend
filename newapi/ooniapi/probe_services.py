@@ -128,7 +128,7 @@ def check_in():
                             type: string
 
     """
-
+    log = current_app.logger
     # TODO: Implement throttling
     # TODO: Add geoip
     data = req_json()
@@ -165,9 +165,14 @@ def check_in():
 
     try:
         test_items = generate_test_list(probe_cc, category_codes, url_limit)
-    except:
+    except Exception as e:
+        log.error(e, exc_info=1)
+        # TODO: use same failover as prio.py:list_test_urls
+        # failover_generate_test_list runs without any database interaction
+        # test_items = failover_generate_test_list(country_code, category_codes, limit)
         test_items = []
 
+    metrics.gauge("check-in-test-list-count", len(test_items))
     resp = dict(
         v=1,
         tests={

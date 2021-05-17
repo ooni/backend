@@ -1,3 +1,9 @@
+ooni-api (0.26) unstable; urgency=medium
+
+  * Better test-list generation metrics
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 08 Apr 2021 14:35:19 +0100
+
 ooni-api (0.25) unstable; urgency=medium
 
   * Support Signal test
