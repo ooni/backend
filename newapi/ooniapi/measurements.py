@@ -660,7 +660,7 @@ def list_measurements():
     category_code = param("category_code")
 
     ## Workaround for https://github.com/ooni/probe/issues/1034
-    user_agent = request.headers.get("User-Agent")
+    user_agent = request.headers.get("User-Agent", "")
     if user_agent.startswith("okhttp"):
         bug_probe1034_response = jsonify(
             {
