@@ -21,10 +21,15 @@ jobs:
         run: |
           echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
           apt-get update -q
-          apt-get install -y --no-install-recommends git python3 python3-requests python3-gnupg s3cmd
+          apt-get install -y --no-install-recommends git python3 python3-requests python3-gnupg s3cmd wget
+
+      - name: Fetch debops-ci
+        run: |
+          wget https://raw.githubusercontent.com/ooni/sysadmin/master/tools/debops-ci
+          chmod +x debops-ci
 
       - name: Build the package
-        run: ./scripts/debops-ci --show-commands ci --bucket-name ooni-internal-deb
+        run: ./debops-ci --show-commands ci --bucket-name ooni-internal-deb
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
