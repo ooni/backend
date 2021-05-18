@@ -1,11 +1,8 @@
 """
 Fetch test lists from https://github.com/citizenlab/test-lists
 
-Populate citizenlab table from the tests lists and the input table
-
-Populate the domain_input table
-
-The tables are created in oometa/019-domain-and-citizenlab-table.install.sql
+Populate citizenlab table from the tests lists git repository and the
+url_priorities table
 
 The tables have few constraints on the database side: most of the validation
 is done here and it is meant to be strict.
@@ -46,41 +43,6 @@ VALID_URL = re.compile(
 
 URL_BAD_CHARS = {"\r", "\n", "\t", "\\"}
 
-# FIXME: temporarily hardcoded here for backend#361
-PRIORITIES = {
-    "NEWS": 100,
-    "POLR": 100,
-    "HUMR": 100,
-    "LGBT": 100,
-    "ANON": 100,
-    "GRP": 80,
-    "COMT": 80,
-    "MMED": 80,
-    "SRCH": 80,
-    "PUBH": 80,
-    "REL": 60,
-    "XED": 60,
-    "HOST": 60,
-    "ENV": 60,
-    "FILE": 40,
-    "CULTR": 40,
-    "IGO": 40,
-    "GOVT": 40,
-    "DATE": 30,
-    "HATE": 30,
-    "MILX": 30,
-    "PROV": 30,
-    "PORN": 30,
-    "GMB": 30,
-    "ALDR": 30,
-    "GAME": 20,
-    "MISC": 20,
-    "HACK": 20,
-    "ECON": 20,
-    "COMM": 20,
-    "CTRL": 20,
-}
-
 
 def _extract_domain(url: str) -> Optional[str]:
     if any(c in URL_BAD_CHARS for c in url):
@@ -100,7 +62,7 @@ def connect_db(c):
 
 
 @metrics.timer("fetch_citizen_lab_lists")
-def fetch_citizen_lab_lists() -> List[Tuple[str, str, str, str, int]]:
+def fetch_citizen_lab_lists() -> List[dict]:
     """Clone repository in a temporary directory and extract files"""
     out = []  # (cc or "ZZ", domain, url, category_code, priority)
     with TemporaryDirectory() as tmpdir:
@@ -122,8 +84,14 @@ def fetch_citizen_lab_lists() -> List[Tuple[str, str, str, str, int]]:
                         log.debug("Ignoring", url)
                         continue
                     category_code = item["category_code"]
-                    priority = PRIORITIES.get(category_code, 100)
-                    out.append((cc, domain, url, category_code, priority))
+                    d = dict(
+                        domain=domain,
+                        url=url,
+                        cc=cc,
+                        category_code=category_code,
+                        priority=0,
+                    )
+                    out.append(d)
 
     return out
 
@@ -131,16 +99,18 @@ def fetch_citizen_lab_lists() -> List[Tuple[str, str, str, str, int]]:
 @metrics.timer("rebuild_citizenlab_table_from_citizen_lab_lists")
 def rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn):
     """Fetch lists from GitHub repository"""
-    ev = "INSERT INTO citizenlab (cc, domain, url, category_code, priority) VALUES %s"
+    ev = """INSERT INTO citizenlab (domain, url, cc, category_code, priority)
+        VALUES %s"""
 
-    test_items = fetch_citizen_lab_lists()
+    citizenlab = fetch_citizen_lab_lists()
+    compute_url_priorities(conn, citizenlab)
 
     with conn.cursor() as cur:
-        log.info("Truncating citizenlab table")
+        log.info("Emptying citizenlab table")
         cur.execute("DELETE FROM citizenlab")
-        log.info("Inserting %d citizenlab table entries", len(test_items))
-        metrics.gauge("rowcount", len(test_items))
-        execute_values(cur, ev, test_items)
+        log.info("Inserting %d citizenlab table entries", len(citizenlab))
+        metrics.gauge("rowcount", len(citizenlab))
+        execute_values(cur, ev, citizenlab)
 
     if conf.dry_run:
         log.info("rollback")

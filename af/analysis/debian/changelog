@@ -1,3 +1,9 @@
+analysis (0.21) unstable; urgency=medium
+
+  * Compute URL prorities from the url_priorities table
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 18 May 2021 12:21:57 +0100
+
 analysis (0.19) unstable; urgency=medium
 
   * Remove TRUNCATE
