@@ -25,12 +25,12 @@ from psycopg2.extras import execute_values
 
 from analysis.metrics import setup_metrics
 
-from url_prioritization_updater import compute_url_priorities
+from analysis.url_prioritization_updater import compute_url_priorities
 
 
 HTTPS_GIT_URL = "https://github.com/citizenlab/test-lists.git"
 
-log = logging.getLogger("citizenlab_test_lists_updater")
+log = logging.getLogger("analysis.citizenlab_test_lists_updater")
 metrics = setup_metrics(name="citizenlab_test_lists_updater")
 
 
@@ -114,7 +114,8 @@ def rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn):
         cur.execute("DELETE FROM citizenlab")
         log.info("Inserting %d citizenlab table entries", len(citizenlab))
         metrics.gauge("rowcount", len(citizenlab))
-        execute_values(cur, ev, citizenlab)
+        tpl = "(%(domain)s, %(url)s, %(cc)s, %(category_code)s, %(priority)s)"
+        execute_values(cur, ev, citizenlab, template=tpl)
 
     if conf.dry_run:
         log.info("rollback")

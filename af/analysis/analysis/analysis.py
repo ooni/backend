@@ -1359,6 +1359,7 @@ def main():
     except Exception as e:
         log.error(str(e), exc_info=e)
 
+    log.info("done")
     # coverage_generator(conf)
 
     # generate_slow_query_summary(conf)
