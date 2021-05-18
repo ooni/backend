@@ -15,7 +15,7 @@ Local test run:
 from pathlib import Path
 from subprocess import check_call
 from tempfile import TemporaryDirectory
-from typing import List, Tuple, Optional
+from typing import List, Optional
 import csv
 import logging
 import re
@@ -24,6 +24,8 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from analysis.metrics import setup_metrics
+
+from url_prioritization_updater import compute_url_priorities
 
 
 HTTPS_GIT_URL = "https://github.com/citizenlab/test-lists.git"
@@ -104,6 +106,8 @@ def rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn):
 
     citizenlab = fetch_citizen_lab_lists()
     compute_url_priorities(conn, citizenlab)
+    assert len(citizenlab) > 20000
+    assert len(citizenlab) < 1000000
 
     with conn.cursor() as cur:
         log.info("Emptying citizenlab table")
