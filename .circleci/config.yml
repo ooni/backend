@@ -1,4 +1,7 @@
 version: 2
+# DEB_GPG_KEY is set to
+# gpg -a --export-secret-keys B5A08F01796E7F521861B449372D1FF271F2DD50 | base64 --wrap=0
+# because CircleCI cannot handle multiline env vars
 jobs:
   create_deb_package:
     # Build .deb package
@@ -6,11 +9,14 @@ jobs:
       - image: debian:stable
     steps:
       - checkout
-      - run:
-          command: |
-            apt-get update -q
-            apt-get install -y --no-install-recommends git python3 python3-requests
-            ./.circleci/debops-ci ci
+      - run: echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+      - run: apt-get update -q
+      - run: apt-get install -q -y --no-install-recommends git python3 python3-requests s3cmd python3-gnupg wget
+      - run: wget https://raw.githubusercontent.com/ooni/sysadmin/master/tools/debops-ci
+      - run: chmod +x debops-ci
+      - run: |
+          export DEB_GPG_KEY=$(echo $DEB_GPG_KEY | base64 -d)
+          ./debops-ci --show-commands ci --bucket-name ooni-internal-deb
 
   end_to_end_test:
     # Deploy API + fastpath + database + ooniprobe
@@ -42,5 +48,6 @@ workflows:
 
   my_workflows:
     jobs:
-      - create_deb_package
-      - end_to_end_test
+      - create_deb_package:
+          context: ooni
+      #- end_to_end_test

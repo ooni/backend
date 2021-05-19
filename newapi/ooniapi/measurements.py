@@ -16,10 +16,12 @@ import logging
 import math
 import time
 
-# import yaml
-import lz4framed
+try:
+    import lz4framed
+except ImportError:
+    pass
 
-import ujson
+import ujson  # debdeps: python3-ujson
 
 from flask import current_app, request, make_response, abort, redirect
 from flask.json import jsonify
@@ -42,7 +44,7 @@ from ooniapi.models import TEST_NAMES
 
 from flask import Blueprint
 
-import requests
+import requests  # debdeps: python3-requests
 
 api_msm_blueprint = Blueprint("msm_api", "measurements")
 

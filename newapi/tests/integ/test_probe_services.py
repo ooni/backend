@@ -141,26 +141,52 @@ def test_list_collectors(client):
     assert len(c) == 6
 
 
-# @pytest.mark.skip(reason="TODO")
-# def test_(client):
-#     print(dir(client))
-#     c = post(client, "/api/v1/login")
-#     assert True
+## Probe authentication
+
+def test_register(client):
+   j = {
+       "password": "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw",
+       "platform": "miniooni",
+       "probe_asn": "AS0",
+       "probe_cc": "ZZ",
+       "software_name": "miniooni",
+       "software_version": "0.1.0-dev",
+       "supported_tests": ["web_connectivity"],
+   }
+   c = postj(client, "/api/v1/register", **j)
+   assert "client_id" in c
+   assert len(c["client_id"]) == 105
 
 
-# def test_register(client):
-#    j = {
-#        "password": "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw",
-#        "platform": "miniooni",
-#        "probe_asn": "AS0",
-#        "probe_cc": "ZZ",
-#        "software_name": "miniooni",
-#        "software_version": "0.1.0-dev",
-#        "supported_tests": ["web_connectivity"],
-#    }
-#    c = postj(client, "/api/v1/register", **j)
-#    print(c)
-#    assert 0
+def test_register_then_login(client):
+    pwd="HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
+    j = {
+        "password": pwd,
+        "platform": "miniooni",
+        "probe_asn": "AS0",
+        "probe_cc": "ZZ",
+        "software_name": "miniooni",
+        "software_version": "0.1.0-dev",
+        "supported_tests": ["web_connectivity"],
+    }
+    c = postj(client, "/api/v1/register", **j)
+    assert "client_id" in c
+    assert len(c["client_id"]) == 105
+    client_id = c["client_id"]
+    c = postj(client, "/api/v1/login", username=client_id, password=pwd)
+    assert c["token"] == client_id
+
+    # Expect failed login
+    client_id = client_id[:-1]
+    j = dict(username=client_id, password=pwd)
+    resp = client.post("/api/v1/login", json=j)
+    assert resp.status_code == 401
+
+    # Expect failed login
+    j = dict()
+    resp = client.post("/api/v1/login", json=j)
+    assert resp.status_code == 401
+
 
 
 def test_test_helpers(client):

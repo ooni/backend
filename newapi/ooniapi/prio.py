@@ -125,7 +125,7 @@ FROM (
     SELECT priority, url, cc, category_code
     FROM citizenlab
     WHERE
-      UPPER(citizenlab.cc) = :cc
+      citizenlab.cc = :cc_low
       OR citizenlab.cc = 'ZZ'
 ) AS citiz
 LEFT OUTER JOIN (
@@ -141,7 +141,7 @@ LEFT OUTER JOIN (
 ON (citiz.url = cnt.input)
 ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM()
 """
-    q = current_app.db_session.execute(sql, dict(cc=cc))
+    q = current_app.db_session.execute(sql, dict(cc=cc, cc_low=cc.lower()))
     entries = tuple(q.fetchall())
     log.info("%d entries", len(entries))
     return entries
@@ -149,8 +149,7 @@ ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM()
 
 @metrics.timer("generate_test_list")
 def generate_test_list(country_code: str, category_codes: tuple, limit: int):
-    """Generate test list based on the amount of measurements in the last N days
-    """
+    """Generate test list based on the amount of measurements in the last N days"""
     log = current_app.logger
     out = []
     li = fetch_reactive_url_list(country_code)
@@ -187,6 +186,10 @@ def list_test_urls():
         in: query
         type: string
         description: Two letter, uppercase country code
+      - name: probe_cc
+        in: query
+        type: string
+        description: Two letter, uppercase country code (alternative to country_code)
       - name: category_codes
         in: query
         type: string
@@ -226,7 +229,8 @@ def list_test_urls():
     log = current_app.logger
     param = request.args.get
     try:
-        country_code = (param("country_code") or "ZZ").upper()
+        country_code = param("country_code") or param("probe_cc") or "ZZ"
+        country_code = country_code.upper()
         category_codes = param("category_codes") or ""
         category_codes = set(c.strip().upper() for c in category_codes.split(","))
         category_codes.discard("")

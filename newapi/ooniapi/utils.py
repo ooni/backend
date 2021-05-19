@@ -10,3 +10,4 @@ def cachedjson(interval_hours: int, *a, **kw):
     resp = jsonify(*a, **kw)
     resp.cache_control.max_age = interval_hours * 3600
     return resp
+

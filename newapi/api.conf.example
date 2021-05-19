@@ -23,9 +23,15 @@ MAIL_PORT = 465
 MAIL_USE_SSL = True
 MAIL_USERNAME = "CHANGEME"
 MAIL_PASSWORD = "CHANGEME"
+MAIL_SOURCE_ADDRESS = "contact@ooni.org"
 
 #SECRET_KEY = "CHANGEME"
 
 # Measurement spool directory
 MSMT_SPOOL_DIR = "/var/lib/ooniapi/measurements"
 
+GITHUB_ORIGIN_REPO = "https://github.com/citizenlab/test-lists.git"
+GITHUB_PUSH_REPO = "https://github.com/ooni-bot/test-lists.git"
+GITHUB_TOKEN = ""
+GITHUB_WORKDIR = "/tmp/ghworkdir"
+JWT_ENCRYPTION_KEY = "CHANGEME"
