@@ -17,6 +17,9 @@ S3_SECRET_ACCESS_KEY = "CHANGEME"
 S3_SESSION_TOKEN = "CHANGEME"
 S3_ENDPOINT_URL = "CHANGEME"
 
+PSIPHON_CONFFILE = "/etc/ooni/psiphon_config.json"
+TOR_TARGETS_CONFFILE = "/etc/ooni/tor_targets.json"
+
 # Registration email delivery
 MAIL_SERVER = "CHANGEME"
 MAIL_PORT = 465
@@ -25,13 +28,16 @@ MAIL_USERNAME = "CHANGEME"
 MAIL_PASSWORD = "CHANGEME"
 MAIL_SOURCE_ADDRESS = "contact@ooni.org"
 
-#SECRET_KEY = "CHANGEME"
-
-# Measurement spool directory
-MSMT_SPOOL_DIR = "/var/lib/ooniapi/measurements"
-
-GITHUB_ORIGIN_REPO = "https://github.com/citizenlab/test-lists.git"
-GITHUB_PUSH_REPO = "https://github.com/ooni-bot/test-lists.git"
-GITHUB_TOKEN = ""
-GITHUB_WORKDIR = "/tmp/ghworkdir"
 JWT_ENCRYPTION_KEY = "CHANGEME"
+
+SESSION_EXPIRY_DAYS = 365
+LOGIN_EXPIRY_DAYS = 365
+
+GITHUB_ORIGIN_REPO = "citizenlab/test-lists"
+GITHUB_PUSH_REPO = "ooni-bot/test-lists"
+GITHUB_TOKEN = "CHANGEME"
+GITHUB_USER = "CHANGEME"
+GITHUB_WORKDIR = "/var/lib/ooniapi/citizenlab"
+
+MSMT_SPOOL_DIR = "/tmp/oonispool"
+
