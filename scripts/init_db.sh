@@ -4,9 +4,6 @@ set -exuo pipefail
 export POSTGRES_HOST=db
 export PGPASSWORD=$POSTGRES_PASSWORD
 
-sudo apt-get update
-sudo apt-get -y install git
-
 tmpdir=$(mktemp -d)
 cd $tmpdir
 git clone --depth 1 https://github.com/ooni/pipeline.git

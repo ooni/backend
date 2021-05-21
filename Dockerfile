@@ -33,6 +33,9 @@ RUN apt-get install git --no-install-recommends -y \
       python3-sqlalchemy-utils \
       python3-statsd \
       python3-systemd \
+      python3-jwt \
+      python3-filelock \
+      python3-git \
       python3-ujson
 RUN apt-get autoremove -y
 RUN apt-get clean

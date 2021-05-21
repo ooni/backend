@@ -7,7 +7,12 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_PASSWORD: ooni
-      POSTGRES_USER: metadb
+      POSTGRES_USER: shovel
+      POSTGRES_DB: metadb
+    volumes:
+      # ssh ams-pg.ooni.org -t pg_dump metadb -U shovel --schema-only > scripts/2_metadb_schema.sql
+      - ./scripts/1_metadb_users.sql:/docker-entrypoint-initdb.d/1_metadb_users.sql
+      - ./scripts/2_metadb_schema.sql:/docker-entrypoint-initdb.d/2_metadb_schema.sql
 
   api:
     restart: always
