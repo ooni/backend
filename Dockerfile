@@ -36,6 +36,7 @@ RUN apt-get install git --no-install-recommends -y \
       python3-jwt \
       python3-filelock \
       python3-git \
+      python3-freezegun \
       python3-ujson
 RUN apt-get autoremove -y
 RUN apt-get clean
