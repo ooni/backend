@@ -81,7 +81,7 @@ def set_JWT_cookie(res, token: str) -> None:
     - samesite=Strict: send the cookie only between the browser and this API
     """
     assert isinstance(res, flask.wrappers.Response), type(res)
-    res.set_cookie("ooni", token, secure=True, httponly=True, samesite="Strict")
+    res.set_cookie("ooni", token, secure=True, httponly=True)
 
 
 def role_required(roles):
@@ -166,7 +166,7 @@ def send_login_email(dest_addr, nick, token: str) -> None:
     msg = EmailMessage()
     msg["Subject"] = "OONI Account activation"
     msg["From"] = src_addr
-    msg["To"] = (dest_addr,)
+    msg["To"] = dest_addr
 
     txt = f"""Welcome to OONI, {nick}.
 

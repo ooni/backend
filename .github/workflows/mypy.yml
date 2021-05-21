@@ -16,7 +16,6 @@ jobs:
           apt-get install --no-install-recommends -y ca-certificates
           rm -f /etc/apt/sources.list.d/*
           cat <<EOF | tee /etc/apt/sources.list
-          deb [trusted=yes] https://dl.bintray.com/ooni/internal-pull-requests unstable main
           deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
           deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
           deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
@@ -29,4 +28,4 @@ jobs:
           apt-get install --no-install-recommends -y mypy
 
       - name: Run tests
-        run: cd newapi && mypy --ignore-missing-imports **/*.py
+        run: cd newapi && mypy --ignore-missing-imports ooniapi/**/*.py

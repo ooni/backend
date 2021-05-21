@@ -9,6 +9,7 @@ from hashlib import sha224
 from typing import List
 import csv
 import io
+import logging
 import os
 import re
 import shutil
@@ -32,7 +33,7 @@ Values can be wildcards "*". A citizenlab entry can match multiple rules.
 
 # TODO: add per-user locking
 
-log = None
+log = logging.getLogger()  # overridden by current_app.logger
 
 cz_blueprint = Blueprint("citizenlab_api", "citizenlab")
 
