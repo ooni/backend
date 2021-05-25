@@ -69,10 +69,12 @@ def validate_conf(app, conffile):
         "MAIL_USERNAME",
         "MAIL_USE_SSL",
         "MSMT_SPOOL_DIR",
+        "PSIPHON_CONFFILE",
         "S3_ACCESS_KEY_ID",
         "S3_ENDPOINT_URL",
         "S3_SECRET_ACCESS_KEY",
         "S3_SESSION_TOKEN",
+        "TOR_TARGETS_CONFFILE",
     )
     for k in conf_keys:
         if k not in app.config:

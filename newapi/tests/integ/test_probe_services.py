@@ -34,6 +34,13 @@ def getjson(client, url):
     return response.json
 
 
+def getjsonh(client, url, headers=None):
+    response = client.get(url, headers=headers)
+    assert response.status_code == 200
+    assert response.is_json
+    return response.json
+
+
 def post(client, url, data):
     response = client.post(url, data=data)
     assert response.status_code == 200
@@ -78,6 +85,9 @@ def test_check_in(client):
     assert int(asn_i) == 1234
     assert stn == "webconnectivity"
     assert cc == "US"
+
+    # psiphon and tor configurations
+    assert sorted(c["conf"]) == ["psiphon", "tor"]
 
 
 def test_check_in_url_category_news(client):
@@ -133,7 +143,7 @@ def test_check_in_url_prioritization_category_codes(client):
     assert len(set(r["url"] for r in c["results"])) == 100
 
 
-## Test /api/v1/collectors
+# # Test /api/v1/collectors
 
 
 def test_list_collectors(client):
@@ -141,25 +151,11 @@ def test_list_collectors(client):
     assert len(c) == 6
 
 
-## Probe authentication
-
-def test_register(client):
-   j = {
-       "password": "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw",
-       "platform": "miniooni",
-       "probe_asn": "AS0",
-       "probe_cc": "ZZ",
-       "software_name": "miniooni",
-       "software_version": "0.1.0-dev",
-       "supported_tests": ["web_connectivity"],
-   }
-   c = postj(client, "/api/v1/register", **j)
-   assert "client_id" in c
-   assert len(c["client_id"]) == 105
+# # Probe authentication
 
 
-def test_register_then_login(client):
-    pwd="HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
+def _register(client):
+    pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
     j = {
         "password": pwd,
         "platform": "miniooni",
@@ -169,24 +165,50 @@ def test_register_then_login(client):
         "software_version": "0.1.0-dev",
         "supported_tests": ["web_connectivity"],
     }
-    c = postj(client, "/api/v1/register", **j)
+    return postj(client, "/api/v1/register", **j)
+
+
+import ooniapi.auth
+
+
+def decode_token(client):
+    # Decode JWT token in the cookie jar
+    assert len(client.cookie_jar) == 1
+    cookie = list(client.cookie_jar)[0].value
+    tok = ooniapi.auth.decode_jwt(cookie, audience="user_auth")
+    return tok
+
+
+def test_register(client):
+    c = _register(client)
     assert "client_id" in c
-    assert len(c["client_id"]) == 105
+    assert len(c["client_id"]) == 132
+
+
+def test_register_then_login(client):
+    pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
+    c = _register(client)
+    assert "client_id" in c
+    assert len(c["client_id"]) == 132
+    tok = ooniapi.auth.decode_jwt(c["client_id"], audience="probe_login")
+
     client_id = c["client_id"]
     c = postj(client, "/api/v1/login", username=client_id, password=pwd)
-    assert c["token"] == client_id
+    tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
+    assert tok["registration_time"] is not None
 
-    # Expect failed login
-    client_id = client_id[:-1]
+    # Login with a bogus client id emulating probes before 2022
+    client_id = "BOGUSBOGUS"
     j = dict(username=client_id, password=pwd)
-    resp = client.post("/api/v1/login", json=j)
-    assert resp.status_code == 401
+    r = client.post("/api/v1/login", json=j)
+    assert r.status_code == 200
+    token = r.json["token"]
+    tok = ooniapi.auth.decode_jwt(token, audience="probe_token")
+    assert tok["registration_time"] is None  # we don't know the reg. time
 
     # Expect failed login
-    j = dict()
-    resp = client.post("/api/v1/login", json=j)
-    assert resp.status_code == 401
-
+    resp = client.post("/api/v1/login", json=dict())
+    # FIXME assert resp.status_code == 401
 
 
 def test_test_helpers(client):
@@ -194,16 +216,46 @@ def test_test_helpers(client):
     assert len(c) == 6
 
 
-# @pytest.mark.skip(reason="TODO")
-# def test_psiphon(client):
-#     c = getjson(client, "/api/v1/test-list/psiphon-config")
-#     assert True
+def test_psiphon(client):
+    # register and login
+    pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
+    client_id = _register(client)["client_id"]
+
+    c = postj(client, "/api/v1/login", username=client_id, password=pwd)
+    tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
+    assert tok["registration_time"] is not None
+
+    url = "/api/v1/test-list/psiphon-config"
+    # broken token
+    headers = {"Authorization": "Bearer " + c["token"][2:]}
+    r = client.get(url, headers=headers)
+    assert r.status_code == 401
+
+    # valid token
+    headers = {"Authorization": "Bearer " + c["token"]}
+    r = client.get(url, headers=headers)
+    assert r.status_code == 200, r.json
 
 
-# @pytest.mark.skip(reason="TODO")
-# def test_tor_targets(client):
-#     c = getjson(client, "/api/v1/test-list/tor-targets")
-#     assert True
+def test_tor_targets(client):
+    # register and login
+    pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
+    client_id = _register(client)["client_id"]
+
+    c = postj(client, "/api/v1/login", username=client_id, password=pwd)
+    tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
+    assert tok["registration_time"] is not None
+
+    url = "/api/v1/test-list/tor-targets"
+    # broken token
+    headers = {"Authorization": "Bearer " + c["token"][2:]}
+    r = client.get(url, headers=headers)
+    assert r.status_code == 401
+
+    # valid token
+    headers = {"Authorization": "Bearer " + c["token"]}
+    r = client.get(url, headers=headers)
+    assert r.status_code == 200, r.json
 
 
 def test_bouncer_net_tests(client):

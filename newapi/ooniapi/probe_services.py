@@ -175,12 +175,20 @@ def check_in():
         test_items = []
 
     metrics.gauge("check-in-test-list-count", len(test_items))
+    try:
+        torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
+        psconf = _load_json(current_app.config["PSIPHON_CONFFILE"])
+        conf = dict(tor=torconf, psiphon=psconf)
+    except Exception as e:
+        log.error(str(e), exc_info=1)
+        conf = {}
+
     resp = dict(
         v=1,
         tests={
             "web_connectivity": {"urls": test_items},
         },
-        conf={},
+        conf=conf,
     )
 
     # get asn, asn_i, probe_cc, network name
@@ -450,28 +458,83 @@ def list_test_helpers():
     return cachedjson(1, **j)
 
 
-# @probe_services_blueprint.route("/api/v1/test-list/psiphon-config")
-# def serve_psiphon_config():
-#    """Probe Services: Psiphon data
-#    Not implemented
-#    ---
-#    responses:
-#      '200':
-#        description: TODO
-#    """
-#    #decoded = jwt.decode(encoded, key, algorithms="HS256")
-#    return jsonify({"msg": "not implemented"})  # TODO
+def _check_probe_token(desc):
+    """Validates probe token, returns None or error response
+    """
+    log = current_app.logger
+    try:
+        token = request.headers.get("Authorization")
+        if not token.startswith("Bearer "):
+            return jerror("Invalid token format")
+        token = token[7:]
+        decode_jwt(token, audience="probe_token")
+        return
+    except jwt.exceptions.MissingRequiredClaimError:
+        log.info(f"{desc}: invalid or missing claim")
+        return jerror("Invalid credentials", code=401)
+    except jwt.exceptions.InvalidAudienceError:
+        log.info(f"{desc}: invalid audience")
+        return jerror("Invalid credentials", code=401)
+    except jwt.exceptions.InvalidSignatureError:
+        log.info(f"{desc}: invalid signature")
+        return jerror("Invalid JWT signature", code=401)
+    except jwt.exceptions.DecodeError:
+        log.info(f"{desc}: invalid signature")
+        return jerror("Invalid credentials", code=401)
+    except Exception as e:
+        log.info(str(e), exc_info=1)
+        return jerror(str(e))
 
 
-# @probe_services_blueprint.route("/api/v1/test-list/tor-targets")
-# def serve_tor_targets():
-#    """Probe Services: Tor targets
-#    ---
-#    responses:
-#      '200':
-#        description: TODO
-#    """
-#    return jsonify({"msg": "not implemented"})  # TODO
+def _load_json(path: str):
+    log = current_app.logger
+    conffile = Path(path).resolve()
+    log.debug(f"reading {conffile.as_posix()}")
+    return ujson.loads(conffile.read_text())
+
+
+@probe_services_blueprint.route("/api/v1/test-list/psiphon-config")
+def serve_psiphon_config():
+    """Probe Services: Psiphon data
+    Requires a probe_token JWT provided by /api/v1/login
+    ---
+    responses:
+      200:
+        description: TODO
+    """
+    log = current_app.logger
+    err = _check_probe_token("psiphon")
+    if err:
+        return err
+    psconf = _load_json(current_app.config["PSIPHON_CONFFILE"])
+    return jsonify(psconf)
+
+
+def _fetch_tor_bridges(cc):
+    # url = "https://bridges.torproject.org/wolpertinger/bridges?id=&type=ooni&country_code={cc}"
+    # key = current_app.config["TOR_TARGETS_CONFFILE"]
+    # req = urllib.request.Request(url)
+    # req.add_header("Authorization", f"Bearer {key}")
+    # resp = urlopen(req)
+    # content = resp.read()
+    pass
+
+
+@probe_services_blueprint.route("/api/v1/test-list/tor-targets")
+def serve_tor_targets():
+    """Probe Services: Tor targets
+    Requires a probe_token JWT provided by /api/v1/login
+    ---
+    responses:
+      200:
+        description: TODO
+    """
+    log = current_app.logger
+    err = _check_probe_token("tor_targets")
+    if err:
+        return err
+    torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
+    return jsonify(torconf)
 
 
 # Unneded: we use an external test helper

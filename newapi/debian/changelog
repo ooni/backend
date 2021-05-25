@@ -1,3 +1,9 @@
+ooni-api (0.28) unstable; urgency=medium
+
+  * Serve Tor and Psiphon configuration
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 19 May 2021 15:49:39 +0100
+
 ooni-api (0.27) unstable; urgency=medium
 
   * Implement login prototype
