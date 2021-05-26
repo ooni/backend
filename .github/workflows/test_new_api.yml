@@ -9,4 +9,4 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run tests
-        run: docker-compose run api pytest-3 -s --show-capture=no -s -vv -k test_list_me
+        run: docker-compose run --rm api pytest-3 -k test_private_explorer.py -k test_smoke.py -k test_citizenlab.py
