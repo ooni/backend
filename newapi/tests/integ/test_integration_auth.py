@@ -26,9 +26,6 @@ def log(app):
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_test_session():
-    os.environ["DATABASE_URL"] = "postgresql://readonly@localhost:5432/metadb"
-    os.environ["CONF"] = "tests/integ/api.conf"
-
     # mock smtplib
     m = Mock(name="MockSMTPInstance")
     s = Mock(name="SMTP session")
