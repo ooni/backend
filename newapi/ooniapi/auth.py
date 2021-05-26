@@ -17,6 +17,7 @@ import flask.wrappers
 import jwt  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
+from ooniapi.utils import cachedjson, nocachejson
 
 # from ooniapi.utils import cachedjson
 
@@ -160,8 +161,8 @@ def _send_email(dest_addr: str, msg: EmailMessage) -> None:
 def send_login_email(dest_addr, nick, token: str) -> None:
     """Format and send a registration/login  email"""
     src_addr = current_app.config["MAIL_SOURCE_ADDRESS"]
-    baseurl = current_app.config["BASE_URL"]
-    url = urljoin(baseurl, f"/api/v1/user_login?k={token}")
+    baseurl = current_app.config["LOGIN_BASE_URL"]
+    url = urljoin(baseurl, f"?token={token}")
 
     msg = EmailMessage()
     msg["Subject"] = "OONI Account activation"
@@ -304,6 +305,7 @@ def user_login():
     token = _create_session_token(dec["account_id"], dec["nick"], role)
     r = make_response(jsonify(), 200)
     set_JWT_cookie(r, token)
+    r.cache_control.no_cache = True
     return r
 
 
@@ -345,8 +347,14 @@ def _set_account_role(email_address, role: str) -> int:
 @auth_blueprint.route("/api/v1/set_account_role", methods=["POST"])
 @role_required("admin")
 def set_account_role():
-    """Set a role to a given account identified by an email address
+    """Set a role to a given account identified by an email address.
+    Only for admins.
     ---
+    security:
+      cookieAuth:
+        type: JWT
+        in: cookie
+        name: ooni
     parameters:
       - in: body
         name: email address and role
@@ -398,11 +406,36 @@ def _get_account_role(account_id: str) -> Optional[str]:
     return None
 
 
+@auth_blueprint.route("/api/_/account_metadata")
+def get_account_metadata():
+    """Get account metadata for logged-in users
+    ---
+    responses:
+      200:
+        description: Username and role if logged in.
+        schema:
+          type: object
+    """
+    try:
+        token = request.cookies.get("ooni", "")
+        tok = decode_jwt(token, audience="user_auth")
+        return nocachejson(role=tok["role"], nick=tok["nick"])
+
+    except Exception:
+        return nocachejson({})
+
+
 @auth_blueprint.route("/api/v1/get_account_role/<email_address>")
 @role_required("admin")
 def get_account_role(email_address):
     """Get account role. Return an error message if the account is not found.
+    Only for admins.
     ---
+    security:
+      cookieAuth:
+        type: JWT
+        in: cookie
+        name: ooni
     parameters:
       - name: email_address
         in: path
@@ -425,14 +458,20 @@ def get_account_role(email_address):
         return jerror("Account not found")
 
     log.info(f"Getting account {account_id} role: {role}")
-    return jsonify(role=role)
+    return nocachejson(role=role)
 
 
 @auth_blueprint.route("/api/v1/set_session_expunge", methods=["POST"])
 @role_required("admin")
 def set_session_expunge():
-    """Force refreshing all session tokens for a given account
+    """Force refreshing all session tokens for a given account.
+    Only for admins.
     ---
+    security:
+      cookieAuth:
+        type: JWT
+        in: cookie
+        name: ooni
     parameters:
       - in: body
         name: email address
@@ -466,7 +505,7 @@ def set_session_expunge():
     q = current_app.db_session.execute(query, query_params).rowcount
     log.info(f"Expunge set {q}")
     current_app.db_session.commit()
-    return jsonify()
+    return nocachejson()
 
 
 def _remove_from_session_expunge(email_address: str) -> None:

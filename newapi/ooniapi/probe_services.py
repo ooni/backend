@@ -17,7 +17,7 @@ from flask.json import jsonify
 import jwt.exceptions  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
-from ooniapi.utils import cachedjson
+from ooniapi.utils import cachedjson, nocachejson
 
 from ooniapi.auth import create_jwt, decode_jwt
 from ooniapi.prio import generate_test_list
@@ -534,7 +534,7 @@ def serve_tor_targets():
     if err:
         return err
     torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
-    return jsonify(torconf)
+    return nocachejson(torconf)
 
 
 # Unneded: we use an external test helper

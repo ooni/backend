@@ -62,6 +62,7 @@ def validate_conf(app, conffile):
         "GITHUB_TOKEN",
         "GITHUB_WORKDIR",
         "JWT_ENCRYPTION_KEY",
+        "LOGIN_BASE_URL",
         "MAIL_PASSWORD",
         "MAIL_PORT",
         "MAIL_SERVER",
@@ -120,7 +121,7 @@ def init_app(app, testmode=False):
 
     # FIXME
     # CORS(app, resources={r"/api/*": {"origins": "*"}})
-    CORS(app, resources={r"*": {"origins": "*"}})
+    CORS(app, resources={r"*": {"origins": "*"}}, supports_credentials=True)
 
 
 def check_config(config):

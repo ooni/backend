@@ -1,3 +1,9 @@
+ooni-api (0.29) unstable; urgency=medium
+
+  * Get logged user data
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 25 May 2021 16:42:05 +0100
+
 ooni-api (0.28) unstable; urgency=medium
 
   * Serve Tor and Psiphon configuration
