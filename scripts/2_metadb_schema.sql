@@ -712,3 +712,7 @@ GRANT SELECT ON TABLE public.session_expunge TO amsapi;
 -- permissions on the accounts table
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.accounts TO readonly;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.accounts TO amsapi;
+
+
+GRANT INSERT, UPDATE, DELETE ON TABLE public.url_priorities TO readonly;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.url_priorities TO amsapi;
