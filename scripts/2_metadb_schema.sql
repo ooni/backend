@@ -710,5 +710,5 @@ GRANT SELECT ON TABLE public.session_expunge TO amsapi;
 
 -- It's a bit weird that the readonly user actually needs to have UPDATE
 -- permissions on the accounts table
-GRANT SELECT, INSERT, UPDATE ON TABLE public.accounts TO readonly;
-GRANT SELECT, INSERT, UPDATE ON TABLE public.accounts TO amsapi;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.accounts TO readonly;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.accounts TO amsapi;

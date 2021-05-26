@@ -23,7 +23,7 @@ TOR_TARGETS_CONFFILE = "/etc/ooni/tor_targets.json"
 # Registration email delivery
 MAIL_SERVER = "CHANGEME"
 MAIL_PORT = 465
-MAIL_USE_SSL = True
+MAIL_USE_SSL = False
 MAIL_USERNAME = "CHANGEME"
 MAIL_PASSWORD = "CHANGEME"
 MAIL_SOURCE_ADDRESS = "contact@ooni.org"
