@@ -5,7 +5,7 @@ OONI Probe Services API - reactive URL prioritization
 based on the citizenlab URL list and the measurements count from the last
 7 days.
 
-The ooni-update-counters service updates the counters table at intervals
+The ooni-update-counters service updates the counters_test_list table at intervals
 
 The ooni-update-citizenlab service updates the citizenlab table at intervals
 
@@ -14,8 +14,8 @@ blockdiag {
   Probes [color = "#ffeeee"];
   "API: test-list/urls" [color = "#eeeeff"];
   Probes -> "API: receive msmt" -> "Fastpath" -> "DB: fastpath table";
-  "DB: fastpath table" -> "ooni-update-counters service" -> "DB: counters table";
-  "DB: counters table" -> "API: test-list/urls" -> Probes;
+  "DB: fastpath table" -> "ooni-update-counters service" -> "DB: counters_test_list table";
+  "DB: counters_test_list table" -> "API: test-list/urls" -> Probes;
   "DB: citizenlab table" -> "API: test-list/urls";
 }
 ```
@@ -25,7 +25,6 @@ blockdiag {
 from collections import namedtuple
 from typing import List, Dict
 import random
-import time
 
 from flask import Blueprint, current_app, request
 from flask.json import jsonify
@@ -86,7 +85,6 @@ def failover_generate_test_list(country_code: str, category_codes: tuple, limit:
     if not category_codes:
         category_codes = tuple(failover_test_items.keys())
 
-    log = current_app.logger
     candidates: List[CTZ] = []
     for catcode in category_codes:
         if catcode not in failover_test_items:
@@ -129,14 +127,9 @@ FROM (
       OR citizenlab.cc = 'ZZ'
 ) AS citiz
 LEFT OUTER JOIN (
-    SELECT input, SUM(measurement_count) AS msmt_cnt
-    FROM counters
-    WHERE
-        measurement_start_day < CURRENT_DATE + interval '1 days'
-        AND measurement_start_day > CURRENT_DATE - interval '8 days'
-        AND probe_cc = :cc
-        AND test_name = 'web_connectivity'
-    GROUP BY input
+    SELECT input, msmt_cnt
+    FROM counters_test_list
+    WHERE probe_cc = :cc
 ) AS cnt
 ON (citiz.url = cnt.input)
 ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM()
@@ -149,8 +142,8 @@ ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM()
 
 @metrics.timer("generate_test_list")
 def generate_test_list(country_code: str, category_codes: tuple, limit: int):
-    """Generate test list based on the amount of measurements in the last N days"""
-    log = current_app.logger
+    """Generate test list based on the amount of measurements in the last
+    N days"""
     out = []
     li = fetch_reactive_url_list(country_code)
     for entry in li:
@@ -158,13 +151,12 @@ def generate_test_list(country_code: str, category_codes: tuple, limit: int):
             continue
 
         cc = "XX" if entry["cc"] == "ZZ" else entry["cc"].upper()
-        out.append(
-            {
-                "category_code": entry["category_code"],
-                "url": entry["url"],
-                "country_code": cc,
-            }
-        )
+        i = {
+            "category_code": entry["category_code"],
+            "url": entry["url"],
+            "country_code": cc,
+        }
+        out.append(i)
         if len(out) >= limit:
             break
 
