@@ -117,14 +117,15 @@ def _register_and_login(client, email_address):
     setup_test_session.mocked_s.send_message.assert_called_once()
     msg = setup_test_session.mocked_s.send_message.call_args[0][0]
     msg = str(msg)
+    url = ""
     assert "Subject: OONI Account activation" in msg
     for line in msg.splitlines():
         if '<a href="https://api.ooni.io' in line:
             url = line.split('"')[1]
-    assert url.startswith("https://api.ooni.io/api/v1/user_login?k=")
+    assert url.startswith("https://api.ooni.io/api/v1/user_login?token=")
     token = url[40:]
 
-    r = client.get(f"/api/v1/user_login?k={token}")
+    r = client.get(f"/api/v1/user_login?token={token}")
     assert r.status_code == 200
     cookies = r.headers.getlist("Set-Cookie")
     assert len(cookies) == 1
