@@ -12,6 +12,7 @@ Test using:
 
 import os
 from unittest.mock import MagicMock, Mock
+from urllib.parse import urlparse
 
 import pytest
 from freezegun import freeze_time  # debdeps: python3-freezegun
@@ -120,12 +121,13 @@ def _register_and_login(client, email_address):
     url = ""
     assert "Subject: OONI Account activation" in msg
     for line in msg.splitlines():
-        if '<a href="https://api.ooni.io' in line:
+        if '<a href="https://' in line:
             url = line.split('"')[1]
-    assert url.startswith("https://api.ooni.io/api/v1/user_login?token=")
-    token = url[40:]
+    u = urlparse(url)
+    token = u.query.split('=')[1]
+    assert len(token) > 0
 
-    r = client.get(f"/api/v1/user_login?token={token}")
+    r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200
     cookies = r.headers.getlist("Set-Cookie")
     assert len(cookies) == 1
