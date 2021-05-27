@@ -708,6 +708,9 @@ GRANT SELECT ON TABLE public.counters_asn_noinput TO amsapi;
 GRANT SELECT ON TABLE public.session_expunge TO readonly;
 GRANT SELECT ON TABLE public.session_expunge TO amsapi;
 
+GRANT SELECT ON TABLE public.jsonl TO readonly;
+GRANT SELECT ON TABLE public.jsonl TO amsapi;
+
 -- It's a bit weird that the readonly user actually needs to have UPDATE
 -- permissions on the accounts table
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.accounts TO readonly;
