@@ -6,6 +6,7 @@ __pycache__
 .cache/
 .idea/
 .state/
+.vscode/
 
 ooni_measurements.db
 /data/

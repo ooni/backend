@@ -241,7 +241,7 @@ def test_list_files_range_cc_asn(client):
 
 
 def test_get_measurement_meta_basic(client):
-    rid = "20200209T235610Z_AS22773_NqZSA7xdrVbZb6yO25E5a7HM2Zr7ENIwvxEC18a4TpfYOzWxOz"
+    rid = "20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss"
     inp = "http://www.theonion.com/"
     response = api(client, f"measurement_meta?report_id={rid}&input={inp}")
     assert response == {
@@ -249,13 +249,13 @@ def test_get_measurement_meta_basic(client):
         "confirmed": False,
         "failure": False,
         "input": inp,
-        "measurement_start_time": "2020-02-09T23:57:26Z",
-        "probe_asn": 22773,
-        "probe_cc": "US",
+        "measurement_start_time": "2020-12-16T05:44:41Z",
+        "probe_asn": 21826,
+        "probe_cc": "VE",
         "report_id": rid,
         "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
         "test_name": "web_connectivity",
-        "test_start_time": "2020-02-09T23:56:06Z",
+        "test_start_time": "2020-12-16T05:03:48Z",
         "category_code": "CULTR",
     }
     # TODO

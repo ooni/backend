@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:11.12
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ooni
+      POSTGRES_USER: shovel
+      POSTGRES_DB: metadb
+    volumes:
+      # ssh ams-pg.ooni.org -t pg_dump metadb -U shovel --schema-only > scripts/2_metadb_schema.sql
+      - ./scripts/1_metadb_users.sql:/docker-entrypoint-initdb.d/1_metadb_users.sql
+      - ./scripts/2_metadb_schema.sql:/docker-entrypoint-initdb.d/2_metadb_schema.sql
+      - ./scripts/3_test_fixtures.sql:/docker-entrypoint-initdb.d/3_test_fixtures.sql
+
+  api:
+    restart: always
+    build:
+      context: .
+    command: gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
+    volumes:
+      - ./newapi/:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db

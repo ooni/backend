@@ -12,6 +12,7 @@ Test using:
 
 import os
 from unittest.mock import MagicMock, Mock
+from urllib.parse import urlparse
 
 import pytest
 from freezegun import freeze_time  # debdeps: python3-freezegun
@@ -26,9 +27,6 @@ def log(app):
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_test_session():
-    os.environ["DATABASE_URL"] = "postgresql://readonly@localhost:5432/metadb"
-    os.environ["CONF"] = "tests/integ/api.conf"
-
     # mock smtplib
     m = Mock(name="MockSMTPInstance")
     s = Mock(name="SMTP session")
@@ -120,12 +118,14 @@ def _register_and_login(client, email_address):
     setup_test_session.mocked_s.send_message.assert_called_once()
     msg = setup_test_session.mocked_s.send_message.call_args[0][0]
     msg = str(msg)
+    url = ""
     assert "Subject: OONI Account activation" in msg
     for line in msg.splitlines():
-        if '<a href="https://api.ooni.io' in line:
+        if '<a href="https://' in line:
             url = line.split('"')[1]
-    assert url.startswith("https://api.ooni.io/api/v1/user_login?k=")
-    token = url[40:]
+    u = urlparse(url)
+    token = u.query.split('=')[1]
+    assert len(token) > 0
 
     r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200
