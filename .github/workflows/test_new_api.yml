@@ -1,5 +1,13 @@
 name: OONI API local tests
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Run the build with tmate debugging enabled'
+        required: false
+        default: false
 
 jobs:
   test:
@@ -7,6 +15,12 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
+        with:
+          limit-access-to-actor: true
 
       - name: Run tests
         run: docker-compose run --rm api pytest-3 -k test_private_explorer.py -k test_smoke.py -k test_citizenlab.py
