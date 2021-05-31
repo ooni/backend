@@ -1,3 +1,9 @@
+ooni-api (0.31) unstable; urgency=medium
+
+  * Fix CORS
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 31 May 2021 13:50:04 +0100
+
 ooni-api (0.30) unstable; urgency=medium
 
   * Switch to counters_test_list

@@ -8,11 +8,13 @@ import sys
 from flask import Flask, json
 
 from flask_cors import CORS  # debdeps: python3-flask-cors
+
 # python3-flask-cors has unnecessary dependencies :-/
 from ooniapi.rate_limit_quotas import FlaskLimiter
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
+
     enable_journal = True
 except ImportError:
     enable_journal = False
@@ -50,8 +52,7 @@ class FlaskJSONEncoder(json.JSONEncoder):
 
 
 def validate_conf(app, conffile):
-    """Fail early if the app configuration looks incorrect
-    """
+    """Fail early if the app configuration looks incorrect"""
     conf_keys = (
         "BASE_URL",
         "COLLECTORS",
@@ -113,7 +114,8 @@ def init_app(app, testmode=False):
         app.jinja_env.auto_reload = True
         app.config["TEMPLATES_AUTO_RELOAD"] = True
         app.config["DEBUG"] = True
-    elif stage not in ("testing", "staging",):  # known envs according to Readme.md
+    elif stage not in ("testing", "staging"):
+        # known envs according to Readme.md
         raise RuntimeError("Unexpected APP_ENV", stage)
 
     # md = Misaka(fenced_code=True)
@@ -121,7 +123,13 @@ def init_app(app, testmode=False):
 
     # FIXME
     # CORS(app, resources={r"/api/*": {"origins": "*"}})
-    CORS(app, resources={r"*": {"origins": "*"}}, supports_credentials=True)
+    orig = [
+        "https://explorer-test.ooni.io",
+        "https://explorer-test.ooni.org",
+        "https://explorer.ooni.org",
+        "https://url-prioritization.ooni.org",
+    ]
+    CORS(app, resources={r"*": {"origins": orig}}, supports_credentials=True)
 
 
 def check_config(config):
@@ -165,10 +173,6 @@ def create_app(*args, testmode=False, **kw):
     )
 
     Swagger(app, parse=True)
-
-    #mail = Mail(app)
-
-    # security = Security(app, app.db_session)
 
     # FIXME
     views.register(app)
