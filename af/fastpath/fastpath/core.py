@@ -414,6 +414,10 @@ def _detect_unknown_failure(tk):
     return False
 
 
+def init_scores() -> dict:
+    return {f"blocking_{lv}": 0.0 for lv in LOCALITY_VALS}
+
+
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm):
     tk = msm["test_keys"]
@@ -440,7 +444,7 @@ def score_measurement_facebook_messenger(msm):
     # These are keys that if they are true it means there is something fishy
     anomaly_keys = ["facebook_tcp_blocking", "facebook_dns_blocking"]
 
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
 
     # Workaround for 'facebook_dns_blocking': True
     # See tests/test_functional.py:test_facebook_messenger*
@@ -562,7 +566,7 @@ def score_measurement_telegram(msm):
     if web_blocking:
         s += 1
 
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     scores["blocking_general"] = s
     scores["web_failure"] = web_failure
     scores["accessible_endpoints"] = accessible_endpoints
@@ -580,7 +584,7 @@ def score_measurement_hhfm(msm):
     tk = msm["test_keys"]
     rid = msm["report_id"]
     del msm
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
 
     # See test_functional.py:test_score_measurement_hhfm_stats
     #
@@ -652,7 +656,7 @@ def score_http_invalid_request_line(msm):
     # https://github.com/ooni/spec/blob/master/nettests/ts-007-http-invalid-request-line.md
     tk = msm["test_keys"]
     rid = msm["report_id"]
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     sent = tk.get("sent", [])
     received = tk.get("received", [])
 
@@ -731,7 +735,7 @@ def score_measurement_whatsapp(msm):
         if score == 0.2:
             score = 0
 
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     # TODO: refactor
     if _detect_unknown_failure(tk):
         scores["accuracy"] = 0.0
@@ -799,7 +803,7 @@ def score_vanilla_tor(msm):
     Returns a scores dict
     """
     tk = msm["test_keys"]
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
 
     nks = ("error", "success", "tor_log", "tor_progress_summary", "tor_progress_tag")
     if msm["software_name"] == "ooniprobe" and all_keys_none(tk, nks):
@@ -833,7 +837,7 @@ def score_web_connectivity(msm, matches) -> dict:
     """Calculate measurement scoring for web connectivity
     Returns a scores dict
     """
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
+    scores = init_scores()  # type: Dict[str, Any]
     if len(matches):
         scores["confirmed"] = True
     tk = msm.get("test_keys", None)
@@ -917,7 +921,7 @@ def score_tcp_connect(msm) -> dict:
     # https://github.com/ooni/spec/blob/master/nettests/ts-008-tcp-connect.md
     # NOTE: this is *NOT* spec/blob/master/data-formats/df-005-tcpconnect.md
     # TODO: review scores
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     tk = msm["test_keys"]
     assert msm["input"]
     conn_result = tk.get("connection", None)
@@ -953,7 +957,7 @@ def score_dash(msm) -> dict:
     """
     # TODO: review scores
     # TODO: any blocking scoring based on performance?
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
+    scores = init_scores()  # type: Dict[str, Any]
     failure = msm["test_keys"].get("failure", None)
     if failure is None:
         pass
@@ -998,7 +1002,7 @@ def score_meek_fronted_requests_test(msm) -> dict:
     """Calculate measurement scoring for Meek
     Returns a scores dict
     """
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     tk = msm["test_keys"]
     requests = tk.get("requests", ()) or ()
 
@@ -1037,7 +1041,7 @@ def score_psiphon(msm) -> dict:
     """Calculate measurement scoring for Psiphon
     Returns a scores dict
     """
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     tk = msm.get("test_keys", {})
 
     # https://github.com/ooni/spec/blob/master/nettests/ts-015-psiphon.md
@@ -1072,7 +1076,7 @@ def score_tor(msm) -> dict:
     https://github.com/ooni/spec/blob/master/nettests/ts-023-tor.md
     Returns a scores dict
     """
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     tk = msm.get("test_keys", {})
 
     # targets -> <ipaddr:port>|<sha obfs4 fprint> -> failure
@@ -1119,7 +1123,7 @@ def score_http_requests(msm) -> dict:
     """Calculates measurement scoring for legacy test http_requests
     Returns a scores dict
     """
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     tk = msm.get("test_keys", {})
     body_length_match = tk.get("body_length_match", None)
     headers_match = tk.get("headers_match", None)
@@ -1208,7 +1212,7 @@ def score_dns_consistency(msm) -> dict:
     Returns a scores dict
     """
     # TODO: implement scoring
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     return scores
 
 
@@ -1217,7 +1221,7 @@ def score_signal(msm) -> dict:
     Returns a scores dict
     """
     # https://github.com/ooni/spec/blob/master/nettests/ts-029-signal.md
-    scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+    scores = init_scores()
     tk = msm.get("test_keys", {})
     if tk.get("failed_operation", True) or tk.get("failure", True):
         scores["accuracy"] = 0.0
@@ -1276,7 +1280,7 @@ def score_measurement(msm: dict) -> dict:
             return score_signal(msm)
 
         log.debug("Unsupported test name %s", tn)
-        scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+        scores = init_scores()
         scores["accuracy"] = 0.0
         return scores
 
@@ -1284,7 +1288,7 @@ def score_measurement(msm: dict) -> dict:
         # unknown / new client bugs are often catched by assertions
         if str(e).startswith("pbug "):  # suspected probe bug
             logbug(0, str(e)[4:], msm)
-            scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}
+            scores = init_scores()
             scores["accuracy"] = 0.0
             return scores
 
@@ -1341,10 +1345,10 @@ def msm_processor(queue):
 @metrics.timer("full_run")
 def process_measurement(msm_tup) -> None:
     """Process a measurement:
-        - Parse JSON if needed
-        - Unwrap "content" key if needed
-        - Score it
-        - Upsert to fastpath table unless no_write_to_db is set
+    - Parse JSON if needed
+    - Unwrap "content" key if needed
+    - Score it
+    - Upsert to fastpath table unless no_write_to_db is set
     """
     try:
         msm_jstr, measurement, msmt_uid = msm_tup
