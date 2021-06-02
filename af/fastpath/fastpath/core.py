@@ -1162,7 +1162,7 @@ def score_http_requests(msm) -> dict:
                 body = b64decode(body["data"])
 
             else:
-                logbug(2, "incorrect body of type dict", measurement)
+                logbug(3, "incorrect body of type dict", msm)
                 body = None
 
         for fp in zzfps["body_match"] + ccfps.get("body_match", []):
