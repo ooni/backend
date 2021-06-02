@@ -1323,7 +1323,7 @@ def unwrap_msmt(post):
     if fmt == "json":
         return post["content"]
     if fmt == "yaml":
-        return yaml.safe_load(msmt)
+        return yaml.safe_load(post["content"])  # TODO: test
 
 
 def msm_processor(queue):
