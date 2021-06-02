@@ -17,8 +17,6 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Iterator, Dict, Any
 import hashlib
 import logging
 import multiprocessing as mp
@@ -357,7 +355,7 @@ def all_keys_true(d, keys):
     if isinstance(keys, str):
         keys = (keys,)
     for k in keys:
-        if d.get(k, None) != True:
+        if d.get(k, None) is not True:
             return False
 
     return True
@@ -368,7 +366,7 @@ def all_keys_false(d, keys):
     if isinstance(keys, str):
         keys = (keys,)
     for k in keys:
-        if d.get(k, None) != False:
+        if d.get(k, None) is not False:
             return False
 
     return True
@@ -379,7 +377,7 @@ def all_keys_none(d, keys):
     if isinstance(keys, str):
         keys = (keys,)
     for k in keys:
-        if d.get(k, True) != None:
+        if d.get(k, True) is not None:
             return False
 
     return True
@@ -465,13 +463,13 @@ def score_measurement_facebook_messenger(msm):
         score = 0
         for key in consistency_keys:
             v = tk.get(key, None)
-            if v == False:
+            if v is False:
                 score += 0.5
                 scores[key] = v
 
         for key in anomaly_keys:
             v = tk.get(key, None)
-            if v == True:
+            if v is True:
                 score += 0.5
                 scores[key] = v
 
@@ -765,7 +763,7 @@ def score_measurement_whatsapp(msm):
 
         elif url == "https://v.whatsapp.net/v2/register":
             # In case of connection failure "response" might be empty
-            registration_accessible = b.get("failure", None) == None
+            registration_accessible = b.get("failure", None) is None
 
     if webapp_accessible is None or registration_accessible is None:
         # bug e.g. 20190101T191128Z_AS34594_ZCyS8OE3SSvRwLeuiAeiklVZ8H91hEfY0Ook7ljgfotgpQklhv
@@ -957,7 +955,7 @@ def score_dash(msm) -> dict:
     # TODO: any blocking scoring based on performance?
     scores = {f"blocking_{l}": 0.0 for l in LOCALITY_VALS}  # type: Dict[str, Any]
     failure = msm["test_keys"].get("failure", None)
-    if failure == None:
+    if failure is None:
         pass
     elif failure == "connection_aborted":
         scores["blocking_general"] = 0.1
@@ -1017,14 +1015,14 @@ def score_meek_fronted_requests_test(msm) -> dict:
         if resp is None:
             # Error during probing?
             scores["blocking_general"] = 1.0
-            if success != None:
+            if success is not None:
                 log.info("Client bug: success != None")
             return scores
 
         if resp.get("code", 0) != 200:
             # A failed response is enough
             scores["blocking_general"] = 1.0
-            if success != False:
+            if success is not False:
                 log.info("Client bug: success != False")
             return scores
 
@@ -1100,7 +1098,7 @@ def score_tor(msm) -> dict:
         # string: failed
         if f is False:
             not_run_cnt += 1
-        elif f == None:
+        elif f is None:
             success_cnt += 1
         elif f == "":
             # logbug(8
