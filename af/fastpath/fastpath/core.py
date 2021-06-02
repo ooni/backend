@@ -261,19 +261,20 @@ def prepare_for_json_normalize(report):
         pass
 
 
-def process_measurements_from_s3(queue):
-    """Pull measurements from S3 and place them in the queue"""
+def process_measurements_from_s3():
+    """Pull measurements from S3 and process them"""
+    if conf.no_write_to_db:
+        log.info("Skipping DB connection setup")
+    else:
+        db.setup(conf)
+
     for measurement_tup in s3feeder.stream_cans(conf, conf.start_day, conf.end_day):
+        assert measurement_tup is not None
         assert len(measurement_tup) == 3
         msm_jstr, msm, msm_uid = measurement_tup
         assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
         assert msm is None or isinstance(msm, dict)
-
-        while queue.qsize() >= 500:
-            time.sleep(0.1)
-        assert measurement_tup is not None
-        queue.put(measurement_tup)
-        metrics.gauge("queue_size", queue.qsize())
+        process_measurement(measurement_tup)
 
 
 @metrics.timer("match_fingerprints")
@@ -1336,67 +1337,77 @@ def msm_processor(queue):
             log.info("Worker with PID %d exiting", os.getpid())
             return
 
-        with metrics.timer("full_run"):
-            try:
-                msm_jstr, measurement, msmt_uid = msm_tup
-                if measurement is None:
-                    measurement = ujson.loads(msm_jstr)
-                if sorted(measurement.keys()) == ["content", "format"]:
-                    measurement = unwrap_msmt(measurement)
-                rid = measurement.get("report_id", None)
-                inp = measurement.get("input", None)
-                log.debug(f"Processing {msmt_uid} {rid} {inp}")
-                if measurement.get("probe_cc", "").upper() == "ZZ":
-                    log.debug(f"Ignoring measurement with probe_cc=ZZ")
-                    metrics.incr("discarded_measurement")
-                    continue
+        process_measurement(msm_tup)
 
-                if measurement.get("probe_asn", "").upper() == "AS0":
-                    log.debug(f"Ignoring measurement with ASN 0")
-                    metrics.incr("discarded_measurement")
-                    continue
 
-                scores = score_measurement(measurement)
-                # Generate anomaly, confirmed and failure to keep consistency
-                # with the legacy pipeline, allowing simple queries in the API
-                # and in manual analysis; also keep compatibility with Explorer
-                anomaly = scores.get("blocking_general", 0.0) > 0.5
-                failure = scores.get("accuracy", 1.0) < 0.5
-                confirmed = scores.get("confirmed", False)
+@metrics.timer("full_run")
+def process_measurement(msm_tup) -> None:
+    """Process a measurement:
+        - Parse JSON if needed
+        - Unwrap "content" key if needed
+        - Score it
+        - Upsert to fastpath table unless no_write_to_db is set
+    """
+    try:
+        msm_jstr, measurement, msmt_uid = msm_tup
+        if measurement is None:
+            measurement = ujson.loads(msm_jstr)
+        if sorted(measurement.keys()) == ["content", "format"]:
+            measurement = unwrap_msmt(measurement)
+        rid = measurement.get("report_id", None)
+        inp = measurement.get("input", None)
+        log.debug(f"Processing {msmt_uid} {rid} {inp}")
+        if measurement.get("probe_cc", "").upper() == "ZZ":
+            log.debug(f"Ignoring measurement with probe_cc=ZZ")
+            metrics.incr("discarded_measurement")
+            return
 
-                if anomaly or failure or confirmed:
-                    log.debug(
-                        f"Storing {msmt_uid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
-                    )
-                sw_name = measurement.get("software_name", "unknown")
-                sw_version = measurement.get("software_version", "unknown")
-                platform = "unset"
-                if "annotations" in measurement and isinstance(
-                    measurement["annotations"], dict
-                ):
-                    platform = measurement["annotations"].get("platform", "unset")
+        if measurement.get("probe_asn", "").upper() == "AS0":
+            log.debug(f"Ignoring measurement with ASN 0")
+            metrics.incr("discarded_measurement")
+            return
 
-                if msmt_uid is None:
-                    msmt_uid = trivial_id(measurement)  # legacy measurement
+        scores = score_measurement(measurement)
+        # Generate anomaly, confirmed and failure to keep consistency
+        # with the legacy pipeline, allowing simple queries in the API
+        # and in manual analysis; also keep compatibility with Explorer
+        anomaly = scores.get("blocking_general", 0.0) > 0.5
+        failure = scores.get("accuracy", 1.0) < 0.5
+        confirmed = scores.get("confirmed", False)
 
-                if conf.no_write_to_db:
-                    continue
+        if anomaly or failure or confirmed:
+            log.debug(
+                f"Storing {msmt_uid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
+            )
+        sw_name = measurement.get("software_name", "unknown")
+        sw_version = measurement.get("software_version", "unknown")
+        platform = "unset"
+        if "annotations" in measurement and isinstance(
+            measurement["annotations"], dict
+        ):
+            platform = measurement["annotations"].get("platform", "unset")
 
-                db.upsert_summary(
-                    measurement,
-                    scores,
-                    anomaly,
-                    confirmed,
-                    failure,
-                    msmt_uid,
-                    sw_name,
-                    sw_version,
-                    platform,
-                    conf.update,
-                )
-            except Exception as e:
-                log.exception(e)
-                metrics.incr("unhandled_exception")
+        if msmt_uid is None:
+            msmt_uid = trivial_id(measurement)  # legacy measurement
+
+        if conf.no_write_to_db:
+            return
+
+        db.upsert_summary(
+            measurement,
+            scores,
+            anomaly,
+            confirmed,
+            failure,
+            msmt_uid,
+            sw_name,
+            sw_version,
+            platform,
+            conf.update,
+        )
+    except Exception as e:
+        log.exception(e)
+        metrics.incr("unhandled_exception")
 
 
 def shut_down(queue):
@@ -1414,7 +1425,10 @@ def core():
     # - report files on collectors fetched in "real-time"
     # Load json/yaml files and apply filters like canning
 
-    t00 = time.time()
+    if conf.noapi:
+        # Process measurements from S3
+        process_measurements_from_s3()
+        return
 
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module
@@ -1423,15 +1437,9 @@ def core():
     ]
     try:
         [t.start() for t in workers]
-
-        if conf.noapi:
-            # Pull measurements from S3
-            process_measurements_from_s3(queue)
-
-        else:
-            # Start HTTP API
-            log.info("Starting HTTP API")
-            start_http_api(queue)
+        # Start HTTP API
+        log.info("Starting HTTP API")
+        start_http_api(queue)
 
     except Exception as e:
         log.exception(e)
