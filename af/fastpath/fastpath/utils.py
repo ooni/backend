@@ -14,6 +14,7 @@ import csv
 # unclassified locality is named "general"
 fingerprints = {
     "AE": [
+        # https://explorer.ooni.org/measurement/20200119T122050Z_AS5384_c3w6BLgePoeH9DLcYiH5MbgwfNujXtBUPNkMzpHmn1tdxZdn4P?input=http://www.helem.net/
         {
             "header_name": "Server",
             "header_prefix": "Protected by WireFilter",
@@ -25,6 +26,20 @@ fingerprints = {
             "header_name": "Location",
             "header_prefix": "http://www.bluecoat.com/notify-NotifyUser1",
             "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20191118T063541Z_AS15802_ocKS0RbSg8GE1oLahQKYeAozvsxM3HglG8f3xMRkrWVOd4ajtN?input=http://gayguide.net/
+        # https://explorer.ooni.org/measurement/20171105T032733Z_AS15802_HaY0S8nTvD8xcK50zBOzcdDFCLiqhjVRFAFhPnUowVNv582Tp6?input=http://amygoodloe.com/lesbian-dot-org/
+        # https://explorer.ooni.org/measurement/20200127T092537Z_AS15802_GvFE8kAEn7C40Sq0vlu5OUmUxAP89DajF7LRzqs51Bl8eztjip?input=http://www.gayscape.com/
+        # https://explorer.ooni.org/measurement/20171105T032733Z_AS15802_HaY0S8nTvD8xcK50zBOzcdDFCLiqhjVRFAFhPnUowVNv582Tp6?input=http://amygoodloe.com/lesbian-dot-org/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://lighthouse.du.ae",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190708T075453Z_AS5384_VXPZQorUMS5VJxSy4BWbzITW3GGfQOWX9APTD9wBEJDCCDU4s5?input=http://gaytoday.com/
+        {
+            "body_match": "it-security-operations@etisalat.ae",
+            "locality": "isp"
         }
     ],
     "AF": [
@@ -89,6 +104,43 @@ fingerprints = {
             "locality": "local",
         }
     ],
+    "BH": [
+        # https://explorer.ooni.org/measurement/20200103T214930Z_AS5416_Cb0eigi9DgBdD9lrQfZLTSckVYANzKDOzI5LSd9yPbFcJNEUuT?input=http://www.gay.com/
+        {
+            "body_match": "www.anonymous.com.bh",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20180821T225240Z_AS51375_arIbEdkOsq47wsCE8tRpJWQuIeDN8adphRYo1e76drI3rZWRWr?input=http://gaytoday.com
+        {
+            "body_match": "www.viva.com.bh/static/block",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170220T113603Z_AS39015_Lamk4jT9RlMfeIjwMbg4oi8xBU67dBgnWwzD7Nb4UhihIaR0Ap?input=http://gaytoday.com
+        {
+            "body_match": "menatelecom.com/deny_page.html",
+            "locality": "isp"
+        }
+    ],
+    "BY": [
+        # https://explorer.ooni.org/measurement/20200809T064736Z_AS42772_Sn8W1QKfDMxmJzphNHpEWpYmWbyNQS09eB8wgpQQCYIASBbkPh?input=http://intimby.net/
+        {
+            "header_name": "Location",
+            "header_prefix": "https://www.a1.by/mininfo/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20200808T143914Z_AS6697_vIveEEZm32Xz4qc8nChMRmJQvQXS2vKLEFQ553NmpborhsfzDY?input=http://intimby.net/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://82.209.230.23",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20200808T195507Z_AS25106_hY9xbufjqUKiqPI5LZJ4IqiwfGMNcaOdrtKnwCaXADPRhSOL8J?input=http://intimby.net/
+        {
+            "header_name": "Location",
+            "header_prefix": "https://internet.mts.by/blocked/",
+            "locality": "isp"
+        },
+    ],
     "CA": [
         # https://explorer.ooni.org/measurement/20171026T125929Z_AS0_nkYRKqxCJy1PZQ9yBcsFuG61hFzZRYeio3N21CEBwot7MiikfZ?input=http:%2F%2Fwww.schwarzreport.org
         # https://explorer.ooni.org/measurement/20181010T185819Z_AS5664_EeT6QJ84dSl7QaHu9Dwb5TcByIY2qiGrdtcyZlSFotmQlc53Hg?input=http:%2F%2Fwww.sportingbet.com
@@ -96,6 +148,14 @@ fingerprints = {
         {
             "body_match": " <title>Notification: Policy: URL Filtering</title>",
             "locality": "local"
+        },
+        {
+            "body_match": "Access to this site has been blocked by an Order issued by the Federal Court of Canada",
+            "locality": "isp"
+        },
+        {
+            "body_match": "Access to the location you have attempted to reach has been disabled pursuant to an Order&nbsp;of the Federal Court (Canada)",
+            "locality": "isp"
         }
     ],
     "CH": [
@@ -146,6 +206,17 @@ fingerprints = {
             "header_name": "X-App-Url",
             "locality": "isp",
         },
+        # https://explorer.ooni.org/measurement/20191129T093025Z_AS31334_QLJPBWGVj5ZqNmPb7C3R4KQkEatrbGCQu9nVQQwgkNH4SnWxpZ?input=http://www.newnownext.com/
+        {
+            "body_match": "title>IServ",
+            "locality": "local"
+        },
+        # https://explorer.ooni.org/measurement/20200127T113040Z_AS31334_f2WzvfEf8rj0X645IsaTmrojbWpB4VpU48c7TRifHnwrEPT1J7?input=http://www.nclrights.org/
+        {
+            "header_name": "Location",
+            "header_prefix": "https://hotspot.vodafone.de/access_denied.html",
+            "locality": "isp"
+        },
     ],
     "DK": [
         {"body_match": "lagt at blokere for adgang til siden.", "locality": "country"},
@@ -182,7 +253,10 @@ fingerprints = {
         },
     ],
     "FR": [
-        {"body_match": 'xtpage = "page-blocage-terrorisme"', "locality": "country"},
+        {
+            "body_match": 'xtpage = "page-blocage-terrorisme"',
+            "locality": "country"
+        },
         # https://github.com/ooni/pipeline/issues/184
         # https://explorer.ooni.org/measurement/20170213T143932Z_AS57584_U1gMCvIFLNWIKnSrpWTLrN9oewaHiT0DdKjLaT3MiMqnBk3J3U?input=http:%2F%2Fwww.23.org
         {
@@ -191,8 +265,43 @@ fingerprints = {
             "body_match": "<title>Notification: Policy: URL Filtering</title>",
             "locality": "local",
         },
+        # https://explorer.ooni.org/measurement/20181013T160011Z_AS3215_IRIYlWDvBY8FTKrWmI3C6GrvGXVEeHwibS9J9AeorEPZbKp62j?input=http://gaytoday.com
+        {
+            "header_name": "Server",
+            "header_prefix": "Olfeo",
+            "locality": "local"
+        }
     ],
     "GB": [
+        # https://explorer.ooni.org/measurement/20190403T143637Z_AS29180_Rg2EoxvcDr0pcIYCywybM010BYCl8skvqZk7yAQbArxo2lHSJJ?input=http://www.bglad.com/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://assets.o2.co.uk/18plusaccess/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190704T000814Z_AS25135_mqMcWW8a9uRprR4q1bWdrsOnWMgJnQljybCpd5pJ488dXV3zYw?input=http://www.bglad.com
+        {
+            "header_name": "Location",
+            "header_prefix": "http://www.vodafone.co.uk/restricted-content",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20191009T152456Z_AS35228_2YC8q7bdXWrnOO8NuKvNjS5F0SsVQBHLCyt17C5i684qDQ7DQT?input=http://www.bglad.com/
+        {
+            "header_name": "Location",
+            "header_prefix": "https://www.giffgaff.com/mobile/over18",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190929T145217Z_AS5607_2kkJ5ZcoHY65PnXshBrnVW1SkwHUGBJYgKApmQ82qYQl5U6kkC?input=http://www.grindr.com/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://block.cf.sky.com",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190523T171133Z_AS12513_H6Wc12khwbndgeJ9oKath0nvUZ4IeEcmNSCxmcTpYPe59MdSpV?input=http://www.grindr.com/
+        {
+            "body_match": "Taunton School allow access to the following search engines",
+            "locality": "local"
+        },
         # https://github.com/ooni/pipeline/issues/188
         # https://explorer.ooni.org/measurement/20160401T061018Z_ehdZlDMzbUsYhYSGSWalmqKnqGIynfVHQhKvocrcKEmFeynXHd?input=Trans500.com
         {
@@ -269,10 +378,201 @@ fingerprints = {
             "header_prefix": "http://internet-positif.org",
             "locality": "country",
         },
+        # https://explorer.ooni.org/measurement/20180528T130640Z_AS7713_A2RVHOGPmVoYQ5U9Fe3WNCMkJcH7D2kCmPboBZDEfgt6XjE8OM?input=http://www.samesexmarriage.ca
+        {
+            "header_name": "Location",
+            "header_prefix": "http://internetpositif.uzone.id",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20200312T024737Z_AS45292_QGO96hC1JiPt1T30OH3q4EXyCDfE8D3c4cjGqalbffrgJCrbe9?input=http://ilga.org/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://mercusuar.uzone.id/",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20200213T053902Z_AS17974_igK3SmCYSdqnVjV2OxZ1VCUnsaECgo8Dh7S6CfU0AQgWg5nPQU?input=http://www.queernet.org/
+        {
+            "body_match": "http://block.uzone.id",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20170414T032645Z_AS17974_Qho7Y39z1oG2s1ylGbQvoFuQh8aDDnY2OwhXMVkqmyBPwQjmT5?input=http://www.bglad.com
+        {
+            "body_match": ".uzone.id/assets/internetpositif",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20171121T103829Z_AS17974_QgZkCjksBNucHe11XDLxKXIC3MTW32OamXngJCJrLaoouWNoEM?input=http://www.ifge.org
+        {
+            "body_match": "positif.uzone.id",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20190314T214950Z_AS17658_kybYxwcXIxWZYnX32z36B1ZprSLxFT3WpxY0g7sfuy0Uy7MLAo?input=http://www.samesexmarriage.ca/
+        {
+            "body_match": "This page is blocked by <a href=http://trustpositif.kominfo.go.id",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20170214T023529Z_AS17974_1hVbJGBPLdOsxQvNgIawwvABxfZuLNeVK5VaY1XWajguEt0yK3?input=http://www.lesbian.org
+        {
+            "body_match": "tidak bisa diakses melalui jaringan ini sesuai peraturan perundang-undangan",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20180727T095622Z_AS17670_ryQ3v3ZDI2X8YI7FKTxeG9L5PEmgc0Z5N3bDIU7uusFaaIcuql?input=http://www.bglad.com
+        {
+            "body_match": "internetpositif.mncplaymedia.com",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190420T092536Z_AS135478_mLOlXUu4n0QwTV10X6nqZYFwh9aQga4i4fPo9fMomwk2IMV6Le?input=http://transsexual.org/
+        {
+            "body_match": "Maaf, akses Anda ke situs ini telah diblokir sesuai dengan <a",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170213T013637Z_AS4832_Y8ct5af944VzPhrMoeoll3Ap7MtHL97R2JBO0lEHto45vPYwFQ?input=http://www.gayscape.com
+        {
+            "body_match": "We are blocking this abusive site as stated by the Indonesia regulation in order to provide Internet Sehat.",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20161031T235715Z_AS23700_3cxMXOKGRHBMQly8HBD4vFHM3qRsMKtzc5Yl8Dcm8LVeQasRLj?input=http://www.bglad.com
+        {
+            "body_match": "internetsehatdanamanfastnet.html",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20191124T035958Z_AS23700_qdrRmnIMyFi0rfhj3OnrSb94TDyu7uRcw9vRTM1mjghyJGnAJW?input=http://ilga.org/
+        {
+            "body_match": "var pname='internet-sehat';",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190301T020519Z_AS55666_zcD5kLAL3QHZypge7Kppqp2ysd5p76afVPmvC7XlZ8zol52iEl?input=http://ilga.org/
+        {
+            "body_match": "xblock.gmedia.net.id",
+            "locality": "isp"
+        },
+        {
+            "body_match": "http://crypto.net.id/images/crypto_emblem.png",
+            "locality": "isp"
+        },
+        {
+            "body_match": "<title>Negatif Konten</title>",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190323T072437Z_AS0_pvl7biYGsLZDaHODVWbZ1PHC3iijtVfwM4a7BmBOd3YCg8705w?input=http://www.tsroadmap.com
+        {
+            "body_match": "<a href=http://megavision.net.id>StarNet Project</a></strong> - DNS Filter Project.",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170920T165858Z_AS17974_3WOOOvd6aU5LlWGoP1mVIXMiXBDXaJpAwfkjP4IYR52V0nXvDF?input=http://transsexual.org
+        {
+            "header_name": "Location",
+            "header_prefix": "http://filter.citra.net.id",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20171010T001639Z_AS17974_DRF1cmT5lEsJdMlrkJ6xtFk4FW4zwAJHmf0eYBmCzoNFFHSgua?input=http://www.bglad.com
+        {
+            "body_match": "<h2>INTERNET SEHAT CITRANET</h2>",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20200213T135057Z_AS4761_0VqghBlufZfB6k68FBcGkeU9XAUcCmfXguHZJGBJhaQfurl2do?input=http://www.grindr.com/
+        {
+            "body_match": "<title>Indosatooredoo Netsafe</title>",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170403T000118Z_AS4795_ZGyxgVEVzoRMZpL4QlHyPZtmJOwAO26NUv1Op3Vh6fCv7XIAW3?input=http://www.ifge.org
+        {
+            "body_match": "<title>Netsafe IndosatM2</title>",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20200213T135057Z_AS4761_0VqghBlufZfB6k68FBcGkeU9XAUcCmfXguHZJGBJhaQfurl2do?input=http://www.grindr.com/
+        # https://explorer.ooni.org/measurement/20190602T174828Z_AS4761_YOEBG2rWEL90gfaLLyKNI3kBNU5RjG5ryZ5b3LPd81ayu8oW31?input=http://www.gayegypt.com/
+        {
+            "body_match": "http://netsafe.indosatooredoo.com",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170501T123218Z_AS17974_TQovh9GvtBR3FlRa5IfIH19tSRfiGUgUzEnGoh5sgdLI1m0OgY?input=http://www.ifge.org
+        {
+            "body_match": "argon_files/stop.jpg",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190905T165736Z_AS63859_PeIPMNtOMVuCacZ3pJmR3RySVKbNArcUTaKTPPLgPddZXwN2KC?input=http://www.queernet.org/
+        {
+            "body_match": "https://myrepublic.co.id/internet-sehat/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20200130T135811Z_AS23693_d5uipVzMCxrQlnNCO4cB3ZxZYk4CyYZWr8ipsdgC8Qzp4K2Bl9?input=http://www.bglad.com/
+        {
+            "body_match": "internetbaik.telkomsel.com/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170316T024318Z_AS23693_CQPxlyILeqGXlHzFqGSCPR6MgtCBfZtbs3h2l37MOyiU77N1xP?input=http://www.bglad.com
+        {
+            "body_match": "telkomsel|internet sehat|baik|internet baik",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190307T051144Z_AS131472_7RLBdzGBIF3RPC6UcuV9HJAMkysGP4IR9JkfwfhCSXuieZQtAq?input=http://www.tsroadmap.com
+        {
+            "body_match": "www.xl.co.id/xlblockpage",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20170412T174345Z_AS24203_qlNBUtI6cL4DZGjeNWLOQ5puycMYiMol71agNH5Qvg1WmSAWzL?input=http://www.bglad.com
+        {
+            "body_match": "blockpage.xl.co.id",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190727T045744Z_AS17451_kC7sYnleU6DzAOhrgOf4LXXvtois6M4GnEpgvFCcFP0taBcuIU?input=http://www.gayhealth.com/
+        {
+            "body_match": "www.biznetnetworks.com/safesurf/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190905T052510Z_AS24207_I540tCMJL3Wtb3cJ4oOCQaH7Fv44n2rn8kLkMubuSLLipSctue?input=http://www.gayegypt.com/
+        {
+            "body_match": "VELO Networks :: Internet Sehat dan Aman",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20191005T031241Z_AS45727_93jXiGYrI1w8wHNC9FVzF5zuylmtgOToSGsA0mgYubk132ZKuV?input=http://www.nclrights.org/
+        {
+            "body_match": "restricted.tri.co.id/",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20190605T140849Z_AS4800_bKVUk4pjoLXBQOUdWBLnQOPZfWfDPGCSoURwopRoEj0O4ZjOKG?input=http://www.tsroadmap.com/
+        {
+            "body_match": "<title>IdOLA Lintasarta</title>",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20180315T084438Z_AS133357_LeDGv9wMP20hFNfN2nqsvJxL1vUKOFZ0grMlnMJXACYHkmPLNB?input=http://www.ifge.org
+        {
+            "body_match": "<title>Internet Sehat Telkom University</title>",
+            "locality": "local"
+        },
+        # https://explorer.ooni.org/measurement/20190905T165736Z_AS63859_PeIPMNtOMVuCacZ3pJmR3RySVKbNArcUTaKTPPLgPddZXwN2KC?input=http://www.queernet.org/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://block.myrepublic.co.id",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20200130T135811Z_AS23693_d5uipVzMCxrQlnNCO4cB3ZxZYk4CyYZWr8ipsdgC8Qzp4K2Bl9?input=http://www.bglad.com/
+        {
+            "header_name": "Location",
+            "header_prefix": "https://internetbaik.telkomsel.com/block?",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20180308T104910Z_AS24203_nhfe7SS0mYB7NFo906daTIuBIz5qPAue9LDvWSAw7p2E3hjUna?input=http://www.tsroadmap.com
+        {
+            "header_name": "Location",
+            "header_prefix": "https://blockpage.xl.co.id",
+            "locality": "isp"
+        },
+        # https://explorer.ooni.org/measurement/20191005T031241Z_AS45727_93jXiGYrI1w8wHNC9FVzF5zuylmtgOToSGsA0mgYubk132ZKuV?input=http://www.nclrights.org/
+        {
+            "header_name": "Location",
+            "header_prefix": "http://restricted.tri.co.id",
+            "locality": "isp"
+        },
         # https://explorer.ooni.org/measurement/20170826T071505Z_AS24526_40Tlz7tR7m0UVaTRZi5EUtsuAjHnYuAgDlNjkec64t70Tujbo9?input=http:%2F%2Fwww.budweiser.com
         {
             "body_match": '<title>Blocked Page Bina Nusantara Networks</title>',
             "locality": "isp",
+        },
+        # https://explorer.ooni.org/measurement/20200130T121354Z_AS18103_6roxhkcpVP4ML3VyjL75G28deYvsJgocbDyeV8Ud6WBHAFTwy4?input=http://www.grindr.com/
+        {
+            "body_match": "di.og.ofnimok@netnoknauda",
+            "locality": "country"
         },
     ],
     "IN": [
