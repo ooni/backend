@@ -1,3 +1,9 @@
+fastpath (0.39) unstable; urgency=medium
+
+  * Cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 02 Jun 2021 12:34:31 +0100
+
 fastpath (0.38) unstable; urgency=medium
 
   * Add Signal scoring
