@@ -1492,7 +1492,7 @@ fingerprints = {
         # https://explorer.ooni.org/measurement/20190314T223836Z_AS45758_saZmEbyWARgKDPY5FS8JmbrexGQAUUAHO0naE3K4jqMrEPuVfD?input=http://instinctmagazine.com/
         {
             "header_name": "Location",
-            "header_prefix": "http://110.164.252.137/wpwarn/soft_bd/wpcbt_res.php"
+            "header_prefix": "http://110.164.252.137/wpwarn/soft_bd/wpcbt_res.php",
             "locality": "isp"
         }
     ],
