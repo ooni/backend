@@ -245,9 +245,16 @@ class URLListManager:
         if state == "IN_PROGRESS":
             return
         if self.is_pr_resolved(username):
-            shutil.rmtree(self.get_user_repo_path(username))
-            self.repo.git.worktree("prune")
-            self.repo.delete_head(self.get_user_branchname(username), force=True)
+            path = self.get_user_repo_path(username)
+            bname = self.get_user_branchname(username)
+            log.debug(f"Deleting {path}")
+            try:
+                # TODO: investigate
+                shutil.rmtree(path)
+                self.repo.git.worktree("prune")
+                self.repo.delete_head(bname, force=True)
+            except Exception as e:
+                log.info(f"Error deleting {path} {e}")
 
             self.set_state(username, "CLEAN")
 
@@ -350,10 +357,13 @@ class URLListManager:
         return j["url"]
 
     def is_pr_resolved(self, username):
-        pr_id = (self.get_pr_id(username),)
+        pr_id = self.get_pr_id(username)
+        assert pr_id.startswith("https")
+        log.debug(f"Fetching PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
-        r = requests.post(pr_id, auth=auth)
+        r = requests.get(pr_id, auth=auth)
         j = r.json()
+        assert "state" in j
         return j["state"] != "open"
 
     def push_to_repo(self, username):
@@ -459,6 +469,9 @@ def get_test_list(country_code):
     username = get_username()
     ulm = get_url_list_manager()
     tl = ulm.get_test_list(username, country_code)
+    # make an array of dicts
+    header = tl[0]
+    tl = [dict(zip(header, row)) for row in tl[1:]]
     return make_response(jsonify(tl))
 
 

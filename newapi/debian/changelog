@@ -1,3 +1,9 @@
+ooni-api (0.32) unstable; urgency=medium
+
+  * Fixes for citizenlab URL submission
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 03 Jun 2021 14:58:28 +0100
+
 ooni-api (0.31) unstable; urgency=medium
 
   * Fix CORS

@@ -118,11 +118,9 @@ def init_app(app, testmode=False):
         # known envs according to Readme.md
         raise RuntimeError("Unexpected APP_ENV", stage)
 
-    # md = Misaka(fenced_code=True)
-    # md.init_app(app)
-
     # FIXME
     # CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # TODO: configure from api.conf:
     orig = [
         "https://explorer-test.ooni.io",
         "https://explorer-test.ooni.org",
