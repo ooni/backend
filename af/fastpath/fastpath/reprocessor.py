@@ -153,31 +153,31 @@ def parse_args():
     return c
 
 
-def score_measurement_and_upsert_fastpath(measurement, msmt_uid) -> None:
-    raise NotImplementedError
-    scores = score_measurement(measurement)
-    anomaly = scores.get("blocking_general", 0.0) > 0.5
-    failure = scores.get("accuracy", 1.0) < 0.5
-    confirmed = scores.get("confirmed", False)
-
-    sw_name = measurement.get("software_name", "unknown")
-    sw_version = measurement.get("software_version", "unknown")
-    platform = "unset"
-    if "annotations" in measurement and isinstance(measurement["annotations"], dict):
-        platform = measurement["annotations"].get("platform", "unset")
-
-    db.upsert_summary(
-        measurement,
-        scores,
-        anomaly,
-        confirmed,
-        failure,
-        msmt_uid,
-        sw_name,
-        sw_version,
-        platform,
-        conf.update,
-    )
+# def score_measurement_and_upsert_fastpath(measurement, msmt_uid) -> None:
+#     raise NotImplementedError
+#     scores = score_measurement(measurement)
+#     anomaly = scores.get("blocking_general", 0.0) > 0.5
+#     failure = scores.get("accuracy", 1.0) < 0.5
+#     confirmed = scores.get("confirmed", False)
+#
+#     sw_name = measurement.get("software_name", "unknown")
+#     sw_version = measurement.get("software_version", "unknown")
+#     platform = "unset"
+#     if "annotations" in measurement and isinstance(measurement["annotations"], dict):
+#         platform = measurement["annotations"].get("platform", "unset")
+#
+#     db.upsert_summary(
+#         measurement,
+#         scores,
+#         anomaly,
+#         confirmed,
+#         failure,
+#         msmt_uid,
+#         sw_name,
+#         sw_version,
+#         platform,
+#         conf.update,
+#     )
 
 
 @dataclass
@@ -191,7 +191,7 @@ class Entity:
 seen_uids = set()
 
 
-def finalize_jsonl(s3sig, db_conn, conf, e):
+def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
     jsize = int(e.fd.offset / 1024)
     log.info(f"Closing jsonl and uploading it. Size: {jsize} KB")
     e.fd.close()
@@ -269,8 +269,8 @@ def process_measurement(msm_tup, buf, conf, s3sig, db_conn):
         # The jsonlf is big enough
         finalize_jsonl(s3sig, db_conn, conf, e)
 
-    if conf.write_fastpath:
-        score_measurement_and_upsert_fastpath(msm)
+    # if conf.write_fastpath:
+    #     score_measurement_and_upsert_fastpath(msm)
 
 
 @metrics.timer("total_run_time")
@@ -293,7 +293,7 @@ def main():
 
     s3uns = s3f.create_s3_client()  # unsigned client for reading
     cans_fns = s3f.list_cans_on_s3_for_a_day(s3uns, conf.day)
-    cans_fns = sorted(cans_fns)  # not enough to really sort by time
+    cans_fns = sorted(cans_fns)  # this is not enough to sort by time
     tot_size = sum(size for _, size in cans_fns)
     processed_size = 0
     log.info(f"{tot_size/1024/1024/1024} GB to process")
@@ -308,9 +308,12 @@ def main():
             process_measurement(msm_tup, buf, conf, s3sig, db_conn)
         processed_size += size
 
-    for e in buf.values():
-        # Finish jsonl files still open
-        finalize_jsonl(s3sig, db_conn, conf, e)
+    log.info("Finish jsonl files still open")
+    for json_entities in buf.values():
+        for e in json_entities:
+            if e.fd.closed:
+                continue
+            finalize_jsonl(s3sig, db_conn, conf, e)
 
     log.info("Exiting")
 
