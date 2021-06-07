@@ -277,7 +277,7 @@ def process_measurements_from_s3():
 
 @metrics.timer("match_fingerprints")
 def match_fingerprints(measurement):
-    """Match fingerprints against HTTP headers and bodies.
+    """Match fingerprints against HTTP headers, bodies and DNS.
     Used only on web_connectivity
     """
     msm_cc = measurement["probe_cc"]
@@ -290,6 +290,14 @@ def match_fingerprints(measurement):
         return []
 
     matches = []
+    queries = test_keys.get("queries", ()) or ()
+    for q in queries:
+        for answer in q.get("answers", ()) or ():
+            for fp in zzfps["dns_full"] + ccfps.get("dns_full", []):
+                addr = answer.get("ipv4", "")
+                if fp["dns_full"] == addr:
+                    matches.append(fp)
+
     requests = test_keys.get("requests", ()) or ()
     for req in requests:
         r = req.get("response", None)
@@ -1459,7 +1467,7 @@ def setup_fingerprints():
     # pre-process fingerprints to speed up lookup
     global fingerprints
     # cc -> fprint_type -> list of dicts
-    fingerprints = {"ZZ": {"body_match": [], "header_prefix": [], "header_full": []}}
+    fingerprints = {"ZZ": {"body_match": [], "header_prefix": [], "header_full": [], "dns_full": []}}
     for cc, fprints in fastpath.utils.fingerprints.items():
         d = fingerprints.setdefault(cc, {})
         for fp in fprints:
@@ -1472,6 +1480,8 @@ def setup_fingerprints():
             elif "header_full" in fp:
                 fp["header_name"] = fp["header_name"].lower()
                 d.setdefault("header_full", []).append(fp)
+            elif "dns_full" in fp:
+                d.setdefault("dns_full", []).append(fp)
 
 
 def main():

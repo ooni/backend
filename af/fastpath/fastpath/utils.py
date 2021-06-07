@@ -788,7 +788,7 @@ fingerprints = {
         },
         # TODO add support for DNS based fingerprints
         # https://explorer.ooni.org/measurement/20160817T033110Z_AS4788_jk5ghw4QwieT2JOFiIqto9Z2LzCFhP05v3U0sCcaetBr50NxuU?input=http:%2F%2Fwww.sarawakreport.org%2Ftag%2F1mdb
-        # {"dns_match": "175.139.142.25", "locality": "country"},
+        {"dns_full": "175.139.142.25", "locality": "country"},
     ],
     "NO": [
         {
@@ -945,8 +945,8 @@ fingerprints = {
             "locality": "isp"
         },
         # https://explorer.ooni.org/measurement/20180315T174422Z_AS12688_7Iy8vwd6JYREOl2E6E1PJnNeCVGVKlORQNYhUJ2tKyiWjaEFkY?input=http:%2F%2Fmaidanua.org%2F
-        # {"dns_match": "62.33.207.196", "locality": "country"},
-        # {"dns_match": "62.33.207.197", "locality": "country"},
+        {"dns_full": "62.33.207.196", "locality": "country"},
+        {"dns_full": "62.33.207.197", "locality": "country"},
         # https://explorer.ooni.org/measurement/20181229T072204Z_AS39289_xlYTdPez910QvwBFCYyD3sgv0hQq1WBgbhW3lMjIs3MVMUdGtg?input=http:%2F%2Fblackberry.com
         {
             # Using the Location header is a possible alternative
@@ -1530,7 +1530,7 @@ fingerprints = {
             "locality": "isp"
         },
         # https://explorer.ooni.org/measurement/20180403T183403Z_AS9121_FfHjDmPkC0E5UoU3JMZoXJ2KRrMVyqdeTkHchmGEqAonEU64u4?input=http:%2F%2Fbeeg.com
-        # {"dns_match": "195.175.254.2", "locality": "country"},
+        {"dns_full": "195.175.254.2", "locality": "country"},
     ],
     "UA": [
         # https://github.com/ooni/pipeline/issues/121

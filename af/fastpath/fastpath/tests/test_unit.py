@@ -33,6 +33,38 @@ def test_match_fingerprints_match_country():
     matches = fp.match_fingerprints(msm)
     assert matches == [{"body_match": "Makluman/Notification", "locality": "country"}]
 
+def test_match_dns_fingerprints_match_country():
+    fp.setup_fingerprints()
+    msm = {
+        "probe_cc": "TR",
+        "test_keys": {
+	    "queries": [
+		{
+		    "engine": "system",
+		    "resolver_hostname": None,
+		    "query_type": "A",
+		    "hostname": "beeg.com",
+		    "answers": [
+			{
+			    "hostname": "beeg.com",
+			    "answer_type": "CNAME",
+			    "ttl": 0
+			    },
+			{
+			    "ipv4": "195.175.254.2",
+			    "answer_type": "A",
+			    "ttl": 0
+			    }
+			],
+		    "failure": None,
+		    "resolver_port": None
+		    }
+		]
+        },
+    }
+    matches = fp.match_fingerprints(msm)
+    assert matches == [{"dns_full": "195.175.254.2", "locality": "country"}]
+
 
 def test_match_fingerprints_dict_body():
     fp.setup_fingerprints()
