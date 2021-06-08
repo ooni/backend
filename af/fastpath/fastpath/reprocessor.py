@@ -20,9 +20,12 @@ PYTHONPATH=. ./fastpath/reprocessor.py ooni-data ooni-data-eu-fra-test --day 201
 
 DB update:
 
-ALTER TABLE jsonl ADD CONSTRAINT jsonl_unique UNIQUE (report_id, input, id);
-ALTER TABLE jsonl ALTER COLUMN id TYPE TEXT;
-
+BEGIN;
+ALTER TABLE jsonl ADD COLUMN measurement_uid TEXT;
+COMMIT;
+CREATE UNIQUE INDEX CONCURRENTLY jsonl_unique ON jsonl (report_id, input, measurement_uid);
+DROP INDEX IF EXISTS jsonl_lookup_idx;
+ALTER TABLE jsonl DROP COLUMN id;
 """
 
 from argparse import ArgumentParser
@@ -41,6 +44,7 @@ import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import execute_values
 import statsd  # debdeps: python3-statsd
 
+import fastpath.db as db
 import fastpath.s3feeder as s3f
 from fastpath.core import score_measurement, setup_fingerprints, unwrap_msmt
 from fastpath.core import trivial_id
@@ -76,8 +80,9 @@ def update_db_table(conn, lookup_list, jsonltbl_policy):
     if jsonltbl_policy == "dryrun":
         return
 
-    q = """INSERT INTO jsonl (report_id, input, id, s3path, linenum) VALUES %s
-    ON CONFLICT ON CONSTRAINT jsonl_unique DO
+    q = """INSERT INTO jsonl
+    (report_id, input, measurement_uid, s3path, linenum) VALUES %s
+    ON CONFLICT (report_id, input, measurement_uid) DO
     """
     if jsonltbl_policy == "upsert":
         log.info(f"Upserting {len(lookup_list)} rows to DB")
@@ -140,44 +145,42 @@ def parse_args():
         help="jsonl table update policy. insert = never overwrite",
     )
     ap.add_argument(
-        "--write-fastpath", action="store_true", help="write to fastpath table"
+        "--fastpathtbl",
+        choices=["dryrun", "insert", "upsert"],
+        default="upsert",
+        help="fastpath table update policy. insert = never overwrite",
     )
     db = "postgresql://shovel:yEqgNr2eXvgG255iEBxVeP@localhost/metadb"
     ap.add_argument("--db-uri", default=db)
-    ap.add_argument("--s3cachedir", default="s3cachedir")
     c = ap.parse_args()
 
-    c.no_write_to_db = not c.write_fastpath
-    c.s3cachedir = Path(c.s3cachedir)
-    c.keep_s3_cache = False
     return c
 
 
-# def score_measurement_and_upsert_fastpath(measurement, msmt_uid) -> None:
-#     raise NotImplementedError
-#     scores = score_measurement(measurement)
-#     anomaly = scores.get("blocking_general", 0.0) > 0.5
-#     failure = scores.get("accuracy", 1.0) < 0.5
-#     confirmed = scores.get("confirmed", False)
-#
-#     sw_name = measurement.get("software_name", "unknown")
-#     sw_version = measurement.get("software_version", "unknown")
-#     platform = "unset"
-#     if "annotations" in measurement and isinstance(measurement["annotations"], dict):
-#         platform = measurement["annotations"].get("platform", "unset")
-#
-#     db.upsert_summary(
-#         measurement,
-#         scores,
-#         anomaly,
-#         confirmed,
-#         failure,
-#         msmt_uid,
-#         sw_name,
-#         sw_version,
-#         platform,
-#         conf.update,
-#     )
+def score_measurement_and_upsert_fastpath(msm, msmt_uid, do_update: bool) -> None:
+    scores = score_measurement(msm)
+    anomaly = scores.get("blocking_general", 0.0) > 0.5
+    failure = scores.get("accuracy", 1.0) < 0.5
+    confirmed = scores.get("confirmed", False)
+
+    sw_name = msm.get("software_name", "unknown")
+    sw_version = msm.get("software_version", "unknown")
+    platform = "unset"
+    if "annotations" in msm and isinstance(msm["annotations"], dict):
+        platform = msm["annotations"].get("platform", "unset")
+
+    db.upsert_summary(
+        msm,
+        scores,
+        anomaly,
+        confirmed,
+        failure,
+        msmt_uid,
+        sw_name,
+        sw_version,
+        platform,
+        do_update,
+    )
 
 
 @dataclass
@@ -204,9 +207,9 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     """
     THRESHOLD = 20 * 1024 * 1024
     msm_jstr, msm, _ = msm_tup
+    assert msm is None
     if msm is None:
         msm = ujson.loads(msm_jstr)
-    # TODO: yaml?
     if sorted(msm.keys()) == ["content", "format"]:
         msm = unwrap_msmt(msm)
 
@@ -266,8 +269,9 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         # The jsonlf is big enough
         finalize_jsonl(s3sig, db_conn, conf, e)
 
-    # if conf.write_fastpath:
-    #     score_measurement_and_upsert_fastpath(msm)
+    if conf.fastpathtbl in ("insert", "upsert"):
+        update = conf.fastpathtbl == "upsert"
+        score_measurement_and_upsert_fastpath(msm, msmt_uid, update)
 
 
 @metrics.timer("total_run_time")
@@ -279,6 +283,7 @@ def main():
     log.info(f"From bucket {conf.src_bucket} to {conf.dst_bucket}")
     s3sig = create_s3_client(conf)  # signed client for writing
     db_conn = psycopg2.connect(conf.db_uri)
+    db.setup(conf)  # setup db conn inside db module
     setup_fingerprints()
 
     # Fetch msmts for one day
@@ -296,6 +301,8 @@ def main():
     processed_size = 0
     log.info(f"{tot_size/1024/1024/1024} GB to process")
     log.info(f"{len(cans_fns)} cans to process")
+    #  TODO make assertions on msmt
+    #  TODO add consistency check on trivial id found in fastpath table
     for can in cans_fns:
         can_fn, size = can
         log.info(f"Processed percentage: {100 * processed_size / tot_size}")
