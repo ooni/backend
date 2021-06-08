@@ -188,9 +188,6 @@ class Entity:
     lookup_list: list
 
 
-seen_uids = set()
-
-
 def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
     jsize = int(e.fd.offset / 1024)
     log.info(f"Closing jsonl and uploading it. Size: {jsize} KB")
@@ -200,7 +197,7 @@ def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
     e.jsonlf.unlink()
 
 
-def process_measurement(msm_tup, buf, conf, s3sig, db_conn):
+def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     """Process a msmt
     If needed: create a new Entity tracking a jsonl file,
       close and upload jsonl to S3 and upsert db
@@ -287,6 +284,7 @@ def main():
     # Fetch msmts for one day
 
     buf = {}  # "<cc> <testname>" -> jsonlf / fd / jsonl_s3path
+    seen_uids = set()  # Avoid uploading duplicates
 
     # raw/20210601/00/SA/webconnectivity/2021060100_SA_webconnectivity.n0.0.jsonl.gz
     # jsonl_s3path = f"raw/{ts}/00/{cc}/{testname}/{jsonlf.name}"
@@ -305,7 +303,7 @@ def main():
         Path(can_fn).parent.mkdir(parents=True, exist_ok=True)
         s3uns.download_file(conf.src_bucket, can_fn, can_fn)
         for msm_tup in s3f.load_multiple(can_fn):
-            process_measurement(msm_tup, buf, conf, s3sig, db_conn)
+            process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn)
         processed_size += size
 
     log.info("Finish jsonl files still open")
