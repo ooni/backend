@@ -294,7 +294,13 @@ def match_fingerprints(measurement):
     for q in queries:
         for answer in q.get("answers", ()) or ():
             for fp in zzfps["dns_full"] + ccfps.get("dns_full", []):
-                addr = answer.get("ipv4", "")
+                addr = ""
+                if "ipv4" in answer:
+                    addr = answer["ipv4"]
+                elif "hostname" in answer:
+                    addr = answer["hostname"]
+                elif "ipv6" in answer:
+                    addr = answer["ipv6"]
                 if fp["dns_full"] == addr:
                     matches.append(fp)
 
