@@ -151,6 +151,7 @@ fingerprints = {
             "header_prefix": "https://vk.com/blank.php?rkn=",
             "locality": "country"
         },
+        {"dns_full": "134.17.0.7", "locality": "isp"}
     ],
     "CA": [
         # https://explorer.ooni.org/measurement/20171026T125929Z_AS0_nkYRKqxCJy1PZQ9yBcsFuG61hFzZRYeio3N21CEBwot7MiikfZ?input=http:%2F%2Fwww.schwarzreport.org
@@ -200,6 +201,19 @@ fingerprints = {
             "body_match": "nba.com.cy/Eas/eas.nsf/All/6F7F17A7790A55C8C2257B130055C86F",
             "locality": "country",
         }
+    ],
+    "CN": [
+        {"dns_full": "8.7.198.45", "locality": "country"},
+        {"dns_full": "37.61.54.158", "locality": "country"},
+        {"dns_full": "46.82.174.68", "locality": "country"},
+        # https://explorer.ooni.org/measurement/20191205T074509Z_AS4134_snD532tevf4HneyRwKvtRLSxBppvIFgxGq8FwjFKH3R1eSVv1m?input=http://kareemazmy.blogspot.com/
+        {"dns_full": "78.16.49.15", "locality": "country"},
+        {"dns_full": "93.46.8.89", "locality": "country"},
+        {"dns_full": "159.106.121.75", "locality": "country"},
+        {"dns_full": "203.98.7.65", "locality": "country"},
+        {"dns_full": "59.24.3.173", "locality": "country"},
+        {"dns_full": "203.98.7.65", "locality": "country"},
+        {"dns_full": "243.185.187.39", "locality": "country"}
     ],
     "DE": [
         # https://github.com/ooni/pipeline/issues/181
@@ -585,6 +599,105 @@ fingerprints = {
             "body_match": "di.og.ofnimok@netnoknauda",
             "locality": "country"
         },
+        # https://explorer.ooni.org/measurement/20170214T023529Z_AS17974_1hVbJGBPLdOsxQvNgIawwvABxfZuLNeVK5VaY1XWajguEt0yK3?input=http://www.lesbian.org
+        {"dns_full": "180.131.146.7", "locality": "general"},
+        # https://explorer.ooni.org/measurement/20170316T024318Z_AS23693_CQPxlyILeqGXlHzFqGSCPR6MgtCBfZtbs3h2l37MOyiU77N1xP?input=http://www.bglad.com
+        {"dns_full": "202.3.219.209", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20200329T090119Z_AS45727_GqQe4DZduLsSaYZB6qnqeMpsNgJn7dTvEaoEFZ0eGGmjyBoQG4?input=https://www.scruff.com/
+        {"dns_full": "restricted.tri.co.id", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20200329T090119Z_AS45727_GqQe4DZduLsSaYZB6qnqeMpsNgJn7dTvEaoEFZ0eGGmjyBoQG4?input=https://www.scruff.com/
+        {"dns_full": "116.206.10.31", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20171025T095349Z_AS131709_vvCnDreaVjMN1MQ2imNyl4ynBG4EhIZRdWHJIBKgOexJSnaWcb?input=http://www.bglad.com
+        {"dns_full": "36.86.63.185", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20191114T004142Z_AS17974_zSo1qO4rG5Isd8Rr2WGTHYV4hwK9jeGkR201ACNu7np3CxXqOQ?input=http://ilga.org/
+        {"dns_full": "internet-positif.org", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20191114T004142Z_AS17974_zSo1qO4rG5Isd8Rr2WGTHYV4hwK9jeGkR201ACNu7np3CxXqOQ?input=http://ilga.org/
+        {"dns_full": "mypage.blocked.bltsel", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20191114T004142Z_AS17974_zSo1qO4rG5Isd8Rr2WGTHYV4hwK9jeGkR201ACNu7np3CxXqOQ?input=http://ilga.org/
+        {"dns_full": "114.121.254.4", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170307T194134Z_AS45727_gEN976jgNQgOx6CuLiiYDb2flPY8CpNtRPcnrHTwjggcats4At?input=http://www.gay.com
+        {"dns_full": "180.214.232.61", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170213T013637Z_AS4832_Y8ct5af944VzPhrMoeoll3Ap7MtHL97R2JBO0lEHto45vPYwFQ?input=http://www.gayscape.com
+        {"dns_full": "202.62.29.1", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170916T151028Z_AS63859_OMzXkgk31oMZMCyxyswHDc9s7PcHYUDMAm8BEsKSmcioamnK0f?input=http://www.gayscape.com
+        {"dns_full": "103.47.132.195", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190420T092536Z_AS135478_mLOlXUu4n0QwTV10X6nqZYFwh9aQga4i4fPo9fMomwk2IMV6Le?input=http://transsexual.org/
+        {"dns_full": "internetsehataman.cbn.net.id", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180324T031959Z_AS24203_oRMW0HPO6Z2u3lkA8d4uROtqX2fuKU6XH8ARB0JtGanxPSHX3L?input=https://www.scruff.com/
+        {"dns_full": "blockpage.xl.co.id", "locality": "isp"},
+        #
+        {"dns_full": "202.52.141.98", "locality": "isp"},
+        #
+        {"dns_full": "150.107.140.200", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20181006T114052Z_AS9657_yU1pa9b0I0vRzcBU5OsWOV6phrI2FBxQosem0mJRQdKZupCPkE?input=http://bisexual.org/
+        {"dns_full": "103.14.16.18", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170620T000111Z_AS0_5is0TiDSWSWQSmW01Yc1B4kQFQsMmPhLT2vKSqFsVhuYzbPYvd?input=http://www.gayscape.com
+        {"dns_full": "113.197.108.236", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170920T165858Z_AS17974_3WOOOvd6aU5LlWGoP1mVIXMiXBDXaJpAwfkjP4IYR52V0nXvDF?input=http://www.advocate.com
+        {"dns_full": "202.65.113.54", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170501T123218Z_AS17974_TQovh9GvtBR3FlRa5IfIH19tSRfiGUgUzEnGoh5sgdLI1m0OgY?input=http://www.ifge.org
+        {"dns_full": "103.195.19.54", "locality": "isp"},
+        {"dns_full": "103.10.120.3", "locality": "isp"},
+        {"dns_full": "27.123.220.197", "locality": "isp"},
+        {"dns_full": "103.108.159.238", "locality": "isp"},
+        {"dns_full": "103.126.10.252", "locality": "isp"},
+        {"dns_full": "103.142.60.250", "locality": "isp"},
+        {"dns_full": "103.19.56.2", "locality": "isp"},
+        {"dns_full": "103.70.68.68", "locality": "isp"},
+        {"dns_full": "103.83.96.242", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170323T040824Z_AS38758_zjtAoJrqVgnQCOYSHGqrVt4bSHxEUGnj0DvgJqHEJMKnnmllir?input=http://transsexual.org
+        {"dns_full": "114.129.22.33", "locality": "isp"},
+        {"dns_full": "114.129.23.9", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170330T110102Z_AS4795_yod1sqqu9NwrIBlJDfMepLmyAp3zVxQK5QG6Qqux11QuioLrYJ?input=https://www.gay.com/
+        {"dns_full": "netsafe.indosatm2.com", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20170608T035018Z_AS4761_HEJ2bT3U6QBEL4IdHLTPpWshehej9EcxiwssgeMxRTlBLQeLJx?input=http://www.glil.org
+        {"dns_full": "114.6.128.8", "locality": "isp"},
+        {"dns_full": "150.107.151.151", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180601T040605Z_AS63859_uzo47992c80YC59mVTgn649d8nTkGPtm3Z8TZ69jdWAmMMMkCb?input=http://www.samesexmarriage.ca
+        {"dns_full": "158.140.186.3", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190612T150505Z_AS23700_e7qsqPDY72QkdwPcDeUb5NkHxZ9HgpHOuU8p5oNFp5uW4BJAk7?input=https://www.shoe.org/
+        {"dns_full": "internetpositif3.firstmedia.com", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20181006T114052Z_AS9657_yU1pa9b0I0vRzcBU5OsWOV6phrI2FBxQosem0mJRQdKZupCPkE?input=http://www.bglad.com
+        {"dns_full": "filter.melsa.net.id", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190314T214950Z_AS17658_kybYxwcXIxWZYnX32z36B1ZprSLxFT3WpxY0g7sfuy0Uy7MLAo?input=https://www.ilga-europe.org/
+        {"dns_full": "block.centrin.net.id", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190605T140849Z_AS4800_bKVUk4pjoLXBQOUdWBLnQOPZfWfDPGCSoURwopRoEj0O4ZjOKG?input=http://www.tsroadmap.com/
+        {"dns_full": "202.152.4.67", "locality": "isp"},
+        {"dns_full": "202.165.36.253", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20171105T072208Z_AS17451_7r3LG7AAcL538QaLjG44o23fmyWhbFiEOWEnbZfDhu1Lfpg6jF?input=http://www.grindr.com/
+        {"dns_full": "202.169.44.80", "locality": "isp"},
+        #
+        {"dns_full": "202.50.202.50", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190924T072134Z_AS17995_Seinciq0527hnzfIuN4ZQvKYqy8NKBKGHK9vt01KkY79iofutj?input=http://www.gayhealth.com/
+        {"dns_full": "trustpositif.iforte.net.id", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180119T081053Z_AS45287_NWeT8zKRcKd7z2WYMntHuw2GIwqK0zCAh0A5UnvxzKw4s9rN0u?input=http://www.gayhealth.com
+        {"dns_full": "202.56.160.131", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180119T081053Z_AS45287_NWeT8zKRcKd7z2WYMntHuw2GIwqK0zCAh0A5UnvxzKw4s9rN0u?input=http://www.gayhealth.com
+        {"dns_full": "202.56.160.132", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180224T051609Z_AS45287_IoqMH28cD0RwJsIYHmj0rMDUt8oigefrA7YweS4lZ0ahxrDrDy?input=http://www.gay.com/
+        {"dns_full": "203.99.130.131", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20171120T160605Z_AS0_J83hVqCVk4VUk9IGei68s4rSrT0F9OWHa3EzXwz6iJaHcxCO6J?input=https://www.gay.com/
+        {"dns_full": "203.119.13.75", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20200130T121354Z_AS18103_6roxhkcpVP4ML3VyjL75G28deYvsJgocbDyeV8Ud6WBHAFTwy4?input=http://www.bglad.com/
+        {"dns_full": "203.119.13.76", "locality": "isp"},
+        {"dns_full": "203.160.56.38", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20200213T075343Z_AS131111_n3Zv50ZiRaGIm7uCn3IwOIN879EzYbr3OV08aHpZdOIzsk83iT?input=https://www.ilga-europe.org/
+        {"dns_full": "220.247.168.195", "locality": "isp"},
+        {"dns_full": "58.147.184.141", "locality": "isp"},
+        {"dns_full": "58.147.185.131", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20161003T063421Z_AS23700_BcAJiWTdgtzSTE5ezaPJoywgMdwm8hZm8yb6Hw3iUB8atIiJCI?input=http://transsexual.org
+        {"dns_full": "202.73.99.3", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190301T020519Z_AS55666_zcD5kLAL3QHZypge7Kppqp2ysd5p76afVPmvC7XlZ8zol52iEl?input=http://ilga.org/
+        {"dns_full": "xblock.gmedia.net.id", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180119T133726Z_AS55666_NfgRumGXxCBp0t0SjoNsX0KyrzzmQmoXbSoXzPfHgw9ICwI5zr?input=http://www.queernet.org
+        {"dns_full": "49.128.177.13", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20191225T231001Z_AS18004_hA8xsVHcbUOLZLKxI8kAQ2GV3yzQ8TpDNqUpHA1Sm3Mdb3yYVB?input=http://www.samesexmarriage.ca/
+        {"dns_full": "internetsehat.smartfren.com", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180727T095622Z_AS17670_ryQ3v3ZDI2X8YI7FKTxeG9L5PEmgc0Z5N3bDIU7uusFaaIcuql?input=http://www.bglad.com
+        {"dns_full": "internetpositif.mncplaymedia.com", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180315T084438Z_AS133357_LeDGv9wMP20hFNfN2nqsvJxL1vUKOFZ0grMlnMJXACYHkmPLNB?input=http://transsexual.org
+        {"dns_full": "dnssehat.telkomuniversity.ac.id", "locality": "isp"},
+        {"dns_full": "trustpositif.kominfo.go.id", "locality": "country"}
     ],
     "IE": [
         # https://explorer.ooni.org/measurement/20190724T152019Z_AS13280_5XchAx4T8ZNmgtqbFSgcjHFB9QKFqviPSJa88PQs4VXCdk1mBo?input=http://www.gayscape.com/
@@ -657,6 +770,10 @@ fingerprints = {
           "body_match": "peyvandha.ir/1-2",
           "locality": "country"
         },
+        # https://explorer.ooni.org/measurement/20170525T030641Z_AS50810_5iVwM98EMQORqXeZtbhiDquo9zifyYSMmE5AWTARCw3XJ1R4is?input=http://pesareghabile.blogspot.com
+        {"dns_full": "10.10.34.34", "locality": "country"},
+        # https://explorer.ooni.org/measurement/20180114T045727Z_AS61173_bkL7bV97kNEYVREkD0Lg4LnvnnlDtlNlbvA1jbzPlsncPdNlIm?input=http://queerquotes.blogspot.com
+        {"dns_full": "10.10.34.35", "locality": "country"},
     ],
     "IT": [
         {
@@ -761,7 +878,14 @@ fingerprints = {
         {
             "body_match": "<li><a href=\"whatever.html\" class=\"menupics\"><img src=\"legaltext.png\" alt=\"descriptivetext\" /></a></li>",
             "locality": "isp"
-        }
+        },
+        # https://explorer.ooni.org/measurement/20210208T105603Z_webconnectivity_MM_58952_n1_NEm53Iw0ysgcGt9J?input=http://www.facebook.com
+        {"dns_full": "59.153.90.11", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20210201T223944Z_webconnectivity_MM_133385_n1_LlJnFqnaVXNfXygL?input=http://www.hornybank.com/
+        {"dns_full": "167.172.4.60", "locality": "country"},
+    ],
+    "MN": [
+        {"dns_full": "218.100.84.78", "locality": "country"},
     ],
     "MX": [
         # https://github.com/ooni/pipeline/issues/159
@@ -786,8 +910,8 @@ fingerprints = {
             "header_prefix": "https://wifi.uitm.edu.my",
             "locality": "local"
         },
-        # TODO add support for DNS based fingerprints
         # https://explorer.ooni.org/measurement/20160817T033110Z_AS4788_jk5ghw4QwieT2JOFiIqto9Z2LzCFhP05v3U0sCcaetBr50NxuU?input=http:%2F%2Fwww.sarawakreport.org%2Ftag%2F1mdb
+        # https://explorer.ooni.org/measurement/20190503T024619Z_AS4788_agTXVdX7lipOjGFLnaQQFSkxEMVNoXopd20czlazmSW5XIofs4?input=http://www.gaystarnews.com/
         {"dns_full": "175.139.142.25", "locality": "country"},
     ],
     "NO": [
@@ -861,7 +985,12 @@ fingerprints = {
         {
           "body_match": "As per your subscription of Nayatel Safeweb service, the website you are trying to access is blocked for your viewing",
           "locality": "isp"
-        }
+        },
+        # https://explorer.ooni.org/measurement/20161025T235721Z_AS23674_Lldjua1VqHuWrRcILrD3wrfRXiOVP5P3e0wHwJV1MACuOzBFwY?input=http://www.queerty.com
+        {"dns_full": "203.82.48.83", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20191206T015807Z_AS23674_BbXvUMwowxajbM9Q1pTeOp84pawo9ccTUsltC6B1vhyNHC2kkM?input=http://gaytoday.com/
+        {"dns_full": "203.82.48.86", "locality": "isp"},
+
     ],
     "PL": [
         # https://github.com/ooni/pipeline/issues/224
@@ -944,9 +1073,6 @@ fingerprints = {
             "body_match": "<iframe src=\"http://subblock.mts.ru/api",
             "locality": "isp"
         },
-        # https://explorer.ooni.org/measurement/20180315T174422Z_AS12688_7Iy8vwd6JYREOl2E6E1PJnNeCVGVKlORQNYhUJ2tKyiWjaEFkY?input=http:%2F%2Fmaidanua.org%2F
-        {"dns_full": "62.33.207.196", "locality": "country"},
-        {"dns_full": "62.33.207.197", "locality": "country"},
         # https://explorer.ooni.org/measurement/20181229T072204Z_AS39289_xlYTdPez910QvwBFCYyD3sgv0hQq1WBgbhW3lMjIs3MVMUdGtg?input=http:%2F%2Fblackberry.com
         {
             # Using the Location header is a possible alternative
@@ -1393,6 +1519,28 @@ fingerprints = {
             "header_prefix": "http://block.runnet.ru",
             "locality": "local"
         },
+        {"dns_full": "159.255.26.69", "locality": "general"},
+        # https://explorer.ooni.org/measurement/20171003T161217Z_AS15599_eoh3aUHQ7NV5LwWDA3Br8Hf3FGcgxG3s8mjxFd40cSWcV5BL23?input=http://lgbt.foundation/
+        {"dns_full": "193.58.251.1", "locality": "general"},
+        {"dns_full": "193.58.251.11", "locality": "general"},
+        {"dns_full": "95.217.66.240", "locality": "general"},
+        # https://explorer.ooni.org/measurement/20180919T192809Z_AS34984_Rlb0RqQAPfo5LqUQHWREV7c1sxNXcHSGHrVftNTgOoVBhAcu20?input=http://www.exgay.com
+        {"dns_full": "93.158.134.250", "locality": "general"},
+        {"dns_full": "217.148.54.171", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20190628T034744Z_AS35807_4XwiNixlQ8odJ6ek21IUmKwtvCecSOWoII5ZjwqzCCgx6Sx9a3?input=http://bluesystem.ru/
+        {"dns_full": "185.37.129.10", "locality": "isp"},
+        {"dns_full": "46.175.31.250", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20200318T090603Z_AS8641_sZfld8WLVRMRZ6Oa6uj23WNddUJ5zFCFLL5JCNBqorFDn1P050?input=http://www.lesbi.ru/
+        {"dns_full": "46.175.31.250", "locality": "isp"},
+        {"dns_full": "83.69.208.124", "locality": "isp"},
+        {"dns_full": "212.1.226.59", "locality": "isp"},
+        {"dns_full": "37.44.40.254", "locality": "isp"},
+        {"dns_full": "87.241.223.133", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180313T233202Z_AS51645_dIEFx0okmP7iqOXN3x1p97EObb6Z1oLDQYOHFLVvfn7c0FKRW6?input=http://bluesystem.ru/
+        {"dns_full": "5.3.3.17", "locality": "isp"},
+        # https://explorer.ooni.org/measurement/20180315T174422Z_AS12688_7Iy8vwd6JYREOl2E6E1PJnNeCVGVKlORQNYhUJ2tKyiWjaEFkY?input=http:%2F%2Fmaidanua.org%2F
+        {"dns_full": "62.33.207.196", "locality": "country"},
+        {"dns_full": "62.33.207.197", "locality": "country"},
     ],
     "SA": [
         # TODO maybe we would to classify this as knowing the vendor
@@ -1494,7 +1642,9 @@ fingerprints = {
             "header_name": "Location",
             "header_prefix": "http://110.164.252.137/wpwarn/soft_bd/wpcbt_res.php",
             "locality": "isp"
-        }
+        },
+        # https://explorer.ooni.org/measurement/20201228T234534Z_webconnectivity_TH_131445_n1_deRHboYpdtGToSqk?input=http://www.bbc.com/news/world-asia-38126928/
+        {"dns_full": "125.26.170.3", "locality": "country"},
     ],
     "TR": [
         {
@@ -1531,6 +1681,14 @@ fingerprints = {
         },
         # https://explorer.ooni.org/measurement/20180403T183403Z_AS9121_FfHjDmPkC0E5UoU3JMZoXJ2KRrMVyqdeTkHchmGEqAonEU64u4?input=http:%2F%2Fbeeg.com
         {"dns_full": "195.175.254.2", "locality": "country"},
+        {"dns_full": "193.192.98.41", "locality": "isp"},
+        {"dns_full": "193.192.98.42", "locality": "isp"},
+        {"dns_full": "193.192.98.43", "locality": "isp"},
+        {"dns_full": "193.192.98.45", "locality": "isp"},
+        {"dns_full": "193.192.98.46", "locality": "isp"},
+        {"dns_full": "193.192.98.47", "locality": "isp"},
+        {"dns_full": "193.192.98.48", "locality": "isp"},
+        {"dns_full": "193.192.98.49", "locality": "isp"},
     ],
     "UA": [
         # https://github.com/ooni/pipeline/issues/121
@@ -1680,6 +1838,18 @@ fingerprints = {
             "header_full": "BarracudaHTTP 4.0",
             "locality": "local"
         },
+        # https://explorer.ooni.org/measurement/20190824T132919Z_AS5650_gwWRIicciG8fgrTzTFnuvsmlAHFOWgiAIAuDeL9RgH05TQsY3L?input=http://www.samesexmarriage.ca/
+        {"dns_full": "185.228.168.254", "locality": "general"},
+        {"dns_full": "207.246.127.171", "locality": "general"},
+        {"dns_full": "45.77.77.148", "locality": "general"},
+        # https://explorer.ooni.org/measurement/20180212T093619Z_AS12874_ivZ63xkT6Tqmlz8SyoIsbdkQNfN85CyNZTO1ZVeYTZFRh24xb8?input=http://www.gayscape.com
+        {"dns_full": "185.236.104.104", "locality": "general"},
+        {"dns_full": "54.242.237.204", "locality": "general"},
+        {"dns_full": "45.32.203.129", "locality": "general"},
+        {"dns_full": "3.93.224.57", "locality": "general"},
+        {"dns_full": "52.206.227.167", "locality": "general"},
+        # https://explorer.ooni.org/measurement/20191115T114711Z_AS12390_NIVFbxg8nx3pPxL5vbk2Fg4duFANRINLyvIaMNuzyDPiMdY2X3?input=https://bisexual.org/
+        {"dns_full": "195.46.39.11", "locality": "general"},
     ],
 }
 
