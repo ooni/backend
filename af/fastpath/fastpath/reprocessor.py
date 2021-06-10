@@ -10,7 +10,7 @@ Inputs:
 
 Outputs:
   jsonl files in new S3 bucket e.g.:
-    raw/20181101/00/US/webconnectivity/20181101_US_webconnectivity.l.0.jsonl.gz
+    jsonl/{testname}/{cc}/{ts}/00/{jsonlf.name}
   rows in the jsonl database table
     upsert or insert-but-not-overwrite
 
@@ -36,8 +36,6 @@ from pathlib import Path
 import gzip
 import logging
 import os
-import sys
-import tarfile
 
 import ujson
 import psycopg2  # debdeps: python3-psycopg2
@@ -103,29 +101,6 @@ def upload_to_s3(s3, bucket_name, tarf, s3path):
     obj = s3.Object(bucket_name, s3path)
     log.info(f"Uploading {tarf} to {s3path}")
     obj.put(Body=tarf.read_bytes())
-
-
-@metrics.timer("fill_postcan")
-def fill_postcan(hourdir, postcanf):
-    # Fill postcan file from .post files in hourdir
-    log.info(f"Filling {postcanf.name}")
-    measurements = []
-    postcan_byte_thresh = 20 * 1000 * 1000
-    # Open postcan
-    with tarfile.open(str(postcanf), "w") as tar:
-        for msmt_f in sorted(hourdir.iterdir()):
-            if msmt_f.suffix != ".post":
-                continue
-            # Add a msmt and delete the msmt file
-            metrics.incr("msmt_count")
-            tar.add(str(msmt_f))
-            measurements.append(msmt_f)
-            tarsize = postcanf.stat().st_size
-            if tarsize > postcan_byte_thresh:
-                log.info(f"Reached {tarsize} bytes")
-                return measurements
-
-    return measurements
 
 
 def parse_date(d):
@@ -231,12 +206,12 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     seen_uids.add(msmt_uid)
 
     if msm.get("probe_cc", "").upper() == "ZZ":
-        log.debug(f"Ignoring measurement with probe_cc=ZZ")
+        log.debug("Ignoring measurement with probe_cc=ZZ")
         metrics.incr("discarded_measurement")
         return
 
     if msm.get("probe_asn", "").upper() == "AS0":
-        log.debug(f"Ignoring measurement with ASN 0")
+        log.debug("Ignoring measurement with ASN 0")
         metrics.incr("discarded_measurement")
         return
 
@@ -246,10 +221,11 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     if len(entities) == 0 or entities[-1].fd.closed:
         ts = conf.day.strftime("%Y%m%d")
         jsonlf = Path(f"{ts}_{cc}_{tn}.l.{len(entities)}.jsonl.gz")
+        jsonl_s3path = f"jsonl/{tn}/{cc}/{ts}/00/{jsonlf.name}"
         e = Entity(
             jsonlf=jsonlf,
             fd=gzip.open(jsonlf, "w"),
-            jsonl_s3path=f"raw/{ts}/00/{cc}/{tn}/{jsonlf.name}",
+            jsonl_s3path=jsonl_s3path,
             lookup_list=[],
         )
         entities.append(e)
