@@ -83,10 +83,10 @@ def update_db_table(conn, lookup_list, jsonltbl_policy):
     ON CONFLICT (report_id, input, measurement_uid) DO
     """
     if jsonltbl_policy == "upsert":
-        log.info(f"Upserting {len(lookup_list)} rows to DB")
+        log.info(f"Upserting {len(lookup_list)} rows to jsonl table")
         q += "UPDATE SET s3path = excluded.s3path, linenum = excluded.linenum"
     elif jsonltbl_policy == "insert":
-        log.info(f"Inserting {len(lookup_list)} rows to DB")
+        log.info(f"Inserting {len(lookup_list)} rows to jsonl table")
         q += "NOTHING"
     else:
         raise Exception(f"Unexpected --jsonltbl value {jsonltbl_policy}")
@@ -182,7 +182,6 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     """
     THRESHOLD = 20 * 1024 * 1024
     msm_jstr, msm, _ = msm_tup
-    assert msm is None
     if msm is None:
         msm = ujson.loads(msm_jstr)
     if sorted(msm.keys()) == ["content", "format"]:
@@ -193,16 +192,12 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     inp = msm.get("input", None)
     tn = msm.get("test_name").replace("_", "")
     cc = msm.get("probe_cc").upper()
-    # if msmt_uid == "00c11116832b22cb75a6fc8868c72b72":
-    #    log.debug(f"Processing {msmt_uid} {tn} {cc} {rid} {inp}")
-    #    Path("meow").write_text(ujson.dumps(msm, sort_keys=1, indent=1))
 
     # log.debug(f"Processing {msmt_uid} {tn} {cc} {rid} {inp}")
     if msmt_uid in seen_uids:
         log.info(f"DUPLICATE {msmt_uid} {tn} {cc} {rid} {inp}")
         return
-        # Path("meow2").write_text(ujson.dumps(msm, sort_keys=1, indent=1))
-        # sys.exit(1)
+
     seen_uids.add(msmt_uid)
 
     if msm.get("probe_cc", "").upper() == "ZZ":
