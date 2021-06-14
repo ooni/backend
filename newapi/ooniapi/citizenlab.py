@@ -89,10 +89,6 @@ def jerror(msg, code=400):
     return make_response(jsonify(error=msg), code)
 
 
-class DuplicateURL(Exception):
-    pass
-
-
 class ProgressPrinter(git.RemoteProgress):
     def update(self, op_code, cur_count, max_count=None, message=""):
         print(
@@ -271,7 +267,7 @@ class URLListManager:
             csv_f = self.get_user_repo_path(username) / "lists" / f"{cc}.csv"
 
             if self.is_duplicate_url(username, cc, new_entry[0]):
-                raise DuplicateURL()
+                raise Exception(f"{new_entry[0]} is duplicate")
 
             log.debug(f"Writing {csv_f}")
             with csv_f.open("a") as out_file:
@@ -310,7 +306,7 @@ class URLListManager:
             if new_url != old_entry[0]:
                 # If the URL is being changed check for collisions
                 if self.is_duplicate_url(username, cc, new_url):
-                    raise DuplicateURL()
+                    raise Exception(f"{new_url} is duplicate")
 
             out_buffer = io.StringIO()
             with csv_f.open() as in_file:
