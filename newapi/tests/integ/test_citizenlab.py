@@ -43,14 +43,14 @@ def test_no_auth(client):
 def list_global(client, usersession):
     r = client.get("/api/v1/url-submission/test-list/global")
     assert r.status_code == 200
-    assert r.json[0] == [
+    assert set(r.json[0].keys()) == set([
         "url",
         "category_code",
         "category_description",
         "date_added",
         "source",
         "notes",
-    ]
+    ])
     assert len(r.json) > 1000
 
 
@@ -101,7 +101,15 @@ def test_update_url_nochange(client, usersession):
     r = client.get("/api/v1/url-submission/test-list/it")
     assert r.status_code == 200
 
-    old = r.json[1]  # first entry, skip header
+    fe = r.json[0] # first entry
+    old = [
+        fe["url"],
+        fe["category_code"],
+        fe["category_description"],
+        fe["date_added"],
+        fe["source"],
+        fe["notes"],
+    ]
     new = old
     d = dict(country_code="it", old_entry=old, new_entry=new, comment="")
     r = client.post("/api/v1/url-submission/update-url", json=d)
@@ -115,7 +123,15 @@ def update_url_basic(client, usersession):
     r = client.get("/api/v1/url-submission/test-list/it")
     assert r.status_code == 200
 
-    old = r.json[1]  # first entry, skip header
+    fe = r.json[0] # first entry
+    old = [
+        fe["url"],
+        fe["category_code"],
+        fe["category_description"],
+        fe["date_added"],
+        fe["source"],
+        fe["notes"],
+    ]
     new = list(old)
     new[-1] = "Bogus comment"
     assert new != old
@@ -142,7 +158,7 @@ def test_pr_state(client, usersession):
 class MK:
     @staticmethod
     def json():  # mock both openin a pr or checking its status
-        return {"state": "closed", "url": "testurl"}
+        return {"state": "closed", "url": "https://testurl"}
 
 
 @pytest.fixture
@@ -159,6 +175,7 @@ def mock_requests(monkeypatch):
 
     monkeypatch.setattr(ooniapi.citizenlab.URLListManager, "push_to_repo", push)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "post", req)
+    monkeypatch.setattr(ooniapi.citizenlab.requests, "get", req)
 
 
 @pytest.fixture

@@ -354,7 +354,7 @@ class URLListManager:
 
     def is_pr_resolved(self, username):
         pr_id = self.get_pr_id(username)
-        assert pr_id.startswith("https")
+        assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
         log.debug(f"Fetching PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         r = requests.get(pr_id, auth=auth)
