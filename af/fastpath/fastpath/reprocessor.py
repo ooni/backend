@@ -26,6 +26,8 @@ COMMIT;
 CREATE UNIQUE INDEX CONCURRENTLY jsonl_unique ON jsonl (report_id, input, measurement_uid);
 DROP INDEX IF EXISTS jsonl_lookup_idx;
 ALTER TABLE jsonl DROP COLUMN id;
+
+CREATE INDEX CONCURRENTLY jsonl_measurement_uid ON jsonl (measurement_uid);
 """
 
 from argparse import ArgumentParser
