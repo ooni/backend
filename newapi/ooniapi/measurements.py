@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, date
 from dateutil.parser import parse as parse_date
 from io import StringIO
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional
 import gzip
 import http.client
 import json
@@ -27,7 +27,7 @@ from flask import current_app, request, make_response, abort, redirect
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
-from sqlalchemy import func, and_, false, text, select, sql, column
+from sqlalchemy import func, and_, text, select, sql, column
 from sqlalchemy.sql import literal_column
 from sqlalchemy import String, cast
 from sqlalchemy.exc import OperationalError
@@ -37,7 +37,6 @@ from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
 from ooniapi import __version__
-from ooniapi.config import REPORT_INDEX_OFFSET
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson
 from ooniapi.models import TEST_NAMES
@@ -58,6 +57,10 @@ log = logging.getLogger()
 class QueryTimeoutError(HTTPException):
     code = 504
     description = "The database query timed out.\nTry changing the query parameters."
+
+
+class MsmtNotFound(Exception):
+    pass
 
 
 def get_version():
@@ -173,7 +176,6 @@ def _fetch_jsonl_measurement_body_inner(
     linenum: int,
 ) -> bytes:
     log = current_app.logger
-    REQID_HDR = "X-Request-ID"
     # TODO configure from file
     BASEURL = "https://ooni-data-eu-fra.s3.amazonaws.com/"
     url = urljoin(BASEURL, s3path)
@@ -184,32 +186,39 @@ def _fetch_jsonl_measurement_body_inner(
         if n == linenum:
             return line
 
-    return b""
+    raise MsmtNotFound
 
 
-def _fetch_jsonl_measurement_body(report_id, input: str) -> bytes:
+def _fetch_jsonl_measurement_body(report_id, input: str, measurement_uid) -> bytes:
     """Fetch jsonl from S3, decompress it, extract msmt"""
-    query = """SELECT s3path, linenum
-    FROM jsonl
-    WHERE report_id = :report_id
-    AND input = :input
-    """
-    if input is None:
-        input = ""
-    query_params = dict(input=input, report_id=report_id)
+    query = "SELECT s3path, linenum FROM jsonl "
+    if measurement_uid is None:
+        query += "WHERE report_id = :report_id AND input = :input LIMIT 1"
+        query_params = dict(input=input, report_id=report_id)
+
+    else:
+        query += """WHERE measurement_uid = :mid
+        OR (report_id = :rid AND input = :inp)
+        LIMIT 1
+        """
+        inp = input or ""
+        query_params = dict(inp=inp, rid=report_id, mid=measurement_uid)
+
     q = current_app.db_session.execute(query, query_params)
     lookup = q.fetchone()
     if lookup is None:
-        log.error(f"Row not found in jsonl table: {report_id} {input}")
-        return b""
+        m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
+        log.error(m)
+        raise MsmtNotFound
 
     s3path = lookup.s3path
     linenum = lookup.linenum
-    if s3path.startswith("raw/") and s3path.endswith(".jsonl.gz"):
-        log.error(s3path)
+    log.debug(f"Fetching file {s3path} from S3")
+    try:
         return _fetch_jsonl_measurement_body_inner(s3path, linenum)
-
-    return b""
+    except:
+        log.error(f"Failed to fetch file {s3path} from S3")
+        raise MsmtNotFound
 
 
 def _unwrap_post(post: dict) -> dict:
@@ -261,7 +270,7 @@ def _fetch_measurement_body_on_disk(report_id, input: str) -> Optional[bytes]:
     return ujson.dumps(body).encode()
 
 
-def _fetch_autoclaved_measurement_body(report_id: str, input) -> Optional[bytes]:
+def _fetch_autoclaved_measurement_body(report_id: str, input) -> bytes:
     """fetch the measurement body using autoclavedlookup"""
     # uses_pg_index autoclavedlookup_idx
     # None/NULL input needs to be is treated as ""
@@ -284,7 +293,7 @@ def _fetch_autoclaved_measurement_body(report_id: str, input) -> Optional[bytes]
         current_app.logger.error(f"missing autoclaved for {report_id} {input}")
         # This is a bug somewhere: the msmt is is the fastpath table and
         # not in the autoclavedlookup table
-        return None
+        raise MsmtNotFound
 
     body = _fetch_autoclaved_measurement_body_from_s3(
         r.filename, r.frame_off, r.frame_size, r.intra_off, r.intra_size
@@ -292,30 +301,31 @@ def _fetch_autoclaved_measurement_body(report_id: str, input) -> Optional[bytes]
     return body
 
 
-def _fetch_measurement_body(report_id, input: str) -> Optional[bytes]:
+def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
     """Fetch measurement body from either disk, jsonl or autoclaved on S3"""
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")
-    # The number of underscores can be:
-    # 1: Legacy measurement e.g.
-    # 20141101T220015Z_OzDkiPoJMVjHItj<redacted>
-    # 2: Legacy measurement e.g.
-    # 20201019T050625Z_AS8369_VVqkepmw<redacted>
     # 5: Current format e.g.
     # 20210124T210009Z_webconnectivity_VE_22313_n1_Ojb<redacted>
     if u_count == 5:
         # Look on disk and then from JSONL cans on S3
         body = _fetch_measurement_body_on_disk(report_id, input)
-        if body is None:
-            log.debug(f"Fetching body for {report_id} {input} from jsonl on S3")
-            body = _fetch_jsonl_measurement_body(report_id, input)
-    elif u_count == 2:
-        body = _fetch_autoclaved_measurement_body(report_id, input)
-    elif u_count == 1:
-        body = _fetch_autoclaved_measurement_body(report_id, input)
-    else:
-        raise BadRequest("Invalid report_id")
-    return body
+        if body is not None:
+            return body
+
+    log.debug(f"Fetching body for {report_id} {input} from jsonl on S3")
+    try:
+        return _fetch_jsonl_measurement_body(report_id, input, measurement_uid)
+    except MsmtNotFound:
+        pass
+
+    log.debug(f"Fetching body for {report_id} {input} from autoclaved on S3")
+    try:
+        return _fetch_autoclaved_measurement_body(report_id, input)
+    except MsmtNotFound:
+        log.error(f"Failed to fetch body for {report_id} {input}")
+
+    raise MsmtNotFound
 
 
 def genurl(path: str, **kw) -> str:
@@ -350,7 +360,7 @@ def get_raw_measurement():
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
     input = param("input")
-    body = _fetch_measurement_body(report_id, input)
+    body = _fetch_measurement_body(report_id, input, None)
     resp = make_response(body)
     resp.headers.set("Content-Type", "application/json")
     resp.cache_control.max_age = 24 * 3600
@@ -451,6 +461,7 @@ def get_measurement_meta():
         probe_asn,
         probe_cc,
         report_id,
+        measurement_uid,
         CAST(scores AS varchar) AS scores,
         test_name,
         test_start_time
@@ -484,7 +495,14 @@ def get_measurement_meta():
     if not full:
         return cachedjson(24, **msmt_meta)
 
-    body = _fetch_measurement_body(report_id, input)
+    try:
+        body = _fetch_measurement_body(report_id, input, msmt_meta["measurement_uid"])
+        assert isinstance(body, bytes)
+        body = body.decode()
+    except Exception as e:
+        log.error(e, exc_info=1)
+        body = ""
+
     return cachedjson(24, raw_measurement=body, **msmt_meta)
 
 

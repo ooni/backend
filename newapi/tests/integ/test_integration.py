@@ -84,8 +84,7 @@ def fastpath_rid_input(app):
 
 
 def dbquery(app, sql, **query_params):
-    """Access DB directly, returns row as tuple.
-    """
+    """Access DB directly, returns row as tuple."""
     with app.app_context():
         q = app.db_session.execute(sql, query_params)
         return q.fetchone()
@@ -95,7 +94,7 @@ def api(client, subpath, **kw):
     url = f"/api/v1/{subpath}"
     if kw:
         assert "?" not in url
-        url += ("?" + urlencode(kw))
+        url += "?" + urlencode(kw)
 
     response = client.get(url)
     assert response.status_code == 200
@@ -250,6 +249,7 @@ def test_get_measurement_meta_basic(client):
         "failure": False,
         "input": inp,
         "measurement_start_time": "2020-12-16T05:44:41Z",
+        "measurement_uid": "20201216054344.884408_VE_webconnectivity_a255255d74fff0be",
         "probe_asn": 21826,
         "probe_cc": "VE",
         "report_id": rid,
@@ -335,7 +335,7 @@ def test_get_measurement_meta_full(client):
     rid = "20200209T235610Z_AS22773_NqZSA7xdrVbZb6yO25E5a7HM2Zr7ENIwvxEC18a4TpfYOzWxOz"
     inp = "http://www.theonion.com/"
     response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
-    data = response.pop("data")
+    data = response.pop("raw_measurement")
     assert response == {
         "anomaly": False,
         "confirmed": False,
@@ -407,6 +407,38 @@ def test_get_measurement_meta_duplicate_in_fp(client, fastpath_dup_rid_input):
     assert response["scores"] != "{}"  # from faspath
 
 
+# This is a msmt from reprocessor.py
+# Tested by setting BASEURL = "https://ooni-data-eu-fra-test.s3.amazonaws.com/"
+# in def _fetch_jsonl_measurement_body_inner(
+@pytest.mark.skip(reason="no way of currently testing this")
+def test_get_measurement_meta_full_reprocessed(client):
+    rid = "20181030T014439Z_AS10796_ucOhFJsuTvBnUYbJvIaYeMjWe1lxHbfZHuyY9lJp77BXqS7tki"
+    inp = "http://del.icio.us"
+    response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
+    print(response)
+    assert response
+    data = response.pop("raw_measurement")
+    assert response == {
+        "anomaly": False,
+        "confirmed": False,
+        "failure": False,
+        "input": inp,
+        "measurement_start_time": "2018-10-30T01:44:47Z",
+        "measurement_uid": "00066c98de599500d0ca5a6b83e0154e",
+        "probe_asn": 10796,
+        "probe_cc": "US",
+        "report_id": rid,
+        "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
+        "test_name": "web_connectivity",
+        "test_start_time": "2018-10-30T01:44:45Z",
+        "category_code": None,
+        # "analysis": {"blocking": "http-diff",},
+        # "network_name": "Fidget Unlimited",
+    }
+    assert data is not None
+    assert "test_keys" in data
+
+
 # # list_measurements # #
 
 
@@ -446,7 +478,8 @@ def test_list_measurements_search(client):
     # ...leading to an API call to:
     # api.ooni.io/api/v1/measurements?probe_cc=MY&domain=malaysia.msn.com&until=2019-12-05&limit=50
     response = api(
-        client, f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2020-12-05&limit=50",
+        client,
+        f"measurements?probe_cc=MY&domain=malaysia.msn.com&until=2020-12-05&limit=50",
     )
     assert len(response["results"]) == 50, jd(response)
 
@@ -480,7 +513,9 @@ def test_list_measurements_slow_order_by_complete(
     response = api(client, url)
 
 
-@pytest.mark.parametrize("f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity"))
+@pytest.mark.parametrize(
+    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
+)
 def test_list_measurements_slow_order_by_group_1(f, log, client):
     # filter on probe_cc or probe_asn or test_name
     # order by --> "test_start_time"
@@ -559,7 +594,9 @@ def today_range():
 @pytest.mark.parametrize("anomaly", (True, False))
 @pytest.mark.parametrize("confirmed", (True, False))
 @pytest.mark.parametrize("failure", (True, False))
-def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
+def test_list_measurements_filter_flags_fastpath(
+    anomaly, confirmed, failure, client, log
+):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
     SELECT COUNT(*), anomaly, confirmed, msm_failure AS failure
@@ -597,7 +634,9 @@ def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, cl
 @pytest.mark.parametrize("failure", (True, False))
 @pytest.mark.parametrize("confirmed", (True, False))
 @pytest.mark.parametrize("anomaly", (True, False))
-def test_list_measurements_filter_flags_pipeline(anomaly, confirmed, failure, client, log):
+def test_list_measurements_filter_flags_pipeline(
+    anomaly, confirmed, failure, client, log
+):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
     COUNT(*), anomaly, confirmed, measurement.exc IS NOT NULL AS failure
@@ -670,7 +709,9 @@ def test_list_measurements_shared(client, shared_rid_input, log):
     until = since + timedelta(seconds=100)
     url = f"measurements?since={since}&until={until}&input={inp}&limit=5"
     response = api(client, url)
-    results = [r for r in response["results"] if r["report_id"] == rid and r["input"] == inp]
+    results = [
+        r for r in response["results"] if r["report_id"] == rid and r["input"] == inp
+    ]
     assert results
     for r in results:
         m = r["measurement_id"]
@@ -716,7 +757,7 @@ def test_list_measurements_paging_2(client):
         else:
             assert meta["current_page"] == pagenum, url
             assert meta["offset"] == 700, url
-            assert meta["count"] == 763, (url, meta) # is this ok?
+            assert meta["count"] == 763, (url, meta)  # is this ok?
             assert meta["next_url"] is None
             break
 
@@ -847,7 +888,9 @@ def test_get_measurement_joined_multi(log, client, shared_rid_input_multi):
 
 
 @pytest.mark.get_measurement
-def test_get_measurement_joined_multi_input_null(log, client, shared_rid_multi_input_null):
+def test_get_measurement_joined_multi_input_null(
+    log, client, shared_rid_multi_input_null
+):
     """Simulate Explorer behavior
     Get a measurement that has an entry in the fastpath table and also
     in the traditional pipeline
@@ -1094,7 +1137,10 @@ def test_private_api_test_names(client, log):
             {"id": "dash", "name": "DASH"},
             {"id": "dns_consistency", "name": "DNS Consistency"},
             {"id": "facebook_messenger", "name": "Facebook Messenger"},
-            {"id": "http_header_field_manipulation", "name": "HTTP Header Field Manipulation",},
+            {
+                "id": "http_header_field_manipulation",
+                "name": "HTTP Header Field Manipulation",
+            },
             {"id": "http_host", "name": "HTTP Host"},
             {"id": "http_invalid_request_line", "name": "HTTP Invalid Request Line"},
             {"id": "http_requests", "name": "HTTP Requests"},
@@ -1513,7 +1559,9 @@ def test_aggregation_x_axis_only_csv_2d(client, log):
 
 def test_aggregation_x_axis_category_code(client, log):
     # 1d data over a special column: category_code
-    url = "aggregation?probe_cc=DE&since=2020-01-01&until=2020-01-03&axis_x=category_code"
+    url = (
+        "aggregation?probe_cc=DE&since=2020-01-01&until=2020-01-03&axis_x=category_code"
+    )
     r = api(client, url)
     assert r["dimension_count"] == 1, fjd(r)
     # shortened to save space
@@ -1544,7 +1592,9 @@ def test_aggregation_x_axis_category_code(client, log):
 
 def test_aggregation_y_axis_category_code(client, log):
     # 1d data over a special column: category_code
-    url = "aggregation?probe_cc=DE&since=2020-03-01&until=2020-03-02&axis_y=category_code"
+    url = (
+        "aggregation?probe_cc=DE&since=2020-03-01&until=2020-03-02&axis_y=category_code"
+    )
     r = api(client, url)
     assert "dimension_count" in r, fjd(r)
     assert r["dimension_count"] == 1, fjd(r)
@@ -1589,12 +1639,14 @@ def test_aggregation_xy_axis_category_code(client, log):
 def test_aggregation_tor(client):
     r = api(client, "aggregation?probe_cc=BY&since=2020-10-10T10:30:00&test_name=tor")
     assert r == {
-        "dimension_count": 0, "result": {
+        "dimension_count": 0,
+        "result": {
             "anomaly_count": 365,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 407
-        }, "v": 0
+            "measurement_count": 407,
+        },
+        "v": 0,
     }
 
 
@@ -1607,10 +1659,12 @@ def test_aggregation_input(client):
     url = "aggregation?since=2020-01-01&until=2020-01-03&input=https://ccc.de/"
     r = api(client, url)
     assert r == {
-        "dimension_count": 0, "result": {
+        "dimension_count": 0,
+        "result": {
             "anomaly_count": 23,
             "confirmed_count": 0,
             "failure_count": 21,
-            "measurement_count": 319
-        }, "v": 0
+            "measurement_count": 319,
+        },
+        "v": 0,
     }

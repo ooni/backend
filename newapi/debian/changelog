@@ -1,3 +1,9 @@
+ooni-api (0.34) unstable; urgency=medium
+
+  * Support reprocessed jsonl
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 14 Jun 2021 13:35:28 +0100
+
 ooni-api (0.33) unstable; urgency=medium
 
   * More fixes for citizenlab URL submission
