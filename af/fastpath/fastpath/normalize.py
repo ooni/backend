@@ -586,8 +586,11 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
         if "test_start_time" in entry and "test_start_time" in header:
             header.pop("test_start_time")
         entry.update(header)
-        out = normalize_entry(entry, bucket_tstamp, report_fn, esha)
-        yield out
+        try:
+            yield normalize_entry(entry, bucket_tstamp, report_fn, esha)
+        except Exception as e:
+            log.error(str(e), exc_info=1)
+            continue
 
         # try:
         #    if not entry:  # e.g. '---\nnull\n...\n'
