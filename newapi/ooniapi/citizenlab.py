@@ -6,9 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 from hashlib import sha224
-from typing import List
+from typing import Dict, List
 import csv
-import io
 import logging
 import os
 import re
@@ -22,6 +21,7 @@ import git  # debdeps: python3-git
 import requests
 
 from ooniapi.auth import role_required
+from ooniapi.utils import cachedjson, nocachejson
 
 """
 
@@ -102,7 +102,7 @@ class ProgressPrinter(git.RemoteProgress):
 
 def safe(username: str) -> str:
     """Convert username to a filesystem-safe string"""
-    return sha224("aoeu".encode()).hexdigest()
+    return sha224(username.encode()).hexdigest()
 
 
 class URLListManager:
@@ -162,13 +162,19 @@ class URLListManager:
         except FileNotFoundError:
             return "CLEAN"
 
+    def get_diff(self, username: str):
+        """Returns the git diff"""
+        # FIXME
+        repo = self.get_user_repo(username)
+        return repo.index.diff()
+
     def set_state(self, username, state: str):
         """
         This will record the current state of the pull request for the user to
         the statefile.
         The absence of a statefile is an indication of a clean state.
         """
-        assert state in ("IN_PROGRESS", "PR_OPEN", "CLEAN")
+        assert state in ("IN_PROGRESS", "PR_OPEN", "CLEAN"), "Unexpected state"
         log.debug(f"setting state for {username} to {state}")
         if state == "CLEAN":
             self.get_user_statefile_path(username).unlink()
@@ -197,7 +203,7 @@ class URLListManager:
         lockfile_f = self.working_dir / "users" / safe(username) / "state.lock"
         return FileLock(lockfile_f, timeout=5)
 
-    def get_test_list(self, username, country_code):
+    def get_test_list(self, username, country_code) -> List[Dict[str, str]]:
         country_code = country_code.lower()
         if len(country_code) != 2 and country_code != "global":
             raise Exception("Invalid country code")
@@ -209,25 +215,25 @@ class URLListManager:
         if not os.path.exists(repo_path):
             repo_path = self.repo_dir
 
-        test_list = []
         path = repo_path / "lists" / f"{country_code}.csv"
         log.debug(f"Reading {path}")
+        keys = set(("url", "category_code", "date_added", "source", "notes"))
+        tl = []
         with path.open() as tl_file:
-            csv_reader = csv.reader(tl_file)
-            for line in csv_reader:
-                test_list.append(line)
-        return test_list
+            reader = csv.DictReader(tl_file)
+            for e in reader:
+                d = {k: (e[k] or "") for k in keys}
+                tl.append(d)
 
-    def is_duplicate_url(self, username, country_code, new_url):
-        url_set = set()
-        for row in self.get_test_list(username, country_code):
-            url = row[0]
-            url_set.add(url)
+        return tl
+
+    def prevent_duplicate_url(self, username, country_code, new_url):
+        rows = self.get_test_list(username, country_code)
         if country_code != "global":
-            for row in self.get_test_list(username, "global"):
-                url = row[0]
-                url_set.add(url)
-        return new_url in url_set
+            rows.extend(self.get_test_list(username, "global"))
+
+        if new_url in (r["url"] for r in rows):
+            raise Exception(f"{new_url} is duplicate")
 
     def pull_origin_repo(self):
         self.repo.remotes.origin.pull(progress=ProgressPrinter())
@@ -254,36 +260,37 @@ class URLListManager:
 
             self.set_state(username, "CLEAN")
 
-    def add(self, username, cc, new_entry, comment):
-        self.sync_state(username)
-        self.pull_origin_repo()
-        log.debug("adding new entry")
-        state = self.get_state(username)
-        if state in ("PR_OPEN"):
-            raise Exception("You cannot edit files while changes are pending")
+    def update(self, username: str, cc: str, old_entry: dict, new_entry: dict, comment):
+        """Create/update/delete"""
+        # TODO: set date_added to now() on new_entry
+        # fields follow the order in the CSV files
+        fields = (
+            "url",
+            "category_code",
+            "category_description",
+            "date_added",
+            "source",
+            "notes",
+        )
+        if old_entry:
+            old_entry["category_description"] = CATEGORY_CODES[
+                old_entry["category_code"]
+            ]
+            assert sorted(old_entry.keys()) == sorted(fields), "Unexpected keys"
 
-        repo = self.get_user_repo(username)
-        with self.get_user_lock(username):
-            csv_f = self.get_user_repo_path(username) / "lists" / f"{cc}.csv"
+        if new_entry:
+            new_entry["category_description"] = CATEGORY_CODES[
+                new_entry["category_code"]
+            ]
+            assert sorted(new_entry.keys()) == sorted(fields), "Unexpected keys"
 
-            if self.is_duplicate_url(username, cc, new_entry[0]):
-                raise Exception(f"{new_entry[0]} is duplicate")
+        if old_entry and new_entry:
+            log.debug("updating existing entry")
+        elif old_entry:
+            log.debug("deleting existing entry")
+        elif new_entry:
+            log.debug("creating new entry")
 
-            log.debug(f"Writing {csv_f}")
-            with csv_f.open("a") as out_file:
-                csv_writer = csv.writer(
-                    out_file, quoting=csv.QUOTE_MINIMAL, lineterminator="\n"
-                )
-                csv_writer.writerow(new_entry)
-
-            log.debug(f"Writtten {csv_f}")
-            repo.index.add([csv_f.as_posix()])
-            repo.index.commit(comment)
-
-            self.set_state(username, "IN_PROGRESS")
-
-    def update(self, username, cc, old_entry, new_entry, comment):
-        log.debug("updating existing entry")
         cc = cc.lower()
         if len(cc) != 2:
             raise Exception("Invalid country code")
@@ -299,37 +306,51 @@ class URLListManager:
 
         repo = self.get_user_repo(username)
         with self.get_user_lock(username):
-
             csv_f = self.get_user_repo_path(username) / "lists" / f"{cc}.csv"
+            tmp_f = csv_f.with_suffix(".tmp")
 
-            new_url = new_entry[0]
-            if new_url != old_entry[0]:
-                # If the URL is being changed check for collisions
-                if self.is_duplicate_url(username, cc, new_url):
-                    raise Exception(f"{new_url} is duplicate")
+            if new_entry:
+                # Check for collisions:
+                if not old_entry:
+                    self.prevent_duplicate_url(username, cc, new_entry["url"])
 
-            out_buffer = io.StringIO()
-            with csv_f.open() as in_file:
-                csv_reader = csv.reader(in_file)
-                csv_writer = csv.writer(
-                    out_buffer, quoting=csv.QUOTE_MINIMAL, lineterminator="\n"
+                elif old_entry and new_entry["url"] != old_entry["url"]:
+                    # If the URL is being changed check for collisions
+                    self.prevent_duplicate_url(username, cc, new_entry["url"])
+
+            with csv_f.open() as in_f, tmp_f.open("w") as out_f:
+                reader = csv.DictReader(in_f)
+                writer = csv.DictWriter(
+                    out_f,
+                    quoting=csv.QUOTE_MINIMAL,
+                    lineterminator="\n",
+                    fieldnames=fields,
                 )
+                writer.writeheader()
 
-                found = False
-                for row in csv_reader:
+                done = False
+                for row in reader:
                     if row == old_entry:
-                        found = True
-                        csv_writer.writerow(new_entry)
-                    else:
-                        csv_writer.writerow(row)
+                        if new_entry:
+                            writer.writerow(new_entry)  # update entry
+                        else:
+                            pass  # delete entry
+                        done = True
 
-            if not found:
+                    else:
+                        writer.writerow(row)
+
+                if new_entry and not old_entry:
+                    writer.writerow(new_entry)  # add new entry at end
+                    done = True
+
+            if not done:
                 m = "Unable to update. The URL list has changed in the meantime."
+                tmp_f.unlink()
                 raise Exception(m)
 
-            with csv_f.open("w") as out_file:
-                out_buffer.seek(0)
-                shutil.copyfileobj(out_buffer, out_file)
+            log.debug(f"Writing {csv_f.as_posix()}")
+            tmp_f.rename(csv_f)
             repo.index.add([csv_f.as_posix()])
             repo.index.commit(comment)
 
@@ -371,6 +392,7 @@ class URLListManager:
         )
 
     def propose_changes(self, username: str) -> str:
+        # FIXME: username is not unique to users, switch to account_id
         with self.get_user_lock(username):
             log.debug("proposing changes")
             self.set_state(username, "PR_OPEN")
@@ -411,16 +433,19 @@ def check_url(url):
         raise BadURL()
 
 
-def validate_entry(entry: List[str]) -> None:
-    url, category_code, category_desc, date_str, user, notes = entry
-    check_url(url)
-    if category_code not in CATEGORY_CODES:
+def validate_entry(entry: Dict[str, str]) -> None:
+    keys = ["category_code", "date_added", "notes", "source", "url"]
+    if sorted(entry.keys()) != keys:
+        raise Exception(f"Incorrect entry keys {list(entry)}")
+
+    check_url(entry["url"])
+    if entry["category_code"] not in CATEGORY_CODES:
         raise BadCategoryCode()
-    if category_desc != CATEGORY_CODES[category_code]:
-        raise BadCategoryDescription()
+
     try:
-        d = datetime.strptime(date_str, "%Y-%m-%d").date().isoformat()
-        if d != date_str:
+        date_added = entry["date_added"]
+        d = datetime.strptime(date_added, "%Y-%m-%d").date().isoformat()
+        if d != date_added:
             raise BadDate()
     except Exception:
         raise BadDate()
@@ -465,68 +490,18 @@ def get_test_list(country_code):
     username = get_username()
     ulm = get_url_list_manager()
     tl = ulm.get_test_list(username, country_code)
-    # make an array of dicts
-    header = tl[0]
-    tl = [dict(zip(header, row)) for row in tl[1:]]
     return make_response(jsonify(tl))
-
-
-@cz_blueprint.route("/api/v1/url-submission/add-url", methods=["POST"])
-@role_required(["admin", "user"])
-def url_submission_add_url():
-    """Submit a new citizenlab URL entry
-    ---
-    parameters:
-      - in: body
-        name: add new URL
-        required: true
-        schema:
-          type: object
-          properties:
-            country_code:
-              type: string
-            comment:
-              type: string
-            new_entry:
-              type: array
-    responses:
-      200:
-        description: New URL confirmation
-        schema:
-          type: object
-          properties:
-            new_entry:
-              type: array
-    """
-    global log
-    log = current_app.logger
-    try:
-        username = get_username()
-        ulm = get_url_list_manager()
-        validate_entry(request.json["new_entry"])
-        ulm.add(
-            username=username,
-            cc=request.json["country_code"],
-            new_entry=request.json["new_entry"],
-            comment=request.json["comment"],
-        )
-        d = {"new_entry": request.json["new_entry"]}
-        return make_response(jsonify(d))
-    except Exception as e:
-        log.info(f"URL submission add error {e}", exc_info=1)
-        return jerror(str(e))
 
 
 @cz_blueprint.route("/api/v1/url-submission/update-url", methods=["POST"])
 @role_required(["admin", "user"])
 def url_submission_update_url():
-    """Update a citizenlab URL entry.
-    The current value needs to be sent back as "old_entry" as a check
-    against race conditions
+    """Create/update/delete a Citizenlab URL entry. The current value needs
+    to be sent back as "old_entry" as a check against race conditions.
+    Empty old_entry: create new rule. Empty new_entry: delete existing rule.
     ---
     parameters:
       - in: body
-        name: add new URL
         required: true
         schema:
           type: object
@@ -535,10 +510,32 @@ def url_submission_update_url():
               type: string
             comment:
               type: string
-            new_entry:
-              type: array
             old_entry:
-              type: array
+              type: object
+              properties:
+                category_code:
+                  type: string
+                url:
+                  type: string
+                date_added:
+                  type: string
+                user:
+                  type: string
+                notes:
+                  type: string
+            new_entry:
+              type: object
+              properties:
+                category_code:
+                  type: string
+                url:
+                  type: string
+                date_added:
+                  type: string
+                user:
+                  type: string
+                notes:
+                  type: string
     responses:
       200:
         description: New URL confirmation
@@ -546,21 +543,28 @@ def url_submission_update_url():
           type: object
           properties:
             updated_entry:
-              type: array
+              type: object
     """
     global log
     log = current_app.logger
     username = get_username()
 
     ulm = get_url_list_manager()
-    validate_entry(request.json["new_entry"])
+    rj = request.json
+    new = rj["new_entry"]
+    old = rj["old_entry"]
     try:
+        if new:
+            validate_entry(new)
+        if old:
+            validate_entry(old)
+
         ulm.update(
             username=username,
-            cc=request.json["country_code"],
-            old_entry=request.json["old_entry"],
-            new_entry=request.json["new_entry"],
-            comment=request.json["comment"],
+            cc=rj["country_code"],
+            old_entry=old,
+            new_entry=new,
+            comment=rj["comment"],
         )
         return jsonify({"updated_entry": request.json["new_entry"]})
     except Exception as e:
@@ -586,6 +590,26 @@ def get_workflow_state():
     ulm = get_url_list_manager()
     state = ulm.get_state(username)
     return jsonify(state=state)
+
+
+@cz_blueprint.route("/api/v1/url-submission/diff", methods=["GET"])
+@role_required(["admin", "user"])
+def get_git_diff():
+    """Get changes as a git diff
+    ---
+    responses:
+      200:
+        description: Git diff
+        schema:
+          type: object
+    """
+    global log
+    log = current_app.logger
+    username = get_username()
+    log.debug("get citizenlab git diff")
+    ulm = get_url_list_manager()
+    diff = ulm.get_diff(username)
+    return nocachejson(diff=diff)
 
 
 @cz_blueprint.route("/api/v1/url-submission/submit", methods=["POST"])
@@ -701,7 +725,9 @@ def list_url_priorities():
 @cz_blueprint.route("/api/_/url-priorities/update", methods=["POST"])
 @role_required(["admin"])
 def post_update_url_priority():
-    """Add/update/delete an URL priority rule
+    """Add/update/delete an URL priority rule. Empty old_entry: create new rule.
+    Empty new_entry: delete existing rule. The current value needs to be sent
+    back as "old_entry" as a check against race conditions
     ---
     parameters:
       - in: body
@@ -786,8 +812,7 @@ def post_update_url_priority():
 
 
 def match_prio_rule(cz, pr: dict) -> bool:
-    """Match a priority rule to citizenlab entry
-    """
+    """Match a priority rule to citizenlab entry"""
     for k in ["category_code", "cc", "domain", "url"]:
         if pr[k] not in ("*", cz[k]):
             return False

@@ -43,54 +43,82 @@ def test_no_auth(client):
 def list_global(client, usersession):
     r = client.get("/api/v1/url-submission/test-list/global")
     assert r.status_code == 200
-    assert set(r.json[0].keys()) == set([
-        "url",
-        "category_code",
-        "category_description",
-        "date_added",
-        "source",
-        "notes",
-    ])
+    assert r.json[0] == {
+        "url": "https://2600.org/",
+        "category_code": "HACK",
+        "date_added": "2014-04-15",
+        "source": "citizenlab",
+        "notes": "Updated by OONI on 2017-02-14",
+    }
     assert len(r.json) > 1000
 
 
-def add_url(client, usersession):
+def add_url(client, usersession, url, tmp_path):
+    new_entry = {
+        "url": url,
+        "category_code": "FILE",
+        "date_added": "2017-04-12",
+        "source": "",
+        "notes": "Integ test",
+    }
     d = dict(
         country_code="US",
-        new_entry=[
-            "https://www.example.com/",
-            "FILE",
-            "File-sharing",
-            "2017-04-12",
-            "",
-            "",
-        ],
-        comment="add example URL",
+        new_entry=new_entry,
+        old_entry={},
+        comment="Integ test: add example URL",
     )
 
-    r = client.post("/api/v1/url-submission/add-url", json=d)
+    r = client.post("/api/v1/url-submission/update-url", json=d)
+    assert r.status_code == 200, r.data
+
+    r = client.get("/api/v1/url-submission/test-list/us")
+    assert r.status_code == 200
+    en = [e for e in r.json if e["url"] == url]
+    assert len(en) == 1
+    assert en[0] == new_entry
+
+
+def lookup_and_delete_us_url(client, usersession, url):
+    r = client.get("/api/v1/url-submission/test-list/us")
+    assert r.status_code == 200
+    en = [e for e in r.json if e["url"] == url]
+    assert len(en) == 1
+    old_entry = en[0]
+    assert sorted(old_entry) == [
+        "category_code",
+        "date_added",
+        "notes",
+        "source",
+        "url",
+    ]
+    d = dict(
+        country_code="US",
+        new_entry={},
+        old_entry=old_entry,
+        comment="Integ test: delete URL",
+    )
+
+    r = client.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 200, r.data
 
 
 def test_update_url_reject(client, usersession):
     d = dict(
         country_code="it",
-        old_entry=[
-            "http://btdigg.org/",
-            "FILE",
-            "File-sharing",
-            "2017-04-12",
-            "",
-            "<bogus value not matching anything>",
-        ],
-        new_entry=[
-            "https://btdigg.org/",
-            "FILE",
-            "File-sharing",
-            "2017-04-12",
-            "",
-            "Meow",
-        ],
+        old_entry={
+            "url": "http://btdigg.org/",
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "<bogus value not matching anything>",
+        },
+        new_entry={
+            "url": "https://btdigg.org/",
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "Meow",
+        },
         comment="add HTTPS to the website url",
     )
     r = client.post("/api/v1/url-submission/update-url", json=d)
@@ -101,15 +129,14 @@ def test_update_url_nochange(client, usersession):
     r = client.get("/api/v1/url-submission/test-list/it")
     assert r.status_code == 200
 
-    fe = r.json[0] # first entry
-    old = [
-        fe["url"],
-        fe["category_code"],
-        fe["category_description"],
-        fe["date_added"],
-        fe["source"],
-        fe["notes"],
-    ]
+    fe = r.json[0]  # first entry
+    old = {
+        "url": fe["url"],
+        "category_code": fe["category_code"],
+        "date_added": fe["date_added"],
+        "source": fe["source"],
+        "notes": fe["notes"],
+    }
     new = old
     d = dict(country_code="it", old_entry=old, new_entry=new, comment="")
     r = client.post("/api/v1/url-submission/update-url", json=d)
@@ -123,17 +150,16 @@ def update_url_basic(client, usersession):
     r = client.get("/api/v1/url-submission/test-list/it")
     assert r.status_code == 200
 
-    fe = r.json[0] # first entry
-    old = [
-        fe["url"],
-        fe["category_code"],
-        fe["category_description"],
-        fe["date_added"],
-        fe["source"],
-        fe["notes"],
-    ]
-    new = list(old)
-    new[-1] = "Bogus comment"
+    fe = r.json[0]  # first entry
+    old = {
+        "url": fe["url"],
+        "category_code": fe["category_code"],
+        "date_added": fe["date_added"],
+        "source": fe["source"],
+        "notes": fe["notes"],
+    }
+    new = old.copy()
+    new["notes"] = "Bogus comment"
     assert new != old
     d = dict(country_code="it", old_entry=old, new_entry=new, comment="")
     r = client.post("/api/v1/url-submission/update-url", json=d)
@@ -142,10 +168,34 @@ def update_url_basic(client, usersession):
     assert get_state(client) == "IN_PROGRESS"
 
 
+def delete_url(client, usersession):
+    d = dict(
+        country_code="US",
+        old_entry={
+            "url": "https://www.example.com/",
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "",
+        },
+        new_entry={},
+        comment="delete example URL",
+    )
+
+    r = client.post("/api/v1/url-submission/update-url", json=d)
+    assert r.status_code == 200, r.data
+
+
 def get_state(client):
     r = client.get("/api/v1/url-submission/state")
     assert r.status_code == 200
     return r.json["state"]
+
+
+def get_diff(client):
+    r = client.get("/api/v1/url-submission/diff")
+    assert r.status_code == 200
+    return r.json["diff"]
 
 
 def test_pr_state(client, usersession):
@@ -187,14 +237,34 @@ def clean_workdir(app, tmp_path):
         conf["GITHUB_WORKDIR"] = tmp_path.as_posix()
 
 
-def test_checkout_update_submit(clean_workdir, client, usersession, mock_requests):
+def _read_us_csv_file(tmp_path):
+    # h = ooniapi.citizenlab.safe(username)  # from usersession
+    h = "71a5b4e2515fa1d386a6f395f3b3e84aed1e40442ff95fcef1e2b4d8"
+    f = tmp_path / "users" / h / "test-lists/lists/us.csv"
+    return f.read_text().splitlines()
+
+
+def _test_checkout_update_submit(client, tmp_path):
     assert get_state(client) == "CLEAN"
 
     list_global(client, usersession)
     assert get_state(client) == "CLEAN"
 
-    add_url(client, usersession)
+    assert get_diff(client) == []
+
+    url = "https://example-bogus-1.org/"
+    add_url(client, usersession, url, tmp_path)
     assert get_state(client) == "IN_PROGRESS"
+
+    csv = _read_us_csv_file(tmp_path)
+    assert csv[0] == "url,category_code,category_description,date_added,source,notes"
+    assert url in csv[-1], "URL not found in the last line in the CSV file"
+
+    # assert get_diff(client) != []
+
+
+    add_url(client, usersession, "https://example-bogus.org/", tmp_path)
+    lookup_and_delete_us_url(client, usersession, "https://example-bogus.org/")
 
     update_url_basic(client, usersession)
 
@@ -203,7 +273,13 @@ def test_checkout_update_submit(clean_workdir, client, usersession, mock_request
 
     assert get_state(client) == "PR_OPEN"
 
-    # Before getting the list URLListManager will check if the PR is done
+
+def test_checkout_update_submit(
+    clean_workdir, client, usersession, mock_requests, tmp_path
+):
+    _test_checkout_update_submit(client, tmp_path)
+
+    # Before getting the list URLListManager will check if the mock PR is done
     # (it is) and set the state to CLEAN
     list_global(client, usersession)
     assert get_state(client) == "CLEAN"
@@ -213,22 +289,9 @@ def test_checkout_update_submit(clean_workdir, client, usersession, mock_request
 
 
 @pytest.mark.skipif(not pytest.run_ghpr, reason="use --ghpr to run")
-def test_ghpr_checkout_update_submit(clean_workdir, client, usersession):
-    assert get_state(client) == "CLEAN"
-
-    list_global(client, usersession)
-    assert get_state(client) == "CLEAN"
-
-    add_url(client, usersession)
-    assert get_state(client) == "IN_PROGRESS"
-
-    update_url_basic(client, usersession)
-
-    r = client.post("/api/v1/url-submission/submit")
-    assert r.status_code == 200
-
-    assert get_state(client) == "PR_OPEN"
-
+def test_ghpr_checkout_update_submit(clean_workdir, client, usersession, tmp_path):
+    _test_checkout_update_submit(client, tmp_path)
+    # This is a *real* PR
     list_global(client, usersession)
     assert get_state(client) == "PR_OPEN"
 
@@ -318,9 +381,9 @@ def test_x(client, adminsession):
     post200(client, "/api/_/url-priorities/update", new_entry=zzz)
 
     ## XXX currently broken
-    #r = client.get("/api/_/url-priorities/WIP")
-    #assert r.json
-    #for e in r.json:
+    # r = client.get("/api/_/url-priorities/WIP")
+    # assert r.json
+    # for e in r.json:
     #    if e["category_code"] == "NEWS" and e["cc"] == "it" and e["url"] == 'http://www.leggo.it/':
     #        assert e["priority"] == 118  # 4 rules matched
 

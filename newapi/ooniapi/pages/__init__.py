@@ -41,7 +41,7 @@ pages_blueprint = Blueprint(
 )
 
 
-DAY_REGEXP = re.compile("^\d{4}\-[0-1]\d\-[0-3]\d$")
+DAY_REGEXP = re.compile(r"^\d{4}\-[0-1]\d\-[0-3]\d$")
 
 
 @pages_blueprint.route("/")

@@ -10,7 +10,6 @@ Test using:
     pytest-3 -s --show-capture=no ooniapi/tests/integ/test_integration_auth.py
 """
 
-import os
 from unittest.mock import MagicMock, Mock
 from urllib.parse import urlparse
 
@@ -84,7 +83,7 @@ def postj(client, url, **kw):
 
 
 def test_login_user_bogus_token(client, mocksmtp):
-    r = client.get(f"/api/v1/user_login?k=BOGUS")
+    r = client.get("/api/v1/user_login?k=BOGUS")
     assert r.status_code == 401
     assert r.json == {"error": "Invalid credentials"}
 
@@ -107,7 +106,7 @@ def test_user_register_non_valid(client, mocksmtp):
 
 
 def _register_and_login(client, email_address):
-    ## return cookie header for further use
+    # # return cookie header for further use
     d = dict(nickname="nick", email_address=email_address)
     r = client.post("/api/v1/user_register", json=d)
     assert r.status_code == 200
@@ -118,11 +117,13 @@ def _register_and_login(client, email_address):
     setup_test_session.mocked_s.send_message.assert_called_once()
     msg = setup_test_session.mocked_s.send_message.call_args[0][0]
     msg = str(msg)
-    url = ""
+    url = None
     assert "Subject: OONI Account activation" in msg
+    assert msg
     for line in msg.splitlines():
         if '<a href="https://' in line:
             url = line.split('"')[1]
+    assert url
     u = urlparse(url)
     token = u.query.split('=')[1]
     assert len(token) > 0

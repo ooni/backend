@@ -1,3 +1,9 @@
+ooni-api (0.35) unstable; urgency=medium
+
+  * Citizenlab: handle deletion, change format
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 14 Jun 2021 19:50:09 +0100
+
 ooni-api (0.34) unstable; urgency=medium
 
   * Support reprocessed jsonl

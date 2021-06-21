@@ -29,6 +29,7 @@ Requirements:
   - Never store users email address nor IP addresses nor passwords
   - Verify email to limit spambots. Do not use CAPCHAs
   - Support multiple sessions / devices, ability to register/login again
+  - Do not leak the existence/absence of accounts with a given login or email
 
 Workflow:
   Explorer:
