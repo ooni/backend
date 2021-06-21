@@ -14,6 +14,7 @@ setup(
     packages=["fastpath", "fastpath.tests"],
     entry_points={"console_scripts": [
         "fastpath=fastpath.core:main",
+        "reprocessor=fastpath.reprocessor:main",
         "domain_input_updater=fastpath.domain_input:main",
     ]},
     install_requires=REQUIRED,
