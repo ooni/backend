@@ -13,6 +13,7 @@ import time
 
 from flask import Blueprint, current_app, request, make_response
 from flask.json import jsonify
+from flask_cors import cross_origin
 import flask.wrappers
 import jwt  # debdeps: python3-jwt
 
@@ -21,6 +22,10 @@ from ooniapi.utils import cachedjson, nocachejson
 
 # from ooniapi.utils import cachedjson
 
+origins = [
+    re.compile(r"^https://[-A-Za-z0-9]+\.ooni\.org$"),
+    re.compile(r"^https://[-A-Za-z0-9]+\.ooni\.io$"),
+]
 auth_blueprint = Blueprint("auth_api", "auth")
 
 """
@@ -57,7 +62,9 @@ EMAIL_RE = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 
 
 def jerror(msg, code=400):
-    return make_response(jsonify(error=msg), code)
+    resp = make_response(jsonify(error=msg), code)
+    resp.cache_control.no_cache = True
+    return resp
 
 
 def create_jwt(payload: dict) -> str:
@@ -87,12 +94,19 @@ def set_JWT_cookie(res, token: str) -> None:
 
 
 def role_required(roles):
-    # Decorator requiring user to be logged in and have the right role
-    # Also refreshes the session
+    # Decorator requiring user to be logged in and have the right role.
+    # Also:
+    #  refreshes the session cookie if needed
+    #  explicitely set no-cache headers
+    #  apply the cross_origin decorator to:
+    #    - set CORS header to a trusted URL
+    #    - enable credentials (cookies)
+    #
     if isinstance(roles, str):
         roles = [roles]
 
     def decorator(func):
+        @cross_origin(origins=origins, supports_credentials=True)
         @wraps(func)
         def wrapper(*args, **kwargs):
             token = request.cookies.get("ooni", "")
@@ -123,7 +137,9 @@ def role_required(roles):
             request._user_nickname = tok["nick"]
             # run the HTTP route method
             resp = func(*args, **kwargs)
-            assert isinstance(resp, flask.wrappers.Response), type(resp)
+            # Prevent an authenticated page to be cached and served to
+            # unauthorized users
+            resp.cache_control.no_cache = True
 
             token_age = time.time() - tok["iat"]
             if token_age > 600:  # refresh token if needed

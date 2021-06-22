@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 
-import logging
 import datetime
+import logging
 import os
+import re
 import sys
 
 from flask import Flask, json
@@ -85,6 +86,15 @@ def validate_conf(app, conffile):
             sys.exit(4)
 
 
+def parse_cors_origins(app):
+    out = []
+    for i in app.config["CORS_URLS"]:
+        if i.startswith("^"):
+            i = re.compile(i)
+        out.append(i)
+    app.config["CORS_URLS"] = out
+
+
 def init_app(app, testmode=False):
     # Load configurations defaults from ooniapi/config.py
     # and then from the file pointed by CONF
@@ -99,6 +109,8 @@ def init_app(app, testmode=False):
     log.info(f"Starting OONI API. Loading conf from {conffile}")
     app.config.from_pyfile(conffile)
     validate_conf(app, conffile)
+    #parse_cors_origins(app)
+    # TODO: fix logging
     log.info("Configuration loaded")
 
     # Prevent messy duplicate logs during testing
@@ -118,20 +130,7 @@ def init_app(app, testmode=False):
         # known envs according to Readme.md
         raise RuntimeError("Unexpected APP_ENV", stage)
 
-    # FIXME
-    # CORS(app, resources={r"/api/*": {"origins": "*"}})
-    # TODO: configure from api.conf:
-    orig = [
-        "https://explorer-test.ooni.io",
-        "https://explorer-test.ooni.org",
-        "https://explorer.ooni.org",
-        "https://url-prioritization.ooni.org",
-    ]
-    CORS(app, resources={r"*": {"origins": orig}}, supports_credentials=True)
-
-
-def check_config(config):
-    pass
+    CORS(app)
 
 
 def create_app(*args, testmode=False, **kw):
@@ -143,7 +142,6 @@ def create_app(*args, testmode=False, **kw):
 
     # Order matters
     init_app(app, testmode=testmode)
-    check_config(app.config)
 
     # Setup Database connector
     init_db(app)

@@ -1,3 +1,9 @@
+ooni-api (0.36) unstable; urgency=medium
+
+  * Configure CORS
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 21 Jun 2021 19:02:13 +0100
+
 ooni-api (0.35) unstable; urgency=medium
 
   * Citizenlab: handle deletion, change format

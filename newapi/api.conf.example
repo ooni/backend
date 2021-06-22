@@ -8,6 +8,8 @@ DATABASE_URI_RO = "postgresql://readonly:ooni@db/metadb"
 
 DATABASE_STATEMENT_TIMEOUT = 30
 BASE_URL = "https://api.ooni.io/"
+# list of URLs: strings starting with "^" will be converted to regexps
+CORS_URLS = [r"^https://[-A-Za-z0-9]+\.ooni\.org$", r"^https://[-A-Za-z0-9]+\.ooni\.io$"]
 
 AUTOCLAVED_BASE_URL = "http://datacollector.infra.ooni.io/ooni-public/autoclaved/"
 
