@@ -48,6 +48,7 @@ def fetch_citizenlab_data() -> Dict[str, List[CTZ]]:
     sql = """SELECT category_code, priority, url
     FROM citizenlab
     WHERE cc = 'ZZ'
+    ORDER BY priority DESC
     """
     out: Dict[str, List[CTZ]] = {}
     query = current_app.db_session.execute(sql)
@@ -132,7 +133,7 @@ LEFT OUTER JOIN (
     WHERE probe_cc = :cc
 ) AS cnt
 ON (citiz.url = cnt.input)
-ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM()
+ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM() ASC
 """
     q = current_app.db_session.execute(sql, dict(cc=cc, cc_low=cc.lower()))
     entries = tuple(q.fetchall())
