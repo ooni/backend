@@ -192,16 +192,16 @@ def _fetch_jsonl_measurement_body_inner(
 def _fetch_jsonl_measurement_body(report_id, input: str, measurement_uid) -> bytes:
     """Fetch jsonl from S3, decompress it, extract msmt"""
     query = "SELECT s3path, linenum FROM jsonl "
+    inp = input or ""  # NULL/None input is stored as ''
     if measurement_uid is None:
-        query += "WHERE report_id = :report_id AND input = :input LIMIT 1"
-        query_params = dict(input=input, report_id=report_id)
+        query += "WHERE report_id = :report_id AND input = :inp LIMIT 1"
+        query_params = dict(inp=inp, report_id=report_id)
 
     else:
         query += """WHERE measurement_uid = :mid
         OR (report_id = :rid AND input = :inp)
         LIMIT 1
         """
-        inp = input or ""
         query_params = dict(inp=inp, rid=report_id, mid=measurement_uid)
 
     q = current_app.db_session.execute(query, query_params)

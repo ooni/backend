@@ -408,9 +408,6 @@ def test_get_measurement_meta_duplicate_in_fp(client, fastpath_dup_rid_input):
 
 
 # This is a msmt from reprocessor.py
-# Tested by setting BASEURL = "https://ooni-data-eu-fra-test.s3.amazonaws.com/"
-# in def _fetch_jsonl_measurement_body_inner(
-@pytest.mark.skip(reason="no way of currently testing this")
 def test_get_measurement_meta_full_reprocessed(client):
     rid = "20181030T014439Z_AS10796_ucOhFJsuTvBnUYbJvIaYeMjWe1lxHbfZHuyY9lJp77BXqS7tki"
     inp = "http://del.icio.us"
@@ -437,6 +434,15 @@ def test_get_measurement_meta_full_reprocessed(client):
     }
     assert data is not None
     assert "test_keys" in data
+
+
+# https://explorer.ooni.org/measurement/20210622T144545Z_riseupvpn_MM_133384_n1_VJkB5EObudGDpy9Y
+@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+def test_get_raw_measurement_input_null_bug(client):
+    # PR#254
+    rid = "20210622T144545Z_riseupvpn_MM_133384_n1_VJkB5EObudGDpy9Y"
+    r = api(client, f"raw_measurement?report_id={rid}")
+    assert "test_keys" in r
 
 
 # # list_measurements # #
