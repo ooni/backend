@@ -1,0 +1,11 @@
+[Unit]
+Description=Rotate test helpers
+Wants=ooni-rotation.timer
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rotation
+
+[Install]
+WantedBy=multi-user.target
+

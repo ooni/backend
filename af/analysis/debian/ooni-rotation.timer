@@ -1,0 +1,11 @@
+[Unit]
+Description=Rotate test helpers
+Requires=ooni-rotation.service
+
+[Timer]
+Unit=ooni-rotation.service
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
