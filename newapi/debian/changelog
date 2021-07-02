@@ -1,3 +1,9 @@
+ooni-api (0.38) unstable; urgency=medium
+
+  * More CORS
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 23 Jun 2021 22:21:20 +0100
+
 ooni-api (0.37) unstable; urgency=medium
 
   * jsonl lookup bugfix

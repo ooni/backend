@@ -211,6 +211,7 @@ def send_login_email(dest_addr, nick, token: str) -> None:
 
 @metrics.timer("user_register")
 @auth_blueprint.route("/api/v1/user_register", methods=["POST"])
+@cross_origin(origins=origins, supports_credentials=True)
 def user_register():
     """Auth Services: start email-based user registration
     ---
@@ -292,6 +293,7 @@ def _create_session_token(account_id, nick, role: str, login_time=None) -> str:
 
 @metrics.timer("user_login")
 @auth_blueprint.route("/api/v1/user_login", methods=["GET"])
+@cross_origin(origins=origins, supports_credentials=True)
 def user_login():
     """Probe Services: login using a registration/login link
     ---
@@ -424,6 +426,7 @@ def _get_account_role(account_id: str) -> Optional[str]:
 
 
 @auth_blueprint.route("/api/_/account_metadata")
+@cross_origin(origins=origins, supports_credentials=True)
 def get_account_metadata():
     """Get account metadata for logged-in users
     ---
