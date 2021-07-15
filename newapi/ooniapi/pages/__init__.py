@@ -17,7 +17,10 @@ from datetime import timedelta, datetime
 from urllib.parse import urljoin
 
 import requests
-import lz4framed
+try:
+    import lz4framed
+except ImportError:
+    pass
 
 from flask import (
     Blueprint,
