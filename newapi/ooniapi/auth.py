@@ -18,13 +18,15 @@ import flask.wrappers
 import jwt  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
-from ooniapi.utils import cachedjson, nocachejson
+from ooniapi.utils import nocachejson
 
 # from ooniapi.utils import cachedjson
 
 origins = [
     re.compile(r"^https://[-A-Za-z0-9]+\.ooni\.org$"),
+    re.compile(r"^https://[-A-Za-z0-9]+\.test\.ooni\.org$"),
     re.compile(r"^https://[-A-Za-z0-9]+\.ooni\.io$"),
+    re.compile(r"^https://[-A-Za-z0-9]+\.test\.ooni\.io$"),
 ]
 auth_blueprint = Blueprint("auth_api", "auth")
 

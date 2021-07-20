@@ -1,3 +1,9 @@
+ooni-api (0.39) unstable; urgency=medium
+
+  * Add test.ooni.org/io to CORS
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 19 Jul 2021 15:09:09 +0100
+
 ooni-api (0.38) unstable; urgency=medium
 
   * More CORS
