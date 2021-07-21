@@ -285,6 +285,7 @@ def main():
         for msm_tup in s3f.load_multiple(can_fn):
             process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn)
         processed_size += size
+        Path(can_fn).unlink()
 
     log.info("Finish jsonl files still open")
     for json_entities in buf.values():
