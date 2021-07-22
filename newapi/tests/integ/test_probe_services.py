@@ -13,18 +13,12 @@ Test using:
 
 # TODO: mock out /etc/ooni/api.conf during testing
 
-import os
 import pytest
 
 
 @pytest.fixture()
 def log(app):
     return app.logger
-
-
-@pytest.fixture(autouse=True, scope="session")
-def setup_database_url():
-    os.environ["DATABASE_URL"] = "postgresql://readonly@localhost:5432/metadb"
 
 
 def getjson(client, url):

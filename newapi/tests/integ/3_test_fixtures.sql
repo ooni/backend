@@ -40,4 +40,4 @@ INSERT INTO public.fastpath VALUES ('20201216054344.884408_VE_webconnectivity_a2
 
 INSERT INTO public.citizenlab VALUES ('www.theonion.com', 'http://www.theonion.com/', 'ZZ', 'CULTR', 40);
 
-INSERT INTO public.jsonl VALUES ('20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss', 'http://www.theonion.com/', NULL, 'raw/20201216/05/VE/webconnectivity/2020121605_VE_webconnectivity.n0.8.jsonl.gz', 119);
+--INSERT INTO public.jsonl VALUES ('20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss', 'http://www.theonion.com/', NULL, 'raw/20201216/05/VE/webconnectivity/2020121605_VE_webconnectivity.n0.8.jsonl.gz', 119);

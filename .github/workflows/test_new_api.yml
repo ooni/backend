@@ -22,5 +22,19 @@ jobs:
         with:
           limit-access-to-actor: true
 
-      - name: Run tests
-        run: docker-compose run --rm api pytest-3 -k test_private_explorer.py -k test_smoke.py -k test_citizenlab.py
+      - name: Run integ tests
+        run: |
+          docker-compose run --rm api \
+            pytest-3 --show-capture=no -s -vv --cov=ooniapi \
+              --create-db \
+              tests/integ/test_integration.py \
+              tests/integ/test_integration_auth.py \
+              tests/integ/test_aggregation.py \
+              tests/integ/test_citizenlab.py
+      - name: debug docker
+        if: always()
+        run: docker logs api_db_1
+
+      - name: debug docker
+        if: always()
+        run: docker ps -a

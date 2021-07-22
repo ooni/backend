@@ -6,14 +6,14 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: ooni
-      POSTGRES_USER: shovel
-      POSTGRES_DB: metadb
+      POSTGRES_USER: oonitest
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: oonitestdb
     volumes:
       # ssh ams-pg.ooni.org -t pg_dump metadb -U shovel --schema-only > scripts/2_metadb_schema.sql
-      - ./scripts/1_metadb_users.sql:/docker-entrypoint-initdb.d/1_metadb_users.sql
-      - ./scripts/2_metadb_schema.sql:/docker-entrypoint-initdb.d/2_metadb_schema.sql
-      - ./scripts/3_test_fixtures.sql:/docker-entrypoint-initdb.d/3_test_fixtures.sql
+      - ./newapi/tests/integ/1_metadb_users.sql:/docker-entrypoint-initdb.d/1_metadb_users.sql
+      - ./newapi/tests/integ/2_metadb_schema.sql:/docker-entrypoint-initdb.d/2_metadb_schema.sql
+      - ./newapi/tests/integ/3_test_fixtures.sql:/docker-entrypoint-initdb.d/3_test_fixtures.sql
 
   api:
     restart: always

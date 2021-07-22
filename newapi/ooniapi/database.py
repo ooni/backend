@@ -13,7 +13,6 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy_utils import database_exists, create_database
 
 from ooniapi.config import metrics
 
@@ -45,22 +44,19 @@ hooks_are_set = False
 
 
 def init_db(app):
-    """Initializes database connection
-    """
+    """Initializes database connection"""
     application_name = _gen_application_name()
     # Unfortunately this application_name is not logged during `connection authorized`,
     # but it is used for `disconnection` event even if the client dies during query!
     query_timeout = app.config["DATABASE_STATEMENT_TIMEOUT"] * 1000
     assert query_timeout > 1000
-    connect_args = {
+    connargs = {
         "application_name": application_name,
         "options": f"-c statement_timeout={query_timeout}",
     }
-    app.db_engine = create_engine(
-        app.config["DATABASE_URI_RO"], convert_unicode=True, connect_args=connect_args
-    )
-    # if not database_exists(app.db_engine.url):
-    #    create_database(app.db_engine.url)
+    uri = app.config["DATABASE_URI_RO"]
+    app.logger.info(f"Database URI: {uri}")
+    app.db_engine = create_engine(uri, convert_unicode=True, connect_args=connargs)
     app.db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=app.db_engine)
     )
@@ -68,8 +64,8 @@ def init_db(app):
 
     # Set query duration limits (in milliseconds)
     app.db_session.execute(
-        #"SET seq_page_cost=2;"
-        #"SET enable_seqscan=off;"
+        # "SET seq_page_cost=2;"
+        # "SET enable_seqscan=off;"
         "SET idle_in_transaction_session_timeout = 6000000"
     )
 
@@ -83,17 +79,17 @@ def init_db(app):
 
     @event.listens_for(Engine, "before_cursor_execute")
     def before_cursor_execute(
-        conn, cursor, statement, parameters, context, executemany
+        conn, cursor, statement, params, context, execmany
     ):
         qh = query_hash(statement)
         with metrics.timer(f"query-{qh}"):
-            query = cursor.mogrify(statement, parameters).decode()
+            query = cursor.mogrify(statement, params).decode()
             conn.info.setdefault("query_start_time", []).append(time.time())
             query = query.replace("\n", " ")
             app.logger.debug("Starting query %s ---- %s ----", qh, query)
 
     @event.listens_for(Engine, "after_cursor_execute")
-    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def after_cursor_execute(conn, cursor, statement, params, context, execmany):
         total_time = time.time() - conn.info["query_start_time"].pop(-1)
         qh = query_hash(statement)
         # query_time.labels(qh).observe(total_time)

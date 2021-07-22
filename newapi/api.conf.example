@@ -4,7 +4,9 @@
 COLLECTORS = []
 
 # Read-only database access
-DATABASE_URI_RO = "postgresql://readonly:ooni@db/metadb"
+#DATABASE_URI_RO = "postgresql://readonly:ooni@db/metadb"
+# FIXME
+DATABASE_URI_RO = "postgresql://oonitest:test@db/oonitestdb"
 
 DATABASE_STATEMENT_TIMEOUT = 30
 BASE_URL = "https://api.ooni.io/"
@@ -33,8 +35,8 @@ LOGIN_BASE_URL = "https://CHANGEME/login"
 
 JWT_ENCRYPTION_KEY = "CHANGEME"
 
-SESSION_EXPIRY_DAYS = 365
-LOGIN_EXPIRY_DAYS = 365
+SESSION_EXPIRY_DAYS = 2
+LOGIN_EXPIRY_DAYS = 7
 
 GITHUB_ORIGIN_REPO = "citizenlab/test-lists"
 GITHUB_PUSH_REPO = "ooni-bot/test-lists"
