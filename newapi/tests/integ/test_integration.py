@@ -102,11 +102,13 @@ def api(client, subpath, **kw):
     return response.json
 
 
-@pytest.mark.skip(reason="broken")
+# # rate limiting / quotas # #
+
 def test_redirects_and_rate_limit_basic(client):
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
     headers = {"X-Real-IP": "1.2.3.4"}
+    limit = 4000
     paths = (
         "/stats",
         "/files",
@@ -114,12 +116,9 @@ def test_redirects_and_rate_limit_basic(client):
         "/api/_/test_names",
         "/api/_/test_names",
     )
-    previous_remaining = 4000
     for p in paths:
         resp = client.get(p, headers=headers)
-        remaining = float(resp.headers["X-RateLimit-Remaining"])
-        assert remaining < previous_remaining
-        previous_remaining = remaining
+        assert int(resp.headers["X-RateLimit-Remaining"]) < limit
 
 
 def test_redirects_and_rate_limit_for_explorer(client):
@@ -134,18 +133,16 @@ def test_redirects_and_rate_limit_for_explorer(client):
     assert "X-RateLimit-Remaining" not in resp.headers
 
 
-@pytest.mark.skip(reason="broken")
 def test_redirects_and_rate_limit_spin(client):
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
     limit = 4000
     headers = {"X-Real-IP": "1.2.3.4"}
-    t1 = time.monotonic() + 0.2
-    while time.monotonic() < t1:
+    end_time = time.monotonic() + 1.1
+    while time.monotonic() < end_time:
         resp = client.get("/stats", headers=headers)
-    delta = time.monotonic() - t1
-    assert 0 < delta < 0.3
-    assert 0 < limit - float(resp.headers["X-RateLimit-Remaining"]) < 0.3
+    assert abs(time.monotonic() - end_time) < 0.2
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 2
 
 
 def test_redirects_and_rate_limit_summary(client):
@@ -156,6 +153,34 @@ def test_redirects_and_rate_limit_summary(client):
     assert len(response) == 1
     assert response[0][0] == 127  # first octet from 127.0.0.1
     assert int(response[0][1]) == 3999  # quota remaining in seconds
+
+
+@pytest.fixture()
+def lower_rate_limits(app):
+    # Access the rate limiter buckets directly
+    limits = app.limiter._limiter._ipaddr_limits
+    old, limits[0] = limits[0], 1
+    yield
+    limits[0] = old
+
+
+def test_redirects_and_rate_limit_spin_to_zero(client, lower_rate_limits):
+    headers = {"X-Real-IP": "1.2.3.4"}
+    end_time = time.monotonic() + 2
+    while time.monotonic() < end_time:
+        resp = client.get("/_/test_names", headers=headers)
+        if resp.status_code == 429:
+            return  # we reached the limit
+
+    assert 0, "429 was never received"
+
+
+def test_redirects_and_rate_limit_spin_to_zero_unmetered(client, lower_rate_limits):
+    headers = {"X-Real-IP": "1.2.3.4"}
+    end_time = time.monotonic() + 2
+    while time.monotonic() < end_time:
+        resp = client.get("/health", headers=headers)
+        assert resp.status_code == 200, "Unmetered page should always work"
 
 
 # # list_files # #
