@@ -238,9 +238,9 @@ def clean_workdir(app, tmp_path):
 
 
 def _read_us_csv_file(tmp_path):
-    # h = ooniapi.citizenlab.safe(username)  # from usersession
-    h = "71a5b4e2515fa1d386a6f395f3b3e84aed1e40442ff95fcef1e2b4d8"
-    f = tmp_path / "users" / h / "test-lists/lists/us.csv"
+    # read from user repo path: citizenlab.py get_user_repo_path
+    account_id = "ff266536c4bda24306b30187fca19f6b"
+    f = tmp_path / "users" / account_id / "test-lists/lists/us.csv"
     return f.read_text().splitlines()
 
 

@@ -135,8 +135,9 @@ def role_required(roles):
                 if iat < threshold:
                     return jerror("Authentication token expired", 401)
 
-            # attach nickname to request
+            # attach nickname and account_id to request
             request._user_nickname = tok["nick"]
+            request._account_id = account_id
             # run the HTTP route method
             resp = func(*args, **kwargs)
             # Prevent an authenticated page to be cached and served to

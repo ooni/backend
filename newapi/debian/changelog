@@ -4,6 +4,12 @@ ooni-api (0.41) unstable; urgency=medium
 
  -- Federico Ceratto <federico@debian.org>  Wed, 14 Jul 2021 18:52:42 +0100
 
+ooni-api (0.40) unstable; urgency=medium
+
+  * Fix worktree
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 20 Jul 2021 15:04:11 +0100
+
 ooni-api (0.39) unstable; urgency=medium
 
   * Add test.ooni.org/io to CORS
