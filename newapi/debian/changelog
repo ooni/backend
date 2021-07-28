@@ -1,3 +1,9 @@
+ooni-api (0.42) unstable; urgency=medium
+
+  * Set SameSite=None cookie
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 28 Jul 2021 17:24:14 +0100
+
 ooni-api (0.41) unstable; urgency=medium
 
   * Improve tests

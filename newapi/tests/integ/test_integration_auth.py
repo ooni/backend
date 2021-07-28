@@ -134,7 +134,7 @@ def _register_and_login(client, email_address):
     assert len(cookies) == 1
     c = cookies[0]
     assert c.startswith("ooni=")
-    assert c.endswith("; Secure; HttpOnly; Path=/")
+    assert c.endswith("; Secure; HttpOnly; SameSite=None; Path=/")
     return {"Set-Cookie": c}
 
 

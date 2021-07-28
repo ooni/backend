@@ -92,7 +92,10 @@ def set_JWT_cookie(res, token: str) -> None:
     - samesite=Strict: send the cookie only between the browser and this API
     """
     assert isinstance(res, flask.wrappers.Response), type(res)
-    res.set_cookie("ooni", token, secure=True, httponly=True)
+    # https://github.com/pallets/werkzeug/issues/1549
+    # res.set_cookie("ooni", token, secure=True, httponly=True)
+    cookie = f"ooni={token}; Secure; HttpOnly; SameSite=None; Path=/"
+    res.headers.add("Set-Cookie", cookie)
 
 
 def role_required(roles):
