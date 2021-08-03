@@ -1000,6 +1000,12 @@ fingerprints = {
             "header_name": "Location",
             "locality": "country"
         },
+        # https://explorer.ooni.org/measurement/20210409T092428Z_webconnectivity_PL_12912_n1_DoMtAEf0oFS4J7oc?input=http://www.eurogrand.com/
+        {
+            "header_full": "https://www.finanse.mf.gov.pl/inne-podatki/podatek-od-gier-gry-hazardowe/komunikat",
+            "header_name": "Location",
+            "locality": "country"
+        },
         {
             "header_prefix": "http://80.50.144.142/UserCheck/PortalMain",
             "header_name": "Location",
