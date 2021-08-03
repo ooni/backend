@@ -1251,6 +1251,22 @@ def score_signal(msm) -> dict:
     return scores
 
 
+def score_torsf(msm) -> dict:
+    """Calculate measurement scoring for Tor Snowflake
+    Returns a scores dict
+    """
+    # https://github.com/ooni/ooni.org/issues/772
+    scores = init_scores()
+    tk = msm.get("test_keys", {})
+    failure = tk.get("failure")
+    if failure:
+        scores["blocking_general"] = 1.0
+        return scores
+
+    scores["extra"] = dict(bootstrap_time=tk.get("bootstrap_time"))
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm: dict) -> dict:
     """Calculates measurement scoring. Returns a scores dict"""
@@ -1292,6 +1308,8 @@ def score_measurement(msm: dict) -> dict:
             return score_dns_consistency(msm)
         if tn == "signal":
             return score_signal(msm)
+        if tn == "torsf":
+            return score_torsf(msm)
 
         log.debug("Unsupported test name %s", tn)
         scores = init_scores()
@@ -1473,7 +1491,9 @@ def setup_fingerprints():
     # pre-process fingerprints to speed up lookup
     global fingerprints
     # cc -> fprint_type -> list of dicts
-    fingerprints = {"ZZ": {"body_match": [], "header_prefix": [], "header_full": [], "dns_full": []}}
+    fingerprints = {
+        "ZZ": {"body_match": [], "header_prefix": [], "header_full": [], "dns_full": []}
+    }
     for cc, fprints in fastpath.utils.fingerprints.items():
         d = fingerprints.setdefault(cc, {})
         for fp in fprints:

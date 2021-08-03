@@ -33,33 +33,26 @@ def test_match_fingerprints_match_country():
     matches = fp.match_fingerprints(msm)
     assert matches == [{"body_match": "Makluman/Notification", "locality": "country"}]
 
+
 def test_match_dns_fingerprints_match_country():
     fp.setup_fingerprints()
     msm = {
         "probe_cc": "TR",
         "test_keys": {
-	    "queries": [
-		{
-		    "engine": "system",
-		    "resolver_hostname": None,
-		    "query_type": "A",
-		    "hostname": "beeg.com",
-		    "answers": [
-			{
-			    "hostname": "beeg.com",
-			    "answer_type": "CNAME",
-			    "ttl": 0
-			    },
-			{
-			    "ipv4": "195.175.254.2",
-			    "answer_type": "A",
-			    "ttl": 0
-			    }
-			],
-		    "failure": None,
-		    "resolver_port": None
-		    }
-		]
+            "queries": [
+                {
+                    "engine": "system",
+                    "resolver_hostname": None,
+                    "query_type": "A",
+                    "hostname": "beeg.com",
+                    "answers": [
+                        {"hostname": "beeg.com", "answer_type": "CNAME", "ttl": 0},
+                        {"ipv4": "195.175.254.2", "answer_type": "A", "ttl": 0},
+                    ],
+                    "failure": None,
+                    "resolver_port": None,
+                }
+            ]
         },
     }
     matches = fp.match_fingerprints(msm)
@@ -90,6 +83,7 @@ def test_match_fingerprints_dict_body():
 # Follow the order in score_measurement
 
 # # test_name: web_connectivity
+
 
 def test_score_measurement_simple():
     msm = {
@@ -122,15 +116,7 @@ def test_score_measurement_confirmed():
         "test_name": "web_connectivity",
         "test_start_time": "",
         "probe_cc": "IT",
-        "test_keys": {
-            "requests": [
-                {
-                    "response": {
-                        "body": "GdF Stop Page"
-                    }
-                }
-            ]
-        },
+        "test_keys": {"requests": [{"response": {"body": "GdF Stop Page"}}]},
     }
     scores = fp.score_measurement(msm)
     assert scores == {
@@ -196,6 +182,7 @@ def test_score_meek2():
 
 # # test_name http_requests
 
+
 def test_score_http_requests():
     # failed
     fn = "fastpath/tests/data/http_requests_1.json"
@@ -209,6 +196,38 @@ def test_score_http_requests():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
+    }
+
+
+# # test_name: torsf
+
+
+def test_score_torsf():
+    fn = "fastpath/tests/data/torsf_1.json"
+    with open(fn) as f:
+        msm = ujson.load(f)
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
+def test_score_torsf2():
+    fn = "fastpath/tests/data/torsf_2.json"
+    with open(fn) as f:
+        msm = ujson.load(f)
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "extra": {"bootstrap_time": 78.980935917},
     }
 
 
@@ -288,7 +307,7 @@ def test_bug_various_keys_missing():
         "test_name": "web_connectivity",
         "test_start_time": "2021-01-21 09:28:28",
         "probe_cc": "US",
-        "test_keys": {}
+        "test_keys": {},
     }
     scores = fp.score_measurement(msm)
     assert scores == {
