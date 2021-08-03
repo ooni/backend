@@ -1,8 +1,14 @@
-analysis (0.23) UNRELEASED; urgency=medium
+analysis (0.24) unstable; urgency=medium
+
+  * Support SSL certificats
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 02 Jul 2021 18:42:39 +0100
+
+analysis (0.23) unstable; urgency=medium
 
   * Add test-helper rotation
 
- -- Federico Ceratto <federico@debian.org>  Fri, 11 Jun 2021 16:24:57 +0100
+ -- Federico Ceratto <federico@debian.org>  Fri, 02 Jul 2021 18:41:57 +0100
 
 analysis (0.22) unstable; urgency=medium
 

@@ -11,6 +11,7 @@ REQUIRED = []
 setup(
     name=NAME,
     python_requires=">=3.7.0",
+    py_modules=["rotation"],
     packages=["analysis"],
     entry_points={
         "console_scripts": [
