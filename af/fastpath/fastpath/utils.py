@@ -1006,6 +1006,34 @@ fingerprints = {
             "header_name": "Location",
             "locality": "country"
         },
+        # https://explorer.ooni.org/measurement/20210814T181316Z_webconnectivity_PL_6830_n1_SYkkWB22SGFxDWci?input=http://www.eurogrand.com/
+        {
+            "dns_full": "145.237.235.240",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20210814T182231Z_webconnectivity_PL_47223_n1_7oaXBHkOiFTedMoy?input=http://sub3.blocked-site-hole-cert.pl/
+        {
+            "dns_full": "195.187.6.33",
+            "locality": "country"
+        },
+        {
+            "dns_full": "195.187.6.34",
+            "locality": "country"
+        },
+        {
+            "dns_full": "195.187.6.35",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20210814T204223Z_webconnectivity_PL_12912_n1_BkDZpOVduWcGOFcD?input=http://sub3.blocked-site-hole-cert.pl/
+        {
+            "dns_full": "78.133.250.166",
+            "locality": "country"
+        },
+        # https://explorer.ooni.org/measurement/20210814T212740Z_webconnectivity_PL_5617_n1_9eoomhLK9CV2op6b?input=http://sub3.blocked-site-hole-cert.pl/
+        {
+            "dns_full": "195.116.107.98",
+            "locality": "country"
+        },
         {
             "header_prefix": "http://80.50.144.142/UserCheck/PortalMain",
             "header_name": "Location",
