@@ -1,9 +1,5 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
 # Publised to Explorer in private.py
+# Also used in measurement.py
 
 TEST_GROUPS = {
     "websites": ["web_connectivity"],
@@ -17,6 +13,7 @@ TEST_GROUPS = {
         "tcp_connect",
         "psiphon",
         "tor",
+        "torsf",
         "riseupvpn",
     ],
     "legacy": [

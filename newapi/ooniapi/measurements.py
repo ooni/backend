@@ -571,6 +571,7 @@ def list_measurements():
         - tcp_connect
         - telegram
         - tor
+        - torsf
         - urlgetter
         - vanilla_tor
         - web_connectivity
@@ -1022,6 +1023,7 @@ def get_aggregated():
         - tcp_connect
         - telegram
         - tor
+        - torsf
         - urlgetter
         - vanilla_tor
         - web_connectivity

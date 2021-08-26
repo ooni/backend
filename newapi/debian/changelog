@@ -1,3 +1,9 @@
+ooni-api (0.43) unstable; urgency=medium
+
+  * Add pluggable transport support
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 29 Jul 2021 14:22:37 +0100
+
 ooni-api (0.42) unstable; urgency=medium
 
   * Set SameSite=None cookie

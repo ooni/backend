@@ -6,17 +6,16 @@ not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
 from datetime import date, datetime, timedelta
-from dateutil.relativedelta import relativedelta
 
 from urllib.parse import urljoin, urlencode
 
 import logging
 import math
 
-from flask import Blueprint, current_app, request, abort
+from flask import Blueprint, current_app, request
 from flask.json import jsonify
 
-from sqlalchemy import func, and_, or_, sql, select
+from sqlalchemy import and_, or_, sql, select
 
 from werkzeug.exceptions import BadRequest
 
@@ -32,6 +31,7 @@ api_private_blueprint = Blueprint("api_private", "measurements")
 # TODO: configure tags for HTTP caching across where useful
 
 log = logging.getLogger()
+
 
 def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
@@ -168,6 +168,7 @@ def api_private_test_names():
         "tcp_connect": "TCP Connect",
         "telegram": "Telegram",
         "tor": "Tor",
+        "torsf": "Tor Snowflake",
         "urlgetter": "URL Getter",
         "vanilla_tor": "Vanilla Tor",
         "web_connectivity": "Web Connectivity",
