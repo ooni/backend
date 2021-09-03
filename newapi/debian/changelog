@@ -1,3 +1,9 @@
+ooni-api (0.44) unstable; urgency=medium
+
+  * Fix prioritization
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 25 Aug 2021 21:04:25 +0100
+
 ooni-api (0.43) unstable; urgency=medium
 
   * Add pluggable transport support

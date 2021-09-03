@@ -166,7 +166,7 @@ def check_in():
         assert c.isalpha()
 
     try:
-        test_items = generate_test_list(probe_cc, category_codes, url_limit)
+        test_items = generate_test_list(probe_cc, category_codes, url_limit, False)
     except Exception as e:
         log.error(e, exc_info=1)
         # TODO: use same failover as prio.py:list_test_urls

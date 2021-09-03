@@ -41,3 +41,10 @@ INSERT INTO public.fastpath VALUES ('20201216054344.884408_VE_webconnectivity_a2
 INSERT INTO public.citizenlab VALUES ('www.theonion.com', 'http://www.theonion.com/', 'ZZ', 'CULTR', 40);
 
 --INSERT INTO public.jsonl VALUES ('20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss', 'http://www.theonion.com/', NULL, 'raw/20201216/05/VE/webconnectivity/2020121605_VE_webconnectivity.n0.8.jsonl.gz', 119);
+
+-- prepare counters_test_list
+INSERT INTO public.counters VALUES (CURRENT_DATE, 'web_connectivity', 'IT', 1, 'https://www.leggo.it/', 0, 0, 0, 2);
+INSERT INTO public.counters VALUES (CURRENT_DATE, 'web_connectivity', 'IT', 2, 'https://www.ilfattoquotidiano.it/', 0, 0, 0, 2);
+INSERT INTO public.counters VALUES (CURRENT_DATE, 'web_connectivity', 'IT', 3, 'https://www.ilmattino.it/', 0, 0, 0, 2);
+INSERT INTO public.counters VALUES (CURRENT_DATE, 'web_connectivity', 'IT', 4, 'https://www.ilgiorno.it/', 0, 0, 0, 2);
+REFRESH MATERIALIZED VIEW counters_test_list;

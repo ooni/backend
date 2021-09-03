@@ -105,26 +105,49 @@ def failover_generate_test_list(country_code: str, category_codes: tuple, limit:
 # # reactive algorithm
 
 
+def match_prio_rule(cz, pr: dict) -> bool:
+    """Match a priority rule to citizenlab entry"""
+    for k in ["category_code", "domain", "url"]:
+        if pr[k] not in ("*", cz[k]):
+            return False
+
+    if cz["cc"] != "ZZ" and pr["cc"] not in ("*", cz["cc"]):
+        return False
+
+    return True
+
+
+def compute_priorities(entries, prio_rules):
+    # Order based on (msmt_cnt / priority) to provide balancing
+    test_list = []
+    for e in entries:
+        # Calculate priority for an URL
+        priority = 0
+        for pr in prio_rules:
+            if match_prio_rule(e, pr):
+                priority += pr["priority"]
+
+        o = dict(e)
+        o["priority"] = priority
+        o["weight"] = priority / max(e["msmt_cnt"], 0.1)
+        test_list.append(o)
+
+    return sorted(test_list, key=lambda k: k["weight"], reverse=True)
+
+
 @metrics.timer("fetch_reactive_url_list")
 def fetch_reactive_url_list(cc: str):
-    """Fetch test URL from the citizenlab table in the database
-    weighted by the amount of measurements in the last N days
-    """
-    log = current_app.logger
-    log.info("Started fetch_reactive_url_list")
-
-    # Select all citizenlab URLs for the given probe_cc + ZZ
-    # Select measurements count from the last 7 days in a left outer join
-    # Order based on msmt_cnt / priority to provide balancing
-    # When the msmt_cnt / priority ratio is the same, also use RANDOM() to
-    # shuffle. GREATEST(...) prevents division by zero.
+    """Select all citizenlab URLs for the given probe_cc + ZZ
+    Select measurements count from the last 7 days in a left outer join
+    (without any info about priority)"""
     sql = """
-SELECT category_code, url, cc
+SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0)::float AS msmt_cnt
 FROM (
-    SELECT priority, url, cc, category_code
+    SELECT domain, url, cc, category_code
     FROM citizenlab
     WHERE
       citizenlab.cc = :cc_low
+      OR citizenlab.cc = :cc
       OR citizenlab.cc = 'ZZ'
 ) AS citiz
 LEFT OUTER JOIN (
@@ -133,22 +156,39 @@ LEFT OUTER JOIN (
     WHERE probe_cc = :cc
 ) AS cnt
 ON (citiz.url = cnt.input)
-ORDER BY COALESCE(msmt_cnt, 0)::float / GREATEST(priority, 1), RANDOM() ASC
 """
+    # support uppercase or lowercase match
     q = current_app.db_session.execute(sql, dict(cc=cc, cc_low=cc.lower()))
-    entries = tuple(q.fetchall())
-    log.info("%d entries", len(entries))
-    return entries
+    return tuple(q.fetchall())
+
+
+@metrics.timer("fetch_prioritization_rules")
+def fetch_prioritization_rules(cc: str) -> tuple:
+    sql = """SELECT category_code, cc, domain, url, priority
+    FROM url_priorities WHERE cc = :cc OR cc = '*'
+    """
+    q = current_app.db_session.execute(sql, dict(cc=cc))
+    return tuple(q.fetchall())
 
 
 @metrics.timer("generate_test_list")
-def generate_test_list(country_code: str, category_codes: tuple, limit: int):
+def generate_test_list(
+    country_code: str, category_codes: tuple, limit: int, debug: bool
+):
     """Generate test list based on the amount of measurements in the last
     N days"""
+    log = current_app.logger
+    entries = fetch_reactive_url_list(country_code)
+    log.info("fetched %d url entries", len(entries))
+    prio_rules = fetch_prioritization_rules(country_code)
+    log.info("fetched %d priority rules", len(prio_rules))
+    li = compute_priorities(entries, prio_rules)
+    # Filter unwanted category codes, replace ZZ, trim priority <= 0
     out = []
-    li = fetch_reactive_url_list(country_code)
     for entry in li:
         if category_codes and entry["category_code"] not in category_codes:
+            continue
+        if entry["priority"] <= 0:
             continue
 
         cc = "XX" if entry["cc"] == "ZZ" else entry["cc"].upper()
@@ -157,6 +197,10 @@ def generate_test_list(country_code: str, category_codes: tuple, limit: int):
             "url": entry["url"],
             "country_code": cc,
         }
+        if debug:
+            i["msmt_cnt"] = entry["msmt_cnt"]
+            i["priority"] = entry["priority"]
+            i["weight"] = entry["weight"]
         out.append(i)
         if len(out) >= limit:
             break
@@ -191,6 +235,10 @@ def list_test_urls():
         in: query
         type: integer
         description: Maximum number of URLs to return
+      - name: debug
+        in: query
+        type: boolean
+        description: Include measurement counts and priority
     responses:
       200:
         description: URL test list
@@ -231,12 +279,13 @@ def list_test_urls():
         limit = int(param("limit") or -1)
         if limit == -1:
             limit = 9999
+        debug = param("debug", "").lower() in ("true", "1", "yes")
     except Exception as e:
         log.error(e, exc_info=1)
         return jsonify({})
 
     try:
-        test_items = generate_test_list(country_code, category_codes, limit)
+        test_items = generate_test_list(country_code, category_codes, limit, debug)
     except Exception as e:
         log.error(e, exc_info=1)
         # failover_generate_test_list runs without any database interaction
