@@ -1,3 +1,9 @@
+ooni-api (0.45) unstable; urgency=medium
+
+  * Fix category filtering
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 03 Sep 2021 18:34:11 +0100
+
 ooni-api (0.44) unstable; urgency=medium
 
   * Fix prioritization

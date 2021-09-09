@@ -742,10 +742,12 @@ def list_url_priorities():
     log = current_app.logger
     log.debug("listing URL prio rules")
     query = """SELECT category_code, cc, domain, url, priority
-    FROM url_priorities"""
+    FROM url_priorities
+    ORDER BY 2, 1, 3, 4
+    """
     q = current_app.db_session.execute(query)
-    row = [dict(r) for r in q]
-    return make_response(jsonify(rules=row))
+    rows = [dict(r) for r in q]
+    return make_response(jsonify(rules=rows))
 
 
 @cz_blueprint.route("/api/_/url-priorities/update", methods=["POST"])
@@ -835,49 +837,3 @@ def post_update_url_priority():
 
     current_app.db_session.commit()
     return make_response(jsonify(q))
-
-
-def match_prio_rule(cz, pr: dict) -> bool:
-    """Match a priority rule to citizenlab entry"""
-    for k in ["category_code", "cc", "domain", "url"]:
-        if pr[k] not in ("*", cz[k]):
-            return False
-
-    return True
-
-
-def compute_url_priorities():
-    log = current_app.logger
-    sql = "SELECT category_code, cc, domain, url, priority FROM citizenlab"
-    q = current_app.db_session.execute(sql)
-    citizenlab = [dict(r) for r in q]
-    sql = "SELECT category_code, cc, domain, url, priority FROM url_priorities"
-    q = current_app.db_session.execute(sql)
-    prio_rules = [dict(r) for r in q]
-    assert prio_rules
-    match_attempt_cnt = 0
-    match_cnt = 0
-    for cz in citizenlab:
-        cz["priority"] = 0
-        for pr in prio_rules:
-            match_attempt_cnt += 1
-            if match_prio_rule(cz, pr):
-                match_cnt += 1
-                cz["priority"] += pr["priority"]
-
-    perc = match_cnt / match_attempt_cnt * 100
-    log.info(f"Prioritization rules match percentage {perc}")
-    return citizenlab
-
-
-# TODO: remove this
-@cz_blueprint.route("/api/_/url-priorities/WIP", methods=["GET"])
-def get_computed_url_priorities():
-    log = current_app.logger
-    try:
-        create_url_priorities_table()
-        p = compute_url_priorities()
-        return jsonify(p)
-    except Exception as e:
-        log.error(e, exc_info=1)
-        return jerror(str(e), 400)

@@ -109,6 +109,9 @@ def check_in():
             probe_asn:
               type: string
               description: probe ASN inferred from GeoIP or None
+            utc_time:
+              type: string
+              description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
             tests:
               type: object
               properties:
@@ -183,12 +186,14 @@ def check_in():
         log.error(str(e), exc_info=1)
         conf = {}
 
+    utc_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     resp = dict(
         v=1,
         tests={
             "web_connectivity": {"urls": test_items},
         },
         conf=conf,
+        utc_time=utc_time,
     )
 
     # get asn, asn_i, probe_cc, network name
