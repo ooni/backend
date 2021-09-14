@@ -4,8 +4,7 @@ Requires=ooni-update-counters.service
 
 [Timer]
 Unit=ooni-update-counters.service
-# WARNING: the update interval must match the timedelta in the code
-OnCalendar=*-*-* *:00/10
+OnCalendar=*-*-* *:00/01
 
 [Install]
 WantedBy=timers.target

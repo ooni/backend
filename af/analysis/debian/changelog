@@ -1,3 +1,9 @@
+analysis (0.25) unstable; urgency=medium
+
+  * Speed up counter tables upsert
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 20 Aug 2021 20:04:32 +0100
+
 analysis (0.24) unstable; urgency=medium
 
   * Support SSL certificats

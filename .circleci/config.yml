@@ -5,7 +5,7 @@ version: 2
 jobs:
   create_deb_package:
     docker:
-      - image: debian:stable
+      - image: debian:buster
     steps:
       - checkout
       - run: echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list

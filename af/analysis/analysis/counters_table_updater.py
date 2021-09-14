@@ -4,18 +4,20 @@ Updates counters* tables at frequent intervals:
  - counters_asn_noinput
  - counters_noinput
 
+The updating is done at frequent intervals using "ON CONFLICT DO UPDATE" that
+sums values to the existing rows in the counters* tables.
+
 Update global and country stats materialized views every day.
 
 Runs in a dedicated thread
 
 """
 
-# TODO: regenerate data for the previous day once a day
-
 from datetime import datetime, timedelta
 
 import logging
 
+from filelock import FileLock  # debdeps: python3-filelock
 import psycopg2
 
 from analysis.metrics import setup_metrics
@@ -273,43 +275,46 @@ def update_all_counters_tables(conf):
     Allows for very fast updates by filtering on measurement_uid
     Even if we receive an "old" msmt days after the tests, we still update the
     correct counter.
-    WARNING: the update interval must match the systemd timer
     WARNING: the upsert is doing a sum and creates false data if run at the
-    wrong times
-    If we miss or duplicate a run the only option is to truncate/recreate
-    the tables completely or partially
+    wrong times. A lockfile provides safety.
     """
     log.info("Started update_all_counters_tables")
     metrics.gauge("update_all_counters_tables.running", 1)
 
-    fn = conf.output_directory / "counters_table_updater.last_msm_uid_end"
-    try:
-        msm_uid_start = fn.read_text().strip()
-    except FileNotFoundError:
-        log.warn("%s not found, defaulting to utcnow", fn)
-        msm_uid_start = datetime.utcnow().strftime("%Y%m%d%H%M")
+    lock_f = conf.output_directory / "counters_table_updater.lock"
+    with FileLock(lock_f, timeout=30):
+        fn = conf.output_directory / "counters_table_updater.last_msm_uid_end"
+        # Start from the last msm uid in the previous run
+        try:
+            msm_uid_start = fn.read_text().strip()
+        except FileNotFoundError:
+            log.warn("%s not found, defaulting to utcnow", fn)
+            msm_uid_start = datetime.utcnow().strftime("%Y%m%d%H%M%S")
 
-    end = datetime.utcnow() - timedelta(minutes=10)
-    msm_uid_end = end.strftime("%Y%m%d%H%M")
-    fn.write_text(msm_uid_end)
+        # Stop 10 seconds in the past to avoid racing against the fastpath
+        # processing time
+        end = datetime.utcnow() - timedelta(seconds=10)
+        msm_uid_end = end.strftime("%Y%m%d%H%M%S")
+        fn.write_text(msm_uid_end)
 
-    conn = connect_db(conf.active)
-    # transaction, commit on context exiting
-    with conn:
-        update_counters_hourly_software_table(conn, msm_uid_start, msm_uid_end)
+        conn = connect_db(conf.active)
+        # transaction, commit on context exiting
+        with conn:
+            update_counters_hourly_software_table(conn, msm_uid_start, msm_uid_end)
 
-    with conn:
-        update_counters_table(conn, msm_uid_start, msm_uid_end)
-        create_counters_test_list_matview(conn)
-        refresh_counters_test_list_matview(conn)
+        with conn:
+            update_counters_table(conn, msm_uid_start, msm_uid_end)
+            create_counters_test_list_matview(conn)
+            refresh_counters_test_list_matview(conn)
 
-    with conn:
-        update_counters_asn_noinput_table(conn, msm_uid_start, msm_uid_end)
+        with conn:
+            update_counters_asn_noinput_table(conn, msm_uid_start, msm_uid_end)
 
-    with conn:
-        update_counters_noinput_table(conn, msm_uid_start, msm_uid_end)
+        with conn:
+            update_counters_noinput_table(conn, msm_uid_start, msm_uid_end)
 
-    conn.close()
+        conn.close()
+
     metrics.gauge("update_all_counters_tables.running", 0)
     log.info("Done")
 
