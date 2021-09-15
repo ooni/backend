@@ -746,7 +746,7 @@ def open_report() -> Response:
 
     log.info("Open report %r", data)
     asn = data.get("probe_asn", "AS0").upper()
-    if len(asn) > 8 or len(asn) < 3 or not asn.startswith("AS"):
+    if len(asn) > 12 or len(asn) < 3 or not asn.startswith("AS"):
         asn = "AS0"
     try:
         asn_i = int(asn[2:])
