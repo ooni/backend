@@ -1,3 +1,9 @@
+fastpath (0.43) unstable; urgency=medium
+
+  * Support filtering minicans
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 14 Sep 2021 20:11:53 +0100
+
 fastpath (0.42) unstable; urgency=medium
 
   * Add pluggable transport support

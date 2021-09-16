@@ -4,13 +4,15 @@
 
 from datetime import date
 
+import ujson
+
+from fastpath.utils import trivial_id
 import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
-import ujson
 
 
 def test_trivial_id():
-    tid = fp.trivial_id(dict(a="🐱"))
+    tid = trivial_id(dict(a="🐱"))
     assert tid == "00d1cb49bba274be952c9f701f1e13b8"
 
 

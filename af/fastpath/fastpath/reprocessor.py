@@ -47,7 +47,7 @@ import statsd  # debdeps: python3-statsd
 import fastpath.db as db
 import fastpath.s3feeder as s3f
 from fastpath.core import score_measurement, setup_fingerprints, unwrap_msmt
-from fastpath.core import trivial_id
+from fastpath.utils import trivial_id
 
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="reprocessor")
 log = logging.getLogger("reprocessor")

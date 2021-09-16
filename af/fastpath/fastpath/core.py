@@ -17,7 +17,6 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-import hashlib
 import logging
 import multiprocessing as mp
 import os
@@ -89,24 +88,18 @@ def setup():
     ap.add_argument("--noapi", action="store_true", help="Do not start API feeder")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
     ap.add_argument("--db-uri", help="Database DSN or URI.")
-    ap.add_argument(
-        "--update",
-        action="store_true",
-        help="Update summaries and files instead of logging an error",
-    )
-    ap.add_argument(
-        "--stop-after", type=int, help="Stop after feeding N measurements", default=None
-    )
-    ap.add_argument(
-        "--no-write-to-db",
-        action="store_true",
-        help="Do not insert measurement in database",
-    )
-    ap.add_argument(
-        "--keep-s3-cache",
-        action="store_true",
-        help="Keep files downloaded from S3 in the local cache",
-    )
+    h = "Update summaries and files instead of logging an error"
+    ap.add_argument("--update", action="store_true", help=h)
+    h = "Stop after feeding N measurements"
+    ap.add_argument("--stop-after", type=int, help=h, default=None)
+    h = "Do not insert measurement in database"
+    ap.add_argument("--no-write-to-db", action="store_true", help=h)
+    h = "Keep files downloaded from S3 in the local cache"
+    ap.add_argument("--keep-s3-cache", action="store_true", help=h)
+    ap.add_argument("--ccs", help="Filter comma-separated CCs when feeding from S3")
+    h = "Filter comma-separated test names when feeding from S3 (without underscores)"
+    ap.add_argument("--testnames", help=h)
+
     conf = ap.parse_args()
 
     if conf.devel or conf.stdout or no_journal_handler:
@@ -116,6 +109,12 @@ def setup():
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
         log.setLevel(logging.DEBUG)
+
+    if conf.ccs:
+        conf.ccs = set(cc.strip() for cc in conf.ccs.split(","))
+
+    if conf.testnames:
+        conf.testnames = set(x.strip() for x in conf.testnames.split(","))
 
     # Run inside current directory in devel mode
     root = Path(os.getcwd()) if conf.devel else Path("/")
@@ -1245,6 +1244,8 @@ def score_signal(msm) -> dict:
         pass
     elif st == "blocked":
         scores["blocking_general"] = 1.0
+        sbf = tk.get("signal_backend_failure")
+        scores["analysis"] = {"signal_backend_failure": sbf}
     else:
         scores["accuracy"] = 0.0
 
@@ -1327,24 +1328,6 @@ def score_measurement(msm: dict) -> dict:
         raise
 
 
-@metrics.timer("trivial_id")
-def trivial_id(msm: dict) -> str:
-    """Generate a trivial id of the measurement to allow upsert if needed
-    This is used for legacy (before measurement_uid) measurements
-    - 32-bytes hexdigest
-    - Deterministic / stateless with no DB interaction
-    - Malicious/bugged msmts with collisions on report_id/input/test_name lead
-    to different hash values avoiding the collision
-    - Malicious/duplicated msmts that are semantically identical to the "real"
-    one lead to harmless collisions
-    """
-    # Same output with Python's json
-    VER = "00"
-    msm_jstr = ujson.dumps(msm, sort_keys=True, ensure_ascii=False).encode()
-    tid = VER + hashlib.shake_128(msm_jstr).hexdigest(15)
-    return tid
-
-
 def unwrap_msmt(post):
     fmt = post["format"].lower()
     if fmt == "json":
@@ -1379,6 +1362,7 @@ def process_measurement(msm_tup) -> None:
     """
     try:
         msm_jstr, measurement, msmt_uid = msm_tup
+        assert msmt_uid
         if measurement is None:
             measurement = ujson.loads(msm_jstr)
         if sorted(measurement.keys()) == ["content", "format"]:
@@ -1415,9 +1399,6 @@ def process_measurement(msm_tup) -> None:
             measurement["annotations"], dict
         ):
             platform = measurement["annotations"].get("platform", "unset")
-
-        if msmt_uid is None:
-            msmt_uid = trivial_id(measurement)  # legacy measurement
 
         if conf.no_write_to_db:
             return
