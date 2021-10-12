@@ -1,3 +1,9 @@
+fastpath (0.44) unstable; urgency=medium
+
+  * Score RiseUp VPN
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 08 Oct 2021 17:12:23 +0100
+
 fastpath (0.43) unstable; urgency=medium
 
   * Support filtering minicans
