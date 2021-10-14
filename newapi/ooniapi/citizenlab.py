@@ -380,7 +380,12 @@ class URLListManager:
             },
         )
         j = r.json()
-        return j["url"]
+        try:
+            url = j["url"]
+            return url
+        except KeyError:
+            log.error(f"Failed to retrieve URL for the PR {j}")
+            raise
 
     def is_pr_resolved(self, account_id) -> bool:
         """Raises if the PR was never opened"""
@@ -404,10 +409,10 @@ class URLListManager:
     def propose_changes(self, account_id: str) -> str:
         with self.get_user_lock(account_id):
             log.debug("proposing changes")
-            self.set_state(account_id, "PR_OPEN")
             self.push_to_repo(account_id)
             pr_id = self.open_pr(self.get_user_branchname(account_id))
             self.set_pr_id(account_id, pr_id)
+            self.set_state(account_id, "PR_OPEN")
             return pr_id
 
 

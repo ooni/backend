@@ -1,3 +1,9 @@
+ooni-api (0.46) unstable; urgency=medium
+
+  * Add debugging around PR opening
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 11 Oct 2021 14:20:17 +0100
+
 ooni-api (0.45) unstable; urgency=medium
 
   * Fix category filtering
