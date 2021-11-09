@@ -1159,7 +1159,8 @@ def score_http_requests(msm) -> dict:
     # One request is from the probe and one is over Tor. If the latter
     # is blocked the msmt is failed.
     tk = msm.get("test_keys", {})
-    for r in tk.get("requests", []):
+    requests = tk.get("requests", []) or []
+    for r in requests:
         is_tor = r.get("request", {}).get("tor", {}).get("is_tor", None)
         body = r.get("response", {}).get("body", None)
         if is_tor is None or body is None:
