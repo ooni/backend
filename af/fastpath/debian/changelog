@@ -1,3 +1,9 @@
+fastpath (0.47) unstable; urgency=medium
+
+  * Handle http whatsapp
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 11 Nov 2021 09:17:02 +0000
+
 fastpath (0.46) unstable; urgency=medium
 
   * Flag measurements from the future

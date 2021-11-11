@@ -775,7 +775,8 @@ def score_measurement_whatsapp(msm):
             # has unexpected contents
             # Also note bug https://github.com/ooni/probe-legacy/issues/60
 
-        # TODO: handle elif url == "http://web.whatsapp.com/":
+        elif url == "http://web.whatsapp.com/":
+            webapp_accessible = b.get("failure", True) in (None, "", False)
 
         elif url == "https://v.whatsapp.net/v2/register":
             # In case of connection failure "response" might be empty
