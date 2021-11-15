@@ -12,7 +12,6 @@ import os
 import time
 
 import ujson
-import boto3  # debdeps: python3-boto3
 import pytest  # debdeps: python3-pytest
 
 import fastpath.core as fp
@@ -30,7 +29,6 @@ log = logging.getLogger()
 # Explore bucket from CLI:
 # s3cmd ls s3://ooni-data-eu-fra
 
-# TODO: drop the boto3 code and use only s3feeder
 BUCKET_NAME = "ooni-data"
 
 
@@ -1107,3 +1105,20 @@ def test_score_signal():
             }
         # No failure was found
         # elif "accuracy" in scores:
+
+
+def test_flag_measurements_with_wrong_date_from_future():
+    # measurement_start_time > msmt_uid timestamp
+    msm = {"measurement_start_time": "2021-11-09 23:59:31"}
+    msmt_uid = "20211109115946.469008_IR_webconnectivity_9ba8a0d4f9b116fe"
+    scores = {}
+    fp.flag_measurements_with_wrong_date(msm, msmt_uid, scores)
+    assert scores["msg"] == "Measurement start time from the future"
+
+
+def test_flag_measurements_with_wrong_date_too_old():
+    msm = {"measurement_start_time": "2020-01-01 00:00:01"}
+    msmt_uid = "20211109115946.469008_IR_webconnectivity_9ba8a0d4f9b116fe"
+    scores = {}
+    fp.flag_measurements_with_wrong_date(msm, msmt_uid, scores)
+    assert scores["msg"] == "Measurement start time too old"

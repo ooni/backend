@@ -1375,6 +1375,27 @@ def msm_processor(queue):
         process_measurement(msm_tup)
 
 
+def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
+    if not msmt_uid.startswith("20") or len(msmt_uid) < 20:
+        return
+    try:
+        recv_time = datetime.strptime(msmt_uid[:22], "%Y%m%d%H%M%S.%f_")
+        start_time = msm.get("measurement_start_time")
+        start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return
+
+    delta = (recv_time - start_time).total_seconds()
+    if delta < -3600:
+        log.debug(f"Flagging measurement {msmt_uid} from the future")
+        scores["accuracy"] = 0.0
+        scores["msg"] = "Measurement start time from the future"
+    elif delta > 31536000:
+        log.debug(f"Flagging measurement {msmt_uid} as too old")
+        scores["accuracy"] = 0.0
+        scores["msg"] = "Measurement start time too old"
+
+
 @metrics.timer("full_run")
 def process_measurement(msm_tup) -> None:
     """Process a measurement:
@@ -1404,6 +1425,8 @@ def process_measurement(msm_tup) -> None:
             return
 
         scores = score_measurement(measurement)
+        flag_measurements_with_wrong_date(measurement, msmt_uid, scores)
+
         # Generate anomaly, confirmed and failure to keep consistency
         # with the legacy pipeline, allowing simple queries in the API
         # and in manual analysis; also keep compatibility with Explorer
