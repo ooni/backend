@@ -186,7 +186,7 @@ def check_in():
         log.error(str(e), exc_info=1)
         conf = {}
 
-    utc_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    utc_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     resp = dict(
         v=1,
         tests={
@@ -460,12 +460,22 @@ def list_test_helpers():
             },
         ],
     }
-    return cachedjson(1, **j)
+    probe_ipaddr = request.headers.get("X-Real-Ip", "")
+    if probe_ipaddr.startswith("2.34."):
+        # Temporary hack to match 2.34.0.0/16 announced by AS30722
+        j["web-connectivity"] = [
+            {"address": "https://0.th.ooni.org", "type": "https"},
+            {
+                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
+                "front": "d33d1gs9kpq1c5.cloudfront.net",
+                "type": "cloudfront",
+            },
+        ]
+    return cachedjson(0, **j)
 
 
 def _check_probe_token(desc):
-    """Validates probe token, returns None or error response
-    """
+    """Validates probe token, returns None or error response"""
     log = current_app.logger
     try:
         token = request.headers.get("Authorization")

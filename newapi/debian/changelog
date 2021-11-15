@@ -1,3 +1,9 @@
+ooni-api (0.48) unstable; urgency=medium
+
+  * Switch selected networks to new test helper
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Nov 2021 13:41:56 +0000
+
 ooni-api (0.47) unstable; urgency=medium
 
   * Bump up gunicorn workers
