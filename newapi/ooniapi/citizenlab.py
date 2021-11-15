@@ -98,13 +98,14 @@ class ProgressPrinter(git.RemoteProgress):
 
 
 class URLListManager:
-    def __init__(self, working_dir, github_token, push_repo, origin_repo):
+    def __init__(self, working_dir, github_user, github_token, push_repo, origin_repo):
         self.working_dir = working_dir
         self.origin_repo = origin_repo
         self.push_repo = push_repo
-        self.github_user = push_repo.split("/")[0]
+        self.github_user = github_user
         self.github_token = github_token
         self.repo_dir = self.working_dir / "test-lists"
+        self.push_username = push_repo.split("/")[0]
 
         self.repo = self.init_repo()
 
@@ -189,7 +190,7 @@ class URLListManager:
         """
         apiurl = self.get_pr_id(account_id)
         pr_num = apiurl.split("/")[-1]
-        return f"https://github.com/{self.push_repo}/pull/{pr_num}"
+        return f"https://github.com/{self.origin_repo}/pull/{pr_num}"
 
     def get_user_repo(self, account_id: str):
         repo_path = self.get_user_repo_path(account_id)
@@ -366,17 +367,17 @@ class URLListManager:
         """Opens PR. Returns API URL e.g.
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
         """
-        head = f"{self.github_user}:{branchname}"
-        log.info(f"opening a PR for {head} on {self.push_repo}")
+        head = f"{self.push_username}:{branchname}"
+        log.info(f"opening a PR for {head} on {self.origin_repo} using {self.push_repo}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
-        apiurl = f"https://api.github.com/repos/{self.push_repo}/pulls"
+        apiurl = f"https://api.github.com/repos/{self.origin_repo}/pulls"
         r = requests.post(
             apiurl,
             auth=auth,
             json={
                 "head": head,
                 "base": "master",
-                "title": "Pull requests from the web",
+                "title": "Contribution from test-lists.ooni.org",
             },
         )
         j = r.json()
@@ -482,6 +483,7 @@ def get_url_list_manager():
     conf = current_app.config
     return URLListManager(
         working_dir=Path(conf["GITHUB_WORKDIR"]),
+        github_user=conf["GITHUB_USER"],
         github_token=conf["GITHUB_TOKEN"],
         origin_repo=conf["GITHUB_ORIGIN_REPO"],
         push_repo=conf["GITHUB_PUSH_REPO"],

@@ -62,6 +62,7 @@ def validate_conf(app, conffile):
         "GITHUB_ORIGIN_REPO",
         "GITHUB_PUSH_REPO",
         "GITHUB_TOKEN",
+        "GITHUB_USER",
         "GITHUB_WORKDIR",
         "JWT_ENCRYPTION_KEY",
         "LOGIN_BASE_URL",
