@@ -1,3 +1,9 @@
+ooni-api (0.47) unstable; urgency=medium
+
+  * Bump up gunicorn workers
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Nov 2021 11:37:30 +0000
+
 ooni-api (0.46) unstable; urgency=medium
 
   * Add debugging around PR opening
