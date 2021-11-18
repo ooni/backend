@@ -1,3 +1,9 @@
+fastpath (0.48) unstable; urgency=medium
+
+  * Bump up python version
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Nov 2021 19:24:34 +0000
+
 fastpath (0.46) unstable; urgency=medium
 
   * Flag measurements from the future

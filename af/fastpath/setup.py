@@ -10,7 +10,7 @@ REQUIRED = []
 
 setup(
     name=NAME,
-    python_requires=">=3.6.0",
+    python_requires=">=3.7.0",
     packages=["fastpath", "fastpath.tests"],
     entry_points={"console_scripts": [
         "fastpath=fastpath.core:main",

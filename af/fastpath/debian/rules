@@ -2,7 +2,8 @@
 export DH_VERBOSE = 1
 
 %:
-	dh $@ --buildsystem=pybuild
+
+	dh $@ --with python3 --buildsystem=pybuild
 
 override_dh_installsystemd:
 	dh_installsystemd --no-restart-on-upgrade
