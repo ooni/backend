@@ -4,5 +4,12 @@ branch = True
 source = measurements
 
 [report]
-exclude_lines = 
-    # pragma: no cover
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if False:
+
+ignore_errors = True

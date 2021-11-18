@@ -15,6 +15,16 @@ services:
       - ./newapi/tests/integ/2_metadb_schema.sql:/docker-entrypoint-initdb.d/2_metadb_schema.sql
       - ./newapi/tests/integ/3_test_fixtures.sql:/docker-entrypoint-initdb.d/3_test_fixtures.sql
 
+  clickhouse:
+    image: yandex/clickhouse-server:21.8.8
+    hostname: clickhouse
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./data/clickhouse/data:/var/lib/clickhouse
+
   api:
     restart: always
     build:
@@ -26,3 +36,4 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - clickhouse

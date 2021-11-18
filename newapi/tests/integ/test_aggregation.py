@@ -2,6 +2,7 @@ import pytest
 
 from textwrap import dedent
 from urllib.parse import urlencode
+from ..utils import fjd
 
 
 def api(client, subpath, **kw):
@@ -16,97 +17,93 @@ def api(client, subpath, **kw):
     return response.json
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+@pytest.mark.skip("FIXME no header")
 def test_aggregation_no_axis_with_caching(client, log):
     # 0-dimensional data
-    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01"
-    response = client.get(f"/api/v1/{url}")
-    assert response.status_code == 200
-    assert response.is_json
-    assert response.headers["Cache-Control"] == "max-age=86400"
-    r = response.json
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10"
+    resp = client.get(f"/api/v1/{url}")
+    assert resp.status_code == 200
+    assert resp.is_json
+    r = resp.json
+    r.pop("db_stats", None)
     expected = {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 13,
+            "anomaly_count": 187,
             "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 350,
+            "failure_count": 2,
+            "measurement_count": 1689,
         },
         "v": 0,
     }
     assert r == expected, fjd(r)
+    h = dict(resp.headers)
+    assert h["Cache-Control"] == "max-age=86400"
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_no_axis_csv(client, log):
     # 0-dimensional data
-    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01&format=CSV"
-    r = api(client, url)
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV"
+    r = client.get(f"/api/v1/{url}")
+    assert not r.is_json
     expected = dedent(
         """\
         anomaly_count,confirmed_count,failure_count,measurement_count
-        13,0,0,350
+        187,0,2,1689
     """
     )
-    assert r.replace("\r", "") == expected
+    assert r.data.decode().replace("\r", "") == expected
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+@pytest.mark.skip("FIXME no domain")
 def test_aggregation_no_axis_domain(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=IE&domain=twitter.com&since=2020-01-01&until=2020-01-03"
+    url = "aggregation?probe_cc=BR&domain=www.cabofrio.rj.gov.br&since=2021-07-09&until=2021-07-10"
     r = api(client, url)
+    r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
         "result": {
             "anomaly_count": 0,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 236,
+            "measurement_count": 240,
         },
         "v": 0,
     }, fjd(r)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_aggregation_no_axis_category_code(client):
+def test_aggregation_no_axis_filter_by_category_code(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=IE&category_code=HACK&since=2020-01-01&until=2020-01-03"
+    url = "aggregation?probe_cc=BR&category_code=CULTR&since=2021-07-09&until=2021-07-10"
     r = api(client, url)
+    r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 45,
+            "anomaly_count": 21,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 2538,
+            "measurement_count": 35,
         },
         "v": 0,
     }, fjd(r)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
-    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-01-05&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
     r = api(client, url)
+    r.pop("db_stats", None)
     expected = {
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 0,
+                "anomaly_count": 187,
                 "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 5,
-                "measurement_start_day": "2020-01-02",
-            },
-            {
-                "anomaly_count": 1,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 37,
-                "measurement_start_day": "2020-01-04",
+                "failure_count": 2,
+                "measurement_count": 1689,
+                "measurement_start_day": "2021-07-09",
             },
         ],
         "v": 0,
@@ -114,10 +111,67 @@ def test_aggregation_x_axis_only(client, log):
     assert r == expected, fjd(r)
 
 
+def test_aggregation_y_axis_only_blocking_type(client, log):
+    # 1 dimension: Y: blocking_type
+    url = "aggregation?since=2021-07-09&until=2021-07-10&axis_y=blocking_type"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    expected = {
+        "dimension_count": 1,
+        "result": [
+            {
+                "anomaly_count": 372,
+                "blocking_type": "",
+                "confirmed_count": 0,
+                "failure_count": 455,
+                "measurement_count": 9622,
+            },
+            {
+                "anomaly_count": 105,
+                "blocking_type": "dns",
+                "confirmed_count": 11,
+                "failure_count": 2,
+                "measurement_count": 105,
+            },
+            {
+                "anomaly_count": 139,
+                "blocking_type": "http-diff",
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 139,
+            },
+            {
+                "anomaly_count": 50,
+                "blocking_type": "http-failure",
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 50,
+            },
+            {
+                "anomaly_count": 72,
+                "blocking_type": "tcp_ip",
+                "confirmed_count": 0,
+                "failure_count": 12,
+                "measurement_count": 72,
+            },
+        ],
+        "v": 0,
+    }
+    assert r == expected, fjd(r)
+
+
+def test_aggregation_x_axis_only_probe_cc(client, log):
+    # 1 dimension: X
+    url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc"
+    r = api(client, url)
+    assert r["dimension_count"] == 1
+    assert len(r["result"]) == 33
+
+
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_only_category_code(client):
     # 1-dimensional data
-    url = "aggregation?probe_cc=IE&category_code=HACK&since=2020-01-01&until=2020-01-03&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=IE&category_code=HACK&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day"
     r = api(client, url)
     expected = {
         "dimension_count": 1,
@@ -127,14 +181,14 @@ def test_aggregation_x_axis_only_category_code(client):
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 1302,
-                "measurement_start_day": "2020-01-02",
+                "measurement_start_day": "2021-07-10",
             },
             {
                 "anomaly_count": 13,
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 1236,
-                "measurement_start_day": "2020-01-03",
+                "measurement_start_day": "2021-07-10",
             },
         ],
         "v": 0,
@@ -145,12 +199,12 @@ def test_aggregation_x_axis_only_category_code(client):
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_only_csv(client, log):
     # 1-dimensional data
-    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2020-01-01&until=2020-02-01&format=CSV&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2021-07-09&until=2021-07-10&format=CSV&axis_x=measurement_start_day"
     r = api(client, url)
     expected = dedent(
         """\
         anomaly_count,confirmed_count,failure_count,measurement_count,measurement_start_day
-        0,0,0,5,2020-01-02
+        0,0,0,5,2021-07-10
         1,0,0,37,2020-01-04
         2,0,0,46,2020-01-08
         2,0,0,26,2020-01-13
@@ -168,7 +222,7 @@ def test_aggregation_x_axis_only_csv(client, log):
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_y_axis(client, log):
     # 2-dimensional data
-    url = "aggregation?since=2020-01-01&until=2020-02-01&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
+    url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
     r = api(client, url)
 
     assert "error" not in r
@@ -177,10 +231,30 @@ def test_aggregation_x_axis_y_axis(client, log):
 
 
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+def test_aggregation_two_axis_too_big(client, log):
+    url = "aggregation?since=2021-10-14&until=2021-10-15&test_name=web_connectivity&axis_x=measurement_start_day&axis_y=input"
+    r = api(client, url)
+    assert r == {}
+
+
+def test_aggregation_foo(client):
+    url = "aggregation?test_name=web_connectivity&since=2021-07-09&axis_x=probe_cc&until=2021-07-10"
+    r = api(client, url)
+    assert sorted(r["result"][0]) == [
+        "anomaly_count",
+        "confirmed_count",
+        "failure_count",
+        "measurement_count",
+        "probe_cc",
+    ]
+
+
+@pytest.mark.skip("FIXME needs domain")
 def test_aggregation_x_axis_y_axis_domain(client, log):
     # 2-dimensional data: day vs ASN
-    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2020-01-01&until=2020-01-03&axis_x=measurement_start_day&axis_y=probe_asn"
+    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn"
     r = api(client, url)
+    r.pop("db_stats", None)
     assert r == {
         "dimension_count": 2,
         "result": [
@@ -188,16 +262,40 @@ def test_aggregation_x_axis_y_axis_domain(client, log):
                 "anomaly_count": 0,
                 "confirmed_count": 0,
                 "failure_count": 0,
-                "measurement_count": 4,
-                "measurement_start_day": "2020-01-02",
+                "measurement_count": 12,
+                "measurement_start_day": "2021-07-09",
                 "probe_asn": 3320,
             },
             {
                 "anomaly_count": 0,
                 "confirmed_count": 0,
                 "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09",
+                "probe_asn": 31334,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
                 "measurement_count": 4,
-                "measurement_start_day": "2020-01-02",
+                "measurement_start_day": "2021-07-10",
+                "probe_asn": 3320,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-10",
+                "probe_asn": 6830,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 4,
+                "measurement_start_day": "2021-07-10",
                 "probe_asn": 13184,
             },
             {
@@ -205,139 +303,86 @@ def test_aggregation_x_axis_y_axis_domain(client, log):
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 1,
-                "measurement_start_day": "2020-01-02",
+                "measurement_start_day": "2021-07-10",
                 "probe_asn": 200052,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 4,
-                "measurement_start_day": "2020-01-03",
-                "probe_asn": 3209,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 5,
-                "measurement_start_day": "2020-01-03",
-                "probe_asn": 3320,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1,
-                "measurement_start_day": "2020-01-03",
-                "probe_asn": 9145,
-            },
-            {
-                "anomaly_count": 4,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 4,
-                "measurement_start_day": "2020-01-03",
-                "probe_asn": 29562,
             },
         ],
         "v": 0,
     }, fjd(r)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+@pytest.mark.skip("FIXME")
 def test_aggregation_x_axis_only_csv_2d(client, log):
     # 2-dimensional data: day vs ASN
-    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2020-01-01&until=2020-01-03&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
+    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
     r = api(client, url)
     expected = dedent(
         """\
         anomaly_count,confirmed_count,failure_count,measurement_count,measurement_start_day,probe_asn
-        0,0,0,4,2020-01-02,3320
-        0,0,0,4,2020-01-02,13184
-        0,0,0,1,2020-01-02,200052
-        0,0,0,4,2020-01-03,3209
-        0,0,0,5,2020-01-03,3320
-        0,0,0,1,2020-01-03,9145
-        4,0,0,4,2020-01-03,29562
+        0,0,0,4,2021-07-10,3320
+        0,0,0,4,2021-07-10,13184
+        0,0,0,1,2021-07-10,200052
+        0,0,0,4,2021-07-10,3209
+        0,0,0,5,2021-07-10,3320
+        0,0,0,1,2021-07-10,9145
+        4,0,0,4,2021-07-10,29562
     """
     )
     assert r.replace("\r", "") == expected
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+aggreg_over_category_code_expected = [
+    {
+        "anomaly_count": 77,
+        "category_code": "ALDR",
+        "confirmed_count": 0,
+        "failure_count": 116,
+        "measurement_count": 250,
+    },
+    {
+        "anomaly_count": 118,
+        "category_code": "ANON",
+        "confirmed_count": 0,
+        "failure_count": 184,
+        "measurement_count": 405,
+    },
+    {
+        "anomaly_count": 35,
+        "category_code": "COMM",
+        "confirmed_count": 0,
+        "failure_count": 54,
+        "measurement_count": 107,
+    },
+]
+
+
+@pytest.mark.skip("FIXME citizenlab")
 def test_aggregation_x_axis_category_code(client, log):
     # 1d data over a special column: category_code
-    url = (
-        "aggregation?probe_cc=DE&since=2020-01-01&until=2020-01-03&axis_x=category_code"
-    )
+    url = "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_x=category_code"
     r = api(client, url)
     assert r["dimension_count"] == 1, fjd(r)
     # shortened to save space
-    assert r["result"][:3] == [
-        {
-            "anomaly_count": 45,
-            "category_code": "ALDR",
-            "confirmed_count": 0,
-            "failure_count": 1,
-            "measurement_count": 261,
-        },
-        {
-            "anomaly_count": 80,
-            "category_code": "ANON",
-            "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 423,
-        },
-        {
-            "anomaly_count": 21,
-            "category_code": "COMM",
-            "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 107,
-        },
-    ], fjd(r)
+    assert r["result"][:3] == aggreg_over_category_code_expected, fjd(r)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+# @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
+@pytest.mark.skip("FIXME citizenlab")
 def test_aggregation_y_axis_category_code(client, log):
     # 1d data over a special column: category_code
-    url = (
-        "aggregation?probe_cc=DE&since=2020-03-01&until=2020-03-02&axis_y=category_code"
-    )
+    url = "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_y=category_code"
     r = api(client, url)
     assert "dimension_count" in r, fjd(r)
     assert r["dimension_count"] == 1, fjd(r)
     # shortened to save space. The query should be identical to
     # test_aggregation_x_axis_category_code
-    assert r["result"][:3] == [
-        {
-            "anomaly_count": 45,
-            "category_code": "ALDR",
-            "confirmed_count": 0,
-            "failure_count": 1,
-            "measurement_count": 261,
-        },
-        {
-            "anomaly_count": 80,
-            "category_code": "ANON",
-            "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 423,
-        },
-        {
-            "anomaly_count": 21,
-            "category_code": "COMM",
-            "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 107,
-        },
-    ], fjd(r)
+    assert r["result"][:3] == aggreg_over_category_code_expected, fjd(r)
 
 
+@pytest.mark.skip("FIXME citizenlab")
 def test_aggregation_xy_axis_category_code(client, log):
     # 2d data over a special column: category_code
-    url = "aggregation?since=2020-01-01&until=2020-01-03&axis_x=category_code&axis_y=category_code"
+    url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=category_code&axis_y=category_code"
     r = api(client, url)
     assert "dimension_count" in r, fjd(r)
     assert r["dimension_count"] == 2, fjd(r)
@@ -346,16 +391,16 @@ def test_aggregation_xy_axis_category_code(client, log):
     assert r["result"][:3] == [], fjd(r)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_aggregation_tor(client):
-    r = api(client, "aggregation?probe_cc=BY&since=2021-06-10T10:30:00&test_name=tor")
+def test_aggregation_psiphon(client):
+    r = api(client, "aggregation?probe_cc=BR&since=2021-07-09&until=2021-07-10&test_name=psiphon")
+    r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 365,
+            "anomaly_count": 0,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 407,
+            "measurement_count": 20,
         },
         "v": 0,
     }
@@ -366,17 +411,35 @@ def test_aggregation_test_name(client):
     assert r.status_code == 400
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_input(client):
-    url = "aggregation?since=2020-01-01&until=2020-01-03&input=https://ccc.de/"
+    url = "aggregation?since=2021-07-09&until=2021-07-10&input=http://www.cabofrio.rj.gov.br/"
     r = api(client, url)
+    r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 23,
+            "anomaly_count": 21,
             "confirmed_count": 0,
-            "failure_count": 21,
-            "measurement_count": 319,
+            "failure_count": 0,
+            "measurement_count": 21,
         },
         "v": 0,
     }
+
+
+def test_aggregation_invalid_input(client):
+    url = "aggregation?since=2021-07-09&until=2021-07-10&input=https:///ccc.de/"
+    r = api(client, url)
+    assert r == {"error": "Invalid characters in input field", "v": 0}
+
+
+def test_aggregation_invalid_input_2(client):
+    url = "aggregation?since=2021-07-09&until=2021-07-10&input=foo.org;"
+    r = api(client, url)
+    assert r == {"error": "Invalid characters in input field", "v": 0}
+
+
+def test_aggregation_invalid_input_3(client):
+    url = "aggregation?since=2021-07-09&until=2021-07-10&input=foo.org%3D%27"
+    r = api(client, url)
+    assert r == {"error": "Invalid characters in input field", "v": 0}

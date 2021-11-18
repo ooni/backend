@@ -8,6 +8,6 @@ setup(
     include_package_data=True,
     zip_safe=False,
     entry_points={"console_scripts": ["ooniapi = measurements.cli:cli",]},
-    scripts=["ooni_api_uploader.py"],
+    scripts=["ooni_api_uploader.py", "database_upgrade_schema.py"],
     package_data={"ooniapi": ("*.adoc", "templates/*", "static/*/*",),},
 )

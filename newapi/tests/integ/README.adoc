@@ -1,14 +1,27 @@
 === Integration tests
 
-Integration tests are run against a PostgreSQL database
+Integration tests are run against a Clickhouse or PostgreSQL database
 
-They require a readonly or read-write user
+They require a readonly and read-write user
 
-Examples using database with port forwarding:
+The --create-db flag will:
+ * create DB schemas
 
-DATABASE_URL=postgresql://readonly@localhost:5433/metadb pytest-3 -s --show-capture=no tests/integ/test_integration.py
+ * run the fastpath on a fixed date:
+   * populate the fastpath table with deterministic data from the past
 
-DATABASE_URL=postgresql://readonly@localhost:5433/metadb pytest-3 -s --show-capture=no -f -x
+ * import citizenlab test list from github
+
+The --inject-msmts flag will:
+ * run the API to receive as set of artificial fresh measurements simulating msmt upload
+   * populate the fastpath table with partially deterministic data
+     * this trigger updates to Clickhouse materialized views and allow testing URL prioritization
+
+   * run the measurement uploader to populate the jsonl table
+     * do not write to S3
+
+Multiple runs of --inject-msmts *may* add new data. Tests should be written to pass if one or more runs have been done.
+
 
 Use --show-capture=no to avoid multiple log chunks
 Use -s to show logs in real time

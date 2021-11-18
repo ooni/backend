@@ -24,7 +24,6 @@ from ooniapi.measurements import FASTPATH_MSM_ID_PREFIX
 # The flask app is created in tests/conftest.py
 
 
-
 @pytest.fixture()
 def fastpath_dup_rid_input(app):
     """
@@ -84,7 +83,8 @@ def api(client, subpath, **kw):
 
 # # rate limiting / quotas # #
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run") # FIXME
+
+@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
 def test_redirects_and_rate_limit_basic(client):
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
@@ -126,7 +126,7 @@ def test_redirects_and_rate_limit_spin(client):
     assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 2
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run") # FIXME
+@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
 def test_redirects_and_rate_limit_summary(client):
     url = "quotas_summary"
     response = privapi(client, url)
@@ -146,7 +146,7 @@ def lower_rate_limits(app):
     limits[0] = old
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run") # FIXME
+@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
 def test_redirects_and_rate_limit_spin_to_zero(client, lower_rate_limits):
     headers = {"X-Real-IP": "1.2.3.4"}
     end_time = time.monotonic() + 2
@@ -158,6 +158,7 @@ def test_redirects_and_rate_limit_spin_to_zero(client, lower_rate_limits):
     assert 0, "429 was never received"
 
 
+@pytest.mark.skip("SLOW")
 def test_redirects_and_rate_limit_spin_to_zero_unmetered(client, lower_rate_limits):
     headers = {"X-Real-IP": "1.2.3.4"}
     end_time = time.monotonic() + 2
@@ -248,25 +249,25 @@ def test_list_files_range_cc_asn(client):
 
 
 def test_get_measurement_meta_basic(client):
-    rid = "20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss"
-    inp = "http://www.theonion.com/"
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
     response = api(client, f"measurement_meta?report_id={rid}&input={inp}")
     assert response == {
-        "anomaly": False,
+        "anomaly": True,
         "confirmed": False,
         "failure": False,
         "input": inp,
-        "measurement_start_time": "2020-12-16T05:44:41Z",
-        "measurement_uid": "20201216054344.884408_VE_webconnectivity_a255255d74fff0be",
-        "probe_asn": 21826,
-        "probe_cc": "VE",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
         "report_id": rid,
-        "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
         "test_name": "web_connectivity",
-        "test_start_time": "2020-12-16T05:03:48Z",
-        "category_code": "CULTR",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
     }
-    # TODO
+    # TODO implement
     # "platform": None,
     # "software_name": "ooniprobe-android",
     # "software_version": "2.2.0"
@@ -313,8 +314,8 @@ def FIXME_MISSING_MSMT____test_get_measurement_meta_input_none_from_fp(client):
     }
 
 
-def FIXME_test_get_measurement_meta_input_none_from_fp(client):
-    rid = "20200121T235958Z_AS15169_4oH03thuTgTJeZorlWOpDd5rgNAmHoxnb0xfUFbnWxMvc2sfFJ"
+def test_get_measurement_meta_input_none_from_fp(client):
+    rid = "20210709T000017Z_httpinvalidrequestline_CH_3303_n1_8mr2M3dzkoFmmjIU"
     # input is None
     response = api(client, f"measurement_meta?report_id={rid}")
     assert response == {
@@ -322,91 +323,46 @@ def FIXME_test_get_measurement_meta_input_none_from_fp(client):
         "category_code": None,
         "confirmed": False,
         "failure": False,
-        "fp_measurement_id": "temp-fid-00ae35a61dadc20e014d9d544525b823",
-        "input": None,
-        "measurement_id": "temp-fid-00ae35a61dadc20e014d9d544525b823",
-        "measurement_start_time": "2020-07-20T19:36:23Z",
-        "mr_measurement_id": None,
-        "platform": "android",
-        "probe_asn": 27775,
-        "probe_cc": "SR",
+        "input": "",
+        "measurement_start_time": "2021-07-09T00:00:18Z",
+        "measurement_uid": "20210709000024.440526_CH_httpinvalidrequestline_3937f817503ed4ea",
+        "probe_asn": 3303,
+        "probe_cc": "CH",
         "report_id": rid,
-        "scores": "{}",
-        "software_name": None,
-        "software_version": None,
-        "test_name": "ndt",
-        "test_start_time": "2020-07-20 19:35:55",
+        "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
+        "test_name": "http_invalid_request_line",
+        "test_start_time": "2021-07-09T00:00:16Z",
     }
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_get_measurement_meta_full(client):
-    rid = "20200209T235610Z_AS22773_NqZSA7xdrVbZb6yO25E5a7HM2Zr7ENIwvxEC18a4TpfYOzWxOz"
-    inp = "http://www.theonion.com/"
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
     response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
     data = response.pop("raw_measurement")
     assert response == {
-        "anomaly": False,
-        "confirmed": False,
-        "failure": False,
-        "fp_measurement_id": None,
-        "input": inp,
-        "measurement_id": "temp-id-381224597",
-        "measurement_start_time": "2020-02-09T23:57:26Z",
-        "mr_measurement_id": "temp-id-381224597",
-        "probe_asn": 22773,
-        "probe_cc": "US",
-        "report_id": rid,
-        "scores": "{}",
-        "test_name": "web_connectivity",
-        "test_start_time": "2020-02-09T23:56:06Z",
-        "platform": None,
-        "category_code": "CULTR",
-        "software_name": "ooniprobe-android",
-        "software_version": "2.2.0",
-        "engine_name": "libmeasurement_kit",
-        "engine_version": "0.10.6",
-        # "analysis": {"blocking": "http-diff",},
-        # "network_name": "Fidget Unlimited",
-    }
-    assert "test_keys" in data
-
-
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_get_measurement_meta_full2(client):
-    rid = "20200315T031450Z_AS23674_KLMX2GDXaQhaNPGa58tgrGQ6DkKaEGYbaQRG5hLAdEnjVjCMUm"
-    inp = "http://www.expressindia.com/"
-    response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
-    data = response.pop("data")
-    assert response == {
-        "anomaly": False,
+        "anomaly": True,
         "confirmed": False,
         "failure": False,
         "input": inp,
-        "measurement_start_time": "2020-03-15T03:37:10Z",
-        "probe_asn": 23674,
-        "probe_cc": "PK",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
         "report_id": rid,
-        "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
         "test_name": "web_connectivity",
-        "test_start_time": "2020-03-15T03:14:50Z",
-        "category_code": "NEWS",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
     }
-    assert "test_keys" in data
+    assert data
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_get_measurement_meta_only_in_fp_full(client, fastpath_rid_input):
-    rid, inp, test_start_time = fastpath_rid_input
-    response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
-    assert response["input"] == inp
-    assert response["scores"] != "{}"  # from fastpath
-    assert "category_code" in response
-    assert "data" in response
-    assert "engine_name" in response
-    assert "engine_version" in response
-    assert "software_name" in response
-    assert "software_version" in response
+def test_get_raw_measurement(client):
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
+    r = api(client, f"raw_measurement?report_id={rid}&input={inp}")
+    assert len(r.keys()) == 20
 
 
 @pytest.mark.slow
@@ -417,36 +373,6 @@ def test_get_measurement_meta_duplicate_in_fp(client, fastpath_dup_rid_input):
     # TODO FIXME count duplicates and verify
     assert response["input"] == inp
     assert response["scores"] != "{}"  # from faspath
-
-
-# This is a msmt from reprocessor.py
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_get_measurement_meta_full_reprocessed(client):
-    rid = "20181030T014439Z_AS10796_ucOhFJsuTvBnUYbJvIaYeMjWe1lxHbfZHuyY9lJp77BXqS7tki"
-    inp = "http://del.icio.us"
-    response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
-    print(response)
-    assert response
-    data = response.pop("raw_measurement")
-    assert response == {
-        "anomaly": False,
-        "confirmed": False,
-        "failure": False,
-        "input": inp,
-        "measurement_start_time": "2018-10-30T01:44:47Z",
-        "measurement_uid": "00066c98de599500d0ca5a6b83e0154e",
-        "probe_asn": 10796,
-        "probe_cc": "US",
-        "report_id": rid,
-        "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
-        "test_name": "web_connectivity",
-        "test_start_time": "2018-10-30T01:44:45Z",
-        "category_code": None,
-        # "analysis": {"blocking": "http-diff",},
-        # "network_name": "Fidget Unlimited",
-    }
-    assert data is not None
-    assert "test_keys" in data
 
 
 # https://explorer.ooni.org/measurement/20210622T144545Z_riseupvpn_MM_133384_n1_VJkB5EObudGDpy9Y
@@ -462,24 +388,25 @@ def test_get_raw_measurement_input_null_bug(client):
 
 
 def test_list_measurements_one(client):
-    rid = "20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss"
-    inp = "http://www.theonion.com/"
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
     response = api(client, f"measurements?report_id={rid}&input={inp}")
     assert response["metadata"]["count"] == 1, jd(response)
     r = response["results"][0]
     assert r == {
-        "anomaly": False,
+        "anomaly": True,
         "confirmed": False,
         "failure": False,
         "input": inp,
-        "measurement_start_time": "2020-12-16T05:44:41Z",
-        "measurement_url": "https://api.ooni.io/api/v1/raw_measurement?report_id=20201216T050353Z_webconnectivity_VE_21826_n1_wxAHEUDoof21UBss&input=http%3A%2F%2Fwww.theonion.com%2F",
-        "probe_asn": "AS21826",
-        "probe_cc": "VE",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "measurement_url": "https://api.ooni.io/api/v1/raw_measurement?report_id=20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3&input=https%3A%2F%2Fwww.backtrack-linux.org%2F",
+        "probe_asn": "AS4818",
+        "probe_cc": "MY",
         "report_id": rid,
         "scores": {
+            "analysis": {"blocking_type": "http-failure"},
             "blocking_country": 0.0,
-            "blocking_general": 0.0,
+            "blocking_general": 1.0,
             "blocking_global": 0.0,
             "blocking_isp": 0.0,
             "blocking_local": 0.0,
@@ -488,7 +415,7 @@ def test_list_measurements_one(client):
     }
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run") # FIXME
+@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
 def test_list_measurements_search(client):
     # Used by Explorer search
     response = api(
@@ -498,7 +425,7 @@ def test_list_measurements_search(client):
     assert len(response["results"]) == 7, jd(response)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run") # FIXME
+@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
 def test_list_measurements_search_cc(client):
     # Used by Explorer search
     response = api(
@@ -530,16 +457,14 @@ def test_list_measurements_slow_order_by_complete(
         test_name=test_name,
         anomaly=anomaly,
         domain=domain,
-        until="2021-01-10",
+        until="2021-07-11",
     )
     d = {k: v for k, v in d.items() if v is not None}
     url = "measurements?" + urlencode(d)
     response = api(client, url)
 
 
-@pytest.mark.parametrize(
-    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
-)
+@pytest.mark.parametrize("f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity"))
 def test_list_measurements_slow_order_by_group_1(f, log, client):
     # filter on probe_cc or probe_asn or test_name
     # order by --> "test_start_time"
@@ -609,6 +534,13 @@ def test_list_measurements_pagination_new(client, log):
         j = new
 
 
+@pytest.mark.skip(reason="Broken. To be fixed after updating Flask")
+def test_list_measurements_error_json_mimetype(client):
+    resp = client.get("/api/v1/measurements?test_name=BOGUS")
+    assert resp.status_code == 400
+    assert resp.is_json
+
+
 def today_range():
     """Return since/until pair to extract fresh fastpath entries"""
     since = datetime.utcnow().date()
@@ -616,33 +548,29 @@ def today_range():
     return since, until
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 @pytest.mark.parametrize("anomaly", (True, False))
 @pytest.mark.parametrize("confirmed", (True, False))
 @pytest.mark.parametrize("failure", (True, False))
-def test_list_measurements_filter_flags_fastpath(
-    anomaly, confirmed, failure, client, log
-):
+def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
     SELECT COUNT(*), anomaly, confirmed, msm_failure AS failure
     FROM fastpath
-    WHERE measurement_start_time > '2020-01-13T00:00:00'::timestamp
-    AND measurement_start_time <= '2020-01-14T00:00:00'::timestamp
+    WHERE measurement_start_time > '2021-07-09'
+    AND measurement_start_time <= '2021-07-10'
     GROUP BY anomaly, confirmed, failure
     ORDER BY anomaly, confirmed, failure ASC;
-      54412 | f       | f         | f
-     156477 | f       | f         | t
-      18679 | t       | f         | f
-       6820 | t       | f         | t
-        352 | t       | t         | f
-       2637 | t       | t         | t
+    ┌─count()─┬─anomaly─┬─confirmed─┬─failure─┐
+    │    8796 │ f       │ f         │ f       │
+    │     454 │ f       │ f         │ t       │
+    │     714 │ t       │ f         │ f       │
+    │      13 │ t       │ f         │ t       │
+    │       9 │ t       │ t         │ f       │
+    │       2 │ t       │ t         │ t       │
+    └─────────┴─────────┴───────────┴─────────┘
     """
-    since, until = today_range()
-    p = (
-        f"measurements?since={since}&until={until}&anomaly={anomaly}"
-        + f"&confirmed={confirmed}&failure={failure}&limit=100"
-    )
+    p = f"measurements?since=2021-07-09&until=2021-07-10&anomaly={anomaly}"
+    p += f"&confirmed={confirmed}&failure={failure}&limit=100"
     p = p.lower()
     log.info("Calling %s", p)
     response = api(client, p)
@@ -652,54 +580,10 @@ def test_list_measurements_filter_flags_fastpath(
         assert r["failure"] == failure, r
 
     i = anomaly * 4 + confirmed * 2 + failure * 1
-    thresholds = [10, 100, 0, 0, 10, 10, 0, 10]
-    assert len(response["results"]) >= thresholds[i]
+    thresholds = [100, 100, 0, 0, 100, 13, 9, 2]
+    assert len(response["results"]) == thresholds[i], len(response["results"])
 
 
-# Notice: the decorators must be in reversed order
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-@pytest.mark.parametrize("failure", (True, False))
-@pytest.mark.parametrize("confirmed", (True, False))
-@pytest.mark.parametrize("anomaly", (True, False))
-def test_list_measurements_filter_flags_pipeline(
-    anomaly, confirmed, failure, client, log
-):
-    """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
-
-    COUNT(*), anomaly, confirmed, measurement.exc IS NOT NULL AS failure
-    FROM measurement
-    WHERE
-        measurement.measurement_start_time > '2019-01-01T00:00:00'::timestamp
-        AND measurement.measurement_start_time <= '2019-02-01T00:00:00'::timestamp
-        GROUP BY anomaly, confirmed, failure
-        ORDER BY anomaly, confirmed, failure;
-    """
-
-    p = (
-        f"measurements?since=2019-01-01&until=2019-02-01&anomaly={anomaly}"
-        + f"&confirmed={confirmed}&failure={failure}&limit=100"
-    )
-    p = p.lower()
-    log.info("Calling %s", p)
-    response = api(client, p)
-    for r in response["results"]:
-        assert r["anomaly"] == anomaly, r
-        assert r["confirmed"] == confirmed, r
-        assert r["failure"] == failure, r
-
-    if (anomaly, confirmed) == (False, True):
-        # confirmed implies anomaly
-        cnt = 0
-    elif (anomaly, confirmed, failure) == (True, True, True):
-        cnt = 1
-    else:
-        cnt = 100
-
-    assert len(response["results"]) == cnt
-
-
-# FIXME: glitchy on GH CI
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_list_measurements_probe_asn(client):
     p = "measurements?probe_asn=AS5089&since=2019-12-8&until=2021-12-11&limit=50"
     response = api(client, p)
@@ -708,30 +592,24 @@ def test_list_measurements_probe_asn(client):
         assert r["probe_asn"] == "AS5089"
 
 
-@pytest.mark.skip(reason="no way of currently testing this")
 def test_list_measurements_failure_true_fastpath(client):
-    since = datetime.utcnow().date()
-    until = since + timedelta(days=1)
-    p = f"measurements?failure=true&since={since}&until={until}&limit=50"
+    p = f"measurements?failure=true&since=2021-07-09&until=2021-07-10&limit=50"
     response = api(client, p)
-    assert len(response["results"]) == 50
+    assert len(response["results"]) > 0
     for r in response["results"]:
         assert r["failure"] == True, r
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_list_measurements_failure_false_fastpath(client):
-    since = datetime.utcnow().date()
-    until = since + timedelta(days=1)
-    p = f"measurements?failure=false&since={since}&until={until}&limit=50"
+    p = f"measurements?failure=false&since=2021-07-09&until=2021-07-10&limit=50"
     response = api(client, p)
-    assert len(response["results"]) == 50
+    assert len(response["results"]) > 0
     for r in response["results"]:
         assert r["failure"] == False, r
 
 
 def notest_list_measurements_paging_1(client):
-    url = "measurements?test_name=dnscheck&since=2020-12-03&until=2020-12-05"
+    url = "measurements?test_name=dnscheck&since=2021-07-09&until=2021-07-10"
     resp = api(client, url)
     meta = resp["metadata"]
     assert meta["count"] == 0
@@ -739,25 +617,26 @@ def notest_list_measurements_paging_1(client):
     assert meta["next_url"] == None
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_list_measurements_paging_2(client):
-    url = "measurements?test_name=dnscheck&since=2020-12-03&until=2020-12-04"
-    for pagenum in range(1, 9):
+    url = "measurements?since=2021-07-09&until=2021-07-10&test_name=web_connectivity&probe_cc=IE"
+    for pagenum in range(1, 999):
         resp = api(client, url)
         meta = resp["metadata"]
-        if pagenum < 8:
+        if pagenum < 4:
             assert meta["current_page"] == pagenum, url
             assert meta["offset"] == (pagenum - 1) * 100, url
             assert meta["count"] == -1, (url, meta)
+            assert meta["pages"] == -1, (url, meta)
             assert meta["next_url"].startswith("https://api.ooni.io/api/v1/")
-        else:
+        else: # last page
             assert meta["current_page"] == pagenum, url
-            assert meta["offset"] == 700, url
-            assert meta["count"] == 763, (url, meta)  # is this ok?
+            assert meta["offset"] == 300, url
+            assert meta["count"] == 300, (url, meta)  # is this ok?
             assert meta["next_url"] is None
+            assert meta["pages"] == 3 # in this a bug?
             break
 
-        url = meta["next_url"].split("/", 5)[-1]
+        url = meta["next_url"].split("/", 5)[-1] # fetch next url
 
 
 ## get_measurement ##
@@ -977,5 +856,3 @@ def test_files_download_missing_legacy(client):
     url = "files/download/without-slash-bogus-probe.json"
     response = client.get(url)
     assert response.status_code == 404
-
-

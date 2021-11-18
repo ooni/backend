@@ -15,3 +15,10 @@ def privapi(client, subpath):
     assert response.status_code == 200
     assert response.is_json
     return response.json
+
+
+def getjson(client, url):
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.is_json
+    return response.json

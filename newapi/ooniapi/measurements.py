@@ -9,11 +9,14 @@ from dateutil.parser import parse as parse_date
 from io import StringIO
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 import gzip
 import http.client
 import json
 import logging
 import math
+import re
+import string
 import time
 
 try:
@@ -27,6 +30,7 @@ from flask import current_app, request, make_response, abort, redirect
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
+# debdeps: python3-sqlalchemy
 from sqlalchemy import func, and_, text, select, sql, column
 from sqlalchemy.sql import literal_column
 from sqlalchemy import String, cast
@@ -40,6 +44,7 @@ from ooniapi import __version__
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson
 from ooniapi.models import TEST_NAMES
+from ooniapi.database import query_click, query_click_one_row
 
 from flask import Blueprint
 
@@ -82,7 +87,7 @@ def list_files():
 # FIXME respond with help message
 @metrics.timer("get_measurement")
 @api_msm_blueprint.route("/v1/measurement/<measurement_id>")
-def get_measurement(measurement_id, download=None):
+def get_measurement(measurement_id, download=None):  # pragma: no cover
     """Get one measurement by measurement_id,
     fetching the file from S3 or the fastpath host as needed
     Returns only the measurement without extra data from the database
@@ -117,6 +122,7 @@ def get_measurement(measurement_id, download=None):
         FASTPATH_PORT,
         path,
     )
+    #FIXME
     conn = http.client.HTTPConnection(FASTPATH_SERVER, FASTPATH_PORT)
     conn.request("GET", path)
     r = conn.getresponse()
@@ -140,7 +146,7 @@ def get_measurement(measurement_id, download=None):
 
 def _fetch_autoclaved_measurement_body_from_s3(
     autoclaved_fn: str, frame_off: int, frame_size: int, intra_off: int, intra_size: int
-) -> bytes:
+) -> bytes:  # pragma: no cover
     """Fetch autoclaved byte range from S3, decompress it"""
     log = current_app.logger
     REQID_HDR = "X-Request-ID"
@@ -189,7 +195,7 @@ def _fetch_jsonl_measurement_body_inner(
     raise MsmtNotFound
 
 
-def _fetch_jsonl_measurement_body(report_id, input: str, measurement_uid) -> bytes:
+def _fetch_jsonl_measurement_body_postgresql(report_id, input: str, measurement_uid) -> bytes:  # pragma: no cover
     """Fetch jsonl from S3, decompress it, extract msmt"""
     query = "SELECT s3path, linenum FROM jsonl "
     inp = input or ""  # NULL/None input is stored as ''
@@ -217,6 +223,32 @@ def _fetch_jsonl_measurement_body(report_id, input: str, measurement_uid) -> byt
     try:
         return _fetch_jsonl_measurement_body_inner(s3path, linenum)
     except:
+        log.error(f"Failed to fetch file {s3path} from S3")
+        raise MsmtNotFound
+
+
+def _fetch_jsonl_measurement_body_clickhouse(
+    report_id, input: str, measurement_uid
+) -> bytes:
+    """Fetch jsonl from S3, decompress it, extract msmt"""
+    inp = input or ""  # NULL/None input is stored as ''
+    query = """SELECT s3path, linenum FROM jsonl
+        PREWHERE report_id = :report_id AND input = :inp
+        LIMIT 1"""
+    query_params = dict(inp=inp, report_id=report_id)
+
+    lookup = query_click_one_row(sql.text(query), query_params)
+    if lookup is None:
+        m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
+        log.error(m)
+        raise MsmtNotFound
+
+    s3path = lookup["s3path"]
+    linenum = lookup["linenum"]
+    log.debug(f"Fetching file {s3path} from S3")
+    try:
+        return _fetch_jsonl_measurement_body_inner(s3path, linenum)
+    except:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
         raise MsmtNotFound
 
@@ -270,7 +302,29 @@ def _fetch_measurement_body_on_disk(report_id, input: str) -> Optional[bytes]:
     return ujson.dumps(body).encode()
 
 
-def _fetch_autoclaved_measurement_body(report_id: str, input) -> bytes:
+def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes]:
+    """Fetch raw POST from disk, extract msmt
+    This is used only for msmts that have been processed by the fastpath
+    but are not uploaded to S3 yet.
+    YAML msmts not supported: requires implementing normalization here
+    """
+    assert msmt_uid.startswith("20")
+    tstamp, cc, testname, hash_ = msmt_uid.split("_")
+    hour = tstamp[:10]
+    int(hour)
+    spooldir = Path("/var/lib/ooniapi/measurements/incoming/")
+    postf = spooldir / f"{hour}_{cc}_{testname}/{msmt_uid}.post"
+    log.debug(f"Attempt at reading {postf}")
+    try:
+        with postf.open() as f:
+            post = ujson.load(f)
+    except FileNotFoundError:
+        return None
+    body = _unwrap_post(post)
+    return ujson.dumps(body).encode()
+
+
+def _fetch_autoclaved_measurement_body(report_id: str, input) -> bytes:  # pragma: no cover
     """fetch the measurement body using autoclavedlookup"""
     # uses_pg_index autoclavedlookup_idx
     # None/NULL input needs to be is treated as ""
@@ -307,23 +361,29 @@ def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
     u_count = report_id.count("_")
     # 5: Current format e.g.
     # 20210124T210009Z_webconnectivity_VE_22313_n1_Ojb<redacted>
-    if u_count == 5:
+    if u_count == 5 and measurement_uid:
         # Look on disk and then from JSONL cans on S3
-        body = _fetch_measurement_body_on_disk(report_id, input)
+        body = _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
         if body is not None:
             return body
 
     log.debug(f"Fetching body for {report_id} {input} from jsonl on S3")
     try:
-        return _fetch_jsonl_measurement_body(report_id, input, measurement_uid)
+        if current_app.config["USE_CLICKHOUSE"]:
+            return _fetch_jsonl_measurement_body_clickhouse(
+                report_id, input, measurement_uid
+            )
+        else:
+            return _fetch_jsonl_measurement_body_postgresql(report_id, input, measurement_uid)
     except MsmtNotFound:
         pass
 
-    log.debug(f"Fetching body for {report_id} {input} from autoclaved on S3")
-    try:
-        return _fetch_autoclaved_measurement_body(report_id, input)
-    except MsmtNotFound:
-        log.error(f"Failed to fetch body for {report_id} {input}")
+    if not current_app.config["USE_CLICKHOUSE"]:  # pragma: no cover
+        log.debug(f"Fetching body for {report_id} {input} from autoclaved on S3")
+        try:
+            return _fetch_autoclaved_measurement_body(report_id, input)
+        except MsmtNotFound:
+            log.error(f"Failed to fetch body for {report_id} {input}")
 
     raise MsmtNotFound
 
@@ -365,6 +425,89 @@ def get_raw_measurement():
     resp.headers.set("Content-Type", "application/json")
     resp.cache_control.max_age = 24 * 3600
     return resp
+
+
+def _get_measurement_meta_postgresql(
+    report_id: str, input_
+) -> dict:  # pragma: no cover
+    # Given report_id + input, fetch measurement data from fastpath table
+    query = """SELECT
+        anomaly,
+        confirmed,
+        msm_failure AS failure,
+        input,
+        measurement_start_time,
+        probe_asn,
+        probe_cc,
+        report_id,
+        measurement_uid,
+        CAST(scores AS varchar) AS scores,
+        test_name,
+        test_start_time
+    """
+    # fastpath uses input = '' for empty values
+    if input_ is None:
+        query += """
+        FROM fastpath
+        WHERE fastpath.report_id = :report_id
+        AND (fastpath.input IS NULL or fastpath.input = '')
+        AND probe_asn != 0
+        """
+    else:
+        query += """
+            , citizenlab.category_code AS category_code
+        FROM fastpath
+        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+        WHERE fastpath.input = :input
+        AND fastpath.report_id = :report_id
+        AND probe_asn != 0
+        """
+    query_params = dict(input=input_, report_id=report_id)
+    q = current_app.db_session.execute(query, query_params)
+    msmt_meta = q.fetchone()
+    if msmt_meta is None:
+        return {}  # measurement not found
+
+    return dict(msmt_meta)
+
+
+def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
+    # Given report_id + input, fetch measurement data from fastpath table
+    query = "SELECT * FROM fastpath "
+    if input_ is None:
+        # fastpath uses input = '' for empty values
+        query += "WHERE report_id = :report_id AND input = '' "
+    else:
+        query += """
+        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+        WHERE fastpath.input = :input
+        AND fastpath.report_id = :report_id
+        """
+    query += "LIMIT 1"
+    query_params = dict(input=input_, report_id=report_id)
+    msmt_meta = query_click_one_row(sql.text(query), query_params)
+    if not msmt_meta:
+        return {}  # measurement not found
+    if msmt_meta["probe_asn"] == 0:
+        return {}  # unwanted
+
+    keys = (
+        "input",
+        "measurement_start_time",
+        "measurement_uid",
+        "report_id",
+        "test_name",
+        "test_start_time",
+        "probe_asn",
+        "probe_cc",
+        "scores",
+    )
+    out = {k: msmt_meta[k] for k in keys}
+    out["category_code"] = msmt_meta.get("category_code", None)
+    out["anomaly"] = msmt_meta["anomaly"] == "t"
+    out["confirmed"] = msmt_meta["confirmed"] == "t"
+    out["failure"] = msmt_meta["msm_failure"] == "t"
+    return out
 
 
 @api_msm_blueprint.route("/v1/measurement_meta")
@@ -444,66 +587,33 @@ def get_measurement_meta():
     report_id = param("report_id")
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
-    input = param("input", None)
-    if input == "":
-        input = None
+    input_ = param("input", None)
+    if input_ == "":
+        input_ = None
 
     full = param("full", "").lower() in ("true", "1", "yes")
-    log.info(f"get_measurement_meta '{report_id}' '{input}'")
+    log.info(f"get_measurement_meta '{report_id}' '{input_}'")
 
-    # Given report_id + input, fetch measurement data from fastpath table
-    query = """SELECT
-        anomaly,
-        confirmed,
-        msm_failure AS failure,
-        input,
-        measurement_start_time,
-        probe_asn,
-        probe_cc,
-        report_id,
-        measurement_uid,
-        CAST(scores AS varchar) AS scores,
-        test_name,
-        test_start_time
-    """
-    # fastpath uses input = '' for empty values
-    if input is None:
-        query += """
-        FROM fastpath
-        WHERE fastpath.report_id = :report_id
-        AND (fastpath.input IS NULL or fastpath.input = '')
-        AND probe_asn != 0
-        """
+    if current_app.config["USE_CLICKHOUSE"]:
+        msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
     else:
-        query += """
-            , citizenlab.category_code AS category_code
-        FROM fastpath
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE fastpath.input = :input
-        AND fastpath.report_id = :report_id
-        AND probe_asn != 0
-        """
-    query_params = dict(input=input, report_id=report_id)
-    q = current_app.db_session.execute(query, query_params)
-    msmt_meta = q.fetchone()
-    if msmt_meta is None:
-        # measurement not found
-        return jsonify({})
+        msmt_meta = _get_measurement_meta_postgresql(report_id, input_)
 
-    msmt_meta = dict(msmt_meta)
-
+    assert isinstance(msmt_meta, dict)
     if not full:
-        return cachedjson(24, **msmt_meta)
+        # FIXME cache timing
+        return cachedjson(0, **msmt_meta)
 
     try:
-        body = _fetch_measurement_body(report_id, input, msmt_meta["measurement_uid"])
+        body = _fetch_measurement_body(report_id, input_, msmt_meta["measurement_uid"])
         assert isinstance(body, bytes)
         body = body.decode()
     except Exception as e:
         log.error(e, exc_info=1)
         body = ""
 
-    return cachedjson(24, raw_measurement=body, **msmt_meta)
+    # FIXME cache timing
+    return cachedjson(0, raw_measurement=body, **msmt_meta)
 
 
 # # Listing measurements
@@ -669,7 +779,11 @@ def list_measurements():
     probe_cc = param("probe_cc")
     test_name = param("test_name")
     since = param("since")
+    if since:
+        since = parse_date(since)
     until = param("until")
+    if until:
+        until = parse_date(until)
     since_index = param("since_index")  # unused
     order_by = param("order_by")
     order = param("order", "desc")
@@ -719,8 +833,6 @@ def list_measurements():
         if until is None:
             if report_id is None:
                 until = date.today() + timedelta(days=1)
-        else:
-            until = parse_date(until)
     except ValueError:
         raise BadRequest("Invalid until")
 
@@ -728,20 +840,75 @@ def list_measurements():
         if since is None:
             if report_id is None and until is not None:
                 since = until - timedelta(days=30)
-        else:
-            since = parse_date(since)
     except ValueError:
         raise BadRequest("Invalid since")
 
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
+    if current_app.config["USE_CLICKHOUSE"]:
+        return _list_measurements_click(
+            since,
+            until,
+            report_id,
+            probe_cc,
+            probe_asn,
+            test_name,
+            anomaly,
+            confirmed,
+            failure,
+            input_,
+            domain,
+            category_code,
+            order,
+            order_by,
+            limit,
+            offset,
+        )
+    else:
+        return _list_measurements_pg(
+            since,
+            until,
+            report_id,
+            probe_cc,
+            probe_asn,
+            test_name,
+            anomaly,
+            confirmed,
+            failure,
+            input_,
+            domain,
+            category_code,
+            order,
+            order_by,
+            limit,
+            offset,
+        )
+
+
+def _list_measurements_pg(
+    since,
+    until,
+    report_id,
+    probe_cc,
+    probe_asn,
+    test_name,
+    anomaly,
+    confirmed,
+    failure,
+    input_,
+    domain,
+    category_code,
+    order,
+    order_by,
+    limit,
+    offset,
+):
     INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
 
     ## Create fastpath columns for query
+    # TODO cast scores, coalesce input as ""
     fpcols = [
-        # func.coalesce(0).label("m_input_no"),
-        # We use test_start_time here as the batch pipeline has many NULL measurement_start_times
         literal_column("measurement_start_time").label("test_start_time"),
         literal_column("measurement_start_time"),
         literal_column("anomaly"),
@@ -752,7 +919,7 @@ def list_measurements():
         literal_column("probe_cc"),
         literal_column("probe_asn"),
         literal_column("test_name"),
-        func.coalesce(sql.text("fastpath.input"), INULL).label("input"),
+        sql.text("coalesce(fastpath.input, '') AS input"),
     ]
 
     fpwhere = []
@@ -837,12 +1004,8 @@ def list_measurements():
             )
             fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
-    fp_query = (
-        select(fpcols)
-        .where(and_(*fpwhere))
-        .select_from(fpq_table)
-        .limit(offset + limit)
-    )
+    fp_query = select(fpcols).where(and_(*fpwhere)).select_from(fpq_table)
+    # .limit(offset + limit)
 
     # SELECT * FROM fastpath  WHERE measurement_start_time <= '2019-01-01T00:00:00'::timestamp AND probe_cc = 'YT' ORDER BY test_start_time desc   LIMIT 100 OFFSET 0;
     # is using BRIN and running slowly
@@ -865,6 +1028,8 @@ def list_measurements():
     # Assemble the "external" query. Run a final order by followed by limit and
     # offset
     query = fp_query.offset(offset).limit(limit)
+    query_params["param_1"] = limit
+    query_params["param_2"] = offset
 
     # Run the query, generate the results list
     iter_start_time = time.time()
@@ -873,6 +1038,7 @@ def list_measurements():
     current_app.db_session.execute("SET enable_seqscan=false;")
     try:
         q = current_app.db_session.execute(query, query_params)
+
         tmpresults = []
         for row in q:
             if row.input in (None, ""):
@@ -949,6 +1115,222 @@ def list_measurements():
     return jsonify({"metadata": metadata, "results": results[:limit]})
 
 
+def _list_measurements_click(
+    since,
+    until,
+    report_id,
+    probe_cc,
+    probe_asn,
+    test_name,
+    anomaly,
+    confirmed,
+    failure,
+    input_,
+    domain,
+    category_code,
+    order,
+    order_by,
+    limit,
+    offset,
+):
+    INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
+
+    ## Create fastpath columns for query
+    # TODO castscores,   coalesce inputas ""
+    fpwhere = []
+    query_params = {}
+
+    # Populate WHERE clauses and query_params dict
+
+    if since is not None:
+        query_params["since"] = since
+        fpwhere.append(sql.text("measurement_start_time > :since"))
+
+    if until is not None:
+        query_params["until"] = until
+        fpwhere.append(sql.text("measurement_start_time <= :until"))
+
+    if report_id:
+        query_params["report_id"] = report_id
+        fpwhere.append(sql.text("report_id = :report_id"))
+
+    if probe_cc:
+        query_params["probe_cc"] = probe_cc
+        fpwhere.append(sql.text("probe_cc = :probe_cc"))
+
+    if probe_asn is not None:
+        if probe_asn == 0:
+            log.info("Refusing list_measurements with probe_asn set to 0")
+            abort(403)
+        query_params["probe_asn"] = probe_asn
+        fpwhere.append(sql.text("probe_asn = :probe_asn"))
+    else:
+        fpwhere.append(sql.text("probe_asn != 0"))
+
+    if test_name is not None:
+        query_params["test_name"] = test_name
+        fpwhere.append(sql.text("test_name = :test_name"))
+
+    # Filter on anomaly, confirmed and failure:
+    # The database stores anomaly and confirmed as boolean + NULL and stores
+    # failures in different columns. This leads to many possible combinations
+    # but only a subset is used.
+    # On anomaly and confirmed: any value != TRUE is treated as FALSE
+    # See test_list_measurements_filter_flags_fastpath
+
+    if anomaly is True:
+        fpwhere.append(sql.text("fastpath.anomaly = 't'"))
+
+    elif anomaly is False:
+        fpwhere.append(sql.text("fastpath.anomaly = 'f'"))
+
+    if confirmed is True:
+        fpwhere.append(sql.text("fastpath.confirmed = 't'"))
+
+    elif confirmed is False:
+        fpwhere.append(sql.text("fastpath.confirmed = 'f'"))
+
+    if failure is True:
+        # residual_no is never NULL, msm_failure is always NULL
+        fpwhere.append(sql.text("fastpath.msm_failure = 't'"))
+
+    elif failure is False:
+        # on success measurement.exc is NULL
+        fpwhere.append(sql.text("fastpath.msm_failure = 'f'"))
+
+    fpq_table = sql.table("fastpath")
+
+    if input_:
+        # input_ overrides domain and category_code
+        query_params["input"] = input_
+        fpwhere.append(sql.text("input = :input"))
+
+    elif domain or category_code:
+        # both domain and category_code can be set at the same time
+        if domain:
+            query_params["domain"] = domain
+            fpwhere.append(sql.text("domain = :domain"))
+
+        if category_code:
+            query_params["category_code"] = category_code
+            fpq_table = fpq_table.join(
+                sql.table("citizenlab"),
+                sql.text("citizenlab.url = :input"),
+            )
+            fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
+
+    fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
+    # .limit(offset + limit)
+
+    # SELECT * FROM fastpath  WHERE measurement_start_time <= '2019-01-01T00:00:00'::timestamp AND probe_cc = 'YT' ORDER BY test_start_time desc   LIMIT 100 OFFSET 0;
+    # is using BRIN and running slowly
+
+    if order_by is None:
+        # Use test_start_time or measurement_start_time depending on other
+        # filters in order to avoid heavy joins.
+        # Filtering on anomaly, confirmed, msm_failure -> measurement_start_time
+        # Filtering on probe_cc, probe_asn, test_name -> test_start_time
+        # See test_list_measurements_slow_order_by_* tests
+        if probe_cc or probe_asn or test_name:
+            order_by = "test_start_time"
+        elif anomaly or confirmed or failure or input_ or domain or category_code:
+            order_by = "measurement_start_time"
+        else:
+            order_by = "measurement_start_time"
+
+    fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
+
+    # Assemble the "external" query. Run a final order by followed by limit and
+    # offset
+    query = fp_query.offset(offset).limit(limit)
+    query_params["param_1"] = limit
+    query_params["param_2"] = offset
+
+    # Run the query, generate the results list
+    iter_start_time = time.time()
+
+    try:
+        rows = query_click(query, query_params)
+        tmpresults = []
+        for row in rows:
+            if row["input"] in (None, ""):
+                url = genurl("/api/v1/raw_measurement", report_id=row["report_id"])
+            else:
+                url = genurl(
+                    "/api/v1/raw_measurement",
+                    report_id=row["report_id"],
+                    input=row["input"],
+                )
+            tmpresults.append(
+                {
+                    "measurement_url": url,
+                    "report_id": row["report_id"],
+                    "probe_cc": row["probe_cc"],
+                    "probe_asn": "AS{}".format(row["probe_asn"]),
+                    "test_name": row["test_name"],
+                    "measurement_start_time": row["measurement_start_time"],
+                    "input": row["input"],
+                    "anomaly": row["anomaly"] == "t",
+                    "confirmed": row["confirmed"] == "t",
+                    "failure": row["msm_failure"] == "t",
+                    "scores": json.loads(row["scores"]),
+                }
+            )
+    except OperationalError as exc:
+        log.error(exc)
+        if isinstance(exc.orig, QueryCanceledError):
+            # Timeout due to a slow query. Generate metric and do not feed it
+            # to Sentry.
+            abort(504)
+
+        raise exc
+
+    # For each report_id / input tuple, we want at most one entry.
+    results = _merge_results(tmpresults)
+
+    # Replace the special value INULL for "input" with None
+    for i, r in enumerate(results):
+        if r["input"] == INULL:
+            results[i]["input"] = None
+
+    pages = -1
+    count = -1
+    current_page = math.ceil(offset / limit) + 1
+
+    # We got less results than what we expected, we know the count and that
+    # we are done
+    if len(tmpresults) < limit:
+        count = offset + len(results)
+        pages = math.ceil(count / limit)
+        next_url = None
+    else:
+        # XXX this is too intensive. find a workaround
+        # count_start_time = time.time()
+        # count = q.count()
+        # pages = math.ceil(count / limit)
+        # current_page = math.ceil(offset / limit) + 1
+        # query_time += time.time() - count_start_time
+        next_args = request.args.to_dict()
+        next_args["offset"] = str(offset + limit)
+        next_args["limit"] = str(limit)
+        next_url = genurl("/api/v1/measurements", **next_args)
+
+    query_time = time.time() - iter_start_time
+    metadata = {
+        "offset": offset,
+        "limit": limit,
+        "count": count,
+        "pages": pages,
+        "current_page": current_page,
+        "next_url": next_url,
+        "query_time": query_time,
+    }
+
+    response = jsonify({"metadata": metadata, "results": results[:limit]})
+    response.cache_control.max_age = 1
+    return response
+
+
 def _convert_to_csv(r) -> str:
     """Convert aggregation result dict/list to CSV"""
     csvf = StringIO()
@@ -969,6 +1351,71 @@ def _convert_to_csv(r) -> str:
     result = csvf.getvalue()
     csvf.close()
     return result
+
+
+def validate(item: str, accepted: str):
+    if item is None:
+        return
+    for c in item:
+        if c not in accepted:
+            raise ValueError("Invalid characters")
+
+
+def param_lowercase_underscore(name):
+    p = request.args.get(name)
+    accepted = string.ascii_lowercase + "_"
+    validate(p, accepted)
+    return p
+
+
+def param_uppercase(name):
+    p = request.args.get(name)
+    validate(p, string.ascii_uppercase)
+    return p
+
+
+def param_asn(name):
+    p = request.args.get(name)
+    if p:
+        if p.startswith("AS"):
+            int(p[2:])
+        else:
+            int(p)
+    return p
+
+
+domain_matcher = re.compile(
+    r"^(?:[a-zA-Z0-9]"  # First char
+    r"(?:[a-zA-Z0-9-_]{0,61}[A-Za-z0-9])?\.)"  # sub domain
+    r"+[A-Za-z0-9][A-Za-z0-9-_]{0,61}"  # TLD
+    r"[A-Za-z]$"  # TLD, last char
+)
+
+
+def validate_domain(p, name):
+    try:
+        p = p.encode("idna").decode("ascii")
+    except:
+        raise ValueError(f"Invalid characters in {name} field")
+    if not domain_matcher.match(p):
+        raise ValueError(f"Invalid characters in {name} field")
+
+
+def param_domain(name):
+    p = request.args.get(name)
+    if not p:
+        return p
+    validate_domain(p, name)
+    return p
+
+
+def param_url(name):
+    p = request.args.get(name)
+    if not p:
+        return p
+    url = urlparse(p)
+    validate_domain(url.netloc, name)
+    return p
 
 
 @api_msm_blueprint.route("/v1/aggregation")
@@ -1062,33 +1509,90 @@ def get_aggregated():
       '200':
         description: Returns aggregated counters
     """
+    # TODO:
+    #  better split of large dimensions in output?
+    #  add limit and warn user
     log = current_app.logger
     param = request.args.get
-    axis_x = param("axis_x")
-    axis_y = param("axis_y")
-    category_code = param("category_code")
-    domain = param("domain")
-    input = param("input")
-    test_name = param("test_name")
-    probe_asn = param("probe_asn")
-    probe_cc = param("probe_cc")
-    since = param("since")
-    until = param("until")
-    format = param("format", "JSON")
+    try:
+        axis_x = param_lowercase_underscore("axis_x")
+        axis_y = param_lowercase_underscore("axis_y")
+        category_code = param_uppercase("category_code")
+        domain = param_domain("domain")
+        inp = param_url("input")
+        test_name = param_lowercase_underscore("test_name")
+        probe_asn = param_asn("probe_asn")
+        probe_cc = param_uppercase("probe_cc")
+        since = param("since")
+        if since:
+            since = parse_date(since)
+        until = param("until")
+        if until:
+            until = parse_date(until)
+
+        resp_format = param("format", "JSON").upper()
+        assert resp_format in ("JSON", "CSV")
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})
+
+    if current_app.config["USE_CLICKHOUSE"]:
+        r = _clickhouse_aggregation(
+            resp_format,
+            since,
+            until,
+            inp,
+            domain,
+            category_code,
+            probe_cc,
+            probe_asn,
+            test_name,
+            axis_x,
+            axis_y,
+        )
+        return r
+
+    r = _postgresql_aggregation(
+        resp_format,
+        since,
+        until,
+        inp,
+        domain,
+        category_code,
+        probe_cc,
+        probe_asn,
+        test_name,
+        axis_x,
+        axis_y,
+    )
+    return r
+
+
+def _postgresql_aggregation(
+    resp_format,
+    since,
+    until,
+    inp,
+    domain,
+    category_code,
+    probe_cc,
+    probe_asn,
+    test_name,
+    axis_x,
+    axis_y,
+):  # pragma: no cover
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
-
-    cacheable = until and parse_date(until) < datetime.now() - timedelta(hours=72)
+    cacheable = until and until < datetime.now() - timedelta(hours=72)
 
     # Assemble query
     def coalsum(name):
         return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
 
     cols = [
-        coalsum("anomaly_count"),
-        coalsum("confirmed_count"),
-        coalsum("failure_count"),
-        coalsum("measurement_count"),
+        sql.text("SUM(anomaly = 't') AS anomaly_count"),
+        sql.text("SUM(confirmed = 't') AS confirmed_count"),
+        sql.text("SUM(msm_failure = 't') AS failure_count"),
+        sql.text("COUNT(*) AS measurement_count"),
     ]
     table = sql.table("counters")
     where = []
@@ -1098,9 +1602,9 @@ def get_aggregated():
         where.append(sql.text("domain = :domain"))
         query_params["domain"] = domain
 
-    if input:
+    if inp:
         where.append(sql.text("input = :input"))
-        query_params["input"] = input
+        query_params["input"] = inp
 
     if category_code:
         # Join in citizenlab table and filter by category_code
@@ -1123,13 +1627,11 @@ def get_aggregated():
         query_params["probe_asn"] = probe_asn
 
     if since:
-        since = parse_date(since)
-        where.append(sql.text("measurement_start_day > :since"))
+        where.append(sql.text("measurement_start_time > :since"))
         query_params["since"] = since
 
     if until:
-        until = parse_date(until)
-        where.append(sql.text("measurement_start_day <= :until"))
+        where.append(sql.text("measurement_start_time <= :until"))
         query_params["until"] = until
 
     if test_name:
@@ -1186,10 +1688,190 @@ def get_aggregated():
         else:
             r = dict(q.fetchone())
 
-        if format == "CSV":
+        if resp_format == "CSV":
             return _convert_to_csv(r)
 
         response = jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
+        if cacheable:
+            response.cache_control.max_age = 3600 * 24
+        return response
+
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})
+
+
+def validate_axis_name(axis):
+    # TODO: use swagger instead?
+    valid = (
+        "category_code",
+        "input",
+        "measurement_start_day",
+        "probe_asn",
+        "probe_cc",
+        "blocking_type",
+    )
+    if axis not in valid:
+        raise ValueError("Invalid axis name")
+
+
+def _clickhouse_aggregation(
+    resp_format,
+    since,
+    until,
+    inp,
+    domain,
+    category_code,
+    probe_cc,
+    probe_asn,
+    test_name,
+    axis_x,
+    axis_y,
+):
+    log = current_app.logger
+    dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
+    cacheable = until and until < datetime.now() - timedelta(hours=72)
+    cacheable = False  # FIXME
+
+    # Assemble query
+    colnames = [
+        "anomaly_count",
+        "confirmed_count",
+        "failure_count",
+        "measurement_count",
+    ]
+    cols = [
+        sql.text("countIf(anomaly = 't') AS anomaly_count"),
+        sql.text("countIf(confirmed = 't') AS confirmed_count"),
+        sql.text("countIf(msm_failure = 't') AS failure_count"),
+        sql.text("COUNT(*) AS measurement_count"),
+    ]
+    table = sql.table("fastpath")
+    where = []
+    query_params = {}
+
+    if domain:
+        where.append(sql.text("domain = :domain"))
+        query_params["domain"] = domain
+
+    if inp:
+        where.append(sql.text("input = :input"))
+        query_params["input"] = inp
+
+    if category_code:
+        where.append(sql.text("category_code = :category_code"))
+        query_params["category_code"] = category_code
+
+    if probe_cc:
+        where.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
+
+    if probe_asn is not None:
+        if probe_asn.startswith("AS"):
+            probe_asn = probe_asn[2:]
+        probe_asn = int(probe_asn)
+        where.append(sql.text("probe_asn = :probe_asn"))
+        query_params["probe_asn"] = probe_asn
+
+    if since:
+        where.append(sql.text("measurement_start_time > :since"))
+        query_params["since"] = since
+
+    if until:
+        where.append(sql.text("measurement_start_time <= :until"))
+        query_params["until"] = until
+
+    if test_name:
+        assert test_name in TEST_NAMES
+        where.append(sql.text("test_name = :test_name"))
+        query_params["test_name"] = test_name
+
+    if axis_x == axis_y and axis_x is not None:
+        raise ValueError("Axis X and Y cannot be the same")
+
+    def group_by_date(since, until, cols, colnames, group_by):
+        if since and until:
+            delta = abs((until - since).days)
+        else:
+            delta = 0
+
+        # lim = 100
+        # if delta > lim * 30:
+        #     granularity = ("year", "toYear")
+        # elif delta > lim * 7:
+        #     granularity = ("month", "toMonth")
+        # elif delta > lim:
+        #     granularity = ("week", "toWeek")
+        if delta < 2:
+            granularity = ("hour", "toHour")
+        else:
+            granularity = ("day", "toDate")
+        tcol, fun = granularity
+        tcol = "measurement_start_day"  # TODO: support dynamic axis names
+        cols.append(sql.text(f"{fun}(measurement_start_time) AS {tcol}"))
+        colnames.append(tcol)
+        group_by.append(column(tcol))
+
+    def add_axis(axis, cols, colnames, group_by):
+        if axis == "blocking_type":
+            t = "JSONExtractString(scores, 'analysis', 'blocking_type') AS blocking_type"
+            cols.append(sql.text(t))
+        else:
+            validate_axis_name(axis)
+            cols.append(sql.text(axis))
+        colnames.append(axis)
+        group_by.append(column(axis))
+
+    group_by = []
+    if axis_x == "measurement_start_day":
+        group_by_date(since, until, cols, colnames, group_by)
+    elif axis_x:
+        add_axis(axis_x, cols, colnames, group_by)
+
+    if axis_y == "measurement_start_day":
+        group_by_date(since, until, cols, colnames, group_by)
+    elif axis_y:
+        add_axis(axis_y, cols, colnames, group_by)
+
+    # Assemble query
+    if category_code or axis_x == "category_code" or axis_y == "category_code":
+        # Join in the citizenlab table if we need to filter on category_code
+        # or perform group-by on it
+        table = table.join(
+            sql.table("citizenlab"),
+            sql.text("citizenlab.url = fastpath.input"),
+        )
+
+    where_expr = and_(*where)
+    query = select(cols).where(where_expr).select_from(table)
+
+    # Add group-by
+    for g in group_by:
+        query = query.group_by(g).order_by(g)
+
+    try:
+        if dimension_cnt > 0:
+            r = list(query_click(query, query_params))
+        else:
+            r = query_click_one_row(query, query_params)
+
+        if resp_format == "CSV":
+            return _convert_to_csv(r)
+
+        pq = current_app.click.last_query
+        msg = f"Stats: {pq.progress.rows} {pq.progress.bytes} {pq.progress.total_rows} {pq.elapsed}"
+        log.info(msg)
+        response = {
+            "v": 0,
+            "dimension_count": dimension_cnt,
+            "result": r,
+            "db_stats": {
+                "row_count": pq.progress.rows,
+                "bytes": pq.progress.bytes,
+                "total_row_count": pq.progress.total_rows,
+                "elapsed_seconds": pq.elapsed,
+            },
+        }
+        response = jsonify(response)
         if cacheable:
             response.cache_control.max_age = 3600 * 24
         return response

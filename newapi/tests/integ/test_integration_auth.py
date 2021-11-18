@@ -12,6 +12,7 @@ Test using:
 
 from unittest.mock import MagicMock, Mock
 from urllib.parse import urlparse
+import quopri
 
 import pytest
 from freezegun import freeze_time  # debdeps: python3-freezegun
@@ -119,17 +120,24 @@ def _register_and_login(client, email_address):
     msg = str(msg)
     url = None
     assert "Subject: OONI Account activation" in msg
-    assert msg
+    # Decode MIME-quoted email
+    msg = quopri.decodestring(msg)
+    # Look for:
+    #    <a href="https://CHANGEME/login?token=...">Please login here</a>
     for line in msg.splitlines():
-        if '<a href="https://' in line:
+        if b'<a href="https://' in line:
+            assert b"Please login" in line
+            line = line.decode()
             url = line.split('"')[1]
-    assert url
+            break
+
+    assert url, msg
     u = urlparse(url)
     token = u.query.split('=')[1]
-    assert len(token) > 0
+    assert len(token) == 233
 
     r = client.get(f"/api/v1/user_login?k={token}")
-    assert r.status_code == 200
+    assert r.status_code == 200, r.json
     cookies = r.headers.getlist("Set-Cookie")
     assert len(cookies) == 1
     c = cookies[0]
@@ -169,7 +177,7 @@ def test_role_set(client, mocksmtp, integtest_admin):
     # We are logged in with role "admin"
     d = dict(email_address=admin_e, role="admin")
     r = client.post("/api/v1/set_account_role", json=d)
-    assert r.status_code == 200
+    assert r.status_code == 200, r.json
 
     d = dict(email_address="BOGUS_EMAIL_ADDR", role="admin")
     r = client.post("/api/v1/set_account_role", json=d)
@@ -200,7 +208,7 @@ def test_role_set_with_expunged_token(client, mocksmtp, integtest_admin):
 
     d = dict(email_address="BOGUS_EMAIL_ADDR", role="admin")
     r = client.post("/api/v1/set_session_expunge", json=d)
-    assert r.status_code == 400
+    assert r.status_code == 401, r.json
 
     # As admin, I expunge my own session token
     d = dict(email_address=admin_e, role="admin")

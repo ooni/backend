@@ -28,7 +28,9 @@ import random
 
 from flask import Blueprint, current_app, request
 from flask.json import jsonify
+from sqlalchemy import sql as sa
 
+from ooniapi.database import query_click, query_click_one_row
 from ooniapi.config import metrics
 
 prio_bp = Blueprint("prio", "probe_services_prio")
@@ -36,49 +38,31 @@ prio_bp = Blueprint("prio", "probe_services_prio")
 
 # # failover algorithm
 
-CTZ = namedtuple("CTZ", ["priority", "url", "category_code"])
+CTZ = namedtuple("CTZ", ["url", "category_code"])
 failover_test_items: Dict[str, List[CTZ]] = {}
 
 
-@metrics.timer("fetch_citizenlab_data")
-def fetch_citizenlab_data() -> Dict[str, List[CTZ]]:
-    """Fetch the citizenlab table from the database"""
+def failover_fetch_citizenlab_data() -> Dict[str, List[CTZ]]:
+    """Fetches the citizenlab table from the database.
+    Used only once at startime for failover."""
     log = current_app.logger
-    log.info("Started fetch_citizenlab_data")
-    sql = """SELECT category_code, priority, url
+    log.info("Started failover_fetch_citizenlab_data")
+    sql = """SELECT category_code, url
     FROM citizenlab
     WHERE cc = 'ZZ'
-    ORDER BY priority DESC
     """
     out: Dict[str, List[CTZ]] = {}
-    query = current_app.db_session.execute(sql)
+    if current_app.config["USE_CLICKHOUSE"]:
+        query = query_click(sql, {})
+    else:
+        query = current_app.db_session.execute(sql)  # pragma: no cover
     for e in query:
         catcode = e["category_code"]
-        c = CTZ(e["priority"], e["url"], catcode)
+        c = CTZ(e["url"], catcode)
         out.setdefault(catcode, []).append(c)
 
     log.info("Fetch done: %d" % len(out))
     return out
-
-
-def algo_chao(s: List, k: int) -> List:
-    """Chao weighted random sampling"""
-    n = len(s)
-    assert len(s) >= k
-    wsum = 0
-    r = s[:k]
-    assert len(r) == k
-    for i in range(0, n):
-        wsum = wsum + s[i].priority
-        if i < k:
-            continue
-        p = s[i].priority / wsum  # probability for this item
-        j = random.random()
-        if j <= p:
-            pos = random.randint(0, k - 1)
-            r[pos] = s[i]
-
-    return r
 
 
 def failover_generate_test_list(country_code: str, category_codes: tuple, limit: int):
@@ -94,7 +78,7 @@ def failover_generate_test_list(country_code: str, category_codes: tuple, limit:
         candidates.extend(new)
 
     limit = min(limit, len(candidates))
-    selected = algo_chao(candidates, limit)
+    selected = random.sample(candidates, k=limit)
     out = [
         dict(category_code=entry.category_code, url=entry.url, country_code="XX")
         for entry in selected
@@ -135,11 +119,7 @@ def compute_priorities(entries, prio_rules):
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
 
-@metrics.timer("fetch_reactive_url_list")
-def fetch_reactive_url_list(cc: str):
-    """Select all citizenlab URLs for the given probe_cc + ZZ
-    Select measurements count from the last 7 days in a left outer join
-    (without any info about priority)"""
+def fetch_reactive_url_list_pg(cc):  # pragma: no cover
     sql = """
 SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0)::float AS msmt_cnt
 FROM (
@@ -162,13 +142,52 @@ ON (citiz.url = cnt.input)
     return tuple(q.fetchall())
 
 
+def fetch_reactive_url_list_click(cc):
+    q = """
+SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0) AS msmt_cnt
+FROM (
+    SELECT domain, url, cc, category_code
+    FROM citizenlab
+    WHERE
+      citizenlab.cc = :cc_low
+      OR citizenlab.cc = :cc
+      OR citizenlab.cc = 'ZZ'
+) AS citiz
+LEFT OUTER JOIN (
+    SELECT input, SUM(msmt_cnt) AS msmt_cnt
+    FROM counters_asn_test_list
+    WHERE probe_cc = :cc
+    GROUP BY input
+) AS cnt
+ON (citiz.url = cnt.input)
+"""
+    # support uppercase or lowercase match
+    q = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower()))
+    return tuple(q)
+
+
+@metrics.timer("fetch_reactive_url_list")
+def fetch_reactive_url_list(cc: str):
+    """Select all citizenlab URLs for the given probe_cc + ZZ
+    Select measurements count from the last 7 days in a left outer join
+    (without any info about priority)"""
+    if current_app.config["USE_CLICKHOUSE"]:
+        return fetch_reactive_url_list_click(cc)
+    else:
+        return fetch_reactive_url_list_pg(cc)
+
+
 @metrics.timer("fetch_prioritization_rules")
 def fetch_prioritization_rules(cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities WHERE cc = :cc OR cc = '*'
     """
-    q = current_app.db_session.execute(sql, dict(cc=cc))
-    return tuple(q.fetchall())
+    if current_app.config["USE_CLICKHOUSE"]:
+        q = query_click(sa.text(sql), dict(cc=cc))
+        return tuple(q)
+    else:
+        q = current_app.db_session.execute(sql, dict(cc=cc))  # pragma: no cover
+        return tuple(q.fetchall())
 
 
 @metrics.timer("generate_test_list")
@@ -265,7 +284,7 @@ def list_test_urls():
     """
     global failover_test_items
     if failover_test_items == {}:  # initialize once
-        failover_test_items = fetch_citizenlab_data()
+        failover_test_items = failover_fetch_citizenlab_data()
 
     log = current_app.logger
     param = request.args.get

@@ -17,13 +17,13 @@ try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
 
     enable_journal = True
-except ImportError:
+except ImportError:  # pragma: no cover
     enable_journal = False
 
 from flasgger import Swagger
 
 from decimal import Decimal
-from ooniapi.database import init_db
+from ooniapi.database import init_postgres_db, init_clickhouse_db
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -59,6 +59,8 @@ def validate_conf(app, conffile):
         "COLLECTORS",
         "DATABASE_STATEMENT_TIMEOUT",
         "DATABASE_URI_RO",
+        "CLICKHOUSE_HOST",
+        "USE_CLICKHOUSE",
         "GITHUB_ORIGIN_REPO",
         "GITHUB_PUSH_REPO",
         "GITHUB_TOKEN",
@@ -103,7 +105,6 @@ def init_app(app, testmode=False):
     log = logging.getLogger("ooni-api")
     app.config.from_object("ooniapi.config")
     conffile = os.getenv("CONF", "/etc/ooni/api.conf")
-    # conffile = os.getenv("CONF", "/root/tests/integ/api.conf")
     if enable_journal:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni-api"))
     log.setLevel(logging.DEBUG)
@@ -113,24 +114,6 @@ def init_app(app, testmode=False):
     #parse_cors_origins(app)
     # TODO: fix logging
     log.info("Configuration loaded")
-
-    # Prevent messy duplicate logs during testing
-    # if not testmode:
-    #    app.logger.addHandler(logging.StreamHandler())
-
-    stage = app.config["APP_ENV"]
-    if stage == "production":
-        app.logger.setLevel(logging.INFO)
-    elif stage == "development":
-        app.logger.setLevel(logging.DEBUG)
-        # Set the jinja templates to reload when in development
-        app.jinja_env.auto_reload = True
-        app.config["TEMPLATES_AUTO_RELOAD"] = True
-        app.config["DEBUG"] = True
-    elif stage not in ("testing", "staging"):
-        # known envs according to Readme.md
-        raise RuntimeError("Unexpected APP_ENV", stage)
-
     CORS(app)
 
 
@@ -144,8 +127,10 @@ def create_app(*args, testmode=False, **kw):
     # Order matters
     init_app(app, testmode=testmode)
 
-    # Setup Database connector
-    init_db(app)
+    if app.config["DATABASE_URI_RO"]:
+        init_postgres_db(app)  # pragma: no cover
+    if app.config["USE_CLICKHOUSE"]:
+        init_clickhouse_db(app)
 
     # Setup rate limiting
     # NOTE: the limits apply per-process. The number of processes is set in:
@@ -177,7 +162,8 @@ def create_app(*args, testmode=False, **kw):
     # why is it `teardown_appcontext` and not `teardown_request` ?...
     @app.teardown_appcontext
     def shutdown_session(exception=None):
-        app.db_session.remove()
+        if hasattr(app, "db_session"):
+            app.db_session.remove()  # pragma: no cover
 
     @app.route("/health")
     def health():

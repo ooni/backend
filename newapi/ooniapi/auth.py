@@ -14,10 +14,12 @@ import time
 from flask import Blueprint, current_app, request, make_response
 from flask.json import jsonify
 from flask_cors import cross_origin
+from sqlalchemy import sql
 import flask.wrappers
 import jwt  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
+from ooniapi.database import query_click, query_click_one_row
 from ooniapi.utils import nocachejson
 
 # from ooniapi.utils import cachedjson
@@ -130,8 +132,11 @@ def role_required(roles):
                 WHERE account_id = :account_id """
             account_id = tok["account_id"]
             query_params = dict(account_id=account_id)
-            q = current_app.db_session.execute(query, query_params)
-            row = q.fetchone()
+            if current_app.config["USE_CLICKHOUSE"]:
+                row = query_click_one_row(sql.text(query), query_params)
+            else:  # pragma: no cover
+                q = current_app.db_session.execute(query, query_params)
+                row = q.fetchone()
             if row:
                 iat = datetime.utcfromtimestamp(tok["iat"])
                 threshold = row[0]
@@ -205,7 +210,7 @@ def send_login_email(dest_addr, nick, token: str) -> None:
   <body>
     <p>Welcome to OONI, {nick}</p>
     <p>
-        <a href="{url}">Please login here </a>
+        <a href="{url}">Please login here</a>
     </p>
     <p>The link can be used on multiple devices and will expire in 24 hours.</p>
   </body>
@@ -314,6 +319,7 @@ def user_login():
     """
     log = current_app.logger
     token = request.args.get("k", "")
+    log.error(repr(token))
     try:
         dec = decode_jwt(token, audience="register")
     except jwt.exceptions.MissingRequiredClaimError:
@@ -356,16 +362,23 @@ GRANT SELECT ON TABLE public.session_expunge TO readonly;
 def _set_account_role(email_address, role: str) -> int:
     account_id = hash_email_address(email_address)
     # log.info(f"Giving account {account_id} role {role}")
-    query = """INSERT INTO accounts (account_id, role)
-        VALUES(:account_id, :role)
-        ON CONFLICT (account_id) DO
-        UPDATE SET role = EXCLUDED.role
-    """
     # TODO: when role is changed enforce token expunge
     query_params = dict(account_id=account_id, role=role)
-    q = current_app.db_session.execute(query, query_params).rowcount
-    current_app.db_session.commit()
-    # TODO: return update/insert count
+    if current_app.config["DATABASE_URI_RO"]:
+        query = """INSERT INTO accounts (account_id, role)
+            VALUES(:account_id, :role)
+            ON CONFLICT (account_id) DO
+            UPDATE SET role = EXCLUDED.role
+        """
+        q = current_app.db_session.execute(query, query_params).rowcount
+        current_app.db_session.commit()
+
+    if current_app.config["USE_CLICKHOUSE"]:
+        query = """INSERT INTO accounts (account_id, role)
+            VALUES(:account_id, :role)"""
+        query_click(sql.text(query), query_params)
+        q = 1
+
     return q
 
 
@@ -411,24 +424,35 @@ def set_account_role():
 
 
 def _delete_account_data(email_address: str) -> None:
+    # Used by integ test
     account_id = hash_email_address(email_address)
-    query = "DELETE FROM accounts WHERE account_id = :account_id"
     query_params = dict(account_id=account_id)
-    q = current_app.db_session.execute(query, query_params).rowcount
-    current_app.db_session.commit()
-    # TODO return status
-    return q
+    if current_app.config["DATABASE_URI_RO"]:
+        query = "DELETE FROM accounts WHERE account_id = :account_id"
+        q = current_app.db_session.execute(query, query_params).rowcount
+        current_app.db_session.commit()
+
+    if current_app.config["USE_CLICKHOUSE"]:
+        # reset account to "user" role
+        q = "INSERT INTO accounts (account_id, role) VALUES(:account_id, 'role')"
+        query_click(sql.text(q), query_params)
+
 
 
 def _get_account_role(account_id: str) -> Optional[str]:
     """Get account role from database, or None"""
     query = "SELECT role FROM accounts WHERE account_id = :account_id"
     query_params = dict(account_id=account_id)
-    q = current_app.db_session.execute(query, query_params)
-    r = q.fetchone()
-    if r:
-        return r[0]
-    return None
+    if current_app.config["USE_CLICKHOUSE"]:
+        r = query_click_one_row(sql.text(query), query_params)
+        if r:
+            return r["role"]
+
+    else:  # pragma: no cover
+        q = current_app.db_session.execute(query, query_params)
+        r = q.fetchone()
+        if r:
+            return r[0]
 
 
 @auth_blueprint.route("/api/_/account_metadata")
@@ -521,25 +545,42 @@ def set_session_expunge():
     log.info(f"Setting expunge for account {account_id}")
     # If an entry is already in place update the threshold as the new
     # value is going to be safer
-    query = """INSERT INTO session_expunge (account_id, threshold)
-        VALUES(:account_id, :now)
-        ON CONFLICT (account_id) DO
-        UPDATE SET threshold = EXCLUDED.threshold
-    """
     now = datetime.utcnow()
     query_params = dict(account_id=account_id, now=now)
-    q = current_app.db_session.execute(query, query_params).rowcount
-    log.info(f"Expunge set {q}")
-    current_app.db_session.commit()
+    if current_app.config["DATABASE_URI_RO"]:
+        log.info("Inserting into PostgreSQL session_expunge")
+        query = """INSERT INTO session_expunge (account_id, threshold)
+            VALUES(:account_id, :now)
+            ON CONFLICT (account_id) DO
+            UPDATE SET threshold = EXCLUDED.threshold
+        """
+        q = current_app.db_session.execute(query, query_params).rowcount
+        log.info(f"Expunge set {q}")
+        current_app.db_session.commit()
+
+    if current_app.config["USE_CLICKHOUSE"]:
+        log.info("Inserting into Clickhouse session_expunge")
+        query = """INSERT INTO session_expunge (account_id)
+            VALUES(:account_id)
+        """
+        query_click_one_row(sql.text(query), query_params)
+
     return nocachejson()
 
 
 def _remove_from_session_expunge(email_address: str) -> None:
+    # Used by integ test
+    log = current_app.logger
     account_id = hash_email_address(email_address)
     query = "DELETE FROM session_expunge WHERE account_id = :account_id"
     query_params = dict(account_id=account_id)
-    current_app.db_session.execute(query, query_params)
-    current_app.db_session.commit()
+    if current_app.config["DATABASE_URI_RO"]:
+        log.info("Deleting from PostgreSQL session_expunge")
+        current_app.db_session.execute(query, query_params)
+        current_app.db_session.commit()
 
+    #if current_app.config["USE_CLICKHOUSE"]:
+    #    log.info("Deleting from Clickhouse session_expunge")
+    #    query_click_one_row(sql.text(query), query_params)
 
 # TODO: purge session_expunge

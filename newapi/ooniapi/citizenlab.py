@@ -18,8 +18,10 @@ from flask import Blueprint, current_app, request, make_response, jsonify
 from werkzeug.exceptions import HTTPException
 import git  # debdeps: python3-git
 import requests
+from sqlalchemy import sql
 
 from ooniapi.auth import role_required
+from ooniapi.database import query_click, query_click_one_row
 from ooniapi.utils import nocachejson
 
 """
@@ -668,7 +670,8 @@ def post_propose_changes():
 # # Prioritization management # #
 
 
-def create_url_priorities_table() -> None:
+def create_url_priorities_table() -> None:  # pragma: no cover
+    # Only for PostgreSQL
     # See description in module docstring
     log = current_app.logger
     sql = "SELECT to_regclass('url_priorities')"
@@ -751,11 +754,108 @@ def list_url_priorities():
     log.debug("listing URL prio rules")
     query = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities
-    ORDER BY 2, 1, 3, 4
+    ORDER BY category_code, cc, domain, url, priority
     """
-    q = current_app.db_session.execute(query)
-    rows = [dict(r) for r in q]
+    if current_app.config["USE_CLICKHOUSE"]:
+        q = query_click(sql.text(query), {})
+        rows = list(q)
+    else:
+        q = current_app.db_session.execute(query)
+        rows = [dict(r) for r in q]
     return make_response(jsonify(rules=rows))
+
+
+def update_url_priority_postgresql(old, new):  # pragma: no cover
+    log = current_app.logger
+    if old:  # delete an existing rule
+        query = """DELETE FROM url_priorities
+        WHERE category_code = :category_code
+        AND cc = :cc
+        AND domain = :domain
+        AND url = :url
+        AND priority = :priority
+        """
+        q = current_app.db_session.execute(query, old).rowcount
+        if q < 1:
+            return jerror("Old rule not found", 400)
+
+    if new:  # add new rule
+        query = """INSERT INTO url_priorities
+            (category_code, cc, domain, url, priority)
+            VALUES(:category_code, :cc, :domain, :url, :priority)
+        """
+        try:
+            q = current_app.db_session.execute(query, new).rowcount
+        except Exception as e:
+            log.info(str(e))
+            current_app.db_session.rollback()
+            return jerror("Duplicate rule", 400)
+
+    current_app.db_session.commit()
+    return q
+
+
+def dicthash(d: dict):
+    return hash(tuple(sorted(d.items())))
+
+def init():
+    rules = [
+        ('NEWS', '*', '*', '*', 100),
+        ('POLR', '*', '*', '*', 100),
+        ('HUMR', '*', '*', '*', 100),
+        ('LGBT', '*', '*', '*', 100),
+        ('ANON', '*', '*', '*', 100),
+        ('MMED', '*', '*', '*', 80),
+        ('SRCH', '*', '*', '*', 80),
+        ('PUBH', '*', '*', '*', 80),
+        ('REL', '*', '*', '*', 60),
+        ('XED', '*', '*', '*', 60),
+        ('HOST', '*', '*', '*', 60),
+        ('ENV', '*', '*', '*', 60),
+        ('FILE', '*', '*', '*', 40),
+        ('CULTR', '*', '*', '*', 40),
+        ('IGO', '*', '*', '*', 40),
+        ('GOVT', '*', '*', '*', 40),
+        ('DATE', '*', '*', '*', 30),
+        ('HATE', '*', '*', '*', 30),
+        ('MILX', '*', '*', '*', 30),
+        ('PROV', '*', '*', '*', 30),
+        ('PORN', '*', '*', '*', 30),
+        ('GMB', '*', '*', '*', 30),
+        ('ALDR', '*', '*', '*', 30),
+        ('GAME', '*', '*', '*', 20),
+        ('MISC', '*', '*', '*', 20),
+        ('HACK', '*', '*', '*', 20),
+        ('ECON', '*', '*', '*', 20),
+        ('COMM', '*', '*', '*', 20),
+        ('CTRL', '*', '*', '*', 20),
+        ('NEWS', 'it', '*', '*', 10),
+        ('NEWS', 'it', 'www.leggo.it', '*', 5),
+        ('COMT', '*', '*', '*', 100),
+        ('GRP', '*', '*', '*', 100),
+    ]
+    for r in rules:
+        keys = ["category_code", "cc", "domain", "url", "priority"]
+        new = dict(zip(keys, r))
+        update_url_priority_click({}, new)
+
+
+def update_url_priority_click(old, new):
+    log = current_app.logger
+    if old:  # delete an existing rule
+        q = """REPLACE TABLE url_priorities
+            SELECT * FROM url_priorities WHERE hash = ':h'"""
+        h = dicthash(old)
+        query_click(sql.text(q), {"h": h})
+
+    if new:  # add new rule
+        # EmbeddedRocksDB with a hash guarantees uniqueness
+        h = dicthash(new)
+        query = """INSERT INTO url_priorities
+            (hash, category_code, cc, domain, url, priority)
+            VALUES(:h, :category_code, :cc, :domain, :url, :priority)
+        """
+        query_click(query, new)
 
 
 @cz_blueprint.route("/api/_/url-priorities/update", methods=["POST"])
@@ -819,29 +919,6 @@ def post_update_url_priority():
             new[k] = "*"
 
     assert old or new
-    if old:  # delete an existing rule
-        query = """DELETE FROM url_priorities
-        WHERE category_code = :category_code
-        AND cc = :cc
-        AND domain = :domain
-        AND url = :url
-        AND priority = :priority
-        """
-        q = current_app.db_session.execute(query, old).rowcount
-        if q < 1:
-            return jerror("Old rule not found", 400)
 
-    if new:  # add new rule
-        query = """INSERT INTO url_priorities
-            (category_code, cc, domain, url, priority)
-            VALUES(:category_code, :cc, :domain, :url, :priority)
-        """
-        try:
-            q = current_app.db_session.execute(query, new).rowcount
-        except Exception as e:
-            log.info(str(e))
-            current_app.db_session.rollback()
-            return jerror("Duplicate rule", 400)
-
-    current_app.db_session.commit()
+    q = update_url_priority_postgresql(old, new)
     return make_response(jsonify(q))

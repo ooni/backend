@@ -4,6 +4,7 @@ import pytest
 import sys
 import shutil
 import subprocess
+from datetime import date, timedelta
 from textwrap import dedent
 from subprocess import PIPE
 from pathlib import Path
@@ -60,7 +61,8 @@ def client(app):
 def pytest_addoption(parser):
     parser.addoption("--ghpr", action="store_true", help="enable GitHub integ tests")
     parser.addoption("--proddb", action="store_true", help="uses data from prod DB")
-    parser.addoption("--create-db", action="store_true", help="populate a dedicated DB")
+    parser.addoption("--create-db", action="store_true", help="populate the DB")
+    parser.addoption("--inject-msmts", action="store_true", help="populate the DB with fresh data")
 
 
 def pytest_configure(config):
@@ -68,6 +70,7 @@ def pytest_configure(config):
     pytest.proddb = config.getoption("--proddb")
     assert pytest.proddb is False, "--proddb is disabled"
     pytest.create_db = config.getoption("--create-db")
+    pytest.inject_msmts = config.getoption("--inject-msmts")
 
 
 def sudopg(cmd, check=True):
@@ -82,9 +85,12 @@ def sudopg(cmd, check=True):
 @pytest.fixture(scope="session")
 def setup_database_part_1():
     # Create database and users.
+    # Executed as a dependency of setup_database_part_2
     # Drop and recreate database if exists.
     if not pytest.create_db:
         return
+
+    return  # Use only clickhouse
 
     if os.path.exists("/usr/bin/sudo"):
         print("Creating PostgreSQL user and database")
@@ -101,20 +107,22 @@ def setup_database_part_1():
 
 @pytest.fixture(scope="session")
 def checkout_pipeline(tmpdir_factory):
-    if not pytest.create_db:
+    """Clone pipeline repo to then run fastpath from S3 and citizenlab importer"""
+    if not pytest.create_db and not pytest.inject_msmts:
         return
     d = tmpdir_factory.mktemp("pipeline")
     if d.isdir():
         shutil.rmtree(d)
     # cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
-    cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch stop-after -q {d}"
+    # FIXME change branch
+    cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch clickhouse2 -q {d}"
     print(cmd)
     cmd = cmd.split()
     subprocess.run(cmd, check=True, stdout=PIPE, stderr=PIPE).stdout
     return Path(d)
 
 
-def run_sql_scripts(app):
+def run_pg_sql_scripts(app):
     log = app.logger
     # for i in ["1_metadb_users.sql", "2_metadb_schema.sql", "3_test_fixtures.sql"]:
     query = ""
@@ -135,40 +143,71 @@ def run_sql_scripts(app):
                 query = ""
 
 
-def run_fastpath(log, pipeline_dir, dburi):
-    fpdir = pipeline_dir / "af" / "fastpath"
+def run_clickhouse_sql_scripts(app):
+    clickhouse_host = app.config["CLICKHOUSE_HOST"]
+    assert clickhouse_host
+    for fn in ["1_schema", "2_fixtures"]:
+        fn = f"tests/integ/clickhouse_{fn}.sql"
+        cmd = [
+            "/usr/bin/clickhouse-client",
+            "--host",
+            clickhouse_host,
+            "--multiline",
+            "--multiquery",
+            "--queries-file",
+            fn,
+        ]
+        app.logger.info(f"Running {fn} on Clickhouse")
+        app.loggr.info("Running " + " ".join(cmd))
+        r = subprocess.run(cmd, capture_output=True, timeout=5)
+        if r.returncode:
+            msg = "ERROR running clickhouse-client"
+            app.logger.error(msg)
+            app.logger.error(r.stderr.decode())
+            app.logger.error("^" * 40)
+            pytest.exit(msg, returncode=r.returncode)
+
+
+def _run_fastpath(fpdir, dburi, start, end, limit):
     fprun = fpdir / "run_fastpath"
+    cmd = [fprun.as_posix(), "--noapi", "--devel", "--db-uri", dburi]
+    cmd.extend(["--start-day", start, "--end-day", end, "--stop-after", str(limit)])
+    subprocess.run(cmd, check=True, cwd=fpdir)
+
+
+def run_fastpath(log, pipeline_dir, dburi, clickhouse_host):
+    """Run fastpath from S3"""
+    fpdir = pipeline_dir / "af" / "fastpath"
     conffile = fpdir / "etc/ooni/fastpath.conf"
     conffile.parent.mkdir(parents=True)
     conf = f"""
         [DEFAULT]
         collectors = localhost
         db_uri = {dburi}
+        clickhouse_host = {clickhouse_host}
         s3_access_key =
         s3_secret_key =
     """
     conffile.write_text(dedent(conf))
-    cmd = [
-        fprun.as_posix(),
-        "--noapi",
-        "--devel",
-        "--db-uri",
+    # Necessary to test the statistics in the private API
+    # Makes the contents of the test DB non deterministic
+    log.info("Running fastpath to populate 'yesterday'")
+    _run_fastpath(
+        fpdir,
         dburi,
-        "--start-day",
-        "2021-07-9",
-        "--end-day",
-        "2021-07-10",
-        "--stop-after",
-        "10000",
-    ]
-    log.info("Running fastpath")
-    log.info(cmd)
-    subprocess.run(cmd, check=True, cwd=fpdir)
+        (date.today() - timedelta(days=1)).strftime("%Y-%m-%d"),
+        date.today().strftime("%Y-%m-%d"),
+        3000,
+    )
+
+    log.info("Running fastpath to populate 2021-07-9")
+    _run_fastpath(fpdir, dburi, "2021-07-09", "2021-07-10", 10000)
 
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
     # Create tables, indexes and so on
+    # on PostgreSQL and Clickhouse
     # This part needs the "app" object
     if not pytest.create_db:
         return
@@ -178,9 +217,25 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
         print("Refusing to make changes on metadb!")
         sys.exit(1)
 
+    clickhouse_host = app.config["CLICKHOUSE_HOST"]
+    assert clickhouse_host in ("localhost", "clickhouse")
+
     log = app.logger
-    run_sql_scripts(app)
-    run_fastpath(log, checkout_pipeline, dburi)
+    # run_pg_sql_scripts(app)
+    run_clickhouse_sql_scripts(app)
+    run_fastpath(log, checkout_pipeline, dburi, clickhouse_host)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def inject_msmts(app, checkout_pipeline):
+    if not pytest.inject_msmts:
+        return
+
+
+
+
+
+
 
 
 # # Fixtures used by test files # #
@@ -189,3 +244,4 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
 @pytest.fixture()
 def log(app):
     return app.logger
+

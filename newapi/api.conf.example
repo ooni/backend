@@ -1,18 +1,18 @@
-# Configuration for OONI API
-# This is a sample file specific to the OONI setup
+# Configuration for OONI API. This is a sample file specific to the OONI setup
 # Syntax: treat it as a Python file, but only uppercase variables are used
 COLLECTORS = []
 
 # Read-only database access
-#DATABASE_URI_RO = "postgresql://readonly:ooni@db/metadb"
-# FIXME
 DATABASE_URI_RO = "postgresql://oonitest:test@db/oonitestdb"
 
 DATABASE_STATEMENT_TIMEOUT = 30
+
+USE_CLICKHOUSE = True
+CLICKHOUSE_HOST = "clickhouse"
+
 BASE_URL = "https://api.ooni.io/"
 # list of URLs: strings starting with "^" will be converted to regexps
 CORS_URLS = [r"^https://[-A-Za-z0-9]+\.ooni\.org$", r"^https://[-A-Za-z0-9]+\.ooni\.io$"]
-
 AUTOCLAVED_BASE_URL = "http://datacollector.infra.ooni.io/ooni-public/autoclaved/"
 
 # S3 endpoint

@@ -1,3 +1,9 @@
+ooni-api (0.50) unstable; urgency=medium
+
+  * Support Clickhouse
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 14 Oct 2021 18:11:37 +0100
+
 ooni-api (0.49.5) unstable; urgency=medium
 
   * Uploader: write measurement UID in jsonl table

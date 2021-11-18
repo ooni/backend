@@ -4,15 +4,21 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from hashlib import shake_128
+from typing import Optional
 import os
 import time
 
+from flask import current_app
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, sql
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+
+# debdeps: python3-clickhouse-driver
+from clickhouse_driver import Client as Clickhouse
 
 from ooniapi.config import metrics
 
@@ -20,7 +26,7 @@ from ooniapi.config import metrics
 Base = declarative_base()
 
 
-def _gen_application_name():
+def _gen_application_name():  # pragma: no cover
     try:
         machine_id = "/etc/machine-id"
         with open(machine_id) as fd:
@@ -43,8 +49,10 @@ def query_hash(q: str) -> str:
 hooks_are_set = False
 
 
-def init_db(app):
+def init_postgres_db(app):  # pragma: no cover
     """Initializes database connection"""
+    uri = app.config["DATABASE_URI_RO"]
+    app.logger.info(f"Connecting to PostgreSQL at: {uri}")
     application_name = _gen_application_name()
     # Unfortunately this application_name is not logged during `connection authorized`,
     # but it is used for `disconnection` event even if the client dies during query!
@@ -54,8 +62,6 @@ def init_db(app):
         "application_name": application_name,
         "options": f"-c statement_timeout={query_timeout}",
     }
-    uri = app.config["DATABASE_URI_RO"]
-    app.logger.info(f"Database URI: {uri}")
     app.db_engine = create_engine(uri, convert_unicode=True, connect_args=connargs)
     app.db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=app.db_engine)
@@ -78,9 +84,7 @@ def init_db(app):
     # TODO auto reconnect
 
     @event.listens_for(Engine, "before_cursor_execute")
-    def before_cursor_execute(
-        conn, cursor, statement, params, context, execmany
-    ):
+    def before_cursor_execute(conn, cursor, statement, params, context, execmany):
         qh = query_hash(statement)
         with metrics.timer(f"query-{qh}"):
             query = cursor.mogrify(statement, params).decode()
@@ -96,3 +100,37 @@ def init_db(app):
         app.logger.debug("Query %s completed in %fs", qh, total_time)
 
     hooks_are_set = True
+
+
+# # Clickhouse
+
+
+def init_clickhouse_db(app):
+    """Initializes Clickhouse session"""
+    host = app.config["CLICKHOUSE_HOST"]
+    app.logger.info(f"Connecting to Clickhouse at {host}")
+    app.click = Clickhouse(host=host)
+
+
+def query_click(query, query_params):
+    if not isinstance(query, str):
+        # TODO: switch to sqlalchemy instead of compile(...) ?
+        # query = sql.text(query)
+        query = str(query.compile(dialect=postgresql.dialect()))
+    q = current_app.click.execute(query, query_params, with_column_types=True)
+    rows, coldata = q
+    colnames, coltypes = tuple(zip(*coldata))
+
+    for row in rows:
+        yield dict(zip(colnames, row))
+
+
+def query_click_one_row(query, query_params) -> Optional[dict]:
+    if not isinstance(query, str):
+        query = str(query.compile(dialect=postgresql.dialect()))
+    q = current_app.click.execute(query, query_params, with_column_types=True)
+    rows, coldata = q
+    colnames, coltypes = tuple(zip(*coldata))
+
+    for row in rows:
+        return dict(zip(colnames, row))

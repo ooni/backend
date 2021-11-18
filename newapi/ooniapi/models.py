@@ -28,6 +28,7 @@ TEST_GROUPS = {
     ],
 }
 
+# Used in ooniapi/measurements.py for validation
 TEST_NAMES = []
 for v in TEST_GROUPS.values():
     assert isinstance(v, list)

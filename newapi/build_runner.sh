@@ -7,26 +7,34 @@
 set -eu
 export DEBIAN_FRONTEND=noninteractive
 
-echo 'deb http://deb.debian.org/debian buster-backports main' \
+echo 'deb http://deb.debian.org/debian bullseye-backports main' \
   > /etc/apt/sources.list.d/backports.list
 
 # Install ca-certificates and gnupg first
 apt-get update
-apt-get install --no-install-recommends -y ca-certificates gnupg locales
+apt-get install --no-install-recommends -y ca-certificates gnupg locales apt-transport-https dirmngr
 locale-gen en_US.UTF-8
 
 # Set up OONI archive
 echo 'deb http://deb-ci.ooni.org unstable main' \
   > /etc/apt/sources.list.d/ooni.list
-apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com \
+apt-key adv --keyserver hkp://keyserver.ubuntu.com \
   --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
+
+# Set up Clickhouse archive
+echo "deb https://repo.clickhouse.com/deb/lts/ main/" \
+  > /etc/apt/sources.list.d/clickhouse.list
+apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv E0C56BD4
+
 apt-get update
 # Keep this in sync with debian/control
 # hint: grep debdeps **/*.py
 apt-get install --no-install-recommends -qy \
+  clickhouse-client \
   git \
   gunicorn3 \
   python3-boto3 \
+  python3-clickhouse-driver \
   python3-filelock \
   python3-flasgger \
   python3-flask \
@@ -36,6 +44,7 @@ apt-get install --no-install-recommends -qy \
   python3-git \
   python3-jwt \
   python3-lz4 \
+  python3-mock \
   python3-psycopg2 \
   python3-pytest \
   python3-pytest-cov \
