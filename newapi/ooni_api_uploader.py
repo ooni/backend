@@ -65,8 +65,8 @@ def connect_to_db(conf):
 
 @metrics.timer("update_db_table")
 def update_db_table(conn, lookup_list, jsonl_s3path):
-    rows = [(rid, inp, jsonl_s3path, num) for rid, inp, _, num in lookup_list]
-    q = "INSERT INTO jsonl (report_id, input, s3path, linenum) VALUES %s"
+    rows = [(rid, inp, jsonl_s3path, num, msmt_uid) for rid, inp, msmt_uid, num in lookup_list]
+    q = "INSERT INTO jsonl (report_id, input, s3path, linenum, measurement_uid) VALUES %s"
     log.info("Writing to DB")
     with conn.cursor() as cur:
         execute_values(cur, q, rows)
@@ -82,14 +82,16 @@ def upload_to_s3(s3, bucket_name, tarf, s3path):
 
 @metrics.timer("fill_postcan")
 def fill_postcan(hourdir, postcanf):
+    msmt_files = sorted(f for f in hourdir.iterdir() if f.suffix == ".post")
+    if not msmt_files:
+        log.info(f"Nothing to fill {postcanf.name}")
+        return []
     log.info(f"Filling {postcanf.name}")
     measurements = []
     postcan_byte_thresh = 20 * 1000 * 1000
     # Open postcan
     with tarfile.open(str(postcanf), "w") as tar:
-        for msmt_f in sorted(hourdir.iterdir()):
-            if msmt_f.suffix != ".post":
-                continue
+        for msmt_f in msmt_files:
             # Add a msmt and delete the msmt file
             metrics.incr("msmt_count")
             tar.add(str(msmt_f))
@@ -136,7 +138,8 @@ def fill_jsonl(measurements, jsonlf):
 
             rid = msm.get("report_id", "") or ""
             input = msm.get("input", "") or ""
-            lookup_list.append((rid, input, str(msmt_f), linenum))
+            msmt_uid = msmt_f.name[:-5]
+            lookup_list.append((rid, input, msmt_uid, linenum))
 
     return lookup_list
 
