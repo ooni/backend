@@ -146,6 +146,7 @@ def test_score_tor():
         "blocking_country": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
+        "extra": {"test_runtime": 0.7671142980000001},
     }
 
 
@@ -229,7 +230,7 @@ def test_score_torsf2():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"bootstrap_time": 78.980935917},
+        "extra": {"bootstrap_time": 78.980935917, "test_runtime": 79.196301917},
     }
 
 

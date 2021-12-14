@@ -1,3 +1,9 @@
+fastpath (0.51) unstable; urgency=medium
+
+  * Extract test runtime from pluggable transport measurements
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 30 Nov 2021 17:49:15 +0000
+
 fastpath (0.48) unstable; urgency=medium
 
   * Bump up python version
