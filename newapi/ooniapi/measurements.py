@@ -1198,6 +1198,98 @@ def get_aggregated():
         return jsonify({"v": 0, "error": str(e)})
 
 
+@api_msm_blueprint.route("/v1/torsf_stats")
+@metrics.timer("get_torsf_stats")
+def get_torsf_stats():
+    """Tor Pluggable Transports statistics
+    Average / percentiles / total_count grouped by day
+    Either group-by or filter by probe_cc
+    Returns a format similar to get_aggregated
+    ---
+    parameters:
+      - name: probe_cc
+        in: query
+        type: string
+        description: The two letter country code
+        minLength: 2
+      - name: since
+        in: query
+        type: string
+        description: >-
+          The start date of when measurements were run (ex.
+          "2016-10-20T10:30:00")
+      - name: until
+        in: query
+        type: string
+        description: >-
+          The end date of when measurement were run (ex.
+          "2016-10-20T10:30:00")
+    responses:
+      '200':
+        description: Returns aggregated counters
+    """
+    log = current_app.logger
+    param = request.args.get
+    probe_cc = param("probe_cc")
+    since = param("since")
+    until = param("until")
+    cacheable = False
+
+    # Assemble query
+    def coalsum(name):
+        return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
+
+    cols = [
+        column("measurement_start_day"),
+        column("probe_cc"),
+        coalsum("anomaly_count"),
+        coalsum("failure_count"),
+        coalsum("measurement_count")
+    ]
+    table = sql.table("counters")
+    where = [sql.text("test_name = 'torsf'")]
+    query_params = {}
+
+    if probe_cc:
+        where.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
+
+    if since:
+        since = parse_date(since)
+        where.append(sql.text("measurement_start_day > :since"))
+        query_params["since"] = since
+
+    if until:
+        until = parse_date(until)
+        where.append(sql.text("measurement_start_day <= :until"))
+        query_params["until"] = until
+        cacheable = (until < datetime.now() - timedelta(hours=72))
+
+    # Assemble query
+    where_expr = and_(*where)
+    query = select(cols).where(where_expr).select_from(table)
+
+    query = query.group_by(column("measurement_start_day"), column("probe_cc"))
+    query = query.order_by(column("measurement_start_day"), column("probe_cc"))
+
+    try:
+        # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
+        current_app.db_session.execute("SET enable_seqscan=false;")
+        q = current_app.db_session.execute(query, query_params)
+        result = []
+        for row in q:
+            row = dict(row)
+            row["anomaly_rate"] = row["anomaly_count"] / row["measurement_count"]
+            result.append(row)
+        response = jsonify({"v": 0, "result": result})
+        if cacheable:
+            response.cache_control.max_age = 3600 * 24
+        return response
+
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})
+
+
 @api_msm_blueprint.route("/private/aggregation")
 def aggregation_form():
     """Aggregated counters: HTML page
