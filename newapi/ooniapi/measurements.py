@@ -1917,18 +1917,14 @@ def get_torsf_stats():
     until = param("until")
     cacheable = False
 
-    # Assemble query
-    def coalsum(name):
-        return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
-
     cols = [
-        column("measurement_start_day"),
+        sql.text("toDate(measurement_start_time) AS measurement_start_day"),
         column("probe_cc"),
-        coalsum("anomaly_count"),
-        coalsum("failure_count"),
-        coalsum("measurement_count")
+        sql.text("countIf(anomaly = 't') AS anomaly_count"),
+        sql.text("countIf(confirmed = 't') AS confirmed_count"),
+        sql.text("countIf(msm_failure = 't') AS failure_count"),
     ]
-    table = sql.table("counters")
+    table = sql.table("fastpath")
     where = [sql.text("test_name = 'torsf'")]
     query_params = {}
 
@@ -1938,12 +1934,12 @@ def get_torsf_stats():
 
     if since:
         since = parse_date(since)
-        where.append(sql.text("measurement_start_day > :since"))
+        where.append(sql.text("measurement_start_time > :since"))
         query_params["since"] = since
 
     if until:
         until = parse_date(until)
-        where.append(sql.text("measurement_start_day <= :until"))
+        where.append(sql.text("measurement_start_time <= :until"))
         query_params["until"] = until
         cacheable = (until < datetime.now() - timedelta(hours=72))
 
@@ -1955,9 +1951,7 @@ def get_torsf_stats():
     query = query.order_by(column("measurement_start_day"), column("probe_cc"))
 
     try:
-        # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
-        current_app.db_session.execute("SET enable_seqscan=false;")
-        q = current_app.db_session.execute(query, query_params)
+        q = query_click(query, query_params)
         result = []
         for row in q:
             row = dict(row)
