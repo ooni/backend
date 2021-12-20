@@ -107,9 +107,9 @@ def init_postgres_db(app):  # pragma: no cover
 
 def init_clickhouse_db(app):
     """Initializes Clickhouse session"""
-    host = app.config["CLICKHOUSE_HOST"]
+    url = app.config["CLICKHOUSE_URL"]
     app.logger.info(f"Connecting to Clickhouse at {host}")
-    app.click = Clickhouse(host=host)
+    app.click = Clickhouse.from_url(url)
 
 
 def query_click(query, query_params):

@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from textwrap import dedent
 from subprocess import PIPE
 from pathlib import Path
+from urllib.parse import urlparse
 
 import flask
 
@@ -144,7 +145,8 @@ def run_pg_sql_scripts(app):
 
 
 def run_clickhouse_sql_scripts(app):
-    clickhouse_host = app.config["CLICKHOUSE_HOST"]
+    clickhouse_url = app.config["CLICKHOUSE_URL"]
+    clickhouse_host = urlparse(clickhouse_url).hostname
     assert clickhouse_host
     for fn in ["1_schema", "2_fixtures"]:
         fn = f"tests/integ/clickhouse_{fn}.sql"
@@ -175,7 +177,7 @@ def _run_fastpath(fpdir, dburi, start, end, limit):
     subprocess.run(cmd, check=True, cwd=fpdir)
 
 
-def run_fastpath(log, pipeline_dir, dburi, clickhouse_host):
+def run_fastpath(log, pipeline_dir, dburi, clickhouse_url):
     """Run fastpath from S3"""
     fpdir = pipeline_dir / "af" / "fastpath"
     conffile = fpdir / "etc/ooni/fastpath.conf"
@@ -184,7 +186,7 @@ def run_fastpath(log, pipeline_dir, dburi, clickhouse_host):
         [DEFAULT]
         collectors = localhost
         db_uri = {dburi}
-        clickhouse_host = {clickhouse_host}
+        clickhouse_url = {clickhouse_url}
         s3_access_key =
         s3_secret_key =
     """
@@ -217,13 +219,13 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
         print("Refusing to make changes on metadb!")
         sys.exit(1)
 
-    clickhouse_host = app.config["CLICKHOUSE_HOST"]
-    assert clickhouse_host in ("localhost", "clickhouse")
+    clickhouse_url = app.config["CLICKHOUSE_URL"]
+    assert any([x in clickhouse_url for x in ("localhost", "clickhouse")])
 
     log = app.logger
     # run_pg_sql_scripts(app)
     run_clickhouse_sql_scripts(app)
-    run_fastpath(log, checkout_pipeline, dburi, clickhouse_host)
+    run_fastpath(log, checkout_pipeline, dburi, clickhouse_url)
 
 
 @pytest.fixture(autouse=True, scope="session")

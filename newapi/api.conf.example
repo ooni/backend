@@ -8,7 +8,7 @@ DATABASE_URI_RO = "postgresql://oonitest:test@db/oonitestdb"
 DATABASE_STATEMENT_TIMEOUT = 30
 
 USE_CLICKHOUSE = True
-CLICKHOUSE_HOST = "clickhouse"
+CLICKHOUSE_URL = "clickhouse://clickhouse:9000/default"
 
 BASE_URL = "https://api.ooni.io/"
 # list of URLs: strings starting with "^" will be converted to regexps

@@ -59,7 +59,7 @@ def validate_conf(app, conffile):
         "COLLECTORS",
         "DATABASE_STATEMENT_TIMEOUT",
         "DATABASE_URI_RO",
-        "CLICKHOUSE_HOST",
+        "CLICKHOUSE_URL",
         "USE_CLICKHOUSE",
         "GITHUB_ORIGIN_REPO",
         "GITHUB_PUSH_REPO",
