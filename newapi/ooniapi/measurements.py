@@ -122,7 +122,7 @@ def get_measurement(measurement_id, download=None):  # pragma: no cover
         FASTPATH_PORT,
         path,
     )
-    #FIXME
+    # FIXME
     conn = http.client.HTTPConnection(FASTPATH_SERVER, FASTPATH_PORT)
     conn.request("GET", path)
     r = conn.getresponse()
@@ -195,7 +195,9 @@ def _fetch_jsonl_measurement_body_inner(
     raise MsmtNotFound
 
 
-def _fetch_jsonl_measurement_body_postgresql(report_id, input: str, measurement_uid) -> bytes:  # pragma: no cover
+def _fetch_jsonl_measurement_body_postgresql(
+    report_id, input: str, measurement_uid
+) -> bytes:  # pragma: no cover
     """Fetch jsonl from S3, decompress it, extract msmt"""
     query = "SELECT s3path, linenum FROM jsonl "
     inp = input or ""  # NULL/None input is stored as ''
@@ -324,7 +326,9 @@ def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes
     return ujson.dumps(body).encode()
 
 
-def _fetch_autoclaved_measurement_body(report_id: str, input) -> bytes:  # pragma: no cover
+def _fetch_autoclaved_measurement_body(
+    report_id: str, input
+) -> bytes:  # pragma: no cover
     """fetch the measurement body using autoclavedlookup"""
     # uses_pg_index autoclavedlookup_idx
     # None/NULL input needs to be is treated as ""
@@ -374,7 +378,9 @@ def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
                 report_id, input, measurement_uid
             )
         else:
-            return _fetch_jsonl_measurement_body_postgresql(report_id, input, measurement_uid)
+            return _fetch_jsonl_measurement_body_postgresql(
+                report_id, input, measurement_uid
+            )
     except MsmtNotFound:
         pass
 
@@ -1589,10 +1595,10 @@ def _postgresql_aggregation(
         return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
 
     cols = [
-        sql.text("SUM(anomaly = 't') AS anomaly_count"),
-        sql.text("SUM(confirmed = 't') AS confirmed_count"),
-        sql.text("SUM(msm_failure = 't') AS failure_count"),
-        sql.text("COUNT(*) AS measurement_count"),
+        coalsum("anomaly_count"),
+        coalsum("confirmed_count"),
+        coalsum("failure_count"),
+        coalsum("measurement_count"),
     ]
     table = sql.table("counters")
     where = []
@@ -1627,11 +1633,11 @@ def _postgresql_aggregation(
         query_params["probe_asn"] = probe_asn
 
     if since:
-        where.append(sql.text("measurement_start_time > :since"))
+        where.append(sql.text("measurement_start_day > :since"))
         query_params["since"] = since
 
     if until:
-        where.append(sql.text("measurement_start_time <= :until"))
+        where.append(sql.text("measurement_start_day <= :until"))
         query_params["until"] = until
 
     if test_name:
@@ -1941,7 +1947,7 @@ def get_torsf_stats():
         until = parse_date(until)
         where.append(sql.text("measurement_start_time <= :until"))
         query_params["until"] = until
-        cacheable = (until < datetime.now() - timedelta(hours=72))
+        cacheable = until < datetime.now() - timedelta(hours=72)
 
     # Assemble query
     where_expr = and_(*where)
