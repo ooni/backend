@@ -23,6 +23,7 @@ log = logging.getLogger("ooni_api_uploader")
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
+
     log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni_api_uploader"))
 except ImportError:
     pass
@@ -65,7 +66,10 @@ def connect_to_db(conf):
 
 @metrics.timer("update_db_table")
 def update_db_table(conn, lookup_list, jsonl_s3path):
-    rows = [(rid, inp, jsonl_s3path, num, msmt_uid) for rid, inp, msmt_uid, num in lookup_list]
+    rows = [
+        (rid, inp, jsonl_s3path, num, msmt_uid)
+        for rid, inp, msmt_uid, num in lookup_list
+    ]
     q = "INSERT INTO jsonl (report_id, input, s3path, linenum, measurement_uid) VALUES %s"
     log.info("Writing to DB")
     with conn.cursor() as cur:
