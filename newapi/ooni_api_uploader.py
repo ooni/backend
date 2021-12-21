@@ -204,10 +204,12 @@ def main():
             jsonl_s3path = (
                 f"raw/{tstamp[:8]}/{tstamp[8:10]}/{cc}/{testname}/{jsonlf.name}"
             )
-            upload_to_s3(s3, bucket_name, postcanf, postcan_s3path)
-            upload_to_s3(s3, bucket_name, jsonlf, jsonl_s3path)
-
-            update_db_table(db_conn, lookup_list, jsonl_s3path)
+            if conf.get("run_mode", "") == "DESTROY_DATA":
+                log.info("Testbed mode: Destroying postcans!")
+            else:
+                upload_to_s3(s3, bucket_name, postcanf, postcan_s3path)
+                upload_to_s3(s3, bucket_name, jsonlf, jsonl_s3path)
+                update_db_table(db_conn, lookup_list, jsonl_s3path)
 
             postcanf.unlink()
             jsonlf.unlink()
