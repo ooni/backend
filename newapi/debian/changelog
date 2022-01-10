@@ -1,4 +1,4 @@
-ooni-api (0.51) unstable; urgency=medium
+ooni-api (1.0.0) unstable; urgency=medium
 
   * Support Clickhouse
 
