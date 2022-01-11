@@ -98,21 +98,33 @@ def parse_cors_origins(app):
     app.config["CORS_URLS"] = out
 
 
+def setup_logging(log):
+    if enable_journal:
+        root_logger = log.root
+        h = JournalHandler(SYSLOG_IDENTIFIER="ooni-api")
+        formatter = logging.Formatter("%(levelname)s %(message)s")
+        h.setFormatter(formatter)
+        root_logger.addHandler(h)
+        root_logger.setLevel(logging.DEBUG)
+    else:
+        log.setLevel(logging.DEBUG)
+        logging.basicConfig(format="%(message)s")
+
+
 def init_app(app, testmode=False):
     # Load configurations defaults from ooniapi/config.py
     # and then from the file pointed by CONF
     # (defaults to /etc/ooni/api.conf)
     log = logging.getLogger("ooni-api")
-    app.config.from_object("ooniapi.config")
     conffile = os.getenv("CONF", "/etc/ooni/api.conf")
-    if enable_journal:
-        log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni-api"))
-    log.setLevel(logging.DEBUG)
+    setup_logging(log)
+
     log.info(f"Starting OONI API. Loading conf from {conffile}")
+    app.config.from_object("ooniapi.config")
     app.config.from_pyfile(conffile)
     validate_conf(app, conffile)
-    #parse_cors_origins(app)
-    # TODO: fix logging
+    # parse_cors_origins(app)
+
     log.info("Configuration loaded")
     CORS(app)
 
