@@ -10,6 +10,7 @@ Build-Depends: debhelper-compat (= 12),
  python3-lz4,
  python3-psycopg2,
  python3-setuptools,
+ python3-setproctitle,
  python3-statsd,
  python3-systemd,
  python3-ujson
