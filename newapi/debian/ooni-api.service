@@ -5,9 +5,7 @@ After=network-online.target
 
 [Service]
 ExecStart=/usr/bin/gunicorn3 \
-  --workers 12 \
-  --statsd-host 127.0.0.1:8125 --statsd-prefix ooni-api \
-  --reuse-port \
+  --config file:/etc/ooni/api.gunicorn.py \
   ooniapi.wsgi
 
 Restart=on-abort
