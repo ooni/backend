@@ -359,7 +359,7 @@ def get_recent_test_coverage_ch(probe_cc):
     rows = tuple(rows)
     # "pivot": create a datapoint for each test group, for each day
     tmp = {(r["test_group"], r["measurement_start_day"]): r["msmt_cnt"] for r in rows}
-    del(rows)
+    del rows
     test_coverage = []
     for test_group in test_group_names:
         for measurement_start_day in last_30days():
@@ -375,36 +375,38 @@ def get_recent_test_coverage_ch(probe_cc):
 
 
 def get_recent_network_coverage_ch(probe_cc, test_groups):
-    """Returns [{"count": 58, "test_day": "2021-10-16" }, ... ]"""
-    log = current_app.logger
-    test_names = set()
+    """Count ASNs with at least one measurements, grouped by day,
+    for a given CC, and filtered by test groups
+    Return [{"count": 58, "test_day": "2021-10-16" }, ... ]"""
+    s = """SELECT
+        toDate(measurement_start_time) AS test_day,
+        COUNT(DISTINCT probe_asn) as count
+    FROM fastpath
+    WHERE test_day >= today() - interval 31 day
+        AND test_day < today()
+        AND probe_cc = :probe_cc
+        --mark--
+    GROUP BY test_day ORDER BY test_day
+    WITH FILL
+        FROM today() - interval 31 day
+        TO today()
+    """
     if test_groups:
         assert isinstance(test_groups, list)
+        test_names = set()
         for tg in test_groups:
             tnames = TEST_GROUPS.get(tg, [])
             test_names.update(tnames)
+        test_names = sorted(test_names)
+        s = s.replace("--mark--", "AND test_name IN :test_names")
+        d = {"probe_cc": probe_cc, "test_names": test_names}
 
-    s = """SELECT
-    toDate(measurement_start_time) AS test_day,
-    test_name,
-    COUNT(DISTINCT probe_asn) as cnt
-    FROM fastpath
-    WHERE test_day >= today() - interval 31 day
-    AND test_day < today()
-    GROUP BY test_day, test_name ORDER BY test_day
-    """
-    q = query_click(sql.text(s), {"probe_cc": probe_cc})
-    network_map = {}
-    for r in q:
-        day = r["test_day"].strftime("%Y-%m-%d")
-        if not test_names or r["test_name"] in test_names:
-            network_map[day] = network_map.get(day, 0) + r["cnt"]
+    else:
+        s = s.replace("--mark--", "")
+        d = {"probe_cc": probe_cc}
 
-    network_coverage = [
-        dict(test_day=test_day, count=network_map.get(test_day, 0))
-        for test_day in last_30days()
-    ]
-    return network_coverage
+    q = query_click(sql.text(s), d)
+    return list(q)
 
 
 @api_private_blueprint.route("/test_coverage", methods=["GET"])
