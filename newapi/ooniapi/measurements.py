@@ -1972,6 +1972,7 @@ def get_torsf_stats():
         return jsonify({"v": 0, "error": str(e)})
 
 
+# TODO: remove
 @api_msm_blueprint.route("/private/aggregation")
 def aggregation_form():
     """Aggregated counters: HTML page
