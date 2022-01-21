@@ -336,6 +336,27 @@ def get_recent_test_coverage_pg(probe_cc):  # pragma: no cover
     return test_coverage
 
 
+def pivot_test_coverage(rows, test_group_names, days):
+    # "pivot": create a datapoint for each test group, for each day
+    # lookup map (tg, day) -> cnt
+    tmp = {}
+    for r in rows:
+        day = r["measurement_start_day"].strftime("%Y-%m-%d")
+        k = (r["test_group"], day)
+        tmp[k] = r["msmt_cnt"]
+
+    test_coverage = [
+        dict(
+            count=tmp.get((tg, day), 0),
+            test_day=day,
+            test_group=tg,
+        )
+        for tg in test_group_names
+        for day in days
+    ]
+    return test_coverage
+
+
 def get_recent_test_coverage_ch(probe_cc):
     """Returns
     [{"count": 4888, "test_day": "2021-10-16", "test_group": "websites"}, ... ]
@@ -357,21 +378,8 @@ def get_recent_test_coverage_ch(probe_cc):
     """
     rows = query_click(sql.text(q), dict(probe_cc=probe_cc))
     rows = tuple(rows)
-    # "pivot": create a datapoint for each test group, for each day
-    tmp = {(r["test_group"], r["measurement_start_day"]): r["msmt_cnt"] for r in rows}
-    del rows
-    test_coverage = []
-    for test_group in test_group_names:
-        for measurement_start_day in last_30days():
-            count = tmp.get((test_group, measurement_start_day), 0)
-            e = dict(
-                count=count,
-                test_day=measurement_start_day,
-                test_group=test_group,
-            )
-            test_coverage.append(e)
-
-    return test_coverage
+    l30d = tuple(last_30days())
+    return pivot_test_coverage(rows, test_group_names, l30d)
 
 
 def get_recent_network_coverage_ch(probe_cc, test_groups):
