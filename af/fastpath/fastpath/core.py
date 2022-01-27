@@ -696,6 +696,19 @@ def score_http_invalid_request_line(msm):
     return scores
 
 
+def get_header_from_header_list(header_list, header_name, case_sensitive=False):
+    if case_sensitive == False:
+        header_name = header_name.lower()
+
+    values = []
+    for h, v in header_list:
+        if case_sensitive == False:
+            h = h.lower()
+        if h == header_name:
+            values.append(v)
+
+    return values
+
 @metrics.timer("score_measurement_whatsapp")
 def score_measurement_whatsapp(msm):
     """Calculate measurement scoring for Whatsapp.
@@ -776,7 +789,20 @@ def score_measurement_whatsapp(msm):
             # Also note bug https://github.com/ooni/probe-legacy/issues/60
 
         elif url == "http://web.whatsapp.com/":
-            webapp_accessible = b.get("failure", True) in (None, "", False)
+            webapp_accessible = True
+            if b.get("failure", True) not in (None, "", False):
+                webapp_accessible = False
+            else:
+                resp = b.get("response", {})
+                status_code = resp.get("code", 0)
+                headers_list = resp.get("headers_list", [])
+                get_header_from_header_list(headers_list, "Location")
+                if status_code != 302:
+                    webapp_accessible = False
+                elif len(headers_list) == 0:
+                    webapp_accessible = False
+                elif "https://web.whatsapp.com/" not in headers_list:
+                    webapp_accessible = False
 
         elif url == "https://v.whatsapp.net/v2/register":
             # In case of connection failure "response" might be empty
