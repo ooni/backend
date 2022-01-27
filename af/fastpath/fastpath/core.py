@@ -1081,6 +1081,8 @@ def score_psiphon(msm) -> dict:
         logbug(0, "no resolver_ip", msm)
         scores["accuracy"] = 0.0
 
+    truntime = msm.get("test_runtime")
+    scores["extra"] = dict(test_runtime=truntime, bootstrap_time=bootstrap_time)
     return scores
 
 
@@ -1129,6 +1131,7 @@ def score_tor(msm) -> dict:
     else:
         scores["accuracy"] = 0.0
 
+    scores["extra"] = dict(test_runtime=msm.get("test_runtime"))
     return scores
 
 
@@ -1265,7 +1268,9 @@ def score_torsf(msm) -> dict:
         scores["blocking_general"] = 1.0
         return scores
 
-    scores["extra"] = dict(bootstrap_time=tk.get("bootstrap_time"))
+    scores["extra"] = dict(
+        bootstrap_time=tk.get("bootstrap_time"), test_runtime=msm.get("test_runtime")
+    )
     return scores
 
 
@@ -1287,6 +1292,7 @@ def score_riseupvpn(msm) -> dict:
     if anomaly:
         scores["blocking_general"] = 1.0
 
+    scores["extra"] = dict(test_runtime=msm.get("test_runtime"))
     return scores
 
 

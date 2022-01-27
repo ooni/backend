@@ -142,6 +142,7 @@ def minicans(test_name, start_date: date, end_date: date, end=None):
     file_cnt = 0
     while day <= end_date:
         tn_filter = set([test_name.replace("_", "")])
+        log.info(day)
         li = s3feeder.list_minicans_on_s3_for_a_day(s3, day, None, tn_filter)
         for s3fname, s3size in li:
             # s3fname: raw/20210426/23/YE/ndt/2021042623_YE_ndt.n0.0.tar.gz
@@ -613,6 +614,7 @@ def test_score_tor():
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
+                "extra": {"test_runtime": 31.942783471},
             }
         # TODO: review tests
         break
@@ -974,7 +976,7 @@ def test_score_meek_fronted_requests_test(cans):
 
 
 def test_score_psiphon(cans):
-    for can_fn, msm in s3msmts("psiphon", date(2019, 12, 20), date(2020, 1, 10)):
+    for can_fn, msm in s3msmts("psiphon", date(2020, 1, 9), date(2020, 1, 10)):
         assert msm["test_name"] == "psiphon"
         rid = msm["report_id"]
         # test version 0.3.1 has different mkeys than before
@@ -993,7 +995,29 @@ def test_score_psiphon(cans):
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
+                "extra": {"test_runtime": 15.25602748, "bootstrap_time": 5.532639553},
             }
+            break
+
+
+@pytest.mark.skip("slow")
+def test_score_psiphon_2():
+    for can_fn, msm in minicans("psiphon", date(2021, 11, 1), date(2021, 11, 2), 1):
+        rid = msm["report_id"]
+        scores = fp.score_measurement(msm)
+        if rid == "20211101T002503Z_psiphon_AT_40980_n1_pJPrpMWu3rfDXEcV":
+            assert scores == {
+                "accuracy": 1.0,
+                "blocking_general": 0.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+                "extra": {"test_runtime": 6.774142658},
+            }, msm
+            return
+
+    assert 0, "Measurement not found"
 
 
 def test_score_http_invalid_request_line_1():
@@ -1105,6 +1129,41 @@ def test_score_signal():
             }
         # No failure was found
         # elif "accuracy" in scores:
+
+
+def test_score_torsf():
+    for can_fn, msm in minicans("torsf", date(2021, 11, 23), date(2021, 11, 23), 1):
+        scores = fp.score_measurement(msm)
+        assert scores == {
+            "blocking_general": 0.0,
+            "blocking_global": 0.0,
+            "blocking_country": 0.0,
+            "blocking_isp": 0.0,
+            "blocking_local": 0.0,
+            "extra": {"bootstrap_time": 142.883336871, "test_runtime": 143.090651217},
+        }
+        assert msm["report_id"] == "20211123T142631Z_torsf_IT_30722_n1_vrWHDorLfK5ROZzS"
+        return
+
+    assert 0, "Measurement not found"
+
+
+def test_score_riseupvpn():
+    for can_fn, msm in minicans("riseupvpn", date(2021, 10, 15), date(2021, 10, 16), 1):
+        scores = fp.score_measurement(msm)
+        assert scores == {
+            "blocking_general": 0.0,
+            "blocking_global": 0.0,
+            "blocking_country": 0.0,
+            "blocking_isp": 0.0,
+            "blocking_local": 0.0,
+            'extra': {'test_runtime': 3.8260852},
+
+        }
+        assert msm["report_id"] == "20211015T005140Z_riseupvpn_AR_7303_n1_gc8so3BXiS9thxBJ"
+        return
+
+    assert 0, "Measurement not found"
 
 
 def test_flag_measurements_with_wrong_date_from_future():

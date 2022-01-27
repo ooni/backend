@@ -1629,6 +1629,15 @@ fingerprints = {
         # https://explorer.ooni.org/measurement/20191115T114711Z_AS12390_NIVFbxg8nx3pPxL5vbk2Fg4duFANRINLyvIaMNuzyDPiMdY2X3?input=https://bisexual.org/
         {"dns_full": "195.46.39.11", "locality": "general"},
     ],
+    "UZ": [
+	# https://explorer.ooni.org/measurement/20211231T141146Z_webconnectivity_UZ_8193_n1_Ap5yFzrVoL671ahx?input=http%3A%2F%2Fwww.europacasino.com%2F
+	# https://explorer.ooni.org/measurement/20211231T172847Z_webconnectivity_UZ_8193_n1_kzei9uKT3oPETGzS?input=http%3A%2F%2Fikhwanonline.com%2F
+        {
+            "header_name": "Location",
+            "header_prefix": "http://reestr.mitc.uz/",
+            "locality": "country",
+        },
+    ],
 }
 
 
