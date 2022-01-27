@@ -696,9 +696,19 @@ def score_http_invalid_request_line(msm):
     return scores
 
 
-def get_header_from_header_list(header_list, header_name, case_sensitive=False):
+def get_http_header(resp, header_name, case_sensitive=False):
     if case_sensitive == False:
         header_name = header_name.lower()
+
+    header_list = []
+
+    # backward compatibility with older measurements that don't have
+    # header_list
+    if "header_list" not in resp:
+        headers = resp.get("headers", {})
+        header_list = [[h,v] for h,v in headers.items()]
+    else:
+        headers_list = resp.get("headers_list")
 
     values = []
     for h, v in header_list:
@@ -795,13 +805,10 @@ def score_measurement_whatsapp(msm):
             else:
                 resp = b.get("response", {})
                 status_code = resp.get("code", 0)
-                headers_list = resp.get("headers_list", [])
-                get_header_from_header_list(headers_list, "Location")
+                location_header_list = get_http_header(resp, "Location")
                 if status_code != 302:
                     webapp_accessible = False
-                elif len(headers_list) == 0:
-                    webapp_accessible = False
-                elif "https://web.whatsapp.com/" not in headers_list:
+                elif "https://web.whatsapp.com/" not in location_header_list:
                     webapp_accessible = False
 
         elif url == "https://v.whatsapp.net/v2/register":

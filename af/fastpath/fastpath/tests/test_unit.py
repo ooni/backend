@@ -342,3 +342,36 @@ def test_s3feeder_eta():
         t0, now, start_day, date(2020, 1, 4), date(2020, 1, 5), 9, 10
     )
     assert etr / 3600 == 1.0
+
+def test_get_http_header():
+    resp = {
+        "headers": {
+            "Location": "http://example.com"
+        },
+        "headers_list": [
+            ["Location", "http://example.com"]
+        ],
+    }
+    assert fp.get_http_header(resp, "Location") == ["http://example.com"]
+
+    resp = {
+        "headers": {
+            "Location": "http://example.com"
+        },
+    }
+    assert fp.get_http_header(resp, "Location") == ["http://example.com"]
+
+    resp = {}
+    assert fp.get_http_header(resp, "Location") == []
+
+    resp = {
+        "headers": {
+            "location": "http://example2.com"
+        },
+        "headers_list": [
+            ["location", "http://example.com"]
+            ["location", "http://example2.com"]
+        ],
+    }
+    assert fp.get_http_header(resp, "Location") == ["http://example.com", "http://example2.com"]
+
