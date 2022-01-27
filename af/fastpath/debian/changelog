@@ -1,3 +1,9 @@
+fastpath (0.52) unstable; urgency=medium
+
+  * Upsert measurement to Clickhouse as well
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 18 Nov 2021 18:39:14 +0000
+
 fastpath (0.51) unstable; urgency=medium
 
   * Extract test runtime from pluggable transport measurements

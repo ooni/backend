@@ -84,12 +84,15 @@ def setup():
     ap.add_argument("--start-day", type=lambda d: parse_date(d))
     ap.add_argument("--end-day", type=lambda d: parse_date(d))
     ap.add_argument("--devel", action="store_true", help="Devel mode")
-    ap.add_argument("--noapi", action="store_true", help="Do not start API feeder")
+    h = "Process measurements from S3 and do not start API feeder"
+    ap.add_argument("--noapi", action="store_true", help=h)
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
-    ap.add_argument("--db-uri", help="Database DSN or URI.")
+    ap.add_argument("--debug", action="store_true", help="Log at debug level")
+    ap.add_argument("--db-uri", help="PG database DSN or URI")
+    ap.add_argument("--clickhouse-url", help="Clickhouse url")
     h = "Update summaries and files instead of logging an error"
     ap.add_argument("--update", action="store_true", help=h)
-    h = "Stop after feeding N measurements"
+    h = "Stop after feeding N measurements from S3"
     ap.add_argument("--stop-after", type=int, help=h, default=None)
     h = "Do not insert measurement in database"
     ap.add_argument("--no-write-to-db", action="store_true", help=h)
@@ -103,11 +106,12 @@ def setup():
 
     if conf.devel or conf.stdout or no_journal_handler:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
+        logging.basicConfig(stream=sys.stdout, format=format)
 
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
-        log.setLevel(logging.DEBUG)
+    log.setLevel(logging.DEBUG if conf.debug else logging.INFO)
+    logging.getLogger("clickhouse_driver.connection").setLevel(logging.WARNING)
 
     if conf.ccs:
         conf.ccs = set(cc.strip() for cc in conf.ccs.split(","))
@@ -128,6 +132,8 @@ def setup():
         conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
         if conf.db_uri is None:
             conf.db_uri = cp["DEFAULT"]["db_uri"].strip()
+        if conf.clickhouse_url is None:
+            conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
 
     setup_dirs(conf, root)
 
@@ -262,8 +268,12 @@ def process_measurements_from_s3():
     if conf.no_write_to_db:
         log.info("Skipping DB connection setup")
     else:
-        db.setup(conf)
+        if conf.db_uri:
+            db.setup(conf)
+        if conf.clickhouse_url:
+            db.setup_clickhouse(conf)
 
+    msmt_cnt = 0
     for measurement_tup in s3feeder.stream_cans(conf, conf.start_day, conf.end_day):
         assert measurement_tup is not None
         assert len(measurement_tup) == 3
@@ -271,6 +281,10 @@ def process_measurements_from_s3():
         assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
         assert msm is None or isinstance(msm, dict)
         process_measurement(measurement_tup)
+        if conf.stop_after:
+            msmt_cnt += 1
+            if msmt_cnt >= conf.stop_after:
+                return
 
 
 @metrics.timer("match_fingerprints")
@@ -1370,7 +1384,10 @@ def msm_processor(queue):
     if conf.no_write_to_db:
         log.info("Skipping DB connection setup")
     else:
-        db.setup(conf)
+        if conf.db_uri:
+            db.setup(conf)
+        if conf.clickhouse_url:
+            db.setup_clickhouse(conf)
 
     while True:
         msm_tup = queue.get()
@@ -1455,18 +1472,31 @@ def process_measurement(msm_tup) -> None:
         if conf.no_write_to_db:
             return
 
-        db.upsert_summary(
-            measurement,
-            scores,
-            anomaly,
-            confirmed,
-            failure,
-            msmt_uid,
-            sw_name,
-            sw_version,
-            platform,
-            conf.update,
-        )
+        if conf.db_uri:
+            db.upsert_summary(
+                measurement,
+                scores,
+                anomaly,
+                confirmed,
+                failure,
+                msmt_uid,
+                sw_name,
+                sw_version,
+                platform,
+                conf.update,
+            )
+        if conf.clickhouse_url:
+            db.clickhouse_upsert_summary(
+                measurement,
+                scores,
+                anomaly,
+                confirmed,
+                failure,
+                msmt_uid,
+                sw_name,
+                sw_version,
+                platform,
+            )
     except Exception as e:
         log.exception(e)
         metrics.incr("unhandled_exception")

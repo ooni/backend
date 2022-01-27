@@ -196,13 +196,23 @@ def list_minicans_on_s3_for_a_day(
             if testnames and testname not in testnames:
                 continue
 
-            files.append((fname, f["Size"]))
+            if f["Size"] > 0:
+                files.append((fname, f["Size"]))
 
         if cont_token is None:
             log.info(f"Found {len(files)} minican .tar.gz files")
             return sorted(files)
 
     assert False
+
+
+def log_download(s3fname, size) -> None:
+    s = size / 1024 / 1024
+    d = "M"
+    if s < 1:
+        s = size / 1024
+        d = "K"
+    log.info(f"Downloading can {s3fname} size {s:.1f} {d}B")
 
 
 @metrics.timer("fetch_cans")
@@ -233,7 +243,6 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
         _cb.count += bytes_count
         _cb.total_count += bytes_count
         metrics.gauge("s3_download_percentage", _cb.total_count / _cb.total_size * 100)
-        # log.debug("s3_download_percentage %d", _cb.total_count / _cb.total_size * 100)
         try:
             speed = _cb.count / 131_072 / (time.time() - _cb.start_time)
             metrics.gauge("s3_download_speed_avg_Mbps", speed)
@@ -250,7 +259,7 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
             continue
 
         # TODO: handle missing file
-        log.info("Downloading can %s size %d MB" % (s3fname, size / 1024 / 1024))
+        log_download(s3fname, size)
         diskf.parent.mkdir(parents=True, exist_ok=True)
         tmpf = diskf.with_suffix(".s3tmp")
         metrics.gauge("fetching", 1)

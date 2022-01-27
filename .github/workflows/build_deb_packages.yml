@@ -4,7 +4,7 @@ on: pull_request
 jobs:
   build_deb_packages:
     runs-on: "ubuntu-20.04"
-    container: debian:10
+    container: debian:11
     steps:
       - name: Install git
         run: |
@@ -18,7 +18,7 @@ jobs:
 
       - name: Install depedencies
         run: |
-          echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
+          echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backports.list
           apt-get update -q
           apt-get install -y --no-install-recommends git python3 python3-requests python3-gnupg s3cmd wget
 

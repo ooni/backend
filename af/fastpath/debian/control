@@ -2,11 +2,11 @@ Source: fastpath
 Section: python
 Priority: optional
 Maintainer: Federico Ceratto <federico@debian.org>
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: debhelper-compat (= 13),
  python3,
- dh-systemd (>= 1.5),
  dh-python,
  python3-boto3,
+ python3-clickhouse-driver,
  python3-gunicorn,
  python3-lz4,
  python3-psycopg2,
@@ -15,13 +15,14 @@ Build-Depends: debhelper-compat (= 12),
  python3-systemd,
  python3-ujson,
  python3-yaml
-Standards-Version: 4.4.4.1
+Standards-Version: 4.6.0
 
 Package: fastpath
 Architecture: all
 Depends: ${misc:Depends},
  ${python3:Depends},
  python3-boto3,
+ python3-clickhouse-driver,
  python3-gunicorn,
  python3-lz4,
  python3-psycopg2,

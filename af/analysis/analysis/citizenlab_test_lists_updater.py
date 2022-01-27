@@ -23,9 +23,9 @@ import re
 import psycopg2
 from psycopg2.extras import execute_values
 
-from analysis.metrics import setup_metrics
+from clickhouse_driver import Client as Clickhouse
 
-from analysis.url_prioritization_updater import compute_url_priorities
+from analysis.metrics import setup_metrics
 
 
 HTTPS_GIT_URL = "https://github.com/citizenlab/test-lists.git"
@@ -57,7 +57,7 @@ def _extract_domain(url: str) -> Optional[str]:
     return None
 
 
-def connect_db(c):
+def connect_postgresql_db(c):
     return psycopg2.connect(
         dbname=c["dbname"], user=c["dbuser"], host=c["dbhost"], password=c["dbpassword"]
     )
@@ -66,7 +66,7 @@ def connect_db(c):
 @metrics.timer("fetch_citizen_lab_lists")
 def fetch_citizen_lab_lists() -> List[dict]:
     """Clone repository in a temporary directory and extract files"""
-    out = []  # (cc or "ZZ", domain, url, category_code, priority)
+    out = []  # (cc or "ZZ", domain, url, category_code)
     with TemporaryDirectory() as tmpdir:
         cmd = ("git", "clone", "--depth", "1", HTTPS_GIT_URL, tmpdir)
         check_call(cmd, timeout=120)
@@ -91,10 +91,11 @@ def fetch_citizen_lab_lists() -> List[dict]:
                         url=url,
                         cc=cc,
                         category_code=category_code,
-                        priority=0,
                     )
                     out.append(d)
 
+    assert len(out) > 20000
+    assert len(out) < 1000000
     return out
 
 
@@ -107,36 +108,59 @@ def create_citizenlab_cc_idx(conn):
         cur.execute(sql)
 
 
-@metrics.timer("rebuild_citizenlab_table_from_citizen_lab_lists")
-def rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn):
+def rebuild_citizenlab_table_from_citizen_lab_lists(conf, citizenlab, conn):
     """Fetch lists from GitHub repository"""
-    ev = """INSERT INTO citizenlab (domain, url, cc, category_code, priority)
+    ev = """INSERT INTO citizenlab (domain, url, cc, category_code)
         VALUES %s"""
 
-    citizenlab = fetch_citizen_lab_lists()
-    compute_url_priorities(conn, citizenlab)
-    assert len(citizenlab) > 20000
-    assert len(citizenlab) < 1000000
-
     with conn.cursor() as cur:
-        log.info("Emptying citizenlab table")
+        log.info("Emptying PG citizenlab table")
         cur.execute("DELETE FROM citizenlab")
         log.info("Inserting %d citizenlab table entries", len(citizenlab))
         metrics.gauge("rowcount", len(citizenlab))
-        tpl = "(%(domain)s, %(url)s, %(cc)s, %(category_code)s, %(priority)s)"
+        tpl = "(%(domain)s, %(url)s, %(cc)s, %(category_code)s)"
         execute_values(cur, ev, citizenlab, template=tpl)
 
     if conf.dry_run:
         log.info("rollback")
         conn.rollback()
     else:
-        log.info("commit")
+        log.info("PG citizenlab commit")
         conn.commit()
-        log.info("citizenlab_table is ready")
+        log.info("PG citizenlab_table is ready")
+
+
+def query_c(click, query: str, qparams: dict):
+    click.execute(query, qparams, types_check=True)
+
+
+@metrics.timer("rebuild_citizenlab_table_from_citizen_lab_lists")
+def update_citizenlab_table_click(conf, citizenlab):
+    """Overwrite citizenlab_flip and swap tables atomically"""
+    if conf.dry_run:
+        return
+    click = Clickhouse("localhost")
+    log.info("Emptying Clickhouse citizenlab_flip table")
+    q = "TRUNCATE TABLE citizenlab_flip"
+    click.execute(q)
+
+    log.info("Inserting %d citizenlab table entries", len(citizenlab))
+    q = "INSERT INTO citizenlab_flip (domain, url, cc, category_code) VALUES"
+    click.execute(q, citizenlab, types_check=True)
+
+    log.info("Swapping Clickhouse citizenlab tables")
+    q = "EXCHANGE TABLES citizenlab_flip AND citizenlab"
+    click.execute(q)
 
 
 def update_citizenlab_test_lists(conf) -> None:
     log.info("update_citizenlab_test_lists")
-    conn = connect_db(conf.active)
-    create_citizenlab_cc_idx(conn)
-    rebuild_citizenlab_table_from_citizen_lab_lists(conf, conn)
+    citizenlab = fetch_citizen_lab_lists()
+
+    update_citizenlab_table_click(conf, citizenlab)
+
+    if conf.active["dbname"]:
+        # PostgreSQL
+        pgconn = connect_postgresql_db(conf.active)
+        create_citizenlab_cc_idx(pgconn)
+        rebuild_citizenlab_table_from_citizen_lab_lists(conf, citizenlab, pgconn)

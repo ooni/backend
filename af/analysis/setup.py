@@ -19,6 +19,7 @@ setup(
             "rotation=rotation:main",
         ]
     },
+    scripts = ["analysis/clickhouse_feeder.py"],
     install_requires=REQUIRED,
     include_package_data=True,
     zip_safe=False,
