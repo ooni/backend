@@ -1,3 +1,9 @@
+ooni-api (1.0.1) unstable; urgency=medium
+
+  * Add stunreachability
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 27 Jan 2022 16:32:13 +0000
+
 ooni-api (1.0.0) unstable; urgency=medium
 
   * Support Clickhouse

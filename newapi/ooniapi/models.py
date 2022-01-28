@@ -25,6 +25,7 @@ TEST_GROUPS = {
     "experimental": [
         "urlgetter",
         "dnscheck",
+        "stunreachability",
     ],
 }
 

@@ -134,3 +134,5 @@ def query_click_one_row(query, query_params) -> Optional[dict]:
 
     for row in rows:
         return dict(zip(colnames, row))
+
+    return None

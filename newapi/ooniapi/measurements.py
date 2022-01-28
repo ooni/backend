@@ -1473,6 +1473,7 @@ def get_aggregated():
         - psiphon
         - riseupvpn
         - signal
+        - stunreachability
         - tcp_connect
         - telegram
         - tor

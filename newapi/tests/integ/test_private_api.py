@@ -242,3 +242,13 @@ def test_private_api_check_report_id_not_found(client, log):
     url = f"check_report_id?report_id=BOGUS_REPORT_ID"
     response = privapi(client, url)
     assert response == {"v": 0, "found": False}
+
+
+# # /circumvention_stats_by_country
+
+
+def test_private_api_circumvention_stats_by_country(client, log):
+    url = "circumvention_stats_by_country"
+    resp = privapi(client, url)
+    assert resp["v"] == 0
+    assert len(resp["results"]) > 3

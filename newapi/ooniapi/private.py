@@ -114,6 +114,7 @@ def api_private_test_names():
       '200':
         description: TODO
     """
+    # TODO: merge this and models.py:TEST_GROUPS
     TEST_NAMES = {
         "bridge_reachability": "Bridge Reachability",
         "dash": "DASH",
@@ -130,6 +131,7 @@ def api_private_test_names():
         "psiphon": "Psiphon",
         "riseupvpn": "RiseupVPN",
         "signal": "Signal",
+        "stunreachability": "STUN Reachability",
         "tcp_connect": "TCP Connect",
         "telegram": "Telegram",
         "tor": "Tor",
@@ -1130,3 +1132,31 @@ def api_private_global_by_month():
     return cachedjson(
         24, networks_by_month=n, countries_by_month=c, measurements_by_month=m
     )
+
+
+@api_private_blueprint.route("/circumvention_stats_by_country")
+def api_private_circumvention_stats_by_country():
+    """Aggregated statistics on protocols used for circumvention,
+    grouped by country.
+    ---
+    responses:
+      200:
+        description: List of dicts with keys probe_cc and cnt
+    """
+    if not current_app.config["USE_CLICKHOUSE"]:
+        return jsonify({"v": 0, "error": "Not supported"})
+
+    q = """SELECT probe_cc, COUNT(*) as cnt
+        FROM fastpath
+        WHERE measurement_start_time > today() - interval 6 month
+        AND measurement_start_time < today() - interval 1 day
+        AND test_name IN ['torsf', 'tor', 'stunreachability', 'psiphon','riseupvpn']
+        GROUP BY probe_cc ORDER BY probe_cc
+    """
+    try:
+        q = query_click(sql.text(q), {})
+        result = [dict(x) for x in q]
+        return cachedjson(24, v=0, results=result)
+
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})

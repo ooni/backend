@@ -73,7 +73,11 @@ def jerror(msg, code=400):
 
 def create_jwt(payload: dict) -> str:
     key = current_app.config["JWT_ENCRYPTION_KEY"]
-    return jwt.encode(payload, key, algorithm="HS256").decode()
+    token = jwt.encode(payload, key, algorithm="HS256")
+    if isinstance(token, bytes):
+        return token.decode()
+    else:
+        return token
 
 
 def decode_jwt(token, **kw):
@@ -182,7 +186,7 @@ def _send_email(dest_addr: str, msg: EmailMessage) -> None:
             s.login(mail_user, mail_password)
             s.send_message(msg)
     except Exception as e:
-        log.error(e, exc_info=1)
+        log.error(e, exc_info=True)
         raise
 
 
@@ -438,7 +442,6 @@ def _delete_account_data(email_address: str) -> None:
         query_click(sql.text(q), query_params)
 
 
-
 def _get_account_role(account_id: str) -> Optional[str]:
     """Get account role from database, or None"""
     query = "SELECT role FROM accounts WHERE account_id = :account_id"
@@ -453,6 +456,8 @@ def _get_account_role(account_id: str) -> Optional[str]:
         r = q.fetchone()
         if r:
             return r[0]
+
+    return None
 
 
 @auth_blueprint.route("/api/_/account_metadata")
@@ -579,8 +584,9 @@ def _remove_from_session_expunge(email_address: str) -> None:
         current_app.db_session.execute(query, query_params)
         current_app.db_session.commit()
 
-    #if current_app.config["USE_CLICKHOUSE"]:
+    # if current_app.config["USE_CLICKHOUSE"]:
     #    log.info("Deleting from Clickhouse session_expunge")
     #    query_click_one_row(sql.text(query), query_params)
+
 
 # TODO: purge session_expunge
