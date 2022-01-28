@@ -240,11 +240,11 @@ def check_report_id():
         return cachedjson(0, v=0, error=str(e))
 
 
-def last_30days():
-    first_day = datetime.now() - timedelta(31)
+def last_30days(begin=31, end=1):
+    first_day = datetime.now() - timedelta(begin)
     first_day = datetime(first_day.year, first_day.month, first_day.day)
 
-    last_day = datetime.now() - timedelta(1)
+    last_day = datetime.now() - timedelta(end)
     last_day = datetime(last_day.year, last_day.month, last_day.day)
 
     for d in daterange(first_day, last_day):
@@ -373,14 +373,14 @@ def get_recent_test_coverage_ch(probe_cc):
         COUNT() as msmt_cnt
     FROM fastpath
     ANY LEFT JOIN test_groups USING (test_name)
-    WHERE measurement_start_day >= (today() - interval '31 day')
-    AND measurement_start_day < today()
+    WHERE measurement_start_day >= today() - interval 32 day
+    AND measurement_start_day < today() - interval 2 day
     AND probe_cc = :probe_cc
     GROUP BY measurement_start_day, test_group
     """
     rows = query_click(sql.text(q), dict(probe_cc=probe_cc))
     rows = tuple(rows)
-    l30d = tuple(last_30days())
+    l30d = tuple(last_30days(32, 2))
     return pivot_test_coverage(rows, test_group_names, l30d)
 
 
@@ -392,14 +392,14 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
         toDate(measurement_start_time) AS test_day,
         COUNT(DISTINCT probe_asn) as count
     FROM fastpath
-    WHERE test_day >= today() - interval 31 day
-        AND test_day < today()
+    WHERE test_day >= today() - interval 32 day
+        AND test_day < today() - interval 2 day
         AND probe_cc = :probe_cc
         --mark--
     GROUP BY test_day ORDER BY test_day
     WITH FILL
         FROM today() - interval 31 day
-        TO today()
+        TO today() - interval 2 day
     """
     if test_groups:
         assert isinstance(test_groups, list)
@@ -446,7 +446,8 @@ def api_private_test_coverage():
     else:  # pragma: no cover
         tc = get_recent_test_coverage_pg(probe_cc)
         nc = get_recent_network_coverage_pg(probe_cc, test_groups)
-    return cachedjson(24, network_coverage=nc, test_coverage=tc)
+    # FIXME
+    return cachedjson(0, network_coverage=nc, test_coverage=tc)
 
 
 @api_private_blueprint.route("/website_networks", methods=["GET"])
