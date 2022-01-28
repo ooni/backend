@@ -1535,6 +1535,8 @@ def get_aggregated():
         until = param("until")
         if until:
             until = parse_date(until)
+        if test_name and test_name not in TEST_NAMES:
+            raise ValueError("Invalid test name")
 
         resp_format = param("format", "JSON").upper()
         assert resp_format in ("JSON", "CSV")
@@ -1787,7 +1789,6 @@ def _clickhouse_aggregation(
         query_params["until"] = until
 
     if test_name:
-        assert test_name in TEST_NAMES
         where.append(sql.text("test_name = :test_name"))
         query_params["test_name"] = test_name
 
