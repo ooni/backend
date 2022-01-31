@@ -703,7 +703,7 @@ def get_http_header(resp, header_name, case_sensitive=False):
        headers_list field is present in the response, we'll use
        that, otherwise we'll fallback to the headers map. We perform
        case sensitive header names search by default. You can yet
-       optionally select case insenstive comparison, which is useful,
+       optionally select case insensitive comparison, which is useful,
        e.g., when processing results where a change in the case
        implies the presence of a transparent HTTP proxy."""
     if case_sensitive == False:
