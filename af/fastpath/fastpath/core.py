@@ -697,6 +697,15 @@ def score_http_invalid_request_line(msm):
 
 
 def get_http_header(resp, header_name, case_sensitive=False):
+    """This function returns the HTTP header(s) matching the given
+       header_name from the headers. The returned value is a list
+       given that we may have multiple keys per header. If the new
+       headers_list field is present in the response, we'll use
+       that, otherwise we'll fallback to the headers map. We perform
+       case sensitive header names search by default. You can yet
+       optionally select case insenstive comparison, which is useful,
+       e.g., when processing results where a change in the case
+       implies the presence of a transparent HTTP proxy."""
     if case_sensitive == False:
         header_name = header_name.lower()
 
