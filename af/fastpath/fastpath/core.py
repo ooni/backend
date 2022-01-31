@@ -710,6 +710,38 @@ def score_http_invalid_request_line(msm):
     return scores
 
 
+def get_http_header(resp, header_name, case_sensitive=False):
+    """This function returns the HTTP header(s) matching the given
+       header_name from the headers. The returned value is a list
+       given that we may have multiple keys per header. If the new
+       headers_list field is present in the response, we'll use
+       that, otherwise we'll fallback to the headers map. We perform
+       case sensitive header names search by default. You can yet
+       optionally select case insensitive comparison, which is useful,
+       e.g., when processing results where a change in the case
+       implies the presence of a transparent HTTP proxy."""
+    if case_sensitive == False:
+        header_name = header_name.lower()
+
+    header_list = []
+
+    # backward compatibility with older measurements that don't have
+    # header_list
+    if "header_list" not in resp:
+        headers = resp.get("headers", {})
+        header_list = [[h,v] for h,v in headers.items()]
+    else:
+        headers_list = resp.get("headers_list")
+
+    values = []
+    for h, v in header_list:
+        if case_sensitive == False:
+            h = h.lower()
+        if h == header_name:
+            values.append(v)
+
+    return values
+
 @metrics.timer("score_measurement_whatsapp")
 def score_measurement_whatsapp(msm):
     """Calculate measurement scoring for Whatsapp.
@@ -789,7 +821,18 @@ def score_measurement_whatsapp(msm):
             # has unexpected contents
             # Also note bug https://github.com/ooni/probe-legacy/issues/60
 
-        # TODO: handle elif url == "http://web.whatsapp.com/":
+        elif url == "http://web.whatsapp.com/":
+            webapp_accessible = True
+            if b.get("failure", True) not in (None, "", False):
+                webapp_accessible = False
+            else:
+                resp = b.get("response", {})
+                status_code = resp.get("code", 0)
+                location_header_list = get_http_header(resp, "Location")
+                if status_code != 302:
+                    webapp_accessible = False
+                elif "https://web.whatsapp.com/" not in location_header_list:
+                    webapp_accessible = False
 
         elif url == "https://v.whatsapp.net/v2/register":
             # In case of connection failure "response" might be empty
