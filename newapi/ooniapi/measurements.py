@@ -31,7 +31,7 @@ from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
 # debdeps: python3-sqlalchemy
-from sqlalchemy import func, and_, text, select, sql, column
+from sqlalchemy import and_, text, select, sql, column
 from sqlalchemy.sql import literal_column
 from sqlalchemy import String, cast
 from sqlalchemy.exc import OperationalError
@@ -1746,12 +1746,18 @@ def _clickhouse_aggregation(
         "anomaly_count",
         "confirmed_count",
         "failure_count",
+        "ok_count",
         "measurement_count",
     ]
     cols = [
-        sql.text("countIf(anomaly = 't') AS anomaly_count"),
-        sql.text("countIf(confirmed = 't') AS confirmed_count"),
+        sql.text(
+            "countIf(anomaly = 't' AND confirmed = 'f' AND msm_failure = 'f') AS anomaly_count"
+        ),
+        sql.text("countIf(confirmed = 't' AND msm_failure = 'f') AS confirmed_count"),
         sql.text("countIf(msm_failure = 't') AS failure_count"),
+        sql.text(
+            "countIf(anomaly = 'f' AND confirmed = 'f' AND msm_failure = 'f') AS ok_count"
+        ),
         sql.text("COUNT(*) AS measurement_count"),
     ]
     table = sql.table("fastpath")

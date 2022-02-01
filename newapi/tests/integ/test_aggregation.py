@@ -48,8 +48,8 @@ def test_aggregation_no_axis_csv(client, log):
     assert not r.is_json
     expected = dedent(
         """\
-        anomaly_count,confirmed_count,failure_count,measurement_count
-        187,0,2,1689
+        anomaly_count,confirmed_count,failure_count,measurement_count,ok_count
+        187,0,2,1689,1500
     """
     )
     assert r.data.decode().replace("\r", "") == expected
@@ -85,6 +85,7 @@ def test_aggregation_no_axis_filter_by_category_code(client):
             "confirmed_count": 0,
             "failure_count": 0,
             "measurement_count": 35,
+            "ok_count": 14
         },
         "v": 0,
     }, fjd(r)
@@ -104,6 +105,7 @@ def test_aggregation_x_axis_only(client, log):
                 "failure_count": 2,
                 "measurement_count": 1689,
                 "measurement_start_day": "2021-07-09",
+                "ok_count": 1500
             },
         ],
         "v": 0,
@@ -125,6 +127,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 455,
                 "measurement_count": 9622,
+                "ok_count": 8796
             },
             {
                 "anomaly_count": 105,
@@ -132,6 +135,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 11,
                 "failure_count": 2,
                 "measurement_count": 105,
+                "ok_count": 0
             },
             {
                 "anomaly_count": 139,
@@ -139,6 +143,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 139,
+                "ok_count": 0
             },
             {
                 "anomaly_count": 50,
@@ -146,6 +151,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 50,
+                "ok_count": 0
             },
             {
                 "anomaly_count": 72,
@@ -153,6 +159,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 12,
                 "measurement_count": 72,
+                "ok_count": 0
             },
         ],
         "v": 0,
@@ -245,6 +252,7 @@ def test_aggregation_foo(client):
         "confirmed_count",
         "failure_count",
         "measurement_count",
+        "ok_count",
         "probe_cc",
     ]
 
@@ -401,6 +409,7 @@ def test_aggregation_psiphon(client):
             "confirmed_count": 0,
             "failure_count": 0,
             "measurement_count": 20,
+            "ok_count": 20,
         },
         "v": 0,
     }
@@ -422,6 +431,7 @@ def test_aggregation_input(client):
             "confirmed_count": 0,
             "failure_count": 0,
             "measurement_count": 21,
+            "ok_count": 0,
         },
         "v": 0,
     }
