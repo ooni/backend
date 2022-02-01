@@ -1,3 +1,9 @@
+ooni-api (1.0.2) unstable; urgency=medium
+
+  * Bump up version
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 01 Feb 2022 19:47:40 +0000
+
 ooni-api (1.0.1) unstable; urgency=medium
 
   * Add stunreachability
