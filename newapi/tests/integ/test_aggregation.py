@@ -55,7 +55,6 @@ def test_aggregation_no_axis_csv(client, log):
     assert r.data.decode().replace("\r", "") == expected
 
 
-@pytest.mark.skip("FIXME no domain")
 def test_aggregation_no_axis_domain(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=BR&domain=www.cabofrio.rj.gov.br&since=2021-07-09&until=2021-07-10"
@@ -64,10 +63,11 @@ def test_aggregation_no_axis_domain(client):
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 0,
+            "anomaly_count": 23,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 240,
+            "measurement_count": 23,
+            "ok_count": 0,
         },
         "v": 0,
     }, fjd(r)
@@ -75,7 +75,9 @@ def test_aggregation_no_axis_domain(client):
 
 def test_aggregation_no_axis_filter_by_category_code(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=BR&category_code=CULTR&since=2021-07-09&until=2021-07-10"
+    url = (
+        "aggregation?probe_cc=BR&category_code=CULTR&since=2021-07-09&until=2021-07-10"
+    )
     r = api(client, url)
     r.pop("db_stats", None)
     assert r == {
@@ -85,7 +87,7 @@ def test_aggregation_no_axis_filter_by_category_code(client):
             "confirmed_count": 0,
             "failure_count": 0,
             "measurement_count": 35,
-            "ok_count": 14
+            "ok_count": 14,
         },
         "v": 0,
     }, fjd(r)
@@ -105,12 +107,33 @@ def test_aggregation_x_axis_only(client, log):
                 "failure_count": 2,
                 "measurement_count": 1689,
                 "measurement_start_day": "2021-07-09",
-                "ok_count": 1500
+                "ok_count": 1500,
             },
         ],
         "v": 0,
     }
     assert r == expected, fjd(r)
+
+
+def test_aggregation_x_axis_domain(client, log):
+    # 1 dimension: X
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&axis_x=domain"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r["dimension_count"] == 1
+    for x in r["result"]:
+        if x["domain"] == "www.theregister.co.uk":
+            assert x == {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "domain": "www.theregister.co.uk",
+                "failure_count": 0,
+                "measurement_count": 1,
+                "ok_count": 1,
+            }
+            return
+
+    assert False, "Msmt not found"
 
 
 def test_aggregation_y_axis_only_blocking_type(client, log):
@@ -127,7 +150,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 455,
                 "measurement_count": 9622,
-                "ok_count": 8796
+                "ok_count": 8796,
             },
             {
                 "anomaly_count": 105,
@@ -135,7 +158,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 11,
                 "failure_count": 2,
                 "measurement_count": 105,
-                "ok_count": 0
+                "ok_count": 0,
             },
             {
                 "anomaly_count": 139,
@@ -143,7 +166,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 139,
-                "ok_count": 0
+                "ok_count": 0,
             },
             {
                 "anomaly_count": 50,
@@ -151,7 +174,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 50,
-                "ok_count": 0
+                "ok_count": 0,
             },
             {
                 "anomaly_count": 72,
@@ -159,7 +182,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "confirmed_count": 0,
                 "failure_count": 12,
                 "measurement_count": 72,
-                "ok_count": 0
+                "ok_count": 0,
             },
         ],
         "v": 0,
@@ -257,69 +280,6 @@ def test_aggregation_foo(client):
     ]
 
 
-@pytest.mark.skip("FIXME needs domain")
-def test_aggregation_x_axis_y_axis_domain(client, log):
-    # 2-dimensional data: day vs ASN
-    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn"
-    r = api(client, url)
-    r.pop("db_stats", None)
-    assert r == {
-        "dimension_count": 2,
-        "result": [
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 12,
-                "measurement_start_day": "2021-07-09",
-                "probe_asn": 3320,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1,
-                "measurement_start_day": "2021-07-09",
-                "probe_asn": 31334,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 4,
-                "measurement_start_day": "2021-07-10",
-                "probe_asn": 3320,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1,
-                "measurement_start_day": "2021-07-10",
-                "probe_asn": 6830,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 4,
-                "measurement_start_day": "2021-07-10",
-                "probe_asn": 13184,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1,
-                "measurement_start_day": "2021-07-10",
-                "probe_asn": 200052,
-            },
-        ],
-        "v": 0,
-    }, fjd(r)
-
-
-@pytest.mark.skip("FIXME")
 def test_aggregation_x_axis_only_csv_2d(client, log):
     # 2-dimensional data: day vs ASN
     url = "aggregation?probe_cc=DE&domain=twitter.com&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
@@ -367,7 +327,9 @@ aggreg_over_category_code_expected = [
 @pytest.mark.skip("FIXME citizenlab")
 def test_aggregation_x_axis_category_code(client, log):
     # 1d data over a special column: category_code
-    url = "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_x=category_code"
+    url = (
+        "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_x=category_code"
+    )
     r = api(client, url)
     assert r["dimension_count"] == 1, fjd(r)
     # shortened to save space
@@ -378,7 +340,9 @@ def test_aggregation_x_axis_category_code(client, log):
 @pytest.mark.skip("FIXME citizenlab")
 def test_aggregation_y_axis_category_code(client, log):
     # 1d data over a special column: category_code
-    url = "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_y=category_code"
+    url = (
+        "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_y=category_code"
+    )
     r = api(client, url)
     assert "dimension_count" in r, fjd(r)
     assert r["dimension_count"] == 1, fjd(r)
@@ -400,7 +364,10 @@ def test_aggregation_xy_axis_category_code(client, log):
 
 
 def test_aggregation_psiphon(client):
-    r = api(client, "aggregation?probe_cc=BR&since=2021-07-09&until=2021-07-10&test_name=psiphon")
+    r = api(
+        client,
+        "aggregation?probe_cc=BR&since=2021-07-09&until=2021-07-10&test_name=psiphon",
+    )
     r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,

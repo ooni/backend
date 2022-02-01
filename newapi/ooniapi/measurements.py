@@ -1718,6 +1718,7 @@ def validate_axis_name(axis):
         "probe_asn",
         "probe_cc",
         "blocking_type",
+        "domain",
     )
     if axis not in valid:
         raise ValueError("Invalid axis name")
