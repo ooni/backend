@@ -401,13 +401,13 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
         COUNT(DISTINCT probe_asn) as count
     FROM fastpath
     WHERE test_day >= today() - interval 31 day
-        AND test_day < today() - interval 2 day
+        AND test_day < today() - interval 1 day
         AND probe_cc = :probe_cc
         --mark--
     GROUP BY test_day ORDER BY test_day
     WITH FILL
         FROM today() - interval 31 day
-        TO today() - interval 2 day
+        TO today() - interval 1 day
     """
     if test_groups:
         assert isinstance(test_groups, list)
