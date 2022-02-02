@@ -96,10 +96,12 @@ def api_private_countries_by_month():
             toStartOfMonth(measurement_start_time) AS date
         FROM fastpath
         WHERE measurement_start_time < toStartOfMonth(addMonths(now(), 1))
-        AND measurement_start_time > toStartOfMonth(subtractMonths(now(), 25))
+        AND measurement_start_time > toStartOfMonth(subtractMonths(now(), 24))
         GROUP BY date ORDER BY date
         """
         li = list(query_click(q, {}))
+        for i in li:
+            i["date"] = i["date"].strftime("%Y-%m-%dT00:00:00+00:00")
     else:  # pragma: no cover
         cols = [sql.text("countries_by_month"), sql.text("month")]
         q = select(cols).select_from(sql.table("global_by_month"))
