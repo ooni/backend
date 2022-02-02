@@ -1052,6 +1052,7 @@ def api_private_country_overview():
             COUNT(DISTINCT probe_asn) AS network_count
             FROM fastpath
             WHERE probe_cc = :probe_cc
+            AND measurement_start_time > '2016-01-01'
         """
         r = query_click_one_row(sql.text(s), {"probe_cc": probe_cc})
     else:  # pragma: no cover
