@@ -19,11 +19,12 @@ def privapi(client, subpath):
 def test_private_api_asn_by_month(client):
     url = "asn_by_month"
     response = privapi(client, url)
-    assert len(response) > 1
+    assert len(response) == 25
     r = response[0]
     assert sorted(r.keys()) == ["date", "value"]
     assert r["value"] > 10
     assert r["value"] < 10 ** 6
+    assert r["date"].endswith("T00:00:00+00:00")
 
 
 def test_private_api_countries_by_month(client):
