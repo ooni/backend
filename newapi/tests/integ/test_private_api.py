@@ -226,6 +226,7 @@ def test_private_api_global_overview_by_month(client):
     assert sorted(resp["networks_by_month"][0].keys()) == ["date", "value"]
     assert sorted(resp["countries_by_month"][0].keys()) == ["date", "value"]
     assert sorted(resp["measurements_by_month"][0].keys()) == ["date", "value"]
+    assert resp["networks_by_month"][0]["date"].endswith("T00:00:00+00:00")
 
 
 @pytest.mark.skip(reason="cannot be tested")

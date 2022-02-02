@@ -54,6 +54,12 @@ def validate_probe_asn_query_param():
     return probe_asn
 
 
+def expand_dates(li):
+    """Replaces 'date' key in a list of dict"""
+    for i in li:
+        i["date"] = i["date"].strftime("%Y-%m-%dT00:00:00+00:00")
+
+
 @api_private_blueprint.route("/asn_by_month")
 def api_private_asn_by_month():
     """Network count by month
@@ -72,8 +78,7 @@ def api_private_asn_by_month():
         GROUP BY date ORDER BY date
         """
         li = list(query_click(q, {}))
-        for i in li:
-            i["date"] = i["date"].strftime("%Y-%m-%dT00:00:00+00:00")
+        expand_dates(li)
     else:  # pragma: no cover
         cols = [sql.text("networks_by_month"), sql.text("month")]
         q = select(cols).select_from(sql.table("global_by_month"))
@@ -100,8 +105,7 @@ def api_private_countries_by_month():
         GROUP BY date ORDER BY date
         """
         li = list(query_click(q, {}))
-        for i in li:
-            i["date"] = i["date"].strftime("%Y-%m-%dT00:00:00+00:00")
+        expand_dates(li)
     else:  # pragma: no cover
         cols = [sql.text("countries_by_month"), sql.text("month")]
         q = select(cols).select_from(sql.table("global_by_month"))
@@ -1134,6 +1138,9 @@ def api_private_global_by_month():
     n = [{"date": r["month"], "value": r["networks_by_month"]} for r in rows]
     c = [{"date": r["month"], "value": r["countries_by_month"]} for r in rows]
     m = [{"date": r["month"], "value": r["measurements_by_month"]} for r in rows]
+    expand_dates(n)
+    expand_dates(c)
+    expand_dates(m)
     return cachedjson(
         24, networks_by_month=n, countries_by_month=c, measurements_by_month=m
     )
