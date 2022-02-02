@@ -461,8 +461,8 @@ def list_test_helpers():
         ],
     }
     probe_ipaddr = request.headers.get("X-Real-Ip", "")
-    if probe_ipaddr.startswith("2.34."):
-        # Temporary hack to match 2.34.0.0/16 announced by AS30722
+    # Temporary hack to pass the new test-helper to some ASNs
+    if probe_ipaddr.startswith("2.34.") or probe_ipaddr.startswith("58.97."):
         j["web-connectivity"] = [
             {"address": "https://0.th.ooni.org", "type": "https"},
             {
