@@ -400,7 +400,7 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
         toDate(measurement_start_time) AS test_day,
         COUNT(DISTINCT probe_asn) as count
     FROM fastpath
-    WHERE test_day >= today() - interval 32 day
+    WHERE test_day >= today() - interval 31 day
         AND test_day < today() - interval 2 day
         AND probe_cc = :probe_cc
         --mark--
