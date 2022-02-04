@@ -6,6 +6,7 @@ not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
 from datetime import date, datetime, timedelta
+from itertools import product
 
 from urllib.parse import urljoin, urlencode
 
@@ -1169,6 +1170,70 @@ def api_private_circumvention_stats_by_country():
     try:
         q = query_click(sql.text(q), {})
         result = [dict(x) for x in q]
+        return cachedjson(24, v=0, results=result)
+
+    except Exception as e:
+        return jsonify({"v": 0, "error": str(e)})
+
+
+def pivot_circumvention_runtime_stats(rows):
+    # "pivot": create a datapoint for each probe_cc/test_name/date
+    tmp = {}
+    test_names = set()
+    ccs = set()
+    dates = set()
+    for r in rows:
+        k = (r["test_name"], r["probe_cc"], r["date"])
+        tmp[k] = (r["p50"], r["p90"], r["cnt"])
+        test_names.add(k[0])
+        ccs.add(k[1])
+        dates.add(k[2])
+
+    dates = sorted(dates)
+    ccs = sorted(ccs)
+    test_names = sorted(test_names)
+    no_data = ()
+    result = [
+        dict(
+            test_name=k[0],
+            probe_cc=k[1],
+            date=k[2],
+            v=tmp.get(k, no_data),
+        )
+        for k in product(test_names, ccs, dates)
+    ]
+    return result
+
+
+@api_private_blueprint.route("/circumvention_runtime_stats")
+def api_private_circumvention_runtime_stats():
+    """Runtime statistics on protocols used for circumvention,
+    grouped by date, country, test_name.
+    ---
+    responses:
+      200:
+        description: List of dicts with keys probe_cc and cnt
+    """
+    if not current_app.config["USE_CLICKHOUSE"]:
+        return jsonify({"v": 0, "error": "Not supported"})
+
+    q = """SELECT
+        toDate(measurement_start_time) AS date,
+        test_name,
+        probe_cc,
+        quantile(.5)(JSONExtractFloat(scores, 'extra', 'test_runtime')) AS p50,
+        quantile(.9)(JSONExtractFloat(scores, 'extra', 'test_runtime')) AS p90,
+        count() as cnt
+    FROM fastpath
+    WHERE test_name IN ['torsf', 'tor', 'stunreachability', 'psiphon','riseupvpn']
+    AND measurement_start_time > today() - interval 6 month
+    AND measurement_start_time < today() - interval 1 day
+    AND JSONHas(scores, 'extra', 'test_runtime')
+    GROUP BY date, probe_cc, test_name
+    """
+    try:
+        q = query_click(sql.text(q), {})
+        result = pivot_circumvention_runtime_stats(q)
         return cachedjson(24, v=0, results=result)
 
     except Exception as e:
