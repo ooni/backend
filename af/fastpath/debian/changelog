@@ -1,3 +1,9 @@
+fastpath (0.54) unstable; urgency=medium
+
+  * Make Clickhouse dependency optional
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 11 Feb 2022 11:31:06 +0000
+
 fastpath (0.53) unstable; urgency=medium
 
   * Add stunreachability scoring
