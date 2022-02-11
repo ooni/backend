@@ -3,7 +3,7 @@ pyasn1==0.1.8
 # These are dependencies of oonibackend specifically
 cffi==1.10.0
 PyYaml==3.12
-Twisted==13.2.0
+Twisted==22.1.0
 cyclone==1.1
 ipaddr==2.1.10
 pygeoip==0.2.6
