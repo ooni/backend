@@ -22,7 +22,6 @@ Architecture: all
 Depends: ${misc:Depends},
  ${python3:Depends},
  python3-boto3,
- python3-clickhouse-driver,
  python3-gunicorn,
  python3-lz4,
  python3-psycopg2,
@@ -31,6 +30,8 @@ Depends: ${misc:Depends},
  python3-ujson,
  python3-yaml,
  nginx
+Recommends:
+ python3-clickhouse-driver
 Suggests:
  bpython3,
  python3-pytest,

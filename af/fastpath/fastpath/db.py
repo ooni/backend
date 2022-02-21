@@ -15,8 +15,11 @@ import logging
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import Json
 
-# debdeps: python3-clickhouse-driver
-from clickhouse_driver import Client as Clickhouse
+try:
+    # debdeps: python3-clickhouse-driver
+    from clickhouse_driver import Client as Clickhouse
+except ImportError:
+    pass
 import ujson
 
 from fastpath.metrics import setup_metrics
