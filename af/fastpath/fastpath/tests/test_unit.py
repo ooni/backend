@@ -146,7 +146,7 @@ def test_score_tor():
         "blocking_country": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"test_runtime": 0.7671142980000001},
+        "extra": {"test_runtime": 0.767114298},
     }
 
 
@@ -199,6 +199,42 @@ def test_score_http_requests():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
+    }
+
+
+# # test_name: stunreachability
+
+
+def test_score_stunreachability():
+    msm_subset = {
+        "test_name": "stunreachability",
+        "test_keys": {"endpoint": "stun.l.google.com:19302", "failure": None},
+    }
+    scores = fp.score_measurement(msm_subset)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "extra": {"endpoint": "stun.l.google.com:19302"},
+    }
+
+
+def test_score_stunreachability_fail():
+    # failure, also the endpoint key is missing
+    msm_subset = {
+        "test_name": "stunreachability",
+        "test_keys": {"failure": "boo"},
+    }
+    scores = fp.score_measurement(msm_subset)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "extra": {"endpoint": None, "failure": "boo"},
     }
 
 

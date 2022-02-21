@@ -1312,6 +1312,22 @@ def score_signal(msm) -> dict:
     return scores
 
 
+def score_stunreachability(msm) -> dict:
+    """Calculate measurement scoring for STUN reachability
+    Returns a scores dict
+    """
+    # https://github.com/ooni/backend/issues/551
+    scores = init_scores()
+    tk = msm.get("test_keys", {})
+    scores["extra"] = dict(endpoint=tk.get("endpoint"))
+    failure = tk.get("failure")
+    if failure:
+        scores["blocking_general"] = 1.0
+        scores["extra"]["failure"] = failure
+
+    return scores
+
+
 def score_torsf(msm) -> dict:
     """Calculate measurement scoring for Tor Snowflake
     Returns a scores dict
@@ -1393,6 +1409,8 @@ def score_measurement(msm: dict) -> dict:
             return score_dns_consistency(msm)
         if tn == "signal":
             return score_signal(msm)
+        if tn == "stunreachability":
+            return score_stunreachability(msm)
         if tn == "torsf":
             return score_torsf(msm)
         if tn == "riseupvpn":
