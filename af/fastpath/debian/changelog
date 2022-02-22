@@ -1,3 +1,9 @@
+fastpath (0.56) unstable; urgency=medium
+
+  * Handle RiseUp VPS transport_status set to None
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 21 Feb 2022 19:12:37 +0000
+
 fastpath (0.54) unstable; urgency=medium
 
   * Make Clickhouse dependency optional
