@@ -716,10 +716,8 @@ def get_http_header(resp, header_name, case_sensitive=False):
        given that we may have multiple keys per header. If the new
        headers_list field is present in the response, we'll use
        that, otherwise we'll fallback to the headers map. We perform
-       case sensitive header names search by default. You can yet
-       optionally select case insensitive comparison, which is useful,
-       e.g., when processing results where a change in the case
-       implies the presence of a transparent HTTP proxy."""
+       case insensitive header names search by default. You can yet
+       optionally select case sensitive comparison."""
     if case_sensitive == False:
         header_name = header_name.lower()
 
