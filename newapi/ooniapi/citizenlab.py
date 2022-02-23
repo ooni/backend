@@ -618,6 +618,7 @@ def get_workflow_state():
     account_id = get_account_id()
     log.debug("get citizenlab workflow state")
     ulm = get_url_list_manager()
+    ulm.sync_state(account_id)
     state = ulm.get_state(account_id)
     if state in ("PR_OPEN"):
         pr_url = ulm.get_pr_url(account_id)
