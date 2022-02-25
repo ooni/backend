@@ -98,7 +98,8 @@ def update_db_table(conn, lookup_list, jsonl_mode):
 
 def update_jsonl_clickhouse_table(conn, lookup_list, jsonl_mode):
     if jsonl_mode == "dryrun":
-        raise NotImplementedError
+        return
+
     # FIXME table name
     q = """INSERT INTO new_jsonl
     (report_id, input, measurement_uid, s3path, linenum, date, source) VALUES
@@ -159,7 +160,7 @@ def parse_args():
     )
     ap.add_argument(
         "--s3mode",
-        choices=["check", "create"],
+        choices=["check", "create", "dryrun"],
         default="check",
         help="create jsonl files on S3 or just check",
     )
@@ -214,7 +215,7 @@ def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
     stats["files_generated"] += 1
     if conf.s3mode == "create":
         upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
-    else:
+    elif conf.s3mode == "check":
         s3_check(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
     # update_db_table(db_conn, e.lookup_list, conf.jsonlmode)
     update_jsonl_clickhouse_table(db_conn, e.lookup_list, conf.jsonlmode)
