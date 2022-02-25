@@ -4,6 +4,7 @@ A hybrid between fastpath and the ooni_api_uploader.py from the API
 To be used once, fetches legacy cans from the legacy S3 bucket
 Generates new postcans and jsonl files and uploads to the new S3 bucket
 Updates both the fastpath and jsonl tables
+It uses the trivial_id format for measurement_uid (00<hash>)
 
 Inputs:
   Legacy raw cans in old S3 bucket
@@ -12,11 +13,13 @@ Outputs:
   jsonl files in new S3 bucket e.g.:
     jsonl/{testname}/{cc}/{ts}/00/{jsonlf.name}
   rows in the jsonl database table
-    upsert or insert-but-not-overwrite
+  rows in the fastpath database table
 
 Usage:
 export AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 PYTHONPATH=. ./fastpath/reprocessor.py ooni-data ooni-data-eu-fra-test --day 2015-1-1
+
+Note: the bundling of measurements into jsonl gz files has to remain deterministic
 
 DB update:
 
@@ -32,12 +35,13 @@ CREATE INDEX CONCURRENTLY jsonl_measurement_uid ON jsonl (measurement_uid);
 
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from os import getenv
 from pathlib import Path
 import gzip
 import logging
 import os
+import time
 
 import ujson
 import psycopg2  # debdeps: python3-psycopg2
@@ -56,8 +60,10 @@ log.setLevel(logging.DEBUG)
 for lo in ("urllib3", "botocore", "s3transfer", "boto"):
     logging.getLogger(lo).setLevel(logging.INFO)
 
-
 import boto3
+import botocore.exceptions
+
+stats = dict(files_uploaded=0, files_size_mismatch=0, files_generated=0, t0=0)
 
 
 def create_s3_client(conf):
@@ -68,34 +74,37 @@ def create_s3_client(conf):
     return session.resource("s3")
 
 
-def ping_db(conn):
-    q = "SELECT pg_postmaster_start_time();"
-    with conn.cursor() as cur:
-        cur.execute(q)
-        row = cur.fetchone()
-        log.debug("Database start time: %s", row[0])
-
-
-def update_db_table(conn, lookup_list, jsonltbl_policy):
-    if jsonltbl_policy == "dryrun":
+def update_db_table(conn, lookup_list, jsonl_mode):
+    if jsonl_mode == "dryrun":
         return
 
     q = """INSERT INTO jsonl
     (report_id, input, measurement_uid, s3path, linenum) VALUES %s
     ON CONFLICT (report_id, input, measurement_uid) DO
     """
-    if jsonltbl_policy == "upsert":
+    if jsonl_mode == "upsert":
         log.info(f"Upserting {len(lookup_list)} rows to jsonl table")
         q += "UPDATE SET s3path = excluded.s3path, linenum = excluded.linenum"
-    elif jsonltbl_policy == "insert":
+    elif jsonl_mode == "insert":
         log.info(f"Inserting {len(lookup_list)} rows to jsonl table")
         q += "NOTHING"
     else:
-        raise Exception(f"Unexpected --jsonltbl value {jsonltbl_policy}")
+        raise Exception(f"Unexpected --jsonlmode value {jsonl_mode}")
 
     with conn.cursor() as cur:
         execute_values(cur, q, lookup_list)
         conn.commit()
+
+
+def update_jsonl_clickhouse_table(conn, lookup_list, jsonl_mode):
+    if jsonl_mode == "dryrun":
+        raise NotImplementedError
+    # FIXME table name
+    q = """INSERT INTO new_jsonl
+    (report_id, input, measurement_uid, s3path, linenum, date, source) VALUES
+    """
+    x = conn.execute(q, lookup_list)
+    log.info(f"Inserted {x}")
 
 
 @metrics.timer("upload_measurement")
@@ -103,6 +112,27 @@ def upload_to_s3(s3, bucket_name, tarf, s3path):
     obj = s3.Object(bucket_name, s3path)
     log.info(f"Uploading {tarf} to {s3path}")
     obj.put(Body=tarf.read_bytes())
+    stats["files_uploaded"] += 1
+
+
+def s3_check(s3, bucket_name, local_file, s3path):
+    # Only check if the file is present
+    try:
+        obj = s3.Object(bucket_name, s3path)
+        size = obj.content_length
+    except botocore.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            log.info(f"Dryrun creating new file {bucket_name} {s3path}")
+            stats["files_uploaded"] += 1
+            return
+        raise
+
+    disk_size = local_file.stat().st_size
+    if disk_size != size:
+        log.info(f"Size difference: {size} {disk_size} {size - disk_size}")
+        stats["files_size_mismatch"] += 1
+    else:
+        log.info("File found")
 
 
 def parse_date(d):
@@ -116,19 +146,25 @@ def parse_args():
     ap.add_argument("dst_bucket")
     ap.add_argument("--day", type=lambda d: parse_date(d))
     ap.add_argument(
-        "--jsonltbl",
+        "--jsonlmode",
         choices=["dryrun", "insert", "upsert"],
-        default="upsert",
+        default="dryrun",
         help="jsonl table update policy. insert = never overwrite",
     )
     ap.add_argument(
-        "--fastpathtbl",
+        "--fastpathmode",
         choices=["dryrun", "insert", "upsert"],
-        default="upsert",
+        default="dryrun",
         help="fastpath table update policy. insert = never overwrite",
     )
-    db = "postgresql://shovel:yEqgNr2eXvgG255iEBxVeP@localhost/metadb"
-    ap.add_argument("--db-uri", default=db)
+    ap.add_argument(
+        "--s3mode",
+        choices=["check", "create"],
+        default="check",
+        help="create jsonl files on S3 or just check",
+    )
+    ap.add_argument("--db-uri")
+    ap.add_argument("--clickhouse-url")
     c = ap.parse_args()
 
     return c
@@ -169,15 +205,23 @@ class Entity:
 
 
 def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
+    """For each JSONL file we do one upload to S3 and one
+    INSERT query with many rows
+    """
     jsize = int(e.fd.offset / 1024)
-    log.info(f"Closing jsonl and uploading it. Size: {jsize} KB")
+    log.info(f"Closing and uploading {e.jsonl_s3path}. Size: {jsize} KB")
     e.fd.close()
-    upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
-    update_db_table(db_conn, e.lookup_list, conf.jsonltbl)
+    stats["files_generated"] += 1
+    if conf.s3mode == "create":
+        upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+    else:
+        s3_check(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+    # update_db_table(db_conn, e.lookup_list, conf.jsonlmode)
+    update_jsonl_clickhouse_table(db_conn, e.lookup_list, conf.jsonlmode)
     e.jsonlf.unlink()
 
 
-def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
+def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     """Process a msmt
     If needed: create a new Entity tracking a jsonl file,
       close and upload jsonl to S3 and upsert db
@@ -235,32 +279,53 @@ def process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn):
 
     rid = msm.get("report_id", "") or ""
     input = msm.get("input", "") or ""
-    i = (rid, input, msmt_uid, str(e.jsonl_s3path), len(e.lookup_list))
+    source = can_fn
+    try:
+        assert can_fn.startswith("canned/20")
+        date = parse_date(can_fn.split("/", 2)[1])
+    except Exception:
+        log.error(f"Unable to extract date from {can_fn}")
+        date = None
+    # report_id, input, measurement_uid, s3path, linenum, date, source
+    i = (rid, input, msmt_uid, e.jsonl_s3path, len(e.lookup_list), date, source)
     e.lookup_list.append(i)
 
     if e.fd.offset > THRESHOLD:
         # The jsonlf is big enough
         finalize_jsonl(s3sig, db_conn, conf, e)
 
-    if conf.fastpathtbl in ("insert", "upsert"):
-        update = conf.fastpathtbl == "upsert"
+    if conf.fastpathmode in ("insert", "upsert"):
+        update = conf.fastpathmode == "upsert"
         score_measurement_and_upsert_fastpath(msm, msmt_uid, update)
+
+
+def progress(t0, processed_size, tot_size):
+    now = time.time()
+    p = processed_size / tot_size
+    if p == 0:
+        return
+    rem = (now - t0) / p - (now - t0)
+    rem = str(timedelta(seconds=rem))
+    log.info(f"Processed percentage: {100 * p} Remaining: {rem}\n{stats}")
 
 
 @metrics.timer("total_run_time")
 def main():
     conf = parse_args()
-    format_char = "n"
-    collector_id = "L"
-    identity = f"{format_char}{collector_id}"
     log.info(f"From bucket {conf.src_bucket} to {conf.dst_bucket}")
     s3sig = create_s3_client(conf)  # signed client for writing
-    db_conn = psycopg2.connect(conf.db_uri)
-    db.setup(conf)  # setup db conn inside db module
+    if conf.db_uri:
+        log.info(f"Connecting to PG at {conf.db_uri}")
+        db_conn = psycopg2.connect(conf.db_uri)
+        db.setup(conf)  # setup db conn inside db module
+    elif conf.clickhouse_url:
+        log.info(f"Connecting to CH at {conf.clickhouse_url}")
+        db.setup_clickhouse(conf)
+        db_conn = db.click_client
     setup_fingerprints()
 
+    # s3_check(s3sig, "ooni-data-eu-fra", "none", "jsonl/tor/VE/20200827/00/20200827_VE_tor.l.0.jsonl.gz")
     # Fetch msmts for one day
-
     buf = {}  # "<cc> <testname>" -> jsonlf / fd / jsonl_s3path
     seen_uids = set()  # Avoid uploading duplicates
 
@@ -271,19 +336,21 @@ def main():
     cans_fns = s3f.list_cans_on_s3_for_a_day(s3uns, conf.day)
     cans_fns = sorted(cans_fns)  # this is not enough to sort by time
     tot_size = sum(size for _, size in cans_fns)
+    # Reminder: listing and bundling of msmts has to remain deterministic
     processed_size = 0
     log.info(f"{tot_size/1024/1024/1024} GB to process")
     log.info(f"{len(cans_fns)} cans to process")
+    stats["t0"] = time.time()
     #  TODO make assertions on msmt
     #  TODO add consistency check on trivial id found in fastpath table
     for can in cans_fns:
         can_fn, size = can
-        log.info(f"Processed percentage: {100 * processed_size / tot_size}")
+        progress(stats["t0"], processed_size, tot_size)
         log.info(f"Opening can {can_fn}")
         Path(can_fn).parent.mkdir(parents=True, exist_ok=True)
         s3uns.download_file(conf.src_bucket, can_fn, can_fn)
         for msm_tup in s3f.load_multiple(can_fn):
-            process_measurement(msm_tup, buf, seen_uids, conf, s3sig, db_conn)
+            process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn)
         processed_size += size
         Path(can_fn).unlink()
 

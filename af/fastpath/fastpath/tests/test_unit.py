@@ -24,6 +24,20 @@ def test_trivial_id():
     assert tid == "00d1cb49bba274be952c9f701f1e13b8"
 
 
+def test_trivial_id_ujson_1_35():
+    #python3-ujson  version 1.35-3
+    tid = trivial_id(dict(f=0.333333333333333333))
+    assert tid == '00a302fb14656e7720d4830f98bcb871'
+
+    # with ujson 5.1.0-1 '001ff098c3c4f4f8cbb43269bab38c0f'
+
+    # with json '00b25af86613c6171871c7c0c4ffdecb'
+
+    # this is independent from the truncation
+    tid = trivial_id(dict(f=0.3333333333))
+    assert tid == '00a302fb14656e7720d4830f98bcb871'
+
+
 def test_match_fingerprints_no_match():
     fp.setup_fingerprints()
     msm = {"probe_cc": "IE", "test_keys": {"requests": []}}

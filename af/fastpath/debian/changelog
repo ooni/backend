@@ -1,3 +1,9 @@
+fastpath (0.57) unstable; urgency=medium
+
+  * Improve reprocessor
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 24 Feb 2022 16:45:44 +0000
+
 fastpath (0.56) unstable; urgency=medium
 
   * Handle RiseUp VPS transport_status set to None
