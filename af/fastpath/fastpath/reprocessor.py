@@ -229,14 +229,19 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     msm_jstr, msm, msmt_uid = msm_tup
     if msm is None:
         msm = ujson.loads(msm_jstr)
-    if sorted(msm.keys()) == ["content", "format"]:
-        msm = unwrap_msmt(msm)
+    try:
+        if sorted(msm.keys()) == ["content", "format"]:
+            msm = unwrap_msmt(msm)
 
-    rid = msm.get("report_id", None)
-    inp = msm.get("input", None)
-    tn = msm.get("test_name").replace("_", "")
-    cc = msm.get("probe_cc").upper()
-    desc = f"{msmt_uid} {tn} {cc} {rid} {inp}"
+        rid = msm.get("report_id")
+        inp = msm.get("input")
+        tn = msm.get("test_name").replace("_", "")
+        cc = msm.get("probe_cc").upper()
+        desc = f"{msmt_uid} {tn} {cc} {rid} {inp}"
+    except Exception as e:
+        log.info(f"Ignoring broken measurement")
+        return
+
 
     if msm.get("probe_cc", "").upper() == "ZZ":
         log.debug(f"Ignoring measurement with probe_cc=ZZ {desc}")
@@ -334,6 +339,7 @@ def main():
     s3uns = s3f.create_s3_client()  # unsigned client for reading
     cans_fns = s3f.list_cans_on_s3_for_a_day(s3uns, conf.day)
     cans_fns = sorted(cans_fns)  # this is not enough to sort by time
+    # cans_fns = [ x for x in cans_fns if "Tv9HsC0CeHuWLg5SDyOnE" in x[0] ] # FIXME
     tot_size = sum(size for _, size in cans_fns)
     # Reminder: listing and bundling of msmts has to remain deterministic
     processed_size = 0
