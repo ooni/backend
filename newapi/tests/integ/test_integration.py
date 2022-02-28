@@ -628,15 +628,22 @@ def test_list_measurements_paging_2(client):
             assert meta["count"] == -1, (url, meta)
             assert meta["pages"] == -1, (url, meta)
             assert meta["next_url"].startswith("https://api.ooni.io/api/v1/")
-        else: # last page
+        else:  # last page
             assert meta["current_page"] == pagenum, url
             assert meta["offset"] == 300, url
             assert meta["count"] == 300, (url, meta)  # is this ok?
             assert meta["next_url"] is None
-            assert meta["pages"] == 3 # in this a bug?
+            assert meta["pages"] == 3  # in this a bug?
             break
 
-        url = meta["next_url"].split("/", 5)[-1] # fetch next url
+        url = meta["next_url"].split("/", 5)[-1]  # fetch next url
+
+
+def test_list_measurements_filter_category_code(client):
+    p = "measurements?since=2021-11-8&until=2021-12-11&category_code=NEWS"
+    r = api(client, p)
+    urls = set(e["input"] for e in r["results"])
+    assert "http://www.bbc.com/" in urls
 
 
 ## get_measurement ##

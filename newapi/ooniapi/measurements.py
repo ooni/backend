@@ -692,6 +692,10 @@ def list_measurements():
         - vanilla_tor
         - web_connectivity
         - whatsapp
+      - name: category_code
+        in: query
+        type: string
+        description: The category code from the citizenlab list
       - name: since
         in: query
         type: string
@@ -1221,7 +1225,7 @@ def _list_measurements_click(
             query_params["category_code"] = category_code
             fpq_table = fpq_table.join(
                 sql.table("citizenlab"),
-                sql.text("citizenlab.url = :input"),
+                sql.text("citizenlab.url = fastpath.input"),
             )
             fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
