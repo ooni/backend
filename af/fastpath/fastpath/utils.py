@@ -1,3 +1,4 @@
+from datetime import datetime
 import csv
 import hashlib
 import ujson
@@ -1630,8 +1631,8 @@ fingerprints = {
         {"dns_full": "195.46.39.11", "locality": "local"},
     ],
     "UZ": [
-	# https://explorer.ooni.org/measurement/20211231T141146Z_webconnectivity_UZ_8193_n1_Ap5yFzrVoL671ahx?input=http%3A%2F%2Fwww.europacasino.com%2F
-	# https://explorer.ooni.org/measurement/20211231T172847Z_webconnectivity_UZ_8193_n1_kzei9uKT3oPETGzS?input=http%3A%2F%2Fikhwanonline.com%2F
+        # https://explorer.ooni.org/measurement/20211231T141146Z_webconnectivity_UZ_8193_n1_Ap5yFzrVoL671ahx?input=http%3A%2F%2Fwww.europacasino.com%2F
+        # https://explorer.ooni.org/measurement/20211231T172847Z_webconnectivity_UZ_8193_n1_kzei9uKT3oPETGzS?input=http%3A%2F%2Fikhwanonline.com%2F
         {
             "header_name": "Location",
             "header_prefix": "http://reestr.mitc.uz/",
@@ -1688,15 +1689,48 @@ def mock_out_long_strings(d, maxlen):  # noqa
 def trivial_id(msm: dict) -> str:
     """Generate a trivial id of the measurement to allow upsert if needed
     This is used for legacy (before measurement_uid) measurements
-    - 32-bytes hexdigest
     - Deterministic / stateless with no DB interaction
     - Malicious/bugged msmts with collisions on report_id/input/test_name lead
     to different hash values avoiding the collision
     - Malicious/duplicated msmts that are semantically identical to the "real"
     one lead to harmless collisions
+    - Sortable by date
     """
-    # Same output with Python's json
-    VER = "00"
-    msm_jstr = ujson.dumps(msm, sort_keys=True, ensure_ascii=False).encode()
-    tid = VER + hashlib.shake_128(msm_jstr).hexdigest(15)
+    VER = "01"
+    h = hashlib.shake_128()
+
+    def update_hash(x):
+        if x is None:
+            h.update(b"none")
+        elif isinstance(x, (tuple, list)):
+            for i in x:
+                update_hash(i)
+        elif isinstance(x, dict):
+            for k in sorted(x):
+                v = x[k]
+                if isinstance(k, str):
+                    k = k.encode(encoding="utf-8", errors="ignore")
+                h.update(k)
+                update_hash(v)
+        elif isinstance(x, float):
+            h.update(f"{x:.9}".encode())
+            pass
+        elif isinstance(x, int):
+            h.update(f"{x}".encode())
+        else:
+            if isinstance(x, str):
+                x = x.encode(encoding="utf-8", errors="ignore")
+            h.update(x)
+
+    update_hash(msm)
+    h = h.hexdigest(15)
+
+    try:
+        t = msm.get("measurement_start_time")
+        t = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
+        ts = t.strftime("%Y%m%d")
+    except:
+        ts = "00000000"
+
+    tid = f"{VER}{ts}{h}"
     return tid

@@ -21,13 +21,24 @@ def loadj(fn):
 
 def test_trivial_id():
     tid = trivial_id(dict(a="🐱"))
-    assert tid == "00d1cb49bba274be952c9f701f1e13b8"
+    assert tid == "010000000009e3c7ff64a9851301007fdc10d254"
+
+
+def test_trivial_mbx_1():
+    msm = loadj("mbx-1")
+    assert trivial_id(msm) == "0120190411ccfab7dc568c82f88076ac314d7beb"
+
+
+def test_trivial_id_float():
+    assert trivial_id(dict(f=0.3333333333)) == "0100000000718dd84be3f78679f2a1f681dbbb9f"
+    assert trivial_id(dict(f=0.333333333)) == "0100000000718dd84be3f78679f2a1f681dbbb9f"
+    assert trivial_id(dict(f=0.33333333)) != "0100000000718dd84be3f78679f2a1f681dbbb9f"
 
 
 def test_trivial_id_ujson_1_35():
-    #python3-ujson  version 1.35-3
+    # python3-ujson  version 1.35-3
     tid = trivial_id(dict(f=0.333333333333333333))
-    assert tid == '00a302fb14656e7720d4830f98bcb871'
+    assert tid == "00a302fb14656e7720d4830f98bcb871"
 
     # with ujson 5.1.0-1 '001ff098c3c4f4f8cbb43269bab38c0f'
 
@@ -35,7 +46,7 @@ def test_trivial_id_ujson_1_35():
 
     # this is independent from the truncation
     tid = trivial_id(dict(f=0.3333333333))
-    assert tid == '00a302fb14656e7720d4830f98bcb871'
+    assert tid == "00a302fb14656e7720d4830f98bcb871"
 
 
 def test_match_fingerprints_no_match():
