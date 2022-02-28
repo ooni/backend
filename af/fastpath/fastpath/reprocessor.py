@@ -4,7 +4,6 @@ A hybrid between fastpath and the ooni_api_uploader.py from the API
 To be used once, fetches legacy cans from the legacy S3 bucket
 Generates new postcans and jsonl files and uploads to the new S3 bucket
 Updates both the fastpath and jsonl tables
-It uses the trivial_id format for measurement_uid (00<hash>)
 
 Inputs:
   Legacy raw cans in old S3 bucket
@@ -51,7 +50,6 @@ import statsd  # debdeps: python3-statsd
 import fastpath.db as db
 import fastpath.s3feeder as s3f
 from fastpath.core import score_measurement, setup_fingerprints, unwrap_msmt
-from fastpath.utils import trivial_id
 
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="reprocessor")
 log = logging.getLogger("reprocessor")
@@ -228,34 +226,34 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
       close and upload jsonl to S3 and upsert db
     """
     THRESHOLD = 20 * 1024 * 1024
-    msm_jstr, msm, _ = msm_tup
+    msm_jstr, msm, msmt_uid = msm_tup
     if msm is None:
         msm = ujson.loads(msm_jstr)
     if sorted(msm.keys()) == ["content", "format"]:
         msm = unwrap_msmt(msm)
 
-    msmt_uid = trivial_id(msm)
     rid = msm.get("report_id", None)
     inp = msm.get("input", None)
     tn = msm.get("test_name").replace("_", "")
     cc = msm.get("probe_cc").upper()
-
-    # log.debug(f"Processing {msmt_uid} {tn} {cc} {rid} {inp}")
-    if msmt_uid in seen_uids:
-        log.info(f"DUPLICATE {msmt_uid} {tn} {cc} {rid} {inp}")
-        return
-
-    seen_uids.add(msmt_uid)
+    desc = f"{msmt_uid} {tn} {cc} {rid} {inp}"
 
     if msm.get("probe_cc", "").upper() == "ZZ":
-        log.debug("Ignoring measurement with probe_cc=ZZ")
+        log.debug(f"Ignoring measurement with probe_cc=ZZ {desc}")
         metrics.incr("discarded_measurement")
         return
 
     if msm.get("probe_asn", "").upper() == "AS0":
-        log.debug("Ignoring measurement with ASN 0")
+        log.debug(f"Ignoring measurement with ASN 0  {desc}")
         metrics.incr("discarded_measurement")
         return
+
+    if msmt_uid in seen_uids:
+        log.info(f"Ignoring DUPLICATE {desc}")
+        return
+
+    log.debug(f"Processing {desc}")
+    seen_uids.add(msmt_uid)
 
     # cc tn -> [entity1, entity2, ... ]
 
