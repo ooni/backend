@@ -9,6 +9,7 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 
 from datetime import datetime
 from textwrap import dedent
+from typing import Optional
 from urllib.parse import urlparse
 import logging
 
@@ -30,7 +31,7 @@ metrics = setup_metrics(name="fastpath.db")
 conn = None
 _autocommit_conn = None
 
-click_client = None
+click_client: Clickhouse
 
 # # PostgreSQL backend
 
@@ -52,14 +53,16 @@ def setup(conf) -> None:
     _ping()
 
 
-def extract_input_domain(msm: dict, test_name: str):
+def extract_input_domain(msm: dict, test_name: str) -> tuple[str, str]:
     """Extract domain and handle special case meek_fronted_requests_test"""
-    input_ = msm.get("input", None)
+    input_ = msm.get("input") or ""
     if test_name == "meek_fronted_requests_test" and isinstance(input_, list):
-        domain = None if input_ is None else urlparse(input_[0]).netloc
-        input_ = ":".join(input_)
+        domain = input_[0]  # type: str
+        input_ = ",".join(input_)
+        input_ = "{" + input_ + "}"
     else:
-        domain = None if input_ is None else urlparse(input_).netloc
+        assert isinstance(input_, str)
+        domain = urlparse(input_).netloc
     return input_, domain
 
 
@@ -118,8 +121,8 @@ def upsert_summary(
     args = (
         measurement_uid,
         msm["report_id"],
-        domain,
-        input_,
+        domain or None,
+        input_ or None,
         msm["probe_cc"],
         asn,
         test_name,
@@ -281,12 +284,14 @@ def clickhouse_upsert_summary(
     test_name = msm.get("test_name", None) or ""
     input_, domain = extract_input_domain(msm, test_name)
     asn = int(msm["probe_asn"][2:])  # AS123
-    measurement_start_time = datetime.strptime(msm["measurement_start_time"], "%Y-%m-%d %H:%M:%S")
+    measurement_start_time = datetime.strptime(
+        msm["measurement_start_time"], "%Y-%m-%d %H:%M:%S"
+    )
     test_start_time = datetime.strptime(msm["test_start_time"], "%Y-%m-%d %H:%M:%S")
     row = [
         measurement_uid,
         nn(msm, "report_id"),
-        input_ or "",
+        input_,
         nn(msm, "probe_cc"),
         asn,
         test_name,
@@ -304,7 +309,7 @@ def clickhouse_upsert_summary(
     try:
         click_client.execute(sql_insert, [row])
     except Exception:
-        log.error("Failed Clickhouse insert", exc_info=1)
+        log.error("Failed Clickhouse insert", exc_info=True)
 
     # Future feature extraction:
     # def getint(features: dict, k: str, default: int) -> int:

@@ -13,7 +13,7 @@ import uuid
 
 import yaml
 
-from utils import trivial_id
+from fastpath.utils import trivial_id
 
 log = logging.getLogger("normalize")
 

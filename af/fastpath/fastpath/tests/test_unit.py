@@ -9,6 +9,7 @@ import pytest
 import ujson
 
 from fastpath.utils import trivial_id
+from fastpath.db import extract_input_domain
 import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
 
@@ -20,33 +21,18 @@ def loadj(fn):
 
 
 def test_trivial_id():
-    tid = trivial_id(dict(a="🐱"))
-    assert tid == "010000000009e3c7ff64a9851301007fdc10d254"
+    tid = trivial_id(b"", {"measurement_start_time": "2021-02-03 10:11:12"})
+    assert tid == "01202102037f9c2ba4e88f827d61604550760585"
 
 
-def test_trivial_mbx_1():
-    msm = loadj("mbx-1")
-    assert trivial_id(msm) == "0120190411ccfab7dc568c82f88076ac314d7beb"
+def test_extract_input_domain():
+    assert extract_input_domain({}, "") == ("", "")
+    assert extract_input_domain({"input": "http://x.org"}, "") == ("http://x.org", "x.org")
 
 
-def test_trivial_id_float():
-    assert trivial_id(dict(f=0.3333333333)) == "0100000000718dd84be3f78679f2a1f681dbbb9f"
-    assert trivial_id(dict(f=0.333333333)) == "0100000000718dd84be3f78679f2a1f681dbbb9f"
-    assert trivial_id(dict(f=0.33333333)) != "0100000000718dd84be3f78679f2a1f681dbbb9f"
-
-
-def test_trivial_id_ujson_1_35():
-    # python3-ujson  version 1.35-3
-    tid = trivial_id(dict(f=0.333333333333333333))
-    assert tid == "00a302fb14656e7720d4830f98bcb871"
-
-    # with ujson 5.1.0-1 '001ff098c3c4f4f8cbb43269bab38c0f'
-
-    # with json '00b25af86613c6171871c7c0c4ffdecb'
-
-    # this is independent from the truncation
-    tid = trivial_id(dict(f=0.3333333333))
-    assert tid == "00a302fb14656e7720d4830f98bcb871"
+def test_extract_input_domain_meek():
+    msm = {"input": ["b", "a"]}
+    assert extract_input_domain(msm, "meek_fronted_requests_test") == ("{b,a}", "b")
 
 
 def test_match_fingerprints_no_match():

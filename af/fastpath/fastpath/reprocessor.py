@@ -49,6 +49,7 @@ import statsd  # debdeps: python3-statsd
 
 import fastpath.db as db
 import fastpath.s3feeder as s3f
+from fastpath.db import extract_input_domain
 from fastpath.core import score_measurement, setup_fingerprints, unwrap_msmt
 
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="reprocessor")
@@ -198,7 +199,7 @@ def score_measurement_and_upsert_fastpath(msm, msmt_uid, do_update: bool) -> Non
 @dataclass
 class Entity:
     jsonlf: Path
-    fd: int
+    fd: gzip.GzipFile
     jsonl_s3path: str
     lookup_list: list
 
@@ -234,14 +235,15 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
             msm = unwrap_msmt(msm)
 
         rid = msm.get("report_id")
-        inp = msm.get("input")
-        tn = msm.get("test_name").replace("_", "")
+        test_name = msm.get("test_name")
+        input_, domain = extract_input_domain(msm, test_name)
+        assert not isinstance(input_, list)
+        tn = test_name.replace("_", "")
         cc = msm.get("probe_cc").upper()
-        desc = f"{msmt_uid} {tn} {cc} {rid} {inp}"
+        desc = f"{msmt_uid} {tn} {cc} {rid} {input_}"
     except Exception as e:
         log.info(f"Ignoring broken measurement")
         return
-
 
     if msm.get("probe_cc", "").upper() == "ZZ":
         log.debug(f"Ignoring measurement with probe_cc=ZZ {desc}")
@@ -281,8 +283,7 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     e.fd.write(ujson.dumps(msm).encode())
     e.fd.write(b"\n")
 
-    rid = msm.get("report_id", "") or ""
-    input = msm.get("input", "") or ""
+    rid = msm.get("report_id") or ""  # type: str
     source = can_fn
     try:
         assert can_fn.startswith("canned/20")
@@ -291,7 +292,7 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         log.error(f"Unable to extract date from {can_fn}")
         date = None
     # report_id, input, measurement_uid, s3path, linenum, date, source
-    i = (rid, input, msmt_uid, e.jsonl_s3path, len(e.lookup_list), date, source)
+    i = (rid, input_, msmt_uid, e.jsonl_s3path, len(e.lookup_list), date, source)
     e.lookup_list.append(i)
 
     if e.fd.offset > THRESHOLD:
@@ -339,7 +340,7 @@ def main():
     s3uns = s3f.create_s3_client()  # unsigned client for reading
     cans_fns = s3f.list_cans_on_s3_for_a_day(s3uns, conf.day)
     cans_fns = sorted(cans_fns)  # this is not enough to sort by time
-    # cans_fns = [ x for x in cans_fns if "Tv9HsC0CeHuWLg5SDyOnE" in x[0] ] # FIXME
+    # cans_fns = [ x for x in cans_fns if "meek" in x[0] ] # FIXME
     tot_size = sum(size for _, size in cans_fns)
     # Reminder: listing and bundling of msmts has to remain deterministic
     processed_size = 0
