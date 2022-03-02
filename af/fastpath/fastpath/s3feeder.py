@@ -114,10 +114,10 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                 continue
 
             try:
-                raw = k.read()
+                raw = k.read()  # type: bytes
                 j = ujson.loads(raw)
             except Exception:
-                log.error(repr(k[:100]), exc_info=1)
+                log.error(repr(k)[:100], exc_info=True)
                 continue
 
             fmt = j.get("format", "")
@@ -228,16 +228,16 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
     """
     # fn: can filename without path
     # diskf: File in the s3cachedir directory
-    cans = set()  # (s3fname, filename on disk, size, download required)
+    cans = []  # (s3fname, filename on disk, size, download required)
     for s3fname, size in files:
         diskf = conf.s3cachedir / s3fname.split("/", 1)[1]
         if diskf.exists() and size == diskf.stat().st_size:
             metrics.incr("cache_hit")
             diskf.touch(exist_ok=True)
-            cans.add((s3fname, diskf, size, False))
+            cans.append((s3fname, diskf, size, False))
         else:
             metrics.incr("cache_miss")
-            cans.add((s3fname, diskf, size, True))
+            cans.append((s3fname, diskf, size, True))
 
     def _cb(bytes_count):
         if _cb.start_time is None:
@@ -253,7 +253,7 @@ def fetch_cans(s3, conf, files) -> Generator[Path, None, None]:
         except ZeroDivisionError:
             pass
 
-    cans = sorted(cans)
+    cans = sorted(set(cans))
     _cb.total_size = sum(t[2] for t in cans if t[3])
     _cb.total_count = 0
 
