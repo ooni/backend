@@ -579,7 +579,7 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
     for off, raw_entry in blobgen:
         esha = headsha.copy()
         esha.update(raw_entry)
-        esha = esha.digest()
+        esha_d = esha.digest()
         entry = yaml.safe_load(raw_entry)
 
         if not entry:  # e.g. '---\nnull\n...\n'
@@ -588,12 +588,12 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
             header.pop("test_start_time")
         entry.update(header)
         try:
-            d = normalize_entry(entry, bucket_tstamp, report_fn, esha)
+            d = normalize_entry(entry, bucket_tstamp, report_fn, esha_d)
             msmt_uid = trivial_id(raw_entry, d)
             d["measurement_uid"] = msmt_uid
             yield d
         except Exception as e:
-            log.error(str(e), exc_info=1)
+            log.error(str(e), exc_info=True)
             continue
 
         # try:
