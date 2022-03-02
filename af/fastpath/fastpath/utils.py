@@ -1686,7 +1686,7 @@ def mock_out_long_strings(d, maxlen):  # noqa
                         d[k] = "..."
 
 
-def trivial_id(msm: dict) -> str:
+def trivial_id(raw: str, msm: dict) -> str:
     """Generate a trivial id of the measurement to allow upsert if needed
     This is used for legacy (before measurement_uid) measurements
     - Deterministic / stateless with no DB interaction
@@ -1697,40 +1697,12 @@ def trivial_id(msm: dict) -> str:
     - Sortable by date
     """
     VER = "01"
-    h = hashlib.shake_128()
-
-    def update_hash(x):
-        if x is None:
-            h.update(b"none")
-        elif isinstance(x, (tuple, list)):
-            for i in x:
-                update_hash(i)
-        elif isinstance(x, dict):
-            for k in sorted(x):
-                v = x[k]
-                if isinstance(k, str):
-                    k = k.encode(encoding="utf-8", errors="ignore")
-                h.update(k)
-                update_hash(v)
-        elif isinstance(x, float):
-            h.update(f"{x:.9}".encode())
-            pass
-        elif isinstance(x, int):
-            h.update(f"{x}".encode())
-        else:
-            if isinstance(x, str):
-                x = x.encode(encoding="utf-8", errors="ignore")
-            h.update(x)
-
-    update_hash(msm)
-    h = h.hexdigest(15)
-
+    h = hashlib.shake_128(raw).hexdigest(15)
     try:
         t = msm.get("measurement_start_time")
         t = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
         ts = t.strftime("%Y%m%d")
     except:
         ts = "00000000"
-
     tid = f"{VER}{ts}{h}"
     return tid

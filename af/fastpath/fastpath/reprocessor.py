@@ -310,7 +310,7 @@ def progress(t0, processed_size, tot_size):
         return
     rem = (now - t0) / p - (now - t0)
     rem = str(timedelta(seconds=rem))
-    log.info(f"Processed percentage: {100 * p} Remaining: {rem}\n{stats}")
+    log.info(f"Processed percentage: {100 * p} Remaining time: {rem} {stats}")
 
 
 @metrics.timer("total_run_time")

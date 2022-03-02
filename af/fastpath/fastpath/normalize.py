@@ -13,6 +13,7 @@ import uuid
 
 import yaml
 
+from utils import trivial_id
 
 log = logging.getLogger("normalize")
 
@@ -575,11 +576,11 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
     if not header.get("report_id"):
         header["report_id"] = generate_report_id(header)
 
-    for off, entry in blobgen:
+    for off, raw_entry in blobgen:
         esha = headsha.copy()
-        esha.update(entry)
+        esha.update(raw_entry)
         esha = esha.digest()
-        entry = yaml.safe_load(entry)
+        entry = yaml.safe_load(raw_entry)
 
         if not entry:  # e.g. '---\nnull\n...\n'
             continue
@@ -587,7 +588,10 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
             header.pop("test_start_time")
         entry.update(header)
         try:
-            yield normalize_entry(entry, bucket_tstamp, report_fn, esha)
+            d = normalize_entry(entry, bucket_tstamp, report_fn, esha)
+            msmt_uid = trivial_id(raw_entry, d)
+            d["measurement_uid"] = msmt_uid
+            yield d
         except Exception as e:
             log.error(str(e), exc_info=1)
             continue

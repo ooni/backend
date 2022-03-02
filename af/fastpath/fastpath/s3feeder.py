@@ -66,7 +66,8 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                 if m.name.endswith(".json"):
                     for line in k:
                         msm = ujson.loads(line)
-                        msmt_uid = trivial_id(msm)
+                        msmt_uid = trivial_id(line, msm)
+                        msm["measurement_uid"] = msmt_uid
                         yield (None, msm, msmt_uid)
 
                 elif m.name.endswith(".yaml"):
@@ -74,7 +75,7 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                     rfn = f"{bucket_tstamp}/" + fn.split("/")[-1]
                     for msm in iter_yaml_msmt_normalized(k, bucket_tstamp, rfn):
                         metrics.incr("yaml_normalization")
-                        msmt_uid = trivial_id(msm)
+                        msmt_uid = msm["measurement_uid"]
                         yield (None, msm, msmt_uid)
 
     elif fn.endswith(".json.lz4"):
@@ -82,7 +83,8 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
         with lz4frame.open(fn) as f:
             for line in f:
                 msm = ujson.loads(line)
-                msmt_uid = trivial_id(msm)
+                msmt_uid = trivial_id(line, msm)
+                msm["measurement_uid"] = msmt_uid
                 yield (None, msm, msmt_uid)
 
     elif fn.endswith(".yaml.lz4"):
@@ -92,7 +94,7 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
             rfn = f"{bucket_tstamp}/" + fn.split("/")[-1]
             for msm in iter_yaml_msmt_normalized(f, bucket_tstamp, rfn):
                 metrics.incr("yaml_normalization")
-                msmt_uid = trivial_id(msm)
+                msmt_uid = msm["measurement_uid"]
                 yield (None, msm, msmt_uid)
 
     elif fn.endswith(".tar.gz"):
@@ -112,7 +114,8 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                 continue
 
             try:
-                j = ujson.loads(k.read())
+                raw = k.read()
+                j = ujson.loads(raw)
             except Exception:
                 log.error(repr(k[:100]), exc_info=1)
                 continue
@@ -124,6 +127,7 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                 # ... /20210614004521.999962_JO_signal_68eb19b439326d60.post
                 msmt_uid = m.name.rsplit("/", 1)[1]
                 msmt_uid = msmt_uid[:-5]
+                msm["measurement_uid"] = msmt_uid
                 yield (None, msm, msmt_uid)
 
             elif fmt == "yaml":
