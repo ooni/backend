@@ -16,6 +16,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Any
 import logging
 import multiprocessing as mp
 import os
@@ -56,7 +57,7 @@ log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
-fingerprints = None
+fingerprints: Dict[str, Dict[str, list]]
 
 
 def parse_date(d):
@@ -1463,7 +1464,7 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
         return
     try:
         recv_time = datetime.strptime(msmt_uid[:22], "%Y%m%d%H%M%S.%f_")
-        start_time = msm.get("measurement_start_time")
+        start_time = msm.get("measurement_start_time") or ""
         start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return
