@@ -1686,7 +1686,7 @@ def mock_out_long_strings(d, maxlen):  # noqa
                         d[k] = "..."
 
 
-def trivial_id(raw: str, msm: dict) -> str:
+def trivial_id(raw: bytes, msm: dict) -> str:
     """Generate a trivial id of the measurement to allow upsert if needed
     This is used for legacy (before measurement_uid) measurements
     - Deterministic / stateless with no DB interaction
@@ -1699,7 +1699,7 @@ def trivial_id(raw: str, msm: dict) -> str:
     VER = "01"
     h = hashlib.shake_128(raw).hexdigest(15)
     try:
-        t = msm.get("measurement_start_time")
+        t = msm.get("measurement_start_time") or ""
         t = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
         ts = t.strftime("%Y%m%d")
     except:
