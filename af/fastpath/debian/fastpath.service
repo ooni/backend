@@ -16,9 +16,6 @@ ReadOnlyDirectories=/
 ReadWriteDirectories=/proc/self
 ReadWriteDirectories=/var/lib/fastpath
 
-StandardOutput=syslog+console
-StandardError=syslog+console
-
 PermissionsStartOnly=true
 LimitNOFILE=65536
 
