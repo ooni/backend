@@ -242,7 +242,8 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         cc = msm.get("probe_cc").upper()
         desc = f"{msmt_uid} {tn} {cc} {rid} {input_}"
     except Exception as e:
-        log.info(f"Ignoring broken measurement")
+        log.info(f"Ignoring broken measurement {desc}")
+        metrics.incr("broken_measurement")
         return
 
     if msm.get("probe_cc", "").upper() == "ZZ":
@@ -257,6 +258,7 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
 
     if msmt_uid in seen_uids:
         log.info(f"Ignoring DUPLICATE {desc}")
+        metrics.incr("duplicate_measurement")
         return
 
     log.debug(f"Processing {desc}")
