@@ -265,6 +265,7 @@ def clickhouse_upsert_summary(
     anomaly,
     confirmed,
     msm_failure,
+    domain,
     software_name,
     software_version
     ) VALUES
@@ -302,6 +303,7 @@ def clickhouse_upsert_summary(
         tf(anomaly),
         tf(confirmed),
         tf(msm_failure),
+        domain,
         nn(msm, "software_name"),
         nn(msm, "software_version"),
     ]
