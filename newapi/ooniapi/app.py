@@ -116,7 +116,7 @@ def setup_collectors_ring(config):
         config["OTHER_COLLECTORS"] = c
 
     else:
-        log.error(f"{lh} not found in collectors {colls}")
+        print(f"{lh} not found in collectors {colls}")
         config["OTHER_COLLECTORS"] = deque(c)
 
 
