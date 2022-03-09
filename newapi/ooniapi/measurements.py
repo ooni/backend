@@ -523,6 +523,7 @@ def _get_measurement_meta_postgresql(
     return dict(msmt_meta)
 
 
+@metrics.timer("get_measurement_meta_clickhouse")
 def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
     # Given report_id + input, fetch measurement data from fastpath table
     query = "SELECT * FROM fastpath "
@@ -535,8 +536,19 @@ def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
         WHERE fastpath.input = :input
         AND fastpath.report_id = :report_id
         """
-    query += "LIMIT 1"
     query_params = dict(input=input_, report_id=report_id)
+    try:
+        rid_t = datetime.strptime(report_id[:8], "%Y%m%d")
+        query_params["begin"] = rid_t - timedelta(days=30)
+        query_params["end"] = rid_t + timedelta(days=30)
+        query += """
+        AND fastpath.measurement_start_time > :begin
+        AND fastpath.measurement_start_time < :end
+        """
+    except Exception as e:
+        log.error(e, exc_info=True)
+
+    query += "LIMIT 1"
     msmt_meta = query_click_one_row(sql.text(query), query_params)
     if not msmt_meta:
         return {}  # measurement not found
