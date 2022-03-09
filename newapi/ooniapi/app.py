@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import sys
+from collections import deque
 
 from flask import Flask, json
 
@@ -98,6 +99,27 @@ def parse_cors_origins(app):
     app.config["CORS_URLS"] = out
 
 
+def setup_collectors_ring(config):
+    """Create round-robin ring of collectors excluding localhost"""
+    lh = config.get("HOSTNAME")
+    if not lh:
+        import socket
+
+        lh = socket.gethostname()
+
+    colls = config["COLLECTORS"]
+    c = deque(sorted(set(colls)))
+    if lh in c:
+        while c[0] != lh:
+            c.rotate()
+        c.popleft()
+        config["OTHER_COLLECTORS"] = c
+
+    else:
+        log.error(f"{lh} not found in collectors {colls}")
+        config["OTHER_COLLECTORS"] = deque(c)
+
+
 def setup_logging(log):
     if enable_journal:
         root_logger = log.root
@@ -124,6 +146,7 @@ def init_app(app, testmode=False):
     app.config.from_pyfile(conffile)
     validate_conf(app, conffile)
     # parse_cors_origins(app)
+    setup_collectors_ring(app.config)
 
     log.info("Configuration loaded")
     CORS(app)

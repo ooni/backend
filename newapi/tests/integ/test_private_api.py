@@ -255,3 +255,17 @@ def test_private_api_circumvention_stats_by_country(client, log):
     resp = privapi(client, url)
     assert resp["v"] == 0
     assert len(resp["results"]) > 3
+
+# # /circumvention_runtime_stats
+#
+def test_private_api_circumvention_runtime_stats(client, log):
+    url = "circumvention_runtime_stats"
+    resp = privapi(client, url)
+    assert resp["v"] == 0
+    assert "error" not in resp, resp
+    assert len(resp["results"]) > 3, resp
+    print("num res", len(resp["results"]))
+    import ujson
+    print(len(ujson.dumps(resp)))
+    assert 0, resp
+

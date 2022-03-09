@@ -25,6 +25,7 @@ except ImportError:
     pass
 
 import ujson  # debdeps: python3-ujson
+import urllib3  # debdeps: python3-urllib3
 
 from flask import current_app, request, make_response, abort, redirect
 from flask.json import jsonify
@@ -57,6 +58,8 @@ FASTPATH_SERVER = "fastpath.ooni.nu"
 FASTPATH_PORT = 8000
 
 log = logging.getLogger()
+
+urllib_pool = urllib3.PoolManager()
 
 
 class QueryTimeoutError(HTTPException):
@@ -231,7 +234,7 @@ def _fetch_jsonl_measurement_body_postgresql(
 
 def _fetch_jsonl_measurement_body_clickhouse(
     report_id, input: str, measurement_uid
-) -> bytes:
+) -> Optional[bytes]:
     """Fetch jsonl from S3, decompress it, extract msmt"""
     inp = input or ""  # NULL/None input is stored as ''
     query = """SELECT s3path, linenum FROM jsonl
@@ -243,7 +246,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
     if lookup is None:
         m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
         log.error(m)
-        raise MsmtNotFound
+        return None
 
     s3path = lookup["s3path"]
     linenum = lookup["linenum"]
@@ -252,7 +255,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
         return _fetch_jsonl_measurement_body_inner(s3path, linenum)
     except:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
-        raise MsmtNotFound
+        return None
 
 
 def _unwrap_post(post: dict) -> dict:
@@ -359,39 +362,80 @@ def _fetch_autoclaved_measurement_body(
     return body
 
 
+@metrics.timer("_fetch_measurement_body_from_hosts")
+def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
+    """Fetch raw POST from another API host, extract msmt
+    This is used only for msmts that have been processed by the fastpath
+    but are not uploaded to S3 yet.
+    """
+    try:
+        assert msmt_uid.startswith("20")
+        tstamp, cc, testname, hash_ = msmt_uid.split("_")
+        hour = tstamp[:10]
+        int(hour)
+        path = f"{hour}_{cc}_{testname}/{msmt_uid}.post"
+    except Exception:
+        log.info("Error", exc_info=True)
+        return
+
+    for hostname in current_app.config["OTHER_COLLECTORS"]:
+        url = urljoin(f"https://{hostname}/measurement_spool", path)
+        log.debug(f"Attempt to load {url}")
+        try:
+            r = urllib_pool.request("GET", url)
+            if r.status == 404:
+                log.debug("not found")
+                continue
+            elif r.status != 200:
+                log.error(f"unexpected status {r.status}")
+                continue
+
+            post = ujson.loads(r.data)
+            body = _unwrap_post(post)
+            return ujson.dumps(body).encode()
+        except Exception:
+            log.info("Error", exc_info=True)
+            pass
+
+
+@metrics.timer("fetch_measurement_body")
 def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
-    """Fetch measurement body from either disk, jsonl or autoclaved on S3"""
+    """Fetch measurement body from either disk, jsonl, measurement spool dir
+    on another host or autoclaved on S3"""
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")
     # 5: Current format e.g.
     # 20210124T210009Z_webconnectivity_VE_22313_n1_Ojb<redacted>
-    if u_count == 5 and measurement_uid:
-        # Look on disk and then from JSONL cans on S3
-        body = _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
-        if body is not None:
-            return body
+    new_format = u_count == 5 and measurement_uid
 
-    log.debug(f"Fetching body for {report_id} {input} from jsonl on S3")
-    try:
-        if current_app.config["USE_CLICKHOUSE"]:
-            return _fetch_jsonl_measurement_body_clickhouse(
+    if new_format:
+        ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y%m%d%H%M")
+        fresh = measurement_uid > ts
+
+    if new_format and fresh:
+        body = (
+            _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
+            or _fetch_measurement_body_from_hosts(measurement_uid)
+            or _fetch_jsonl_measurement_body_clickhouse(
                 report_id, input, measurement_uid
             )
-        else:
-            return _fetch_jsonl_measurement_body_postgresql(
+        )
+
+    elif new_format and not fresh:
+        body = (
+            _fetch_jsonl_measurement_body_clickhouse(
                 report_id, input, measurement_uid
             )
-    except MsmtNotFound:
-        pass
+            or _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
+            or _fetch_measurement_body_from_hosts(measurement_uid)
+        )
 
-    if not current_app.config["USE_CLICKHOUSE"]:  # pragma: no cover
-        log.debug(f"Fetching body for {report_id} {input} from autoclaved on S3")
-        try:
-            return _fetch_autoclaved_measurement_body(report_id, input)
-        except MsmtNotFound:
-            log.error(f"Failed to fetch body for {report_id} {input}")
+    else:
+        body = _fetch_jsonl_measurement_body_clickhouse(
+            report_id, input, measurement_uid
+        )
 
-    raise MsmtNotFound
+    return body
 
 
 def genurl(path: str, **kw) -> str:
@@ -420,7 +464,6 @@ def get_raw_measurement():
         description: raw measurement body, served as JSON file to be dowloaded
     """
     # This is used by Explorer to let users download msmts
-    log = current_app.logger
     param = request.args.get
     report_id = param("report_id")
     if not report_id or len(report_id) < 15:
