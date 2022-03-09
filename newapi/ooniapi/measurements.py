@@ -376,7 +376,7 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
         path = f"{hour}_{cc}_{testname}/{msmt_uid}.post"
     except Exception:
         log.info("Error", exc_info=True)
-        return
+        return None
 
     for hostname in current_app.config["OTHER_COLLECTORS"]:
         url = urljoin(f"https://{hostname}/measurement_spool", path)
@@ -396,6 +396,8 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
         except Exception:
             log.info("Error", exc_info=True)
             pass
+
+    return None
 
 
 @metrics.timer("fetch_measurement_body")
@@ -423,9 +425,7 @@ def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
 
     elif new_format and not fresh:
         body = (
-            _fetch_jsonl_measurement_body_clickhouse(
-                report_id, input, measurement_uid
-            )
+            _fetch_jsonl_measurement_body_clickhouse(report_id, input, measurement_uid)
             or _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
             or _fetch_measurement_body_from_hosts(measurement_uid)
         )
@@ -435,7 +435,10 @@ def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
             report_id, input, measurement_uid
         )
 
-    return body
+    if body:
+        return body
+
+    raise MsmtNotFound
 
 
 def genurl(path: str, **kw) -> str:
