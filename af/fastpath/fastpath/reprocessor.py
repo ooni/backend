@@ -42,7 +42,7 @@ import logging
 import os
 import time
 
-import ujson
+import json
 import psycopg2  # debdeps: python3-psycopg2
 from psycopg2.extras import execute_values
 import statsd  # debdeps: python3-statsd
@@ -115,24 +115,25 @@ def upload_to_s3(s3, bucket_name, tarf, s3path):
     stats["files_uploaded"] += 1
 
 
-def s3_check(s3, bucket_name, local_file, s3path):
-    # Only check if the file is present
+def s3_check(s3, bucket_name, local_file, s3path) -> str:
+    """Checks if the file is present and has the same size"""
     try:
         obj = s3.Object(bucket_name, s3path)
         size = obj.content_length
     except botocore.exceptions.ClientError as e:
         if e.response["Error"]["Code"] == "404":
-            log.info(f"Dryrun creating new file {bucket_name} {s3path}")
-            stats["files_uploaded"] += 1
-            return
+            log.info(f"file not found on S3 {bucket_name} {s3path}")
+            return "not-found"
         raise
 
     disk_size = local_file.stat().st_size
     if disk_size != size:
         log.info(f"Size difference: {size} {disk_size} {size - disk_size}")
         stats["files_size_mismatch"] += 1
-    else:
-        log.info("File found")
+        return "different"
+
+    log.info("File found")
+    return "same"
 
 
 def parse_date(d):
@@ -159,7 +160,7 @@ def parse_args():
     )
     ap.add_argument(
         "--s3mode",
-        choices=["check", "create", "dryrun"],
+        choices=["check", "create", "dryrun", "create-if-needed"],
         default="check",
         help="create jsonl files on S3 or just check",
     )
@@ -204,6 +205,7 @@ class Entity:
     lookup_list: list
 
 
+@metrics.timer("finalize_jsonl")
 def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
     """For each JSONL file we do one upload to S3 and one
     INSERT query with many rows
@@ -216,11 +218,17 @@ def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
         upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
     elif conf.s3mode == "check":
         s3_check(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+    elif conf.s3mode == "create-if-needed":
+        s3status = s3_check(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+        if s3status == "not-found":
+            upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+
     # update_db_table(db_conn, e.lookup_list, conf.jsonlmode)
     update_jsonl_clickhouse_table(db_conn, e.lookup_list, conf.jsonlmode)
     e.jsonlf.unlink()
 
 
+@metrics.timer("process_measurement")
 def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     """Process a msmt
     If needed: create a new Entity tracking a jsonl file,
@@ -229,7 +237,7 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     THRESHOLD = 20 * 1024 * 1024
     msm_jstr, msm, msmt_uid = msm_tup
     if msm is None:
-        msm = ujson.loads(msm_jstr)
+        msm = json.loads(msm_jstr)
     try:
         if sorted(msm.keys()) == ["content", "format"]:
             msm = unwrap_msmt(msm)
@@ -282,7 +290,7 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     e = entities[-1]
 
     # Add msmt to open jsonl file
-    e.fd.write(ujson.dumps(msm).encode())
+    e.fd.write(json.dumps(msm).encode())
     e.fd.write(b"\n")
 
     rid = msm.get("report_id") or ""  # type: str
@@ -314,6 +322,16 @@ def progress(t0, processed_size, tot_size):
     rem = (now - t0) / p - (now - t0)
     rem = str(timedelta(seconds=rem))
     log.info(f"Processed percentage: {100 * p} Remaining time: {rem} {stats}")
+
+
+@metrics.timer("process_can")
+def process_can(db_conn, s3uns, s3sig, can_fn, can_size, conf, buf, seen_uids):
+    Path(can_fn).parent.mkdir(parents=True, exist_ok=True)
+    log.info(f"Fetching can {can_fn}")
+    s3uns.download_file(conf.src_bucket, can_fn, can_fn)
+    for msm_tup in s3f.load_multiple(can_fn):
+        process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn)
+    Path(can_fn).unlink()
 
 
 @metrics.timer("total_run_time")
@@ -353,14 +371,9 @@ def main():
     #  TODO add consistency check on trivial id found in fastpath table
     for can in cans_fns:
         can_fn, size = can
-        progress(stats["t0"], processed_size, tot_size)
-        log.info(f"Opening can {can_fn}")
-        Path(can_fn).parent.mkdir(parents=True, exist_ok=True)
-        s3uns.download_file(conf.src_bucket, can_fn, can_fn)
-        for msm_tup in s3f.load_multiple(can_fn):
-            process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn)
+        process_can(db_conn, s3uns, s3sig, can_fn, size, conf, buf, seen_uids)
         processed_size += size
-        Path(can_fn).unlink()
+        progress(stats["t0"], processed_size, tot_size)
 
     log.info("Finish jsonl files still open")
     for json_entities in buf.values():
