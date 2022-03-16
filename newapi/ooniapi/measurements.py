@@ -670,6 +670,9 @@ def get_measurement_meta():
         # FIXME cache timing
         return cachedjson(0, **msmt_meta)
 
+    if msmt_meta == {}:  # measurement not found
+        return cachedjson(0, raw_measurement="", **msmt_meta)
+
     try:
         body = _fetch_measurement_body(report_id, input_, msmt_meta["measurement_uid"])
         assert isinstance(body, bytes)
