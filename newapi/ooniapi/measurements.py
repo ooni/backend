@@ -545,6 +545,8 @@ def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
         AND fastpath.measurement_start_time > :begin
         AND fastpath.measurement_start_time < :end
         """
+    except ValueError:
+        pass  # legacy report_id format without date
     except Exception as e:
         log.error(e, exc_info=True)
 
