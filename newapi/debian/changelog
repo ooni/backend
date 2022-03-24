@@ -1,3 +1,9 @@
+ooni-api (1.0.4) unstable; urgency=medium
+
+  * Switch more networks to new test helper
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 24 Mar 2022 18:58:30 +0000
+
 ooni-api (1.0.3) unstable; urgency=medium
 
   * Set HTTP content type in aggregation

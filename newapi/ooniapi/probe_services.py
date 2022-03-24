@@ -462,8 +462,21 @@ def list_test_helpers():
     }
     probe_ipaddr = request.headers.get("X-Real-Ip", "")
     # Temporary hack to pass the new test-helper to some ASNs
-    if probe_ipaddr.startswith("2.34.") or probe_ipaddr.startswith("58.97."):
+    if probe_ipaddr.startswith("2"):
+        metrics.incr("test_helper_new")
         j["web-connectivity"] = [
+            {"address": "https://0.th.ooni.org", "type": "https"},
+            {"address": "https://1.th.ooni.org", "type": "https"},
+            {
+                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
+                "front": "d33d1gs9kpq1c5.cloudfront.net",
+                "type": "cloudfront",
+            },
+        ]
+    elif probe_ipaddr.startswith("3"):
+        metrics.incr("test_helper_new")
+        j["web-connectivity"] = [
+            {"address": "https://1.th.ooni.org", "type": "https"},
             {"address": "https://0.th.ooni.org", "type": "https"},
             {
                 "address": "https://d33d1gs9kpq1c5.cloudfront.net",
@@ -471,6 +484,9 @@ def list_test_helpers():
                 "type": "cloudfront",
             },
         ]
+    else:
+        metrics.incr("test_helper_old")
+
     return cachedjson(0, **j)
 
 
