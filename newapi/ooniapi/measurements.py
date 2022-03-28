@@ -232,20 +232,36 @@ def _fetch_jsonl_measurement_body_postgresql(
         raise MsmtNotFound
 
 
+@metrics.timer("_fetch_jsonl_measurement_body_clickhouse")
 def _fetch_jsonl_measurement_body_clickhouse(
     report_id, input: str, measurement_uid
 ) -> Optional[bytes]:
     """Fetch jsonl from S3, decompress it, extract msmt"""
     inp = input or ""  # NULL/None input is stored as ''
-    query = """SELECT s3path, linenum FROM jsonl
-        PREWHERE report_id = :report_id AND input = :inp
-        LIMIT 1"""
-    query_params = dict(inp=inp, report_id=report_id)
+    try:
+        # FIXME temporary hack to test reprocessing
+        query = """SELECT s3path, linenum FROM new_jsonl
+            PREWHERE report_id = :report_id AND input = :inp
+            LIMIT 1"""
+        query_params = dict(inp=inp, report_id=report_id)
+        lookup = query_click_one_row(sql.text(query), query_params)
+        assert lookup is not None
+        log.info("Found in new_jsonl")
+        metrics.incr("msmt_found_in_new_jsonl")
 
-    lookup = query_click_one_row(sql.text(query), query_params)
+    except:
+        log.info("Not found in new_jsonl")
+        metrics.incr("msmt_not_found_in_new_jsonl")
+        query = """SELECT s3path, linenum FROM jsonl
+            PREWHERE report_id = :report_id AND input = :inp
+            LIMIT 1"""
+        query_params = dict(inp=inp, report_id=report_id)
+        lookup = query_click_one_row(sql.text(query), query_params)
+
     if lookup is None:
         m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
         log.error(m)
+        metrics.incr("msmt_not_found_in_jsonl")
         return None
 
     s3path = lookup["s3path"]
