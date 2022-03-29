@@ -1228,8 +1228,13 @@ def _list_measurements_click(
         fpwhere.append(sql.text("report_id = :report_id"))
 
     if probe_cc:
+        if probe_cc == "ZZ":
+            log.info("Refusing list_measurements with probe_cc set to ZZ")
+            abort(403)
         query_params["probe_cc"] = probe_cc
         fpwhere.append(sql.text("probe_cc = :probe_cc"))
+    else:
+        fpwhere.append(sql.text("probe_cc != 'ZZ'"))
 
     if probe_asn is not None:
         if probe_asn == 0:
