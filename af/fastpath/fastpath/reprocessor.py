@@ -38,6 +38,7 @@ from datetime import datetime, timedelta
 from os import getenv
 from pathlib import Path
 import gzip
+import hashlib
 import logging
 import os
 import time
@@ -108,7 +109,7 @@ def update_jsonl_clickhouse_table(conn, lookup_list, jsonl_mode):
 
 
 @metrics.timer("upload_measurement")
-def upload_to_s3(s3, bucket_name, tarf, s3path):
+def upload_to_s3(s3, bucket_name: str, tarf: Path, s3path: str) -> None:
     obj = s3.Object(bucket_name, s3path)
     log.info(f"Uploading {tarf} to {s3path}")
     obj.put(Body=tarf.read_bytes())
@@ -201,7 +202,7 @@ def score_measurement_and_upsert_fastpath(msm, msmt_uid, do_update: bool) -> Non
 class Entity:
     jsonlf: Path
     fd: gzip.GzipFile
-    jsonl_s3path: str
+    jsonl_s3path_base: str
     lookup_list: list
 
 
@@ -211,17 +212,32 @@ def finalize_jsonl(s3sig, db_conn, conf, e: Entity) -> None:
     INSERT query with many rows
     """
     jsize = int(e.fd.offset / 1024)
-    log.info(f"Closing and uploading {e.jsonl_s3path}. Size: {jsize} KB")
+    log.info(f"Closing and preparing {e.jsonlf} Size: {jsize} KB")
     e.fd.close()
+
+    # Calculate unique hash
+    # update e.lookup_list
+    # change e.jsonl_s3path
+    hasher = hashlib.shake_128()
+    for table_row in e.lookup_list:
+        rid = table_row[2]
+        hasher.update(rid.encode())
+    h = hasher.hexdigest(8)
+    jsonl_s3path = e.jsonl_s3path_base + f"{h}.jsonl.gz"
+    log.info(f"Uploading {e.jsonlf} as {jsonl_s3path}")
+
+    for n, table_row in enumerate(e.lookup_list):
+        e.lookup_list[n][3] = jsonl_s3path
+
     stats["files_generated"] += 1
     if conf.s3mode == "create":
-        upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+        upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, jsonl_s3path)
     elif conf.s3mode == "check":
-        s3_check(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+        s3_check(s3sig, conf.dst_bucket, e.jsonlf, jsonl_s3path)
     elif conf.s3mode == "create-if-needed":
-        s3status = s3_check(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+        s3status = s3_check(s3sig, conf.dst_bucket, e.jsonlf, jsonl_s3path)
         if s3status == "not-found":
-            upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, e.jsonl_s3path)
+            upload_to_s3(s3sig, conf.dst_bucket, e.jsonlf, jsonl_s3path)
 
     # update_db_table(db_conn, e.lookup_list, conf.jsonlmode)
     update_jsonl_clickhouse_table(db_conn, e.lookup_list, conf.jsonlmode)
@@ -278,11 +294,12 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     if len(entities) == 0 or entities[-1].fd.closed:
         ts = conf.day.strftime("%Y%m%d")
         jsonlf = Path(f"{ts}_{cc}_{tn}.l.{len(entities)}.jsonl.gz")
-        jsonl_s3path = f"jsonl/{tn}/{cc}/{ts}/00/{jsonlf.name}"
+        jsonl_s3path_base = f"jsonl/{tn}/{cc}/{ts}/00/{ts}_{cc}_{tn}.x."
+        # An Entity is a JSONL file [that will be uploaded] on S3
         e = Entity(
             jsonlf=jsonlf,
             fd=gzip.open(jsonlf, "w"),
-            jsonl_s3path=jsonl_s3path,
+            jsonl_s3path_base=jsonl_s3path_base,
             lookup_list=[],
         )
         entities.append(e)
@@ -301,8 +318,9 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     except Exception:
         log.error(f"Unable to extract date from {can_fn}")
         date = None
+
     # report_id, input, measurement_uid, s3path, linenum, date, source
-    i = (rid, input_, msmt_uid, e.jsonl_s3path, len(e.lookup_list), date, source)
+    i = [rid, input_, msmt_uid, None, len(e.lookup_list), date, source]
     e.lookup_list.append(i)
 
     if e.fd.offset > THRESHOLD:
