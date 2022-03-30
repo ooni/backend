@@ -184,7 +184,7 @@ def score_measurement_and_upsert_fastpath(msm, msmt_uid, do_update: bool) -> Non
     if "annotations" in msm and isinstance(msm["annotations"], dict):
         platform = msm["annotations"].get("platform", "unset")
 
-    db.upsert_summary(
+    db.clickhouse_upsert_summary(
         msm,
         scores,
         anomaly,
@@ -194,7 +194,6 @@ def score_measurement_and_upsert_fastpath(msm, msmt_uid, do_update: bool) -> Non
         sw_name,
         sw_version,
         platform,
-        do_update,
     )
 
 
