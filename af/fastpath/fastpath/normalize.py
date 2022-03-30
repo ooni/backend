@@ -456,22 +456,22 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
 
     # Ignore old, rare tests
     if test_name in test_categories["scapyt"]:
-        raise UnsupportedTestError
+        raise UnsupportedTestError(test_name)
 
     if test_name in ("captive_portal", "tls_handshake"):
-        raise UnsupportedTestError
+        raise UnsupportedTestError(test_name)
 
     # TODO: tests these in
     # test_normalize_yaml_sanitise_tcp_connect_bridge_reach
     if entry["test_name"] == "tcp_connect":
         # On 2019-10-08 the last bridge_reachability entry from YAML
         # in the metadb was from 2016-10-12
-        raise UnsupportedTestError
+        raise UnsupportedTestError(test_name)
 
     elif entry["test_name"] == "bridge_reachability":
         # On 2019-10-08 the last bridge_reachability entry from YAML
         # in the metadb was from 2016-10-12
-        raise UnsupportedTestError
+        raise UnsupportedTestError(test_name)
 
     return entry
 
@@ -580,7 +580,12 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
         esha = headsha.copy()
         esha.update(raw_entry)
         esha_d = esha.digest()
-        entry = yaml.safe_load(raw_entry)
+        try:
+            entry = yaml.safe_load(raw_entry)
+        except yaml.constructor.ConstructorError:
+            rid = header["report_id"]
+            log.info(f"YAML construction error {rid}")
+            entry = None
 
         if not entry:  # e.g. '---\nnull\n...\n'
             continue
