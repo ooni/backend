@@ -265,7 +265,7 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         cc = msm.get("probe_cc").upper()
         desc = f"{msmt_uid} {tn} {cc} {rid} {input_}"
     except Exception as e:
-        log.info(f"Ignoring broken measurement {desc}")
+        log.info(f"Ignoring broken measurement {rid}")
         metrics.incr("broken_measurement")
         return
 
