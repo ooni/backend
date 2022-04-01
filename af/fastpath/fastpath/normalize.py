@@ -586,6 +586,10 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
             rid = header["report_id"]
             log.info(f"YAML construction error {rid}")
             entry = None
+        except yaml.parser.ParserError:
+            rid = header["report_id"]
+            log.info(f"YAML parsing error {rid}")
+            entry = None
 
         if not entry:  # e.g. '---\nnull\n...\n'
             continue
