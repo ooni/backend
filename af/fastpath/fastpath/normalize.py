@@ -602,7 +602,7 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
             d["measurement_uid"] = msmt_uid
             yield d
         except Exception as e:
-            log.error(str(e), exc_info=True)
+            log.error(f"Skipping measurement: {e}")
             continue
 
         # try:

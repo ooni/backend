@@ -377,6 +377,25 @@ def match_fingerprints(measurement):
     return matches
 
 
+def g_or(d, key, default):
+    """Dict getter: return 'default' if the key is missing or value is None"""
+    # Note: 'd.get(key) or default' returns 'default' on any falsy value
+    v = d.get(key)
+    return default if v is None else v
+
+
+def g(d, *keys, default=None):
+    """Item getter that supports nested keys. Returns a default when keys are
+    missing or set to None"""
+    for k in keys[:-1]:
+        d = g_or(d, k, default={})
+    return g_or(d, keys[-1], default=default)
+
+
+def gn(d, *a):
+    return g(d, *a, default=None)
+
+
 def all_keys_true(d, keys):
     """Check for values set to True in a dict"""
     if isinstance(keys, str):
@@ -418,8 +437,8 @@ def logbug(id: int, desc: str, msm: dict):
     # TODO: use assertions for unknown bugs
     rid = msm.get("report_id", "")
     url = "https://explorer.ooni.org/measurement/{}".format(rid) if rid else "no rid"
-    sname = msm.get("software_name", "unknown")
-    sversion = msm.get("software_version", "unknown")
+    sname = g_or(msm, "software_name", "unknown")
+    sversion = g_or(msm, "software_version", "unknown")
     if id > 0:
         # unknown, possibly new bug
         log.warning("probe_bug %d: %s %s %s %s", id, sname, sversion, desc, url)
@@ -447,7 +466,7 @@ def init_scores() -> dict:
 
 @metrics.timer("score_measurement_facebook_messenger")
 def score_measurement_facebook_messenger(msm):
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     del msm
 
     # TODO: recompute all these keys in the pipeline
@@ -512,12 +531,11 @@ def _extract_tcp_connect(tk):
     # https://github.com/ooni/spec/blob/master/data-formats/df-005-tcpconnect.md
     # NOTE: this is *NOT* ts-008-tcp-connect.md
     # First the probe tests N TCP connections
-    tcp_connect = tk.get("tcp_connect", [])
+    tcp_connect = g_or(tk, "tcp_connect", [])
     accessible_endpoints = 0
     unreachable_endpoints = 0
     for entry in tcp_connect:
-        s = entry.get("status", {})
-        success = s.get("success", None)
+        success = gn(entry, "status", "success")
         if success is True:
             accessible_endpoints += 1
         elif success is False:
@@ -534,7 +552,7 @@ def score_measurement_telegram(msm):
     Returns a scores dict
     """
     # Ignore tcp_blocking, http_blocking and web_failure from the probe
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     del msm
     web_status = tk.get("telegram_web_status", None)
     if web_status == "ok":
@@ -551,7 +569,7 @@ def score_measurement_telegram(msm):
     http_success_cnt = 0
     http_failure_cnt = 0
     web_failure = None
-    requests = tk.get("requests", ()) or ()
+    requests = g_or(tk, "requests", ())
     for request in requests:
         if "request" not in request:
             # client bug
@@ -608,7 +626,7 @@ def score_measurement_telegram(msm):
 @metrics.timer("score_measurement_hhfm")
 def score_measurement_hhfm(msm):
     """Calculate http_header_field_manipulation"""
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     rid = msm["report_id"]
     del msm
     scores = init_scores()
@@ -681,7 +699,7 @@ def score_measurement_hhfm(msm):
 def score_http_invalid_request_line(msm):
     """Calculate measurement scoring for http_invalid_request_line"""
     # https://github.com/ooni/spec/blob/master/nettests/ts-007-http-invalid-request-line.md
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     rid = msm["report_id"]
     scores = init_scores()
     sent = tk.get("sent", [])
@@ -750,7 +768,7 @@ def score_measurement_whatsapp(msm):
     # TODO: check data_format_version?
 
     score = 0
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
 
     # msg = ""
     # for req in msm.get("requests", []):
@@ -870,7 +888,7 @@ def score_vanilla_tor(msm):
     """Calculate measurement scoring for Tor (test_name: vanilla_tor)
     Returns a scores dict
     """
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     scores = init_scores()
 
     nks = ("error", "success", "tor_log", "tor_progress_summary", "tor_progress_tag")
@@ -908,7 +926,7 @@ def score_web_connectivity(msm, matches) -> dict:
     scores = init_scores()  # type: Dict[str, Any]
     if len(matches):
         scores["confirmed"] = True
-    tk = msm.get("test_keys", None)
+    tk = g_or(msm, "test_keys", {})
     if tk is None:
         logbug(9, "test_keys is None", msm)
         scores["accuracy"] = 0.0
@@ -990,7 +1008,7 @@ def score_tcp_connect(msm) -> dict:
     # NOTE: this is *NOT* spec/blob/master/data-formats/df-005-tcpconnect.md
     # TODO: review scores
     scores = init_scores()
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     assert msm["input"]
     conn_result = tk.get("connection", None)
 
@@ -1071,7 +1089,7 @@ def score_meek_fronted_requests_test(msm) -> dict:
     Returns a scores dict
     """
     scores = init_scores()
-    tk = msm["test_keys"]
+    tk = g_or(msm, "test_keys", {})
     requests = tk.get("requests", ()) or ()
 
     if len(requests) == 0:
@@ -1110,7 +1128,7 @@ def score_psiphon(msm) -> dict:
     Returns a scores dict
     """
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
 
     # https://github.com/ooni/spec/blob/master/nettests/ts-015-psiphon.md
     failure = tk.get("failure", None)
@@ -1147,7 +1165,7 @@ def score_tor(msm) -> dict:
     Returns a scores dict
     """
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
 
     # targets -> <ipaddr:port>|<sha obfs4 fprint> -> failure
     #                                             -> network_events
@@ -1195,7 +1213,7 @@ def score_http_requests(msm) -> dict:
     Returns a scores dict
     """
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
     body_length_match = tk.get("body_length_match", None)
     headers_match = tk.get("headers_match", None)
     rid = msm.get("report_id", None)
@@ -1217,11 +1235,11 @@ def score_http_requests(msm) -> dict:
     # Scan for fingerprint matches in the HTTP body and the HTTP headers
     # One request is from the probe and one is over Tor. If the latter
     # is blocked the msmt is failed.
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
     requests = tk.get("requests", []) or []
     for r in requests:
-        is_tor = r.get("request", {}).get("tor", {}).get("is_tor", None)
-        body = r.get("response", {}).get("body", None)
+        is_tor = gn(r, "request", "tor", "is_tor")
+        body = gn(r, "response", "body")
         if is_tor is None or body is None:
             scores["accuracy"] = 0.0
             log.debug(f"Incorrect measurement t2 {rid} {inp}")
@@ -1229,7 +1247,7 @@ def score_http_requests(msm) -> dict:
 
         if isinstance(body, dict):
             # TODO: is this needed?
-            if "data" in body and body.get("format", "") == "base64":
+            if "data" in body and g_or(body, "format", "") == "base64":
                 log.debug("Decoding base64 body")
                 body = b64decode(body["data"])
 
@@ -1237,7 +1255,7 @@ def score_http_requests(msm) -> dict:
                 logbug(3, "incorrect body of type dict", msm)
                 body = None
 
-        for fp in zzfps["body_match"] + ccfps.get("body_match", []):
+        for fp in zzfps["body_match"] + g_or(ccfps, "body_match", []):
             bm = fp["body_match"]
             if isinstance(body, bytes):
                 idx = body.find(bm.encode())
@@ -1253,9 +1271,9 @@ def score_http_requests(msm) -> dict:
                 log.debug("matched body fp %s %r at pos %d", msm_cc, bm, idx)
 
         # Match HTTP headers if found
-        headers = r.get("headers", {})
+        headers = g_or(r, "headers", {})
         headers = {h.lower(): v for h, v in headers.items()}
-        for fp in zzfps["header_full"] + ccfps.get("header_full", []):
+        for fp in zzfps["header_full"] + g_or(ccfps, "header_full", []):
             name = fp["header_name"]
             if name in headers and headers[name] == fp["header_full"]:
                 if is_tor:
@@ -1265,7 +1283,7 @@ def score_http_requests(msm) -> dict:
                 scores["confirmed"] = True
                 log.debug("matched header full fp %s %r", msm_cc, fp["header_full"])
 
-        for fp in zzfps["header_prefix"] + ccfps.get("header_prefix", []):
+        for fp in zzfps["header_prefix"] + g_or(ccfps, "header_prefix", []):
             name = fp["header_name"]
             prefix = fp["header_prefix"]
             if name in headers and headers[name].startswith(prefix):
@@ -1294,7 +1312,7 @@ def score_signal(msm) -> dict:
     """
     # https://github.com/ooni/spec/blob/master/nettests/ts-029-signal.md
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
     if tk.get("failed_operation", True) or tk.get("failure", True):
         scores["accuracy"] = 0.0
 
@@ -1317,7 +1335,7 @@ def score_stunreachability(msm) -> dict:
     """
     # https://github.com/ooni/backend/issues/551
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
     scores["extra"] = dict(endpoint=tk.get("endpoint"))
     failure = tk.get("failure")
     if failure:
@@ -1333,7 +1351,7 @@ def score_torsf(msm) -> dict:
     """
     # https://github.com/ooni/ooni.org/issues/772
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
     failure = tk.get("failure")
     if failure:
         scores["blocking_general"] = 1.0
@@ -1351,7 +1369,7 @@ def score_riseupvpn(msm) -> dict:
     """
     # https://github.com/ooni/backend/issues/541
     scores = init_scores()
-    tk = msm.get("test_keys", {})
+    tk = g_or(msm, "test_keys", {})
     tstatus = tk.get("transport_status") or {}
     obfs4 = tstatus.get("obfs4")
     openvpn = tstatus.get("openvpn")

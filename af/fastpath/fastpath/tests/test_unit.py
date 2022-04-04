@@ -35,6 +35,31 @@ def test_extract_input_domain_meek():
     assert extract_input_domain(msm, "meek_fronted_requests_test") == ("{b,a}", "b")
 
 
+def test_g():
+    g = fp.g
+    assert g({}, "x", default="v") == "v"
+
+
+def test_gn():
+    gn = fp.gn
+    assert gn({}, "x") is None
+    assert gn({}, "x", "y") is None
+    assert gn({"x": None}, "x", "y") is None
+    assert gn({"x": {}}, "x", "y") is None
+    assert gn({"x": {"y": None}}, "x", "y") is None
+    assert gn({"x": {"y": "v"}}, "x", "y") == "v"
+    assert gn({"x": "v"}, "x") == "v"
+    assert gn({"x": 0}, "x") == 0
+    with pytest.raises(Exception):
+        assert gn({"x": []}, "x", "y") is None
+
+
+def test_g_or():
+    assert fp.g_or({}, "x", "y") == "y"
+    assert fp.g_or({"x": None}, "x", "y") == "y"
+    assert fp.g_or({"x": 0}, "x", "y") == 0
+
+
 def test_match_fingerprints_no_match():
     fp.setup_fingerprints()
     msm = {"probe_cc": "IE", "test_keys": {"requests": []}}
