@@ -284,6 +284,11 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         metrics.incr("duplicate_measurement")
         return
 
+    if not msm.get("measurement_start_time"):
+        log.debug("Ignoring measurement with invalid measurement_start_time")
+        metrics.incr("discarded_measurement")
+        return
+
     log.debug(f"Processing {desc}")
     seen_uids.add(msmt_uid)
 
