@@ -526,10 +526,13 @@ def stream_yaml_blobs(fd):
                 else:
                     head = blob[start:]
             else:
-                raise BrokenFrameError(bloboff + start, prefix)
+                log.error("Broken frame. Ignoring the remaining YAML")
+                return
+                #raise BrokenFrameError(bloboff + start, prefix)
 
     if head:
-        raise TruncatedReportError(fd.tell() - len(head), head[:100])
+        #raise TruncatedReportError(fd.tell() - len(head), head[:100])
+        log.error("Truncated YAML report")
 
 
 def generate_report_id(header):
