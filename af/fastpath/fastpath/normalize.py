@@ -196,6 +196,14 @@ def match(pattern, source):
     return ""
 
 
+def normalize_headers_diff(entry: dict) -> None:
+    if "test_keys" not in entry:
+        return
+    if entry["test_keys"].get("headers_diff") is None:
+        return
+    entry["test_keys"]["headers_diff"] = list(entry["test_keys"]["headers_diff"])
+
+
 def normalize_httpt(entry):
     def normalize_headers(headers):
         # XXX: data loss -- ordering, formatting, duplicate headers, whitespace
@@ -296,8 +304,7 @@ def normalize_httpt(entry):
         pass
     entry["test_keys"]["requests"] += experiment_requests
     entry["test_keys"]["requests"] += control_requests
-    if entry["test_keys"].get("headers_diff", None) is not None:
-        entry["test_keys"]["headers_diff"] = list(entry["test_keys"]["headers_diff"])
+    normalize_headers_diff(entry)
     return entry
 
 
@@ -454,6 +461,9 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
     if test_name in test_categories["dnst"]:
         entry = normalize_dnst(entry)
 
+    if test_name == "website_probe":
+        normalize_headers_diff(entry)
+
     # Ignore old, rare tests
     if test_name in test_categories["scapyt"]:
         raise UnsupportedTestError(test_name)
@@ -528,10 +538,10 @@ def stream_yaml_blobs(fd):
             else:
                 log.error("Broken frame. Ignoring the remaining YAML")
                 return
-                #raise BrokenFrameError(bloboff + start, prefix)
+                # raise BrokenFrameError(bloboff + start, prefix)
 
     if head:
-        #raise TruncatedReportError(fd.tell() - len(head), head[:100])
+        # raise TruncatedReportError(fd.tell() - len(head), head[:100])
         log.error("Truncated YAML report")
 
 
