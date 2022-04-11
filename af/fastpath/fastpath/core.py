@@ -1116,7 +1116,11 @@ def score_meek_fronted_requests_test(msm) -> dict:
                 log.info("Client bug: success != False")
             return scores
 
-        server = resp.get("headers", {}).get("Server", "")
+        headers = resp.get("headers", {})
+        # headers can be a list or a dict
+        if isinstance(headers, list):
+            headers = {i[0]:i[1][0] for i in headers if i}
+        server = headers.get("Server", "")
         if not server.startswith("ECAcc "):
             scores["blocking_general"] += 0.5
 

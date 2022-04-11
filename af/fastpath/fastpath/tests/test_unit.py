@@ -233,6 +233,19 @@ def test_score_meek2():
     }
 
 
+def test_score_meek3():
+    # msmt from legacy probes having a list as "input"
+    msm = loadj("meek3")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.5,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # test_name http_requests
 
 
