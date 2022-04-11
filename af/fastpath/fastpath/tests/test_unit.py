@@ -172,6 +172,21 @@ def test_score_measurement_confirmed():
     }
 
 
+def test_score_web_connectivity_odd_hdr():
+    # Header containing a nested dict
+    fp.setup_fingerprints()
+    msm = loadj("web_connectivity_odd_hdr")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        'analysis': {'blocking_type': 'dns'},
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # test_name: tor
 
 
