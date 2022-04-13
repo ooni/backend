@@ -1186,6 +1186,11 @@ def score_tor(msm) -> dict:
     blocked_cnt = 0
     not_run_cnt = 0
     success_cnt = 0
+    if isinstance(targets, list):
+        # targets were a list in early experiments, see tests/data/tor_list.json
+        scores["accuracy"] = 0.0
+        return scores
+
     for d in targets.values():
         if "failure" not in d or "network_events" not in d:
             logbug(6, "missing Tor failure or network_events field", msm)
