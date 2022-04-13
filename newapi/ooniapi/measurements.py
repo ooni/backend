@@ -1846,8 +1846,10 @@ def _clickhouse_aggregation(
         query_params["input"] = inp
 
     if category_code:
-        where.append(sql.text("category_code = :category_code"))
+        where.append(sql.text("citizenlab.category_code = :category_code"))
+        where.append(sql.text("(citizenlab.cc = :lcc OR citizenlab.cc = 'ZZ')"))
         query_params["category_code"] = category_code
+        query_params["lcc"] = probe_cc.lower()
 
     if probe_cc:
         where.append(sql.text("probe_cc = :probe_cc"))
