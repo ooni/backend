@@ -324,7 +324,7 @@ def match_fingerprints(measurement):
             continue
 
         # Match HTTP body if found
-        body = r["body"]
+        body = r.get("body")
 
         if isinstance(body, dict):
             if "data" in body and body.get("format", "") == "base64":

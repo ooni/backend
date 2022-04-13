@@ -1,0 +1,108 @@
+{
+  "software_name": "ooniprobe-android",
+  "software_version": "2.0.3",
+  "test_runtime": 4.528588056564331,
+  "test_start_time": "2019-03-30 11:56:43",
+  "test_name": "web_connectivity",
+  "test_keys": {
+    "accessible": true,
+    "control": {
+      "tcp_connect": {
+        "69.55.227.29:80": {
+          "status": true
+        }
+      },
+      "http_request": {
+        "body_length": -1,
+        "failure": "unknown_error",
+        "status_code": -1,
+        "headers": {}
+      },
+      "dns": {
+        "addrs": [
+          "69.55.227.29"
+        ]
+      }
+    },
+    "tcp_connect": [
+      {
+        "status": {
+          "success": true,
+          "blocked": false
+        },
+        "ip": "69.55.227.29",
+        "port": 80
+      }
+    ],
+    "http_experiment_failure": "ssl_error: error:14007086:SSL routines:CONNECT_CR_CERT:certificate verify failed",
+    "agent": "redirect",
+    "client_resolver": "91.80.37.87",
+    "dns_consistency": "consistent",
+    "body_proportion": 0,
+    "queries": [
+      {
+        "engine": "system",
+        "query_type": "A",
+        "hostname": "www.nmrc.org",
+        "answers": [
+          {
+            "hostname": "www.nmrc.org",
+            "answer_type": "CNAME"
+          },
+          {
+            "ipv4": "69.55.227.29",
+            "answer_type": "A"
+          }
+        ]
+      }
+    ],
+    "requests": [
+      {
+        "failure": "ssl_error: error:14007086:SSL routines:CONNECT_CR_CERT:certificate verify failed",
+        "request": {
+          "body": "",
+          "headers": {
+            "Accept-Language": "en-US;q=0.8,en;q=0.5",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+          },
+          "url": "https://www.nmrc.org/",
+          "method": "GET",
+          "tor": {
+            "is_tor": false
+          }
+        },
+        "response": {
+          "headers": {}
+        }
+      }
+    ],
+    "blocking": false
+  },
+  "id": "83114b72-a0f2-4298-8c50-f1c793594cca",
+  "data_format_version": "0.2.0",
+  "measurement_start_time": "2019-03-30 11:56:50",
+  "options": [],
+  "test_version": "0.0.1",
+  "input_hashes": [],
+  "input": "http://www.nmrc.org/",
+  "probe_ip": "127.0.0.1",
+  "report_id": "20190409T102953Z_AS30722_DqzadSTn2oMyzawZxs0bfddCbjJyA41TAZqVYlAZv6DibzXpYM",
+  "probe_asn": "AS30722",
+  "annotations": {
+    "engine_name": "libmeasurement_kit",
+    "engine_version_full": "v0.10.1",
+    "engine_version": "0.10.1",
+    "platform": "android",
+    "flavor": "full",
+    "network_type": "wifi"
+  },
+  "test_helpers": {
+    "backend": {
+      "type": "https",
+      "address": "https://b.web-connectivity.th.ooni.io:443"
+    }
+  },
+  "probe_cc": "IT",
+  "measurement_uid": "01201903308c0c639fa85441311c9e811d89ff14"
+}

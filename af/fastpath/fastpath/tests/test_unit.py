@@ -187,6 +187,19 @@ def test_score_web_connectivity_odd_hdr():
     }
 
 
+def test_score_web_connectivity_no_body():
+    # SSL cert verify failed, body key is missing
+    fp.setup_fingerprints()
+    msm = loadj("web_connectivity_no_body")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
 # # test_name: tor
 
 
