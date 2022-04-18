@@ -311,7 +311,14 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
     e = entities[-1]
 
     # Add msmt to open jsonl file
-    e.fd.write(json.dumps(msm).encode())
+    try:
+        jmsm = json.dumps(msm)
+    except TypeError as e:
+        log.error(e, exc_info=True)
+        log.error(msm)
+        raise
+
+    e.fd.write(jmsm.encode())
     e.fd.write(b"\n")
 
     rid = msm.get("report_id") or ""  # type: str
