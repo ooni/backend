@@ -178,7 +178,7 @@ def test_score_web_connectivity_odd_hdr():
     msm = loadj("web_connectivity_odd_hdr")
     scores = fp.score_measurement(msm)
     assert scores == {
-        'analysis': {'blocking_type': 'dns'},
+        "analysis": {"blocking_type": "dns"},
         "blocking_general": 1.0,
         "blocking_global": 0.0,
         "blocking_country": 0.0,
@@ -199,6 +199,23 @@ def test_score_web_connectivity_no_body():
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
     }
+
+
+# # test_name: dash
+
+
+def test_score_dash_no_keys():
+    msm = dict(test_name="dash")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "accuracy": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
 
 # # test_name: tor
 

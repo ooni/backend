@@ -1048,7 +1048,12 @@ def score_dash(msm) -> dict:
     # TODO: review scores
     # TODO: any blocking scoring based on performance?
     scores = init_scores()  # type: Dict[str, Any]
-    failure = msm["test_keys"].get("failure", None)
+    tk = g_or(msm, "test_keys", {})
+    failure = tk.get("failure", None)
+    if tk == {}:
+        scores["accuracy"] = 0.0
+        return scores
+
     if failure is None:
         pass
     elif failure == "connection_aborted":
