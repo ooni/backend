@@ -1780,10 +1780,16 @@ def _postgresql_aggregation(
         else:
             r = dict(q.fetchone())
 
-        if resp_format == "CSV":
-            return _convert_to_csv(r)
+        if resp_format.lower() == "csv":
+            csv_data = _convert_to_csv(r)
+            response = make_response(csv_data)
+            response.headers["Content-Disposition"] = "attachment; filename=ooni-aggregate-data.csv"
+            response.headers["Content-Type"] = "text/csv"
+            return response
 
         response = jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
+        if resp_format.lower() == "json":
+            response.headers["Content-Disposition"] = "attachment; filename=ooni-aggregate-data.json"
         if cacheable:
             response.cache_control.max_age = 3600 * 24
         return response
