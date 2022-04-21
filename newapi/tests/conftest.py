@@ -157,14 +157,14 @@ def run_clickhouse_sql_scripts(app):
             "--queries-file",
             fn,
         ]
-        app.logger.info(f"Running {fn} on Clickhouse")
-        app.loggr.info("Running " + " ".join(cmd))
+        print(f"Running {fn} on Clickhouse")
+        print("Running " + " ".join(cmd))
         r = subprocess.run(cmd, capture_output=True, timeout=5)
         if r.returncode:
             msg = "ERROR running clickhouse-client"
-            app.logger.error(msg)
-            app.logger.error(r.stderr.decode())
-            app.logger.error("^" * 40)
+            print(msg)
+            print(r.stderr.decode())
+            print("^" * 40)
             pytest.exit(msg, returncode=r.returncode)
 
 
