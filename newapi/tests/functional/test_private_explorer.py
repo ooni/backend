@@ -68,7 +68,7 @@ def test_api_private_website_stats(client):
 def test_api_private_im_networks(client):
     response = client.get("/api/_/im_networks", query_string={"probe_cc": "AU"})
     assert response.status_code == 200
-    assert "web_connectivity" in response.json
+    assert "telegram" in response.json
 
 
 def test_api_private_im_stats(client):
