@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 from functools import wraps
 from urllib.parse import urljoin
-from typing import Optional
+from typing import Optional, Dict, Any
 import hashlib
 import re
 import smtplib
@@ -19,7 +19,7 @@ import flask.wrappers
 import jwt  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
-from ooniapi.database import query_click, query_click_one_row
+from ooniapi.database import query_click, query_click_one_row, insert_click
 from ooniapi.utils import nocachejson
 
 # from ooniapi.utils import cachedjson
@@ -130,7 +130,7 @@ def role_required(roles):
                 return jerror("Authentication required", 401)
 
             # check for session expunge
-            # TODO: cache query
+            # TODO: cache query?
             query = """SELECT threshold
                 FROM session_expunge
                 WHERE account_id = :account_id """
@@ -138,14 +138,21 @@ def role_required(roles):
             query_params = dict(account_id=account_id)
             if current_app.config["USE_CLICKHOUSE"]:
                 row = query_click_one_row(sql.text(query), query_params)
+                if row:
+                    threshold = row["threshold"]
+                    iat = datetime.utcfromtimestamp(tok["iat"])
+                    print((iat, threshold))
+                    if iat < threshold:
+                        return jerror("Authentication token expired", 401)
+
             else:  # pragma: no cover
                 q = current_app.db_session.execute(query, query_params)
                 row = q.fetchone()
-            if row:
-                iat = datetime.utcfromtimestamp(tok["iat"])
-                threshold = row[0]
-                if iat < threshold:
-                    return jerror("Authentication token expired", 401)
+                if row:
+                    threshold = row[0]
+                    iat = datetime.utcfromtimestamp(tok["iat"])
+                    if iat < threshold:
+                        return jerror("Authentication token expired", 401)
 
             # attach nickname and account_id to request
             request._user_nickname = tok["nick"]
@@ -323,7 +330,6 @@ def user_login():
     """
     log = current_app.logger
     token = request.args.get("k", "")
-    log.error(repr(token))
     try:
         dec = decode_jwt(token, audience="register")
     except jwt.exceptions.MissingRequiredClaimError:
@@ -364,6 +370,7 @@ GRANT SELECT ON TABLE public.session_expunge TO readonly;
 
 
 def _set_account_role(email_address, role: str) -> int:
+    log = current_app.logger
     account_id = hash_email_address(email_address)
     # log.info(f"Giving account {account_id} role {role}")
     # TODO: when role is changed enforce token expunge
@@ -376,14 +383,15 @@ def _set_account_role(email_address, role: str) -> int:
         """
         q = current_app.db_session.execute(query, query_params).rowcount
         current_app.db_session.commit()
+        return q
 
-    if current_app.config["USE_CLICKHOUSE"]:
-        query = """INSERT INTO accounts (account_id, role)
-            VALUES(:account_id, :role)"""
-        query_click(sql.text(query), query_params)
-        q = 1
+    elif current_app.config["USE_CLICKHOUSE"]:
+        log.info("Creating/Updating account role")
+        # 'accounts' is on RocksDB (ACID key-value database)
+        query = """INSERT INTO accounts (account_id, role) VALUES"""
+        return insert_click(query, [query_params])
 
-    return q
+    raise Exception("Database not configured")
 
 
 @auth_blueprint.route("/api/v1/set_account_role", methods=["POST"])
@@ -438,6 +446,8 @@ def _delete_account_data(email_address: str) -> None:
 
     if current_app.config["USE_CLICKHOUSE"]:
         # reset account to "user" role
+        # 'accounts' is on RocksDB (ACID key-value database)
+        # FIXME
         q = "INSERT INTO accounts (account_id, role) VALUES(:account_id, 'role')"
         query_click(sql.text(q), query_params)
 
@@ -448,16 +458,12 @@ def _get_account_role(account_id: str) -> Optional[str]:
     query_params = dict(account_id=account_id)
     if current_app.config["USE_CLICKHOUSE"]:
         r = query_click_one_row(sql.text(query), query_params)
-        if r:
-            return r["role"]
+        return r["role"] if r else None
 
     else:  # pragma: no cover
         q = current_app.db_session.execute(query, query_params)
         r = q.fetchone()
-        if r:
-            return r[0]
-
-    return None
+        return r[0] if r else None
 
 
 @auth_blueprint.route("/api/_/account_metadata")
@@ -550,10 +556,10 @@ def set_session_expunge():
     log.info(f"Setting expunge for account {account_id}")
     # If an entry is already in place update the threshold as the new
     # value is going to be safer
-    now = datetime.utcnow()
-    query_params = dict(account_id=account_id, now=now)
     if current_app.config["DATABASE_URI_RO"]:
         log.info("Inserting into PostgreSQL session_expunge")
+        now = datetime.utcnow()
+        query_params = dict(account_id=account_id, now=now)
         query = """INSERT INTO session_expunge (account_id, threshold)
             VALUES(:account_id, :now)
             ON CONFLICT (account_id) DO
@@ -564,11 +570,12 @@ def set_session_expunge():
         current_app.db_session.commit()
 
     if current_app.config["USE_CLICKHOUSE"]:
+        # 'session_expunge' is on RocksDB (ACID key-value database)
         log.info("Inserting into Clickhouse session_expunge")
-        query = """INSERT INTO session_expunge (account_id)
-            VALUES(:account_id)
-        """
-        query_click_one_row(sql.text(query), query_params)
+        query = "INSERT INTO session_expunge (account_id) VALUES"
+        query_params = dict(account_id=account_id)
+        # the `threshold` column defaults to the current time
+        insert_click(query, [query_params])
 
     return nocachejson()
 
@@ -577,16 +584,23 @@ def _remove_from_session_expunge(email_address: str) -> None:
     # Used by integ test
     log = current_app.logger
     account_id = hash_email_address(email_address)
-    query = "DELETE FROM session_expunge WHERE account_id = :account_id"
-    query_params = dict(account_id=account_id)
+    query_params: Dict[str, Any] = dict(account_id=account_id)
     if current_app.config["DATABASE_URI_RO"]:
         log.info("Deleting from PostgreSQL session_expunge")
+        query = "DELETE FROM session_expunge WHERE account_id = :account_id"
         current_app.db_session.execute(query, query_params)
         current_app.db_session.commit()
+        return
 
-    # if current_app.config["USE_CLICKHOUSE"]:
-    #    log.info("Deleting from Clickhouse session_expunge")
-    #    query_click_one_row(sql.text(query), query_params)
-
+    elif current_app.config["USE_CLICKHOUSE"]:
+        # 'session_expunge' is on RocksDB (ACID key-value database)
+        q1 = "SELECT * FROM session_expunge WHERE account_id = :account_id"
+        row = query_click_one_row(sql.text(q1), query_params)
+        # https://github.com/ClickHouse/ClickHouse/issues/20546
+        if row:
+            log.info("Resetting expunge in Clickhouse session_expunge")
+            query = "INSERT INTO session_expunge (account_id, threshold) VALUES"
+            query_params["threshold"] = 0
+            insert_click(query, [query_params])
 
 # TODO: purge session_expunge

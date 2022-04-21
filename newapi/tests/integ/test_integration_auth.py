@@ -100,13 +100,14 @@ def test_user_register_non_valid(client, mocksmtp):
     assert r.status_code == 400
     assert r.json == {"error": "User name is too short"}
 
-    d = dict(nickname="nick", email_address="nick@localhost")
+    d = dict(nickname="nick", email_address="nick@localhost")  # no FQDN
     r = client.post("/api/v1/user_register", json=d)
     assert r.status_code == 400
     assert r.json == {"error": "Invalid email address"}
 
 
 def _register_and_login(client, email_address):
+    ooniapi.auth._remove_from_session_expunge(email_address)
     # # return cookie header for further use
     d = dict(nickname="nick", email_address=email_address)
     r = client.post("/api/v1/user_register", json=d)
@@ -133,7 +134,7 @@ def _register_and_login(client, email_address):
 
     assert url, msg
     u = urlparse(url)
-    token = u.query.split('=')[1]
+    token = u.query.split("=")[1]
     assert len(token) == 233
 
     r = client.get(f"/api/v1/user_login?k={token}")
@@ -144,6 +145,7 @@ def _register_and_login(client, email_address):
     assert c.startswith("ooni=")
     assert c.endswith("; Secure; HttpOnly; SameSite=None; Path=/")
     return {"Set-Cookie": c}
+
 
 
 def test_user_register_and_get_metadata(client, mocksmtp):
@@ -171,7 +173,7 @@ def test_role_set_not_allowed(client, mocksmtp):
     assert r.status_code == 401
 
 
-def test_role_set(client, mocksmtp, integtest_admin):
+def test_role_set_multiple(client, mocksmtp, integtest_admin):
     _register_and_login(client, admin_e)
 
     # We are logged in with role "admin"
@@ -208,7 +210,7 @@ def test_role_set_with_expunged_token(client, mocksmtp, integtest_admin):
 
     d = dict(email_address="BOGUS_EMAIL_ADDR", role="admin")
     r = client.post("/api/v1/set_session_expunge", json=d)
-    assert r.status_code == 401, r.json
+    assert r.status_code == 400, r.json
 
     # As admin, I expunge my own session token
     d = dict(email_address=admin_e, role="admin")
