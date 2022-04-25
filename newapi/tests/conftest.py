@@ -115,7 +115,9 @@ def checkout_pipeline(tmpdir_factory):
     d = tmpdir_factory.mktemp("pipeline")
     if d.isdir():
         shutil.rmtree(d)
-    cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
+    #cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
+    # FIXME
+    cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch reprocessor-ch -q {d}"
     print(cmd)
     cmd = cmd.split()
     subprocess.run(cmd, check=True, stdout=PIPE, stderr=PIPE).stdout
