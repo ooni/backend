@@ -21,7 +21,7 @@ import requests
 from sqlalchemy import sql
 
 from ooniapi.auth import role_required
-from ooniapi.database import query_click, query_click_one_row
+from ooniapi.database import query_click, query_click_one_row, insert_click, raw_click
 from ooniapi.utils import nocachejson
 
 """
@@ -370,7 +370,9 @@ class URLListManager:
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
         """
         head = f"{self.push_username}:{branchname}"
-        log.info(f"opening a PR for {head} on {self.origin_repo} using {self.push_repo}")
+        log.info(
+            f"opening a PR for {head} on {self.origin_repo} using {self.push_repo}"
+        )
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         apiurl = f"https://api.github.com/repos/{self.origin_repo}/pulls"
         r = requests.post(
@@ -420,6 +422,10 @@ class URLListManager:
 
 
 class DuplicateURLError(Exception):
+    pass
+
+
+class DuplicateRuleError(Exception):
     pass
 
 
@@ -753,15 +759,19 @@ def list_url_priorities():
     log = current_app.logger
     log.debug("listing URL prio rules")
     query = """SELECT category_code, cc, domain, url, priority
-    FROM url_priorities
+    FROM url_priorities FINAL
     ORDER BY category_code, cc, domain, url, priority
     """
     if current_app.config["USE_CLICKHOUSE"]:
+        initialize_url_priorities_if_needed()
+        # The url_priorities table is CollapsingMergeTree
         q = query_click(sql.text(query), {})
         rows = list(q)
     else:
+        query = query.replace("FINAL", "")
         q = current_app.db_session.execute(query)
         rows = [dict(r) for r in q]
+
     return make_response(jsonify(rules=rows))
 
 
@@ -795,67 +805,96 @@ def update_url_priority_postgresql(old, new):  # pragma: no cover
     return q
 
 
-def dicthash(d: dict):
-    return hash(tuple(sorted(d.items())))
+def initialize_url_priorities_if_needed():
+    cntq = "SELECT count() AS cnt FROM url_priorities"
+    cnt = query_click_one_row(sql.text(cntq), {})
+    if cnt["cnt"] > 0:
+        return
 
-def init():
     rules = [
-        ('NEWS', '*', '*', '*', 100),
-        ('POLR', '*', '*', '*', 100),
-        ('HUMR', '*', '*', '*', 100),
-        ('LGBT', '*', '*', '*', 100),
-        ('ANON', '*', '*', '*', 100),
-        ('MMED', '*', '*', '*', 80),
-        ('SRCH', '*', '*', '*', 80),
-        ('PUBH', '*', '*', '*', 80),
-        ('REL', '*', '*', '*', 60),
-        ('XED', '*', '*', '*', 60),
-        ('HOST', '*', '*', '*', 60),
-        ('ENV', '*', '*', '*', 60),
-        ('FILE', '*', '*', '*', 40),
-        ('CULTR', '*', '*', '*', 40),
-        ('IGO', '*', '*', '*', 40),
-        ('GOVT', '*', '*', '*', 40),
-        ('DATE', '*', '*', '*', 30),
-        ('HATE', '*', '*', '*', 30),
-        ('MILX', '*', '*', '*', 30),
-        ('PROV', '*', '*', '*', 30),
-        ('PORN', '*', '*', '*', 30),
-        ('GMB', '*', '*', '*', 30),
-        ('ALDR', '*', '*', '*', 30),
-        ('GAME', '*', '*', '*', 20),
-        ('MISC', '*', '*', '*', 20),
-        ('HACK', '*', '*', '*', 20),
-        ('ECON', '*', '*', '*', 20),
-        ('COMM', '*', '*', '*', 20),
-        ('CTRL', '*', '*', '*', 20),
-        ('NEWS', 'it', '*', '*', 10),
-        ('NEWS', 'it', 'www.leggo.it', '*', 5),
-        ('COMT', '*', '*', '*', 100),
-        ('GRP', '*', '*', '*', 100),
+        ("NEWS", 100),
+        ("POLR", 100),
+        ("HUMR", 100),
+        ("LGBT", 100),
+        ("ANON", 100),
+        ("MMED", 80),
+        ("SRCH", 80),
+        ("PUBH", 80),
+        ("REL", 60),
+        ("XED", 60),
+        ("HOST", 60),
+        ("ENV", 60),
+        ("FILE", 40),
+        ("CULTR", 40),
+        ("IGO", 40),
+        ("GOVT", 40),
+        ("DATE", 30),
+        ("HATE", 30),
+        ("MILX", 30),
+        ("PROV", 30),
+        ("PORN", 30),
+        ("GMB", 30),
+        ("ALDR", 30),
+        ("GAME", 20),
+        ("MISC", 20),
+        ("HACK", 20),
+        ("ECON", 20),
+        ("COMM", 20),
+        ("CTRL", 20),
+        ("COMT", 100),
+        ("GRP", 100),
     ]
-    for r in rules:
-        keys = ["category_code", "cc", "domain", "url", "priority"]
-        new = dict(zip(keys, r))
-        update_url_priority_click({}, new)
+    rows = [
+        {
+            "sign": 1,
+            "category_code": ccode,
+            "cc": "*",
+            "domain": "*",
+            "url": "*",
+            "priority": prio,
+        }
+        for ccode, prio in rules
+    ]
+    # The url_priorities table is CollapsingMergeTree
+    query = """INSERT INTO url_priorities
+        (sign, category_code, cc, domain, url, priority) VALUES
+    """
+    log.info("Populating url_priorities")
+    r = insert_click(query, rows)
+    return r
 
 
-def update_url_priority_click(old, new):
-    log = current_app.logger
-    if old:  # delete an existing rule
-        q = """REPLACE TABLE url_priorities
-            SELECT * FROM url_priorities WHERE hash = ':h'"""
-        h = dicthash(old)
-        query_click(sql.text(q), {"h": h})
+def validate_url_prio_rule_dict(r: dict):
+    assert sorted(r.keys()) == ["category_code", "cc", "domain", "priority", "url"]
 
-    if new:  # add new rule
-        # EmbeddedRocksDB with a hash guarantees uniqueness
-        h = dicthash(new)
-        query = """INSERT INTO url_priorities
-            (hash, category_code, cc, domain, url, priority)
-            VALUES(:h, :category_code, :cc, :domain, :url, :priority)
-        """
-        query_click(query, new)
+
+def update_url_priority_click(old: dict, new: dict):
+    # The url_priorities table is CollapsingMergeTree
+    # Both old and new might be set
+    ins_sql = """INSERT INTO url_priorities
+        (sign, category_code, cc, domain, url, priority) VALUES
+    """
+    if old:
+        rule = old.copy()
+        rule["sign"] = -1
+        log.info(f"Deleting prioritization rule {rule}")
+        r = insert_click(ins_sql, [rule])
+        log.debug(f"Result: {r}")
+
+    if new:
+        q = """SELECT count() FROM url_priorities FINAL WHERE sign = 1 AND
+        category_code = %(category_code)s AND cc = %(cc)s AND domain = %(domain)s
+        AND url = %(url)s"""
+        r = raw_click(q, new)
+        if r[0][0] > 0:
+            log.info(f"Rejecting duplicate rule {new}")
+            raise DuplicateRuleError("Duplicate rule")
+
+        rule = new.copy()
+        rule["sign"] = 1
+        log.info(f"Creating prioritization rule {rule}")
+        r = insert_click(ins_sql, [rule])
+        log.debug(f"Result: {r}")
 
 
 @cz_blueprint.route("/api/_/url-priorities/update", methods=["POST"])
@@ -919,6 +958,19 @@ def post_update_url_priority():
             new[k] = "*"
 
     assert old or new
+    if old:
+        validate_url_prio_rule_dict(old)
 
-    q = update_url_priority_postgresql(old, new)
-    return make_response(jsonify(q))
+    if new:
+        validate_url_prio_rule_dict(new)
+
+    if current_app.config["USE_CLICKHOUSE"]:
+        try:
+            update_url_priority_click(old, new)
+            return make_response(jsonify(1))
+        except DuplicateRuleError as e:
+            return jerror(str(e))
+
+    else:
+        q = update_url_priority_postgresql(old, new)
+        return make_response(jsonify(q))

@@ -47,15 +47,16 @@ ORDER BY (report_id, input)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE default.url_priorities (
+    `sign` Int8,
     `category_code` String,
     `cc` String,
     `domain` String,
     `url` String,
     `priority` Int32
 )
-ENGINE = ReplacingMergeTree
-ORDER BY (category_code, cc, domain, url)
-SETTINGS index_granularity = 8192;
+ENGINE = CollapsingMergeTree(sign)
+ORDER BY (category_code, cc, domain, url, priority)
+SETTINGS index_granularity = 1024;
 
 CREATE TABLE default.citizenlab
 (

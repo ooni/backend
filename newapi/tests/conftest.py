@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import flask
+from clickhouse_driver import Client as Clickhouse
 
 # Setup logging before doing anything with the Flask app
 # See README.adoc
@@ -224,6 +225,13 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
     # run_pg_sql_scripts(app)
     run_clickhouse_sql_scripts(app)
     run_fastpath(log, checkout_pipeline, dburi, clickhouse_url)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def connect_to_clickhouse(app):
+    clickhouse_url = app.config["CLICKHOUSE_URL"]
+    if clickhouse_url:
+        app.click = Clickhouse.from_url(clickhouse_url)
 
 
 @pytest.fixture(autouse=True, scope="session")
