@@ -19,7 +19,7 @@ def privapi(client, subpath):
 def test_private_api_asn_by_month(client):
     url = "asn_by_month"
     response = privapi(client, url)
-    assert len(response) == 25
+    assert len(response) > 1
     r = response[0]
     assert sorted(r.keys()) == ["date", "value"]
     assert r["value"] > 10
@@ -30,7 +30,7 @@ def test_private_api_asn_by_month(client):
 def test_private_api_countries_by_month(client):
     url = "countries_by_month"
     response = privapi(client, url)
-    assert len(response) == 25
+    assert len(response) > 1
     r = response[0]
     assert sorted(r.keys()) == ["date", "value"]
     assert r["value"] > 10
@@ -61,6 +61,7 @@ def test_private_api_test_names(client, log):
             {"id": "psiphon", "name": "Psiphon"},
             {"id": "riseupvpn", "name": "RiseupVPN"},
             {"id": "signal", "name": "Signal"},
+            {'id': 'stunreachability', 'name': 'STUN Reachability'},
             {"id": "tcp_connect", "name": "TCP Connect"},
             {"id": "telegram", "name": "Telegram"},
             {"id": "tor", "name": "Tor"},
@@ -162,8 +163,10 @@ def test_private_api_vanilla_tor_stats(client):
 def test_private_api_im_networks(client):
     url = "im_networks?probe_cc=BR"
     resp = privapi(client, url)
+    assert len(resp) > 1
     assert len(resp["facebook_messenger"]["ok_networks"]) > 5
-    assert len(resp["telegram"]["ok_networks"]) > 5
+    if "telegram" in resp:
+        assert len(resp["telegram"]["ok_networks"]) > 5
     assert len(resp["signal"]["ok_networks"]) > 5
     # assert len(resp["whatsapp"]["ok_networks"]) > 5
 
@@ -256,16 +259,13 @@ def test_private_api_circumvention_stats_by_country(client, log):
     assert resp["v"] == 0
     assert len(resp["results"]) > 3
 
+
 # # /circumvention_runtime_stats
-#
+
+
 def test_private_api_circumvention_runtime_stats(client, log):
     url = "circumvention_runtime_stats"
     resp = privapi(client, url)
     assert resp["v"] == 0
     assert "error" not in resp, resp
     assert len(resp["results"]) > 3, resp
-    print("num res", len(resp["results"]))
-    import ujson
-    print(len(ujson.dumps(resp)))
-    assert 0, resp
-
