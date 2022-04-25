@@ -33,8 +33,6 @@ INSERT INTO test_groups (test_name, test_group) VALUES ('bridge_reachability', '
 --INSERT INTO url_priorities VALUES ('ECON', '*', '*', '*', 20);
 --INSERT INTO url_priorities VALUES ('COMM', '*', '*', '*', 20);
 --INSERT INTO url_priorities VALUES ('CTRL', '*', '*', '*', 20);
---INSERT INTO url_priorities VALUES ('NEWS', 'it', '*', '*', 10);
---INSERT INTO url_priorities VALUES ('NEWS', 'it', 'www.leggo.it', '*', 5);
 --INSERT INTO url_priorities VALUES ('COMT', '*', '*', '*', 100);
 --INSERT INTO url_priorities VALUES ('GRP', '*', '*', '*', 100);
 
