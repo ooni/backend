@@ -141,3 +141,7 @@ def query_click_one_row(query, query_params) -> Optional[dict]:
 def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
     return current_app.click.execute(query, rows, types_check=True)
+
+
+def raw_click(query, params={}) -> int:
+    return current_app.click.execute(query, params)
