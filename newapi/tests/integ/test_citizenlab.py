@@ -26,14 +26,31 @@ from tests.utils import *
 
 
 @pytest.fixture
-def usersession(client):
+def usersession(client, app):
     # Mock out SMTP, register a user and log in
     user_e = "nick@localhost.local"
     reset_smtp_mock()
-    _register_and_login(client, user_e)
+    with app.app_context():
+        _register_and_login(client, user_e)
     reset_smtp_mock()
     yield
     reset_smtp_mock()
+
+
+@pytest.fixture
+def url_prio_tblready(client):
+    # Ensure the url_priorities table is populated
+    r = client.get("/api/_/url-priorities/list")
+    assert r.status_code == 200, r.json
+    assert len(r.json["rules"]) > 20
+
+
+
+@pytest.fixture()
+def citizenlab_tblready(client, app):
+    # Ensure the citizenlab table is populated
+    r = app.click.execute("SELECT count() FROM citizenlab")[0][0]
+    assert 0, r
 
 
 def test_no_auth(client):
@@ -257,7 +274,6 @@ def _test_checkout_update_submit(client, tmp_path):
 
     # assert get_diff(client) != []
 
-
     add_url(client, usersession, "https://example-bogus.org/", tmp_path)
     lookup_and_delete_us_url(client, usersession, "https://example-bogus.org/")
 
@@ -296,8 +312,9 @@ def test_ghpr_checkout_update_submit(clean_workdir, client, usersession, tmp_pat
 # # Prioritization management # #
 
 
-def test_url_priorities_crud(client, adminsession):
+def test_url_priorities_crud(client, adminsession, url_prio_tblready):
     def match(url):
+        # count how many times `url` appears in the list
         exp = {
             "category_code": "NEWS",
             "cc": "*",
@@ -310,8 +327,8 @@ def test_url_priorities_crud(client, adminsession):
         match = [x for x in r.json["rules"] if x == exp]
         return len(match)
 
-    assert match("BOGUSTEST") == 0
-    assert match("BOGUSTEST2") == 0
+    assert match("INTEG-TEST") == 0
+    assert match("INTEG-TEST2") == 0
 
     r = client.get("/api/_/url-priorities/list")
     assert r.status_code == 200, r.json
@@ -322,27 +339,26 @@ def test_url_priorities_crud(client, adminsession):
     assert r.status_code == 400, r.json
 
     # Create
-    xxx = dict(category_code="NEWS", priority=100, url="BOGUSTEST")
+    xxx = dict(category_code="NEWS", priority=100, url="INTEG-TEST")
     d = dict(new_entry=xxx)
     r = client.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json
-    assert r.json == 1
 
     # Ensure the new entry is present
-    assert match("BOGUSTEST") == 1
+    assert match("INTEG-TEST") == 1
 
     # Fail to create a duplicate
     d = dict(new_entry=xxx)
     r = client.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 400, r.json
 
-    # Update
-    yyy = dict(category_code="NEWS", priority=100, url="BOGUSTEST2")
+    # Update (change URL)
+    yyy = dict(category_code="NEWS", priority=100, url="INTEG-TEST2")
     d = dict(old_entry=xxx, new_entry=yyy)
     r = client.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json
-    assert match("BOGUSTEST") == 0
-    assert match("BOGUSTEST2") == 1
+    assert match("INTEG-TEST") == 0
+    assert match("INTEG-TEST2") == 1
 
     # Delete
     d = dict(old_entry=yyy)
@@ -350,8 +366,8 @@ def test_url_priorities_crud(client, adminsession):
     assert r.status_code == 200, r.json
     assert r.json == 1
 
-    assert match("BOGUSTEST") == 0
-    assert match("BOGUSTEST2") == 0
+    assert match("INTEG-TEST") == 0
+    assert match("INTEG-TEST2") == 0
 
 
 def post(client, url, **kw):
@@ -403,7 +419,7 @@ def test_url_prioritization(client):
     assert len(set(r["url"] for r in c["results"])) == 100
 
 
-def test_url_prioritization_category_code(client):
+def test_url_prioritization_category_code(client, citizenlab_tblready):
     c = getjson(client, "/api/v1/test-list/urls?category_codes=NEWS&limit=100")
     assert "metadata" in c
     assert c["metadata"] == {
@@ -419,7 +435,7 @@ def test_url_prioritization_category_code(client):
     assert len(set(r["url"] for r in c["results"])) == 100
 
 
-def test_url_prioritization_category_codes(client):
+def test_url_prioritization_category_codes(client, citizenlab_tblready):
     c = getjson(
         client,
         "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US&limit=100",
@@ -454,7 +470,7 @@ def test_url_prioritization_country_code_limit(client):
     assert len(set(r["url"] for r in c["results"])) == 999
 
 
-def test_url_prioritization_country_code_nolimit(client):
+def test_url_prioritization_country_code_nolimit(client, url_prio_tblready):
     c = getjson(client, "/api/v1/test-list/urls?country_code=US")
     assert "metadata" in c
     xx_cnt = 0
