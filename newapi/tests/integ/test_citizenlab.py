@@ -50,7 +50,7 @@ def url_prio_tblready(client):
 def citizenlab_tblready(client, app):
     # Ensure the citizenlab table is populated
     r = app.click.execute("SELECT count() FROM citizenlab")[0][0]
-    assert 0, r
+    assert r > 2
 
 
 def test_no_auth(client):
