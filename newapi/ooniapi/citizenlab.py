@@ -882,11 +882,11 @@ def update_url_priority_click(old: dict, new: dict):
         log.debug(f"Result: {r}")
 
     if new:
-        q = """SELECT count() FROM url_priorities FINAL WHERE sign = 1 AND
-        category_code = %(category_code)s AND cc = %(cc)s AND domain = %(domain)s
-        AND url = %(url)s"""
-        r = raw_click(q, new)
-        if r[0][0] > 0:
+        q = """SELECT count() AS cnt FROM url_priorities FINAL WHERE sign = 1 AND
+        category_code = :category_code AND cc = :cc AND domain = :domain
+        AND url = :url"""
+        cnt = query_click_one_row(sql.text(q), new)
+        if cnt and cnt["cnt"] > 0:
             log.info(f"Rejecting duplicate rule {new}")
             raise DuplicateRuleError("Duplicate rule")
 

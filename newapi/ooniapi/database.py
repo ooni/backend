@@ -4,7 +4,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from hashlib import shake_128
-from typing import Optional
+from typing import Optional, Any
 import os
 import time
 
@@ -143,5 +143,5 @@ def insert_click(query, rows: list) -> int:
     return current_app.click.execute(query, rows, types_check=True)
 
 
-def raw_click(query, params={}) -> int:
+def raw_click(query, params={}) -> list[tuple[Any]]:
     return current_app.click.execute(query, params)
