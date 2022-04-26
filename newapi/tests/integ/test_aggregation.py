@@ -421,3 +421,8 @@ def test_aggregation_invalid_input_3(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&input=foo.org%3D%27"
     r = api(client, url)
     assert r == {"error": "Invalid characters in input field", "v": 0}
+
+
+def test_aggregation_bug_585(client):
+    url = "aggregation?test_name=web_connectivity&since=2022-01-24&until=2022-02-24&axis_x=measurement_start_day&category_code=LGBT"
+    r = api(client, url)
