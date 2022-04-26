@@ -55,6 +55,7 @@ def test_aggregation_no_axis_csv(client, log):
     assert r.data.decode().replace("\r", "") == expected
 
 
+
 def test_aggregation_no_axis_domain(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=BR&domain=www.cabofrio.rj.gov.br&since=2021-07-09&until=2021-07-10"
@@ -63,10 +64,10 @@ def test_aggregation_no_axis_domain(client):
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 23,
+            "anomaly_count": 21,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 23,
+            "measurement_count": 21,
             "ok_count": 0,
         },
         "v": 0,
