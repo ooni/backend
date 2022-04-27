@@ -255,3 +255,9 @@ def inject_msmts(app, checkout_pipeline):
 def log(app):
     return app.logger
 
+
+@pytest.fixture()
+def citizenlab_tblready(client, app):
+    # Ensure the citizenlab table is populated
+    r = app.click.execute("SELECT count() FROM citizenlab")[0][0]
+    assert r > 2

@@ -45,14 +45,6 @@ def url_prio_tblready(client):
     assert len(r.json["rules"]) > 20
 
 
-
-@pytest.fixture()
-def citizenlab_tblready(client, app):
-    # Ensure the citizenlab table is populated
-    r = app.click.execute("SELECT count() FROM citizenlab")[0][0]
-    assert r > 2
-
-
 def test_no_auth(client):
     r = client.get("/api/v1/url-submission/test-list/global")
     assert r.status_code == 401
