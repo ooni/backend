@@ -16,8 +16,9 @@ from hashlib import shake_128
 from urllib.parse import urlencode
 import time
 
-import pytest
+from dateutil.parser import parse as parse_date
 from tests.utils import *
+import pytest
 
 from ooniapi.measurements import FASTPATH_MSM_ID_PREFIX
 
@@ -464,7 +465,9 @@ def test_list_measurements_slow_order_by_complete(
     response = api(client, url)
 
 
-@pytest.mark.parametrize("f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity"))
+@pytest.mark.parametrize(
+    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
+)
 def test_list_measurements_slow_order_by_group_1(f, log, client):
     # filter on probe_cc or probe_asn or test_name
     # order by --> "test_start_time"
@@ -551,7 +554,9 @@ def today_range():
 @pytest.mark.parametrize("anomaly", (True, False))
 @pytest.mark.parametrize("confirmed", (True, False))
 @pytest.mark.parametrize("failure", (True, False))
-def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
+def test_list_measurements_filter_flags_fastpath(
+    anomaly, confirmed, failure, client, log
+):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
     SELECT COUNT(*), anomaly, confirmed, msm_failure AS failure
@@ -640,10 +645,20 @@ def test_list_measurements_paging_2(client):
 
 
 def test_list_measurements_filter_category_code(client):
-    p = "measurements?since=2021-11-8&until=2021-12-11&category_code=NEWS"
+    # requires `citizenlab` to be populated
+    p = "measurements?since=2021-7-9&until=2021-7-10&category_code=NEWS"
     r = api(client, p)
     urls = set(e["input"] for e in r["results"])
     assert "http://www.bbc.com/" in urls
+
+
+def test_list_measurements_order(client):
+    # https://github.com/ooni/backend/issues/587
+    url = "measurements?since=2021-07-09&until=2021-07-10"
+    resp = api(client, url)
+    assert len(resp["results"]) == 100
+    start_times = [parse_date(r["measurement_start_time"]) for r in resp["results"]]
+    assert start_times == sorted(start_times, reverse=True)
 
 
 ## get_measurement ##
