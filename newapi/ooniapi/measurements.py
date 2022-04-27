@@ -1320,17 +1320,7 @@ def _list_measurements_click(
     # is using BRIN and running slowly
 
     if order_by is None:
-        # Use test_start_time or measurement_start_time depending on other
-        # filters in order to avoid heavy joins.
-        # Filtering on anomaly, confirmed, msm_failure -> measurement_start_time
-        # Filtering on probe_cc, probe_asn, test_name -> test_start_time
-        # See test_list_measurements_slow_order_by_* tests
-        if probe_cc or probe_asn or test_name:
-            order_by = "test_start_time"
-        elif anomaly or confirmed or failure or input_ or domain or category_code:
-            order_by = "measurement_start_time"
-        else:
-            order_by = "measurement_start_time"
+        order_by = "measurement_start_time"
 
     fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
 
