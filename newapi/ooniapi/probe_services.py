@@ -501,7 +501,7 @@ def _check_probe_token(desc):
         return jerror(str(e))
 
 
-def _load_json(path: str):
+def _load_json(path: str) -> dict:
     log = current_app.logger
     conffile = Path(path).resolve()
     log.debug(f"reading {conffile.as_posix()}")

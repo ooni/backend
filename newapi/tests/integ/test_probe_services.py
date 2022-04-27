@@ -13,11 +13,13 @@ Test using:
 
 # TODO: mock out /etc/ooni/api.conf during testing
 
+from mock import patch
+from pathlib import Path
+import json
+
 import pytest
-from unittest.mock import patch
 
 import ooniapi.probe_services
-
 
 
 @pytest.fixture()
@@ -66,14 +68,29 @@ def test_index(client):
 ## Test /api/v1/check-in
 
 
-def test_check_in(client):
+def mock_load_json():
+    known = ("/etc/ooni/tor_targets.json", "/etc/ooni/psiphon_config.json")
+
+    def load_json(fn):
+        if fn in known:
+            f = Path("tests/integ/data") / Path(fn).name
+            print(f"    Mocking probe_services._load_json {fn} -> {f}")
+            return json.loads(f.read_text())
+        raise NotImplementedError(f"Unexpected fname to be mocked out: {fn}")
+
+    return load_json
+
+
+def test_check_in_basic(client):
     j = dict(
         probe_cc="US",
         probe_asn="AS1234",
         on_wifi=True,
         charging=False,
     )
-    c = postj(client, "/api/v1/check-in", **j)
+    with patch("ooniapi.probe_services._load_json", new_callable=mock_load_json):
+        c = postj(client, "/api/v1/check-in", **j)
+
     assert c["v"] == 1
     urls = c["tests"]["web_connectivity"]["urls"]
     assert len(urls) > 1, urls
