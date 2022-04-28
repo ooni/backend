@@ -57,18 +57,3 @@ def test_url_prioritization_category_codes(client):
         assert r["category_code"] in ("NEWS", "CULTR")
 
     assert len(set(r["url"] for r in c["results"])) == lim
-
-
-@pytest.mark.skip("needs mock db")
-def test_url_prioritization_country_code_nolimit(client):
-    c = getjson(client, "/api/v1/test-list/urls?country_code=US")
-    assert "metadata" in c
-    xx_cnt = 0
-    for r in c["results"]:
-        assert r["country_code"] in ("XX", "US")
-        if r["country_code"] == "XX":
-            xx_cnt += 1
-
-    assert xx_cnt > 1200
-    us_cnt = c["metadata"]["count"] - xx_cnt
-    assert us_cnt > 40
