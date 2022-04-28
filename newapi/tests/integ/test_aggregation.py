@@ -282,21 +282,35 @@ def test_aggregation_foo(client):
 
 def test_aggregation_x_axis_only_csv_2d(client, log):
     # 2-dimensional data: day vs ASN
-    url = "aggregation?probe_cc=DE&domain=twitter.com&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
-    r = api(client, url)
+    dom = "www.cabofrio.rj.gov.br"
+    url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
+    r = client.get(f"/api/v1/{url}")
+    assert r.status_code == 200
+    assert not r.is_json
     expected = dedent(
         """\
-        anomaly_count,confirmed_count,failure_count,measurement_count,measurement_start_day,probe_asn
-        0,0,0,4,2021-07-10,3320
-        0,0,0,4,2021-07-10,13184
-        0,0,0,1,2021-07-10,200052
-        0,0,0,4,2021-07-10,3209
-        0,0,0,5,2021-07-10,3320
-        0,0,0,1,2021-07-10,9145
-        4,0,0,4,2021-07-10,29562
+        anomaly_count,confirmed_count,failure_count,measurement_count,measurement_start_day,ok_count,probe_asn
+        1,0,0,1,2021-07-09,0,18881
+        1,0,0,1,2021-07-09,0,28154
+        1,0,0,1,2021-07-09,0,28183
+        1,0,0,1,2021-07-09,0,28210
+        1,0,0,1,2021-07-09,0,28343
+        3,0,0,3,2021-07-09,0,28573
+        1,0,0,1,2021-07-09,0,53029
+        1,0,0,1,2021-07-09,0,53089
+        1,0,0,1,2021-07-09,0,53209
+        1,0,0,1,2021-07-09,0,262616
+        1,0,0,1,2021-07-09,0,262644
+        1,0,0,1,2021-07-09,0,262970
+        2,0,0,2,2021-07-09,0,262983
+        1,0,0,1,2021-07-09,0,264146
+        1,0,0,1,2021-07-09,0,264510
+        1,0,0,1,2021-07-09,0,264592
+        1,0,0,1,2021-07-09,0,268821
+        1,0,0,1,2021-07-09,0,269246
     """
     )
-    assert r.replace("\r", "") == expected
+    assert r.data.decode().replace("\r", "") == expected
 
 
 aggreg_over_category_code_expected = [

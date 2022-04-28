@@ -1892,17 +1892,9 @@ def _clickhouse_aggregation(
         else:
             delta = 0
 
-        # lim = 100
-        # if delta > lim * 30:
-        #     granularity = ("year", "toYear")
-        # elif delta > lim * 7:
-        #     granularity = ("month", "toMonth")
-        # elif delta > lim:
-        #     granularity = ("week", "toWeek")
-        if delta < 2:
-            granularity = ("hour", "toHour")
-        else:
-            granularity = ("day", "toDate")
+        # TODO: add a granularity parameter and a check around query weight /
+        # / response size. Also add support in CSV format.
+        granularity = ("day", "toDate")
         tcol, fun = granularity
         tcol = "measurement_start_day"  # TODO: support dynamic axis names
         cols.append(sql.text(f"{fun}(measurement_start_time) AS {tcol}"))
