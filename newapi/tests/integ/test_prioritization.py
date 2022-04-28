@@ -60,24 +60,6 @@ def test_url_prioritization_category_codes(client):
 
 
 @pytest.mark.skip("needs mock db")
-def test_url_prioritization_country_code_limit(client):
-    lim = 2
-    c = getjson(client, f"/api/v1/test-list/urls?country_code=US&limit={lim}")
-    assert "metadata" in c
-    assert c["metadata"] == {
-        "count": lim,
-        "current_page": -1,
-        "limit": -1,
-        "next_url": "",
-        "pages": 1,
-    }
-    for r in c["results"]:
-        assert r["country_code"] in ("XX", "US")
-
-    assert len(set(r["url"] for r in c["results"])) == lim
-
-
-@pytest.mark.skip("needs mock db")
 def test_url_prioritization_country_code_nolimit(client):
     c = getjson(client, "/api/v1/test-list/urls?country_code=US")
     assert "metadata" in c
