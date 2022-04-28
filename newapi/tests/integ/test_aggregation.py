@@ -55,7 +55,6 @@ def test_aggregation_no_axis_csv(client, log):
     assert r.data.decode().replace("\r", "") == expected
 
 
-
 def test_aggregation_no_axis_domain(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=BR&domain=www.cabofrio.rj.gov.br&since=2021-07-09&until=2021-07-10"
@@ -84,10 +83,10 @@ def test_aggregation_no_axis_filter_by_category_code(client):
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 21,
+            "anomaly_count": 0,
             "confirmed_count": 0,
             "failure_count": 0,
-            "measurement_count": 35,
+            "measurement_count": 14,
             "ok_count": 14,
         },
         "v": 0,
@@ -146,17 +145,17 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 372,
+                "anomaly_count": 371,
                 "blocking_type": "",
                 "confirmed_count": 0,
-                "failure_count": 455,
+                "failure_count": 452,
                 "measurement_count": 9622,
-                "ok_count": 8796,
+                "ok_count": 8799,
             },
             {
-                "anomaly_count": 105,
+                "anomaly_count": 94,
                 "blocking_type": "dns",
-                "confirmed_count": 11,
+                "confirmed_count": 9,
                 "failure_count": 2,
                 "measurement_count": 105,
                 "ok_count": 0,
@@ -178,7 +177,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "ok_count": 0,
             },
             {
-                "anomaly_count": 72,
+                "anomaly_count": 60,
                 "blocking_type": "tcp_ip",
                 "confirmed_count": 0,
                 "failure_count": 12,
