@@ -261,3 +261,63 @@ def citizenlab_tblready(client, app):
     # Ensure the citizenlab table is populated
     r = app.click.execute("SELECT count() FROM citizenlab")[0][0]
     assert r > 2
+
+
+@pytest.fixture
+def url_prio_tblready(app):
+    log = app.logger
+    # Ensure the url_priorities table is populated
+    r = app.click.execute("SELECT count() FROM url_priorities")[0][0]
+    if r > 5:
+        return
+
+    rules = [
+        ("NEWS", 100),
+        ("POLR", 100),
+        ("HUMR", 100),
+        ("LGBT", 100),
+        ("ANON", 100),
+        ("MMED", 80),
+        ("SRCH", 80),
+        ("PUBH", 80),
+        ("REL", 60),
+        ("XED", 60),
+        ("HOST", 60),
+        ("ENV", 60),
+        ("FILE", 40),
+        ("CULTR", 40),
+        ("IGO", 40),
+        ("GOVT", 40),
+        ("DATE", 30),
+        ("HATE", 30),
+        ("MILX", 30),
+        ("PROV", 30),
+        ("PORN", 30),
+        ("GMB", 30),
+        ("ALDR", 30),
+        ("GAME", 20),
+        ("MISC", 20),
+        ("HACK", 20),
+        ("ECON", 20),
+        ("COMM", 20),
+        ("CTRL", 20),
+        ("COMT", 100),
+        ("GRP", 100),
+    ]
+    rows = [
+        {
+            "sign": 1,
+            "category_code": ccode,
+            "cc": "*",
+            "domain": "*",
+            "url": "*",
+            "priority": prio,
+        }
+        for ccode, prio in rules
+    ]
+    # The url_priorities table is CollapsingMergeTree
+    query = """INSERT INTO url_priorities
+        (sign, category_code, cc, domain, url, priority) VALUES
+    """
+    log.info("Populating url_priorities")
+    app.click.execute(query, rows)

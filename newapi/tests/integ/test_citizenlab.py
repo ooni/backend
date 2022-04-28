@@ -37,13 +37,6 @@ def usersession(client, app):
     reset_smtp_mock()
 
 
-@pytest.fixture
-def url_prio_tblready(app):
-    # Ensure the url_priorities table is populated
-    r = app.click.execute("SELECT count() FROM url_priorities")[0][0]
-    assert r > 20
-
-
 def test_no_auth(client):
     r = client.get("/api/v1/url-submission/test-list/global")
     assert r.status_code == 401

@@ -763,7 +763,6 @@ def list_url_priorities():
     ORDER BY category_code, cc, domain, url, priority
     """
     if current_app.config["USE_CLICKHOUSE"]:
-        initialize_url_priorities_if_needed()
         # The url_priorities table is CollapsingMergeTree
         q = query_click(sql.text(query), {})
         rows = list(q)
