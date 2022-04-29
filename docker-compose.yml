@@ -1,22 +1,8 @@
 version: '3.9'
 
 services:
-  db:
-    image: postgres:11.12
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: oonitest
-      POSTGRES_PASSWORD: test
-      POSTGRES_DB: oonitestdb
-    volumes:
-      # ssh ams-pg.ooni.org -t pg_dump metadb -U shovel --schema-only > scripts/2_metadb_schema.sql
-      - ./newapi/tests/integ/1_metadb_users.sql:/docker-entrypoint-initdb.d/1_metadb_users.sql
-      - ./newapi/tests/integ/2_metadb_schema.sql:/docker-entrypoint-initdb.d/2_metadb_schema.sql
-      - ./newapi/tests/integ/3_test_fixtures.sql:/docker-entrypoint-initdb.d/3_test_fixtures.sql
-
   clickhouse:
-    image: yandex/clickhouse-server:21.8.8
+    image: yandex/clickhouse-server:21.8.12
     hostname: clickhouse
     container_name: clickhouse
     ports:
@@ -35,5 +21,4 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
       - clickhouse

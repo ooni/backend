@@ -8,7 +8,6 @@ from datetime import date, timedelta
 from textwrap import dedent
 from subprocess import PIPE
 from pathlib import Path
-from urllib.parse import urlparse
 
 import flask
 from clickhouse_driver import Client as Clickhouse
@@ -138,28 +137,18 @@ def run_pg_sql_scripts(app):
 
 def run_clickhouse_sql_scripts(app):
     clickhouse_url = app.config["CLICKHOUSE_URL"]
-    clickhouse_host = urlparse(clickhouse_url).hostname
-    assert clickhouse_host
+    click = Clickhouse.from_url(clickhouse_url)
+    tables = click.execute("SHOW TABLES")
+    for row in tables:
+        if row[0] == "fastpath":
+            return
+
     for fn in ["1_schema", "2_fixtures"]:
-        fn = f"tests/integ/clickhouse_{fn}.sql"
-        cmd = [
-            "/usr/bin/clickhouse-client",
-            "--host",
-            clickhouse_host,
-            "--multiline",
-            "--multiquery",
-            "--queries-file",
-            fn,
-        ]
-        print(f"Running {fn} on Clickhouse")
-        print("Running " + " ".join(cmd))
-        r = subprocess.run(cmd, capture_output=True, timeout=5)
-        if r.returncode:
-            msg = "ERROR running clickhouse-client"
-            print(msg)
-            print(r.stderr.decode())
-            print("^" * 40)
-            pytest.exit(msg, returncode=r.returncode)
+        sql_f = Path(f"tests/integ/clickhouse_{fn}.sql")
+        print(f"Running {sql_f} on Clickhouse")
+        queries = sql_f.read_text().split(";")
+        for q in queries:
+            click.execute(q)
 
 
 def _run_fastpath(fpdir, dburi, start, end, limit):
@@ -174,10 +163,11 @@ def run_fastpath(log, pipeline_dir, dburi, clickhouse_url):
     fpdir = pipeline_dir / "af" / "fastpath"
     conffile = fpdir / "etc/ooni/fastpath.conf"
     conffile.parent.mkdir(parents=True)
+    # PG is disabled
     conf = f"""
         [DEFAULT]
         collectors = localhost
-        db_uri = {dburi}
+        db_uri =
         clickhouse_url = {clickhouse_url}
         s3_access_key =
         s3_secret_key =
@@ -206,13 +196,16 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
     if not pytest.create_db:
         return
 
-    dburi = app.config["DATABASE_URI_RO"]
-    if dburi and "metadb" in dburi:
-        print("Refusing to make changes on metadb!")
-        sys.exit(1)
-
     clickhouse_url = app.config["CLICKHOUSE_URL"]
     assert any([x in clickhouse_url for x in ("localhost", "clickhouse")])
+
+    if clickhouse_url:
+        dburi = ""
+    else:
+        dburi = app.config["DATABASE_URI_RO"]
+        if dburi and "metadb" in dburi:
+            print("Refusing to make changes on metadb!")
+            sys.exit(1)
 
     log = app.logger
     # run_pg_sql_scripts(app)

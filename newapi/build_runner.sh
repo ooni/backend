@@ -21,16 +21,10 @@ echo 'deb http://deb-ci.ooni.org unstable main' \
 apt-key adv --keyserver hkp://keyserver.ubuntu.com \
   --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
 
-# Set up Clickhouse archive
-echo "deb https://repo.clickhouse.com/deb/lts/ main/" \
-  > /etc/apt/sources.list.d/clickhouse.list
-apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv E0C56BD4
-
 apt-get update
 # Keep this in sync with debian/control
 # hint: grep debdeps **/*.py
 apt-get install --no-install-recommends -qy \
-  clickhouse-client \
   git \
   gunicorn3 \
   python3-boto3 \
