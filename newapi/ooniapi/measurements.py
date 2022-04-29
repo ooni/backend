@@ -571,6 +571,8 @@ def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
     if not msmt_meta:
         return {}  # measurement not found
     if msmt_meta["probe_asn"] == 0:
+        # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
+        # https://github.com/ooni/explorer/issues/495
         return {}  # unwanted
 
     keys = (
@@ -1259,6 +1261,8 @@ def _list_measurements_click(
         query_params["probe_asn"] = probe_asn
         fpwhere.append(sql.text("probe_asn = :probe_asn"))
     else:
+        # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
+        # https://github.com/ooni/explorer/issues/495
         fpwhere.append(sql.text("probe_asn != 0"))
 
     if test_name is not None:
