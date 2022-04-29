@@ -917,7 +917,7 @@ def api_private_im_stats():
     if current_app.config["USE_CLICKHOUSE"]:
         s = """SELECT
             COUNT() as total_count,
-            toDate(measurement_start_time) as test_day
+            toDate(measurement_start_time) AS test_day
             FROM fastpath
             WHERE probe_cc = :probe_cc
             AND test_name = :test_name
