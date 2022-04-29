@@ -162,10 +162,10 @@ def create_app(*args, testmode=False, **kw):
     # Order matters
     init_app(app, testmode=testmode)
 
-    if app.config["DATABASE_URI_RO"]:
-        init_postgres_db(app)  # pragma: no cover
     if app.config["USE_CLICKHOUSE"]:
         init_clickhouse_db(app)
+    else:
+        init_postgres_db(app)  # pragma: no cover
 
     # Setup rate limiting
     # NOTE: the limits apply per-process. The number of processes is set in:

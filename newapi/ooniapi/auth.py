@@ -375,7 +375,13 @@ def _set_account_role(email_address, role: str) -> int:
     # log.info(f"Giving account {account_id} role {role}")
     # TODO: when role is changed enforce token expunge
     query_params = dict(account_id=account_id, role=role)
-    if current_app.config["DATABASE_URI_RO"]:
+    if current_app.config["USE_CLICKHOUSE"]:
+        log.info("Creating/Updating account role")
+        # 'accounts' is on RocksDB (ACID key-value database)
+        query = """INSERT INTO accounts (account_id, role) VALUES"""
+        return insert_click(query, [query_params])
+
+    else:
         query = """INSERT INTO accounts (account_id, role)
             VALUES(:account_id, :role)
             ON CONFLICT (account_id) DO
@@ -384,12 +390,6 @@ def _set_account_role(email_address, role: str) -> int:
         q = current_app.db_session.execute(query, query_params).rowcount
         current_app.db_session.commit()
         return q
-
-    elif current_app.config["USE_CLICKHOUSE"]:
-        log.info("Creating/Updating account role")
-        # 'accounts' is on RocksDB (ACID key-value database)
-        query = """INSERT INTO accounts (account_id, role) VALUES"""
-        return insert_click(query, [query_params])
 
     raise Exception("Database not configured")
 
@@ -556,7 +556,15 @@ def set_session_expunge():
     log.info(f"Setting expunge for account {account_id}")
     # If an entry is already in place update the threshold as the new
     # value is going to be safer
-    if current_app.config["DATABASE_URI_RO"]:
+    if current_app.config["USE_CLICKHOUSE"]:
+        # 'session_expunge' is on RocksDB (ACID key-value database)
+        log.info("Inserting into Clickhouse session_expunge")
+        query = "INSERT INTO session_expunge (account_id) VALUES"
+        query_params = dict(account_id=account_id)
+        # the `threshold` column defaults to the current time
+        insert_click(query, [query_params])
+
+    else:
         log.info("Inserting into PostgreSQL session_expunge")
         now = datetime.utcnow()
         query_params = dict(account_id=account_id, now=now)
@@ -569,13 +577,6 @@ def set_session_expunge():
         log.info(f"Expunge set {q}")
         current_app.db_session.commit()
 
-    if current_app.config["USE_CLICKHOUSE"]:
-        # 'session_expunge' is on RocksDB (ACID key-value database)
-        log.info("Inserting into Clickhouse session_expunge")
-        query = "INSERT INTO session_expunge (account_id) VALUES"
-        query_params = dict(account_id=account_id)
-        # the `threshold` column defaults to the current time
-        insert_click(query, [query_params])
 
     return nocachejson()
 
@@ -585,14 +586,7 @@ def _remove_from_session_expunge(email_address: str) -> None:
     log = current_app.logger
     account_id = hash_email_address(email_address)
     query_params: Dict[str, Any] = dict(account_id=account_id)
-    if current_app.config["DATABASE_URI_RO"]:
-        log.info("Deleting from PostgreSQL session_expunge")
-        query = "DELETE FROM session_expunge WHERE account_id = :account_id"
-        current_app.db_session.execute(query, query_params)
-        current_app.db_session.commit()
-        return
-
-    elif current_app.config["USE_CLICKHOUSE"]:
+    if current_app.config["USE_CLICKHOUSE"]:
         # 'session_expunge' is on RocksDB (ACID key-value database)
         q1 = "SELECT * FROM session_expunge WHERE account_id = :account_id"
         row = query_click_one_row(sql.text(q1), query_params)
@@ -602,5 +596,12 @@ def _remove_from_session_expunge(email_address: str) -> None:
             query = "INSERT INTO session_expunge (account_id, threshold) VALUES"
             query_params["threshold"] = 0
             insert_click(query, [query_params])
+
+    else:
+        log.info("Deleting from PostgreSQL session_expunge")
+        query = "DELETE FROM session_expunge WHERE account_id = :account_id"
+        current_app.db_session.execute(query, query_params)
+        current_app.db_session.commit()
+
 
 # TODO: purge session_expunge
