@@ -136,6 +136,7 @@ def run_pg_sql_scripts(app):
 
 
 def run_clickhouse_sql_scripts(app):
+    log = app.logger
     clickhouse_url = app.config["CLICKHOUSE_URL"]
     click = Clickhouse.from_url(clickhouse_url)
     tables = click.execute("SHOW TABLES")
@@ -148,6 +149,9 @@ def run_clickhouse_sql_scripts(app):
         print(f"Running {sql_f} on Clickhouse")
         queries = sql_f.read_text().split(";")
         for q in queries:
+            q = q.strip()
+            if not q:
+                continue
             click.execute(q)
 
 
