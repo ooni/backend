@@ -463,6 +463,11 @@ def api_private_test_coverage():
 def api_private_website_network_tests():
     """TODO
     ---
+    parameters:
+      - name: probe_cc
+        in: query
+        type: string
+        description: The two letter country code
     responses:
       '200':
         description: TODO
@@ -987,6 +992,11 @@ def api_private_im_stats():
 def api_private_network_stats():
     """Network speed statistics - not implemented
     ---
+    parameters:
+      - name: probe_cc
+        in: query
+        type: string
+        description: The two letter country code
     responses:
       '200':
         description: TODO
@@ -1053,7 +1063,7 @@ def api_private_country_overview():
             COUNT(DISTINCT probe_asn) AS network_count
             FROM fastpath
             WHERE probe_cc = :probe_cc
-            AND measurement_start_time > '2016-01-01'
+            AND measurement_start_time > '2012-12-01'
         """
         r = query_click_one_row(sql.text(s), {"probe_cc": probe_cc})
     else:  # pragma: no cover
