@@ -439,17 +439,17 @@ def _delete_account_data(email_address: str) -> None:
     # Used by integ test
     account_id = hash_email_address(email_address)
     query_params = dict(account_id=account_id)
-    if current_app.config["DATABASE_URI_RO"]:
-        query = "DELETE FROM accounts WHERE account_id = :account_id"
-        q = current_app.db_session.execute(query, query_params).rowcount
-        current_app.db_session.commit()
-
     if current_app.config["USE_CLICKHOUSE"]:
         # reset account to "user" role
         # 'accounts' is on RocksDB (ACID key-value database)
         # FIXME
         q = "INSERT INTO accounts (account_id, role) VALUES(:account_id, 'role')"
         query_click(sql.text(q), query_params)
+
+    else:
+        query = "DELETE FROM accounts WHERE account_id = :account_id"
+        q = current_app.db_session.execute(query, query_params).rowcount
+        current_app.db_session.commit()
 
 
 def _get_account_role(account_id: str) -> Optional[str]:
@@ -576,7 +576,6 @@ def set_session_expunge():
         q = current_app.db_session.execute(query, query_params).rowcount
         log.info(f"Expunge set {q}")
         current_app.db_session.commit()
-
 
     return nocachejson()
 
