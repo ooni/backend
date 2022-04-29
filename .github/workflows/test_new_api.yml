@@ -25,7 +25,7 @@ jobs:
         # Uses Dockerfile ./build_runner.sh and docker-compose.yml to set up the runner
         run: |
           docker-compose run --rm api \
-            pytest-3 --show-capture=no -s -vv --cov=ooniapi \
+            pytest-3 -vv --cov=ooniapi \
               --create-db \
               tests/functional/test_private_explorer.py \
               tests/integ/test_aggregation.py \
