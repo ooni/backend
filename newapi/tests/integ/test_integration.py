@@ -366,7 +366,6 @@ def test_get_raw_measurement(client):
     assert len(r.keys()) == 20
 
 
-@pytest.mark.slow
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_get_measurement_meta_duplicate_in_fp(client, fastpath_dup_rid_input):
     rid, inp = fastpath_dup_rid_input
@@ -442,13 +441,11 @@ def test_list_measurements_search_cc(client):
 
 
 # These are some of the parameters exposed by Explorer Search
-@pytest.mark.timeout(20)
 @pytest.mark.parametrize("probe_cc", ("US", None))
 @pytest.mark.parametrize("since", ("2021-01-01", None))
 @pytest.mark.parametrize("test_name", ("web_connectivity", None))
 @pytest.mark.parametrize("anomaly", ("true", None))
 @pytest.mark.parametrize("domain", ("twitter.com", None))
-@pytest.mark.slow
 def test_list_measurements_slow_order_by_complete(
     domain, anomaly, test_name, since, probe_cc, log, client
 ):
@@ -683,7 +680,6 @@ def test_get_measurement_missing_pipeline(client):
     assert response.status_code == 400
 
 
-@pytest.mark.get_measurement
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_get_measurement_2(log, client, fastpath_rid_input):
     """Simulate Explorer behavior
@@ -718,7 +714,6 @@ def test_get_measurement_2(log, client, fastpath_rid_input):
 
 
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-@pytest.mark.get_measurement
 def test_bug_355_confirmed(client):
     # Use RU to have enough msmt
     p = "measurements?probe_cc=RU&limit=50&confirmed=true&since=2019-12-23&until=2019-12-24"
