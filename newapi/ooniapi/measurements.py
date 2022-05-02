@@ -1462,14 +1462,15 @@ def param_uppercase(name):
     return p
 
 
-def param_asn(name):
+def param_asn(name: str) -> Optional[int]:
     p = request.args.get(name)
     if p:
         if p.startswith("AS"):
-            int(p[2:])
-        else:
-            int(p)
-    return p
+            return int(p[2:])
+
+        return int(p)
+
+    return None
 
 
 domain_matcher = re.compile(
@@ -1711,9 +1712,6 @@ def _postgresql_aggregation(
         query_params["probe_cc"] = probe_cc
 
     if probe_asn is not None:
-        if probe_asn.startswith("AS"):
-            probe_asn = probe_asn[2:]
-        probe_asn = int(probe_asn)
         where.append(sql.text("probe_asn = :probe_asn"))
         query_params["probe_asn"] = probe_asn
 
@@ -1869,9 +1867,6 @@ def _clickhouse_aggregation(
         query_params["probe_cc"] = probe_cc
 
     if probe_asn is not None:
-        if probe_asn.startswith("AS"):
-            probe_asn = probe_asn[2:]
-        probe_asn = int(probe_asn)
         where.append(sql.text("probe_asn = :probe_asn"))
         query_params["probe_asn"] = probe_asn
 
