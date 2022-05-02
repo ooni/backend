@@ -765,6 +765,7 @@ def list_measurements():
         - psiphon
         - riseupvpn
         - signal
+        - stunreachability
         - tcp_connect
         - telegram
         - tor

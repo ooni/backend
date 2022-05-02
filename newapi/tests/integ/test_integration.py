@@ -658,6 +658,13 @@ def test_list_measurements_order(client):
     assert start_times == sorted(start_times, reverse=True)
 
 
+def test_list_measurements_stunreachability(client):
+    # https://github.com/ooni/backend/issues/573
+    url = "measurements?test_name=stunreachability&since=2021-07-09&until=2021-07-10"
+    resp = api(client, url)
+    assert len(resp["results"]) > 2
+
+
 ## get_measurement ##
 
 
