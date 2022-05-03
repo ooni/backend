@@ -731,8 +731,8 @@ def test_bug_355_confirmed(client):
 
 
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-@pytest.mark.get_measurement
 def test_bug_355_anomaly(client):
+    # https://github.com/ooni/explorer/issues/355
     p = "measurements?probe_cc=RU&limit=50&anomaly=true&since=2019-12-23&until=2019-12-24"
     response = api(client, p)
     for r in response["results"]:
