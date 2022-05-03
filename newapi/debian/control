@@ -44,8 +44,6 @@ Depends: ${misc:Depends},
  python3-ujson,
 Suggests:
  python3-freezegun,
- python3-pytest,
- python3-pytest-mock,
- python3-pytest-benchmark
+ python3-pytest
 Description: OONI API
  OONI API

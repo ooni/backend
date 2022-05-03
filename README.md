@@ -6,81 +6,41 @@ File bugs with the API inside of: https://github.com/ooni/backend/issues/new
 
 ## Local development
 
+You can run the OONI API locally in a development environment using `docker`
+and `docker-compose`. Follow the instructions below to set it up.
+
 ### Quickstart
 
-**Note**: the default database configuration is `postgres@localhost:15432/ooni_measurements`,
-you only need to run the second step below (`export DATABASE_URL`) in case you want to use a different one.
-
-### Running the API on Debian Buster
-
-Option 1: Build a package with dpkg-buildpackage -us -uc and install it with sudo debi
-
-Option 2: Install the dependencies from newapi/debian/control or using the commands in build_docker.sh
-
-```bash
-
-# Monitor the generated metrics
-watch -n1 -d 'curl -s http://127.0.0.1:5000/metrics'
-
-# Call the API
-curl http://127.0.0.1:5000/api/v1/measurements?since=2019-01-01&until=2019-02-01&limit=1
+First you should build the docker image for the API:
+```
+make build
 ```
 
-### Running the API using Docker
+This only needs to be run once, or any time you make changes to the
+dependencies in the `newapi/build_runnner.sh` script.
 
-```bash
-docker build -t ooniapi .
-
-docker run --name ooniapirun --rm  --net=host -i -t ooniapi gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
+To populate the database with some sample data (this is needed for running many
+of the tests), you should run:
+```
+make initdb
 ```
 
-### Running The API using systemd-nspawn
+This also needs to only be run once.
 
-```bash
-cd newapi
-./spawnrunner gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
+At this point you have a fully setup development environment.
+
+You can run the full test suite via:
+```
+make tests
 ```
 
-### Running tests using systemd-nspawn
-
-```bash
-cd newapi
-./spawnrunner pytest-3 tests/integ/test_probe_services.py
+If you care to only run a specific test, that can be done using the `pytest`
+`-k` option, passed in as a T env var to `make`:
+```
+T="-k test_my_test_name" make tests
 ```
 
-### Running the API using gunicorn on macOS
-
-First setup a local port forward with:
-
-```bash
-ssh ams-pg-test.ooni.org -L 0.0.0.0:5432:127.0.0.1:5432 -Snone -g -C
+If you want to run a local instance of the OONI API, this can be done via:
 ```
-
-Run the newapi under gunicorn:
-
+make serve
 ```
-cd newapi
-CONF=$(pwd)/api.conf.example gunicorn --reuse-port ooniapi.wsgi
-```
-
-### Running the tests
-
-Run the integration tests:
-
-```bash
-docker-compose run --rm api pytest-3 -k test_private_explorer.py -k test_smoke.py -k test_citizenlab.py
-```
-
-### Bug fix micro-tutorial
-
-Clone the API repository.
-
-Create a new test in `tests/integ/test_integration.py` and run it with:
-
-```bash
-docker-compose run --rm api pytest-3 -k test_bug_12345_blah
-```
-
-Fix the bug and send a pull request for the bugfix and test together.
-
-Thanks!

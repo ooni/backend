@@ -1,51 +1,25 @@
-APP_ENV = development
-DATABASE_URL?=postgresql://postgres@localhost:5432/ooni_measurements
-VERSION = $(shell cat package.json \
-  | grep version \
-  | head -1 \
-  | awk -F: '{ print $$2 }' \
-  | sed 's/[",]//g' \
-  | tr -d '[[:space:]]')
+TESTARGS ?= tests/functional/test_private_explorer.py tests/integ/test_aggregation.py tests/integ/test_citizenlab.py tests/integ/test_integration.py tests/integ/test_integration_auth.py tests/integ/test_prioritization.py tests/integ/test_private_api.py tests/integ/test_probe_services.py tests/unit/test_prio.py
 
-PWD = $(shell pwd)
+#tests/integ/test_prioritization_nodb.py
+#tests/integ/test_probe_services_nodb.py
+#tests/integ/test_integration_auth.py
 
-PYTHON_WITH_ENV = PYTHONPATH=$(PWD) APP_ENV=$(APP_ENV) DATABASE_URL=$(DATABASE_URL) python
+.state/docker-build: Dockerfile
+	docker-compose build --force-rm api
 
--include make.conf # to override DATABASE_URL, PYTHON_WITH_ENV to use venv and so on
+	mkdir -p .state
+	touch .state/docker-build
 
-default:
-	@echo "ERR: Did not specify a command"
-	@exit 1
+serve: .state/docker-build
+	docker-compose up --remove-orphans
 
-clean:
-	rm -rf measurements/static/dist venv
+build:
+	@$(MAKE) .state/docker-build
 
-venv:
-	virtualenv -p python3.7 venv && venv/bin/pip install -r requirements/deploy.txt -r requirements/main.txt -r requirements/tests.txt
+initdb:
+	docker-compose run --rm api python3 -m pytest --setup-only --create-db
 
-tox37:
-	tox -e py37 $(args)
+tests: .state/docker-build
+	docker-compose run --rm api python3 -m pytest $(T) $(TESTARGS)
 
-tox37-coverage:
-	tox -e py37 -- --cov --cov-report=term-missing $(args)
-
-dev:
-	$(PYTHON_WITH_ENV) -m measurements run -p 3000 --reload
-
-update-country-list:
-	curl https://raw.githubusercontent.com/hellais/country-util/master/data/country-list.json > measurements/countries/country-list.json
-
-shell:
-	$(PYTHON_WITH_ENV) -m measurements shell
-
-test-unit:
-	$(PYTHON_WITH_ENV) -m coverage run -m pytest -m unit
-
-test-functional:
-	$(PYTHON_WITH_ENV) -m coverage run -m pytest -m functional
-
-test: test-unit test-functional
-	$(PYTHON_WITH_ENV) -m coverage report -m
-
-.PHONY: default dev build clean shell \
-		test test-unit test-functional
+.PHONY: build initdb tests serve

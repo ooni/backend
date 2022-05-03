@@ -21,24 +21,15 @@ jobs:
         with:
           limit-access-to-actor: true
 
-      - name: Run integ tests
-        # Uses Dockerfile ./build_runner.sh and docker-compose.yml to set up the runner
-        run: |
-          docker-compose run --rm api \
-            pytest-3 -vv --cov=ooniapi \
-              --create-db \
-              tests/functional/test_private_explorer.py \
-              tests/integ/test_aggregation.py \
-              tests/integ/test_citizenlab.py \
-              tests/integ/test_integration.py \
-              tests/integ/test_integration_auth.py \
-              tests/integ/test_prioritization.py \
-              tests/integ/test_private_api.py \
-              tests/integ/test_probe_services.py \
-              tests/unit/test_prio.py
-              #tests/integ/test_prioritization_nodb.py \
-              #tests/integ/test_probe_services_nodb.py \
-              #tests/integ/test_integration_auth.py \
+
+      - name: Build docker image
+        run: make build
+
+      - name: Setup database fixtures
+        run: make initdb
+
+      - name: Run all tests
+        run: T="--show-capture=no -s -vv --cov=ooniapi" make tests
 
       - name: debug docker
         if: always()

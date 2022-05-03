@@ -10,15 +10,18 @@ services:
       - "9000:9000"
     volumes:
       - ./data/clickhouse/data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://127.0.0.1:8123/ping"]
 
   api:
     restart: always
     build:
       context: .
-    command: gunicorn3 --reuse-port ooniapi.wsgi --statsd-host 127.0.0.1:8125
+    command: gunicorn3 --reuse-port ooniapi.wsgi -b 0.0.0.0:8000
     volumes:
       - ./newapi/:/app
     ports:
       - "8000:8000"
     depends_on:
-      - clickhouse
+      clickhouse:
+        condition: service_healthy

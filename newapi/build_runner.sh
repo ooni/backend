@@ -41,7 +41,9 @@ apt-get install --no-install-recommends -qy \
   python3-mock \
   python3-psycopg2 \
   python3-pytest \
+  python3-pytest-benchmark\
   python3-pytest-cov \
+  python3-pytest-mock \
   python3-setuptools \
   python3-sqlalchemy \
   python3-sqlalchemy-utils \
