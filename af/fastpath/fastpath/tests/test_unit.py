@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import date
 
 import pytest
-import ujson
+import json
 
 from fastpath.utils import trivial_id
 from fastpath.db import extract_input_domain
@@ -14,10 +14,26 @@ import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
 
 
+scores_failed = {
+    "accuracy": 0.0,
+    "blocking_general": 0.0,
+    "blocking_global": 0.0,
+    "blocking_country": 0.0,
+    "blocking_isp": 0.0,
+    "blocking_local": 0.0,
+}
+
+
+def load_yaml(fn):
+    f = Path("fastpath/tests/data") / fn
+    t = f.with_suffix(".yaml").read_text()
+    return t
+
+
 def loadj(fn):
     f = Path("fastpath/tests/data") / fn
     t = f.with_suffix(".json").read_text()
-    return ujson.loads(t)
+    return json.loads(t)
 
 
 def test_trivial_id():
@@ -123,6 +139,31 @@ def test_match_fingerprints_dict_body():
 
 
 # Follow the order in score_measurement
+
+# # test_name: http_header_field_manipulation
+
+
+def test_score_http_header_field_manipulation_1():
+    # failure: requests -> null
+    msm = loadj("http_header_field_manipulation_1")
+    scores = fp.score_measurement(msm)
+    assert scores == scores_failed
+
+
+def test_score_http_header_field_manipulation_2():
+    # failure: requests -> empty list
+    msm = loadj("http_header_field_manipulation_2")
+    scores = fp.score_measurement(msm)
+    assert scores == scores_failed
+
+
+def test_score_http_header_field_manipulation_3():
+    # test helper issue
+    msm = loadj("http_header_field_manipulation_3")
+    scores = fp.score_measurement(msm)
+    assert scores == scores_failed
+
+
 
 # # test_name: web_connectivity
 

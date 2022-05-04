@@ -1,0 +1,45 @@
+{
+  "annotations": {
+    "assets_version": "20200619115947",
+    "engine_name": "ooniprobe-engine",
+    "engine_version": "0.14.0",
+    "platform": "macos"
+  },
+  "data_format_version": "0.2.0",
+  "extensions": {
+    "dnst": 0,
+    "httpt": 0,
+    "dnst": 0,
+    "httpt": 0,
+    "netevents": 0,
+    "tlshandshake": 0,
+    "tunnel": 0
+  },
+  "input": null,
+  "measurement_start_time": "2020-07-10 16:50:51",
+  "measurement_uid": "01202007106531b7e19c05e300cacea8803d9f9c",
+  "probe_asn": "AS30722",
+  "probe_cc": "IT",
+  "probe_ip": "127.0.0.1",
+  "probe_network_name": "Vodafone Italia S.p.A.",
+  "report_id": "20200710T165051Z_AS30722_hyNI8FUQCKwzgFPKHn79ooTj9yTkiiFZ8C78a8WoZVUr14XrNt",
+  "resolver_asn": "AS30722",
+  "resolver_ip": "91.80.36.85",
+  "resolver_network_name": "Vodafone Italia S.p.A.",
+  "software_name": "miniooni",
+  "software_version": "0.14.0",
+  "test_keys": {
+    "agent": "",
+    "failed_operation": null,
+    "failure": null,
+    "network_events": null,
+    "queries": null,
+    "requests": null,
+    "tcp_connect": null,
+    "tls_handshakes": null
+  },
+  "test_name": "http_header_field_manipulation",
+  "test_runtime": 9.9814e-05,
+  "test_start_time": "2020-07-10 16:50:51",
+  "test_version": "0.1.0"
+}

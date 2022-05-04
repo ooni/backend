@@ -650,15 +650,15 @@ def score_measurement_hhfm(msm):
     # }
     try:
         resp = tk["requests"][0].get("response", {})
-    except (KeyError, IndexError):
-        # See 20191028T115649Z_AS28573_eIrzDM4njwMjxBi0ODrerI5N03zM7qQoCvl4xpapTccdW0kCRg"
-        scores["blocking_general"] = 0.0
+    except (KeyError, IndexError, TypeError):
+        # See 20191028T115649Z_AS28573_eIrzDM4njwMjxBi0ODrerI5N03zM7qQoCvl4xpapTccdW0kCRg
+        scores["accuracy"] = 0.0
         return scores
 
     # See 20191027T002012Z_AS45595_p2qNg0FmL4d2kIuLQXEn36MbraErPPA5i64eE1e6nLfGluHpLk
     if resp is None:
         # Broken test?
-        scores["blocking_general"] = 0.0
+        scores["accuracy"] = 0.0
         return scores
 
     resp_body = resp.get("body", None)
