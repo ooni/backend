@@ -300,15 +300,15 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         jsonlf = Path(f"{ts}_{cc}_{tn}.l.{len(entities)}.jsonl.gz")
         jsonl_s3path_base = f"jsonl/{tn}/{cc}/{ts}/00/{ts}_{cc}_{tn}.x."
         # An Entity is a JSONL file [that will be uploaded] on S3
-        e = Entity(
+        en = Entity(
             jsonlf=jsonlf,
             fd=gzip.open(jsonlf, "w"),
             jsonl_s3path_base=jsonl_s3path_base,
             lookup_list=[],
         )
-        entities.append(e)
+        entities.append(en)
 
-    e = entities[-1]
+    en = entities[-1]
 
     # Add msmt to open jsonl file
     try:
@@ -318,8 +318,8 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         log.error(msm)
         raise
 
-    e.fd.write(jmsm.encode())
-    e.fd.write(b"\n")
+    en.fd.write(jmsm.encode())
+    en.fd.write(b"\n")
 
     rid = msm.get("report_id") or ""  # type: str
     source = can_fn
@@ -331,12 +331,12 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         date = None
 
     # report_id, input, measurement_uid, s3path, linenum, date, source
-    i = [rid, input_, msmt_uid, None, len(e.lookup_list), date, source]
-    e.lookup_list.append(i)
+    i = [rid, input_, msmt_uid, None, len(en.lookup_list), date, source]
+    en.lookup_list.append(i)
 
-    if e.fd.offset > THRESHOLD:
+    if en.fd.offset > THRESHOLD:
         # The jsonlf is big enough
-        finalize_jsonl(s3sig, db_conn, conf, e)
+        finalize_jsonl(s3sig, db_conn, conf, en)
 
     if conf.fastpathmode in ("insert", "upsert"):
         update = conf.fastpathmode == "upsert"
