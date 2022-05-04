@@ -12,6 +12,7 @@ from fastpath.utils import trivial_id
 from fastpath.db import extract_input_domain
 import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
+from fastpath.normalize import iter_yaml_msmt_normalized
 
 
 scores_failed = {
@@ -24,10 +25,9 @@ scores_failed = {
 }
 
 
-def load_yaml(fn):
+def load_yaml(fn):  # returns fd
     f = Path("fastpath/tests/data") / fn
-    t = f.with_suffix(".yaml").read_text()
-    return t
+    return f.with_suffix(".yaml").open("rb")
 
 
 def loadj(fn):
@@ -136,6 +136,18 @@ def test_match_fingerprints_dict_body():
         },
     }
     assert fp.match_fingerprints(msm) == []
+
+
+# normalization
+
+
+def test_yaml_normalization_unexpected_bytes():
+    fd = load_yaml("dns_n_http_bin_body")
+    rfn = "2015-09-03/20150903T223722Z-TR-AS15897-dns_n_http-no_report_id-0.1.0-probe.yaml"
+    msms = tuple(iter_yaml_msmt_normalized(fd, "2015-09-03", rfn))
+    assert len(msms) == 1
+    msm = msms[0]
+    json.dumps(msm)  # should not raise
 
 
 # Follow the order in score_measurement

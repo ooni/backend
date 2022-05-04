@@ -1,0 +1,39 @@
+---
+backend_version: 1.1.4
+input_hashes: [51df00aad4094dd3d32b8d490eac5456e0406bba566c4ea548f72f32da945722]
+options: [-f, alexa-top10k.20150903-http]
+probe_asn: AS15897
+probe_cc: TR
+probe_city: null
+probe_ip: 127.0.0.1
+report_id: null
+software_name: ooniprobe
+software_version: 1.3.1
+start_time: 1441320103.0
+test_helpers: {}
+test_name: dns_n_http
+test_version: '0.1'
+...
+---
+agent: agent
+input: http://360.cn
+queries:
+- addrs: [106.120.167.66]
+  answers:
+  - [<RR name=360.cn type=A class=IN ttl=300s auth=False>, <A address=106.120.167.66
+      ttl=300>]
+  query: '[Query(''360.cn'', 1, 1)]'
+  query_type: A
+  resolver: null
+requests:
+- request:
+    body: null
+    headers: []
+    method: GET
+    tor: {is_tor: false}
+    url: http://360.cn
+  response:
+    body: !!binary |
+      PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KPG1ldGEgY2hhcnNldD0iZ2JrIiAvPgo8dGl0
+# truncated here for testing
+...

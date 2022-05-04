@@ -483,6 +483,13 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
         # in the metadb was from 2016-10-12
         raise UnsupportedTestError(test_name)
 
+    try:
+        for req in entry["test_keys"]["requests"]:
+            if isinstance(req["response"]["body"], bytes):
+                req["response"]["body"] = req["response"]["body"].decode()
+    except KeyError:
+        pass
+
     return entry
 
 
