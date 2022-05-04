@@ -1,1 +1,97 @@
-{"test_keys":{"requests":[{"failure":"connection_refused_error","request":{"body":null,"headers":{"aCcEPt-lANGuAGE":"en-US,en;q=0.8","AccEpt-EncodinG":"gzip,deflate,sdch","AcCePt":"text\/html,application\/xhtml+xml,application\/xml;q=0.9,*\/*;q=0.8","UseR-AgENt":"Mozilla\/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.2) Gecko\/20100115 Firefox\/3.6","acCePT-cHaRSEt":"ISO-8859-1,utf-8;q=0.7,*;q=0.3","hOST":"F3sY7oQdu4lojNZ.com"},"url":"http:\/\/37.218.247.95:80","method":"get","tor":{"is_tor":false,"exit_name":null,"exit_ip":null}},"response":null},{"failure":"connection_refused_error","request":{"body":null,"headers":{"AcCEPT-laNGUaGe":"en-US,en;q=0.8","ACCEPt-EncoDiNG":"gzip,deflate,sdch","aCCePT":"text\/html,application\/xhtml+xml,application\/xml;q=0.9,*\/*;q=0.8","UsER-aGENT":"Mozilla\/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.7) Gecko\/20091221 Firefox\/3.5.7","acCEpT-cHarSet":"ISO-8859-1,utf-8;q=0.7,*;q=0.3","HOSt":"vH90tDvWssJh2CQ.com"},"url":"http:\/\/37.218.247.95:80","method":"GEt","tor":{"is_tor":false,"exit_name":null,"exit_ip":null}},"response":null},{"failure":"connection_refused_error","request":{"body":null,"headers":{"AccEPt-lAnGuAGe":"en-US,en;q=0.8","accEpT-EncODINg":"gzip,deflate,sdch","ACcepT":"text\/html,application\/xhtml+xml,application\/xml;q=0.9,*\/*;q=0.8","UsEr-AgENT":"Mozilla\/5.0 (Windows; U; Windows NT 5.1; de; rv:1.9.1.7) Gecko\/20091221 Firefox\/3.5.7 (.NET CLR 3.5.30729)","accePt-CHARset":"ISO-8859-1,utf-8;q=0.7,*;q=0.3","hoST":"y1DL3gIKCaEWm0G.com"},"url":"http:\/\/37.218.247.95:80","method":"GeT","tor":{"is_tor":false,"exit_name":null,"exit_ip":null}},"response":null}],"agent":"agent","socksproxy":null},"software_version":"2.3.0","test_runtime":0.950111866,"test_start_time":"2019-10-27 00:20:11","input_hashes":[],"software_name":"ooniprobe","options":[],"data_format_version":"0.2.0","measurement_start_time":"2019-10-27 00:32:01","test_version":"0.2.0","probe_city":null,"test_name":"http_header_field_manipulation","id":"219a713c-7732-4679-97a7-ad71a58ea1ef","input":null,"probe_ip":"127.0.0.1","probe_cc":"PK","probe_asn":"AS45595","annotations":{"platform":"lepidopter"},"test_helpers":{"backend":"http:\/\/37.218.247.95:80"},"report_id":"20191027T002012Z_AS45595_p2qNg0FmL4d2kIuLQXEn36MbraErPPA5i64eE1e6nLfGluHpLk"}
+{
+  "test_keys": {
+    "requests": [
+      {
+        "failure": "connection_refused_error",
+        "request": {
+          "body": null,
+          "headers": {
+            "aCcEPt-lANGuAGE": "en-US,en;q=0.8",
+            "AccEpt-EncodinG": "gzip,deflate,sdch",
+            "AcCePt": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "UseR-AgENt": "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.2) Gecko/20100115 Firefox/3.6",
+            "acCePT-cHaRSEt": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+            "hOST": "F3sY7oQdu4lojNZ.com"
+          },
+          "url": "http://37.218.247.95:80",
+          "method": "get",
+          "tor": {
+            "is_tor": false,
+            "exit_name": null,
+            "exit_ip": null
+          }
+        },
+        "response": null
+      },
+      {
+        "failure": "connection_refused_error",
+        "request": {
+          "body": null,
+          "headers": {
+            "AcCEPT-laNGUaGe": "en-US,en;q=0.8",
+            "ACCEPt-EncoDiNG": "gzip,deflate,sdch",
+            "aCCePT": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "UsER-aGENT": "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7",
+            "acCEpT-cHarSet": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+            "HOSt": "vH90tDvWssJh2CQ.com"
+          },
+          "url": "http://37.218.247.95:80",
+          "method": "GEt",
+          "tor": {
+            "is_tor": false,
+            "exit_name": null,
+            "exit_ip": null
+          }
+        },
+        "response": null
+      },
+      {
+        "failure": "connection_refused_error",
+        "request": {
+          "body": null,
+          "headers": {
+            "AccEPt-lAnGuAGe": "en-US,en;q=0.8",
+            "accEpT-EncODINg": "gzip,deflate,sdch",
+            "ACcepT": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "UsEr-AgENT": "Mozilla/5.0 (Windows; U; Windows NT 5.1; de; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7 (.NET CLR 3.5.30729)",
+            "accePt-CHARset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+            "hoST": "y1DL3gIKCaEWm0G.com"
+          },
+          "url": "http://37.218.247.95:80",
+          "method": "GeT",
+          "tor": {
+            "is_tor": false,
+            "exit_name": null,
+            "exit_ip": null
+          }
+        },
+        "response": null
+      }
+    ],
+    "agent": "agent",
+    "socksproxy": null
+  },
+  "software_version": "2.3.0",
+  "test_runtime": 0.950111866,
+  "test_start_time": "2019-10-27 00:20:11",
+  "input_hashes": [],
+  "software_name": "ooniprobe",
+  "options": [],
+  "data_format_version": "0.2.0",
+  "measurement_start_time": "2019-10-27 00:32:01",
+  "test_version": "0.2.0",
+  "probe_city": null,
+  "test_name": "http_header_field_manipulation",
+  "id": "219a713c-7732-4679-97a7-ad71a58ea1ef",
+  "input": null,
+  "probe_ip": "127.0.0.1",
+  "probe_cc": "PK",
+  "probe_asn": "AS45595",
+  "annotations": {
+    "platform": "lepidopter"
+  },
+  "test_helpers": {
+    "backend": "http://37.218.247.95:80"
+  },
+  "report_id": "20191027T002012Z_AS45595_p2qNg0FmL4d2kIuLQXEn36MbraErPPA5i64eE1e6nLfGluHpLk"
+}
