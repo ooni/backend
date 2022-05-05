@@ -82,7 +82,12 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
         # Legacy lz4 json files
         with lz4frame.open(fn) as f:
             for line in f:
-                msm = ujson.loads(line)
+                try:
+                    msm = ujson.loads(line)
+                except ValueError:
+                    log.info("Unable to parse measurement")
+                    continue
+
                 msmt_uid = trivial_id(line, msm)
                 msm["measurement_uid"] = msmt_uid
                 yield (None, msm, msmt_uid)
