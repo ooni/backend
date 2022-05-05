@@ -65,7 +65,12 @@ def load_multiple(fn: str) -> Generator[MsmtTup, None, None]:
                 assert k is not None
                 if m.name.endswith(".json"):
                     for line in k:
-                        msm = ujson.loads(line)
+                        try:
+                            msm = ujson.loads(line)
+                        except ValueError:
+                            log.info("Unable to parse measurement")
+                            continue
+
                         msmt_uid = trivial_id(line, msm)
                         msm["measurement_uid"] = msmt_uid
                         yield (None, msm, msmt_uid)
