@@ -592,6 +592,9 @@ def iter_yaml_msmt_normalized(data, bucket_tstamp: str, report_fn: str):
     headsha = hashlib.sha1(header)
     # XXX: bad header kills whole bucket
     header = yaml.safe_load(header)
+    if isinstance(header.get("probe_city"), bytes):
+        header["probe_city"] = header["probe_city"].decode(errors="ignore")
+
     # Generates report_id if needed
     if not header.get("report_id"):
         header["report_id"] = generate_report_id(header)

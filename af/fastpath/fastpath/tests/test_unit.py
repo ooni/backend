@@ -150,6 +150,16 @@ def test_yaml_normalization_unexpected_bytes():
     json.dumps(msm)  # should not raise
 
 
+def test_yaml_normalization_binary_city():
+    # probe_city in the header is binary. The test measurement is empty
+    fd = load_yaml("binary_city")
+    rfn = "2015-11-05/bogus_fname.yaml"
+    msms = tuple(iter_yaml_msmt_normalized(fd, "2015-11-05", rfn))
+    msm = msms[0]
+    assert msm["probe_city"] == "Reykjavk"
+    json.dumps(msm)  # should not raise
+
+
 # Follow the order in score_measurement
 
 # # test_name: http_header_field_manipulation
