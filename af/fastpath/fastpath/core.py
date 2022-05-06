@@ -1531,9 +1531,14 @@ def process_measurement(msm_tup) -> None:
             measurement = ujson.loads(msm_jstr)
         if sorted(measurement.keys()) == ["content", "format"]:
             measurement = unwrap_msmt(measurement)
-        rid = measurement.get("report_id", None)
-        inp = measurement.get("input", None)
+        rid = measurement.get("report_id")
+        inp = measurement.get("input")
         log.debug(f"Processing {msmt_uid} {rid} {inp}")
+        if rid is None:
+            log.debug(f"Ignoring measurement without report_id")
+            metrics.incr("discarded_measurement")
+            return
+
         if measurement.get("probe_cc", "").upper() == "ZZ":
             log.debug(f"Ignoring measurement with probe_cc=ZZ")
             metrics.incr("discarded_measurement")
