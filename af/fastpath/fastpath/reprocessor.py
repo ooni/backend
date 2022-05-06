@@ -269,6 +269,11 @@ def process_measurement(can_fn, msm_tup, buf, seen_uids, conf, s3sig, db_conn):
         metrics.incr("broken_measurement")
         return
 
+    if msm.get("report_id") is None:
+        log.debug(f"Ignoring measurement without report_id")
+        metrics.incr("discarded_measurement")
+        return
+
     if msm.get("probe_cc", "").upper() == "ZZ":
         log.debug(f"Ignoring measurement with probe_cc=ZZ {desc}")
         metrics.incr("discarded_measurement")
