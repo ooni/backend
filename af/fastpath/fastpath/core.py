@@ -298,7 +298,7 @@ def match_fingerprints(measurement):
     zzfps = fingerprints["ZZ"]
     ccfps = fingerprints.get(msm_cc, {})
 
-    test_keys = measurement.get("test_keys", None)
+    test_keys = measurement.get("test_keys")
     if test_keys is None:
         return []
 
@@ -319,7 +319,7 @@ def match_fingerprints(measurement):
 
     requests = test_keys.get("requests", ()) or ()
     for req in requests:
-        r = req.get("response", None)
+        r = req.get("response")
         if r is None:
             continue
 
@@ -405,7 +405,7 @@ def all_keys_true(d, keys):
     if isinstance(keys, str):
         keys = (keys,)
     for k in keys:
-        if d.get(k, None) is not True:
+        if d.get(k) is not True:
             return False
 
     return True
@@ -416,7 +416,7 @@ def all_keys_false(d, keys):
     if isinstance(keys, str):
         keys = (keys,)
     for k in keys:
-        if d.get(k, None) is not False:
+        if d.get(k) is not False:
             return False
 
     return True
@@ -516,13 +516,13 @@ def score_measurement_facebook_messenger(msm):
     else:
         score = 0
         for key in consistency_keys:
-            v = tk.get(key, None)
+            v = tk.get(key)
             if v is False:
                 score += 0.5
                 scores[key] = v
 
         for key in anomaly_keys:
-            v = tk.get(key, None)
+            v = tk.get(key)
             if v is True:
                 score += 0.5
                 scores[key] = v
@@ -558,7 +558,7 @@ def score_measurement_telegram(msm):
     # Ignore tcp_blocking, http_blocking and web_failure from the probe
     tk = g_or(msm, "test_keys", {})
     del msm
-    web_status = tk.get("telegram_web_status", None)
+    web_status = tk.get("telegram_web_status")
     if web_status == "ok":
         web_blocking = False
     elif web_status == "blocked":
@@ -637,7 +637,7 @@ def score_measurement_hhfm(msm):
 
     # See test_functional.py:test_score_measurement_hhfm_stats
     #
-    # exp_req_failure = tk["requests"][0].get("failure", None)
+    # exp_req_failure = tk["requests"][0].get("failure")
     # if exp_req_failure is not None:
     #    # failure state set by probe
     #    scores["blocking_general"] = 0.5
@@ -661,7 +661,7 @@ def score_measurement_hhfm(msm):
         scores["accuracy"] = 0.0
         return scores
 
-    resp_body = resp.get("body", None)
+    resp_body = resp.get("body")
     if resp_body is None:
         scores["total_tampering"] = True
         scores["blocking_general"] = 1.0
@@ -783,7 +783,7 @@ def score_measurement_whatsapp(msm):
     # Disabled due to bug in the probe https://github.com/ooni/probe-engine/issues/341
     # if tk.get("registration_server_status", "ok") != "ok":
     #     score += 0.2
-    # if tk.get("whatsapp_web_failure", None) != None:
+    # if tk.get("whatsapp_web_failure") != None:
     #     score += 0.2
     # if tk.get("whatsapp_endpoints_status", "ok") != "ok":
     #     score += 0.2
@@ -795,7 +795,7 @@ def score_measurement_whatsapp(msm):
     # if tk.get("whatsapp_endpoints_blocked", []) != []:
     #     score += 0.2
 
-    # registration_server_failure = tk.get("registration_server_failure", None)
+    # registration_server_failure = tk.get("registration_server_failure")
     # if registration_server_failure is not None:
     #    if registration_server_failure.startswith("unknown_failure"):
     #        # Client error
@@ -857,7 +857,7 @@ def score_measurement_whatsapp(msm):
 
         elif url == "https://v.whatsapp.net/v2/register":
             # In case of connection failure "response" might be empty
-            registration_accessible = b.get("failure", None) is None
+            registration_accessible = b.get("failure") is None
 
     if webapp_accessible is None or registration_accessible is None:
         # bug e.g. 20190101T191128Z_AS34594_ZCyS8OE3SSvRwLeuiAeiklVZ8H91hEfY0Ook7ljgfotgpQklhv
@@ -902,7 +902,7 @@ def score_vanilla_tor(msm):
             scores["msg"] = "Client bug"
             return scores
 
-    tor_log = tk.get("tor_log", None)
+    tor_log = tk.get("tor_log")
     if tor_log is None:
         # unknown bug
         return scores
@@ -942,7 +942,7 @@ def score_web_connectivity(msm, matches) -> dict:
 
     # "title_match" is often missing from the raw msmt
     # e.g. 20190912T145602Z_AS9908_oXVmdAo2BZ2Z6uXDdatwL9cN5oiCllrzpGWKY49PlM4vEB03X7
-    tm = tk.get("title_match", None)
+    tm = tk.get("title_match")
     if tm not in (True, False, None):
         logbug(1, "incorrect title_match", msm)
         scores["accuracy"] = 0.0
@@ -1014,7 +1014,7 @@ def score_tcp_connect(msm) -> dict:
     scores = init_scores()
     tk = g_or(msm, "test_keys", {})
     assert msm["input"]
-    conn_result = tk.get("connection", None)
+    conn_result = tk.get("connection")
 
     if conn_result == "success":
         return scores
@@ -1049,7 +1049,7 @@ def score_dash(msm) -> dict:
     # TODO: any blocking scoring based on performance?
     scores = init_scores()  # type: Dict[str, Any]
     tk = g_or(msm, "test_keys", {})
-    failure = tk.get("failure", None)
+    failure = tk.get("failure")
     if tk == {}:
         scores["accuracy"] = 0.0
         return scores
@@ -1107,7 +1107,7 @@ def score_meek_fronted_requests_test(msm) -> dict:
         scores["accuracy"] = 0
         return scores
 
-    success = tk.get("success", None)
+    success = tk.get("success")
 
     for r in requests:
         resp = r.get("response", {})
@@ -1144,7 +1144,7 @@ def score_psiphon(msm) -> dict:
     tk = g_or(msm, "test_keys", {})
 
     # https://github.com/ooni/spec/blob/master/nettests/ts-015-psiphon.md
-    failure = tk.get("failure", None)
+    failure = tk.get("failure")
     bootstrap_time = tk.get("bootstrap_time", 0)
 
     if failure is None:
@@ -1232,11 +1232,11 @@ def score_http_requests(msm) -> dict:
     """
     scores = init_scores()
     tk = g_or(msm, "test_keys", {})
-    body_length_match = tk.get("body_length_match", None)
-    headers_match = tk.get("headers_match", None)
-    rid = msm.get("report_id", None)
-    inp = msm.get("input", None)
-    failed = msm.get("control_failure", None) or msm.get("experiment_failure", None)
+    body_length_match = tk.get("body_length_match")
+    headers_match = tk.get("headers_match")
+    rid = msm.get("report_id")
+    inp = msm.get("input")
+    failed = msm.get("control_failure") or msm.get("experiment_failure")
     if failed or body_length_match is None or headers_match is None:
         scores["accuracy"] = 0.0
         log.debug(f"Incorrect measurement t1 {rid} {inp}")
@@ -1247,7 +1247,7 @@ def score_http_requests(msm) -> dict:
         scores["blocking_general"] = 1.0
 
     zzfps = fingerprints["ZZ"]
-    msm_cc = msm.get("probe_cc", None)
+    msm_cc = msm.get("probe_cc")
     ccfps = fingerprints.get(msm_cc, {})
 
     # Scan for fingerprint matches in the HTTP body and the HTTP headers
