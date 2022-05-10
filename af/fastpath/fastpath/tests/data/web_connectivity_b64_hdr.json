@@ -1,0 +1,143 @@
+{
+  "software_name": "ooniprobe-android",
+  "software_version": "1.1.4",
+  "test_runtime": 35.8544290065765,
+  "test_start_time": "2017-07-25 17:54:50",
+  "test_name": "web_connectivity",
+  "test_keys": {
+    "accessible": false,
+    "control": {
+      "tcp_connect": {
+        "192.124.249.6:80": {
+          "status": true,
+          "failure": null
+        }
+      },
+      "http_request": {
+        "body_length": 20720,
+        "failure": null,
+        "title": "Feminist Majority Foundation - Breaking News, Feminism from Affirmative Action to Sexual Harassment to Women's Sports",
+        "status_code": 200,
+        "headers": {
+          "X-XSS-Protection": "1; mode=block",
+          "X-Content-Type-Options": "nosniff",
+          "content-encoding": "",
+          "Set-Cookie": "ASPSESSIONIDSSDAQBQB=NFNPLIADKCPALFPDJIMJCHJK; path=/",
+          "Server": "nginx",
+          "X-Sucuri-Cache": "MISS",
+          "Cache-Control": "private",
+          "Date": "Tue, 25 Jul 2017 17:56:20 GMT",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Sucuri-ID": "15006",
+          "Content-Type": "text/html"
+        }
+      },
+      "dns": {
+        "failure": null,
+        "addrs": [
+          "feminist.org",
+          "192.124.249.6"
+        ]
+      }
+    },
+    "control_failure": null,
+    "retries": null,
+    "http_experiment_failure": "http_invalid_redirect_url",
+    "socksproxy": null,
+    "agent": "redirect",
+    "headers_match": null,
+    "client_resolver": "210.50.30.167",
+    "tcp_connect": [
+      {
+        "status": {
+          "failure": null,
+          "success": true,
+          "blocked": false
+        },
+        "ip": "192.124.249.6",
+        "port": 80
+      }
+    ],
+    "dns_consistency": "consistent",
+    "dns_experiment_failure": null,
+    "body_proportion": 0,
+    "queries": [
+      {
+        "engine": "system",
+        "resolver_hostname": null,
+        "query_type": "A",
+        "hostname": "www.feminist.org",
+        "answers": [
+          {
+            "ipv4": "192.124.249.6",
+            "answer_type": "A",
+            "ttl": 0
+          }
+        ],
+        "failure": null,
+        "resolver_port": null
+      }
+    ],
+    "body_length_match": null,
+    "requests": [
+      {
+        "failure": "http_invalid_redirect_url",
+        "request": {
+          "body": "",
+          "headers": {
+            "Accept-Language": "en-US;q=0.8,en;q=0.5",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+          },
+          "url": "http://www.feminist.org/",
+          "method": "GET",
+          "tor": {
+            "is_tor": false,
+            "exit_name": null,
+            "exit_ip": null
+          }
+        },
+        "response": {
+          "body": "",
+          "headers": {
+            "Connection": "close",
+            "Location": {
+              "data": "aHR0cDovLzE5Mi4xNjguMjIuMS9Vc2VyQ2hlY2svUG9ydGFsTWFpbj9JSUQ9RjExQzM1MDMtNkQ3Mi02RjY3LTZGNzYtNjk2RUY4NUM5MEExJm9yaWdVcmw9YUhSMGNEb3ZMM2QzZHk1bVpXMXBibWx6ZEM1dmNtY3bwBg==",
+              "format": "base64"
+            }
+          },
+          "response_line": "HTTP/1.1 307 Temporary Redirect",
+          "code": 307
+        }
+      }
+    ],
+    "title_match": null,
+    "blocking": "http-failure",
+    "status_code_match": null
+  },
+  "probe_ip": "202.138.55.172",
+  "id": "6fe5cd98-b272-49b7-9346-e8edbabf0988",
+  "data_format_version": "0.2.0",
+  "measurement_start_time": "2017-07-25 17:55:45",
+  "options": [],
+  "test_version": "0.0.1",
+  "input_hashes": [],
+  "input": "http://www.feminist.org",
+  "probe_city": null,
+  "report_id": "20170725T175452Z_AS9443_ZbmZ2ATan0U4fo035miWKjBgh5NVdrFep4toT9f8dn3G8fTzyw",
+  "probe_asn": "AS9443",
+  "annotations": {
+    "platform": "android",
+    "engine_version_full": "v0.6.6",
+    "engine_version": "0.6.6",
+    "engine_name": "libmeasurement_kit"
+  },
+  "test_helpers": {
+    "backend": {
+      "type": "https",
+      "address": "https://b.web-connectivity.th.ooni.io"
+    }
+  },
+  "probe_cc": "AU",
+  "measurement_uid": "01201707254a40e230fa0f9c80ea07a421b9f2ec"
+}

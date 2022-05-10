@@ -373,7 +373,8 @@ def match_fingerprints(measurement):
             v = headers.get(name)
             if isinstance(v, dict) and v.get("format") == "base64":
                 log.debug("Decoding base64 header")
-                v = b64decode(v.get("data", "")).decode()
+                data = b64decode(v.get("data", ""))
+                v = data.decode("latin1")
             if isinstance(v, str) and v.startswith(prefix):
                 matches.append(fp)
                 log.debug("matched header prefix %s %r", msm_cc, prefix)

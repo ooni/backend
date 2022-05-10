@@ -138,6 +138,12 @@ def test_match_fingerprints_dict_body():
     assert fp.match_fingerprints(msm) == []
 
 
+def test_match_fingerprints_b64_hdr():
+    msm = loadj("web_connectivity_b64_hdr.json")
+    fp.setup_fingerprints()
+    assert fp.match_fingerprints(msm) == []
+
+
 # normalization
 
 
