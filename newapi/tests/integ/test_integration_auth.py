@@ -205,6 +205,7 @@ def test_role_set_multiple(client, mocksmtp, integtest_admin):
     assert r.status_code == 200
 
 
+@pytest.mark.skip("FIXME not deterministic, see auth.py  _delete_account_data")
 def test_role_set_with_expunged_token(client, mocksmtp, integtest_admin):
     _register_and_login(client, admin_e)
 
