@@ -553,6 +553,8 @@ def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
         AND fastpath.report_id = :report_id
         """
     query_params = dict(input=input_, report_id=report_id)
+    # Limit the time range where we scan for the measurement to improve
+    # performance
     try:
         rid_t = datetime.strptime(report_id[:8], "%Y%m%d")
         query_params["begin"] = rid_t - timedelta(days=30)
