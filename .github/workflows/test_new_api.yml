@@ -42,8 +42,4 @@ jobs:
 
       - name: debug docker
         if: always()
-        run: docker logs api_db_1
-
-      - name: debug docker
-        if: always()
         run: docker ps -a
