@@ -787,6 +787,9 @@ def api_private_vanilla_tor_stats():
             if total_count > 5 and float(success_count) / float(total_count) < 0.6:
                 blocked += 1
 
+    if not nets:
+        return cachedjson(0, networks=[], notok_networks=0, last_tested=None)
+
     lt = max(n["last_tested"] for n in nets)
     return cachedjson(0, networks=nets, notok_networks=blocked, last_tested=lt)
 

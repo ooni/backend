@@ -160,6 +160,14 @@ def test_private_api_vanilla_tor_stats(client):
     assert resp["last_tested"].startswith("20")
 
 
+def test_private_api_vanilla_tor_stats_empty(client):
+    url = "vanilla_tor_stats?probe_cc=XY"
+    resp = privapi(client, url)
+    assert resp["notok_networks"] == 0
+    assert len(resp["networks"]) == 0
+    assert resp["last_tested"] is None
+
+
 def test_private_api_im_networks(client):
     url = "im_networks?probe_cc=BR"
     resp = privapi(client, url)
