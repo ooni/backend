@@ -646,7 +646,7 @@ def test_list_measurements_filter_category_code(client):
     p = "measurements?since=2021-7-9&until=2021-7-10&category_code=NEWS"
     r = api(client, p)
     urls = set(e["input"] for e in r["results"])
-    assert "http://www.bbc.com/" in urls
+    assert "http://ncac.org/" in urls
 
 
 def test_list_measurements_order(client):
