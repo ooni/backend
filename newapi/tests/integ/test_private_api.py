@@ -261,6 +261,7 @@ def test_private_api_check_report_id_not_found(client, log):
 # # /circumvention_stats_by_country
 
 
+@pytest.mark.skip(reason="depends on fresh data")
 def test_private_api_circumvention_stats_by_country(client, log):
     url = "circumvention_stats_by_country"
     resp = privapi(client, url)
@@ -271,6 +272,7 @@ def test_private_api_circumvention_stats_by_country(client, log):
 # # /circumvention_runtime_stats
 
 
+@pytest.mark.skip(reason="depends on fresh data")
 def test_private_api_circumvention_runtime_stats(client, log):
     url = "circumvention_runtime_stats"
     resp = privapi(client, url)
