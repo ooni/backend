@@ -332,7 +332,7 @@ def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes
     assert msmt_uid.startswith("20")
     tstamp, cc, testname, hash_ = msmt_uid.split("_")
     hour = tstamp[:10]
-    int(hour)
+    int(hour)  # raise if the string does not contain an integer
     spooldir = Path("/var/lib/ooniapi/measurements/incoming/")
     postf = spooldir / f"{hour}_{cc}_{testname}/{msmt_uid}.post"
     log.debug(f"Attempt at reading {postf}")
