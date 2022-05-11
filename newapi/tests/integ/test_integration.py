@@ -462,9 +462,7 @@ def test_list_measurements_slow_order_by_complete(
     response = api(client, url)
 
 
-@pytest.mark.parametrize(
-    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
-)
+@pytest.mark.parametrize("f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity"))
 def test_list_measurements_slow_order_by_group_1(f, log, client):
     # filter on probe_cc or probe_asn or test_name
     # order by --> "test_start_time"
@@ -551,9 +549,7 @@ def today_range():
 @pytest.mark.parametrize("anomaly", (True, False))
 @pytest.mark.parametrize("confirmed", (True, False))
 @pytest.mark.parametrize("failure", (True, False))
-def test_list_measurements_filter_flags_fastpath(
-    anomaly, confirmed, failure, client, log
-):
+def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
     SELECT COUNT(*), anomaly, confirmed, msm_failure AS failure

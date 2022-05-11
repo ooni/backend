@@ -1598,6 +1598,10 @@ def get_aggregated():
         enum:
           - JSON
           - CSV
+      - name: download
+        in: query
+        type: boolean
+        description: If we should be triggering a file download
     responses:
       '200':
         description: Returns aggregated counters
@@ -1626,6 +1630,7 @@ def get_aggregated():
             raise ValueError("Invalid test name")
 
         resp_format = param("format", "JSON").upper()
+        download = (param("download", "").lower() == "true")
         assert resp_format in ("JSON", "CSV")
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})
@@ -1633,6 +1638,7 @@ def get_aggregated():
     if current_app.config["USE_CLICKHOUSE"]:
         r = _clickhouse_aggregation(
             resp_format,
+            download,
             since,
             until,
             inp,
@@ -1780,16 +1786,10 @@ def _postgresql_aggregation(
         else:
             r = dict(q.fetchone())
 
-        if resp_format.lower() == "csv":
-            csv_data = _convert_to_csv(r)
-            response = make_response(csv_data)
-            response.headers["Content-Disposition"] = "attachment; filename=ooni-aggregate-data.csv"
-            response.headers["Content-Type"] = "text/csv"
-            return response
+        if resp_format == "CSV":
+            return _convert_to_csv(r)
 
         response = jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
-        if resp_format.lower() == "json":
-            response.headers["Content-Disposition"] = "attachment; filename=ooni-aggregate-data.json"
         if cacheable:
             response.cache_control.max_age = 3600 * 24
         return response
@@ -1813,8 +1813,14 @@ def validate_axis_name(axis):
         raise ValueError("Invalid axis name")
 
 
+def set_dload(resp, fname: str):
+    """Add header to make response downloadable"""
+    resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
+
+
 def _clickhouse_aggregation(
-    resp_format,
+    resp_format: str,
+    download: bool,
     since,
     until,
     inp,
@@ -1952,24 +1958,33 @@ def _clickhouse_aggregation(
         else:
             r = query_click_one_row(query, query_params)
 
-        if resp_format == "CSV":
-            return _convert_to_csv(r)
-
         pq = current_app.click.last_query
         msg = f"Stats: {pq.progress.rows} {pq.progress.bytes} {pq.progress.total_rows} {pq.elapsed}"
         log.info(msg)
-        response = {
-            "v": 0,
-            "dimension_count": dimension_cnt,
-            "result": r,
-            "db_stats": {
-                "row_count": pq.progress.rows,
-                "bytes": pq.progress.bytes,
-                "total_row_count": pq.progress.total_rows,
-                "elapsed_seconds": pq.elapsed,
-            },
-        }
-        response = jsonify(response)
+
+        if resp_format == "CSV":
+            csv_data = _convert_to_csv(r)
+            response = make_response(csv_data)
+            response.headers["Content-Type"] = "text/csv"
+            if download:
+                set_dload(response, "ooni-aggregate-data.csv")
+
+        else:
+            response = {
+                "v": 0,
+                "dimension_count": dimension_cnt,
+                "result": r,
+                "db_stats": {
+                    "row_count": pq.progress.rows,
+                    "bytes": pq.progress.bytes,
+                    "total_row_count": pq.progress.total_rows,
+                    "elapsed_seconds": pq.elapsed,
+                },
+            }
+            response = jsonify(response)
+            if download:
+                set_dload(response, "ooni-aggregate-data.json")
+
         if cacheable:
             response.cache_control.max_age = 3600 * 24
         return response

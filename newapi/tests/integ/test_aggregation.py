@@ -17,7 +17,6 @@ def api(client, subpath, **kw):
     return response.json
 
 
-@pytest.mark.skip("FIXME no header")
 def test_aggregation_no_axis_with_caching(client, log):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10"
@@ -33,12 +32,14 @@ def test_aggregation_no_axis_with_caching(client, log):
             "confirmed_count": 0,
             "failure_count": 2,
             "measurement_count": 1689,
+            'ok_count': 1500,
         },
         "v": 0,
     }
     assert r == expected, fjd(r)
     h = dict(resp.headers)
-    assert h["Cache-Control"] == "max-age=86400"
+    # FIXME: caching is currently disabled
+    # assert h["Cache-Control"] == "max-age=86400"
 
 
 def test_aggregation_no_axis_csv(client, log):
@@ -53,6 +54,18 @@ def test_aggregation_no_axis_csv(client, log):
     """
     )
     assert r.data.decode().replace("\r", "") == expected
+    assert r.content_type == "text/csv"
+    assert "Content-Disposition" not in r.headers  # not a download
+
+
+def test_aggregation_no_axis_csv_dload(client, log):
+    # 0-dimensional data
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV&download=true"
+    r = client.get(f"/api/v1/{url}")
+    assert not r.is_json
+    assert r.content_type == "text/csv"
+    exp = "attachment; filename=ooni-aggregate-data.csv"
+    assert r.headers["Content-Disposition"] == exp
 
 
 def test_aggregation_no_axis_domain(client):

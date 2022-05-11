@@ -1,3 +1,9 @@
+ooni-api (1.0.3) unstable; urgency=medium
+
+  * Set HTTP content type in aggregation
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 11 May 2022 17:15:07 +0100
+
 ooni-api (1.0.2) unstable; urgency=medium
 
   * Bump up version
