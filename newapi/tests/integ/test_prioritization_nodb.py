@@ -49,7 +49,8 @@ def mockdb(query, *query_kw):
 
 @pytest.fixture
 def nodb(app):
-    app.db_session.execute = mockdb
+    if hasattr(app, "db_session"):
+        app.db_session.execute = mockdb
 
 
 def getjson(client, url):
