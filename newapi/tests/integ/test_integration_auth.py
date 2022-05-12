@@ -147,6 +147,14 @@ def _register_and_login(client, email_address):
     return {"Set-Cookie": c}
 
 
+def test_user_register_and_logout(client, mocksmtp):
+    assert client.get("/api/_/account_metadata").json == {} # not logged in
+    _register_and_login(client, user_e)
+    assert client.get("/api/_/account_metadata").json != {} # logged in
+    r = client.post("/api/v1/user_logout")
+    assert r.status_code == 200
+    assert client.get("/api/_/account_metadata").json == {} # not logged in
+
 
 def test_user_register_and_get_metadata(client, mocksmtp):
     r = client.get("/api/_/account_metadata")

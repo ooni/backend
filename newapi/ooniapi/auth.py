@@ -95,9 +95,7 @@ def set_JWT_cookie(res, token: str) -> None:
     """Set/overwrite the "ooni" cookie in the browser:
     - secure: used only on HTTPS
     - httponly: block javascript in the browser from accessing it
-    - samesite=Strict: send the cookie only between the browser and this API
     """
-    assert isinstance(res, flask.wrappers.Response), type(res)
     # https://github.com/pallets/werkzeug/issues/1549
     # res.set_cookie("ooni", token, secure=True, httponly=True)
     cookie = f"ooni={token}; Secure; HttpOnly; SameSite=None; Path=/"
@@ -367,6 +365,25 @@ CREATE TABLE IF NOT EXISTS session_expunge (
 GRANT SELECT ON TABLE public.session_expunge TO amsapi;
 GRANT SELECT ON TABLE public.session_expunge TO readonly;
 """
+
+
+@metrics.timer("user_logout")
+@auth_blueprint.route("/api/v1/user_logout", methods=["POST"])
+@cross_origin(origins=origins, supports_credentials=True)
+def user_logout() -> Response:
+    """Probe Services: direct browser to drop auth cookie
+    ---
+    responses:
+      200:
+        description: cookie deletion header
+    """
+    cookie = (
+        "ooni=DELETED; Secure; HttpOnly; SameSite=None; Path=/;"
+        " Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0;"
+    )
+    resp = make_response()
+    resp.headers.add("Set-Cookie", cookie)
+    return resp
 
 
 def _set_account_role(email_address, role: str) -> int:
