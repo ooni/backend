@@ -1519,7 +1519,7 @@ def param_url(name):
 
 @api_msm_blueprint.route("/v1/aggregation")
 @metrics.timer("get_aggregated")
-def get_aggregated() -> int:
+def get_aggregated() -> Any:
     """Aggregate counters data
     ---
     parameters:
