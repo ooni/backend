@@ -27,7 +27,7 @@ except ImportError:
 import ujson  # debdeps: python3-ujson
 import urllib3  # debdeps: python3-urllib3
 
-from flask import current_app, request, make_response, abort, redirect
+from flask import current_app, request, make_response, abort, redirect, Response
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
 
@@ -61,6 +61,8 @@ log = logging.getLogger()
 
 urllib_pool = urllib3.PoolManager()
 
+# type hints
+ostr = Optional[str]
 
 class QueryTimeoutError(HTTPException):
     code = 504
@@ -82,7 +84,7 @@ def show_apidocs():
 
 
 @api_msm_blueprint.route("/v1/files")
-def list_files():
+def list_files() -> Response:
     """List files - unsupported"""
     return cachedjson(24, msg="not implemented")
 
@@ -90,7 +92,7 @@ def list_files():
 # FIXME respond with help message
 @metrics.timer("get_measurement")
 @api_msm_blueprint.route("/v1/measurement/<measurement_id>")
-def get_measurement(measurement_id, download=None):  # pragma: no cover
+def get_measurement(measurement_id, download=None) -> Response:  # pragma: no cover
     """Get one measurement by measurement_id,
     fetching the file from S3 or the fastpath host as needed
     Returns only the measurement without extra data from the database
@@ -465,7 +467,7 @@ def genurl(path: str, **kw) -> str:
 
 @api_msm_blueprint.route("/v1/raw_measurement")
 @metrics.timer("get_raw_measurement")
-def get_raw_measurement():
+def get_raw_measurement() -> Response:
     """Get raw measurement body by measurement_id + input
     ---
     parameters:
@@ -598,7 +600,7 @@ def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
 
 @api_msm_blueprint.route("/v1/measurement_meta")
 @metrics.timer("get_measurement_meta")
-def get_measurement_meta():
+def get_measurement_meta() -> Response:
     """Get metadata on one measurement by measurement_id + input
     ---
     produces:
@@ -698,7 +700,7 @@ def get_measurement_meta():
         assert isinstance(body, bytes)
         body = body.decode()
     except Exception as e:
-        log.error(e, exc_info=1)
+        log.error(e, exc_info=True)
         body = ""
 
     # FIXME cache timing
@@ -721,7 +723,7 @@ def _merge_results(tmpresults):
 
 @api_msm_blueprint.route("/v1/measurements")
 @metrics.timer("list_measurements")
-def list_measurements():
+def list_measurements() -> Response:
     """Search for measurements using only the database. Provide pagination.
     ---
     parameters:
@@ -872,20 +874,16 @@ def list_measurements():
     probe_asn = param("probe_asn")
     probe_cc = param("probe_cc")
     test_name = param("test_name")
-    since = param("since")
-    if since:
-        since = parse_date(since)
-    until = param("until")
-    if until:
-        until = parse_date(until)
+    since = param_date("since")
+    until = param_date("until")
     since_index = param("since_index")  # unused
     order_by = param("order_by")
     order = param("order", "desc")
     offset = int(param("offset", 0))
     limit = int(param("limit", 100))
-    failure = param("failure")
-    anomaly = param("anomaly")
-    confirmed = param("confirmed")
+    failure = param_bool("failure")
+    anomaly = param_bool("anomaly")
+    confirmed = param_bool("confirmed")
     category_code = param("category_code")
 
     ## Workaround for https://github.com/ooni/probe/issues/1034
@@ -917,16 +915,13 @@ def list_measurements():
             probe_asn = probe_asn[2:]
         probe_asn = int(probe_asn)
 
-    failure = failure and failure.lower() == "true"
-    anomaly = anomaly and anomaly.lower() == "true"
-    confirmed = confirmed and confirmed.lower() == "true"
-
     # Set reasonable since/until ranges if not specified. When looking up by
     # report_id a BTREE is used and since/until are not beneficial.
     try:
         if until is None:
             if report_id is None:
-                until = date.today() + timedelta(days=1)
+                t = datetime.utcnow() + timedelta(days=1)
+                until = datetime(t.year, t.month, t.day)
     except ValueError:
         raise BadRequest("Invalid until")
 
@@ -1212,21 +1207,21 @@ def _list_measurements_pg(
 def _list_measurements_click(
     since,
     until,
-    report_id,
-    probe_cc,
-    probe_asn,
-    test_name,
+    report_id: ostr,
+    probe_cc: ostr,
+    probe_asn: ostr,
+    test_name: ostr,
     anomaly,
     confirmed,
     failure,
-    input_,
-    domain,
+    input_: ostr,
+    domain: ostr,
     category_code,
-    order,
+    order: ostr,
     order_by,
     limit,
     offset,
-):
+) -> Any:
     INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
 
     ## Create fastpath columns for query
@@ -1444,22 +1439,24 @@ def _convert_to_csv(r) -> str:
     return result
 
 
-def validate(item: str, accepted: str):
+def validate(item: ostr, accepted: str) -> None:
+    """Ensure item contains only valid chars or is None"""
     if item is None:
         return
     for c in item:
         if c not in accepted:
             raise ValueError("Invalid characters")
 
+# URL parameter parsers
 
-def param_lowercase_underscore(name):
+def param_lowercase_underscore(name) -> ostr:
     p = request.args.get(name)
     accepted = string.ascii_lowercase + "_"
     validate(p, accepted)
     return p
 
 
-def param_uppercase(name):
+def param_uppercase(name) -> ostr:
     p = request.args.get(name)
     validate(p, string.ascii_uppercase)
     return p
@@ -1481,6 +1478,13 @@ def param_date(name: str) -> Optional[datetime]:
     if p is None:
         return None
     return parse_date(p)
+
+
+def param_bool(name: str) -> Optional[bool]:
+    p = request.args.get(name)
+    if not p:
+        return None
+    return p.lower() == "true"
 
 
 domain_matcher = re.compile(
@@ -1519,7 +1523,7 @@ def param_url(name):
 
 @api_msm_blueprint.route("/v1/aggregation")
 @metrics.timer("get_aggregated")
-def get_aggregated() -> Any:
+def get_aggregated() -> Response:
     """Aggregate counters data
     ---
     parameters:
@@ -1826,14 +1830,14 @@ def _clickhouse_aggregation(
     download: bool,
     since,
     until,
-    inp: Optional[str],
-    domain: Optional[str],
-    category_code: Optional[str],
-    probe_cc: Optional[str],
+    inp: ostr,
+    domain: ostr,
+    category_code: ostr,
+    probe_cc: ostr,
     probe_asn: Optional[int],
-    test_name: Optional[str],
-    axis_x: Optional[str],
-    axis_y: Optional[str],
+    test_name: ostr,
+    axis_x: ostr,
+    axis_y: ostr,
 ):
     log = current_app.logger
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
@@ -1998,7 +2002,7 @@ def _clickhouse_aggregation(
 
 @api_msm_blueprint.route("/v1/torsf_stats")
 @metrics.timer("get_torsf_stats")
-def get_torsf_stats():
+def get_torsf_stats() -> Response:
     """Tor Pluggable Transports statistics
     Average / percentiles / total_count grouped by day
     Either group-by or filter by probe_cc
