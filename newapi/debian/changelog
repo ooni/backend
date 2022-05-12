@@ -1,3 +1,9 @@
+ooni-api (1.0.5) unstable; urgency=medium
+
+  * Add logout
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 12 May 2022 18:40:39 +0100
+
 ooni-api (1.0.4) unstable; urgency=medium
 
   * Switch more networks to new test helper

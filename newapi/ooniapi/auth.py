@@ -11,7 +11,7 @@ import re
 import smtplib
 import time
 
-from flask import Blueprint, current_app, request, make_response
+from flask import Blueprint, current_app, request, make_response, Response
 from flask.json import jsonify
 from flask_cors import cross_origin
 from sqlalchemy import sql
@@ -234,7 +234,7 @@ def send_login_email(dest_addr, nick, token: str) -> None:
 @metrics.timer("user_register")
 @auth_blueprint.route("/api/v1/user_register", methods=["POST"])
 @cross_origin(origins=origins, supports_credentials=True)
-def user_register():
+def user_register() -> Response:
     """Auth Services: start email-based user registration
     ---
     parameters:
@@ -287,7 +287,7 @@ def user_register():
         send_login_email(email_address, nick, registration_token)
         log.info("email sent")
     except Exception as e:
-        log.error(e, exc_info=1)
+        log.error(e, exc_info=True)
         return jerror("Unable to send the email")
 
     return make_response(jsonify(msg="ok"), 200)
@@ -316,7 +316,7 @@ def _create_session_token(account_id, nick, role: str, login_time=None) -> str:
 @metrics.timer("user_login")
 @auth_blueprint.route("/api/v1/user_login", methods=["GET"])
 @cross_origin(origins=origins, supports_credentials=True)
-def user_login():
+def user_login() -> Response:
     """Probe Services: login using a registration/login link
     ---
     parameters:
@@ -396,7 +396,7 @@ def _set_account_role(email_address, role: str) -> int:
 
 @auth_blueprint.route("/api/v1/set_account_role", methods=["POST"])
 @role_required("admin")
-def set_account_role():
+def set_account_role() -> Response:
     """Set a role to a given account identified by an email address.
     Only for admins.
     ---
@@ -468,7 +468,7 @@ def _get_account_role(account_id: str) -> Optional[str]:
 
 @auth_blueprint.route("/api/_/account_metadata")
 @cross_origin(origins=origins, supports_credentials=True)
-def get_account_metadata():
+def get_account_metadata() -> Response:
     """Get account metadata for logged-in users
     ---
     responses:
@@ -488,7 +488,7 @@ def get_account_metadata():
 
 @auth_blueprint.route("/api/v1/get_account_role/<email_address>")
 @role_required("admin")
-def get_account_role(email_address):
+def get_account_role(email_address) -> Response:
     """Get account role. Return an error message if the account is not found.
     Only for admins.
     ---
@@ -524,7 +524,7 @@ def get_account_role(email_address):
 
 @auth_blueprint.route("/api/v1/set_session_expunge", methods=["POST"])
 @role_required("admin")
-def set_session_expunge():
+def set_session_expunge() -> Response:
     """Force refreshing all session tokens for a given account.
     Only for admins.
     ---
@@ -560,7 +560,7 @@ def set_session_expunge():
         # 'session_expunge' is on RocksDB (ACID key-value database)
         log.info("Inserting into Clickhouse session_expunge")
         query = "INSERT INTO session_expunge (account_id) VALUES"
-        query_params = dict(account_id=account_id)
+        query_params: Any = dict(account_id=account_id)
         # the `threshold` column defaults to the current time
         insert_click(query, [query_params])
 
