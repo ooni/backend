@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, date
 from dateutil.parser import parse as parse_date
 from io import StringIO
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Any
 from urllib.parse import urlparse
 import gzip
 import http.client
@@ -1476,6 +1476,13 @@ def param_asn(name: str) -> Optional[int]:
     return None
 
 
+def param_date(name: str) -> Optional[datetime]:
+    p = request.args.get(name)
+    if p is None:
+        return None
+    return parse_date(p)
+
+
 domain_matcher = re.compile(
     r"^(?:[a-zA-Z0-9]"  # First char
     r"(?:[a-zA-Z0-9-_]{0,61}[A-Za-z0-9])?\.)"  # sub domain
@@ -1512,7 +1519,7 @@ def param_url(name):
 
 @api_msm_blueprint.route("/v1/aggregation")
 @metrics.timer("get_aggregated")
-def get_aggregated():
+def get_aggregated() -> int:
     """Aggregate counters data
     ---
     parameters:
@@ -1620,12 +1627,8 @@ def get_aggregated():
         test_name = param_lowercase_underscore("test_name")
         probe_asn = param_asn("probe_asn")
         probe_cc = param_uppercase("probe_cc")
-        since = param("since")
-        if since:
-            since = parse_date(since)
-        until = param("until")
-        if until:
-            until = parse_date(until)
+        since = param_date("since")
+        until = param_date("until")
         if test_name and test_name not in TEST_NAMES:
             raise ValueError("Invalid test name")
 
@@ -1823,14 +1826,14 @@ def _clickhouse_aggregation(
     download: bool,
     since,
     until,
-    inp,
-    domain,
-    category_code,
-    probe_cc,
-    probe_asn,
-    test_name,
-    axis_x,
-    axis_y,
+    inp: Optional[str],
+    domain: Optional[str],
+    category_code: Optional[str],
+    probe_cc: Optional[str],
+    probe_asn: Optional[int],
+    test_name: Optional[str],
+    axis_x: Optional[str],
+    axis_y: Optional[str],
 ):
     log = current_app.logger
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
@@ -1883,7 +1886,7 @@ def _clickhouse_aggregation(
 
     if probe_asn is not None:
         where.append(sql.text("probe_asn = :probe_asn"))
-        query_params["probe_asn"] = probe_asn
+        query_params["probe_asn"] = str(probe_asn)
 
     if since:
         where.append(sql.text("measurement_start_time > :since"))
@@ -1925,7 +1928,7 @@ def _clickhouse_aggregation(
         colnames.append(axis)
         group_by.append(column(axis))
 
-    group_by = []
+    group_by: List = []
     if axis_x == "measurement_start_day":
         group_by_date(since, until, cols, colnames, group_by)
     elif axis_x:
@@ -1954,7 +1957,7 @@ def _clickhouse_aggregation(
 
     try:
         if dimension_cnt > 0:
-            r = list(query_click(query, query_params))
+            r: Any = list(query_click(query, query_params))
         else:
             r = query_click_one_row(query, query_params)
 
@@ -1970,7 +1973,7 @@ def _clickhouse_aggregation(
                 set_dload(response, "ooni-aggregate-data.csv")
 
         else:
-            response = {
+            resp_d = {
                 "v": 0,
                 "dimension_count": dimension_cnt,
                 "result": r,
@@ -1981,7 +1984,7 @@ def _clickhouse_aggregation(
                     "elapsed_seconds": pq.elapsed,
                 },
             }
-            response = jsonify(response)
+            response = jsonify(resp_d)
             if download:
                 set_dload(response, "ooni-aggregate-data.json")
 
