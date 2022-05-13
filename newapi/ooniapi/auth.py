@@ -17,6 +17,7 @@ from flask_cors import cross_origin
 from sqlalchemy import sql
 import flask.wrappers
 import jwt  # debdeps: python3-jwt
+import jwt.exceptions  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
 from ooniapi.database import query_click, query_click_one_row, insert_click
