@@ -4,11 +4,15 @@ from flask.json import jsonify
 ISO_TIMESTAMP_SHORT = "%Y%m%dT%H%M%SZ"
 OONI_EPOCH = datetime(2012, 12, 5)
 
+INTERVAL_UNITS = dict(s=1, m=60, h=3600, d=86400)
 
-def cachedjson(interval_hours: int, *a, **kw):
+
+def cachedjson(interval: str, *a, **kw):
     """Jsonify and add cache expiration"""
     resp = jsonify(*a, **kw)
-    resp.cache_control.max_age = interval_hours * 3600
+    unit = interval[-1]
+    value = int(interval[:-1])
+    resp.cache_control.max_age = value * INTERVAL_UNITS[unit]
     return resp
 
 

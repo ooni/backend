@@ -86,7 +86,7 @@ def show_apidocs():
 @api_msm_blueprint.route("/v1/files")
 def list_files() -> Response:
     """List files - unsupported"""
-    return cachedjson(24, msg="not implemented")
+    return cachedjson("1d", msg="not implemented")
 
 
 # FIXME respond with help message
@@ -576,10 +576,10 @@ def get_measurement_meta() -> Response:
     assert isinstance(msmt_meta, dict)
     if not full:
         # FIXME cache timing
-        return cachedjson(0, **msmt_meta)
+        return cachedjson("0s", **msmt_meta)
 
     if msmt_meta == {}:  # measurement not found
-        return cachedjson(0, raw_measurement="", **msmt_meta)
+        return cachedjson("0s", raw_measurement="", **msmt_meta)
 
     try:
         body = _fetch_measurement_body(report_id, input_, msmt_meta["measurement_uid"])
@@ -590,7 +590,7 @@ def get_measurement_meta() -> Response:
         body = ""
 
     # FIXME cache timing
-    return cachedjson(0, raw_measurement=body, **msmt_meta)
+    return cachedjson("0s", raw_measurement=body, **msmt_meta)
 
 
 # # Listing measurements

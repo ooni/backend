@@ -11,7 +11,7 @@ from hashlib import sha512
 from urllib.request import urlopen
 
 import ujson
-from flask import Blueprint, current_app, request, make_response
+from flask import Blueprint, current_app, request, make_response, Response
 from flask.json import jsonify
 
 import jwt.exceptions  # debdeps: python3-jwt
@@ -61,7 +61,7 @@ def lookup_probe_cc(ipaddr: str) -> str:
     return resp.country.iso_code
 
 @probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
-def check_in():
+def check_in() -> Response:
     """Probe Services: check-in. Probes ask for tests to be run
     ---
     produces:
@@ -278,7 +278,7 @@ def check_in():
 
 @probe_services_blueprint.route("/api/v1/collectors")
 @metrics.timer("list_collectors")
-def list_collectors():
+def list_collectors() -> Response:
     """Probe Services: list collectors
     ---
     responses:
@@ -302,7 +302,7 @@ def list_collectors():
             "type": "cloudfront",
         },
     ]
-    return cachedjson(1, j)
+    return cachedjson("1h", j)
 
 
 # # Probe authentication # #
@@ -318,7 +318,7 @@ Workflow:
 
 
 @probe_services_blueprint.route("/api/v1/register", methods=["POST"])
-def probe_register():
+def probe_register() -> Response:
     """Probe Services: Register
     Probes send a random string called password and receive a client_id
     The client_id/password tuple is saved by the probe and long-lived
@@ -377,7 +377,7 @@ def probe_register():
 
 
 @probe_services_blueprint.route("/api/v1/login", methods=["POST"])
-def probe_login_post():
+def probe_login_post() -> Response:
     """Probe Services: login
     ---
     parameters:
@@ -453,7 +453,7 @@ def probe_login_post():
 
 @probe_services_blueprint.route("/api/v1/test-helpers")
 @metrics.timer("list_test_helpers")
-def list_test_helpers():
+def list_test_helpers() -> Response:
     """Probe Services: List test helpers
     ---
     produces:
@@ -534,7 +534,7 @@ def list_test_helpers():
     else:
         metrics.incr("test_helper_old")
 
-    return cachedjson(0, **j)
+    return cachedjson("0s", **j)
 
 
 def _check_probe_token(desc):
@@ -572,7 +572,7 @@ def _load_json(path: str) -> dict:
 
 
 @probe_services_blueprint.route("/api/v1/test-list/psiphon-config")
-def serve_psiphon_config():
+def serve_psiphon_config() -> Response:
     """Probe Services: Psiphon data
     Requires a probe_token JWT provided by /api/v1/login
     ---
@@ -599,7 +599,7 @@ def _fetch_tor_bridges(cc):
 
 
 @probe_services_blueprint.route("/api/v1/test-list/tor-targets")
-def serve_tor_targets():
+def serve_tor_targets() -> Response:
     """Probe Services: Tor targets
     Requires a probe_token JWT provided by /api/v1/login
     ---
@@ -624,12 +624,12 @@ def jerror(msg, code=400):
 
 
 @probe_services_blueprint.route("/invalidpath")
-def invalidpath():
+def invalidpath() -> Response:
     return jerror(404, code=404)
 
 
 @probe_services_blueprint.route("/bouncer/net-tests", methods=["POST"])
-def bouncer_net_tests():
+def bouncer_net_tests() -> Response:
     """Probe Services: (legacy)
     ---
     parameters:
@@ -695,7 +695,7 @@ def bouncer_net_tests():
 
 @probe_services_blueprint.route("/report", methods=["POST"])
 @metrics.timer("open_report")
-def open_report():
+def open_report() -> Response:
     """Probe Services: Open report
     ---
     produces:
@@ -770,7 +770,7 @@ def open_report():
 
 @probe_services_blueprint.route("/report/<report_id>", methods=["POST"])
 @metrics.timer("receive_measurement")
-def receive_measurement(report_id):
+def receive_measurement(report_id) -> Response:
     """Probe Services: Submit measurement
     ---
     produces:
@@ -864,11 +864,11 @@ def receive_measurement(report_id):
 
 
 @probe_services_blueprint.route("/report/<report_id>/close", methods=["POST"])
-def close_report(report_id):
+def close_report(report_id) -> Response:
     """Probe Services: Close report
     ---
     responses:
       '200':
         description: Close a report
     """
-    return cachedjson(1)
+    return cachedjson("1h")

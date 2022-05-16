@@ -15,15 +15,12 @@ from flask import Blueprint, current_app, request, make_response, Response
 from flask.json import jsonify
 from flask_cors import cross_origin
 from sqlalchemy import sql
-import flask.wrappers
 import jwt  # debdeps: python3-jwt
 import jwt.exceptions  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
 from ooniapi.database import query_click, query_click_one_row, insert_click
 from ooniapi.utils import nocachejson
-
-# from ooniapi.utils import cachedjson
 
 origins = [
     re.compile(r"^https://[-A-Za-z0-9]+\.ooni\.org$"),

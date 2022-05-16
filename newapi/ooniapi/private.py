@@ -13,7 +13,7 @@ from urllib.parse import urljoin, urlencode
 import logging
 import math
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, Response
 from flask.json import jsonify
 
 from sqlalchemy import sql
@@ -62,7 +62,7 @@ def expand_dates(li):
 
 
 @api_private_blueprint.route("/asn_by_month")
-def api_private_asn_by_month():
+def api_private_asn_by_month() -> Response:
     """Network count by month
     ---
     responses:
@@ -79,11 +79,11 @@ def api_private_asn_by_month():
     """
     li = list(query_click(q, {}))
     expand_dates(li)
-    return cachedjson(24, li)
+    return cachedjson("1d", li)
 
 
 @api_private_blueprint.route("/countries_by_month")
-def api_private_countries_by_month():
+def api_private_countries_by_month() -> Response:
     """Countries count by month
     ---
     responses:
@@ -100,11 +100,11 @@ def api_private_countries_by_month():
     """
     li = list(query_click(q, {}))
     expand_dates(li)
-    return cachedjson(24, li)
+    return cachedjson("1d", li)
 
 
 @api_private_blueprint.route("/test_names", methods=["GET"])
-def api_private_test_names():
+def api_private_test_names() -> Response:
     """Provides test names and descriptions to Explorer
     ---
     responses:
@@ -139,11 +139,11 @@ def api_private_test_names():
         "whatsapp": "WhatsApp",
     }
     test_names = [{"id": k, "name": v} for k, v in TEST_NAMES.items()]
-    return cachedjson(1, test_names=test_names)
+    return cachedjson("1h", test_names=test_names)
 
 
 @api_private_blueprint.route("/countries", methods=["GET"])
-def api_private_countries():
+def api_private_countries() -> Response:
     """Summary of countries
     ---
     responses:
@@ -166,11 +166,11 @@ def api_private_countries():
         except KeyError:
             pass
 
-    return cachedjson(24, countries=c)
+    return cachedjson("1d", countries=c)
 
 
 @api_private_blueprint.route("/quotas_summary", methods=["GET"])
-def api_private_quotas_summary():
+def api_private_quotas_summary() -> Response:
     """Summary on rate-limiting quotas.
     [(first ipaddr octet, remaining daily quota), ... ]
     """
@@ -178,7 +178,7 @@ def api_private_quotas_summary():
 
 
 @api_private_blueprint.route("/check_report_id", methods=["GET"])
-def check_report_id():
+def check_report_id() -> Response:
     """Check if a report_id exists in the fastpath table
     Used by https://github.com/ooni/probe/issues/1034
     ---
@@ -215,10 +215,10 @@ def check_report_id():
     try:
         q = query_click_one_row(s, dict(rid=report_id))
         found = q is not None
-        return cachedjson(2 / 60, v=0, found=found)  # cache for 2min
+        return cachedjson("2m", v=0, found=found)
 
     except Exception as e:
-        return cachedjson(0, v=0, error=str(e))
+        return cachedjson("0s", v=0, error=str(e))
 
 
 def last_30days(begin=31, end=1):
@@ -314,7 +314,7 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
 
 
 @api_private_blueprint.route("/test_coverage", methods=["GET"])
-def api_private_test_coverage():
+def api_private_test_coverage() -> Response:
     """Return number of measurements per day across test categories
     ---
     parameters:
@@ -337,11 +337,11 @@ def api_private_test_coverage():
     tc = get_recent_test_coverage_ch(probe_cc)
     nc = get_recent_network_coverage_ch(probe_cc, test_groups)
     # FIXME
-    return cachedjson(0, network_coverage=nc, test_coverage=tc)
+    return cachedjson("0s", network_coverage=nc, test_coverage=tc)
 
 
 @api_private_blueprint.route("/website_networks", methods=["GET"])
-def api_private_website_network_tests():
+def api_private_website_network_tests() -> Response:
     """TODO
     ---
     parameters:
@@ -367,11 +367,11 @@ def api_private_website_network_tests():
         """
     q = query_click(sql.text(s), {"probe_cc": probe_cc})
     results = list(q)
-    return cachedjson(1, results=results)
+    return cachedjson("0s", results=results)
 
 
 @api_private_blueprint.route("/website_stats", methods=["GET"])
-def api_private_website_stats():
+def api_private_website_stats() -> Response:
     """TODO
     ---
     responses:
@@ -402,11 +402,11 @@ def api_private_website_stats():
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
     q = query_click(sql.text(s), d)
     results = list(q)
-    return cachedjson(1, results=results)
+    return cachedjson("0s", results=results)
 
 
 @api_private_blueprint.route("/website_urls", methods=["GET"])
-def api_private_website_test_urls():
+def api_private_website_test_urls() -> Response:
     """TODO
     ---
     responses:
@@ -487,11 +487,11 @@ def api_private_website_test_urls():
         )
         metadata["next_url"] = next_url
 
-    return cachedjson(1, metadata=metadata, results=results)  # TODO caching
+    return cachedjson("1h", metadata=metadata, results=results)  # TODO caching
 
 
 @api_private_blueprint.route("/vanilla_tor_stats", methods=["GET"])
-def api_private_vanilla_tor_stats():
+def api_private_vanilla_tor_stats() -> Response:
     """Tor statistics over ASN for a given CC
     ---
     parameters:
@@ -532,14 +532,14 @@ def api_private_vanilla_tor_stats():
                 blocked += 1
 
     if not nets:
-        return cachedjson(0, networks=[], notok_networks=0, last_tested=None)
+        return cachedjson("0s", networks=[], notok_networks=0, last_tested=None)
 
     lt = max(n["last_tested"] for n in nets)
-    return cachedjson(0, networks=nets, notok_networks=blocked, last_tested=lt)
+    return cachedjson("0s", networks=nets, notok_networks=blocked, last_tested=lt)
 
 
 @api_private_blueprint.route("/im_networks", methods=["GET"])
-def api_private_im_networks():
+def api_private_im_networks() -> Response:
     """Instant messaging networks statistics
     ---
     responses:
@@ -585,7 +585,7 @@ def api_private_im_networks():
             e["last_tested"] = r["last_tested"]
         results[r["test_name"]] = e
 
-    return cachedjson(1, **results)  # TODO caching
+    return cachedjson("1h", **results)  # TODO caching
 
 
 def isomid(d) -> str:
@@ -594,7 +594,7 @@ def isomid(d) -> str:
 
 
 @api_private_blueprint.route("/im_stats", methods=["GET"])
-def api_private_im_stats():
+def api_private_im_stats() -> Response:
     """Instant messaging statistics
     ---
     responses:
@@ -640,11 +640,11 @@ def api_private_im_stats():
         e = dict(anomaly_count=None, test_day=test_day, total_count=total_count)
         results.append(e)
 
-    return cachedjson(1, results=results)  # TODO caching
+    return cachedjson("1h", results=results)  # TODO caching
 
 
 @api_private_blueprint.route("/network_stats", methods=["GET"])
-def api_private_network_stats():
+def api_private_network_stats() -> Response:
     """Network speed statistics - not implemented
     ---
     parameters:
@@ -660,7 +660,7 @@ def api_private_network_stats():
     probe_cc = validate_probe_cc_query_param()
 
     return cachedjson(
-        24,
+        "1d",
         {
             "metadata": {
                 "current_page": 1,
@@ -698,7 +698,7 @@ def api_private_network_stats():
 
 
 @api_private_blueprint.route("/country_overview", methods=["GET"])
-def api_private_country_overview():
+def api_private_country_overview() -> Response:
     """Country-specific overview
     ---
     responses:
@@ -721,11 +721,11 @@ def api_private_country_overview():
     """
     r = query_click_one_row(sql.text(s), {"probe_cc": probe_cc})
     # FIXME: websites_confirmed_blocked
-    return cachedjson(24, **r)
+    return cachedjson("1d", **r)
 
 
 @api_private_blueprint.route("/global_overview", methods=["GET"])
-def api_private_global_overview():
+def api_private_global_overview() -> Response:
     """Provide global summary of measurements
     Sources: global_stats db table
     ---
@@ -740,11 +740,11 @@ def api_private_global_overview():
     FROM fastpath
     """
     r = query_click_one_row(q, {})
-    return cachedjson(24, **r)
+    return cachedjson("1d", **r)
 
 
 @api_private_blueprint.route("/global_overview_by_month", methods=["GET"])
-def api_private_global_by_month():
+def api_private_global_by_month() -> Response:
     """Provide global summary of measurements
     Sources: global_by_month db table
     ---
@@ -772,12 +772,12 @@ def api_private_global_by_month():
     expand_dates(c)
     expand_dates(m)
     return cachedjson(
-        24, networks_by_month=n, countries_by_month=c, measurements_by_month=m
+        "1d", networks_by_month=n, countries_by_month=c, measurements_by_month=m
     )
 
 
 @api_private_blueprint.route("/circumvention_stats_by_country")
-def api_private_circumvention_stats_by_country():
+def api_private_circumvention_stats_by_country() -> Response:
     """Aggregated statistics on protocols used for circumvention,
     grouped by country.
     ---
@@ -795,7 +795,7 @@ def api_private_circumvention_stats_by_country():
     try:
         q = query_click(sql.text(q), {})
         result = [dict(x) for x in q]
-        return cachedjson(24, v=0, results=result)
+        return cachedjson("1d", v=0, results=result)
 
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})
@@ -831,7 +831,7 @@ def pivot_circumvention_runtime_stats(rows):
 
 
 @api_private_blueprint.route("/circumvention_runtime_stats")
-def api_private_circumvention_runtime_stats():
+def api_private_circumvention_runtime_stats() -> Response:
     """Runtime statistics on protocols used for circumvention,
     grouped by date, country, test_name.
     ---
@@ -856,7 +856,7 @@ def api_private_circumvention_runtime_stats():
     try:
         q = query_click(sql.text(q), {})
         result = pivot_circumvention_runtime_stats(q)
-        return cachedjson(24, v=0, results=result)
+        return cachedjson("1d", v=0, results=result)
 
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})

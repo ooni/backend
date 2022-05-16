@@ -6,7 +6,6 @@ TESTARGS ?= tests/functional/test_private_explorer.py tests/integ/test_aggregati
 
 .state/docker-build: Dockerfile
 	docker-compose build --force-rm api
-
 	mkdir -p .state
 	touch .state/docker-build
 
