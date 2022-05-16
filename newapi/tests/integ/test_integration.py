@@ -661,6 +661,16 @@ def test_list_measurements_stunreachability(client):
     assert len(resp["results"]) > 2
 
 
+def test_list_measurements_ASN0(client):
+    resp = client.get("/api/v1/measurements?probe_asn=ASN0")
+    assert resp.status_code == 403
+
+
+def test_list_measurements_ZZ(client):
+    resp = client.get("/api/v1/measurements?probe_cc=ZZ")
+    assert resp.status_code == 403
+
+
 ## get_measurement ##
 
 
