@@ -249,48 +249,6 @@ def _unwrap_post(post: dict) -> dict:
     raise Exception("Unexpected format")
 
 
-def _fetch_measurement_body_on_disk(report_id, input: str) -> Optional[bytes]:
-    """Fetch raw POST from disk, extract msmt
-    This is used only for msmts that have been processed by the fastpath
-    but are not uploaded to S3 yet.
-    YAML msmts not supported: requires implementing normalization here
-    """
-    query = """SELECT measurement_uid
-    FROM fastpath
-    WHERE report_id = :report_id
-    AND measurement_uid LIKE '20%'
-    """
-    if input is None:
-        query += " AND input IS NULL"
-    else:
-        query += " AND input = :input"
-    query_params = dict(input=input, report_id=report_id)
-    q = current_app.db_session.execute(query, query_params)
-    lookup = q.fetchone()
-    if lookup is None:
-        log.error(f"Row not found in fastpath table: {report_id} {input}")
-        raise Exception
-
-    msmt_uid = lookup.measurement_uid
-    if msmt_uid is None:
-        # older msmt
-        return None
-    assert msmt_uid.startswith("20")
-    tstamp, cc, testname, hash_ = msmt_uid.split("_")
-    hour = tstamp[:10]
-    int(hour)
-    spooldir = Path("/var/lib/ooniapi/measurements/incoming/")
-    postf = spooldir / f"{hour}_{cc}_{testname}/{msmt_uid}.post"
-    log.debug(f"Attempt at reading {postf}")
-    try:
-        with postf.open() as f:
-            post = ujson.load(f)
-    except FileNotFoundError:
-        return None
-    body = _unwrap_post(post)
-    return ujson.dumps(body).encode()
-
-
 def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes]:
     """Fetch raw POST from disk, extract msmt
     This is used only for msmts that have been processed by the fastpath

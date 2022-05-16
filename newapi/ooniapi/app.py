@@ -201,11 +201,6 @@ def create_app(*args, testmode=False, **kw):
     # FIXME
     views.register(app)
 
-    # why is it `teardown_appcontext` and not `teardown_request` ?...
-    @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        if hasattr(app, "db_session"):
-            app.db_session.remove()  # pragma: no cover
 
     @app.route("/health")
     def health():
