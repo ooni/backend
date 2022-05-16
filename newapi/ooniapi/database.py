@@ -4,7 +4,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from hashlib import shake_128
-from typing import Optional, Any, List, Tuple
+from typing import Optional, Any, List, Tuple, Dict
 import os
 
 from flask import current_app
@@ -47,14 +47,14 @@ hooks_are_set = False
 # # Clickhouse
 
 
-def init_clickhouse_db(app):
+def init_clickhouse_db(app) -> None:
     """Initializes Clickhouse session"""
     url = app.config["CLICKHOUSE_URL"]
     app.logger.info(f"Connecting to Clickhouse")
     app.click = Clickhouse.from_url(url)
 
 
-def query_click(query, query_params):
+def query_click(query, query_params: dict) -> List[Dict]:
     if not isinstance(query, str):
         # TODO: switch to sqlalchemy instead of compile(...) ?
         # query = sql.text(query)
@@ -62,9 +62,7 @@ def query_click(query, query_params):
     q = current_app.click.execute(query, query_params, with_column_types=True)
     rows, coldata = q
     colnames, coltypes = tuple(zip(*coldata))
-
-    for row in rows:
-        yield dict(zip(colnames, row))
+    return [dict(zip(colnames, row)) for row in rows]
 
 
 def query_click_one_row(query, query_params) -> Optional[dict]:

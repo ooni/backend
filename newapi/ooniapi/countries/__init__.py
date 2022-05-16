@@ -260,7 +260,7 @@ _countries = {
 }
 
 
-def lookup_country(probe_cc):
+def lookup_country(probe_cc: str) -> str:
     """Translate 2-char country code into country name"""
     return _countries[probe_cc.upper()]
 

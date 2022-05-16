@@ -5,6 +5,7 @@ OONI Probe Services API
 from base64 import b64encode
 from datetime import datetime, timedelta
 from os import urandom
+from typing import Tuple
 
 from pathlib import Path
 from hashlib import sha512
@@ -204,25 +205,27 @@ def check_in() -> Response:
     else:
         url_limit = 20
 
-    if "web_connectivity" not in data:
-        category_codes = ()
+    if "web_connectivity" in data:
+        catcodes = data["web_connectivity"].get("category_codes", [])
+        if isinstance(catcodes, str):
+            category_codes = catcodes.split(",")
+        else:
+            category_codes = catcodes
+
     else:
-        category_codes = data["web_connectivity"].get("category_codes", ())
-        if isinstance(category_codes, str):
-            category_codes = category_codes.split(",")
+        category_codes = []
 
     assert asn.startswith("AS")
     asn_i = int(asn[2:])
     assert probe_cc.isalpha()
     assert len(probe_cc) == 2
-    category_codes = tuple(category_codes)
     for c in category_codes:
         assert c.isalpha()
 
     try:
         test_items = generate_test_list(probe_cc, category_codes, url_limit, False)
     except Exception as e:
-        log.error(e, exc_info=1)
+        log.error(e, exc_info=True)
         # TODO: use same failover as prio.py:list_test_urls
         # failover_generate_test_list runs without any database interaction
         # test_items = failover_generate_test_list(country_code, category_codes, limit)
@@ -234,7 +237,7 @@ def check_in() -> Response:
         psconf = _load_json(current_app.config["PSIPHON_CONFFILE"])
         conf = dict(tor=torconf, psiphon=psconf)
     except Exception as e:
-        log.error(str(e), exc_info=1)
+        log.error(str(e), exc_info=True)
         conf = {}
 
     resp["tests"] = {
@@ -270,8 +273,8 @@ def check_in() -> Response:
     for tn in test_names:
         stn = tn.replace("_", "")
         rid = generate_report_id(stn, probe_cc, asn_i)
-        resp["tests"].setdefault(tn, {})
-        resp["tests"][tn]["report_id"] = rid
+        resp["tests"].setdefault(tn, {})  # type: ignore
+        resp["tests"][tn]["report_id"] = rid  # type: ignore
 
     return jsonify(resp)
 
@@ -560,7 +563,7 @@ def _check_probe_token(desc):
         log.info(f"{desc}: invalid signature")
         return jerror("Invalid credentials", code=401)
     except Exception as e:
-        log.info(str(e), exc_info=1)
+        log.info(str(e), exc_info=True)
         return jerror(str(e))
 
 

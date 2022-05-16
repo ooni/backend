@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
+from typing import Dict, List
 
 import logging
 import math
@@ -156,8 +157,8 @@ def api_private_countries() -> Response:
     GROUP BY probe_cc ORDER BY probe_cc
     """
     c = []
-    q = query_click(q, {})
-    for r in q:
+    rows = query_click(q, {})
+    for r in rows:
         try:
             name = lookup_country(r["probe_cc"])
             c.append(
@@ -309,8 +310,7 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
         s = s.replace("--mark--", "")
         d = {"probe_cc": probe_cc}
 
-    q = query_click(sql.text(s), d)
-    return list(q)
+    return query_click(sql.text(s), d)
 
 
 @api_private_blueprint.route("/test_coverage", methods=["GET"])
@@ -365,8 +365,7 @@ def api_private_website_network_tests() -> Response:
         GROUP BY probe_asn
         ORDER BY count DESC
         """
-    q = query_click(sql.text(s), {"probe_cc": probe_cc})
-    results = list(q)
+    results = query_click(sql.text(s), {"probe_cc": probe_cc})
     return cachedjson("0s", results=results)
 
 
@@ -400,8 +399,7 @@ def api_private_website_stats() -> Response:
         GROUP BY test_day ORDER BY test_day
     """
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
-    q = query_click(sql.text(s), d)
-    results = list(q)
+    results = query_click(sql.text(s), d)
     return cachedjson("0s", results=results)
 
 
@@ -435,7 +433,7 @@ def api_private_website_test_urls() -> Response:
     q = query_click_one_row(
         sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn)
     )
-    total_count = q["input_count"]
+    total_count = q["input_count"] if q else 0
 
     # Group msmts by CC / ASN / period with LIMIT and OFFSET
     s = """SELECT input,
@@ -461,8 +459,7 @@ def api_private_website_test_urls() -> Response:
         "limit": limit,
         "offset": offset,
     }
-    q = query_click(sql.text(s), d)
-    results = list(q)
+    results = query_click(sql.text(s), d)
     current_page = math.ceil(offset / limit) + 1
     metadata = {
         "offset": offset,
@@ -561,7 +558,7 @@ def api_private_im_networks() -> Response:
     GROUP BY test_name, probe_asn
     ORDER BY test_name ASC, total_count DESC
     """
-    results = {}
+    results: Dict[str, Dict] = {}
     test_names = sorted(TEST_GROUPS["im"])
     q = query_click(sql.text(s), {"probe_cc": probe_cc, "test_names": test_names})
     for r in q:
@@ -720,6 +717,7 @@ def api_private_country_overview() -> Response:
         AND measurement_start_time > '2012-12-01'
     """
     r = query_click_one_row(sql.text(s), {"probe_cc": probe_cc})
+    assert r
     # FIXME: websites_confirmed_blocked
     return cachedjson("1d", **r)
 
@@ -740,6 +738,7 @@ def api_private_global_overview() -> Response:
     FROM fastpath
     """
     r = query_click_one_row(q, {})
+    assert r
     return cachedjson("1d", **r)
 
 
@@ -793,12 +792,11 @@ def api_private_circumvention_stats_by_country() -> Response:
         GROUP BY probe_cc ORDER BY probe_cc
     """
     try:
-        q = query_click(sql.text(q), {})
-        result = [dict(x) for x in q]
+        result = query_click(sql.text(q), {})
         return cachedjson("1d", v=0, results=result)
 
     except Exception as e:
-        return jsonify({"v": 0, "error": str(e)})
+        return cachedjson("0d", v=0, error=str(e))
 
 
 def pivot_circumvention_runtime_stats(rows):
@@ -854,8 +852,8 @@ def api_private_circumvention_runtime_stats() -> Response:
     GROUP BY date, probe_cc, test_name
     """
     try:
-        q = query_click(sql.text(q), {})
-        result = pivot_circumvention_runtime_stats(q)
+        r = query_click(sql.text(q), {})
+        result = pivot_circumvention_runtime_stats(r)
         return cachedjson("1d", v=0, results=result)
 
     except Exception as e:
