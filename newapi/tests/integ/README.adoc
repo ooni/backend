@@ -1,6 +1,6 @@
 === Integration tests
 
-Integration tests are run against a Clickhouse or PostgreSQL database
+Integration tests are run against a Clickhouse database
 
 They require a readonly and read-write user
 

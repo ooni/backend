@@ -52,10 +52,7 @@ def failover_fetch_citizenlab_data() -> Dict[str, List[CTZ]]:
     WHERE cc = 'ZZ'
     """
     out: Dict[str, List[CTZ]] = {}
-    if current_app.config["USE_CLICKHOUSE"]:
-        query = query_click(sql, {})
-    else:
-        query = current_app.db_session.execute(sql)  # pragma: no cover
+    query = query_click(sql, {})
     for e in query:
         catcode = e["category_code"]
         c = CTZ(e["url"], catcode)
@@ -119,29 +116,6 @@ def compute_priorities(entries, prio_rules):
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
 
-def fetch_reactive_url_list_pg(cc):  # pragma: no cover
-    sql = """
-SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0)::float AS msmt_cnt
-FROM (
-    SELECT domain, url, cc, category_code
-    FROM citizenlab
-    WHERE
-      citizenlab.cc = :cc_low
-      OR citizenlab.cc = :cc
-      OR citizenlab.cc = 'ZZ'
-) AS citiz
-LEFT OUTER JOIN (
-    SELECT input, msmt_cnt
-    FROM counters_test_list
-    WHERE probe_cc = :cc
-) AS cnt
-ON (citiz.url = cnt.input)
-"""
-    # support uppercase or lowercase match
-    q = current_app.db_session.execute(sql, dict(cc=cc, cc_low=cc.lower()))
-    return tuple(q.fetchall())
-
-
 def fetch_reactive_url_list_click(cc):
     q = """
 SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0) AS msmt_cnt
@@ -171,10 +145,7 @@ def fetch_reactive_url_list(cc: str):
     """Select all citizenlab URLs for the given probe_cc + ZZ
     Select measurements count from the last 7 days in a left outer join
     (without any info about priority)"""
-    if current_app.config["USE_CLICKHOUSE"]:
-        return fetch_reactive_url_list_click(cc)
-    else:
-        return fetch_reactive_url_list_pg(cc)
+    return fetch_reactive_url_list_click(cc)
 
 
 @metrics.timer("fetch_prioritization_rules")
@@ -182,12 +153,8 @@ def fetch_prioritization_rules(cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities WHERE cc = :cc OR cc = '*'
     """
-    if current_app.config["USE_CLICKHOUSE"]:
-        q = query_click(sa.text(sql), dict(cc=cc))
-        return tuple(q)
-    else:
-        q = current_app.db_session.execute(sql, dict(cc=cc))  # pragma: no cover
-        return tuple(q.fetchall())
+    q = query_click(sa.text(sql), dict(cc=cc))
+    return tuple(q)
 
 
 @metrics.timer("generate_test_list")

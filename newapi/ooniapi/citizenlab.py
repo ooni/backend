@@ -26,8 +26,7 @@ from ooniapi.utils import nocachejson
 
 """
 
-URL prioritization:
-create_url_priorities_table() creates the url_priorities table.
+URL prioritization: uses the url_priorities table.
 It contains rules on category_code, cc, domain and url to assign priorities.
 Values can be wildcards "*". A citizenlab entry can match multiple rules.
 """
@@ -676,76 +675,6 @@ def post_propose_changes():
 # # Prioritization management # #
 
 
-def create_url_priorities_table() -> None:  # pragma: no cover
-    # Only for PostgreSQL
-    # See description in module docstring
-    log = current_app.logger
-    sql = "SELECT to_regclass('url_priorities')"
-    q = current_app.db_session.execute(sql)
-    if q.fetchone()[0] is not None:
-        return  # table already present
-
-    log.info("Creating table url_priorities")
-    sql = """
-CREATE TABLE public.url_priorities (
-    category_code text,
-    cc text,
-    domain text,
-    url text,
-    priority smallint NOT NULL,
-    UNIQUE (category_code, cc, domain, url)
-);
-COMMENT ON COLUMN public.url_priorities.domain IS 'FQDN or ipaddr without http and port number';
-COMMENT ON COLUMN public.url_priorities.category_code IS 'Category from Citizen Lab';
-GRANT SELECT ON TABLE public.url_priorities TO readonly;
-GRANT SELECT ON TABLE public.url_priorities TO shovel;
-GRANT SELECT ON TABLE public.url_priorities TO amsapi;
-"""
-    current_app.db_session.execute(sql)
-
-    log.info("Populating table url_priorities")
-    sql = """INSERT INTO url_priorities
-        (category_code, cc, domain, url, priority)
-        VALUES(:category_code, '*', '*', '*', :priority)"""
-    category_priorities = {
-        "NEWS": 100,
-        "POLR": 100,
-        "HUMR": 100,
-        "LGBT": 100,
-        "ANON": 100,
-        "GRP": 80,
-        "COMT": 80,
-        "MMED": 80,
-        "SRCH": 80,
-        "PUBH": 80,
-        "REL": 60,
-        "XED": 60,
-        "HOST": 60,
-        "ENV": 60,
-        "FILE": 40,
-        "CULTR": 40,
-        "IGO": 40,
-        "GOVT": 40,
-        "DATE": 30,
-        "HATE": 30,
-        "MILX": 30,
-        "PROV": 30,
-        "PORN": 30,
-        "GMB": 30,
-        "ALDR": 30,
-        "GAME": 20,
-        "MISC": 20,
-        "HACK": 20,
-        "ECON": 20,
-        "COMM": 20,
-        "CTRL": 20,
-    }
-    for cat, prio in category_priorities.items():
-        d = dict(category_code=cat, priority=prio)
-        current_app.db_session.execute(sql, d)
-    current_app.db_session.commit()
-
-
 @cz_blueprint.route("/api/_/url-priorities/list", methods=["GET"])
 @role_required(["admin"])
 def list_url_priorities():
@@ -762,46 +691,10 @@ def list_url_priorities():
     FROM url_priorities FINAL
     ORDER BY category_code, cc, domain, url, priority
     """
-    if current_app.config["USE_CLICKHOUSE"]:
-        # The url_priorities table is CollapsingMergeTree
-        q = query_click(sql.text(query), {})
-        rows = list(q)
-    else:
-        query = query.replace("FINAL", "")
-        q = current_app.db_session.execute(query)
-        rows = [dict(r) for r in q]
-
+    # The url_priorities table is CollapsingMergeTree
+    q = query_click(sql.text(query), {})
+    rows = list(q)
     return make_response(jsonify(rules=rows))
-
-
-def update_url_priority_postgresql(old, new):  # pragma: no cover
-    log = current_app.logger
-    if old:  # delete an existing rule
-        query = """DELETE FROM url_priorities
-        WHERE category_code = :category_code
-        AND cc = :cc
-        AND domain = :domain
-        AND url = :url
-        AND priority = :priority
-        """
-        q = current_app.db_session.execute(query, old).rowcount
-        if q < 1:
-            return jerror("Old rule not found", 400)
-
-    if new:  # add new rule
-        query = """INSERT INTO url_priorities
-            (category_code, cc, domain, url, priority)
-            VALUES(:category_code, :cc, :domain, :url, :priority)
-        """
-        try:
-            q = current_app.db_session.execute(query, new).rowcount
-        except Exception as e:
-            log.info(str(e))
-            current_app.db_session.rollback()
-            return jerror("Duplicate rule", 400)
-
-    current_app.db_session.commit()
-    return q
 
 
 def initialize_url_priorities_if_needed():
@@ -963,13 +856,8 @@ def post_update_url_priority():
     if new:
         validate_url_prio_rule_dict(new)
 
-    if current_app.config["USE_CLICKHOUSE"]:
-        try:
-            update_url_priority_click(old, new)
-            return make_response(jsonify(1))
-        except DuplicateRuleError as e:
-            return jerror(str(e))
-
-    else:
-        q = update_url_priority_postgresql(old, new)
-        return make_response(jsonify(q))
+    try:
+        update_url_priority_click(old, new)
+        return make_response(jsonify(1))
+    except DuplicateRuleError as e:
+        return jerror(str(e))

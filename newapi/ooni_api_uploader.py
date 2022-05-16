@@ -55,6 +55,7 @@ def ping_db(conn):
         log.debug("Database start time: %s", row[0])
 
 
+# FIXME: move to ClickHouse
 def connect_to_db(conf):
     log.info("Connecting to database")
     db_uri = conf.get(

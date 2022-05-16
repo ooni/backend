@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover
 from flasgger import Swagger
 
 from decimal import Decimal
-from ooniapi.database import init_postgres_db, init_clickhouse_db
+from ooniapi.database import init_clickhouse_db
 
 APP_DIR = os.path.dirname(__file__)
 
@@ -61,9 +61,7 @@ def validate_conf(app, conffile):
         "BASE_URL",
         "COLLECTORS",
         "DATABASE_STATEMENT_TIMEOUT",
-        "DATABASE_URI_RO",
         "CLICKHOUSE_URL",
-        "USE_CLICKHOUSE",
         "GITHUB_ORIGIN_REPO",
         "GITHUB_PUSH_REPO",
         "GITHUB_TOKEN",
@@ -174,10 +172,7 @@ def create_app(*args, testmode=False, **kw):
     # Order matters
     init_app(app, testmode=testmode)
 
-    if app.config["USE_CLICKHOUSE"]:
-        init_clickhouse_db(app)
-    else:
-        init_postgres_db(app)  # pragma: no cover
+    init_clickhouse_db(app)
 
     # Setup rate limiting
     # NOTE: the limits apply per-process. The number of processes is set in:

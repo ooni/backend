@@ -200,40 +200,6 @@ def _fetch_jsonl_measurement_body_inner(
     raise MsmtNotFound
 
 
-def _fetch_jsonl_measurement_body_postgresql(
-    report_id, input: str, measurement_uid
-) -> bytes:  # pragma: no cover
-    """Fetch jsonl from S3, decompress it, extract msmt"""
-    query = "SELECT s3path, linenum FROM jsonl "
-    inp = input or ""  # NULL/None input is stored as ''
-    if measurement_uid is None:
-        query += "WHERE report_id = :report_id AND input = :inp LIMIT 1"
-        query_params = dict(inp=inp, report_id=report_id)
-
-    else:
-        query += """WHERE measurement_uid = :mid
-        OR (report_id = :rid AND input = :inp)
-        LIMIT 1
-        """
-        query_params = dict(inp=inp, rid=report_id, mid=measurement_uid)
-
-    q = current_app.db_session.execute(query, query_params)
-    lookup = q.fetchone()
-    if lookup is None:
-        m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
-        log.error(m)
-        raise MsmtNotFound
-
-    s3path = lookup.s3path
-    linenum = lookup.linenum
-    log.debug(f"Fetching file {s3path} from S3")
-    try:
-        return _fetch_jsonl_measurement_body_inner(s3path, linenum)
-    except:
-        log.error(f"Failed to fetch file {s3path} from S3")
-        raise MsmtNotFound
-
-
 @metrics.timer("_fetch_jsonl_measurement_body_clickhouse")
 def _fetch_jsonl_measurement_body_clickhouse(
     report_id, input: str, measurement_uid
@@ -345,39 +311,6 @@ def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes
         return None
     body = _unwrap_post(post)
     return ujson.dumps(body).encode()
-
-
-def _fetch_autoclaved_measurement_body(
-    report_id: str, input
-) -> bytes:  # pragma: no cover
-    """fetch the measurement body using autoclavedlookup"""
-    # uses_pg_index autoclavedlookup_idx
-    # None/NULL input needs to be is treated as ""
-    query = """SELECT
-    frame_off,
-    frame_size,
-    intra_off,
-    intra_size,
-    textname,
-    filename,
-    report_id,
-    input
-    FROM autoclavedlookup
-    WHERE md5(report_id || COALESCE(input, '')) = md5(:report_id || :input)
-    """
-    query_params = dict(input=(input or ""), report_id=report_id)
-    q = current_app.db_session.execute(query, query_params)
-    r = q.fetchone()
-    if r is None:
-        current_app.logger.error(f"missing autoclaved for {report_id} {input}")
-        # This is a bug somewhere: the msmt is is the fastpath table and
-        # not in the autoclavedlookup table
-        raise MsmtNotFound
-
-    body = _fetch_autoclaved_measurement_body_from_s3(
-        r.filename, r.frame_off, r.frame_size, r.intra_off, r.intra_size
-    )
-    return body
 
 
 @metrics.timer("_fetch_measurement_body_from_hosts")
@@ -495,50 +428,6 @@ def get_raw_measurement() -> Response:
     resp.headers.set("Content-Type", "application/json")
     resp.cache_control.max_age = 24 * 3600
     return resp
-
-
-def _get_measurement_meta_postgresql(
-    report_id: str, input_
-) -> dict:  # pragma: no cover
-    # Given report_id + input, fetch measurement data from fastpath table
-    query = """SELECT
-        anomaly,
-        confirmed,
-        msm_failure AS failure,
-        input,
-        measurement_start_time,
-        probe_asn,
-        probe_cc,
-        report_id,
-        measurement_uid,
-        CAST(scores AS varchar) AS scores,
-        test_name,
-        test_start_time
-    """
-    # fastpath uses input = '' for empty values
-    if input_ is None:
-        query += """
-        FROM fastpath
-        WHERE fastpath.report_id = :report_id
-        AND (fastpath.input IS NULL or fastpath.input = '')
-        AND probe_asn != 0
-        """
-    else:
-        query += """
-            , citizenlab.category_code AS category_code
-        FROM fastpath
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE fastpath.input = :input
-        AND fastpath.report_id = :report_id
-        AND probe_asn != 0
-        """
-    query_params = dict(input=input_, report_id=report_id)
-    q = current_app.db_session.execute(query, query_params)
-    msmt_meta = q.fetchone()
-    if msmt_meta is None:
-        return {}  # measurement not found
-
-    return dict(msmt_meta)
 
 
 @metrics.timer("get_measurement_meta_clickhouse")
@@ -682,10 +571,7 @@ def get_measurement_meta() -> Response:
     full = param("full", "").lower() in ("true", "1", "yes")
     log.info(f"get_measurement_meta '{report_id}' '{input_}'")
 
-    if current_app.config["USE_CLICKHOUSE"]:
-        msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
-    else:
-        msmt_meta = _get_measurement_meta_postgresql(report_id, input_)
+    msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
 
     assert isinstance(msmt_meta, dict)
     if not full:
@@ -935,273 +821,24 @@ def list_measurements() -> Response:
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
-    if current_app.config["USE_CLICKHOUSE"]:
-        return _list_measurements_click(
-            since,
-            until,
-            report_id,
-            probe_cc,
-            probe_asn,
-            test_name,
-            anomaly,
-            confirmed,
-            failure,
-            input_,
-            domain,
-            category_code,
-            order,
-            order_by,
-            limit,
-            offset,
-        )
-    else:
-        return _list_measurements_pg(
-            since,
-            until,
-            report_id,
-            probe_cc,
-            probe_asn,
-            test_name,
-            anomaly,
-            confirmed,
-            failure,
-            input_,
-            domain,
-            category_code,
-            order,
-            order_by,
-            limit,
-            offset,
-        )
-
-
-def _list_measurements_pg(
-    since,
-    until,
-    report_id,
-    probe_cc,
-    probe_asn,
-    test_name,
-    anomaly,
-    confirmed,
-    failure,
-    input_,
-    domain,
-    category_code,
-    order,
-    order_by,
-    limit,
-    offset,
-):
-    INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
-
-    ## Create fastpath columns for query
-    # TODO cast scores, coalesce input as ""
-    fpcols = [
-        literal_column("measurement_start_time").label("test_start_time"),
-        literal_column("measurement_start_time"),
-        literal_column("anomaly"),
-        literal_column("confirmed"),
-        literal_column("msm_failure").label("failure"),
-        cast(sql.text("scores"), String).label("scores"),
-        literal_column("report_id"),
-        literal_column("probe_cc"),
-        literal_column("probe_asn"),
-        literal_column("test_name"),
-        sql.text("coalesce(fastpath.input, '') AS input"),
-    ]
-
-    fpwhere = []
-    query_params = {}
-
-    # Populate WHERE clauses and query_params dict
-
-    if since is not None:
-        query_params["since"] = since
-        fpwhere.append(sql.text("measurement_start_time > :since"))
-
-    if until is not None:
-        query_params["until"] = until
-        fpwhere.append(sql.text("measurement_start_time <= :until"))
-
-    if report_id:
-        query_params["report_id"] = report_id
-        fpwhere.append(sql.text("report_id = :report_id"))
-
-    if probe_cc:
-        query_params["probe_cc"] = probe_cc
-        fpwhere.append(sql.text("probe_cc = :probe_cc"))
-
-    if probe_asn is not None:
-        if probe_asn == 0:
-            log.info("Refusing list_measurements with probe_asn set to 0")
-            abort(403)
-        query_params["probe_asn"] = probe_asn
-        fpwhere.append(sql.text("probe_asn = :probe_asn"))
-    else:
-        fpwhere.append(sql.text("probe_asn != 0"))
-
-    if test_name is not None:
-        query_params["test_name"] = test_name
-        fpwhere.append(sql.text("test_name = :test_name"))
-
-    # Filter on anomaly, confirmed and failure:
-    # The database stores anomaly and confirmed as boolean + NULL and stores
-    # failures in different columns. This leads to many possible combinations
-    # but only a subset is used.
-    # On anomaly and confirmed: any value != TRUE is treated as FALSE
-    # See test_list_measurements_filter_flags_fastpath
-
-    if anomaly is True:
-        fpwhere.append(sql.text("fastpath.anomaly IS TRUE"))
-
-    elif anomaly is False:
-        fpwhere.append(sql.text("fastpath.anomaly IS NOT TRUE"))
-
-    if confirmed is True:
-        fpwhere.append(sql.text("fastpath.confirmed IS TRUE"))
-
-    elif confirmed is False:
-        fpwhere.append(sql.text("fastpath.confirmed IS NOT TRUE"))
-
-    if failure is True:
-        # residual_no is never NULL, msm_failure is always NULL
-        fpwhere.append(sql.text("fastpath.msm_failure IS TRUE"))
-
-    elif failure is False:
-        # on success measurement.exc is NULL
-        fpwhere.append(sql.text("fastpath.msm_failure IS NOT TRUE"))
-
-    fpq_table = sql.table("fastpath")
-
-    if input_:
-        # input_ overrides domain and category_code
-        query_params["input"] = input_
-        fpwhere.append(sql.text("input = :input"))
-
-    elif domain or category_code:
-        # both domain and category_code can be set at the same time
-        if domain:
-            query_params["domain"] = domain
-            fpwhere.append(sql.text("domain = :domain"))
-
-        if category_code:
-            query_params["category_code"] = category_code
-            fpq_table = fpq_table.join(
-                sql.table("citizenlab"),
-                sql.text("citizenlab.url = :input"),
-            )
-            fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
-
-    fp_query = select(fpcols).where(and_(*fpwhere)).select_from(fpq_table)
-    # .limit(offset + limit)
-
-    # SELECT * FROM fastpath  WHERE measurement_start_time <= '2019-01-01T00:00:00'::timestamp AND probe_cc = 'YT' ORDER BY test_start_time desc   LIMIT 100 OFFSET 0;
-    # is using BRIN and running slowly
-
-    if order_by is None:
-        # Use test_start_time or measurement_start_time depending on other
-        # filters in order to avoid heavy joins.
-        # Filtering on anomaly, confirmed, msm_failure -> measurement_start_time
-        # Filtering on probe_cc, probe_asn, test_name -> test_start_time
-        # See test_list_measurements_slow_order_by_* tests
-        if probe_cc or probe_asn or test_name:
-            order_by = "test_start_time"
-        elif anomaly or confirmed or failure or input_ or domain or category_code:
-            order_by = "measurement_start_time"
-        else:
-            order_by = "measurement_start_time"
-
-    fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
-
-    # Assemble the "external" query. Run a final order by followed by limit and
-    # offset
-    query = fp_query.offset(offset).limit(limit)
-    query_params["param_1"] = limit
-    query_params["param_2"] = offset
-
-    # Run the query, generate the results list
-    iter_start_time = time.time()
-
-    # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
-    current_app.db_session.execute("SET enable_seqscan=false;")
-    try:
-        q = current_app.db_session.execute(query, query_params)
-
-        tmpresults = []
-        for row in q:
-            if row.input in (None, ""):
-                url = genurl("/api/v1/raw_measurement", report_id=row.report_id)
-            else:
-                url = genurl(
-                    "/api/v1/raw_measurement", report_id=row.report_id, input=row.input
-                )
-            tmpresults.append(
-                {
-                    "measurement_url": url,
-                    "report_id": row.report_id,
-                    "probe_cc": row.probe_cc,
-                    "probe_asn": "AS{}".format(row.probe_asn),
-                    "test_name": row.test_name,
-                    "measurement_start_time": row.measurement_start_time,
-                    "input": row.input,
-                    "anomaly": row.anomaly,
-                    "confirmed": row.confirmed,
-                    "failure": row.failure,
-                    "scores": json.loads(row.scores),
-                }
-            )
-    except OperationalError as exc:
-        log.error(exc)
-        if isinstance(exc.orig, QueryCanceledError):
-            # Timeout due to a slow query. Generate metric and do not feed it
-            # to Sentry.
-            abort(504)
-
-        raise exc
-
-    # For each report_id / input tuple, we want at most one entry.
-    results = _merge_results(tmpresults)
-
-    # Replace the special value INULL for "input" with None
-    for i, r in enumerate(results):
-        if r["input"] == INULL:
-            results[i]["input"] = None
-
-    pages = -1
-    count = -1
-    current_page = math.ceil(offset / limit) + 1
-
-    # We got less results than what we expected, we know the count and that
-    # we are done
-    if len(tmpresults) < limit:
-        count = offset + len(results)
-        pages = math.ceil(count / limit)
-        next_url = None
-    else:
-        # XXX this is too intensive. find a workaround
-        # count_start_time = time.time()
-        # count = q.count()
-        # pages = math.ceil(count / limit)
-        # current_page = math.ceil(offset / limit) + 1
-        # query_time += time.time() - count_start_time
-        next_args = request.args.to_dict()
-        next_args["offset"] = str(offset + limit)
-        next_args["limit"] = str(limit)
-        next_url = genurl("/api/v1/measurements", **next_args)
-
-    query_time = time.time() - iter_start_time
-    metadata = {
-        "offset": offset,
-        "limit": limit,
-        "count": count,
-        "pages": pages,
-        "current_page": current_page,
-        "next_url": next_url,
-        "query_time": query_time,
-    }
-
-    return jsonify({"metadata": metadata, "results": results[:limit]})
+    return _list_measurements_click(
+        since,
+        until,
+        report_id,
+        probe_cc,
+        probe_asn,
+        test_name,
+        anomaly,
+        confirmed,
+        failure,
+        input_,
+        domain,
+        category_code,
+        order,
+        order_by,
+        limit,
+        offset,
+    )
 
 
 def _list_measurements_click(
@@ -1642,25 +1279,9 @@ def get_aggregated() -> Response:
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})
 
-    if current_app.config["USE_CLICKHOUSE"]:
-        r = _clickhouse_aggregation(
-            resp_format,
-            download,
-            since,
-            until,
-            inp,
-            domain,
-            category_code,
-            probe_cc,
-            probe_asn,
-            test_name,
-            axis_x,
-            axis_y,
-        )
-        return r
-
-    r = _postgresql_aggregation(
+    r = _clickhouse_aggregation(
         resp_format,
+        download,
         since,
         until,
         inp,
@@ -1673,136 +1294,6 @@ def get_aggregated() -> Response:
         axis_y,
     )
     return r
-
-
-def _postgresql_aggregation(
-    resp_format,
-    since,
-    until,
-    inp,
-    domain,
-    category_code,
-    probe_cc,
-    probe_asn,
-    test_name,
-    axis_x,
-    axis_y,
-):  # pragma: no cover
-
-    dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
-    cacheable = until and until < datetime.now() - timedelta(hours=72)
-
-    # Assemble query
-    def coalsum(name):
-        return sql.text("COALESCE(SUM({0}), 0) AS {0}".format(name))
-
-    cols = [
-        coalsum("anomaly_count"),
-        coalsum("confirmed_count"),
-        coalsum("failure_count"),
-        coalsum("measurement_count"),
-    ]
-    table = sql.table("counters")
-    where = []
-    query_params = {}
-
-    if domain:
-        where.append(sql.text("domain = :domain"))
-        query_params["domain"] = domain
-
-    if inp:
-        where.append(sql.text("input = :input"))
-        query_params["input"] = inp
-
-    if category_code:
-        # Join in citizenlab table and filter by category_code
-        table = table.join(
-            sql.table("citizenlab"),
-            sql.text("citizenlab.url = counters.input"),
-        )
-        where.append(sql.text("category_code = :category_code"))
-        query_params["category_code"] = category_code
-
-    if probe_cc:
-        where.append(sql.text("probe_cc = :probe_cc"))
-        query_params["probe_cc"] = probe_cc
-
-    if probe_asn is not None:
-        where.append(sql.text("probe_asn = :probe_asn"))
-        query_params["probe_asn"] = probe_asn
-
-    if since:
-        where.append(sql.text("measurement_start_day > :since"))
-        query_params["since"] = since
-
-    if until:
-        where.append(sql.text("measurement_start_day <= :until"))
-        query_params["until"] = until
-
-    if test_name:
-        assert test_name in TEST_NAMES
-        where.append(sql.text("test_name = :test_name"))
-        query_params["test_name"] = test_name
-
-    if axis_x:
-        # TODO: check if the value is a valid colum name
-        cols.append(column(axis_x))
-        if axis_x == "category_code":
-            # Join in citizenlab table
-            table = table.join(
-                sql.table("citizenlab"),
-                sql.text("citizenlab.url = counters.input"),
-            )
-
-    if axis_y:
-        # TODO: check if the value is a valid colum name
-        if axis_y == "category_code":
-            if axis_x != "category_code":
-                cols.append(column(axis_y))
-                # Join in citizenlab table
-                table = table.join(
-                    sql.table("citizenlab"),
-                    sql.text("citizenlab.url = counters.input"),
-                )
-        elif axis_y != axis_x:
-            # TODO: consider prohibiting axis_x == axis_y ?
-            cols.append(column(axis_y))
-
-    # Assemble query
-    where_expr = and_(*where)
-    query = select(cols).where(where_expr).select_from(table)
-
-    # Add group-by
-    if axis_x:
-        query = query.group_by(column(axis_x)).order_by(column(axis_x))
-
-    if axis_y and axis_y != axis_x:
-        query = query.group_by(column(axis_y)).order_by(column(axis_y))
-
-    try:
-        # disable bitmapscan otherwise PG uses the BRIN indexes instead of BTREE
-        current_app.db_session.execute("SET enable_seqscan=false;")
-        q = current_app.db_session.execute(query, query_params)
-
-        if dimension_cnt == 2:
-            r = [dict(row) for row in q]
-
-        elif axis_x or axis_y:
-            r = [dict(row) for row in q]
-
-        else:
-            r = dict(q.fetchone())
-
-        if resp_format == "CSV":
-            return _convert_to_csv(r)
-
-        response = jsonify({"v": 0, "dimension_count": dimension_cnt, "result": r})
-        if cacheable:
-            response.cache_control.max_age = 3600 * 24
-        return response
-
-    except Exception as e:
-        return jsonify({"v": 0, "error": str(e)})
 
 
 def validate_axis_name(axis):

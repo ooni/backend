@@ -65,15 +65,6 @@ def pytest_configure(config):
     pytest.inject_msmts = config.getoption("--inject-msmts")
 
 
-def sudopg(cmd, check=True):
-    cmd = ["/usr/bin/sudo", "-u", "postgres", "psql", "-c", cmd]
-    print(cmd)
-    out = subprocess.run(cmd, check=check, stdout=PIPE, stderr=PIPE).stdout
-    out = out.decode().strip()
-    if out:
-        print(out)
-
-
 @pytest.fixture(scope="session")
 def setup_database_part_1():
     # Create database and users.
@@ -81,20 +72,6 @@ def setup_database_part_1():
     # Drop and recreate database if exists.
     if not pytest.create_db:
         return
-
-    return  # Use only clickhouse
-
-    if os.path.exists("/usr/bin/sudo"):
-        print("Creating PostgreSQL user and database")
-        sudopg("DROP DATABASE IF EXISTS oonitestdb", check=True)
-        sudopg("DROP ROLE IF EXISTS oonitest", check=True)
-        sudopg("CREATE USER oonitest WITH ENCRYPTED PASSWORD 'test'", check=False)
-        sudopg("CREATE DATABASE oonitestdb WITH OWNER 'oonitest'", check=False)
-        sudopg("GRANT ALL PRIVILEGES ON DATABASE oonitestdb TO oonitest")
-
-    else:
-        # On github sudo is missing and the database is already created
-        print("Sudo not found - not creating PostgreSQL database")
 
 
 @pytest.fixture(scope="session")
@@ -112,27 +89,6 @@ def checkout_pipeline(tmpdir_factory):
     cmd = cmd.split()
     subprocess.run(cmd, check=True, stdout=PIPE, stderr=PIPE).stdout
     return Path(d)
-
-
-def run_pg_sql_scripts(app):
-    log = app.logger
-    # for i in ["1_metadb_users.sql", "2_metadb_schema.sql", "3_test_fixtures.sql"]:
-    query = ""
-    for i in ["2_metadb_schema.sql", "3_test_fixtures.sql"]:
-        # for i in ["2_metadb_schema.sql",]:
-        p = Path("tests/integ") / i
-        for line in p.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("--"):
-                continue
-            query += line + " "
-            if line.endswith(";"):
-                try:
-                    with app.db_engine.begin():
-                        app.db_engine.execute(query)
-                except Exception as e:
-                    log.error(f"failed {query} {e}")
-                query = ""
 
 
 def run_clickhouse_sql_scripts(app):
@@ -195,24 +151,15 @@ def run_fastpath(log, pipeline_dir, dburi, clickhouse_url):
 @pytest.fixture(autouse=True, scope="session")
 def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
     # Create tables, indexes and so on
-    # on PostgreSQL and Clickhouse
     # This part needs the "app" object
     if not pytest.create_db:
         return
 
     clickhouse_url = app.config["CLICKHOUSE_URL"]
     assert any([x in clickhouse_url for x in ("localhost", "clickhouse")])
-
-    if clickhouse_url:
-        dburi = ""
-    else:
-        dburi = app.config["DATABASE_URI_RO"]
-        if dburi and "metadb" in dburi:
-            print("Refusing to make changes on metadb!")
-            sys.exit(1)
-
+    # TODO: remove dburi
+    dburi = ""
     log = app.logger
-    # run_pg_sql_scripts(app)
     run_clickhouse_sql_scripts(app)
     run_fastpath(log, checkout_pipeline, dburi, clickhouse_url)
 

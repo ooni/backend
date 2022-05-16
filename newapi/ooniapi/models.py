@@ -34,18 +34,3 @@ TEST_NAMES = []
 for v in TEST_GROUPS.values():
     assert isinstance(v, list)
     TEST_NAMES.extend(v)
-
-
-def get_test_group_case():
-    """
-    Returns a postgres CASE statement to return the test_group based on the
-    value of test_name.
-    """
-    c = "CASE\n"
-    for tg_name, tests in TEST_GROUPS.items():
-        c += "WHEN test_name = ANY('{{{}}}') THEN '{}'\n".format(
-            ",".join(tests), tg_name
-        )
-    c += "ELSE 'unknown'\n"
-    c += "END\n"
-    return c
