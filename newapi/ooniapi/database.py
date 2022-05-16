@@ -15,8 +15,6 @@ from sqlalchemy.ext.declarative import declarative_base
 # debdeps: python3-clickhouse-driver
 from clickhouse_driver import Client as Clickhouse
 
-from ooniapi.config import metrics
-
 # query_time = Summary("query", "query", ["hash", ], registry=metrics.registry)
 Base = declarative_base()
 
@@ -50,7 +48,7 @@ hooks_are_set = False
 def init_clickhouse_db(app) -> None:
     """Initializes Clickhouse session"""
     url = app.config["CLICKHOUSE_URL"]
-    app.logger.info(f"Connecting to Clickhouse")
+    app.logger.info("Connecting to Clickhouse")
     app.click = Clickhouse.from_url(url)
 
 

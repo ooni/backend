@@ -4,7 +4,7 @@ The routes are mounted under /api
 """
 
 from csv import DictWriter
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from dateutil.parser import parse as parse_date
 from io import StringIO
 from pathlib import Path
@@ -33,23 +33,18 @@ from werkzeug.exceptions import HTTPException, BadRequest
 
 # debdeps: python3-sqlalchemy
 from sqlalchemy import and_, text, select, sql, column
-from sqlalchemy.sql import literal_column
-from sqlalchemy import String, cast
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
 
 from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
-from ooniapi import __version__
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson
 from ooniapi.models import TEST_NAMES
 from ooniapi.database import query_click, query_click_one_row
 
 from flask import Blueprint
-
-import requests  # debdeps: python3-requests
 
 api_msm_blueprint = Blueprint("msm_api", "measurements")
 
@@ -71,10 +66,6 @@ class QueryTimeoutError(HTTPException):
 
 class MsmtNotFound(Exception):
     pass
-
-
-def get_version():
-    return jsonify({"version": __version__})
 
 
 @api_msm_blueprint.route("/")
@@ -147,39 +138,6 @@ def get_measurement(measurement_id, download=None) -> Response:  # pragma: no co
 
 
 # # Fetching measurement bodies
-
-
-def _fetch_autoclaved_measurement_body_from_s3(
-    autoclaved_fn: str, frame_off: int, frame_size: int, intra_off: int, intra_size: int
-) -> bytes:  # pragma: no cover
-    """Fetch autoclaved byte range from S3, decompress it"""
-    log = current_app.logger
-    REQID_HDR = "X-Request-ID"
-    # This is the legacy / autoclaved S3 bucket
-    BASEURL = "https://ooni-data.s3.amazonaws.com/autoclaved/jsonl.tar.lz4/"
-    # Usual size of LZ4 frames is 256kb of decompressed text.
-    # Largest size of LZ4 frame was ~55Mb compressed and ~56Mb decompressed.
-    url = urljoin(BASEURL, autoclaved_fn)
-    range_header = "bytes={}-{}".format(frame_off, frame_off + frame_size - 1)
-    hdr = {"Range": range_header}
-    log.info(f"Fetching {url} {range_header}")
-    r = requests.get(url, headers=hdr)
-    r.raise_for_status()
-    blob = r.content
-    if len(blob) != frame_size:
-        raise RuntimeError("Failed to fetch LZ4 frame", len(blob), frame_size)
-
-    blob = lz4framed.decompress(blob)[intra_off : intra_off + intra_size]
-    if len(blob) != intra_size or blob[:1] != b"{" or blob[-1:] != b"}":
-        raise RuntimeError(
-            "Failed to decompress LZ4 frame to measurement.json",
-            len(blob),
-            intra_size,
-            blob[:1],
-            blob[-1:],
-        )
-
-    return blob
 
 
 def _fetch_jsonl_measurement_body_inner(
@@ -312,7 +270,7 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
 @metrics.timer("fetch_measurement_body")
 def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
     """Fetch measurement body from either disk, jsonl, measurement spool dir
-    on another host or autoclaved on S3"""
+    on another host or S3"""
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")
     # 5: Current format e.g.

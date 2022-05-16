@@ -26,11 +26,11 @@ from collections import namedtuple
 from typing import List, Dict
 import random
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, Response
 from flask.json import jsonify
 from sqlalchemy import sql as sa
 
-from ooniapi.database import query_click, query_click_one_row
+from ooniapi.database import query_click
 from ooniapi.config import metrics
 
 prio_bp = Blueprint("prio", "probe_services_prio")
@@ -198,7 +198,7 @@ def generate_test_list(
 
 
 @prio_bp.route("/api/v1/test-list/urls")
-def list_test_urls():
+def list_test_urls() -> Response:
     """Generate test URL list with prioritization
     https://orchestrate.ooni.io/api/v1/test-list/urls?country_code=IT
     ---
@@ -267,13 +267,13 @@ def list_test_urls():
             limit = 9999
         debug = param("debug", "").lower() in ("true", "1", "yes")
     except Exception as e:
-        log.error(e, exc_info=1)
+        log.error(e, exc_info=True)
         return jsonify({})
 
     try:
         test_items = generate_test_list(country_code, category_codes, limit, debug)
     except Exception as e:
-        log.error(e, exc_info=1)
+        log.error(e, exc_info=True)
         # failover_generate_test_list runs without any database interaction
         test_items = failover_generate_test_list(country_code, category_codes, limit)
 

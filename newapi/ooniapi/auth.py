@@ -19,7 +19,7 @@ import jwt  # debdeps: python3-jwt
 import jwt.exceptions  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
-from ooniapi.database import query_click, query_click_one_row, insert_click
+from ooniapi.database import query_click_one_row, insert_click
 from ooniapi.utils import nocachejson
 
 origins = [
@@ -430,12 +430,11 @@ def set_account_role() -> Response:
 def _delete_account_data(email_address: str) -> None:
     # Used by integ test
     account_id = hash_email_address(email_address)
-    query_params = dict(account_id=account_id)
     # reset account to "user" role
     # 'accounts' is on RocksDB (ACID key-value database)
-    # FIXME
-    q = "INSERT INTO accounts (account_id, role) VALUES(:account_id, 'role')"
-    query_click(sql.text(q), query_params)
+    query_params = dict(account_id=account_id, role="user")
+    query = """INSERT INTO accounts (account_id, role) VALUES"""
+    insert_click(query, [query_params])
 
 
 def _get_account_role(account_id: str) -> Optional[str]:

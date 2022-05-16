@@ -14,14 +14,14 @@ import shutil
 
 from requests.auth import HTTPBasicAuth
 from filelock import FileLock  # debdeps: python3-filelock
-from flask import Blueprint, current_app, request, make_response, jsonify
+from flask import Blueprint, current_app, request, make_response, jsonify, Response
 from werkzeug.exceptions import HTTPException
 import git  # debdeps: python3-git
 import requests
 from sqlalchemy import sql
 
 from ooniapi.auth import role_required
-from ooniapi.database import query_click, query_click_one_row, insert_click, raw_click
+from ooniapi.database import query_click, query_click_one_row, insert_click
 from ooniapi.utils import nocachejson
 
 """
@@ -499,7 +499,7 @@ def get_url_list_manager():
 
 @cz_blueprint.route("/api/v1/url-submission/test-list/<country_code>", methods=["GET"])
 @role_required(["admin", "user"])
-def get_test_list(country_code):
+def get_test_list(country_code) -> Response:
     """Fetch citizenlab URL list
     ---
     parameters:
@@ -530,7 +530,7 @@ def get_test_list(country_code):
 
 @cz_blueprint.route("/api/v1/url-submission/update-url", methods=["POST"])
 @role_required(["admin", "user"])
-def url_submission_update_url():
+def url_submission_update_url() -> Response:
     """Create/update/delete a Citizenlab URL entry. The current value needs
     to be sent back as "old_entry" as a check against race conditions.
     Empty old_entry: create new rule. Empty new_entry: delete existing rule.
@@ -605,13 +605,13 @@ def url_submission_update_url():
     except DuplicateURLError as e:
         return jerror(str(e))
     except Exception as e:
-        log.info(f"URL submission update error {e}", exc_info=1)
+        log.info(f"URL submission update error {e}", exc_info=True)
         return jerror(str(e))
 
 
 @cz_blueprint.route("/api/v1/url-submission/state", methods=["GET"])
 @role_required(["admin", "user"])
-def get_workflow_state():
+def get_workflow_state() -> Response:
     """Get workflow state
     ---
     responses:
@@ -635,7 +635,7 @@ def get_workflow_state():
 
 @cz_blueprint.route("/api/v1/url-submission/diff", methods=["GET"])
 @role_required(["admin", "user"])
-def get_git_diff():
+def get_git_diff() -> Response:
     """Get changes as a git diff
     ---
     responses:
@@ -655,7 +655,7 @@ def get_git_diff():
 
 @cz_blueprint.route("/api/v1/url-submission/submit", methods=["POST"])
 @role_required(["admin", "user"])
-def post_propose_changes():
+def post_propose_changes() -> Response:
     """Propose changes: open a Pull Request on GitHub
     ---
     responses:
@@ -677,7 +677,7 @@ def post_propose_changes():
 
 @cz_blueprint.route("/api/_/url-priorities/list", methods=["GET"])
 @role_required(["admin"])
-def list_url_priorities():
+def list_url_priorities() -> Response:
     """List URL priority rules
     ---
     responses:
@@ -791,7 +791,7 @@ def update_url_priority_click(old: dict, new: dict):
 
 @cz_blueprint.route("/api/_/url-priorities/update", methods=["POST"])
 @role_required(["admin"])
-def post_update_url_priority():
+def post_update_url_priority() -> Response:
     """Add/update/delete an URL priority rule. Empty old_entry: create new rule.
     Empty new_entry: delete existing rule. The current value needs to be sent
     back as "old_entry" as a check against race conditions
