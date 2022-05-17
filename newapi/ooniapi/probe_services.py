@@ -43,23 +43,23 @@ def generate_report_id(test_name, cc: str, asn_i: int) -> str:
 
 
 def extract_probe_ipaddr() -> str:
-    real_ip_headers = [
-        "X-Forwarded-For",
-        "X-Real-IP"
-    ]
+    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
     for h in real_ip_headers:
         if h in request.headers:
-            return request.headers.getlist(h)[0].rpartition(' ')[-1]
+            return request.headers.getlist(h)[0].rpartition(" ")[-1]
 
     return request.remote_addr
+
 
 def lookup_probe_asn(ipaddr: str) -> str:
     resp = current_app.geoip_asn_reader.asn(ipaddr)
     return "AS{}".format(resp.autonomous_system_number)
 
+
 def lookup_probe_cc(ipaddr: str) -> str:
     resp = current_app.geoip_cc_reader.country(ipaddr)
     return resp.country.iso_code
+
 
 @probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
 def check_in() -> Response:
@@ -162,9 +162,7 @@ def check_in() -> Response:
     run_type = data.get("run_type", "timed")
     charging = data.get("charging", True)
 
-    resp = dict(
-        v=1
-    )
+    resp = dict(v=1)
 
     db_probe_cc = "ZZ"
     db_asn = "AS0"
@@ -176,9 +174,9 @@ def check_in() -> Response:
         log.error(str(e), exc_info=1)
 
     if probe_cc != "ZZ" and probe_cc != db_probe_cc:
-            log.warn(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
+        log.warn(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
     if asn != "AS0" and asn != db_asn:
-            log.warn(f"probe_asn != db_probe_as ({asn} != {db_asn})")
+        log.warn(f"probe_asn != db_probe_as ({asn} != {db_asn})")
 
     # We always returns the looked up probe_cc and probe_asn to the probe
     resp["probe_cc"] = db_probe_cc
