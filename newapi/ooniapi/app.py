@@ -11,7 +11,7 @@ from flask import Flask, json
 
 from flask_cors import CORS  # debdeps: python3-flask-cors
 
-import geoip2.database # debdeps: python3-geoip2
+import geoip2.database  # debdeps: python3-geoip2
 
 # python3-flask-cors has unnecessary dependencies :-/
 from ooniapi.rate_limit_quotas import FlaskLimiter
@@ -133,6 +133,17 @@ def setup_logging(log):
         logging.basicConfig(format="%(message)s")
 
 
+def load_geoip_db(log, app):
+    log.debug("Loading GeoIP DBs")
+    ccfn = app.config.get("GEOIP_CC_DB")
+    asnfn = app.config.get("GEOIP_ASN_DB")
+    try:
+        app.geoip_cc_reader = geoip2.database.Reader(ccfn)
+        app.geoip_asn_reader = geoip2.database.Reader(asnfn)
+    except Exception:
+        log.error("Failed to load geoip DBs at", ccfn, asnfn, exc_info=True)
+
+
 def init_app(app, testmode=False):
     # Load configurations defaults from ooniapi/config.py
     # and then from the file pointed by CONF
@@ -149,18 +160,9 @@ def init_app(app, testmode=False):
     setup_collectors_ring(app.config)
 
     log.info("Configuration loaded")
+    load_geoip_db(log, app)
     CORS(app)
 
-    # Setup readers for the geoip database
-    # Note: code related to geoip reading is not yet ready to be deployed in
-    # production.
-    try:
-        app.geoip_cc_reader = geoip2.database.Reader(app.config["GEOIP_CC_DB"])
-        app.geoip_asn_reader = geoip2.database.Reader(app.config["GEOIP_ASN_DB"])
-    except Exception as exc:
-        log.error("Failed to load geoip databases at paths",
-                app.config["GEOIP_CC_DB"], app.config["GEOIP_ASN_DB"])
-        raise exc
 
 def create_app(*args, testmode=False, **kw):
     from ooniapi import views
@@ -200,7 +202,6 @@ def create_app(*args, testmode=False, **kw):
 
     # FIXME
     views.register(app)
-
 
     @app.route("/health")
     def health():
