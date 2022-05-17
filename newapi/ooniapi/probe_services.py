@@ -182,9 +182,9 @@ def check_in() -> Response:
     resp["probe_cc"] = db_probe_cc
     resp["probe_asn"] = db_asn
 
-    # We don't override the probe_cc or asn, unless the probe has omitted these
-    # values.  This is done, because the IP address we see might not match the
-    # actual probe IP in cases in which a circumvention tool is being used.
+    # Don't override probe_cc or asn unless the probe has omitted these
+    # values. This is done because the IP address we see might not match the
+    # actual probe ipaddr in cases in which a circumvention tool is being used.
     # TODO: eventually we should have the probe signal to the backend that it
     # wants the lookup to be done by the backend and have it pass the public IP
     # through a specific header.
