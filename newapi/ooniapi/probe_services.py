@@ -5,7 +5,7 @@ OONI Probe Services API
 from base64 import b64encode
 from datetime import datetime, timedelta
 from os import urandom
-from typing import Tuple
+from typing import Dict, Any
 
 from pathlib import Path
 from hashlib import sha512
@@ -162,7 +162,7 @@ def check_in() -> Response:
     run_type = data.get("run_type", "timed")
     charging = data.get("charging", True)
 
-    resp = dict(v=1)
+    resp: Dict[str, Any] = dict(v=1)
 
     db_probe_cc = "ZZ"
     db_asn = "AS0"
@@ -171,7 +171,7 @@ def check_in() -> Response:
         db_probe_cc = lookup_probe_cc(ipaddr)
         db_asn = lookup_probe_asn(ipaddr)
     except Exception as e:
-        log.error(str(e), exc_info=1)
+        log.error(str(e), exc_info=True)
 
     if probe_cc != "ZZ" and probe_cc != db_probe_cc:
         log.warn(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
