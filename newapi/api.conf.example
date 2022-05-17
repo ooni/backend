@@ -45,4 +45,5 @@ GITHUB_USER = "CHANGEME"
 GITHUB_WORKDIR = "/var/lib/ooniapi/citizenlab"
 
 MSMT_SPOOL_DIR = "/tmp/oonispool"
-
+GEOIP_ASN_DB = "/var/lib/ooniapi/asn.mmdb"
+GEOIP_CC_DB = "/var/lib/ooniapi/cc.mmdb"

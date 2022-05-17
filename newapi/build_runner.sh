@@ -25,6 +25,7 @@ apt-get update
 # Keep this in sync with debian/control
 # hint: grep debdeps **/*.py
 apt-get install --no-install-recommends -qy \
+  curl \
   git \
   gunicorn3 \
   python3-boto3 \
@@ -35,6 +36,7 @@ apt-get install --no-install-recommends -qy \
   python3-flask-cors \
   python3-flask-restful \
   python3-freezegun \
+  python3-geoip2 \
   python3-git \
   python3-jwt \
   python3-lz4 \

@@ -41,6 +41,25 @@ def generate_report_id(test_name, cc: str, asn_i: int) -> str:
     return rid
 
 
+def extract_probe_ipaddr() -> str:
+    real_ip_headers = [
+        "X-Forwarded-For",
+        "X-Real-IP"
+    ]
+    for h in real_ip_headers:
+        if h in request.headers:
+            return request.headers.getlist(h)[0].rpartition(' ')[-1]
+
+    return request.remote_addr
+
+def lookup_probe_asn(ipaddr: str) -> str:
+    resp = current_app.geoip_asn_reader.asn(ipaddr)
+    return "AS{}".format(resp.autonomous_system_number)
+
+def lookup_probe_cc(ipaddr: str) -> str:
+    resp = current_app.geoip_cc_reader.country(ipaddr)
+    return resp.country.iso_code
+
 @probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
 def check_in():
     """Probe Services: check-in. Probes ask for tests to be run
@@ -142,6 +161,38 @@ def check_in():
     run_type = data.get("run_type", "timed")
     charging = data.get("charging", True)
 
+    resp = dict(
+        v=1
+    )
+
+    db_probe_cc = "ZZ"
+    db_asn = "AS0"
+    try:
+        ipaddr = extract_probe_ipaddr()
+        db_probe_cc = lookup_probe_cc(ipaddr)
+        db_asn = lookup_probe_asn(ipaddr)
+    except Exception as e:
+        log.error(str(e), exc_info=1)
+
+    if probe_cc != "ZZ" and probe_cc != db_probe_cc:
+            log.warn(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
+    if asn != "AS0" and asn != db_asn:
+            log.warn(f"probe_asn != db_probe_as ({asn} != {db_asn})")
+
+    # We always returns the looked up probe_cc and probe_asn to the probe
+    resp["probe_cc"] = db_probe_cc
+    resp["probe_asn"] = db_asn
+
+    # We don't override the probe_cc or asn, unless the probe has omitted these
+    # values.  This is done, because the IP address we see might not match the
+    # actual probe IP in cases in which a circumvention tool is being used.
+    # TODO: eventually we should have the probe signal to the backend that it
+    # wants the lookup to be done by the backend and have it pass the public IP
+    # through a specific header.
+    if probe_cc == "ZZ" and asn == "AS0":
+        probe_cc = db_probe_cc
+        asn = db_asn
+
     # When the run_type is manual we want to preserve the
     # old behavior where we test the whole list. Otherwise,
     # we're running in the background and we don't want
@@ -186,15 +237,11 @@ def check_in():
         log.error(str(e), exc_info=1)
         conf = {}
 
-    utc_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    resp = dict(
-        v=1,
-        tests={
-            "web_connectivity": {"urls": test_items},
-        },
-        conf=conf,
-        utc_time=utc_time,
-    )
+    resp["tests"] = {
+        "web_connectivity": {"urls": test_items},
+    }
+    resp["conf"] = conf
+    resp["utc_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # get asn, asn_i, probe_cc, network name
     test_names = (

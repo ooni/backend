@@ -1,3 +1,6 @@
 debian/etc/ .
 debian/ooni-api-uploader.service /lib/systemd/system/
 debian/ooni-api-uploader.timer /lib/systemd/system/
+debian/ooni-download-geoip.service /lib/systemd/system/
+debian/ooni-download-geoip.timer /lib/systemd/system/
+debian/ooni_download_geoip.py /usr/bin/

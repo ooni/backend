@@ -10,3 +10,5 @@ override_dh_installsystemd:
 	dh_installsystemd --restart-after-upgrade
 	dh_installsystemd --restart-after-upgrade ooni-api-uploader.service
 	dh_installsystemd --restart-after-upgrade ooni-api-uploader.timer
+	dh_installsystemd --restart-after-upgrade ooni-download-geoip.service
+	dh_installsystemd --restart-after-upgrade ooni-download-geoip.timer
