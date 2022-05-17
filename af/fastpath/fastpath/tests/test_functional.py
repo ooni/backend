@@ -279,7 +279,7 @@ def test_telegram(cans):
                 "unreachable_endpoints": 0,
                 "http_success_cnt": 10,
                 "http_failure_cnt": 0,
-                "msg": "Telegam failure: connection_reset",
+                "msg": "failure: connection_reset",
             }
         elif rid == "20190829T210302Z_AS197207_28cN0a47WSIxF3SZlXvceoLCSk3rSkyeg0n07pKGAi7XYyEQXM":
             assert scores == {
@@ -293,7 +293,7 @@ def test_telegram(cans):
                 "unreachable_endpoints": 10,
                 "http_success_cnt": 0,
                 "http_failure_cnt": 10,
-                "msg": "Telegam failure: generic_timeout_error",
+                "msg": "failure: generic_timeout_error",
             }
         elif rid == "20190829T220118Z_AS16345_28eP4Hw7PQsLmb4eEPWitNvIZH8utHddaTbWZ9qFcaZudmHPfz":
             assert scores == {
@@ -307,7 +307,7 @@ def test_telegram(cans):
                 "unreachable_endpoints": 10,
                 "http_success_cnt": 0,
                 "http_failure_cnt": 10,
-                "msg": "Telegam failure: connect_error",
+                "msg": "failure: connect_error",
             }
 
 
@@ -748,6 +748,7 @@ def test_score_web_connectivity_simple(cans):
 
     assert len(expected) == 0, "Not all expected measurements were tested"
 
+# 20170128T062626Z_AS7418_6kv1cZCRLIPSuVMYHsqQpZzfKhlEEWPagKuGTObnPtqjTcgXRc
 
 @pytest.mark.skip(reason="FIXME")
 def test_score_web_connectivity_with_workers(cans, tmp_path):

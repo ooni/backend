@@ -624,7 +624,7 @@ def score_measurement_telegram(msm):
     scores["http_success_cnt"] = http_success_cnt
     scores["http_failure_cnt"] = http_failure_cnt
     if web_failure is not None:
-        scores["msg"] = "Telegam failure: {}".format(web_failure)
+        scores["msg"] = "failure: {}".format(web_failure)
     return scores
 
 
