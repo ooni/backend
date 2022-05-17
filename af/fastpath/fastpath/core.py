@@ -576,13 +576,15 @@ def score_measurement_telegram(msm):
     web_failure = None
     requests = g_or(tk, "requests", ())
     for request in requests:
-        if "request" not in request:
+        try:
+            url = request["request"]["url"]
+        except KeyError:
             # client bug
-            continue
-        if request["request"]["url"] in (
-            "https://web.telegram.org/",
-            "http://web.telegram.org/",
-        ):
+            scores = init_scores()
+            scores["accuracy"] = 0.0
+            return scores
+
+        if url in ("https://web.telegram.org/", "http://web.telegram.org/"):
             if request["failure"] is not None:
                 web_failure = request["failure"]
 

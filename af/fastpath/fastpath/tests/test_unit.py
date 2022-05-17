@@ -168,6 +168,15 @@ def test_yaml_normalization_binary_city():
 
 # Follow the order in score_measurement
 
+# # test_name: telegram
+
+def test_score_measurement_telegram_nourl():
+    # missing key: test_keys -> requests -> request -> url
+    msm = loadj("telegram_nourl")
+    scores = fp.score_measurement(msm)
+    assert scores == scores_failed
+
+
 # # test_name: http_header_field_manipulation
 
 
