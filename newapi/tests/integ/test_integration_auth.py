@@ -90,17 +90,7 @@ def test_login_user_bogus_token(client, mocksmtp):
 
 
 def test_user_register_non_valid(client, mocksmtp):
-    d = dict(nickname="", email_address=user_e)
-    r = client.post("/api/v1/user_register", json=d)
-    assert r.status_code == 400
-    assert r.json == {"error": "Invalid user name"}
-
-    d = dict(nickname="x", email_address=user_e)
-    r = client.post("/api/v1/user_register", json=d)
-    assert r.status_code == 400
-    assert r.json == {"error": "User name is too short"}
-
-    d = dict(nickname="nick", email_address="nick@localhost")  # no FQDN
+    d = dict(email_address="nick@localhost")  # no FQDN
     r = client.post("/api/v1/user_register", json=d)
     assert r.status_code == 400
     assert r.json == {"error": "Invalid email address"}
@@ -109,7 +99,7 @@ def test_user_register_non_valid(client, mocksmtp):
 def _register_and_login(client, email_address):
     ooniapi.auth._remove_from_session_expunge(email_address)
     # # return cookie header for further use
-    d = dict(nickname="nick", email_address=email_address)
+    d = dict(email_address=email_address)
     r = client.post("/api/v1/user_register", json=d)
     assert r.status_code == 200
     assert r.json == {"msg": "ok"}
@@ -135,7 +125,7 @@ def _register_and_login(client, email_address):
     assert url, msg
     u = urlparse(url)
     token = u.query.split("=")[1]
-    assert len(token) == 233
+    assert len(token) == 215
 
     r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200, r.json
@@ -161,7 +151,7 @@ def test_user_register_and_get_metadata(client, mocksmtp):
     assert r.json == {}
     _register_and_login(client, user_e)
     r = client.get("/api/_/account_metadata")
-    assert r.json == {"nick": "nick", "role": "user"}
+    assert r.json == dict(role="user")
 
 
 def test_role_set_not_allowed(client, mocksmtp):
@@ -253,7 +243,6 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
             "aud": "user_auth",
             "account_id": "71e398652ecfb1be6a2359923c7df008",
             "login_time": 1326499200,
-            "nick": "nick",
             "role": "admin",
         }
         r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
@@ -271,7 +260,6 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
             "aud": "user_auth",
             "account_id": "71e398652ecfb1be6a2359923c7df008",
             "login_time": 1326499200,
-            "nick": "nick",
             "role": "admin",
         }
 

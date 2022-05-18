@@ -140,8 +140,7 @@ def role_required(roles):
                 if iat < threshold:
                     return jerror("Authentication token expired", 401)
 
-            # attach nickname and account_id to request
-            request._user_nickname = tok["nick"]
+            # attach account_id to request
             request._account_id = account_id
             # run the HTTP route method
             resp = func(*args, **kwargs)
@@ -152,7 +151,7 @@ def role_required(roles):
             token_age = time.time() - tok["iat"]
             if token_age > 600:  # refresh token if needed
                 newtoken = _create_session_token(
-                    tok["account_id"], tok["nick"], tok["role"], tok["login_time"]
+                    tok["account_id"], tok["role"], tok["login_time"]
                 )
                 set_JWT_cookie(resp, newtoken)
 
@@ -183,7 +182,7 @@ def _send_email(dest_addr: str, msg: EmailMessage) -> None:
         raise
 
 
-def send_login_email(dest_addr, nick, token: str) -> None:
+def send_login_email(dest_addr: str, token: str) -> None:
     """Format and send a registration/login  email"""
     src_addr = current_app.config["MAIL_SOURCE_ADDRESS"]
     baseurl = current_app.config["LOGIN_BASE_URL"]
@@ -194,7 +193,7 @@ def send_login_email(dest_addr, nick, token: str) -> None:
     msg["From"] = src_addr
     msg["To"] = dest_addr
 
-    txt = f"""Welcome to OONI, {nick}.
+    txt = f"""Welcome to OONI.
 
     Please login by following {url}
 
@@ -205,7 +204,7 @@ def send_login_email(dest_addr, nick, token: str) -> None:
 <html>
   <head></head>
   <body>
-    <p>Welcome to OONI, {nick}</p>
+    <p>Welcome to OONI</p>
     <p>
         <a href="{url}">Please login here</a>
     </p>
@@ -231,8 +230,6 @@ def user_register() -> Response:
         schema:
           type: object
           properties:
-            nickname:
-              type: string
             email_address:
               type: string
     responses:
@@ -241,17 +238,8 @@ def user_register() -> Response:
     """
     log = current_app.logger
     req = request.json if request.is_json else request.form
-    nick = req.get("nickname", "").strip()
-    # Accept all alphanum including unicode and whitespaces
-    if not nick.replace(" ", "").isalnum():
-        return jerror("Invalid user name")
-    if len(nick) < 3:
-        return jerror("User name is too short")
-    if len(nick) > 50:
-        return jerror("User name is too long")
-
     email_address = req.get("email_address", "").strip().lower()
-    if not nick or not email_address:
+    if not email_address:
         return jerror("Invalid request")
     if EMAIL_RE.fullmatch(email_address) is None:
         return jerror("Invalid email address")
@@ -264,13 +252,12 @@ def user_register() -> Response:
         "nbf": now,
         "exp": expiration,
         "aud": "register",
-        "account_id": account_id,
-        "nick": nick,
+        "account_id": account_id
     }
     registration_token = create_jwt(payload)
     log.info("sending registration token")
     try:
-        send_login_email(email_address, nick, registration_token)
+        send_login_email(email_address, registration_token)
         log.info("email sent")
     except Exception as e:
         log.error(e, exc_info=True)
@@ -279,7 +266,7 @@ def user_register() -> Response:
     return make_response(jsonify(msg="ok"), 200)
 
 
-def _create_session_token(account_id, nick, role: str, login_time=None) -> str:
+def _create_session_token(account_id: str, role: str, login_time=None) -> str:
     now = int(time.time())
     session_exp = now + current_app.config["SESSION_EXPIRY_DAYS"] * 86400
     if login_time is None:
@@ -293,7 +280,6 @@ def _create_session_token(account_id, nick, role: str, login_time=None) -> str:
         "aud": "user_auth",
         "account_id": account_id,
         "login_time": login_time,
-        "nick": nick,
         "role": role,
     }
     return create_jwt(payload)
@@ -329,7 +315,7 @@ def user_login() -> Response:
     # Store account role in token to prevent frequent DB lookups
     role = _get_account_role(dec["account_id"]) or "user"
 
-    token = _create_session_token(dec["account_id"], dec["nick"], role)
+    token = _create_session_token(dec["account_id"], role)
     r = make_response(jsonify(), 200)
     set_JWT_cookie(r, token)
     r.cache_control.no_cache = True
@@ -459,7 +445,7 @@ def get_account_metadata() -> Response:
     try:
         token = request.cookies.get("ooni", "")
         tok = decode_jwt(token, audience="user_auth")
-        return nocachejson(role=tok["role"], nick=tok["nick"])
+        return nocachejson(role=tok["role"])
 
     except Exception:
         return nocachejson({})

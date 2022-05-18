@@ -1,3 +1,9 @@
+ooni-api (1.0.8) unstable; urgency=medium
+
+  * Remove nickname
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 18 May 2022 19:36:21 +0100
+
 ooni-api (1.0.7) unstable; urgency=medium
 
   * Remove PostgreSQL-related code
