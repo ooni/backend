@@ -4,13 +4,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from hashlib import shake_128
-from typing import Optional, Any, List, Tuple, Dict
+from typing import Optional, List, Dict, Union
 import os
 
 from flask import current_app
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql.elements import TextClause
+from sqlalchemy.sql.selectable import Select
 
 # debdeps: python3-clickhouse-driver
 from clickhouse_driver import Client as Clickhouse
@@ -39,9 +41,6 @@ def query_hash(q: str) -> str:
     return shake_128(q.encode()).hexdigest(4)
 
 
-hooks_are_set = False
-
-
 # # Clickhouse
 
 
@@ -52,24 +51,25 @@ def init_clickhouse_db(app) -> None:
     app.click = Clickhouse.from_url(url)
 
 
-def query_click(query, query_params: dict) -> List[Dict]:
-    if not isinstance(query, str):
-        # TODO: switch to sqlalchemy instead of compile(...) ?
-        # query = sql.text(query)
+Query = Union[str, TextClause, Select]
+
+
+def _run_query(query: Query, query_params: dict):
+    if isinstance(query, (Select, TextClause)):
         query = str(query.compile(dialect=postgresql.dialect()))
     q = current_app.click.execute(query, query_params, with_column_types=True)
     rows, coldata = q
     colnames, coltypes = tuple(zip(*coldata))
+    return colnames, rows
+
+
+def query_click(query: Query, query_params: dict) -> List[Dict]:
+    colnames, rows = _run_query(query, query_params)
     return [dict(zip(colnames, row)) for row in rows]
 
 
-def query_click_one_row(query, query_params) -> Optional[dict]:
-    if not isinstance(query, str):
-        query = str(query.compile(dialect=postgresql.dialect()))
-    q = current_app.click.execute(query, query_params, with_column_types=True)
-    rows, coldata = q
-    colnames, coltypes = tuple(zip(*coldata))
-
+def query_click_one_row(query: Query, query_params: dict) -> Optional[dict]:
+    colnames, rows = _run_query(query, query_params)
     for row in rows:
         return dict(zip(colnames, row))
 
@@ -79,7 +79,3 @@ def query_click_one_row(query, query_params) -> Optional[dict]:
 def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
     return current_app.click.execute(query, rows, types_check=True)
-
-
-def raw_click(query, params={}) -> List[Tuple[Any]]:
-    return current_app.click.execute(query, params)
