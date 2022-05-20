@@ -5,7 +5,7 @@ OONI Probe Services API
 from base64 import b64encode
 from datetime import datetime, timedelta
 from os import urandom
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 from pathlib import Path
 from hashlib import sha512
@@ -51,9 +51,12 @@ def extract_probe_ipaddr() -> str:
     return request.remote_addr
 
 
-def lookup_probe_asn(ipaddr: str) -> str:
+def lookup_probe_network(ipaddr: str) -> Tuple[str, str]:
     resp = current_app.geoip_asn_reader.asn(ipaddr)
-    return "AS{}".format(resp.autonomous_system_number)
+    return (
+        "AS{}".format(resp.autonomous_system_number),
+        resp.autonomous_system_organization,
+    )
 
 
 def lookup_probe_cc(ipaddr: str) -> str:
@@ -125,10 +128,13 @@ def check_in() -> Response:
               type: integer
             probe_cc:
               type: string
-              description: probe CC inferred from GeoIP or None
+              description: probe CC inferred from GeoIP or ZZ
             probe_asn:
               type: string
-              description: probe ASN inferred from GeoIP or None
+              description: probe ASN inferred from GeoIP or AS0
+            probe_network_name:
+              type: string
+              description: probe network name inferred from GeoIP or None
             utc_time:
               type: string
               description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
@@ -166,10 +172,11 @@ def check_in() -> Response:
 
     db_probe_cc = "ZZ"
     db_asn = "AS0"
+    db_probe_network_name = None
     try:
         ipaddr = extract_probe_ipaddr()
         db_probe_cc = lookup_probe_cc(ipaddr)
-        db_asn = lookup_probe_asn(ipaddr)
+        db_asn, db_probe_network_name = lookup_probe_network(ipaddr)
     except Exception as e:
         log.error(str(e), exc_info=True)
 
@@ -181,6 +188,7 @@ def check_in() -> Response:
     # We always returns the looked up probe_cc and probe_asn to the probe
     resp["probe_cc"] = db_probe_cc
     resp["probe_asn"] = db_asn
+    resp["probe_network_name"] = db_probe_network_name
 
     # Don't override probe_cc or asn unless the probe has omitted these
     # values. This is done because the IP address we see might not match the
