@@ -201,6 +201,17 @@ def test_score_http_header_field_manipulation_3():
     assert scores == scores_failed
 
 
+# # test_name: http_invalid_request_line
+
+
+def test_score_http_invalid_request_line_1():
+    fd = load_yaml("http_invalid_request_line")
+    day = "2018-07-27"
+    msms = tuple(iter_yaml_msmt_normalized(fd, day, f"{day}/bogus_fname.yaml"))
+    msm = msms[0]
+    print(msm["test_keys"]["received"])
+    json.dumps(msm)  # should not raise
+
 
 # # test_name: web_connectivity
 

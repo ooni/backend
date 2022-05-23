@@ -395,6 +395,16 @@ def normalize_process(entry):
     return entry
 
 
+def normalize_http_invalid_request_line_received(entry):
+    try:
+        recv = entry["test_keys"]["received"]
+    except KeyError:
+        return
+    for n, val in enumerate(recv):
+        if isinstance(val, bytes):
+            recv[n] = val.decode(errors="ignore")
+
+
 def normalize_entry(entry, bucket_date, perma_fname, esha):
     """Autoclaving"""
     hashuuid = esha[:16]  # sha1 is 20 bytes
@@ -463,6 +473,9 @@ def normalize_entry(entry, bucket_date, perma_fname, esha):
 
     if test_name == "website_probe":
         normalize_headers_diff(entry)
+
+    if test_name == "http_invalid_request_line":
+        normalize_http_invalid_request_line_received(entry)
 
     # Ignore old, rare tests
     if test_name in test_categories["scapyt"]:
