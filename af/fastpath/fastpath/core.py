@@ -16,7 +16,8 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict
+import binascii
 import logging
 import multiprocessing as mp
 import os
@@ -44,7 +45,6 @@ from fastpath.localhttpfeeder import start_http_api
 import fastpath.db as db
 
 from fastpath.metrics import setup_metrics
-from fastpath.mytypes import MsmtTup
 import fastpath.portable_queue as queue
 
 import fastpath.utils
@@ -289,7 +289,7 @@ def process_measurements_from_s3():
 
 
 @metrics.timer("match_fingerprints")
-def match_fingerprints(measurement):
+def match_fingerprints(measurement) -> list:
     """Match fingerprints against HTTP headers, bodies and DNS.
     Used only on web_connectivity
     """
@@ -997,6 +997,17 @@ def score_web_connectivity(msm, matches) -> dict:
     return scores
 
 
+def score_web_connectivity_full(msm: dict) -> dict:
+    try:
+        matches = match_fingerprints(msm)
+    except binascii.Error:
+        scores = score_web_connectivity(msm, [])
+        scores["accuracy"] = 0.0
+        return scores
+
+    return score_web_connectivity(msm, matches)
+
+
 @metrics.timer("score_ndt")
 def score_ndt(msm) -> dict:
     """Calculate measurement scoring for NDT
@@ -1428,8 +1439,7 @@ def score_measurement(msm: dict) -> dict:
         if tn == "vanilla_tor":
             return score_vanilla_tor(msm)
         if tn == "web_connectivity":
-            matches = match_fingerprints(msm)
-            return score_web_connectivity(msm, matches)
+            return score_web_connectivity_full(msm)
         if tn == "ndt":
             return score_ndt(msm)
         if tn == "tcp_connect":

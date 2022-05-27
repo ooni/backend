@@ -1,0 +1,185 @@
+{
+  "test_keys": {
+    "accessible": true,
+    "control": {
+      "tcp_connect": {
+        "104.27.181.31:80": {
+          "status": true,
+          "failure": null
+        },
+        "104.27.180.31:80": {
+          "status": true,
+          "failure": null
+        }
+      },
+      "http_request": {
+        "body_length": 733107,
+        "status_code": 200,
+        "title": "Home page of the ReligiousTolerance.org web site",
+        "failure": null,
+        "headers": {
+          "X-Middleton-Response": "200",
+          "PageSpeed": "off",
+          "X-shard": "",
+          "Display": "stored",
+          "Set-Cookie": "__cfduid=d727a5f589b565f1555462a51e477350a1534036797; expires=Mon, 12-Aug-19 01:19:57 GMT; path=/; domain=.religioustolerance.org; HttpOnly",
+          "Age": "0",
+          "Expires": "Sat, 11 Aug 2018 01:19:57 GMT",
+          "Vary": "Accept-Encoding,X-APP-JSON",
+          "X-Middleton-Display": "stored",
+          "Response": "200",
+          "X-Sol": "middleton",
+          "X-Varnish": "277259195",
+          "X-Middleton-PageSpeed": "off",
+          "Cache-Control": "max-age=0, must-revalidate, no-cache, no-store",
+          "Date": "Sun, 12 Aug 2018 01:19:57 GMT",
+          "Content-Hash": "60f359050c3e38f871d07ade07215748858061f2",
+          "CF-RAY": "448f1ddeb2d091b2-EWR",
+          "Server": "cloudflare",
+          "Content-Type": "text/html; charset=iso-8859-1",
+          "X-VCache": "Miss",
+          "Via": "1.1 varnish (Varnish/6.0)"
+        }
+      },
+      "dns": {
+        "failure": null,
+        "addrs": [
+          "www.religioustolerance.org.cdn.cloudflare.net",
+          "104.27.181.31",
+          "104.27.180.31"
+        ]
+      }
+    },
+    "control_failure": null,
+    "socksproxy": null,
+    "headers_match": true,
+    "http_experiment_failure": null,
+    "agent": "redirect",
+    "title_match": true,
+    "client_resolver": "202.188.1.181",
+    "retries": 1,
+    "dns_consistency": "consistent",
+    "dns_experiment_failure": null,
+    "body_proportion": 0.9953785736597797,
+    "queries": [
+      {
+        "resolver_hostname": null,
+        "query_type": "A",
+        "hostname": "www.religioustolerance.org",
+        "answers": [
+          {
+            "hostname": "www.religioustolerance.org.cdn.cloudflare.net",
+            "answer_type": "CNAME"
+          },
+          {
+            "ipv4": "104.27.181.31",
+            "answer_type": "A"
+          },
+          {
+            "ipv4": "104.27.180.31",
+            "answer_type": "A"
+          }
+        ],
+        "failure": null,
+        "resolver_port": null
+      }
+    ],
+    "body_length_match": true,
+    "requests": [
+      {
+        "failure": null,
+        "request": {
+          "body": null,
+          "headers": {
+            "Accept-Language": "en-US;q=0.8,en;q=0.5",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+          },
+          "url": "http://www.religioustolerance.org",
+          "method": "GET",
+          "tor": {
+            "is_tor": false,
+            "exit_name": null,
+            "exit_ip": null
+          }
+        },
+        "response": {
+          "body": {
+            "data": "aGk",
+            "format": "base64"
+          },
+          "headers": {
+            "Expires": "Sat, 11 Aug 2018 01:19:55 GMT",
+            "Content-Hash": "60f359050c3e38f871d07ade07215748858061f2",
+            "Display": "stored",
+            "Set-Cookie": "__cfduid=d276c16bf5327009d7175c2f8f0de92d31534036789; expires=Mon, 12-Aug-19 01:19:49 GMT; path=/; domain=.religioustolerance.org; HttpOnly",
+            "PageSpeed": "off",
+            "Vary": "Accept-Encoding,X-APP-JSON",
+            "X-Middleton-Display": "stored",
+            "Server": "cloudflare",
+            "Date": "Sun, 12 Aug 2018 01:19:55 GMT",
+            "X-Middleton-Response": "200",
+            "Cache-Control": "max-age=0, must-revalidate, no-cache, no-store",
+            "X-Sol": "middleton",
+            "X-Middleton-PageSpeed": "off",
+            "CF-RAY": "448f1dafc0803120-SIN",
+            "Content-Type": "text/html; charset=iso-8859-1",
+            "Response": "200"
+          },
+          "code": 200
+        }
+      }
+    ],
+    "tcp_connect": [
+      {
+        "status": {
+          "failure": null,
+          "success": true,
+          "blocked": false
+        },
+        "ip": "104.27.181.31",
+        "port": 80
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true,
+          "blocked": false
+        },
+        "ip": "104.27.180.31",
+        "port": 80
+      }
+    ],
+    "blocking": false,
+    "status_code_match": true
+  },
+  "software_version": "2.3.0",
+  "test_runtime": 0.2519850730895996,
+  "test_start_time": "2018-08-12 01:04:42",
+  "input_hashes": [],
+  "software_name": "ooniprobe",
+  "options": [
+    "--file",
+    "$citizenlab_global_urls"
+  ],
+  "data_format_version": "0.2.0",
+  "measurement_start_time": "2018-08-12 01:19:49",
+  "test_version": "0.3.2",
+  "probe_city": null,
+  "test_name": "web_connectivity",
+  "id": "42f29a0c-990c-4e33-9959-545316bb2e38",
+  "input": "http://www.religioustolerance.org",
+  "probe_ip": "127.0.0.1",
+  "probe_cc": "MY",
+  "probe_asn": "AS4788",
+  "annotations": {
+    "platform": "linux"
+  },
+  "test_helpers": {
+    "backend": {
+      "type": "onion",
+      "address": "httpo://y3zq5fwelrzkkv3s.onion"
+    }
+  },
+  "report_id": "20180812T010444Z_AS4788_OyczQMxcMAzMgBQ0YOJ3V9gEgEBlSRqtLZpuEc8ElOgqgTA1VA"
+}

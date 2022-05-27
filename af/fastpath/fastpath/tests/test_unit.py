@@ -290,6 +290,15 @@ def test_score_web_connectivity_no_body():
     }
 
 
+def test_score_web_connectivity_b64_incorrect():
+    # response->body->data is replaced with a short string with
+    # incorrect padding
+    fp.setup_fingerprints()
+    msm = loadj("web_connectivity_b64_incorrect")
+    scores = fp.score_measurement(msm)
+    assert scores
+
+
 # # test_name: dash
 
 
