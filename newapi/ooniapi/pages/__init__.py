@@ -13,7 +13,7 @@ OONI API - various pages e.g.
 import re
 from datetime import timedelta, datetime
 
-from flask import Blueprint, render_template, redirect, send_file
+from flask import Blueprint, render_template, redirect, send_file, make_response
 
 from werkzeug.exceptions import BadRequest, NotFound
 from werkzeug.wrappers import Response  # why not flask.Response?
@@ -31,43 +31,13 @@ DAY_REGEXP = re.compile(r"^\d{4}\-[0-1]\d\-[0-3]\d$")
 
 @pages_blueprint.route("/")
 def index():
-    """TODO
+    """Landing page
     ---
     responses:
       '200':
         description: TODO
     """
     return render_template("index.html")
-
-
-@pages_blueprint.route("/css/bootstrap.min.css")
-def serve_bootstrap_css() -> Response:
-    """TODO
-    ---
-    responses:
-      '200':
-        description: TODO
-    """
-    tpl = "/usr/%s/nodejs/bootstrap/dist/css/bootstrap.min.css"
-    try:
-        return send_file(tpl % "lib")
-    except FileNotFoundError:
-        return send_file(tpl % "share")
-
-
-@pages_blueprint.route("/css/bootstrap.min.js")
-def serve_bootstrap() -> Response:
-    """TODO
-    ---
-    responses:
-      '200':
-        description: TODO
-    """
-    tpl = "/usr/%s/nodejs/bootstrap/dist/js/bootstrap.min.js"
-    try:
-        return send_file(tpl % "lib")
-    except FileNotFoundError:
-        return send_file(tpl % "share")
 
 
 @pages_blueprint.route("/stats")
@@ -150,10 +120,36 @@ def files_in_country(country_code) -> Response:
     )
 
 
+@pages_blueprint.route("/robots.txt")
+def robots_txt() -> Response:
+    """Robots.txt
+    ---
+    responses:
+      '200':
+        description: robots.txt content
+    """
+    txt = """
+User-agent: *
+Disallow: /api/_
+Disallow: /api/v1/aggregation
+Disallow: /api/v1/test-list/urls
+Disallow: /api/v1/torsf_stats
+Disallow: /files
+Disallow: /stats
+Disallow: /201
+Disallow: /202
+Crawl-delay: 300
+"""
+    resp = make_response(txt)
+    resp.headers["Content-type"] = "text/plain"
+    resp.cache_control.max_age = 86400
+    return resp
+
+
 # These two are needed to avoid breaking older URLs
 @pages_blueprint.route("/<date>/<report_file>")
 def backward_compatible_download(date, report_file) -> Response:
-    """TODO
+    """Legacy entry point
     ---
     responses:
       '200':
