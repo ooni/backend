@@ -1,3 +1,9 @@
+ooni-api (1.0.10) unstable; urgency=medium
+
+  * Improve get_account_metadata
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 01 Jun 2022 20:22:31 +0100
+
 ooni-api (1.0.9) unstable; urgency=medium
 
   * Bump up version

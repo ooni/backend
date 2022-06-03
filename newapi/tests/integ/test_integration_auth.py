@@ -138,20 +138,20 @@ def _register_and_login(client, email_address):
 
 
 def test_user_register_and_logout(client, mocksmtp):
-    assert client.get("/api/_/account_metadata").json == {} # not logged in
+    assert client.get("/api/_/account_metadata").json == {'logged_in': False} # not logged in
     _register_and_login(client, user_e)
     assert client.get("/api/_/account_metadata").json != {} # logged in
     r = client.post("/api/v1/user_logout")
     assert r.status_code == 200
-    assert client.get("/api/_/account_metadata").json == {} # not logged in
+    assert client.get("/api/_/account_metadata").json == {'logged_in': False} # not logged in
 
 
 def test_user_register_and_get_metadata(client, mocksmtp):
     r = client.get("/api/_/account_metadata")
-    assert r.json == {}
+    assert r.json == {'logged_in': False}
     _register_and_login(client, user_e)
     r = client.get("/api/_/account_metadata")
-    assert r.json == dict(role="user")
+    assert r.json == dict(role="user", logged_in=True)
 
 
 def test_role_set_not_allowed(client, mocksmtp):

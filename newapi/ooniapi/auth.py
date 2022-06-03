@@ -445,10 +445,11 @@ def get_account_metadata() -> Response:
     try:
         token = request.cookies.get("ooni", "")
         tok = decode_jwt(token, audience="user_auth")
-        return nocachejson(role=tok["role"])
-
+        return nocachejson(logged_in=True, role=tok["role"])
     except Exception:
-        return nocachejson({})
+        resp = make_response(jsonify(logged_in=False), 401)
+        resp.cache_control.no_cache = True
+        return resp
 
 
 @auth_blueprint.route("/api/v1/get_account_role/<email_address>")
