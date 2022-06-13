@@ -4,9 +4,6 @@
 from setuptools import setup
 
 NAME = "analysis"
-DESCRIPTION = ""
-
-REQUIRED = []
 
 setup(
     name=NAME,
@@ -19,8 +16,7 @@ setup(
             "rotation=rotation:main",
         ]
     },
-    scripts = ["analysis/clickhouse_feeder.py"],
-    install_requires=REQUIRED,
+    scripts=["analysis/clickhouse_feeder.py"],
     include_package_data=True,
     zip_safe=False,
     package_data={"analysis": ["views/*.tpl", "static/*"]},

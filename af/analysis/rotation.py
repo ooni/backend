@@ -13,21 +13,27 @@ Interfaces, APIs and stateful contents:
   - certbot certificates stored on local host and pushed to the test hepers
 
 Table setup:
-CREATE UNLOGGED TABLE test_helper_instances (
-    name text NOT NULL,
-    provider text NOT NULL,
-    region text,
-    ipaddr inet NOT NULL,
-    ipv6addr inet,
-    draining_at timestamp without time zone
-);
-ALTER TABLE test_helper_instances OWNER TO shovel;
+
+CREATE TABLE test_helper_instances
+(
+    `rdn` String,
+    `dns_zone` String,
+    `name` String,
+    `provider` String,
+    `region` String,
+    `ipaddr` IPv4,
+    `ipv6addr` IPv6,
+    `draining_at` Nullable(DateTime('UTC')),
+    `sign` Int8
+)
+ENGINE = CollapsingMergeTree(sign)
+ORDER BY name
+
 
 Example for /etc/ooni/rotation.conf
 --
 [DEFAULT]
 token = CHANGEME
-db_uri = postgresql://shovel:CHANGEME@localhost/metadb
 active_droplets_count = 4
 size_slug = s-1vcpu-1gb
 image_name = debian-10-x64
@@ -67,7 +73,8 @@ import random
 import sys
 import time
 
-import psycopg2  # debdeps: python3-psycopg2
+# debdeps: python3-clickhouse-driver
+from clickhouse_driver import Client as Clickhouse
 import statsd  # debdeps: python3-statsd
 import digitalocean  # debdeps: python3-digitalocean
 
@@ -98,66 +105,103 @@ def retry(func):
     return wrapped
 
 
-def add_droplet_to_db_table(db_conn, dr):
-    vals = [dr.name, dr.region["slug"], dr.ip_address, dr.ip_v6_address]
-    q = """INSERT INTO test_helper_instances
-        (name, provider, region, ipaddr, ipv6addr)
-        VALUES (%s, 'Digital Ocean', %s, %s, %s)
-    """
-    with db_conn.cursor() as cur:
-        cur.execute(q, vals)
-        db_conn.commit()
+def insert(click, table: str, cols: dict) -> None:
+    cs = ", ".join(sorted(cols.keys()))
+    q = f"INSERT INTO {table} ({cs}) VALUES"
+    log.info(q)
+    click.execute(q, [cols])
 
 
-def drain_droplet_in_db_table(db_conn, dr):
-    q = """UPDATE test_helper_instances
-    SET draining_at = NOW()
-    WHERE name = %s AND provider = 'Digital Ocean' AND region = %s
-    """
-    vals = [dr.name, dr.region["slug"]]
-    with db_conn.cursor() as cur:
-        cur.execute(q, vals)
-        db_conn.commit()
+def add_droplet_to_db_table(click, dr, rdn, dns_zone) -> None:
+    cols = dict(
+        dns_zone=dns_zone,
+        rdn=rdn,
+        ipaddr=dr.ip_address,
+        ipv6addr=dr.ip_v6_address,
+        name=dr.name,
+        provider="Digital Ocean",
+        region=dr.region["slug"],
+        sign=1,
+    )
+    insert(click, "test_helper_instances", cols)
 
 
-def delete_droplet_from_db_table(db_conn, dr):
-    q = """DELETE FROM test_helper_instances
-    WHERE name = %s AND provider = 'Digital Ocean' AND region = %s
-    """
-    vals = [dr.name, dr.region["slug"]]
-    with db_conn.cursor() as cur:
-        cur.execute(q, vals)
-        db_conn.commit()
+def drain_droplet_in_db_table(click, dr, rdn: str, dns_zone: str) -> None:
+    cols = dict(
+        dns_zone=dns_zone,
+        rdn=rdn,
+        ipaddr=dr.ip_address,
+        ipv6addr=dr.ip_v6_address,
+        name=dr.name,
+        provider="Digital Ocean",
+        region=dr.region["slug"],
+        sign=-1,
+    )
+    insert(click, "test_helper_instances", cols)
+
+    now = datetime.utcnow()
+    cols = dict(
+        dns_zone=dns_zone,
+        draining_at=now,
+        rdn=rdn,
+        ipaddr=dr.ip_address,
+        ipv6addr=dr.ip_v6_address,
+        name=dr.name,
+        provider="Digital Ocean",
+        region=dr.region["slug"],
+        sign=1,
+    )
+    insert(click, "test_helper_instances", cols)
+
+
+def delete_droplet_from_db_table(click, dr, rdn: str, draining_at, dns_zone: str) -> None:
+    cols = dict(
+        dns_zone=dns_zone,
+        draining_at=draining_at,
+        rdn=rdn,
+        ipaddr=dr.ip_address,
+        ipv6addr=dr.ip_v6_address,
+        name=dr.name,
+        provider="Digital Ocean",
+        region=dr.region["slug"],
+        sign=-1,
+    )
+    insert(click, "test_helper_instances", cols)
 
 
 @metrics.timer("destroy_drained_droplets")
-def destroy_drained_droplets(db_conn, api, draining_time_minutes, live_droplets):
-    q = """SELECT name FROM test_helper_instances
-    WHERE provider = 'Digital Ocean'
-    AND draining_at IS NOT NULL
-    AND draining_at < NOW() - interval '%s minutes ago'
-    ORDER BY draining_at
+def destroy_drained_droplets(
+    click, api, draining_time_minutes: int, live_droplets: list, dns_zone: str
+) -> None:
+    q = """SELECT name, rdn, draining_at FROM test_helper_instances
+        FINAL
+        WHERE provider = 'Digital Ocean'
+        AND dns_zone = %(dns_zone)s
+        AND draining_at IS NOT NULL
+        AND draining_at < NOW() - interval %(mins)s minute
+        ORDER BY draining_at
+        LIMIT 1
     """
-    v = [draining_time_minutes]
-    with db_conn.cursor() as cur:
-        cur.execute(q, v)
-        oldest = cur.fetchone()
-
-    if oldest:
-        oldest = oldest[0]
-    else:
+    log.info(q)
+    rows = click.execute(q, dict(dns_zone=dns_zone, mins=draining_time_minutes))
+    if not rows:
         log.info("No droplet to destroy")
         return
 
-    to_delete = [d for d in live_droplets if d.name == oldest]
+    name, rdn, draining_at = rows[0]
+    to_delete = [d for d in live_droplets if d.name == name]
+    if not to_delete:
+        log.error("{name} found in database but not listed in live droplets")
+        return
+
     for droplet in to_delete:
         log.info(f"Destroying {droplet.name} droplet")
-        delete_droplet_from_db_table(db_conn, droplet)
+        delete_droplet_from_db_table(click, droplet, rdn, draining_at, dns_zone)
         droplet.destroy()
 
 
 @metrics.timer("spawn_new_droplet")
-def spawn_new_droplet(api, dig_oc_token, live_regions, conf):
+def spawn_new_droplet(api, dig_oc_token: str, live_regions, conf):
     regions = set(r.slug for r in api.get_all_regions() if r.available is True)
     preferred_regions = regions - live_regions
 
@@ -195,15 +239,16 @@ def spawn_new_droplet(api, dig_oc_token, live_regions, conf):
             time.sleep(1)
 
     log.info(f"Spawning {name} in {region}")
-    timeout = time.time() + 60 * 10
+    timeout = time.time() + 60 * 20
     while time.time() < timeout:
         time.sleep(5)
         for action in droplet.get_actions():
             action.load()
             if action.status == "completed":
                 log.info("Spawning completed, waiting warmup")
-                time.sleep(10)
-                return api.get_droplet(droplet.id)
+                new_droplet = api.get_droplet(droplet.id)
+                ssh_wait_droplet_warmup(new_droplet.ip_address)
+                return new_droplet
 
         log.debug("Waiting for droplet to start")
 
@@ -224,26 +269,32 @@ def load_conf():
     return cp["DEFAULT"]
 
 
-def drain_droplet_if_needed(db_conn, live_droplets, active_droplets_count):
-    q = """SELECT name FROM test_helper_instances
+def list_active_droplets(click, live_droplets, dns_zone: str):
+    q = """SELECT name, rdn FROM test_helper_instances
+        FINAL
         WHERE provider = 'Digital Ocean'
+        AND dns_zone = %(dns_zone)s
         AND draining_at IS NULL
     """
-    with db_conn.cursor() as cur:
-        cur.execute(q)
-        active = set(row[0] for row in cur.fetchall())
+    log.info(q)
+    rows = click.execute(q, dict(dns_zone=dns_zone))
+    log.info(rows)
+    active = set(row[0] for row in rows)
     active_droplets = [d for d in live_droplets if d.name in active]
-    log.info(f"{len(active_droplets)} active droplets")
+    return active_droplets, rows
 
-    if len(active_droplets) > active_droplets_count:
-        by_age = sorted(active_droplets, key=lambda d: d.created_at)
-        oldest = by_age[0]
-        log.info(f"Draining {oldest.name} droplet")
-        drain_droplet_in_db_table(db_conn, oldest)
+
+def drain_droplet(click, dns_zone, active_droplets: list, rows: list) -> str:
+    by_age = sorted(active_droplets, key=lambda d: d.created_at)
+    oldest = by_age[0]
+    rdn = [row[1] for row in rows if row[0] == oldest.name][0]
+    log.info(f"Draining {oldest.name} {rdn} droplet")
+    drain_droplet_in_db_table(click, oldest, rdn, dns_zone)
+    return rdn
 
 
 @metrics.timer("create_le_do_ssl_cert")
-def create_le_do_ssl_cert():
+def create_le_do_ssl_cert(dns_zone: str) -> None:
     """Create/renew Let's Encrypt SSL Certificate through the Digital Ocean API
 
     Namecheap DNS entry to delegate to DO:
@@ -263,10 +314,10 @@ def create_le_do_ssl_cert():
         "--dns-digitalocean-credentials",
         certbot_creds,
         "-d",
-        "*.th.ooni.org",
-        "-n"
+        f"*.{dns_zone}",
+        "-n",
     ]
-    log.info("Creating/refreshing wildcard certificate *.th.ooni.org")
+    log.info(f"Creating/refreshing wildcard certificate *.{dns_zone}")
     log.info(" ".join(cmd))
     check_output(cmd)
 
@@ -308,7 +359,7 @@ def ssh_reload_nginx(host: str) -> None:
         "BatchMode=yes",
         "-i",
         "/etc/ooni/testhelper_ssh_key",
-        host,
+        f"root@{host}",
         "systemctl",
         "reload",
         "nginx",
@@ -316,6 +367,38 @@ def ssh_reload_nginx(host: str) -> None:
     log.info("Reloading nginx")
     log.info(" ".join(cmd))
     check_output(cmd)
+
+
+@metrics.timer("ssh_wait_droplet_warmup")
+def ssh_wait_droplet_warmup(ipaddr: str) -> None:
+    cmd = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "BatchMode=yes",
+        "-i",
+        "/etc/ooni/testhelper_ssh_key",
+        f"root@{ipaddr}",
+        "cat",
+        "/var/run/rotation_setup_completed",
+    ]
+    timeout = time.time() + 60 * 15
+    while time.time() < timeout:
+        log.info("Checking flag")
+        log.info(" ".join(cmd))
+        try:
+            check_output(cmd)
+            log.info("Flag file found")
+            return
+        except:
+            log.debug("Flag file not found")
+            time.sleep(5)
+
+    log.error("Timed out waiting for droplet start")
+    raise Exception
 
 
 def delete_dns_record(api, zone: str, name: str, ip_address, rtype, dig_oc_token=None):
@@ -336,7 +419,8 @@ def update_or_create_dns_record(api, zone, name, rtype, ip_address, records):
         x = x[0]
         url = f"domains/{zone}/records/{x.id}"
         changes = dict(data=ip_address)
-        log.info(f"Updating existing DNS record {x.id} {rtype} {name} {zone} {ip_address}")
+        m = f"Updating existing DNS record {x.id} {rtype} {name} {zone} {ip_address}"
+        log.info(m)
         api.get_data(url, type=digitalocean.baseapi.PUT, params=changes)
         return
 
@@ -361,11 +445,18 @@ def update_or_create_dns_records(dig_oc_token: str, zone: str, vals: list) -> No
 
 
 @metrics.timer("update_dns_records")
-def update_dns_records(dig_oc_token: str, zone: str, droplets) -> None:
-    # Number droplets starting from the newest
-    droplets = sorted(droplets, key=lambda d: d.name, reverse=True)
-    vals = [(n, d.ip_address, d.ip_v6_address) for n, d in enumerate(droplets)]
-    update_or_create_dns_records(dig_oc_token, zone, vals)
+def update_dns_records(click, dig_oc_token: str, dns_zone: str, droplets) -> None:
+    q = """SELECT rdn, ipaddr, ipv6addr FROM test_helper_instances
+        FINAL
+        WHERE provider = 'Digital Ocean'
+        AND dns_zone = %(dns_zone)s
+        AND draining_at IS NULL
+        ORDER BY name
+    """
+    log.info(q)
+    rows = click.execute(q, dict(dns_zone=dns_zone))
+    log.info(rows)
+    update_or_create_dns_records(dig_oc_token, dns_zone, rows)
 
 
 @metrics.timer("deploy_ssl_cert")
@@ -378,63 +469,89 @@ def deploy_ssl_cert(host: str, zone: str) -> None:
     ssh_reload_nginx(host)
 
 
+def assign_rdn(click, dns_zone: str, wanted_droplet_num: int) -> str:
+    q = """SELECT rdn FROM test_helper_instances
+        FINAL
+        WHERE provider = 'Digital Ocean'
+        AND dns_zone = %(dns_zone)s
+        AND draining_at IS NULL
+        """
+    log.info(q)
+    rows = click.execute(q, dict(dns_zone=dns_zone))
+    log.info(rows)
+    in_use = set(r[0] for r in rows)
+    log.info(f"In use RDNs: {in_use}")
+    for n in range(wanted_droplet_num):
+        rdn = str(n)
+        if rdn not in in_use:
+            log.info(f"Selected RDN {rdn}")
+            return rdn
+
+    raise Exception("Unable to pick an RDN")
+
+
 @metrics.timer("run_time")
-def main():
+def main() -> None:
     conf = load_conf()
 
     dig_oc_token = conf["token"]
     assert dig_oc_token
     assert len(dig_oc_token) == 64
     draining_time_minutes = int(conf["draining_time_minutes"])
-    assert draining_time_minutes >= 0
+    assert draining_time_minutes >= 1
 
-    active_droplets_count = int(conf["active_droplets_count"])
-    assert 0 <= active_droplets_count < 100
+    wanted_droplet_num = int(conf["active_droplets_count"])
+    assert 0 <= wanted_droplet_num < 20
     assert Path(setup_script_path).is_file()
     assert Path(certbot_creds).is_file()
     assert Path(nginx_conf).is_file()
     dns_zone = conf["dns_zone"]
     assert dns_zone
 
+    click = Clickhouse("localhost")
     api = digitalocean.Manager(token=dig_oc_token)
     # Fetch all test-helper droplets
     droplets = api.get_all_droplets(tag_name=TAG)
     for d in droplets:
         assert TAG in d.tags
+    # Naming: live_droplets - all VMs running on Digital Ocean in active status
+    #         active_droplets - live_droplets without the ones being drained
     live_droplets = [d for d in droplets if d.status == "active"]
+    active_droplets, rows = list_active_droplets(click, live_droplets, dns_zone)
     log.info(f"{len(droplets)} droplets")
     log.info(f"{len(live_droplets)} live droplets")
+    log.info(f"{len(active_droplets)} active droplets")
 
     # Avoid failure modes where we destroy all VMs or create unlimited amounts
     # or churn too quickly
-    db_conn = psycopg2.connect(conf["db_uri"])
+    destroy_drained_droplets(click, api, draining_time_minutes, live_droplets, dns_zone)
 
-    destroy_drained_droplets(db_conn, api, draining_time_minutes, live_droplets)
-
-    # Drain a droplet if needed
-    drain_droplet_if_needed(db_conn, live_droplets, active_droplets_count)
-
-    if len(live_droplets) > active_droplets_count:
-        log.info(f"No need to spawn a new droplet {len(live_droplets)} > {active_droplets_count}")
-        sys.exit(0)
-
-    if len(droplets) > active_droplets_count + 2:
+    if len(droplets) > wanted_droplet_num + 5:
         log.error("Unexpected amount of running droplets")
         sys.exit(1)
 
+    if len(active_droplets) >= wanted_droplet_num:
+        # Drain one droplet if needed
+        rdn = drain_droplet(click, dns_zone, active_droplets, rows)
+
+    else:
+        # special case: creating a new rdn not seen before
+        rdn = assign_rdn(click, dns_zone, wanted_droplet_num)
+
     # Spawn a new droplet
+    log.info(f"Spawning droplet be become {rdn}.{dns_zone}")
     live_regions = set(d.region["slug"] for d in droplets)
     new_droplet = spawn_new_droplet(api, dig_oc_token, live_regions, conf)
     log.info(f"Droplet {new_droplet.name} ready at {new_droplet.ip_address}")
-    add_droplet_to_db_table(db_conn, new_droplet)
+    add_droplet_to_db_table(click, new_droplet, rdn, dns_zone)
     live_droplets.append(new_droplet)
 
-    create_le_do_ssl_cert()
+    create_le_do_ssl_cert(dns_zone)
     # Deploy SSL certificate to new droplet
     deploy_ssl_cert(f"root@{new_droplet.ip_address}", dns_zone)
 
     # Update DNS A/AAAA records only when a new droplet is deployed
-    update_dns_records(dig_oc_token, dns_zone, live_droplets)
+    update_dns_records(click, dig_oc_token, dns_zone, live_droplets)
 
 
 if __name__ == "__main__":
