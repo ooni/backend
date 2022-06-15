@@ -12,6 +12,7 @@ Local test run:
 
 """
 
+from argparse import Namespace
 from pathlib import Path
 from subprocess import check_call
 from tempfile import TemporaryDirectory
@@ -19,9 +20,6 @@ from typing import List, Optional
 import csv
 import logging
 import re
-
-import psycopg2
-from psycopg2.extras import execute_values
 
 from clickhouse_driver import Client as Clickhouse
 
@@ -57,12 +55,6 @@ def _extract_domain(url: str) -> Optional[str]:
     return None
 
 
-def connect_postgresql_db(c):
-    return psycopg2.connect(
-        dbname=c["dbname"], user=c["dbuser"], host=c["dbhost"], password=c["dbpassword"]
-    )
-
-
 @metrics.timer("fetch_citizen_lab_lists")
 def fetch_citizen_lab_lists() -> List[dict]:
     """Clone repository in a temporary directory and extract files"""
@@ -96,50 +88,20 @@ def fetch_citizen_lab_lists() -> List[dict]:
 
     assert len(out) > 20000
     assert len(out) < 1000000
+    metrics.gauge("citizenlab_test_list_len", len(out))
     return out
-
-
-def create_citizenlab_cc_idx(conn):
-    sql = """
-    CREATE INDEX IF NOT EXISTS citizenlab_cc_idx
-    ON citizenlab USING btree (cc)
-    """
-    with conn.cursor() as cur:
-        cur.execute(sql)
-
-
-def rebuild_citizenlab_table_from_citizen_lab_lists(conf, citizenlab, conn):
-    """Fetch lists from GitHub repository"""
-    ev = """INSERT INTO citizenlab (domain, url, cc, category_code)
-        VALUES %s"""
-
-    with conn.cursor() as cur:
-        log.info("Emptying PG citizenlab table")
-        cur.execute("DELETE FROM citizenlab")
-        log.info("Inserting %d citizenlab table entries", len(citizenlab))
-        metrics.gauge("rowcount", len(citizenlab))
-        tpl = "(%(domain)s, %(url)s, %(cc)s, %(category_code)s)"
-        execute_values(cur, ev, citizenlab, template=tpl)
-
-    if conf.dry_run:
-        log.info("rollback")
-        conn.rollback()
-    else:
-        log.info("PG citizenlab commit")
-        conn.commit()
-        log.info("PG citizenlab_table is ready")
 
 
 def query_c(click, query: str, qparams: dict):
     click.execute(query, qparams, types_check=True)
 
 
-@metrics.timer("rebuild_citizenlab_table_from_citizen_lab_lists")
-def update_citizenlab_table_click(conf, citizenlab):
+@metrics.timer("update_citizenlab_table")
+def update_citizenlab_table(conf: Namespace, citizenlab: list) -> None:
     """Overwrite citizenlab_flip and swap tables atomically"""
     if conf.dry_run:
         return
-    click = Clickhouse("localhost")
+    click = Clickhouse("localhost", user="citizenlab")
     log.info("Emptying Clickhouse citizenlab_flip table")
     q = "TRUNCATE TABLE citizenlab_flip"
     click.execute(q)
@@ -153,14 +115,7 @@ def update_citizenlab_table_click(conf, citizenlab):
     click.execute(q)
 
 
-def update_citizenlab_test_lists(conf) -> None:
+def update_citizenlab_test_lists(conf: Namespace) -> None:
     log.info("update_citizenlab_test_lists")
     citizenlab = fetch_citizen_lab_lists()
-
-    update_citizenlab_table_click(conf, citizenlab)
-
-    if conf.active["dbname"]:
-        # PostgreSQL
-        pgconn = connect_postgresql_db(conf.active)
-        create_citizenlab_cc_idx(pgconn)
-        rebuild_citizenlab_table_from_citizen_lab_lists(conf, citizenlab, pgconn)
+    update_citizenlab_table(conf, citizenlab)

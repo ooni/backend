@@ -6,7 +6,6 @@ Build-Depends: debhelper-compat (= 13),
  python3,
  dh-python,
  python3-lz4,
- python3-psycopg2,
  python3-setuptools,
 Standards-Version: 4.6.0
 
@@ -14,15 +13,11 @@ Package: analysis
 Architecture: all
 Depends: ${misc:Depends},
  ${python3:Depends},
- python3-bottle,
  python3-clickhouse-driver,
  python3-digitalocean,
  python3-filelock,
- python3-matplotlib,
- python3-psycopg2,
  python3-sdnotify,
  python3-smart-open,
- python3-sqlalchemy-ext,
  python3-statsd,
  python3-systemd,
  zstd,

@@ -8,17 +8,18 @@ Monitor with
 sudo journalctl -f --identifier analysis
 
 """
-# debdeps: postgresql-client-11 zstd
+# debdeps: zstd
 
 from datetime import datetime
 from subprocess import Popen, PIPE
+from typing import Any
 
 from smart_open import open as smart_open  # debdeps: python3-smart-open
 from boto3 import Session as botoSession  # debdeps: python3-boto3
 
 from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 
-log = None
+log: Any = None
 metrics = setup_metrics(name="db-backup")
 
 
@@ -31,6 +32,7 @@ def run(cmd):
             return
         yield data
 
+# FIXME: switch to Clickhouse
 
 @metrics.timer("run_backup")
 def run_backup(conf, cp):
