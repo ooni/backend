@@ -36,9 +36,10 @@ def req_json():
 
 def generate_report_id(test_name, cc: str, asn_i: int) -> str:
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    cid = "1"  # collector id  TODO read from conf
+    cid = "2"  # collector id  TODO read from conf
     rand = b64encode(urandom(12), b"oo").decode()
-    rid = f"{ts}_{test_name}_{cc}_{asn_i}_n{cid}_{rand}"
+    stn = test_name.replace("_", "")
+    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
     return rid
 
 
@@ -62,6 +63,52 @@ def lookup_probe_network(ipaddr: str) -> Tuple[str, str]:
 def lookup_probe_cc(ipaddr: str) -> str:
     resp = current_app.geoip_cc_reader.country(ipaddr)
     return resp.country.iso_code
+
+
+def probe_geoip(probe_cc: str, asn: str) -> Tuple[Dict, str, int]:
+    """Looks up probe CC, ASN, network name using GeoIP, prepare
+    response dict
+    """
+    log = current_app.logger
+    db_probe_cc = "ZZ"
+    db_asn = "AS0"
+    db_probe_network_name = None
+    try:
+        ipaddr = extract_probe_ipaddr()
+        db_probe_cc = lookup_probe_cc(ipaddr)
+        db_asn, db_probe_network_name = lookup_probe_network(ipaddr)
+    except Exception as e:
+        log.error(str(e), exc_info=True)
+
+    if probe_cc != "ZZ" and probe_cc != db_probe_cc:
+        log.info(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
+        metrics.incr("geoip_cc_differs")
+    if asn != "AS0" and asn != db_asn:
+        log.info(f"probe_asn != db_probe_as ({asn} != {db_asn})")
+        metrics.incr("geoip_asn_differs")
+
+    # We always returns the looked up probe_cc and probe_asn to the probe
+    resp: Dict[str, Any] = dict(v=1)
+    resp["probe_cc"] = db_probe_cc
+    resp["probe_asn"] = db_asn
+    resp["probe_network_name"] = db_probe_network_name
+
+    # Don't override probe_cc or asn unless the probe has omitted these
+    # values. This is done because the IP address we see might not match the
+    # actual probe ipaddr in cases in which a circumvention tool is being used.
+    # TODO: eventually we should have the probe signal to the backend that it
+    # wants the lookup to be done by the backend and have it pass the public IP
+    # through a specific header.
+    if probe_cc == "ZZ" and asn == "AS0":
+        probe_cc = db_probe_cc
+        asn = db_asn
+
+    assert asn.startswith("AS")
+    asn_int = int(asn[2:])
+    assert probe_cc.isalpha()
+    assert len(probe_cc) == 2
+
+    return resp, probe_cc, asn_int
 
 
 @probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
@@ -161,49 +208,16 @@ def check_in() -> Response:
     """
     log = current_app.logger
     # TODO: Implement throttling
-    # TODO: Add geoip
     data = req_json()
-    probe_cc = data.get("probe_cc", "ZZ").upper()
-    asn = data.get("probe_asn", "AS0")
     run_type = data.get("run_type", "timed")
     charging = data.get("charging", True)
+    probe_cc = data.get("probe_cc", "ZZ").upper()
+    probe_asn = data.get("probe_asn", "AS0")
 
-    resp: Dict[str, Any] = dict(v=1)
+    resp, probe_cc, asn_i = probe_geoip(probe_cc, probe_asn)
 
-    db_probe_cc = "ZZ"
-    db_asn = "AS0"
-    db_probe_network_name = None
-    try:
-        ipaddr = extract_probe_ipaddr()
-        db_probe_cc = lookup_probe_cc(ipaddr)
-        db_asn, db_probe_network_name = lookup_probe_network(ipaddr)
-    except Exception as e:
-        log.error(str(e), exc_info=True)
-
-    if probe_cc != "ZZ" and probe_cc != db_probe_cc:
-        log.warn(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
-    if asn != "AS0" and asn != db_asn:
-        log.warn(f"probe_asn != db_probe_as ({asn} != {db_asn})")
-
-    # We always returns the looked up probe_cc and probe_asn to the probe
-    resp["probe_cc"] = db_probe_cc
-    resp["probe_asn"] = db_asn
-    resp["probe_network_name"] = db_probe_network_name
-
-    # Don't override probe_cc or asn unless the probe has omitted these
-    # values. This is done because the IP address we see might not match the
-    # actual probe ipaddr in cases in which a circumvention tool is being used.
-    # TODO: eventually we should have the probe signal to the backend that it
-    # wants the lookup to be done by the backend and have it pass the public IP
-    # through a specific header.
-    if probe_cc == "ZZ" and asn == "AS0":
-        probe_cc = db_probe_cc
-        asn = db_asn
-
-    # When the run_type is manual we want to preserve the
-    # old behavior where we test the whole list. Otherwise,
-    # we're running in the background and we don't want
-    # too many URLs, in particular when running on battery.
+    # On run_type=manual preserve the old behavior: test the whole list
+    # On timed runs test few URLs, especially when on battery
     if run_type == "manual":
         url_limit = 9999  # same as prio.py
     elif charging:
@@ -221,15 +235,13 @@ def check_in() -> Response:
     else:
         category_codes = []
 
-    assert asn.startswith("AS")
-    asn_i = int(asn[2:])
-    assert probe_cc.isalpha()
-    assert len(probe_cc) == 2
     for c in category_codes:
         assert c.isalpha()
 
     try:
-        test_items = generate_test_list(probe_cc, category_codes, url_limit, False)
+        test_items = generate_test_list(
+            probe_cc, category_codes, asn_i, url_limit, False
+        )
     except Exception as e:
         log.error(e, exc_info=True)
         # TODO: use same failover as prio.py:list_test_urls
@@ -252,7 +264,6 @@ def check_in() -> Response:
     resp["conf"] = conf
     resp["utc_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # get asn, asn_i, probe_cc, network name
     test_names = (
         "bridge_reachability",
         "dash",
@@ -277,8 +288,7 @@ def check_in() -> Response:
         "whatsapp",
     )
     for tn in test_names:
-        stn = tn.replace("_", "")
-        rid = generate_report_id(stn, probe_cc, asn_i)
+        rid = generate_report_id(tn, probe_cc, asn_i)
         resp["tests"].setdefault(tn, {})  # type: ignore
         resp["tests"][tn]["report_id"] = rid  # type: ignore
 
@@ -770,7 +780,7 @@ def open_report() -> Response:
     cc = data.get("probe_cc", "ZZ").upper().replace("_", "")
     if len(cc) != 2:
         cc = "ZZ"
-    test_name = data.get("test_name", "").lower().replace("_", "")
+    test_name = data.get("test_name", "").lower()
     rid = generate_report_id(test_name, cc, asn_i)
     return jsonify(
         backend_version="1.3.5", supported_formats=["yaml", "json"], report_id=rid

@@ -1,3 +1,9 @@
+ooni-api (1.0.11) unstable; urgency=medium
+
+  * Generate test-list using ASN
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 08 Jun 2022 12:57:38 +0100
+
 ooni-api (1.0.10) unstable; urgency=medium
 
   * Improve get_account_metadata

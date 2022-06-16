@@ -11,7 +11,8 @@ from flask import Flask, json
 
 from flask_cors import CORS  # debdeps: python3-flask-cors
 
-import geoip2.database  # debdeps: python3-geoip2
+# debdeps: python3-geoip2
+import geoip2.database  # type: ignore
 
 # python3-flask-cors has unnecessary dependencies :-/
 from ooniapi.rate_limit_quotas import FlaskLimiter

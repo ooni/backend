@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-import os
+"""
+Updates asn.mmdb and cc.mmdb in /var/lib/ooniapi/
+Runs as a systemd timer.
+
+Monitor logs using: sudo journalctl --identifier ooni_download_geoip
+"""
+
 import sys
 import gzip
 import shutil
 import logging
 
-import geoip2.database
+# debdeps: python3-geoip2
+import geoip2.database  # type: ignore
 from pathlib import Path
 from datetime import datetime
 from urllib.error import HTTPError
@@ -24,6 +31,7 @@ log = logging.getLogger("ooni_download_geoip")
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
+
     log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni_download_geoip"))
 except ImportError:
     pass
@@ -31,13 +39,15 @@ except ImportError:
 log.addHandler(logging.StreamHandler(sys.stdout))
 log.setLevel(logging.DEBUG)
 
+
 def get_request(url):
     req = Request(url)
     # We need to set the user-agent otherwise db-ip gives us a 403
     req.add_header("User-Agent", "ooni-downloader")
     return urlopen(req)
 
-def is_already_updated():
+
+def is_already_updated() -> bool:
     try:
         with (OONI_API_DIR / "geoipdbts").open() as in_file:
             current_ts = in_file.read()
@@ -46,7 +56,8 @@ def is_already_updated():
 
     return current_ts == TS
 
-def is_latest_available(url: str):
+
+def is_latest_available(url: str) -> bool:
     log.info(f"fetching {url}")
     try:
         resp = get_request(url)
@@ -58,23 +69,32 @@ def is_latest_available(url: str):
         log.info(f"unexpected status code '{err.code}' in {url}")
         return False
 
-def check_geoip_db(path: Path):
-    assert any([x in path.name for x in ("cc", "asn")]), "invalid path argument supplied"
+
+def check_geoip_db(path: Path) -> None:
+    assert "cc" in path.name or "asn" in path.name, "invalid path"
 
     with geoip2.database.Reader(str(path)) as reader:
         if "asn" in path.name:
             r1 = reader.asn("8.8.8.8")
             assert r1 is not None, "database file is invalid"
+            m = reader.metadata()
+            metrics.gauge("geoip_asn_node_cnt", m.node_count)
+            metrics.gauge("geoip_asn_epoch", m.build_epoch)
 
         elif "cc" in path.name:
             r2 = reader.country("8.8.8.8")
             assert r2 is not None, "database file is invalid"
+            m = reader.metadata()
+            metrics.gauge("geoip_cc_node_cnt", m.node_count)
+            metrics.gauge("geoip_cc_epoch", m.build_epoch)
 
-def download_geoip(url: str, filename: str):
-    log.info("Updating geoip database for {url} ({filename})")
 
-    tmp_gz_out = (OONI_API_DIR / f"{filename}.gz.tmp")
-    tmp_out = (OONI_API_DIR / f"{filename}.tmp")
+@metrics.timer("download_geoip")
+def download_geoip(url: str, filename: str) -> None:
+    log.info(f"Updating geoip database for {url} ({filename})")
+
+    tmp_gz_out = OONI_API_DIR / f"{filename}.gz.tmp"
+    tmp_out = OONI_API_DIR / f"{filename}.tmp"
 
     with get_request(url) as resp:
         with tmp_gz_out.open("wb") as out_file:
@@ -87,13 +107,14 @@ def download_geoip(url: str, filename: str):
     try:
         check_geoip_db(tmp_out)
     except Exception as exc:
-        log.error("consistenty check on the geoip DB failed")
+        log.error(f"consistenty check on the geoip DB failed: {exc}")
         metrics.incr("ooni_geoip_checkfail")
         return
 
     tmp_out.rename(OONI_API_DIR / filename)
 
-def update_geoip():
+
+def update_geoip() -> None:
     OONI_API_DIR.mkdir(parents=True, exist_ok=True)
     download_geoip(ASN_URL, "asn.mmdb")
     download_geoip(CC_URL, "cc.mmdb")
@@ -103,6 +124,7 @@ def update_geoip():
 
     log.info("Updated GeoIP databases")
     metrics.incr("ooni_geoip_updated")
+
 
 def main():
     if is_already_updated():
@@ -114,6 +136,7 @@ def main():
         sys.exit(0)
 
     update_geoip()
+
 
 if __name__ == "__main__":
     main()

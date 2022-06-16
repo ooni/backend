@@ -30,4 +30,5 @@ jobs:
           apt-get install --no-install-recommends -y mypy
 
       - name: Run tests
-        run: cd newapi && mypy --ignore-missing-imports ooniapi/**/*.py
+        # see the mypy.ini file
+        run: cd newapi && mypy ooniapi/**/*.py

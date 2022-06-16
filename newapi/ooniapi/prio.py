@@ -116,7 +116,11 @@ def compute_priorities(entries, prio_rules):
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
 
-def fetch_reactive_url_list_click(cc):
+@metrics.timer("fetch_reactive_url_list")
+def fetch_reactive_url_list(cc: str, probe_asn: int):
+    """Select all citizenlab URLs for the given probe_cc + ZZ
+    Select measurements count from the last 7 days in a left outer join
+    (without any info about priority)"""
     q = """
 SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0) AS msmt_cnt
 FROM (
@@ -131,21 +135,17 @@ LEFT OUTER JOIN (
     SELECT input, SUM(msmt_cnt) AS msmt_cnt
     FROM counters_asn_test_list
     WHERE probe_cc = :cc
+    --asn-filter--
     GROUP BY input
 ) AS cnt
 ON (citiz.url = cnt.input)
 """
+    if probe_asn != 0:
+        q = q.replace("--asn-filter--", "AND probe_asn = :asn")
+
     # support uppercase or lowercase match
-    q = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower()))
-    return tuple(q)
-
-
-@metrics.timer("fetch_reactive_url_list")
-def fetch_reactive_url_list(cc: str):
-    """Select all citizenlab URLs for the given probe_cc + ZZ
-    Select measurements count from the last 7 days in a left outer join
-    (without any info about priority)"""
-    return fetch_reactive_url_list_click(cc)
+    r = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn))
+    return tuple(r)
 
 
 @metrics.timer("fetch_prioritization_rules")
@@ -159,12 +159,12 @@ def fetch_prioritization_rules(cc: str) -> tuple:
 
 @metrics.timer("generate_test_list")
 def generate_test_list(
-    country_code: str, category_codes: tuple, limit: int, debug: bool
+    country_code: str, category_codes: tuple, probe_asn: int, limit: int, debug: bool
 ):
     """Generate test list based on the amount of measurements in the last
     N days"""
     log = current_app.logger
-    entries = fetch_reactive_url_list(country_code)
+    entries = fetch_reactive_url_list(country_code, probe_asn)
     log.info("fetched %d url entries", len(entries))
     prio_rules = fetch_prioritization_rules(country_code)
     log.info("fetched %d priority rules", len(prio_rules))
@@ -200,7 +200,6 @@ def generate_test_list(
 @prio_bp.route("/api/v1/test-list/urls")
 def list_test_urls() -> Response:
     """Generate test URL list with prioritization
-    https://orchestrate.ooni.io/api/v1/test-list/urls?country_code=IT
     ---
     produces:
       - application/json
@@ -271,7 +270,7 @@ def list_test_urls() -> Response:
         return jsonify({})
 
     try:
-        test_items = generate_test_list(country_code, category_codes, limit, debug)
+        test_items = generate_test_list(country_code, category_codes, 0, limit, debug)
     except Exception as e:
         log.error(e, exc_info=True)
         # failover_generate_test_list runs without any database interaction
