@@ -1627,7 +1627,7 @@ fingerprints = {
         {"dns_full": "3.93.224.57", "locality": "general"},
         {"dns_full": "52.206.227.167", "locality": "general"},
         # https://explorer.ooni.org/measurement/20191115T114711Z_AS12390_NIVFbxg8nx3pPxL5vbk2Fg4duFANRINLyvIaMNuzyDPiMdY2X3?input=https://bisexual.org/
-        {"dns_full": "195.46.39.11", "locality": "general"},
+        {"dns_full": "195.46.39.11", "locality": "local"},
     ],
     "UZ": [
 	# https://explorer.ooni.org/measurement/20211231T141146Z_webconnectivity_UZ_8193_n1_Ap5yFzrVoL671ahx?input=http%3A%2F%2Fwww.europacasino.com%2F
