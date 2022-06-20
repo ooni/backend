@@ -526,32 +526,22 @@ def list_test_helpers() -> Response:
             },
         ],
     }
-    probe_ipaddr = request.headers.get("X-Real-Ip", "")
-    # Temporary hack to pass the new test-helper to some ASNs
-    if probe_ipaddr.startswith("2"):
-        metrics.incr("test_helper_new")
-        j["web-connectivity"] = [
-            {"address": "https://0.th.ooni.org", "type": "https"},
-            {"address": "https://1.th.ooni.org", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-        ]
-    elif probe_ipaddr.startswith("3"):
-        metrics.incr("test_helper_new")
-        j["web-connectivity"] = [
-            {"address": "https://1.th.ooni.org", "type": "https"},
-            {"address": "https://0.th.ooni.org", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-        ]
-    else:
-        metrics.incr("test_helper_old")
+    # Load-balance test helpers deterministically
+    probe_ipaddr = request.headers.get("X-Real-Ip", "0.0.0.0")
+    try:
+        last_oct = int(probe_ipaddr.rsplit(".", 1)[1])
+    except:
+        last_oct = 0
+    th0, th1 = last_oct % 2, (last_oct + 1) % 2
+    j["web-connectivity"] = [
+        {"address": f"https://{th0}.th.ooni.org", "type": "https"},
+        {"address": f"https://{th1}.th.ooni.org", "type": "https"},
+        {
+            "address": "https://d33d1gs9kpq1c5.cloudfront.net",
+            "front": "d33d1gs9kpq1c5.cloudfront.net",
+            "type": "cloudfront",
+        },
+    ]
 
     return cachedjson("0s", **j)
 
