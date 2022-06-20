@@ -1,3 +1,10 @@
+fastpath (0.58) unstable; urgency=medium
+
+  * Add DNS fingerprints for Iran
+    https://github.com/ooni/backend/issues/543
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Aug 2022 12:45:45 +0100
+
 fastpath (0.57) unstable; urgency=medium
 
   * Improve reprocessor
