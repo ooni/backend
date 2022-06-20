@@ -665,6 +665,10 @@ fingerprints = {
         {"dns_full": "10.10.34.34", "locality": "country"},
         # https://explorer.ooni.org/measurement/20180114T045727Z_AS61173_bkL7bV97kNEYVREkD0Lg4LnvnnlDtlNlbvA1jbzPlsncPdNlIm?input=http://queerquotes.blogspot.com
         {"dns_full": "10.10.34.35", "locality": "country"},
+        # https://explorer.ooni.org/measurement/20210701T022229Z_webconnectivity_IR_197207_n1_1gpWGw5V9YWvEa44?input=http%3A%2F%2Fwww.freeexpression.org%2F
+        {"dns_full": "10.10.34.36", "locality": "country"},
+        # https://explorer.ooni.org/measurement/20210715T094141Z_webconnectivity_IR_44244_n1_GFBhOu2puPdz4SSt?input=https%3A%2F%2Fwww.sbs.com.au%2Flanguage%2Fcoronavirus%3Fcid%3Dinfocus
+        {"dns_full": "d0::11", "locality": "country"},
     ],
     "IT": [
         {"body_match": "GdF Stop Page", "locality": "country"},
