@@ -1,3 +1,9 @@
+analysis (1.1) unstable; urgency=medium
+
+  * Rotation script cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Jun 2022 16:20:14 +0100
+
 analysis (1.0) unstable; urgency=medium
 
   * Cleanup

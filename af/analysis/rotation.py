@@ -91,6 +91,19 @@ setup_script_path = "/etc/ooni/rotation_setup.sh"
 nginx_conf = "/etc/ooni/rotation_nginx_conf"
 certbot_creds = "/etc/ooni/certbot-digitalocean"
 TAG = "roaming-th"
+ssh_cmd_base = [
+    "ssh",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "BatchMode=yes",
+    "-i",
+    "/etc/ooni/testhelper_ssh_key",
+]
 
 
 def retry(func):
@@ -293,7 +306,7 @@ def drain_droplet(click, dns_zone, active_droplets: list, rows: list) -> str:
     by_age = sorted(active_droplets, key=lambda d: d.created_at)
     oldest = by_age[0]
     rdn = [row[1] for row in rows if row[0] == oldest.name][0]
-    log.info(f"Draining {oldest.name} {rdn} droplet")
+    log.info(f"Draining {oldest.name} {rdn}.{dns_zone} droplet")
     drain_droplet_in_db_table(click, oldest, rdn, dns_zone)
     return rdn
 
@@ -350,42 +363,33 @@ def scp_file(local_fn: str, host: str, remote_fn: str) -> None:
     check_output(cmd)
 
 
-@metrics.timer("ssh_restart_nginx")
-@retry
-def ssh_restart_nginx(host: str) -> None:
-    """Reload Nginx over SSH"""
-    cmd = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        "-o",
-        "ConnectTimeout=10",
-        "-o",
-        "BatchMode=yes",
-        "-i",
-        "/etc/ooni/testhelper_ssh_key",
+def ssh_restart_service(host: str, service_name: str) -> None:
+    cmd = ssh_cmd_base + [
         f"{host}",
         "systemctl",
         "restart",
-        "nginx",
+        service_name,
     ]
-    log.info("Reloading nginx")
+    log.info(f"Restarting {service_name}")
     log.info(" ".join(cmd))
     check_output(cmd)
 
 
+@metrics.timer("ssh_restart_nginx")
+@retry
+def ssh_restart_nginx(host: str) -> None:
+    ssh_restart_service(host, "nginx")
+
+
+@metrics.timer("ssh_restart_netdata")
+@retry
+def ssh_restart_netdata(host: str) -> None:
+    ssh_restart_service(host, "netdata")
+
+
 @metrics.timer("ssh_wait_droplet_warmup")
 def ssh_wait_droplet_warmup(ipaddr: str) -> None:
-    cmd = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        "-o",
-        "ConnectTimeout=10",
-        "-o",
-        "BatchMode=yes",
-        "-i",
-        "/etc/ooni/testhelper_ssh_key",
+    cmd = ssh_cmd_base + [
         f"root@{ipaddr}",
         "cat",
         "/var/run/rotation_setup_completed",
@@ -465,14 +469,18 @@ def update_dns_records(click, dig_oc_token: str, dns_zone: str, droplets) -> Non
     update_or_create_dns_records(dig_oc_token, dns_zone, rows)
 
 
-@metrics.timer("deploy_ssl_cert")
-def deploy_ssl_cert(host: str, zone: str) -> None:
+@metrics.timer("setup_nginx")
+def setup_nginx(host: str, zone: str) -> None:
+    """Deploy TLS certificates, configure Nginx and [re]start it.
+    Then restart Netdata to enable Nginx monitoring.
+    """
     cert_fname = f"/etc/letsencrypt/live/{zone}/fullchain.pem"
     privkey_fname = f"/etc/letsencrypt/live/{zone}/privkey.pem"
     scp_file(cert_fname, host, "/etc/ssl/private/th_fullchain.pem")
     scp_file(privkey_fname, host, "/etc/ssl/private/th_privkey.pem")
     scp_file(nginx_conf, host, "/etc/nginx/sites-enabled/default")
     ssh_restart_nginx(host)
+    ssh_restart_netdata(host)
 
 
 def assign_rdn(click, dns_zone: str, wanted_droplet_num: int) -> str:
@@ -507,7 +515,7 @@ def end_to_end_test(ipaddr: IP4a, fqdn: str) -> None:
     hdr = {"Host": fqdn, "Pragma": "no-cache"}
     log.info(f"Testing {fqdn}")
     r = requests.post(f"https://{ipaddr}", headers=hdr, verify=False, json=j)
-    if r.ok and sorted(r.json()) == ['dns', 'http_request', 'tcp_connect']:
+    if r.ok and sorted(r.json()) == ["dns", "http_request", "tcp_connect"]:
         log.info(f"Test successful")
         return
 
@@ -531,7 +539,7 @@ def main() -> None:
     assert Path(setup_script_path).is_file()
     assert Path(certbot_creds).is_file()
     assert Path(nginx_conf).is_file()
-    dns_zone = conf["dns_zone"]
+    dns_zone = conf["dns_zone"].strip(".")
     assert dns_zone
 
     click = Clickhouse("localhost", user="rotation")
@@ -573,7 +581,7 @@ def main() -> None:
     live_droplets.append(new_droplet)
 
     create_le_do_ssl_cert(dns_zone)
-    deploy_ssl_cert(f"root@{new_droplet.ip_address}", dns_zone)
+    setup_nginx(f"root@{new_droplet.ip_address}", dns_zone)
     end_to_end_test(new_droplet.ip_address, f"{rdn}.dns_zone")
 
     # Update DNS A/AAAA records only when a new droplet is deployed
