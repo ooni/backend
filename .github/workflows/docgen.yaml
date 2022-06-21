@@ -1,6 +1,9 @@
 name: Docgen
 on: [push, pull_request]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Docgen
