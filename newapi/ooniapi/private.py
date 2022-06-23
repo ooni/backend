@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
-from typing import Dict, List
+from typing import Dict
 
 import logging
 import math
@@ -180,7 +180,7 @@ def api_private_quotas_summary() -> Response:
 
 @api_private_blueprint.route("/check_report_id", methods=["GET"])
 def check_report_id() -> Response:
-    """Check if a report_id exists in the fastpath table
+    """Legacy. Used to check if a report_id existed in the fastpath table.
     Used by https://github.com/ooni/probe/issues/1034
     ---
     produces:
@@ -188,14 +188,10 @@ def check_report_id() -> Response:
     parameters:
       - name: report_id
         in: query
-        example: 20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a
         type: string
-        minLength: 10
-        required: true
     responses:
       200:
-        description: Check if a report_id exists in the fastpath table.
-          Cached for a short time.
+        description: Always returns True.
         schema:
           type: object
           properties:
@@ -204,22 +200,11 @@ def check_report_id() -> Response:
               description: version number of this response
             found:
               type: boolean
-              description: True if found
-            error:
-              type: string
-              description: error message
+              description: True
           example: { "found": true, "v": 0 }
 
     """
-    report_id = request.args.get("report_id")
-    s = sql.text("SELECT 1 FROM fastpath WHERE report_id = :rid LIMIT 1")
-    try:
-        q = query_click_one_row(s, dict(rid=report_id))
-        found = q is not None
-        return cachedjson("2m", v=0, found=found)
-
-    except Exception as e:
-        return cachedjson("0s", v=0, error=str(e))
+    return cachedjson("1s", v=0, found=True)
 
 
 def last_30days(begin=31, end=1):

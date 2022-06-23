@@ -255,10 +255,11 @@ def test_private_api_check_report_id(client, log):
     assert response == {"v": 0, "found": True}
 
 
-def test_private_api_check_report_id_not_found(client, log):
+def test_private_api_check_bogus_report_id_is_found(client, log):
+    # The API always returns True
     url = f"check_report_id?report_id=BOGUS_REPORT_ID"
     response = privapi(client, url)
-    assert response == {"v": 0, "found": False}
+    assert response == {"v": 0, "found": True}
 
 
 # # /circumvention_stats_by_country
