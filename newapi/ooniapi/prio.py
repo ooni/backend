@@ -23,7 +23,7 @@ blockdiag {
 """
 
 from collections import namedtuple
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import random
 
 from flask import Blueprint, current_app, request, Response
@@ -32,6 +32,7 @@ from sqlalchemy import sql as sa
 
 from ooniapi.database import query_click
 from ooniapi.config import metrics
+from ooniapi.measurements import param_asn
 
 prio_bp = Blueprint("prio", "probe_services_prio")
 
@@ -119,8 +120,8 @@ def compute_priorities(entries, prio_rules):
 @metrics.timer("fetch_reactive_url_list")
 def fetch_reactive_url_list(cc: str, probe_asn: int):
     """Select all citizenlab URLs for the given probe_cc + ZZ
-    Select measurements count from the last 7 days in a left outer join
-    (without any info about priority)"""
+    Select measurements count from the current and previous week
+    using a left outer join (without any info about priority)"""
     q = """
 SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0) AS msmt_cnt
 FROM (
@@ -135,6 +136,7 @@ LEFT OUTER JOIN (
     SELECT input, SUM(msmt_cnt) AS msmt_cnt
     FROM counters_asn_test_list
     WHERE probe_cc = :cc
+    AND (week IN (toStartOfWeek(now()), toStartOfWeek(now() - interval 1 week)))
     --asn-filter--
     GROUP BY input
 ) AS cnt
@@ -160,7 +162,7 @@ def fetch_prioritization_rules(cc: str) -> tuple:
 @metrics.timer("generate_test_list")
 def generate_test_list(
     country_code: str, category_codes: tuple, probe_asn: int, limit: int, debug: bool
-):
+) -> Tuple[List, List, List]:
     """Generate test list based on the amount of measurements in the last
     N days"""
     log = current_app.logger
@@ -191,7 +193,9 @@ def generate_test_list(
         if len(out) >= limit:
             break
 
-    return out
+    if debug:
+        return out, entries, prio_rules
+    return out, [], []
 
 
 # # API entry point
@@ -257,10 +261,7 @@ def list_test_urls() -> Response:
     try:
         country_code = param("country_code") or param("probe_cc") or "ZZ"
         country_code = country_code.upper()
-        category_codes = param("category_codes") or ""
-        category_codes = set(c.strip().upper() for c in category_codes.split(","))
-        category_codes.discard("")
-        category_codes = tuple(category_codes)
+        category_codes = param_category_codes()
         limit = int(param("limit") or -1)
         if limit == -1:
             limit = 9999
@@ -270,7 +271,9 @@ def list_test_urls() -> Response:
         return jsonify({})
 
     try:
-        test_items = generate_test_list(country_code, category_codes, 0, limit, debug)
+        test_items, _1, _2 = generate_test_list(
+            country_code, category_codes, 0, limit, debug
+        )
     except Exception as e:
         log.error(e, exc_info=True)
         # failover_generate_test_list runs without any database interaction
@@ -289,3 +292,51 @@ def list_test_urls() -> Response:
         "results": test_items,
     }
     return jsonify(out)
+
+
+def param_category_codes() -> tuple:
+    """Return a tuple of category codes without duplicates"""
+    catcod = request.args.get("category_codes") or ""
+    category_codes = set(c.strip().upper() for c in catcod.split(","))
+    category_codes.discard("")
+    return tuple(category_codes)
+
+
+@prio_bp.route("/api/_/debug_prioritization")
+def debug_prioritization() -> Response:
+    """Generate prioritization debug data
+    ---
+    produces:
+      - application/json
+    parameters:
+      - name: probe_cc
+        in: query
+        type: string
+        description: Two letter, uppercase country code
+      - name: category_codes
+        in: query
+        type: string
+        description: Comma separated list of URL categories, all uppercase
+      - name: probe_asn
+        in: query
+        type: string
+        description: Probe ASN
+      - name: limit
+        in: query
+        type: integer
+        description: Maximum number of URLs to return
+    responses:
+      200:
+        description: URL test list and debug data
+        schema:
+          type: object
+    """
+    param = request.args.get
+    country_code = (param("probe_cc") or "ZZ").upper()
+    category_codes = param_category_codes()
+    asn = param_asn("probe_asn") or 0
+    limit = int(param("limit") or -1)
+    test_items, entries, prio_rules = generate_test_list(
+        country_code, category_codes, asn, limit, True
+    )
+    return jsonify(dict(test_items=test_items, entries=entries, prio_rules=prio_rules))

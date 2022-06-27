@@ -239,7 +239,7 @@ def check_in() -> Response:
         assert c.isalpha()
 
     try:
-        test_items = generate_test_list(
+        test_items, _1, _2 = generate_test_list(
             probe_cc, category_codes, asn_i, url_limit, False
         )
     except Exception as e:
