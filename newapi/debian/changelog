@@ -1,3 +1,9 @@
+ooni-api (1.0.15) unstable; urgency=medium
+
+  * Reprocessing-related cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 27 Jun 2022 22:03:39 +0100
+
 ooni-api (1.0.14) unstable; urgency=medium
 
   * Filter prioritization query by week, add debugging

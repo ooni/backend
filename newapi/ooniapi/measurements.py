@@ -673,7 +673,7 @@ def list_measurements() -> Response:
     log = current_app.logger
     param = request.args.get
     report_id = param("report_id")
-    probe_asn = param("probe_asn")
+    probe_asn = param_asn("probe_asn")  # int / None
     probe_cc = param("probe_cc")
     test_name = param("test_name")
     since = param_date("since")
@@ -711,11 +711,6 @@ def list_measurements() -> Response:
 
     input_ = request.args.get("input")
     domain = request.args.get("domain")
-
-    if probe_asn is not None:
-        if probe_asn.startswith("AS"):
-            probe_asn = probe_asn[2:]
-        probe_asn = int(probe_asn)
 
     # Set reasonable since/until ranges if not specified. When looking up by
     # report_id a BTREE is used and since/until are not beneficial.
@@ -774,7 +769,7 @@ def _list_measurements_click(
     order_by,
     limit,
     offset,
-) -> Any:
+) -> Response:
     INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
 
     ## Create fastpath columns for query
