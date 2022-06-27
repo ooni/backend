@@ -757,7 +757,7 @@ def _list_measurements_click(
     until,
     report_id: ostr,
     probe_cc: ostr,
-    probe_asn: ostr,
+    probe_asn: Optional[int],
     test_name: ostr,
     anomaly,
     confirmed,
@@ -1459,13 +1459,13 @@ def get_torsf_stats() -> Response:
     if since:
         since = parse_date(since)
         where.append(sql.text("measurement_start_time > :since"))
-        query_params["since"] = since
+        query_params["since"] = str(since)
 
     if until:
-        until = parse_date(until)
+        until_td = parse_date(until)
         where.append(sql.text("measurement_start_time <= :until"))
-        query_params["until"] = until
-        cacheable = until < datetime.now() - timedelta(hours=72)
+        query_params["until"] = str(until_td)
+        cacheable = until_td < datetime.now() - timedelta(hours=72)
 
     # Assemble query
     where_expr = and_(*where)
