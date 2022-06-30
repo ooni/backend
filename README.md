@@ -28,13 +28,19 @@ This diagram represent the main flow of measurement data
 
 
 blockdiag {
-  Probes [color = "#ffeeee"]; 
-  Explorer [color = "#eeeeff"]; 
-  Probes -> "API: Probe services" -> "Fastpath" -> "DB: fastpath tbl" -> "API: Measurements" -> "Explorer";
-  "API: Probe services" -> "disk queue" -> "API uploader" -> "S3 jsonl" -> "API: Measurements";
-  "API uploader" -> "S3 postcan";
-  "API uploader" -> "DB jsonl tbl";
-  "DB jsonl tbl" -> "API: Measurements"
+ Probes [color = "#ffeeee"]; 
+ Explorer [color = "#eeeeff"]; 
+ "S3 jsonl" [shape = ellipse];
+ "S3 postcan" [shape = ellipse];
+ "DB jsonl tbl" [shape = ellipse];
+ "DB fastpath tbl" [shape = ellipse];
+ "disk queue" [shape = ellipse];
+
+ Probes -> "API: Probe services" -> "Fastpath" -> "DB fastpath tbl" -> "API: Measurements" -> "Explorer";
+ "API: Probe services" -> "disk queue" -> "API: uploader" -> "S3 jsonl" -> "API: Measurements";
+ "API: uploader" -> "S3 postcan";
+ "API: uploader" -> "DB jsonl tbl";
+ "DB jsonl tbl" -> "API: Measurements"
 }
 
 
