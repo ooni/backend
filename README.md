@@ -28,10 +28,15 @@ This diagram represent the main flow of measurement data
 
 
 blockdiag {
-  Probes [color = "#ffeeee"];
-  Explorer [color = "#eeeeff"];
-  Probes -> "API: Probe services" -> "Fastpath" -> "DB: fastpath table" -> "API: Measurements" -> "Explorer";
+  Probes [color = "#ffeeee"]; 
+  Explorer [color = "#eeeeff"]; 
+  Probes -> "API: Probe services" -> "Fastpath" -> "DB: fastpath tbl" -> "API: Measurements" -> "Explorer";
+  "API: Probe services" -> "disk queue" -> "API uploader" -> "S3 jsonl" -> "API: Measurements";
+  "API uploader" -> "S3 postcan";
+  "API uploader" -> "DB jsonl tbl";
+  "DB jsonl tbl" -> "API: Measurements"
 }
+
 
 Each measurement is processed individually in real time.
 
