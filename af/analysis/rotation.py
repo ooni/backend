@@ -513,10 +513,10 @@ def end_to_end_test(ipaddr: IP4a, fqdn: str) -> None:
         "tcp_connect": ["8.8.8.8:443"],
     }
     hdr = {"Host": fqdn, "Pragma": "no-cache"}
-    log.info(f"Testing {fqdn}")
+    log.info(f"Testing TH on {fqdn} using http_request and tcp_connect")
     r = requests.post(f"https://{ipaddr}", headers=hdr, verify=False, json=j)
     if r.ok and sorted(r.json()) == ["dns", "http_request", "tcp_connect"]:
-        log.info(f"Test successful")
+        log.info(f"End-to-end test successful")
         return
 
     log.error(f"Failed end to end test: {r.status_code}\nHeaders: {r.headers}")
@@ -582,7 +582,7 @@ def main() -> None:
 
     create_le_do_ssl_cert(dns_zone)
     setup_nginx(f"root@{new_droplet.ip_address}", dns_zone)
-    end_to_end_test(new_droplet.ip_address, f"{rdn}.dns_zone")
+    end_to_end_test(new_droplet.ip_address, f"{rdn}.{dns_zone}")
 
     # Update DNS A/AAAA records only when a new droplet is deployed
     update_dns_records(click, dig_oc_token, dns_zone, live_droplets)
