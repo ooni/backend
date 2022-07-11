@@ -4,7 +4,7 @@ Requires=ooni-rotation.service
 
 [Timer]
 Unit=ooni-rotation.service
-OnCalendar=weekly
+OnCalendar=Mon *-*-* 15:00:00
 Persistent=true
 
 [Install]
