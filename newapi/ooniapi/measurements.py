@@ -160,9 +160,11 @@ def _fetch_jsonl_measurement_body_inner(
 
 @metrics.timer("_fetch_jsonl_measurement_body_clickhouse")
 def _fetch_jsonl_measurement_body_clickhouse(
-    report_id, input: str, measurement_uid
+    report_id: str, input: Optional[str], measurement_uid
 ) -> Optional[bytes]:
-    """Fetch jsonl from S3, decompress it, extract msmt"""
+    """
+    Fetch jsonl from S3, decompress it, extract single msmt
+    """
     inp = input or ""  # NULL/None input is stored as ''
     try:
         # FIXME temporary hack to test reprocessing
@@ -268,9 +270,12 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
 
 
 @metrics.timer("fetch_measurement_body")
-def _fetch_measurement_body(report_id, input: str, measurement_uid) -> bytes:
-    """Fetch measurement body from either disk, jsonl, measurement spool dir
-    on another host or S3"""
+def _fetch_measurement_body(report_id: str, input: Optional[str], measurement_uid) -> bytes:
+    """Fetch measurement body from either:
+    - local measurement spool dir (.post files)
+    - JSONL files on S3
+    - remote measurement spool dir (another API/collector host)
+    """
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")
     # 5: Current format e.g.
