@@ -347,13 +347,14 @@ def get_raw_measurement() -> Response:
 
 
 @metrics.timer("get_measurement_meta_clickhouse")
-def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
+def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> dict:
     # Given report_id + input, fetch measurement data from fastpath table
     query = "SELECT * FROM fastpath "
     if input_ is None:
         # fastpath uses input = '' for empty values
         query += "WHERE report_id = :report_id AND input = '' "
     else:
+        # Join citizenlab to return category_code (useful only for web conn)
         query += """
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
         WHERE fastpath.input = :input
@@ -361,11 +362,11 @@ def _get_measurement_meta_clickhouse(report_id: str, input_) -> dict:
         """
     query_params = dict(input=input_, report_id=report_id)
     # Limit the time range where we scan for the measurement to improve
-    # performance
+    # performance. Ugly but very effective.
     try:
         rid_t = datetime.strptime(report_id[:8], "%Y%m%d")
-        query_params["begin"] = rid_t - timedelta(days=30)
-        query_params["end"] = rid_t + timedelta(days=30)
+        query_params["begin"] = rid_t - timedelta(days=30)  # type: ignore
+        query_params["end"] = rid_t + timedelta(days=30)  # type: ignore
         query += """
         AND fastpath.measurement_start_time > :begin
         AND fastpath.measurement_start_time < :end
