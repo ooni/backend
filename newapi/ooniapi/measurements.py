@@ -376,6 +376,7 @@ def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> d
     except Exception as e:
         log.error(e, exc_info=True)
 
+    query += "AND NOT startsWith(measurement_uid, '00') "  # reprocessing
     query += "LIMIT 1"
     msmt_meta = query_click_one_row(sql.text(query), query_params)
     if not msmt_meta:
