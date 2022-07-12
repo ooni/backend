@@ -106,7 +106,7 @@ def setup_collectors_ring(config):
     if not lh:
         import socket
 
-        lh = socket.gethostname()
+        lh = socket.getfqdn()
 
     colls = config["COLLECTORS"]
     c = deque(sorted(set(colls)))
