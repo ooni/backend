@@ -111,6 +111,8 @@ def setup_collectors_ring(config):
     colls = config["COLLECTORS"]
     c = deque(sorted(set(colls)))
     if lh in c:
+        # rotated this way to distribute load evenly when n > 2 collectors
+        # are in use
         while c[0] != lh:
             c.rotate()
         c.popleft()
@@ -118,7 +120,9 @@ def setup_collectors_ring(config):
 
     else:
         print(f"{lh} not found in collectors {colls}")
-        config["OTHER_COLLECTORS"] = deque(c)
+        config["OTHER_COLLECTORS"] = c
+
+    print(f"Other collectors: {c}")
 
 
 def setup_logging(log):
