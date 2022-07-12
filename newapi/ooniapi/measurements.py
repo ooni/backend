@@ -865,7 +865,7 @@ def _list_measurements_click(
             )
             fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
-    fpwhere.append(sql.text("measurement_uid NOT LIKE '00%'"))
+    fpwhere.append(sql.text("NOT startsWith(measurement_uid, '00')"))  # reprocessing
 
     fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
     # .limit(offset + limit)
