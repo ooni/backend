@@ -59,6 +59,7 @@ urllib_pool = urllib3.PoolManager()
 # type hints
 ostr = Optional[str]
 
+
 class QueryTimeoutError(HTTPException):
     code = 504
     description = "The database query timed out.\nTry changing the query parameters."
@@ -140,7 +141,8 @@ def get_measurement(measurement_id, download=None) -> Response:  # pragma: no co
 # # Fetching measurement bodies
 
 
-def _fetch_jsonl_measurement_body_inner(
+@metrics.timer("_fetch_jsonl_measurement_body_from_s3")
+def _fetch_jsonl_measurement_body_from_s3(
     s3path: str,
     linenum: int,
 ) -> bytes:
@@ -196,7 +198,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
     linenum = lookup["linenum"]
     log.debug(f"Fetching file {s3path} from S3")
     try:
-        return _fetch_jsonl_measurement_body_inner(s3path, linenum)
+        return _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
     except:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
         return None
@@ -209,6 +211,7 @@ def _unwrap_post(post: dict) -> dict:
     raise Exception("Unexpected format")
 
 
+@metrics.timer("_fetch_measurement_body_on_disk_by_msmt_uid")
 def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes]:
     """Fetch raw POST from disk, extract msmt
     This is used only for msmts that have been processed by the fastpath
@@ -270,7 +273,9 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
 
 
 @metrics.timer("fetch_measurement_body")
-def _fetch_measurement_body(report_id: str, input: Optional[str], measurement_uid) -> bytes:
+def _fetch_measurement_body(
+    report_id: str, input: Optional[str], measurement_uid
+) -> bytes:
     """Fetch measurement body from either:
     - local measurement spool dir (.post files)
     - JSONL files on S3
@@ -1004,7 +1009,9 @@ def validate(item: ostr, accepted: str) -> None:
         if c not in accepted:
             raise ValueError("Invalid characters")
 
+
 # URL parameter parsers
+
 
 def param_lowercase_underscore(name) -> ostr:
     p = request.args.get(name)
@@ -1194,7 +1201,7 @@ def get_aggregated() -> Response:
             raise ValueError("Invalid test name")
 
         resp_format = param("format", "JSON").upper()
-        download = (param("download", "").lower() == "true")
+        download = param("download", "").lower() == "true"
         assert resp_format in ("JSON", "CSV")
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})
