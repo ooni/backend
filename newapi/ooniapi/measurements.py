@@ -924,6 +924,7 @@ def _list_measurements_click(
     except OperationalError as exc:
         log.error(exc)
         if isinstance(exc.orig, QueryCanceledError):
+            # FIXME: this is a postgresql exception!
             # Timeout due to a slow query. Generate metric and do not feed it
             # to Sentry.
             abort(504)
