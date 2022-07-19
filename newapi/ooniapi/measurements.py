@@ -35,6 +35,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 from sqlalchemy import and_, text, select, sql, column
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
+import psycopg2  # debdeps: python3-psycopg2
 
 from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
@@ -272,6 +273,44 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
     return None
 
 
+# temporary hack
+ams_pg_conn = None
+
+
+@metrics.timer("_fetch_jsonl_measurement_body_ams_pg")
+def _fetch_jsonl_measurement_body_ams_pg(
+    report_id: str, input: Optional[str], measurement_uid
+) -> Optional[bytes]:
+    global ams_pg_conn
+    if ams_pg_conn is None:
+        log.info("Connecting to ams-pg PostgreSQL")
+        db_uri = "postgresql://readonly@ams-pg.ooni.org/metadb"
+        ams_pg_conn = psycopg2.connect(db_uri)
+
+    q = """SELECT s3path, linenum FROM jsonl WHERE
+    measurement_uid = %(mid)s OR (report_id = %(rid)s AND input = %(inp)s)
+    LIMIT 1"""
+    mid = "nevermatch" if measurement_uid is None else measurement_uid
+    query_params = dict(rid=report_id, inp=input, mid=mid)
+    with ams_pg_conn.cursor() as cur:
+        cur.execute(q, query_params)
+        row = cur.fetchone()
+        if row is None:
+            log.info(f"Not found on ams-pg jsonl {report_id} {input} {mid}")
+            metrics.incr("ams_pg_msmt_lookup_miss")
+            return None
+
+        log.info(f"Found on ams-pg jsonl {report_id} {input} {mid}")
+        metrics.incr("ams_pg_msmt_lookup_found")
+        s3path, linenum = row
+
+    try:
+        return _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
+    except:  # pragma: no cover
+        log.error(f"Failed to fetch file {s3path} from S3")
+        return None
+
+
 @metrics.timer("fetch_measurement_body")
 def _fetch_measurement_body(
     report_id: str, input: Optional[str], measurement_uid
@@ -298,6 +337,7 @@ def _fetch_measurement_body(
             or _fetch_jsonl_measurement_body_clickhouse(
                 report_id, input, measurement_uid
             )
+            or _fetch_jsonl_measurement_body_ams_pg(report_id, input, measurement_uid)
         )
 
     elif new_format and not fresh:
@@ -305,6 +345,7 @@ def _fetch_measurement_body(
             _fetch_jsonl_measurement_body_clickhouse(report_id, input, measurement_uid)
             or _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
             or _fetch_measurement_body_from_hosts(measurement_uid)
+            or _fetch_jsonl_measurement_body_ams_pg(report_id, input, measurement_uid)
         )
 
     else:
