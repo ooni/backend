@@ -350,8 +350,10 @@ def _fetch_measurement_body(
         )
 
     if body:
+        metrics.incr("msmt_body_not_found")
         return body
 
+    metrics.incr("msmt_body_found")
     raise MsmtNotFound
 
 
