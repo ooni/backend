@@ -410,21 +410,6 @@ def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> d
         AND fastpath.report_id = :report_id
         """
     query_params = dict(input=input_, report_id=report_id)
-    # Limit the time range where we scan for the measurement to improve
-    # performance. Ugly but very effective.
-    try:
-        rid_t = datetime.strptime(report_id[:8], "%Y%m%d")
-        query_params["begin"] = rid_t - timedelta(days=60)  # type: ignore
-        query_params["end"] = rid_t + timedelta(days=400)  # type: ignore
-        query += """
-        AND fastpath.measurement_start_time > :begin
-        AND fastpath.measurement_start_time < :end
-        """
-    except ValueError:
-        pass  # legacy report_id format without date
-    except Exception as e:
-        log.error(e, exc_info=True)
-
     query += "LIMIT 1"
     msmt_meta = query_click_one_row(sql.text(query), query_params)
     if not msmt_meta:
