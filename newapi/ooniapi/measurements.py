@@ -414,8 +414,8 @@ def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> d
     # performance. Ugly but very effective.
     try:
         rid_t = datetime.strptime(report_id[:8], "%Y%m%d")
-        query_params["begin"] = rid_t - timedelta(days=30)  # type: ignore
-        query_params["end"] = rid_t + timedelta(days=30)  # type: ignore
+        query_params["begin"] = rid_t - timedelta(days=60)  # type: ignore
+        query_params["end"] = rid_t + timedelta(days=400)  # type: ignore
         query += """
         AND fastpath.measurement_start_time > :begin
         AND fastpath.measurement_start_time < :end
