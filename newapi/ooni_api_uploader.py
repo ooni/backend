@@ -6,7 +6,9 @@ Reads /etc/ooni/api.conf
 
 from configparser import ConfigParser
 from pathlib import Path
+from pathlib import PosixPath as PP
 from datetime import datetime, timedelta
+from typing import List, Dict
 import gzip
 import logging
 import tarfile
@@ -68,14 +70,14 @@ def update_db_table(conn, lookup_list, jsonl_s3path):
 
 
 @metrics.timer("upload_measurement")
-def upload_to_s3(s3, bucket_name, tarf, s3path):
+def upload_to_s3(s3, bucket_name: str, tarf: PP, s3path: str) -> None:
     obj = s3.Object(bucket_name, s3path)
     log.info(f"Uploading {s3path}")
     obj.put(Body=tarf.read_bytes())
 
 
 @metrics.timer("fill_postcan")
-def fill_postcan(hourdir, postcanf):
+def fill_postcan(hourdir: PP, postcanf: PP) -> List[PP]:
     msmt_files = sorted(f for f in hourdir.iterdir() if f.suffix == ".post")
     if not msmt_files:
         log.info(f"Nothing to fill {postcanf.name}")
@@ -99,7 +101,7 @@ def fill_postcan(hourdir, postcanf):
 
 
 @metrics.timer("fill_jsonl")
-def fill_jsonl(measurements, jsonlf):
+def fill_jsonl(measurements: List[PP], jsonlf: PP) -> List[Dict]:
     log.info(f"Filling {jsonlf.name}")
     # report_id, input, 2020092119_IT_tor.n0.0.jsonl.gz
     lookup_list = []
@@ -141,7 +143,7 @@ def fill_jsonl(measurements, jsonlf):
     return lookup_list
 
 
-def delete_msmt_posts(measurements):
+def delete_msmt_posts(measurements: List[PP]) -> None:
     log.info(f"Deleting {len(measurements)} measurements")
     for msmt_f in measurements:
         msmt_f.unlink()
