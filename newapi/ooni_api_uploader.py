@@ -14,9 +14,11 @@ import yaml
 
 import ujson
 import boto3
-import psycopg2  # debdeps: python3-psycopg2
-from psycopg2.extras import execute_values
 import statsd  # debdeps: python3-statsd
+
+# debdeps: python3-clickhouse-driver
+from clickhouse_driver import Client as Clickhouse
+
 
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="ooni_api_uploader")
 log = logging.getLogger("ooni_api_uploader")
@@ -47,35 +49,22 @@ def read_conf():
     return conf["DEFAULT"]
 
 
-def ping_db(conn):
-    q = "SELECT pg_postmaster_start_time();"
-    with conn.cursor() as cur:
-        cur.execute(q)
-        row = cur.fetchone()
-        log.debug("Database start time: %s", row[0])
-
-
-# FIXME: move to ClickHouse
 def connect_to_db(conf):
-    log.info("Connecting to database")
-    db_uri = conf.get(
-        "db_uri", "postgresql://shovel:yEqgNr2eXvgG255iEBxVeP@localhost/metadb"
-    )
-    conn = psycopg2.connect(db_uri)
+    default = "clickhouse://api:api@localhost/default"
+    uri = conf.get("db_uri", default)
+    log.info(f"Connecting to database on {uri}")
+    conn = Clickhouse.from_url(uri)
     return conn
 
 
 @metrics.timer("update_db_table")
 def update_db_table(conn, lookup_list, jsonl_s3path):
-    rows = [
-        (rid, inp, jsonl_s3path, num, msmt_uid)
-        for rid, inp, msmt_uid, num in lookup_list
-    ]
-    q = "INSERT INTO jsonl (report_id, input, s3path, linenum, measurement_uid) VALUES %s"
-    log.info("Writing to DB")
-    with conn.cursor() as cur:
-        execute_values(cur, q, rows)
-        conn.commit()
+    for d in lookup_list:
+        d["s3path"] = jsonl_s3path
+
+    q = "INSERT INTO jsonl (report_id, input, s3path, linenum, measurement_uid) VALUES"
+    log.info(f"Writing {len(lookup_list)} rows to DB")
+    conn.execute(q, lookup_list)
 
 
 @metrics.timer("upload_measurement")
@@ -141,10 +130,13 @@ def fill_jsonl(measurements, jsonlf):
             jf.write(ujson.dumps(msm).encode())
             jf.write(b"\n")
 
-            rid = msm.get("report_id", "") or ""
-            input = msm.get("input", "") or ""
+            rid = msm.get("report_id") or ""
+            input = msm.get("input") or ""
             msmt_uid = msmt_f.name[:-5]
-            lookup_list.append((rid, input, msmt_uid, linenum))
+            d = dict(
+                report_id=rid, input=input, measurement_uid=msmt_uid, linenum=linenum
+            )
+            lookup_list.append(d)
 
     return lookup_list
 
@@ -187,7 +179,6 @@ def main():
             log.info(f"Stopping before {hourdir_time}")
             break
 
-        ping_db(db_conn)
         log.info(f"Processing {hourdir}")
         # Split msmts across multiple postcans and jsonl files
         can_cnt = 0
