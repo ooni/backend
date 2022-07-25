@@ -155,9 +155,10 @@ def main():
     bucket_name = conf.get("bucket_name")
     spooldir = Path(conf.get("msmt_spool_dir"))
     format_char = "n"
-    collector_id = conf.get("collector_id", "0")
+    collector_id = conf.get("collector_id")
     identity = f"{format_char}{collector_id}"
     log.info(f"Uploader {collector_id} starting")
+    assert collector_id, "collector_id is not set"
     log.info(f"Using bucket {bucket_name} and spool {spooldir}")
 
     s3 = create_s3_client(conf)
