@@ -61,6 +61,7 @@ def validate_conf(app, conffile):
     conf_keys = (
         "BASE_URL",
         "COLLECTORS",
+        "COLLECTOR_ID",
         "DATABASE_STATEMENT_TIMEOUT",
         "CLICKHOUSE_URL",
         "GITHUB_ORIGIN_REPO",

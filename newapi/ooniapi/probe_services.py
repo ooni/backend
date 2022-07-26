@@ -36,7 +36,7 @@ def req_json():
 
 def generate_report_id(test_name, cc: str, asn_i: int) -> str:
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    cid = "2"  # collector id  TODO read from conf
+    cid = current_app.config["COLLECTOR_ID"]
     rand = b64encode(urandom(12), b"oo").decode()
     stn = test_name.replace("_", "")
     rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
