@@ -1,6 +1,7 @@
 # Configuration for OONI API. This is a sample file specific to the OONI setup
 # Syntax: treat it as a Python file, but only uppercase variables are used
 COLLECTORS = []
+COLLECTOR_ID = "X"  # usually an integer
 
 DATABASE_STATEMENT_TIMEOUT = 30
 
@@ -14,6 +15,7 @@ AUTOCLAVED_BASE_URL = "http://datacollector.infra.ooni.io/ooni-public/autoclaved
 # S3 endpoint
 S3_ACCESS_KEY_ID = "CHANGEME"
 S3_SECRET_ACCESS_KEY = "CHANGEME"
+S3_BUCKET_NAME = "CHANGEME"
 S3_SESSION_TOKEN = "CHANGEME"
 S3_ENDPOINT_URL = "CHANGEME"
 
