@@ -80,6 +80,7 @@ def validate_conf(app, conffile):
         "MSMT_SPOOL_DIR",
         "PSIPHON_CONFFILE",
         "S3_ACCESS_KEY_ID",
+        "S3_BUCKET_NAME",
         "S3_ENDPOINT_URL",
         "S3_SECRET_ACCESS_KEY",
         "S3_SESSION_TOKEN",

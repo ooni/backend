@@ -148,9 +148,9 @@ def _fetch_jsonl_measurement_body_from_s3(
     linenum: int,
 ) -> bytes:
     log = current_app.logger
-    # TODO configure from file
-    BASEURL = "https://ooni-data-eu-fra.s3.amazonaws.com/"
-    url = urljoin(BASEURL, s3path)
+    bucket_name = current_app.config["S3_BUCKET_NAME"]
+    baseurl = f"https://{bucket_name}.s3.amazonaws.com/"
+    url = urljoin(baseurl, s3path)
     log.info(f"Fetching {url}")
     r = urlopen(url)
     f = gzip.GzipFile(fileobj=r, mode="r")
