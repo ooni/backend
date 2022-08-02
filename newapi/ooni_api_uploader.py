@@ -86,7 +86,7 @@ def fill_postcan(hourdir: PP, postcanf: PP) -> List[PP]:
     measurements = []
     postcan_byte_thresh = 20 * 1000 * 1000
     # Open postcan
-    with tarfile.open(str(postcanf), "w") as tar:
+    with tarfile.open(str(postcanf), "w:gz") as tar:
         for msmt_f in msmt_files:
             # Add a msmt and delete the msmt file
             metrics.incr("msmt_count")
