@@ -88,7 +88,7 @@ def list_files() -> Response:
 def get_measurement(measurement_id, download=None) -> Response:  # pragma: no cover
     """Get one measurement by measurement_id,
     Returns only the measurement without extra data from the database
-
+    Currently not implemented.
     ---
     parameters:
       - name: measurement_id
