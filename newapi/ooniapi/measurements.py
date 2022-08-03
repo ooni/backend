@@ -373,8 +373,13 @@ def get_raw_measurement() -> Response:
     report_id = param("report_id")
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
-    input = param("input")
-    body = _fetch_measurement_body(report_id, input, None)
+    input_ = param("input")
+
+    # _fetch_measurement_body needs the UID
+    msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
+    measurement_uid = msmt_meta["measurement_uid"]
+
+    body = _fetch_measurement_body(report_id, input_, measurement_uid)
     resp = make_response(body)
     resp.headers.set("Content-Type", "application/json")
     resp.cache_control.max_age = 24 * 3600
