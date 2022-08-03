@@ -82,61 +82,29 @@ def list_files() -> Response:
     return cachedjson("1d", msg="not implemented")
 
 
-# FIXME respond with help message
+# FIXME
 @metrics.timer("get_measurement")
 @api_msm_blueprint.route("/v1/measurement/<measurement_id>")
 def get_measurement(measurement_id, download=None) -> Response:  # pragma: no cover
     """Get one measurement by measurement_id,
-    fetching the file from S3 or the fastpath host as needed
     Returns only the measurement without extra data from the database
-    fetching the file from the fastpath host
+
     ---
     parameters:
       - name: measurement_id
         in: path
         required: true
         type: string
-        description: The measurement_id to retrieve the measurement for
       - name: download
         in: query
         type: boolean
-        description: If we should be triggering a file download
+        description: triggers a file download
     responses:
       '200':
         description: Returns the JSON blob for the specified measurement
-        schema:
-          $ref: "#/definitions/MeasurementBlob"
     """
-    if not measurement_id.startswith(FASTPATH_MSM_ID_PREFIX):
-        raise BadRequest("No measurement found")
-
     log = current_app.logger
-    tid = measurement_id[len(FASTPATH_MSM_ID_PREFIX) :]
-    path = "/measurements/{}.json.lz4".format(tid)
-    log.info(
-        "Incoming fastpath query %r. Fetching %s:%d%s",
-        measurement_id,
-        FASTPATH_SERVER,
-        FASTPATH_PORT,
-        path,
-    )
-    # FIXME
-    conn = http.client.HTTPConnection(FASTPATH_SERVER, FASTPATH_PORT)
-    conn.request("GET", path)
-    r = conn.getresponse()
-    log.debug("Response status: %d", r.status)
-    try:
-        assert r.status == 200
-        blob = r.read()
-        conn.close()
-        log.debug("Decompressing LZ4 data")
-        blob = lz4framed.decompress(blob)
-        response = make_response(blob)
-        response.headers.set("Content-Type", "application/json")
-        log.debug("Sending JSON response")
-        return response
-    except Exception:
-        raise BadRequest("No measurement found")
+    raise MsmtNotFound
 
 
 # # Fetching measurement bodies
