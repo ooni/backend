@@ -128,7 +128,7 @@ def get_measurement(measurement_id) -> Response:
     resp.mimetype = "application/json"
     resp.cache_control.max_age = 3600
     if download:
-        set_dload(resp, "measurement.json")
+        set_dload(resp, f"{measurement_id}.json")
 
     return resp
 
