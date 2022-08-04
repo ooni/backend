@@ -82,13 +82,11 @@ def list_files() -> Response:
     return cachedjson("1d", msg="not implemented")
 
 
-# FIXME
 @metrics.timer("get_measurement")
 @api_msm_blueprint.route("/v1/measurement/<measurement_id>")
-def get_measurement(measurement_id, download=None) -> Response:  # pragma: no cover
+def get_measurement(measurement_id) -> Response:
     """Get one measurement by measurement_id,
     Returns only the measurement without extra data from the database
-    Currently not implemented.
     ---
     parameters:
       - name: measurement_id
@@ -104,7 +102,35 @@ def get_measurement(measurement_id, download=None) -> Response:  # pragma: no co
         description: Returns the JSON blob for the specified measurement
     """
     log = current_app.logger
-    raise MsmtNotFound
+    param = request.args.get
+    assert measurement_id
+    download = param("download", "").lower() == "true"
+    query = """SELECT s3path, linenum FROM jsonl
+        PREWHERE (report_id, input) IN (
+            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid
+        )
+        LIMIT 1"""
+    query_params = dict(uid=measurement_id)
+    lookup = query_click_one_row(sql.text(query), query_params)
+    if lookup is None:
+        return make_response("Incorrect or inexistent measurement_id", 400)
+
+    s3path = lookup["s3path"]
+    linenum = lookup["linenum"]
+    log.debug(f"Fetching file {s3path} from S3")
+    try:
+        body = _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
+    except:  # pragma: no cover
+        log.error(f"Failed to fetch file {s3path} from S3")
+        return make_response("Incorrect or inexistent measurement_id", 400)
+
+    resp = make_response(body)
+    resp.mimetype = "application/json"
+    resp.cache_control.max_age = 3600
+    if download:
+        set_dload(resp, "measurement.json")
+
+    return resp
 
 
 # # Fetching measurement bodies

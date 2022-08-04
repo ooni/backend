@@ -375,6 +375,30 @@ def test_get_measurement_meta_duplicate_in_fp(client, fastpath_dup_rid_input):
     assert response["scores"] != "{}"  # from faspath
 
 
+@pytest.mark.skip(reason="WIP")
+def test_get_measurement_meta_meek(client):
+    rid = "20210709T000901Z_meekfrontedrequeststest_AR_16814_n1_eFZoc0FuSddWPvmL"
+    inp = "{a0.awsstatic.com,d2cly7j4zqgua7.cloudfront.net}"
+    response = api(client, f"measurement_meta?report_id={rid}&input={inp}&full=True")
+    data = response.pop("raw_measurement")
+    assert response == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": False,
+        "input": inp,
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
+        "report_id": rid,
+        "test_name": "web_connectivity",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
+    }
+    assert data
+
+
 # https://explorer.ooni.org/measurement/20210622T144545Z_riseupvpn_MM_133384_n1_VJkB5EObudGDpy9Y
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_get_raw_measurement_input_null_bug(client):
@@ -462,7 +486,9 @@ def test_list_measurements_slow_order_by_complete(
     response = api(client, url)
 
 
-@pytest.mark.parametrize("f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity"))
+@pytest.mark.parametrize(
+    "f", ("probe_cc=YT", "probe_asn=AS3352", "test_name=web_connectivity")
+)
 def test_list_measurements_slow_order_by_group_1(f, log, client):
     # filter on probe_cc or probe_asn or test_name
     # order by --> "test_start_time"
@@ -549,7 +575,9 @@ def today_range():
 @pytest.mark.parametrize("anomaly", (True, False))
 @pytest.mark.parametrize("confirmed", (True, False))
 @pytest.mark.parametrize("failure", (True, False))
-def test_list_measurements_filter_flags_fastpath(anomaly, confirmed, failure, client, log):
+def test_list_measurements_filter_flags_fastpath(
+    anomaly, confirmed, failure, client, log
+):
     """Test filtering by anomaly/confirmed/msm_failure using the cartesian product
 
     SELECT COUNT(*), anomaly, confirmed, msm_failure AS failure
@@ -674,17 +702,20 @@ def test_list_measurements_ZZ(client):
 ## get_measurement ##
 
 
-@pytest.mark.skip(reason="broken")
-def test_get_measurement(client):
-    response = api(client, "measurement/temp-id-321045320")
-    assert response["measurement_start_time"] == "2019-07-20 11:43:55", jd(response)
-    assert response["probe_asn"] == "AS3352"
-    assert response["probe_cc"] == "ES"
-    assert (
-        response["report_filename"]
-        == "2019-07-20/20190717T115517Z-ES-AS3352-web_connectivity-20190720T201845Z_AS3352_Rmagvbg0ufqt8Q0kZBa5Hb0gIzfIBCgHb2PTw0VMLIuHn7mmZ4-0.2.0-probe.json"
-    )
-    assert len(response["test_keys"]["requests"][0]["response"]["body"]) == 72089
+def test_get_measurement_found(client):
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    response = api(client, f"measurement/{uid}")
+    assert response["measurement_start_time"] == "2021-07-09 00:55:13"
+    assert response["probe_asn"] == "AS4818"
+    assert response["probe_cc"] == "MY"
+
+
+def test_get_measurement_found_dload(client):
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    response = api(client, f"measurement/{uid}?download=true")
+    assert response["measurement_start_time"] == "2021-07-09 00:55:13"
+    assert response["probe_asn"] == "AS4818"
+    assert response["probe_cc"] == "MY"
 
 
 def test_get_measurement_missing_pipeline(client):
