@@ -70,7 +70,6 @@ def validate_conf(app, conffile):
         "GITHUB_USER",
         "GITHUB_WORKDIR",
         "JWT_ENCRYPTION_KEY",
-        "LOGIN_BASE_URL",
         "MAIL_PASSWORD",
         "MAIL_PORT",
         "MAIL_SERVER",

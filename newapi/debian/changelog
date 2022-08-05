@@ -1,3 +1,9 @@
+ooni-api (1.0.17) unstable; urgency=medium
+
+  * Support redirect_to in registration
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 05 Aug 2022 15:13:19 +0100
+
 ooni-api (1.0.15) unstable; urgency=medium
 
   * Reprocessing-related cleanup

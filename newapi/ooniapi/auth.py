@@ -4,7 +4,7 @@ Authentication API
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from functools import wraps
-from urllib.parse import urljoin
+import urllib.parse as urlp
 from typing import Optional, Dict, Any
 import hashlib
 import re
@@ -182,11 +182,9 @@ def _send_email(dest_addr: str, msg: EmailMessage) -> None:
         raise
 
 
-def send_login_email(dest_addr: str, token: str) -> None:
+def send_login_email(dest_addr: str, login_url: str) -> None:
     """Format and send a registration/login  email"""
     src_addr = current_app.config["MAIL_SOURCE_ADDRESS"]
-    baseurl = current_app.config["LOGIN_BASE_URL"]
-    url = urljoin(baseurl, f"?token={token}")
 
     msg = EmailMessage()
     msg["Subject"] = "OONI Account activation"
@@ -195,7 +193,7 @@ def send_login_email(dest_addr: str, token: str) -> None:
 
     txt = f"""Welcome to OONI.
 
-    Please login by following {url}
+    Please login by following {login_url}
 
     The link can be used on multiple devices and will expire in 24 hours.
     """
@@ -206,7 +204,7 @@ def send_login_email(dest_addr: str, token: str) -> None:
   <body>
     <p>Welcome to OONI</p>
     <p>
-        <a href="{url}">Please login here</a>
+        <a href="{login_url}">Please login here</a>
     </p>
     <p>The link can be used on multiple devices and will expire in 24 hours.</p>
   </body>
@@ -214,6 +212,21 @@ def send_login_email(dest_addr: str, token: str) -> None:
 """
     msg.add_alternative(html, subtype="html")
     _send_email(dest_addr, msg)
+
+
+def generate_login_url(rt_url: str, token: str) -> str:
+    """Validates the redirect_to URL used in registration and builds login_url"""
+    u = urlp.urlparse(rt_url)
+    if not (u.scheme == "https" and u.netloc.endswith(".ooni.org")):
+        raise ValueError("Invalid URL")
+    dn = u.netloc[:-9]  # without .ooni.org
+    valid_dnames = ("explorer", "explorer.test", "test-list", "test-list.test")
+    if dn not in valid_dnames:
+        raise ValueError("Invalid URL", dn)
+
+    d = dict(token=token, redirect_path=u.path, redirect_query=u.query)
+    e = urlp.urlencode(d)
+    return urlp.urlunsplit(("https", u.netloc, "/login", e, ""))
 
 
 @metrics.timer("user_register")
@@ -232,6 +245,8 @@ def user_register() -> Response:
           properties:
             email_address:
               type: string
+            redirect_to:
+              type: string
     responses:
       200:
         description: Confirmation
@@ -244,6 +259,7 @@ def user_register() -> Response:
     if EMAIL_RE.fullmatch(email_address) is None:
         return jerror("Invalid email address")
 
+    redirect_to = req.get("redirect_to", "").strip()
     account_id = hash_email_address(email_address)
     now = datetime.utcnow()
     expiration = now + timedelta(days=1)
@@ -252,12 +268,17 @@ def user_register() -> Response:
         "nbf": now,
         "exp": expiration,
         "aud": "register",
-        "account_id": account_id
+        "account_id": account_id,
     }
     registration_token = create_jwt(payload)
+    try:
+        login_url = generate_login_url(redirect_to, registration_token)
+    except Exception:
+        return jerror("Invalid request")
+
     log.info("sending registration token")
     try:
-        send_login_email(email_address, registration_token)
+        send_login_email(email_address, login_url)
         log.info("email sent")
     except Exception as e:
         log.error(e, exc_info=True)
