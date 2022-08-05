@@ -214,8 +214,9 @@ def send_login_email(dest_addr: str, login_url: str) -> None:
     _send_email(dest_addr, msg)
 
 
-def generate_login_url(rt_url: str, token: str) -> str:
-    """Validates the redirect_to URL used in registration and builds login_url"""
+def validate_redirect_url(rt_url: str) -> (str, str):
+    """Validates the redirect_to URL used in registration, rebuilds it
+    and return the FQDN"""
     u = urlp.urlparse(rt_url)
     if not (u.scheme == "https" and u.netloc.endswith(".ooni.org")):
         raise ValueError("Invalid URL")
@@ -224,9 +225,7 @@ def generate_login_url(rt_url: str, token: str) -> str:
     if dn not in valid_dnames:
         raise ValueError("Invalid URL", dn)
 
-    d = dict(token=token, redirect_path=u.path, redirect_query=u.query)
-    e = urlp.urlencode(d)
-    return urlp.urlunsplit(("https", u.netloc, "/login", e, ""))
+    return u.geturl(), u.netloc
 
 
 @metrics.timer("user_register")
@@ -260,6 +259,11 @@ def user_register() -> Response:
         return jerror("Invalid email address")
 
     redirect_to = req.get("redirect_to", "").strip()
+    try:
+        redirect_to, login_fqdn = validate_redirect_url(redirect_to)
+    except Exception:
+        return jerror("Invalid request")
+
     account_id = hash_email_address(email_address)
     now = datetime.utcnow()
     expiration = now + timedelta(days=1)
@@ -269,12 +273,12 @@ def user_register() -> Response:
         "exp": expiration,
         "aud": "register",
         "account_id": account_id,
+        "redirect_to": redirect_to,
     }
     registration_token = create_jwt(payload)
-    try:
-        login_url = generate_login_url(redirect_to, registration_token)
-    except Exception:
-        return jerror("Invalid request")
+
+    e = urlp.urlencode(dict(token=registration_token))
+    login_url = urlp.urlunsplit(("https", login_fqdn, "/login", e, ""))
 
     log.info("sending registration token")
     try:
@@ -319,7 +323,7 @@ def user_login() -> Response:
         description: JWT token with aud=register
     responses:
       200:
-        description: Login response, set cookie
+        description: JSON with "redirect_to" or "msg" key; set cookie
     """
     log = current_app.logger
     token = request.args.get("k", "")
@@ -335,9 +339,10 @@ def user_login() -> Response:
     log.info("user login successful")
     # Store account role in token to prevent frequent DB lookups
     role = _get_account_role(dec["account_id"]) or "user"
+    redirect_to = dec.get("redirect_to", "")
 
     token = _create_session_token(dec["account_id"], role)
-    r = make_response(jsonify(), 200)
+    r = make_response(jsonify(redirect_to=redirect_to), 200)
     set_JWT_cookie(r, token)
     r.cache_control.no_cache = True
     return r

@@ -89,17 +89,28 @@ def test_login_user_bogus_token(client, mocksmtp):
     assert r.json == {"error": "Invalid credentials"}
 
 
-def test_user_register_non_valid(client, mocksmtp):
-    d = dict(email_address="nick@localhost")  # no FQDN
+def test_user_register_non_valid_email(client, mocksmtp):
+    d = dict(
+        email_address="nick@localhost", redirect_to="https://explorer.ooni.org"
+    )  # no FQDN
     r = client.post("/api/v1/user_register", json=d)
     assert r.status_code == 400
     assert r.json == {"error": "Invalid email address"}
 
 
+def test_user_register_non_valid_redirect(client, mocksmtp):
+    d = dict(
+        email_address="nick@a.org", redirect_to="https://BOGUS.ooni.org"
+    )  # bogus fqdn
+    r = client.post("/api/v1/user_register", json=d)
+    assert r.status_code == 400
+    assert r.json == {"error": "Invalid request"}
+
+
 def _register_and_login(client, email_address):
     ooniapi.auth._remove_from_session_expunge(email_address)
     # # return cookie header for further use
-    d = dict(email_address=email_address)
+    d = dict(email_address=email_address, redirect_to="https://explorer.ooni.org")
     r = client.post("/api/v1/user_register", json=d)
     assert r.status_code == 200
     assert r.json == {"msg": "ok"}
@@ -125,10 +136,11 @@ def _register_and_login(client, email_address):
     assert url, msg
     u = urlparse(url)
     token = u.query.split("=")[1]
-    assert len(token) == 215
+    assert len(token) == 271
 
     r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200, r.json
+    assert r.json == {'redirect_to': 'https://explorer.ooni.org'}
     cookies = r.headers.getlist("Set-Cookie")
     assert len(cookies) == 1
     c = cookies[0]
@@ -138,17 +150,21 @@ def _register_and_login(client, email_address):
 
 
 def test_user_register_and_logout(client, mocksmtp):
-    assert client.get("/api/_/account_metadata").json == {'logged_in': False} # not logged in
+    assert client.get("/api/_/account_metadata").json == {
+        "logged_in": False
+    }  # not logged in
     _register_and_login(client, user_e)
-    assert client.get("/api/_/account_metadata").json != {} # logged in
+    assert client.get("/api/_/account_metadata").json != {}  # logged in
     r = client.post("/api/v1/user_logout")
     assert r.status_code == 200
-    assert client.get("/api/_/account_metadata").json == {'logged_in': False} # not logged in
+    assert client.get("/api/_/account_metadata").json == {
+        "logged_in": False
+    }  # not logged in
 
 
 def test_user_register_and_get_metadata(client, mocksmtp):
     r = client.get("/api/_/account_metadata")
-    assert r.json == {'logged_in': False}
+    assert r.json == {"logged_in": False}
     _register_and_login(client, user_e)
     r = client.get("/api/_/account_metadata")
     assert r.json == dict(role="user", logged_in=True)
