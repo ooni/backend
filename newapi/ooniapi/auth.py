@@ -214,7 +214,7 @@ def send_login_email(dest_addr: str, login_url: str) -> None:
     _send_email(dest_addr, msg)
 
 
-def validate_redirect_url(rt_url: str) -> (str, str):
+def validate_redirect_url(rt_url: str) -> tuple[str, str]:
     """Validates the redirect_to URL used in registration, rebuilds it
     and return the FQDN"""
     u = urlp.urlparse(rt_url)
