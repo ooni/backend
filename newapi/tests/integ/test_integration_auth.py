@@ -124,11 +124,10 @@ def _register_and_login(client, email_address):
     assert "Subject: OONI Account activation" in msg
     # Decode MIME-quoted email
     msg = quopri.decodestring(msg)
-    # Look for:
-    #    <a href="https://CHANGEME/login?token=...">Please login here</a>
+    # Look for login URL in HTML
     for line in msg.splitlines():
-        if b'<a href="https://' in line:
-            assert b"Please login" in line
+        if b'<a href="https://explorer.ooni.org/login?token=' in line:
+            assert b"Please login here" in line
             line = line.decode()
             url = line.split('"')[1]
             break
