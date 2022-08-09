@@ -221,7 +221,7 @@ def validate_redirect_url(rt_url: str) -> Tuple[str, str]:
     if not (u.scheme == "https" and u.netloc.endswith(".ooni.org")):
         raise ValueError("Invalid URL")
     dn = u.netloc[:-9]  # without .ooni.org
-    valid_dnames = ("explorer", "explorer.test", "test-list", "test-list.test")
+    valid_dnames = ("explorer", "explorer.test", "test-lists", "test-lists.test")
     if dn not in valid_dnames:
         raise ValueError("Invalid URL", dn)
 
