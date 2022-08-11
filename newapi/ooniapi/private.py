@@ -859,6 +859,7 @@ def api_private_domain_metadata() -> Response:
 
     params = {str(idx): d for idx, d in enumerate(domain_variations)}
     domain_q = "OR ".join([f"domain = %({idx})s " for idx in params.keys()])
+    # case 1: domain with or without www is in the global list (cc = 'ZZ')
     res = query_click_one_row(
         f"""
         SELECT category_code, domain 
