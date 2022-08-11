@@ -916,5 +916,4 @@ def api_private_domain_metadata() -> Response:
         "2h",
         category_code=category_code,
         canonical_domain=canonical_domain,
-        domain=domain,
     )
