@@ -414,9 +414,7 @@ def api_private_website_test_urls() -> Response:
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
     """
-    q = query_click_one_row(
-        sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn)
-    )
+    q = query_click_one_row(sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn))
     total_count = q["input_count"] if q else 0
 
     # Group msmts by CC / ASN / period with LIMIT and OFFSET
@@ -842,3 +840,53 @@ def api_private_circumvention_runtime_stats() -> Response:
 
     except Exception as e:
         return jsonify({"v": 0, "error": str(e)})
+
+
+@api_private_blueprint.route("/domain_metadata")
+def api_private_domain_metadata() -> Response:
+    domain = request.args.get("domain")
+
+    domain_variations = [domain]
+    if domain.startswith("www."):
+        domain_variations.append(domain.lstrip("www."))
+    else:
+        domain_variations.append("www." + domain)
+
+    category_code = "MISC"
+    canonical_domain = sorted(domain_variations, key=len)[0]
+
+    params = {str(idx): d for idx, d in enumerate(domain_variations)}
+    domain_q = "OR ".join([f"domain = %({idx})s " for idx in params.keys()])
+    res = query_click_one_row(
+        f"""
+        SELECT category_code, domain 
+        FROM citizenlab 
+        WHERE ({domain_q})
+        AND cc = 'ZZ' 
+        ORDER BY length(url)
+        LIMIT 1
+    """,
+        params,
+    )
+    if not res:
+        res2 = query_click_one_row(
+            f"""
+            SELECT category_code FROM citizenlab 
+            WHERE ({domain_q})
+            ORDER BY length(url)
+            LIMIT 1
+        """,
+            params,
+        )
+        if res2:
+            category_code = res2["category_code"]
+    else:
+        category_code = res["category_code"]
+        canonical_domain = res["domain"]
+
+    return cachedjson(
+        "2h",
+        category_code=category_code,
+        canonical_domain=canonical_domain,
+        domain=domain,
+    )

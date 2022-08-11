@@ -105,6 +105,29 @@ def test_private_api_test_coverage_with_groups(client, log):
     assert 27 < len(resp["network_coverage"]) < 32
 
 
+def test_private_api_domain_metadata(client):
+    url = "domain_metadata?domain=facebook.com"
+    resp = privapi(client, url)
+    assert resp["category_code"] == "GRP"
+    assert resp["canonical_domain"] == "www.facebook.com"
+
+    url = "domain_metadata?domain=www.facebook.com"
+    resp = privapi(client, url)
+    assert resp["category_code"] == "GRP"
+    assert resp["canonical_domain"] == "www.facebook.com"
+
+    url = "domain_metadata?domain=www.twitter.com"
+    resp = privapi(client, url)
+    assert resp["category_code"] == "GRP"
+    assert resp["canonical_domain"] == "twitter.com"
+
+    url = "domain_metadata?domain=www.this-domain-is-not-in-the-test-lists-for-sure.com"
+    resp = privapi(client, url)
+    assert resp["category_code"] == "MISC"
+    assert resp["canonical_domain"] == "this-domain-is-not-in-the-test-lists-for-sure.com"
+
+
+
 @pytest.mark.skip("FIXME not deterministic")
 def test_private_api_website_networks(client, log):
     url = "website_networks?probe_cc=US"
