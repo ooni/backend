@@ -845,6 +845,8 @@ def api_private_circumvention_runtime_stats() -> Response:
 @api_private_blueprint.route("/domain_metadata")
 def api_private_domain_metadata() -> Response:
     domain = request.args.get("domain")
+    if domain is None:
+        raise BadRequest("missing domain")
 
     domain_variations = [domain]
     if domain.startswith("www."):
