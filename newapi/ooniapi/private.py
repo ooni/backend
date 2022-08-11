@@ -871,6 +871,8 @@ def api_private_domain_metadata() -> Response:
         params,
     )
     if not res:
+        # case 2: domain only inside a country list, so we just select the
+        # shortest domain among the one with and without www
         res2 = query_click_one_row(
             f"""
             SELECT category_code FROM citizenlab 
