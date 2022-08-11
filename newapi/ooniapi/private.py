@@ -844,6 +844,29 @@ def api_private_circumvention_runtime_stats() -> Response:
 
 @api_private_blueprint.route("/domain_metadata")
 def api_private_domain_metadata() -> Response:
+    """
+    The goal of this endpoint is to return the primary category code of a
+    certain domain_name and it's canonical representation.
+    We consider the primary category code to be the category code of whatever is
+    the shortest URL in the test lists giving higher priority to what is in the
+    global list (ex. if we have https://twitter.com/amnesty categorised as HUMR
+    and https://twitter.com/ as GRP, we will be picking GRP as the canonical
+    category code).
+    The canonical representation of a domain is whatever is present in the
+    global list or if it's not present, then the shortest possible
+    representation. 
+    Some research related to this problem was done here:
+    https://gist.github.com/hellais/fab319ae20b0ccca7b548a060ed66e14, where some
+    notes were taken on what fixes need to be done in the test-lists to ensure
+    all of this works as expected (ex. moving shortest URL representations from
+    the country lists into the global list).
+
+    Returns:
+    {
+        "category_code": "CITIZENLAB_CATEGORY_CODE",
+        "canonical_domain": "canonical.tld"
+    }
+    """
     domain = request.args.get("domain")
     if domain is None:
         raise BadRequest("missing domain")
