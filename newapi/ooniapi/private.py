@@ -854,7 +854,7 @@ def api_private_domain_metadata() -> Response:
     category code).
     The canonical representation of a domain is whatever is present in the
     global list or if it's not present, then the shortest possible
-    representation. 
+    representation in the other test lists.
     Some research related to this problem was done here:
     https://gist.github.com/hellais/fab319ae20b0ccca7b548a060ed66e14, where some
     notes were taken on what fixes need to be done in the test-lists to ensure
@@ -899,7 +899,7 @@ def api_private_domain_metadata() -> Response:
         # shortest domain among the one with and without www
         res2 = query_click_one_row(
             f"""
-            SELECT category_code FROM citizenlab 
+            SELECT category_code, domain FROM citizenlab 
             WHERE ({domain_q})
             ORDER BY length(url)
             LIMIT 1
@@ -908,6 +908,7 @@ def api_private_domain_metadata() -> Response:
         )
         if res2:
             category_code = res2["category_code"]
+            canonical_domain = res2["domain"]
     else:
         category_code = res["category_code"]
         canonical_domain = res["domain"]
