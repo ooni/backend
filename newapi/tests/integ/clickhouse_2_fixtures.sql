@@ -7,7 +7,7 @@ INSERT INTO test_groups (test_name, test_group) VALUES ('bridge_reachability', '
 INSERT INTO citizenlab VALUES ('www.ushmm.org', 'https://www.ushmm.org/', 'ZZ', 'CULTR');
 INSERT INTO citizenlab VALUES ('www.cabofrio.rj.gov.br', 'http://www.cabofrio.rj.gov.br/', 'BR', 'CULTR');
 INSERT INTO citizenlab VALUES ('ncac.org', 'http://ncac.org/', 'ZZ', 'NEWS');
-INSERT INTO citizenlab VALUES ('www.facebook.com', 'https://ncac.org/', 'ZZ', 'NEWS');
+INSERT INTO citizenlab VALUES ('ncac.org', 'https://ncac.org/', 'ZZ', 'NEWS');
 INSERT INTO citizenlab VALUES ('www.facebook.com','http://www.facebook.com/saakashvilimikheil','ge','NEWS');
 INSERT INTO citizenlab VALUES ('www.facebook.com','http://www.facebook.com/somsakjeam/videos/1283095981743678/','th','POLR');
 INSERT INTO citizenlab VALUES ('www.facebook.com','https://www.facebook.com/','ZZ','GRP');
