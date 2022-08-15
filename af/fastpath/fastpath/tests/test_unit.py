@@ -170,6 +170,7 @@ def test_yaml_normalization_binary_city():
 
 # # test_name: telegram
 
+
 def test_score_measurement_telegram_nourl():
     # missing key: test_keys -> requests -> request -> url
     msm = loadj("telegram_nourl")
@@ -297,6 +298,12 @@ def test_score_web_connectivity_b64_incorrect():
     msm = loadj("web_connectivity_b64_incorrect")
     scores = fp.score_measurement(msm)
     assert scores
+
+
+def test_score_web_connectivity_bug_610():
+    msm = loadj("web_connectivity_null")
+    scores = fp.score_measurement(msm)
+    assert scores == scores_failed
 
 
 # # test_name: dash

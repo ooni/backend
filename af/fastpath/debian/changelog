@@ -1,3 +1,10 @@
+fastpath (0.59) unstable; urgency=medium
+
+  * Mark blocking=null, accessible=null webconn as failed
+    https://github.com/ooni/backend/issues/610
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Aug 2022 17:51:47 +0100
+
 fastpath (0.58) unstable; urgency=medium
 
   * Add DNS fingerprints for Iran

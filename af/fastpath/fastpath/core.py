@@ -964,8 +964,8 @@ def score_web_connectivity(msm, matches) -> dict:
     #    bp = tk["body_proportion"]
     #    delta = abs((tk["body_proportion"] or 1.0) - 1.0)
     #    scores["blocking_general"] += delta
-
     # TODO: refactor to apply to all test types
+
     blocking_types = ("tcp_ip", "dns", "http-diff", "http-failure")
     if "blocking" not in tk:
         logbug(7, "missing blocking field", msm)
@@ -975,8 +975,12 @@ def score_web_connectivity(msm, matches) -> dict:
         scores["blocking_general"] = 1.0
         scores["analysis"] = {"blocking_type": tk["blocking"]}
 
-    elif tk["blocking"] in (None, False):
+    elif tk["blocking"] == False:
         pass
+
+    elif tk["blocking"] is None:
+        # https://github.com/ooni/backend/issues/610
+        scores["accuracy"] = 0.0
 
     else:
         logbug(7, "unexpected value for blocking", msm)
@@ -985,6 +989,10 @@ def score_web_connectivity(msm, matches) -> dict:
 
     # TODO: refactor
     if _detect_unknown_failure(tk):
+        scores["accuracy"] = 0.0
+
+    if "accessible" in tk and tk["accessible"] is None:
+        # https://github.com/ooni/backend/issues/610
         scores["accuracy"] = 0.0
 
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
