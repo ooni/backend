@@ -966,6 +966,11 @@ def score_web_connectivity(msm, matches) -> dict:
     #    scores["blocking_general"] += delta
     # TODO: refactor to apply to all test types
 
+    if "accessible" in tk and tk["accessible"] is None:
+        # https://github.com/ooni/backend/issues/610
+        scores["accuracy"] = 0.0
+        return scores
+
     blocking_types = ("tcp_ip", "dns", "http-diff", "http-failure")
     if "blocking" not in tk:
         logbug(7, "missing blocking field", msm)
@@ -989,10 +994,6 @@ def score_web_connectivity(msm, matches) -> dict:
 
     # TODO: refactor
     if _detect_unknown_failure(tk):
-        scores["accuracy"] = 0.0
-
-    if "accessible" in tk and tk["accessible"] is None:
-        # https://github.com/ooni/backend/issues/610
         scores["accuracy"] = 0.0
 
     # TODO: add heuristic to split blocking_general into local/ISP/country/global
