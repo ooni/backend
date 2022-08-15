@@ -738,12 +738,12 @@ def score_http_invalid_request_line(msm):
 
 def get_http_header(resp, header_name, case_sensitive=False):
     """This function returns the HTTP header(s) matching the given
-       header_name from the headers. The returned value is a list
-       given that we may have multiple keys per header. If the new
-       headers_list field is present in the response, we'll use
-       that, otherwise we'll fallback to the headers map. We perform
-       case insensitive header names search by default. You can yet
-       optionally select case sensitive comparison."""
+    header_name from the headers. The returned value is a list
+    given that we may have multiple keys per header. If the new
+    headers_list field is present in the response, we'll use
+    that, otherwise we'll fallback to the headers map. We perform
+    case insensitive header names search by default. You can yet
+    optionally select case sensitive comparison."""
     if case_sensitive == False:
         header_name = header_name.lower()
 
@@ -753,7 +753,7 @@ def get_http_header(resp, header_name, case_sensitive=False):
     # header_list
     if "header_list" not in resp:
         headers = resp.get("headers", {})
-        header_list = [[h,v] for h,v in headers.items()]
+        header_list = [[h, v] for h, v in headers.items()]
     else:
         headers_list = resp.get("headers_list")  # TODO: unused
 
@@ -765,6 +765,7 @@ def get_http_header(resp, header_name, case_sensitive=False):
             values.append(v)
 
     return values
+
 
 @metrics.timer("score_measurement_whatsapp")
 def score_measurement_whatsapp(msm):
@@ -1143,7 +1144,7 @@ def score_meek_fronted_requests_test(msm) -> dict:
         headers = resp.get("headers", {})
         # headers can be a list or a dict
         if isinstance(headers, list):
-            headers = {i[0]:i[1][0] for i in headers if i}
+            headers = {i[0]: i[1][0] for i in headers if i}
         server = headers.get("Server", "")
         if not server.startswith("ECAcc "):
             scores["blocking_general"] += 0.5
