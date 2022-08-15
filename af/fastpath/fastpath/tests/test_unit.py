@@ -240,6 +240,7 @@ def test_score_measurement_simple():
 
 
 def test_score_measurement_confirmed():
+    fp.setup_fingerprints()
     msm = {
         "input": "foo",
         "measurement_start_time": "",
@@ -248,11 +249,14 @@ def test_score_measurement_confirmed():
         "test_name": "web_connectivity",
         "test_start_time": "",
         "probe_cc": "IT",
-        "test_keys": {"requests": [{"response": {"body": "GdF Stop Page"}}]},
+        "test_keys": {
+            "requests": [{"response": {"body": "GdF Stop Page"}}],
+            "blocking": False,
+            "accessible": True,
+        },
     }
     scores = fp.score_measurement(msm)
     assert scores == {
-        "accuracy": 0.0,
         "blocking_general": 1.0,
         "blocking_global": 0.0,
         "blocking_country": 1.0,
