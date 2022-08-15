@@ -939,6 +939,11 @@ def score_web_connectivity(msm, matches) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
+    if tk.get("blocking") is None or ("accessible" in tk and tk["accessible"] is None):
+        # https://github.com/ooni/backend/issues/610
+        scores["accuracy"] = 0.0
+        return scores
+
     for m in matches:
         l = "blocking_" + m["locality"]
         scores[l] += 1.0
@@ -966,26 +971,13 @@ def score_web_connectivity(msm, matches) -> dict:
     #    scores["blocking_general"] += delta
     # TODO: refactor to apply to all test types
 
-    if "accessible" in tk and tk["accessible"] is None:
-        # https://github.com/ooni/backend/issues/610
-        scores["accuracy"] = 0.0
-        return scores
-
     blocking_types = ("tcp_ip", "dns", "http-diff", "http-failure")
-    if "blocking" not in tk:
-        logbug(7, "missing blocking field", msm)
-        scores["accuracy"] = 0.0
-
-    elif tk["blocking"] in blocking_types:
+    if tk["blocking"] in blocking_types:
         scores["blocking_general"] = 1.0
         scores["analysis"] = {"blocking_type": tk["blocking"]}
 
     elif tk["blocking"] == False:
         pass
-
-    elif tk["blocking"] is None:
-        # https://github.com/ooni/backend/issues/610
-        scores["accuracy"] = 0.0
 
     else:
         logbug(7, "unexpected value for blocking", msm)
