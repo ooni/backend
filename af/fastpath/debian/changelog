@@ -1,3 +1,9 @@
+fastpath (0.60) unstable; urgency=medium
+
+  * Fix backend #610 again. Add tests
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 16 Aug 2022 09:49:51 +0100
+
 fastpath (0.59) unstable; urgency=medium
 
   * Mark blocking=null, accessible=null webconn as failed

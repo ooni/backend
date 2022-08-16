@@ -144,6 +144,23 @@ def test_match_fingerprints_b64_hdr():
     assert fp.match_fingerprints(msm) == []
 
 
+def test_score_web_connectivity_dns_ir_fingerprint():
+    msm = loadj("web_connectivity_ir_fp")
+    fp.setup_fingerprints()
+    matches = fp.match_fingerprints(msm)
+    assert matches == [{"dns_full": "10.10.34.36", "locality": "country"}]
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_general": 2.0,
+        "blocking_global": 0.0,
+        "blocking_country": 1.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "confirmed": True,
+        "analysis": {"blocking_type": "dns"},
+    }
+
+
 # normalization
 
 
@@ -306,6 +323,12 @@ def test_score_web_connectivity_b64_incorrect():
 
 def test_score_web_connectivity_bug_610():
     msm = loadj("web_connectivity_null")
+    scores = fp.score_measurement(msm)
+    assert scores == scores_failed
+
+
+def test_score_web_connectivity_bug_610_2():
+    msm = loadj("web_connectivity_null2")
     scores = fp.score_measurement(msm)
     assert scores == scores_failed
 
