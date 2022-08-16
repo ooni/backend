@@ -175,7 +175,7 @@ def list_cans_on_s3_for_a_day(day, filter=None, bysize=False):
         fns = sorted(fns)
 
     for fn, size in fns:
-        size = size / float(2 ** 20)
+        size = size / float(2**20)
         if filter is None or (filter in fn):
             print(f"{fn:<160} {size} MB")
 
@@ -748,7 +748,9 @@ def test_score_web_connectivity_simple(cans):
 
     assert len(expected) == 0, "Not all expected measurements were tested"
 
+
 # 20170128T062626Z_AS7418_6kv1cZCRLIPSuVMYHsqQpZzfKhlEEWPagKuGTObnPtqjTcgXRc
+
 
 @pytest.mark.skip(reason="FIXME")
 def test_score_web_connectivity_with_workers(cans, tmp_path):
