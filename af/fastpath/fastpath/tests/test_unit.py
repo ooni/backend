@@ -543,11 +543,13 @@ def test_bug_backend352():
     scores = fp.score_measurement(msm)
     assert scores == {
         "analysis": {"blocking_type": "dns"},
-        "blocking_general": 1.0,
+        "blocking_general": 2.0,
         "blocking_global": 0.0,
-        "blocking_country": 0.0,
+        "blocking_country": 1.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
+        "analysis": {"blocking_type": "dns"},
+        "confirmed": True
     }
 
 
