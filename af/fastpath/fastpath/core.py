@@ -16,7 +16,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any
 import binascii
 import logging
 import multiprocessing as mp
@@ -60,11 +60,11 @@ conf = Namespace()
 fingerprints: Dict[str, Dict[str, list]]
 
 
-def parse_date(d):
+def parse_date(d: str):
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
-def setup_dirs(conf, root):
+def setup_dirs(conf, root) -> None:
     """Setup directories creating them if needed"""
     conf.vardir = root / "var/lib/fastpath"
     conf.cachedir = conf.vardir / "cache"
@@ -78,7 +78,7 @@ def setup_dirs(conf, root):
         p.mkdir(parents=True, exist_ok=True)
 
 
-def setup():
+def setup() -> None:
     os.environ["TZ"] = "UTC"
     global conf
     ap = ArgumentParser(__doc__)
@@ -139,7 +139,7 @@ def setup():
     setup_dirs(conf, root)
 
 
-def per_s(name, item_count, t0):
+def per_s(name, item_count, t0) -> None:
     """Generate a gauge metric of items per second"""
     delta = time.time() - t0
     if delta > 0:
@@ -147,7 +147,7 @@ def per_s(name, item_count, t0):
 
 
 @metrics.timer("clean_caches")
-def clean_caches():
+def clean_caches() -> None:
     """Cleanup local caches."""
     # Access times are updated on file load.
     # FIXME: use cache locations correctly
@@ -249,7 +249,7 @@ expected_colnames = {
 }
 
 
-def prepare_for_json_normalize(report):
+def prepare_for_json_normalize(report) -> None:
     try:
         d = report["test_keys"]["control"]["tcp_connect"]
         d = {n: i for n, i in enumerate(d.items())}
@@ -264,7 +264,7 @@ def prepare_for_json_normalize(report):
         pass
 
 
-def process_measurements_from_s3():
+def process_measurements_from_s3() -> None:
     """Pull measurements from S3 and process them"""
     if conf.no_write_to_db:
         log.info("Skipping DB connection setup")
@@ -382,7 +382,7 @@ def match_fingerprints(measurement) -> list:
     return matches
 
 
-def g_or(d, key, default):
+def g_or(d: dict, key: str, default):
     """Dict getter: return 'default' if the key is missing or value is None"""
     # Note: 'd.get(key) or default' returns 'default' on any falsy value
     v = d.get(key)
@@ -401,7 +401,7 @@ def gn(d, *a):
     return g(d, *a, default=None)
 
 
-def all_keys_true(d, keys):
+def all_keys_true(d: dict, keys) -> bool:
     """Check for values set to True in a dict"""
     if isinstance(keys, str):
         keys = (keys,)
@@ -423,7 +423,7 @@ def all_keys_false(d, keys):
     return True
 
 
-def all_keys_none(d, keys):
+def all_keys_none(d: dict, keys) -> bool:
     """Check for values set to None in a dict"""
     if isinstance(keys, str):
         keys = (keys,)
@@ -434,7 +434,7 @@ def all_keys_none(d, keys):
     return True
 
 
-def logbug(id: int, desc: str, msm: dict):
+def logbug(id: int, desc: str, msm: dict) -> None:
     """Log unexpected measurement contents, possibly due to a bug in the probe
     The id helps locating the call to logbug()
     """
@@ -451,7 +451,7 @@ def logbug(id: int, desc: str, msm: dict):
         log.info("known_probe_bug: %s %s %s %s", sname, sversion, desc, url)
 
 
-def _detect_unknown_failure(tk):
+def _detect_unknown_failure(tk: dict) -> bool:
     """Any field ending with _failure can contain `unknown_failure ...`
     due to failed msmt
     """
@@ -470,7 +470,7 @@ def init_scores() -> dict:
 
 
 @metrics.timer("score_measurement_facebook_messenger")
-def score_measurement_facebook_messenger(msm):
+def score_measurement_facebook_messenger(msm: dict) -> dict:
     tk = g_or(msm, "test_keys", {})
     del msm
 
@@ -512,10 +512,10 @@ def score_measurement_facebook_messenger(msm):
         "facebook_stun_dns_consistent",
     )
     if all_keys_true(tk, trues) and all_keys_false(tk, "facebook_tcp_blocking"):
-        score = 0
+        score = 0.0
 
     else:
-        score = 0
+        score = 0.0
         for key in consistency_keys:
             v = tk.get(key)
             if v is False:
@@ -532,7 +532,7 @@ def score_measurement_facebook_messenger(msm):
     return scores
 
 
-def _extract_tcp_connect(tk):
+def _extract_tcp_connect(tk: dict) -> tuple:
     # https://github.com/ooni/spec/blob/master/data-formats/df-005-tcpconnect.md
     # NOTE: this is *NOT* ts-008-tcp-connect.md
     # First the probe tests N TCP connections
@@ -552,7 +552,7 @@ def _extract_tcp_connect(tk):
 
 
 @metrics.timer("score_measurement_telegram")
-def score_measurement_telegram(msm):
+def score_measurement_telegram(msm: dict) -> dict:
     """Calculate measurement scoring for Telegram.
     Returns a scores dict
     """
@@ -631,7 +631,7 @@ def score_measurement_telegram(msm):
 
 
 @metrics.timer("score_measurement_hhfm")
-def score_measurement_hhfm(msm):
+def score_measurement_hhfm(msm: dict) -> dict:
     """Calculate http_header_field_manipulation"""
     tk = g_or(msm, "test_keys", {})
     rid = msm["report_id"]
@@ -703,7 +703,7 @@ def score_measurement_hhfm(msm):
 
 
 @metrics.timer("score_http_invalid_request_line")
-def score_http_invalid_request_line(msm):
+def score_http_invalid_request_line(msm: dict) -> dict:
     """Calculate measurement scoring for http_invalid_request_line"""
     # https://github.com/ooni/spec/blob/master/nettests/ts-007-http-invalid-request-line.md
     tk = g_or(msm, "test_keys", {})
@@ -768,7 +768,7 @@ def get_http_header(resp, header_name, case_sensitive=False):
 
 
 @metrics.timer("score_measurement_whatsapp")
-def score_measurement_whatsapp(msm):
+def score_measurement_whatsapp(msm: dict) -> dict:
     """Calculate measurement scoring for Whatsapp.
     Returns a scores dict
     """
@@ -892,7 +892,7 @@ def score_measurement_whatsapp(msm):
 
 
 @metrics.timer("score_vanilla_tor")
-def score_vanilla_tor(msm):
+def score_vanilla_tor(msm: dict) -> dict:
     """Calculate measurement scoring for Tor (test_name: vanilla_tor)
     Returns a scores dict
     """
@@ -1011,7 +1011,7 @@ def score_web_connectivity_full(msm: dict) -> dict:
 
 
 @metrics.timer("score_ndt")
-def score_ndt(msm) -> dict:
+def score_ndt(msm: dict) -> dict:
     """Calculate measurement scoring for NDT
     Returns a scores dict
     """
@@ -1020,7 +1020,7 @@ def score_ndt(msm) -> dict:
 
 
 @metrics.timer("score_tcp_connect")
-def score_tcp_connect(msm) -> dict:
+def score_tcp_connect(msm: dict) -> dict:
     """Calculate measurement scoring for tcp connect
     Returns a scores dict
     """
@@ -1056,7 +1056,7 @@ def score_tcp_connect(msm) -> dict:
     return scores
 
 
-def score_dash(msm) -> dict:
+def score_dash(msm: dict) -> dict:
     """Calculate measurement scoring for DASH
     (Dynamic Adaptive Streaming over HTTP)
     Returns a scores dict
@@ -1109,7 +1109,7 @@ def score_dash(msm) -> dict:
     return scores
 
 
-def score_meek_fronted_requests_test(msm) -> dict:
+def score_meek_fronted_requests_test(msm: dict) -> dict:
     """Calculate measurement scoring for Meek
     Returns a scores dict
     """
@@ -1152,7 +1152,7 @@ def score_meek_fronted_requests_test(msm) -> dict:
     return scores
 
 
-def score_psiphon(msm) -> dict:
+def score_psiphon(msm: dict) -> dict:
     """Calculate measurement scoring for Psiphon
     Returns a scores dict
     """
@@ -1188,7 +1188,7 @@ def score_psiphon(msm) -> dict:
     return scores
 
 
-def score_tor(msm) -> dict:
+def score_tor(msm: dict) -> dict:
     """Calculate measurement scoring for Tor (test_name: tor)
     https://github.com/ooni/spec/blob/master/nettests/ts-023-tor.md
     Returns a scores dict
@@ -1242,7 +1242,7 @@ def score_tor(msm) -> dict:
     return scores
 
 
-def score_http_requests(msm) -> dict:
+def score_http_requests(msm: dict) -> dict:
     """Calculates measurement scoring for legacy test http_requests
     Returns a scores dict
     """
@@ -1331,7 +1331,7 @@ def score_http_requests(msm) -> dict:
     return scores
 
 
-def score_dns_consistency(msm) -> dict:
+def score_dns_consistency(msm: dict) -> dict:
     """Calculates measurement scoring for legacy test dns_consistency
     Returns a scores dict
     """
@@ -1340,7 +1340,7 @@ def score_dns_consistency(msm) -> dict:
     return scores
 
 
-def score_signal(msm) -> dict:
+def score_signal(msm: dict) -> dict:
     """Calculates measurement scoring for Signal test
     Returns a scores dict
     """
@@ -1363,7 +1363,7 @@ def score_signal(msm) -> dict:
     return scores
 
 
-def score_stunreachability(msm) -> dict:
+def score_stunreachability(msm: dict) -> dict:
     """Calculate measurement scoring for STUN reachability
     Returns a scores dict
     """
@@ -1379,7 +1379,7 @@ def score_stunreachability(msm) -> dict:
     return scores
 
 
-def score_torsf(msm) -> dict:
+def score_torsf(msm: dict) -> dict:
     """Calculate measurement scoring for Tor Snowflake
     Returns a scores dict
     """
@@ -1397,7 +1397,7 @@ def score_torsf(msm) -> dict:
     return scores
 
 
-def score_riseupvpn(msm) -> dict:
+def score_riseupvpn(msm: dict) -> dict:
     """Calculate measurement scoring for RiseUp VPN
     Returns a scores dict
     """
