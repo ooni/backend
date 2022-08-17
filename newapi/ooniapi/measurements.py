@@ -464,7 +464,7 @@ def get_measurement_meta() -> Response:
     report_id = param("report_id")
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
-    input_ = param("input", None)
+    input_ = param_url("input")
     if input_ == "":
         input_ = None
 
@@ -489,8 +489,7 @@ def get_measurement_meta() -> Response:
         log.error(e, exc_info=True)
         body = ""
 
-    # FIXME cache timing
-    return cachedjson("0s", raw_measurement=body, **msmt_meta)
+    return cachedjson("60s", raw_measurement=body, **msmt_meta)
 
 
 # # Listing measurements
