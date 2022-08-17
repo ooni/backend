@@ -475,11 +475,10 @@ def get_measurement_meta() -> Response:
 
     assert isinstance(msmt_meta, dict)
     if not full:
-        # FIXME cache timing
-        return cachedjson("0s", **msmt_meta)
+        return cachedjson("60s", **msmt_meta)
 
     if msmt_meta == {}:  # measurement not found
-        return cachedjson("0s", raw_measurement="", **msmt_meta)
+        return cachedjson("60s", raw_measurement="", **msmt_meta)
 
     try:
         body = _fetch_measurement_body(report_id, input_, msmt_meta["measurement_uid"])
@@ -945,7 +944,7 @@ def _list_measurements_click(
     }
 
     response = jsonify({"metadata": metadata, "results": results[:limit]})
-    response.cache_control.max_age = 1
+    response.cache_control.max_age = 60
     return response
 
 
