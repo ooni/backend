@@ -321,8 +321,7 @@ def api_private_test_coverage() -> Response:
 
     tc = get_recent_test_coverage_ch(probe_cc)
     nc = get_recent_network_coverage_ch(probe_cc, test_groups)
-    # FIXME
-    return cachedjson("0s", network_coverage=nc, test_coverage=tc)
+    return cachedjson("1h", network_coverage=nc, test_coverage=tc)
 
 
 @api_private_blueprint.route("/website_networks", methods=["GET"])
