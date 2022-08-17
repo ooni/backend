@@ -328,7 +328,7 @@ def get_raw_measurement() -> Response:
     """
     # This is used by Explorer to let users download msmts
     param = request.args.get
-    report_id = param("report_id")
+    report_id = param_report_id()
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
     input_ = param("input")
@@ -461,7 +461,7 @@ def get_measurement_meta() -> Response:
     # TODO: input can be '' or NULL in the fastpath table - fix it
     # TODO: see integ tests for TODO items
     param = request.args.get
-    report_id = param("report_id")
+    report_id = param_report_id()
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
     input_ = param_url("input")
@@ -654,7 +654,7 @@ def list_measurements() -> Response:
     # made faster by OOID: https://github.com/ooni/pipeline/issues/48
     log = current_app.logger
     param = request.args.get
-    report_id = param("report_id")
+    report_id = param_report_id()
     probe_asn = param_asn("probe_asn")  # int / None
     probe_cc = param("probe_cc")
     test_name = param("test_name")
@@ -1051,6 +1051,15 @@ def param_url(name):
         return p
     url = urlparse(p)
     validate_domain(url.netloc, name)
+    return p
+
+
+def param_report_id():
+    p = request.args.get("report_id")
+    if not p or len(p) < 5 or len(p) > 100:
+        raise ValueError(f"Invalid report_id field")
+    accepted = string.ascii_letters + string.digits + "_"
+    validate(p, accepted)
     return p
 
 
