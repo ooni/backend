@@ -464,6 +464,7 @@ def get_measurement_meta() -> Response:
     report_id = param_report_id()
     if not report_id or len(report_id) < 15:
         raise BadRequest("Invalid report_id")
+    # FIXME: support non-URL inputs for STUN and others
     input_ = param_url("input")
     if input_ == "":
         input_ = None
@@ -475,10 +476,10 @@ def get_measurement_meta() -> Response:
 
     assert isinstance(msmt_meta, dict)
     if not full:
-        return cachedjson("60s", **msmt_meta)
+        return cachedjson("1m", **msmt_meta)
 
     if msmt_meta == {}:  # measurement not found
-        return cachedjson("60s", raw_measurement="", **msmt_meta)
+        return cachedjson("1m", raw_measurement="", **msmt_meta)
 
     try:
         body = _fetch_measurement_body(report_id, input_, msmt_meta["measurement_uid"])
@@ -488,7 +489,7 @@ def get_measurement_meta() -> Response:
         log.error(e, exc_info=True)
         body = ""
 
-    return cachedjson("60s", raw_measurement=body, **msmt_meta)
+    return cachedjson("1m", raw_measurement=body, **msmt_meta)
 
 
 # # Listing measurements
@@ -1046,6 +1047,7 @@ def param_domain(name):
 
 
 def param_url(name):
+    """Accepts URLs, empty string or None"""
     p = request.args.get(name)
     if not p:
         return p
