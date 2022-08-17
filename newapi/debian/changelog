@@ -1,3 +1,9 @@
+ooni-api (1.0.19) unstable; urgency=medium
+
+  * Filter incoming queries better
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 17 Aug 2022 14:17:25 +0100
+
 ooni-api (1.0.17) unstable; urgency=medium
 
   * Support redirect_to in registration
