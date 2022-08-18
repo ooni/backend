@@ -34,3 +34,35 @@ def test_param_url_invalid(app):
     params = {"input": "(-/"}
     with app.test_request_context("/", query_string=params):
         pytest.raises(Exception, apimsm.param_url)
+
+
+def test_param_input_or_none_invalid(app):
+    params = {"input": ""}
+    with app.test_request_context("/", query_string=params):
+        assert apimsm.param_input_or_none() is None
+
+    with app.test_request_context("/"):
+        assert apimsm.param_input_or_none() is None
+
+
+def test_param_input_or_none_valid(app):
+    valid_inputs = [
+        "https://foo.org",
+        "http://foo.org",
+        "dot://doh-de.blahdns.com/dns-query",
+        "dot://8.8.8.8:853/",
+        "dot://[2a00:5a60::ad2:0ff]:853",
+        "stun://stun.voip.blackberry.com:3478",
+        "obfs3 83.212.101.3:80",
+        "obfs3 83.212.101.3:80 A09D536DD1752D542E1FBB3C9CE4449D51298239",
+        "fte 50.7.176.114:80 2BD466989944867075E872310EBAD65BC88C8AEF",
+        "udp://8.8.8.8",
+        "scramblesuit 83.212.101.3:443",
+        "https://ru.wikipedia.org/wiki/Вторжение_России_на_Украину_(2022)",
+        "obfs4 154.35.22.9:80 C73AD cert=gEWN/bS",
+    ]
+    for inp in valid_inputs:
+        params = {"input": inp}
+        print(params)
+        with app.test_request_context("/", query_string=params):
+            assert apimsm.param_input_or_none() == inp

@@ -460,10 +460,7 @@ def get_measurement_meta() -> Response:
     # TODO: see integ tests for TODO items
     param = request.args.get
     report_id = param_report_id()
-    # FIXME: support non-URL inputs for STUN and others
-    input_ = param_url("input")
-    if input_ == "":
-        input_ = None
+    input_ = param_input_or_none()
 
     full = param("full", "").lower() in ("true", "1", "yes")
     log.info(f"get_measurement_meta '{report_id}' '{input_}'")
@@ -1068,6 +1065,19 @@ def param_report_id() -> str:
     if rid is None:
         raise BadRequest(f"Invalid report_id")
     return rid
+
+
+def param_input_or_none() -> Optional[str]:
+    """Accepts any input format supported or None"""
+    p = request.args.get("input")
+    if not p:
+        return None
+    x = p.encode("ascii", "ignore").decode()
+    accepted = string.ascii_letters + string.digits + r' :/.[]-_%+(){}='
+    for c in x:
+        if c not in accepted:
+            raise ValueError(f"Invalid characters in input field")
+    return p
 
 
 @api_msm_blueprint.route("/v1/aggregation")

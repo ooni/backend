@@ -1,4 +1,4 @@
-TESTARGS ?= tests/functional/test_private_explorer.py tests/integ/test_aggregation.py tests/integ/test_citizenlab.py tests/integ/test_integration.py tests/integ/test_integration_auth.py tests/integ/test_prioritization.py tests/integ/test_private_api.py tests/integ/test_probe_services.py tests/unit/test_prio.py
+TESTARGS ?= tests/functional/test_private_explorer.py tests/integ/test_aggregation.py tests/integ/test_citizenlab.py tests/integ/test_integration.py tests/integ/test_integration_auth.py tests/integ/test_prioritization.py tests/integ/test_private_api.py tests/integ/test_probe_services.py tests/unit/test_prio.py tests/integ/test_params_validation.py
 
 #tests/integ/test_prioritization_nodb.py
 #tests/integ/test_probe_services_nodb.py
