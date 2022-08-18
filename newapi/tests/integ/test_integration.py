@@ -852,7 +852,8 @@ def test_list_measurements_external_order_by(client):
 
 
 def test_list_measurements_bug_probe1034(client):
-    url = "measurements?report_id=blah"
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    url = f"measurements?report_id={rid}"
     r = client.get(f"/api/v1/{url}", headers={"user-agent": "okhttp"})
     assert r.status_code == 200
     assert r.is_json

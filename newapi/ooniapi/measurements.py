@@ -329,8 +329,6 @@ def get_raw_measurement() -> Response:
     # This is used by Explorer to let users download msmts
     param = request.args.get
     report_id = param_report_id()
-    if not report_id or len(report_id) < 15:
-        raise BadRequest("Invalid report_id")
     input_ = param("input")
 
     # _fetch_measurement_body needs the UID
@@ -462,8 +460,6 @@ def get_measurement_meta() -> Response:
     # TODO: see integ tests for TODO items
     param = request.args.get
     report_id = param_report_id()
-    if not report_id or len(report_id) < 15:
-        raise BadRequest("Invalid report_id")
     # FIXME: support non-URL inputs for STUN and others
     input_ = param_url("input")
     if input_ == "":
@@ -655,7 +651,7 @@ def list_measurements() -> Response:
     # made faster by OOID: https://github.com/ooni/pipeline/issues/48
     log = current_app.logger
     param = request.args.get
-    report_id = param_report_id()
+    report_id = param_report_id_or_none()
     probe_asn = param_asn("probe_asn")  # int / None
     probe_cc = param("probe_cc")
     test_name = param("test_name")
@@ -1056,13 +1052,22 @@ def param_url(name):
     return p
 
 
-def param_report_id():
+def param_report_id_or_none() -> Optional[str]:
     p = request.args.get("report_id")
-    if not p or len(p) < 5 or len(p) > 100:
-        raise ValueError(f"Invalid report_id field")
+    if not p:
+        return None
+    if len(p) < 15 or len(p) > 100:
+        raise BadRequest(f"Invalid report_id field")
     accepted = string.ascii_letters + string.digits + "_"
     validate(p, accepted)
     return p
+
+
+def param_report_id() -> str:
+    rid = param_report_id_or_none()
+    if rid is None:
+        raise BadRequest(f"Invalid report_id")
+    return rid
 
 
 @api_msm_blueprint.route("/v1/aggregation")
