@@ -1,4 +1,4 @@
-name: OONI API local tests
+name: 'local test'
 on:
   pull_request:
   workflow_dispatch:
@@ -21,7 +21,6 @@ jobs:
         with:
           limit-access-to-actor: true
 
-
       - name: Build docker image
         run: make build
 
@@ -29,8 +28,18 @@ jobs:
         run: make initdb
 
       - name: Run all tests
-        run: T="--show-capture=no -s -vv --cov=ooniapi" make tests
+        run: T="--show-capture=no -s -vv --junitxml=pytest.xml" make tests
 
-      - name: debug docker
-        if: always()
-        run: docker ps -a
+      #- name: debug docker
+      #  if: always()
+      #  run: docker ps -a
+
+      - run: find / -name pytest.xml
+
+      - name: Test report
+        uses: dorny/test-reporter@v1
+        if: success() || failure() # run even if previous step failed
+        with:
+          name: Test report
+          path: '/app/pytest.xml'
+          reporter: java-junit     # compatible with pytest --junitxml
