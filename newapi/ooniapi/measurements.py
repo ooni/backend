@@ -1483,3 +1483,110 @@ def get_torsf_stats() -> Response:
 
     except Exception as e:
         return jerror(str(e), v=0)
+
+
+# # measurement feedback
+
+from ooniapi.auth import role_required, get_account_id, jerror
+from ooniapi.database import insert_click
+
+
+"""
+CREATE TABLE msmt_feedback
+(
+    `measurement_uid` String,
+    `account_id` String,
+    `status` String,
+    `comment` String,
+    `update_time` DateTime64(3) MATERIALIZED now64()
+)
+ENGINE = ReplacingMergeTree
+ORDER BY (measurement_uid, account_id)
+SETTINGS index_granularity = 4
+"""
+
+valid_feedback_status = [
+    "blocked",
+    "blocked.blockpage",
+    "blocked.blockpage.http",
+    "blocked.blockpage.dns",
+    "blocked.blockpage.server_side",
+    "blocked.blockpage.server_side.captcha",
+    "blocked.dns",
+    "blocked.dns.inconsistent",
+    "blocked.dns.nxdomain",
+    "blocked.tcp",
+    "blocked.tls",
+    "ok",
+    "ok.unreachable",
+    "ok.broken",
+    "ok.parked",
+]
+
+
+@api_msm_blueprint.route("/v1/measurement_feedback")
+@metrics.timer("get_msmt_feedback")
+@role_required(["admin", "user"])
+def get_msmt_feedback() -> Response:
+    def jparam(name):
+        return request.json.get(name, "").strip()
+
+    log = current_app.logger
+    account_id = get_account_id()
+    measurement_uid = jparam("measurement_uid")
+
+    query = """SELECT status, comment FROM msmt_feedback FINAL
+    WHERE account_id = :account_id AND measurement_uid = :measurement_uid
+    LIMIT 1"""
+    qp = dict(account_id=account_id, measurement_uid=measurement_uid)
+    lookup = query_click_one_row(sql.text(query), qp)
+    return cachedjson("0s", **lookup)
+
+
+
+@api_msm_blueprint.route("/v1/submit_measurement_feedback", methods=["POST"])
+@metrics.timer("submit_msmt_feedback")
+@role_required(["admin", "user"])
+def submit_msmt_feedback() -> Response:
+    """Submit measurement feedback. Only for registered users.
+    ---
+    produces:
+      - application/json
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            measurement_uid:
+              type: string
+              description: Measurement ID
+            status:
+              type: string
+              description: Measurement status
+              minLength: 2
+            comment:
+              type: string
+              description: Free-form description of the issue
+              maxLength: 300
+    responses:
+      200:
+        description: Submission or update accepted
+    """
+    def jparam(name):
+        return request.json.get(name, "").strip()
+
+    log = current_app.logger
+    account_id = get_account_id()
+    status = jparam("status")
+    if status not in valid_feedback_status:
+        return jerror("Invalid status")
+    measurement_uid = jparam("measurement_uid")
+    comment = jparam("comment")
+
+    query = "INSERT INTO msmt_feedback (measurement_uid, account_id, status, comment) VALUES"
+    query_params = [measurement_uid, account_id, status, comment]
+    insert_click(query, [query_params])
+    return cachedjson("0s")

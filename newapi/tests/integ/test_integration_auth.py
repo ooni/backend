@@ -139,7 +139,7 @@ def _register_and_login(client, email_address):
 
     r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200, r.json
-    assert r.json == {'redirect_to': 'https://explorer.ooni.org'}
+    assert r.json == {"redirect_to": "https://explorer.ooni.org"}
     cookies = r.headers.getlist("Set-Cookie")
     assert len(cookies) == 1
     c = cookies[0]
@@ -282,3 +282,48 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
         # The login is expired
         r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
         assert r.status_code == 401
+
+
+def test_msmt_feedbk_submit_valid2(log, client, mocksmtp):
+    _register_and_login(client, user_e)
+    # We are logged in with role "user"
+    #
+    d = dict(status="foo", comment="")
+    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    assert r.json == {"msg": "not implemented"}
+
+
+# # msmt_feedback
+
+
+from tests.integ.test_integration import api
+
+
+def test_msmt_feedback_get(client):
+    d = dict(measurement_uid="bogus_uid")
+    r = client.get("/api/v1/measurement_feedback", json=d)
+    assert r.json == {"error": "Authentication required"}
+
+    # Log in as user
+    _register_and_login(client, user_e)
+
+    r = client.get("/api/v1/measurement_feedback", json=d)
+    assert r.json == {"comment": "", "status": "ok"}
+
+
+def test_msmt_feedback_submit_no_auth(log, client):
+    d = dict(status="foo", comment="", measurement_uid="bogus_uid")
+    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    assert r.json == {"error": "Authentication required"}
+
+
+def test_msmt_feedback_submit_valid(client, mocksmtp):
+    # We are not logged in and not allowed to call this
+    d = dict(status="ok", comment="", measurement_uid="bogus_uid")
+    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    assert r.json == {"error": "Authentication required"}
+
+    # Log in as user
+    _register_and_login(client, user_e)
+    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    assert r.json == {}, r.json
