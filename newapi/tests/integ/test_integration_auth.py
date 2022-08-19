@@ -296,19 +296,10 @@ def test_msmt_feedbk_submit_valid2(log, client, mocksmtp):
 # # msmt_feedback
 
 
-from tests.integ.test_integration import api
-
-
-def test_msmt_feedback_get(client):
+def test_msmt_feedback_get_no_auth(client):
     d = dict(measurement_uid="bogus_uid")
     r = client.get("/api/v1/measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
-
-    # Log in as user
-    _register_and_login(client, user_e)
-
-    r = client.get("/api/v1/measurement_feedback", json=d)
-    assert r.json == {"comment": "", "status": "ok"}
 
 
 def test_msmt_feedback_submit_no_auth(log, client):
@@ -317,7 +308,7 @@ def test_msmt_feedback_submit_no_auth(log, client):
     assert r.json == {"error": "Authentication required"}
 
 
-def test_msmt_feedback_submit_valid(client, mocksmtp):
+def test_msmt_feedback_submit_valid_and_get(client, mocksmtp):
     # We are not logged in and not allowed to call this
     d = dict(status="ok", comment="", measurement_uid="bogus_uid")
     r = client.post("/api/v1/submit_measurement_feedback", json=d)
@@ -327,3 +318,11 @@ def test_msmt_feedback_submit_valid(client, mocksmtp):
     _register_and_login(client, user_e)
     r = client.post("/api/v1/submit_measurement_feedback", json=d)
     assert r.json == {}, r.json
+
+    # Read it back
+    r = client.get("/api/v1/measurement_feedback", json=d)
+    assert r.json == {"comment": "", "status": "ok"}
+
+    d = dict(measurement_uid="nonexistent_uid")
+    r = client.get("/api/v1/measurement_feedback", json=d)
+    assert r.json == {}

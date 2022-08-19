@@ -1528,6 +1528,26 @@ valid_feedback_status = [
 @metrics.timer("get_msmt_feedback")
 @role_required(["admin", "user"])
 def get_msmt_feedback() -> Response:
+    """Get measurement for the curred logged user for a given measurement
+    ---
+    produces:
+      - application/json
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            measurement_uid:
+              type: string
+              description: Measurement ID
+    responses:
+      200:
+        description: status and comment or empty JSON
+    """
+
     def jparam(name):
         return request.json.get(name, "").strip()
 
@@ -1539,9 +1559,11 @@ def get_msmt_feedback() -> Response:
     WHERE account_id = :account_id AND measurement_uid = :measurement_uid
     LIMIT 1"""
     qp = dict(account_id=account_id, measurement_uid=measurement_uid)
-    lookup = query_click_one_row(sql.text(query), qp)
-    return cachedjson("0s", **lookup)
+    row = query_click_one_row(sql.text(query), qp)
+    if row:
+        return cachedjson("0s", **row)
 
+    return cachedjson("0s")
 
 
 @api_msm_blueprint.route("/v1/submit_measurement_feedback", methods=["POST"])
@@ -1575,6 +1597,7 @@ def submit_msmt_feedback() -> Response:
       200:
         description: Submission or update accepted
     """
+
     def jparam(name):
         return request.json.get(name, "").strip()
 
