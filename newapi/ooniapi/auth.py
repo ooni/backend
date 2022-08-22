@@ -20,7 +20,7 @@ import jwt.exceptions  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
 from ooniapi.database import query_click_one_row, insert_click
-from ooniapi.utils import nocachejson
+from ooniapi.utils import nocachejson, jerror
 
 origins = [
     re.compile(r"^https://[-A-Za-z0-9]+\.ooni\.org$"),
@@ -61,12 +61,6 @@ Configuration parameters:
 
 # Courtesy of https://emailregex.com/
 EMAIL_RE = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
-
-
-def jerror(msg, code=400):
-    resp = make_response(jsonify(error=msg), code)
-    resp.cache_control.no_cache = True
-    return resp
 
 
 def create_jwt(payload: dict) -> str:

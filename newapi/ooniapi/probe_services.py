@@ -12,13 +12,13 @@ from hashlib import sha512
 from urllib.request import urlopen
 
 import ujson
-from flask import Blueprint, current_app, request, make_response, Response
+from flask import Blueprint, current_app, request, Response
 from flask.json import jsonify
 
 import jwt.exceptions  # debdeps: python3-jwt
 
 from ooniapi.config import metrics
-from ooniapi.utils import cachedjson, nocachejson
+from ooniapi.utils import cachedjson, nocachejson, jerror
 
 from ooniapi.auth import create_jwt, decode_jwt
 from ooniapi.prio import generate_test_list
@@ -626,10 +626,6 @@ def serve_tor_targets() -> Response:
 
 # Unneded: we use an external test helper
 # @probe_services_blueprint.route("/api/private/v1/wcth")
-
-
-def jerror(msg, code=400):
-    return make_response(jsonify(error=msg), code)
 
 
 @probe_services_blueprint.route("/invalidpath")
