@@ -1073,7 +1073,7 @@ def param_input_or_none() -> Optional[str]:
     if not p:
         return None
     x = p.encode("ascii", "ignore").decode()
-    accepted = string.ascii_letters + string.digits + r' :/.[]-_%+(){}='
+    accepted = string.ascii_letters + string.digits + r' :/.[]-_%+(){}=?#&!,'
     for c in x:
         if c not in accepted:
             raise ValueError(f"Invalid characters in input field")
