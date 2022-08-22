@@ -113,7 +113,7 @@ def get_measurement(measurement_id) -> Response:
     query_params = dict(uid=measurement_id)
     lookup = query_click_one_row(sql.text(query), query_params)
     if lookup is None:
-        return make_response("Incorrect or inexistent measurement_id", 400)
+        return jerror("Incorrect or inexistent measurement_id")
 
     s3path = lookup["s3path"]
     linenum = lookup["linenum"]
@@ -122,7 +122,7 @@ def get_measurement(measurement_id) -> Response:
         body = _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
     except:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
-        return make_response("Incorrect or inexistent measurement_id", 400)
+        return jerror("Incorrect or inexistent measurement_id")
 
     resp = make_response(body)
     resp.mimetype = "application/json"
