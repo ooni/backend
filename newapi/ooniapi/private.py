@@ -844,16 +844,15 @@ def api_private_circumvention_runtime_stats() -> Response:
 
 @api_private_blueprint.route("/domain_metadata")
 def api_private_domain_metadata() -> Response:
-    """
-    The goal of this endpoint is to return the primary category code of a
-    certain domain_name and it's canonical representation.
+    """ Return the primary category code of a certain domain_name and its
+    canonical representation.
     We consider the primary category code to be the category code of whatever is
     the shortest URL in the test lists giving higher priority to what is in the
-    global list (ex. if we have https://twitter.com/amnesty categorised as HUMR
+    global list (e.g. if we have https://twitter.com/amnesty categorised as HUMR
     and https://twitter.com/ as GRP, we will be picking GRP as the canonical
     category code).
     The canonical representation of a domain is whatever is present in the
-    global list or if it's not present, then the shortest possible
+    global list. If it's not present, then the shortest possible
     representation in the other test lists.
     Some research related to this problem was done here:
     https://gist.github.com/hellais/fab319ae20b0ccca7b548a060ed66e14, where some
@@ -885,10 +884,10 @@ def api_private_domain_metadata() -> Response:
     # case 1: domain with or without www is in the global list (cc = 'ZZ')
     res = query_click_one_row(
         f"""
-        SELECT category_code, domain 
-        FROM citizenlab 
+        SELECT category_code, domain
+        FROM citizenlab
         WHERE ({domain_q})
-        AND cc = 'ZZ' 
+        AND cc = 'ZZ'
         ORDER BY length(url)
         LIMIT 1
     """,
@@ -899,7 +898,7 @@ def api_private_domain_metadata() -> Response:
         # shortest domain among the one with and without www
         res2 = query_click_one_row(
             f"""
-            SELECT category_code, domain FROM citizenlab 
+            SELECT category_code, domain FROM citizenlab
             WHERE ({domain_q})
             ORDER BY length(url)
             LIMIT 1
