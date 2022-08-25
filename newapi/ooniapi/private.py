@@ -844,7 +844,7 @@ def api_private_circumvention_runtime_stats() -> Response:
 
 @api_private_blueprint.route("/domain_metadata")
 def api_private_domain_metadata() -> Response:
-    """ Return the primary category code of a certain domain_name and its
+    """Return the primary category code of a certain domain_name and its
     canonical representation.
     We consider the primary category code to be the category code of whatever is
     the shortest URL in the test lists giving higher priority to what is in the
@@ -866,54 +866,42 @@ def api_private_domain_metadata() -> Response:
         "canonical_domain": "canonical.tld"
     }
     """
+    category_code = "MISC"
     domain = request.args.get("domain")
     if domain is None:
         raise BadRequest("missing domain")
 
-    domain_variations = [domain]
     if domain.startswith("www."):
-        domain_variations.append(domain.lstrip("www."))
+        canonical_domain = domain[4:]
+        domains = [canonical_domain, domain]
     else:
-        domain_variations.append("www." + domain)
+        canonical_domain = domain
+        domains = [canonical_domain, "www." + domain]
 
-    category_code = "MISC"
-    canonical_domain = sorted(domain_variations, key=len)[0]
-
-    params = {str(idx): d for idx, d in enumerate(domain_variations)}
-    domain_q = "OR ".join([f"domain = %({idx})s " for idx in params.keys()])
     # case 1: domain with or without www is in the global list (cc = 'ZZ')
-    res = query_click_one_row(
-        f"""
+    q = """
         SELECT category_code, domain
         FROM citizenlab
-        WHERE ({domain_q})
+        WHERE domain IN :domains
         AND cc = 'ZZ'
         ORDER BY length(url)
         LIMIT 1
-    """,
-        params,
-    )
+    """
+    res = query_click_one_row(sql.text(q), dict(domains=domains))
     if not res:
         # case 2: domain only inside a country list, so we just select the
         # shortest domain among the one with and without www
-        res2 = query_click_one_row(
-            f"""
+        q = """
             SELECT category_code, domain FROM citizenlab
-            WHERE ({domain_q})
+            WHERE domain IN :domains
             ORDER BY length(url)
             LIMIT 1
-        """,
-            params,
-        )
-        if res2:
-            category_code = res2["category_code"]
-            canonical_domain = res2["domain"]
-    else:
+        """
+        res = query_click_one_row(sql.text(q), dict(domains=domains))
+
+    if res:
         category_code = res["category_code"]
         canonical_domain = res["domain"]
 
-    return cachedjson(
-        "2h",
-        category_code=category_code,
-        canonical_domain=canonical_domain,
-    )
+    j = dict(category_code=category_code, canonical_domain=canonical_domain)
+    return cachedjson("2h", **j)
