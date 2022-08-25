@@ -23,7 +23,7 @@ def test_private_api_asn_by_month(client):
     r = response[0]
     assert sorted(r.keys()) == ["date", "value"]
     assert r["value"] > 10
-    assert r["value"] < 10 ** 6
+    assert r["value"] < 10**6
     assert r["date"].endswith("T00:00:00+00:00")
 
 
@@ -61,7 +61,7 @@ def test_private_api_test_names(client, log):
             {"id": "psiphon", "name": "Psiphon"},
             {"id": "riseupvpn", "name": "RiseupVPN"},
             {"id": "signal", "name": "Signal"},
-            {'id': 'stunreachability', 'name': 'STUN Reachability'},
+            {"id": "stunreachability", "name": "STUN Reachability"},
             {"id": "tcp_connect", "name": "TCP Connect"},
             {"id": "telegram", "name": "Telegram"},
             {"id": "tor", "name": "Tor"},
@@ -105,27 +105,33 @@ def test_private_api_test_coverage_with_groups(client, log):
     assert 27 < len(resp["network_coverage"]) < 32
 
 
-def test_private_api_domain_metadata(client):
+def test_private_api_domain_metadata1(client):
     url = "domain_metadata?domain=facebook.com"
     resp = privapi(client, url)
     assert resp["category_code"] == "GRP"
     assert resp["canonical_domain"] == "www.facebook.com"
 
+
+def test_private_api_domain_metadata2(client):
     url = "domain_metadata?domain=www.facebook.com"
     resp = privapi(client, url)
     assert resp["category_code"] == "GRP"
     assert resp["canonical_domain"] == "www.facebook.com"
 
+
+def test_private_api_domain_metadata3(client):
     url = "domain_metadata?domain=www.twitter.com"
     resp = privapi(client, url)
     assert resp["category_code"] == "GRP"
     assert resp["canonical_domain"] == "twitter.com"
 
+
+def test_private_api_domain_metadata4(client):
     url = "domain_metadata?domain=www.this-domain-is-not-in-the-test-lists-for-sure.com"
     resp = privapi(client, url)
     assert resp["category_code"] == "MISC"
-    assert resp["canonical_domain"] == "this-domain-is-not-in-the-test-lists-for-sure.com"
-
+    exp = "this-domain-is-not-in-the-test-lists-for-sure.com"
+    assert resp["canonical_domain"] == exp
 
 
 @pytest.mark.skip("FIXME not deterministic")
