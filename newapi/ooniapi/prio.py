@@ -99,7 +99,7 @@ def match_prio_rule(cz, pr: dict) -> bool:
     return True
 
 
-def compute_priorities(entries, prio_rules):
+def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
     # Order based on (msmt_cnt / priority) to provide balancing
     test_list = []
     for e in entries:
@@ -118,7 +118,7 @@ def compute_priorities(entries, prio_rules):
 
 
 @metrics.timer("fetch_reactive_url_list")
-def fetch_reactive_url_list(cc: str, probe_asn: int):
+def fetch_reactive_url_list(cc: str, probe_asn: int) -> tuple:
     """Select all citizenlab URLs for the given probe_cc + ZZ
     Select measurements count from the current and previous week
     using a left outer join (without any info about priority)"""
@@ -198,7 +198,7 @@ def generate_test_list(
     return out, [], []
 
 
-# # API entry point
+# # API entry points
 
 
 @prio_bp.route("/api/v1/test-list/urls")
@@ -340,3 +340,29 @@ def debug_prioritization() -> Response:
         country_code, category_codes, asn, limit, True
     )
     return jsonify(dict(test_items=test_items, entries=entries, prio_rules=prio_rules))
+
+
+@prio_bp.route("/api/_/show_countries_prioritization")
+def show_countries_prioritization() -> Response:
+    """Show computed priorities excluding global entries
+    ---
+    produces:
+      - application/json
+    responses:
+      200:
+        description: URL test list and debug data
+        schema:
+          type: object
+    """
+    sql = "SELECT domain, url, cc, category_code, 0 AS msmt_cnt FROM citizenlab"
+    cz = query_click(sa.text(sql), {})
+
+    sql = "SELECT category_code, cc, domain, url, priority FROM url_priorities"
+    prio_rules = query_click(sa.text(sql), {})
+    li = compute_priorities(cz, prio_rules)
+    for x in li:
+        x.pop("weight")
+        x.pop("msmt_cnt")
+
+    li = sorted(li, key=lambda x: (x["cc"], -x["priority"]))
+    return jsonify(li)
