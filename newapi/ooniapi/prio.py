@@ -354,7 +354,9 @@ def show_countries_prioritization() -> Response:
         schema:
           type: object
     """
-    sql = "SELECT domain, url, cc, category_code, 0 AS msmt_cnt FROM citizenlab"
+    sql = """SELECT domain, url, cc, category_code, 0 AS msmt_cnt
+    FROM citizenlab WHERE cc != 'ZZ'
+    """
     cz = tuple(query_click(sa.text(sql), {}))
 
     sql = "SELECT category_code, cc, domain, url, priority FROM url_priorities"

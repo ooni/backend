@@ -43,7 +43,9 @@ def test_url_prioritization_category_code(client):
 
 def test_url_prioritization_category_codes(client):
     lim = 1
-    url = f"/api/v1/test-list/urls?category_codes=NEWS,CULTR&country_code=US&limit={lim}"
+    url = (
+        f"/api/v1/test-list/urls?category_codes=NEWS,CULTR&country_code=US&limit={lim}"
+    )
     c = getjson(client, url)
     assert "metadata" in c
     assert c["metadata"] == {
@@ -57,3 +59,10 @@ def test_url_prioritization_category_codes(client):
         assert r["category_code"] in ("NEWS", "CULTR")
 
     assert len(set(r["url"] for r in c["results"])) == lim
+
+
+def test_show_countries_prioritization(client):
+    c = getjson(client, "/api/_/show_countries_prioritization")
+    assert len(c) > 30000
+    assert len(c) < 60000
+    assert sorted(c[0].keys()) == ["category_code", "cc", "domain", "priority", "url"]
