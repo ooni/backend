@@ -355,10 +355,10 @@ def show_countries_prioritization() -> Response:
           type: object
     """
     sql = "SELECT domain, url, cc, category_code, 0 AS msmt_cnt FROM citizenlab"
-    cz = query_click(sa.text(sql), {})
+    cz = tuple(query_click(sa.text(sql), {}))
 
     sql = "SELECT category_code, cc, domain, url, priority FROM url_priorities"
-    prio_rules = query_click(sa.text(sql), {})
+    prio_rules = tuple(query_click(sa.text(sql), {}))
     li = compute_priorities(cz, prio_rules)
     for x in li:
         x.pop("weight")
