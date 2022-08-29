@@ -348,6 +348,15 @@ def show_countries_prioritization() -> Response:
     ---
     produces:
       - application/json
+    parameters:
+      - name: format
+        in: query
+        type: string
+        description: |
+          Output format, JSON (default) or CSV
+        enum:
+          - JSON
+          - CSV
     responses:
       200:
         description: URL test list and debug data
