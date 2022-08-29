@@ -90,10 +90,10 @@ def failover_generate_test_list(country_code: str, category_codes: tuple, limit:
 def match_prio_rule(cz, pr: dict) -> bool:
     """Match a priority rule to citizenlab entry"""
     for k in ["category_code", "domain", "url"]:
-        if pr[k] not in ("*", cz[k]):
+        if pr[k] not in ("", "*", cz[k]):
             return False
 
-    if cz["cc"] != "ZZ" and pr["cc"] not in ("*", cz["cc"]):
+    if cz["cc"] != "ZZ" and pr["cc"] not in ("", "*", cz["cc"]):
         return False
 
     return True
@@ -153,7 +153,7 @@ ON (citiz.url = cnt.input)
 @metrics.timer("fetch_prioritization_rules")
 def fetch_prioritization_rules(cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
-    FROM url_priorities WHERE cc = :cc OR cc = '*'
+    FROM url_priorities WHERE cc = :cc OR cc = '*' OR cc = ''
     """
     q = query_click(sa.text(sql), dict(cc=cc))
     return tuple(q)
