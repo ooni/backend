@@ -26,13 +26,13 @@ from collections import namedtuple
 from typing import List, Dict, Tuple
 import random
 
-from flask import Blueprint, current_app, request, Response
+from flask import Blueprint, current_app, request, Response, make_response
 from flask.json import jsonify
 from sqlalchemy import sql as sa
 
 from ooniapi.database import query_click
 from ooniapi.config import metrics
-from ooniapi.measurements import param_asn
+from ooniapi.measurements import param_asn, _convert_to_csv
 
 prio_bp = Blueprint("prio", "probe_services_prio")
 
@@ -365,6 +365,16 @@ def show_countries_prioritization() -> Response:
     for x in li:
         x.pop("weight")
         x.pop("msmt_cnt")
+        x["cc"] = x["cc"].upper()
 
     li = sorted(li, key=lambda x: (x["cc"], -x["priority"]))
+
+    param = request.args.get
+    resp_format = param("format", "JSON").upper()
+    if resp_format == "CSV":
+        csv_data = _convert_to_csv(li)
+        response = make_response(csv_data)
+        response.headers["Content-Type"] = "text/csv"
+        return response
+
     return jsonify(li)

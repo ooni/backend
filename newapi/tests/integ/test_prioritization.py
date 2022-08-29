@@ -66,3 +66,8 @@ def test_show_countries_prioritization(client):
     assert len(c) > 30000
     assert len(c) < 60000
     assert sorted(c[0].keys()) == ["category_code", "cc", "domain", "priority", "url"]
+
+
+def test_show_countries_prioritization_csv(client):
+    resp = client.get("/api/_/show_countries_prioritization?format=CSV")
+    assert not resp.is_json
