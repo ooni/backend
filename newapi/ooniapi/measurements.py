@@ -659,21 +659,20 @@ def list_measurements() -> Response:
     # Workaround for https://github.com/ooni/probe/issues/1034
     user_agent = request.headers.get("User-Agent", "")
     if user_agent.startswith("okhttp"):
-        bug_probe1034_response = jsonify(
-            {
-                "metadata": {
-                    "count": 1,
-                    "current_page": 1,
-                    "limit": 100,
-                    "next_url": None,
-                    "offset": 0,
-                    "pages": 1,
-                    "query_time": 0.001,
-                },
-                "results": [{"measurement_url": ""}],
-            }
-        )
-        return bug_probe1034_response
+        bug_probe1034_response = {
+            "metadata": {
+                "count": 1,
+                "current_page": 1,
+                "limit": 100,
+                "next_url": None,
+                "offset": 0,
+                "pages": 1,
+                "query_time": 0.001,
+            },
+            "results": [{"measurement_url": ""}],
+        }
+        # Cannot be cached due to user_agent
+        return nocachejson(**bug_probe1034_response)
 
     # # Prepare query parameters
 
@@ -928,10 +927,7 @@ def _list_measurements_click(
         "next_url": next_url,
         "query_time": query_time,
     }
-
-    response = jsonify({"metadata": metadata, "results": results[:limit]})
-    response.cache_control.max_age = 60
-    return response
+    return cachedjson("1m", metadata=metadata, results=results[:limit])
 
 
 def _convert_to_csv(r) -> str:
@@ -1190,7 +1186,7 @@ def get_aggregated() -> Response:
         download = param("download", "").lower() == "true"
         assert resp_format in ("JSON", "CSV")
     except Exception as e:
-        return jsonify({"v": 0, "error": str(e)})
+        return jerror(str(e), v=0)
 
     r = _clickhouse_aggregation(
         resp_format,
@@ -1401,7 +1397,7 @@ def _clickhouse_aggregation(
         return response
 
     except Exception as e:
-        return jerror(str(e))
+        return jerror(str(e), v=0)
 
 
 @api_msm_blueprint.route("/v1/torsf_stats")
@@ -1486,4 +1482,4 @@ def get_torsf_stats() -> Response:
         return response
 
     except Exception as e:
-        return jerror(str(e))
+        return jerror(str(e), v=0)

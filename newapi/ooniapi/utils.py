@@ -26,7 +26,7 @@ def nocachejson(*a, **kw) -> Response:
     return resp
 
 
-def jerror(msg, code=400) -> Response:
-    resp = make_response(jsonify(error=msg), code)
+def jerror(msg, code=400, **kw) -> Response:
+    resp = make_response(jsonify(error=msg, **kw), code)
     resp.cache_control.no_cache = True
     return resp

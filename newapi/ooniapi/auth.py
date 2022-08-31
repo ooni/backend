@@ -282,7 +282,7 @@ def user_register() -> Response:
         log.error(e, exc_info=True)
         return jerror("Unable to send the email")
 
-    return make_response(jsonify(msg="ok"), 200)
+    return nocachejson(msg="ok")
 
 
 def _create_session_token(account_id: str, role: str, login_time=None) -> str:
@@ -430,7 +430,7 @@ def set_account_role() -> Response:
 
     r = _set_account_role(email_address, role)
     log.info(f"Role set {r}")
-    return jsonify()
+    return nocachejson()
 
 
 def _delete_account_data(email_address: str) -> None:
