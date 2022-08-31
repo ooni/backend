@@ -1186,7 +1186,7 @@ def get_aggregated() -> Response:
         download = param("download", "").lower() == "true"
         assert resp_format in ("JSON", "CSV")
     except Exception as e:
-        return jerror(str(e), v=0)
+        return jerror(str(e), v=0, code=200)
 
     r = _clickhouse_aggregation(
         resp_format,
