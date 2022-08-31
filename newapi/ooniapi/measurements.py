@@ -11,18 +11,12 @@ from pathlib import Path
 from typing import Optional, List, Any
 from urllib.parse import urlparse
 import gzip
-import http.client
 import json
 import logging
 import math
 import re
 import string
 import time
-
-try:
-    import lz4framed
-except ImportError:
-    pass
 
 import ujson  # debdeps: python3-ujson
 import urllib3  # debdeps: python3-urllib3
@@ -34,8 +28,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 # debdeps: python3-sqlalchemy
 from sqlalchemy import and_, text, select, sql, column
 from sqlalchemy.exc import OperationalError
-from psycopg2.extensions import QueryCanceledError
-import psycopg2  # debdeps: python3-psycopg2
+from psycopg2.extensions import QueryCanceledError  # debdeps: python3-psycopg2
 
 from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
@@ -120,7 +113,7 @@ def get_measurement(measurement_id) -> Response:
     log.debug(f"Fetching file {s3path} from S3")
     try:
         body = _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
-    except:  # pragma: no cover
+    except Exception:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
         return jerror("Incorrect or inexistent measurement_id")
 
@@ -180,7 +173,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
     log.debug(f"Fetching file {s3path} from S3")
     try:
         return _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
-    except:  # pragma: no cover
+    except Exception:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
         return None
 
@@ -646,7 +639,6 @@ def list_measurements() -> Response:
     #    curl "https://api.ooni.io/api/v1/measurements?probe_cc=IT&confirmed=true&since=2017-09-01"
     # TODO: list_measurements and get_measurement will be simplified and
     # made faster by OOID: https://github.com/ooni/pipeline/issues/48
-    log = current_app.logger
     param = request.args.get
     report_id = param_report_id_or_none()
     probe_asn = param_asn("probe_asn")  # int / None
@@ -664,7 +656,7 @@ def list_measurements() -> Response:
     confirmed = param_bool("confirmed")
     category_code = param("category_code")
 
-    ## Workaround for https://github.com/ooni/probe/issues/1034
+    # Workaround for https://github.com/ooni/probe/issues/1034
     user_agent = request.headers.get("User-Agent", "")
     if user_agent.startswith("okhttp"):
         bug_probe1034_response = jsonify(
@@ -683,7 +675,7 @@ def list_measurements() -> Response:
         )
         return bug_probe1034_response
 
-    ## Prepare query parameters
+    # # Prepare query parameters
 
     input_ = request.args.get("input")
     domain = request.args.get("domain")
@@ -1025,7 +1017,7 @@ domain_matcher = re.compile(
 def validate_domain(p, name):
     try:
         p = p.encode("idna").decode("ascii")
-    except:
+    except Exception:
         raise ValueError(f"Invalid characters in {name} field")
     if not domain_matcher.match(p):
         raise ValueError(f"Invalid characters in {name} field")
@@ -1054,7 +1046,7 @@ def param_report_id_or_none() -> Optional[str]:
     if not p:
         return None
     if len(p) < 15 or len(p) > 100:
-        raise BadRequest(f"Invalid report_id field")
+        raise BadRequest("Invalid report_id field")
     accepted = string.ascii_letters + string.digits + "_"
     validate(p, accepted)
     return p
@@ -1063,7 +1055,7 @@ def param_report_id_or_none() -> Optional[str]:
 def param_report_id() -> str:
     rid = param_report_id_or_none()
     if rid is None:
-        raise BadRequest(f"Invalid report_id")
+        raise BadRequest("Invalid report_id")
     return rid
 
 
@@ -1073,10 +1065,10 @@ def param_input_or_none() -> Optional[str]:
     if not p:
         return None
     x = p.encode("ascii", "ignore").decode()
-    accepted = string.ascii_letters + string.digits + r' :/.[]-_%+(){}=?#&!,$'
+    accepted = string.ascii_letters + string.digits + r" :/.[]-_%+(){}=?#&!,$"
     for c in x:
         if c not in accepted:
-            raise ValueError(f"Invalid characters in input field")
+            raise ValueError("Invalid characters in input field")
     return p
 
 
@@ -1179,7 +1171,6 @@ def get_aggregated() -> Response:
     # TODO:
     #  better split of large dimensions in output?
     #  add limit and warn user
-    log = current_app.logger
     param = request.args.get
     try:
         axis_x = param_lowercase_underscore("axis_x")
@@ -1443,7 +1434,6 @@ def get_torsf_stats() -> Response:
       '200':
         description: Returns aggregated counters
     """
-    log = current_app.logger
     param = request.args.get
     probe_cc = param("probe_cc")
     since = param("since")
