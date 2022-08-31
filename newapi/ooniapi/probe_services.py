@@ -13,7 +13,6 @@ from urllib.request import urlopen
 
 import ujson
 from flask import Blueprint, current_app, request, Response
-from flask.json import jsonify
 
 import jwt.exceptions  # debdeps: python3-jwt
 
@@ -292,7 +291,7 @@ def check_in() -> Response:
         resp["tests"].setdefault(tn, {})  # type: ignore
         resp["tests"][tn]["report_id"] = rid  # type: ignore
 
-    return jsonify(resp)
+    return nocachejson(**resp)
 
 
 @probe_services_blueprint.route("/api/v1/collectors")
@@ -384,7 +383,7 @@ def probe_register() -> Response:
     """
     log = current_app.logger
     if not request.is_json:
-        return jsonify({"msg": "error: JSON expected!"})
+        return jerror("error: JSON expected!")
 
     now = datetime.utcnow()
     # client_id is a JWT token with "issued at" claim and
@@ -392,7 +391,7 @@ def probe_register() -> Response:
     payload = {"iat": now, "aud": "probe_login"}
     client_id = create_jwt(payload)
     log.info("register successful")
-    return jsonify({"client_id": client_id})
+    return nocachejson(client_id=client_id)
 
 
 @probe_services_blueprint.route("/api/v1/login", methods=["POST"])
@@ -455,19 +454,7 @@ def probe_login_post() -> Response:
     token = create_jwt(payload)
     # expiration string used by the probe e.g. 2006-01-02T15:04:05Z07:00
     expire = exp.strftime("%Y-%m-%dT%H:%M:%SZ00:00")
-    return jsonify(token=token, expire=expire)
-
-
-# UNUSED
-# @probe_services_blueprint.route("/api/v1/update/<clientID>", methods=["PUT"])
-# def api_update(clientID):
-#     """Probe Services
-#     ---
-#     responses:
-#       '200':
-#         description: TODO
-#     """
-#     return jsonify({"msg": "not implemented"})  # TODO
+    return nocachejson(token=token, expire=expire)
 
 
 @probe_services_blueprint.route("/api/v1/test-helpers")
@@ -594,7 +581,7 @@ def serve_psiphon_config() -> Response:
     if err:
         return err
     psconf = _load_json(current_app.config["PSIPHON_CONFFILE"])
-    return jsonify(psconf)
+    return nocachejson(**psconf)
 
 
 def _fetch_tor_bridges(cc):
@@ -695,7 +682,7 @@ def bouncer_net_tests() -> Response:
             }
         ]
     }
-    return jsonify(j)
+    return nocachejson(**j)
 
 
 @probe_services_blueprint.route("/report", methods=["POST"])
@@ -768,7 +755,7 @@ def open_report() -> Response:
         cc = "ZZ"
     test_name = data.get("test_name", "").lower()
     rid = generate_report_id(test_name, cc, asn_i)
-    return jsonify(
+    return nocachejson(
         backend_version="1.3.5", supported_formats=["yaml", "json"], report_id=rid
     )
 
@@ -831,12 +818,12 @@ def receive_measurement(report_id) -> Response:
     if asn_i == 0:
         log.info("Discarding ASN == 0")
         metrics.incr("receive_measurement_discard_asn_0")
-        return jsonify()
+        return nocachejson()
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
         metrics.incr("receive_measurement_discard_cc_zz")
-        return jsonify()
+        return nocachejson()
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
@@ -861,11 +848,11 @@ def receive_measurement(report_id) -> Response:
     try:
         url = f"http://127.0.0.1:8472/{msmt_uid}"
         urlopen(url, data, 59)
-        return jsonify(measurement_uid=msmt_uid)
+        return nocachejson(measurement_uid=msmt_uid)
 
     except Exception as e:
         log.exception(e)
-        return jsonify()
+        return nocachejson()
 
 
 @probe_services_blueprint.route("/report/<report_id>/close", methods=["POST"])
