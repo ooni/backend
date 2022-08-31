@@ -111,7 +111,7 @@ def get_measurement(measurement_id) -> Response:
         )
         LIMIT 1"""
     query_params = dict(uid=measurement_id)
-    lookup = query_click_one_row(sql.text(query), query_params)
+    lookup = query_click_one_row(sql.text(query), query_params, query_prio=11)
     if lookup is None:
         return jerror("Incorrect or inexistent measurement_id")
 
@@ -167,7 +167,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
         PREWHERE report_id = :report_id AND input = :inp
         LIMIT 1"""
     query_params = dict(inp=inp, report_id=report_id)
-    lookup = query_click_one_row(sql.text(query), query_params)
+    lookup = query_click_one_row(sql.text(query), query_params, query_prio=11)
 
     if lookup is None:
         m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
@@ -358,7 +358,7 @@ def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> d
         """
     query_params = dict(input=input_, report_id=report_id)
     query += "LIMIT 1"
-    msmt_meta = query_click_one_row(sql.text(query), query_params)
+    msmt_meta = query_click_one_row(sql.text(query), query_params, query_prio=11)
     if not msmt_meta:
         return {}  # measurement not found
     if msmt_meta["probe_asn"] == 0:
@@ -1374,9 +1374,9 @@ def _clickhouse_aggregation(
 
     try:
         if dimension_cnt > 0:
-            r: Any = list(query_click(query, query_params))
+            r: Any = list(query_click(query, query_params, query_prio=12))
         else:
-            r = query_click_one_row(query, query_params)
+            r = query_click_one_row(query, query_params, query_prio=12)
 
         pq = current_app.click.last_query
         msg = f"Stats: {pq.progress.rows} {pq.progress.bytes} {pq.progress.total_rows} {pq.elapsed}"

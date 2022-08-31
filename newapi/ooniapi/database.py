@@ -54,22 +54,25 @@ def init_clickhouse_db(app) -> None:
 Query = Union[str, TextClause, Select]
 
 
-def _run_query(query: Query, query_params: dict):
+def _run_query(query: Query, query_params: dict, query_prio=10):
+    settings = {"priority": query_prio}
     if isinstance(query, (Select, TextClause)):
         query = str(query.compile(dialect=postgresql.dialect()))
-    q = current_app.click.execute(query, query_params, with_column_types=True)
+    q = current_app.click.execute(
+        query, query_params, with_column_types=True, settings=settings
+    )
     rows, coldata = q
     colnames, coltypes = tuple(zip(*coldata))
     return colnames, rows
 
 
-def query_click(query: Query, query_params: dict) -> List[Dict]:
-    colnames, rows = _run_query(query, query_params)
+def query_click(query: Query, query_params: dict, query_prio=10) -> List[Dict]:
+    colnames, rows = _run_query(query, query_params, query_prio=query_prio)
     return [dict(zip(colnames, row)) for row in rows]
 
 
-def query_click_one_row(query: Query, query_params: dict) -> Optional[dict]:
-    colnames, rows = _run_query(query, query_params)
+def query_click_one_row(query: Query, query_params: dict, query_prio=10) -> Optional[dict]:
+    colnames, rows = _run_query(query, query_params, query_prio=query_prio)
     for row in rows:
         return dict(zip(colnames, row))
 
@@ -78,4 +81,5 @@ def query_click_one_row(query: Query, query_params: dict) -> Optional[dict]:
 
 def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
+    settings = {"priority": 8}  # query_prio
     return current_app.click.execute(query, rows, types_check=True)

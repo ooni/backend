@@ -53,7 +53,7 @@ def failover_fetch_citizenlab_data() -> Dict[str, List[CTZ]]:
     WHERE cc = 'ZZ'
     """
     out: Dict[str, List[CTZ]] = {}
-    query = query_click(sql, {})
+    query = query_click(sql, {}, query_prio=7)
     for e in query:
         catcode = e["category_code"]
         c = CTZ(e["url"], catcode)
@@ -146,7 +146,7 @@ ON (citiz.url = cnt.input)
         q = q.replace("--asn-filter--", "AND probe_asn = :asn")
 
     # support uppercase or lowercase match
-    r = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn))
+    r = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=7)
     return tuple(r)
 
 
@@ -155,7 +155,7 @@ def fetch_prioritization_rules(cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities WHERE cc = :cc OR cc = '*' OR cc = ''
     """
-    q = query_click(sa.text(sql), dict(cc=cc))
+    q = query_click(sa.text(sql), dict(cc=cc), query_prio=7)
     return tuple(q)
 
 

@@ -1,3 +1,9 @@
+ooni-api (1.0.21) unstable; urgency=medium
+
+  * Add query priority
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 31 Aug 2022 14:51:12 +0100
+
 ooni-api (1.0.20) unstable; urgency=medium
 
   * Show computed priorities
