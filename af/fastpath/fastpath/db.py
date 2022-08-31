@@ -308,8 +308,9 @@ def clickhouse_upsert_summary(
         nn(msm, "software_version"),
     ]
 
+    settings = {"priority": 5}
     try:
-        click_client.execute(sql_insert, [row])
+        click_client.execute(sql_insert, [row], settings=settings)
     except Exception:
         log.error("Failed Clickhouse insert", exc_info=True)
 
