@@ -71,7 +71,9 @@ def query_click(query: Query, query_params: dict, query_prio=10) -> List[Dict]:
     return [dict(zip(colnames, row)) for row in rows]
 
 
-def query_click_one_row(query: Query, query_params: dict, query_prio=10) -> Optional[dict]:
+def query_click_one_row(
+    query: Query, query_params: dict, query_prio=10
+) -> Optional[dict]:
     colnames, rows = _run_query(query, query_params, query_prio=query_prio)
     for row in rows:
         return dict(zip(colnames, row))
@@ -82,4 +84,4 @@ def query_click_one_row(query: Query, query_params: dict, query_prio=10) -> Opti
 def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
     settings = {"priority": 8}  # query_prio
-    return current_app.click.execute(query, rows, types_check=True)
+    return current_app.click.execute(query, rows, types_check=True, settings=settings)
