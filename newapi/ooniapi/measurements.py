@@ -1410,7 +1410,7 @@ def _clickhouse_aggregation(
         return response
 
     except Exception as e:
-        return jsonify({"v": 0, "error": str(e)})
+        return jerror(str(e))
 
 
 @api_msm_blueprint.route("/v1/torsf_stats")
@@ -1496,4 +1496,4 @@ def get_torsf_stats() -> Response:
         return response
 
     except Exception as e:
-        return jsonify({"v": 0, "error": str(e)})
+        return jerror(str(e))

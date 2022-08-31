@@ -27,12 +27,12 @@ from typing import List, Dict, Tuple
 import random
 
 from flask import Blueprint, current_app, request, Response, make_response
-from flask.json import jsonify
 from sqlalchemy import sql as sa
 
-from ooniapi.database import query_click
 from ooniapi.config import metrics
+from ooniapi.database import query_click
 from ooniapi.measurements import param_asn, _convert_to_csv
+from ooniapi.utils import cachedjson
 
 prio_bp = Blueprint("prio", "probe_services_prio")
 
@@ -268,7 +268,7 @@ def list_test_urls() -> Response:
         debug = param("debug", "").lower() in ("true", "1", "yes")
     except Exception as e:
         log.error(e, exc_info=True)
-        return jsonify({})
+        return cachedjson("0s")
 
     try:
         test_items, _1, _2 = generate_test_list(
@@ -291,7 +291,7 @@ def list_test_urls() -> Response:
         },
         "results": test_items,
     }
-    return jsonify(out)
+    return cachedjson("1s", **out)
 
 
 def param_category_codes() -> tuple:
@@ -339,7 +339,7 @@ def debug_prioritization() -> Response:
     test_items, entries, prio_rules = generate_test_list(
         country_code, category_codes, asn, limit, True
     )
-    return jsonify(dict(test_items=test_items, entries=entries, prio_rules=prio_rules))
+    return cachedjson("0s", test_items=test_items, entries=entries, prio_rules=prio_rules)
 
 
 @prio_bp.route("/api/_/show_countries_prioritization")
@@ -386,4 +386,4 @@ def show_countries_prioritization() -> Response:
         response.headers["Content-Type"] = "text/csv"
         return response
 
-    return jsonify(li)
+    return cachedjson("1s", li)
