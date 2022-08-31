@@ -23,7 +23,7 @@ from sqlalchemy import sql
 
 from ooniapi.auth import role_required
 from ooniapi.database import query_click, query_click_one_row, insert_click
-from ooniapi.utils import nocachejson
+from ooniapi.utils import nocachejson, cachedjson
 
 """
 
@@ -653,7 +653,7 @@ def get_test_list(country_code) -> Response:
     ulm = get_url_list_manager()
     try:
         tl = ulm.get_test_list(account_id, country_code)
-        return make_response(jsonify(tl))
+        return nocachejson(tl)
     except BaseOONIException as e:
         return jerror(e)
 
@@ -731,7 +731,8 @@ def url_submission_update_url() -> Response:
             new_entry=new,
             comment=rj["comment"],
         )
-        return jsonify({"updated_entry": request.json["new_entry"]})
+        entry = request.json["new_entry"]
+        return nocachejson(updated_entry=entry)
     except BaseOONIException as e:
         return jerror(e)
 
@@ -756,8 +757,8 @@ def get_workflow_state() -> Response:
     state = ulm.get_state(account_id)
     if state in ("PR_OPEN"):
         pr_url = ulm.get_pr_url(account_id)
-        return jsonify(state=state, pr_url=pr_url)
-    return jsonify(state=state)
+        return nocachejson(state=state, pr_url=pr_url)
+    return nocachejson(state=state)
 
 
 @cz_blueprint.route("/api/v1/url-submission/changes", methods=["GET"])
@@ -798,7 +799,7 @@ def post_propose_changes() -> Response:
     ulm = get_url_list_manager()
     try:
         pr_id = ulm.propose_changes(account_id)
-        return jsonify(pr_id=pr_id)
+        return nocachejson(pr_id=pr_id)
     except BaseOONIException as e:
         return jerror(e)
 
@@ -826,7 +827,7 @@ def list_url_priorities() -> Response:
     q = query_click(sql.text(query), {})
     rows = list(q)
     try:
-        return make_response(jsonify(rules=rows))
+        return cachedjson("1s", rules=rows)
     except BaseOONIException as e:
         return jerror(e)
 

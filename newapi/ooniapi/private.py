@@ -15,7 +15,6 @@ import logging
 import math
 
 from flask import Blueprint, current_app, request, Response
-from flask.json import jsonify
 
 from sqlalchemy import sql
 
@@ -24,7 +23,7 @@ from werkzeug.exceptions import BadRequest
 from ooniapi.database import query_click, query_click_one_row
 from ooniapi.models import TEST_GROUPS
 from ooniapi.countries import lookup_country
-from ooniapi.utils import cachedjson
+from ooniapi.utils import cachedjson, nocachejson, jerror
 
 # The private API is exposed under the prefix /api/_
 # e.g. https://api.ooni.io/api/_/test_names
@@ -175,7 +174,7 @@ def api_private_quotas_summary() -> Response:
     """Summary on rate-limiting quotas.
     [(first ipaddr octet, remaining daily quota), ... ]
     """
-    return jsonify(current_app.limiter.get_lowest_daily_quotas_summary())
+    return nocachejson(current_app.limiter.get_lowest_daily_quotas_summary())
 
 
 @api_private_blueprint.route("/check_report_id", methods=["GET"])
@@ -839,7 +838,7 @@ def api_private_circumvention_runtime_stats() -> Response:
         return cachedjson("1d", v=0, results=result)
 
     except Exception as e:
-        return jsonify({"v": 0, "error": str(e)})
+        return jerror(str(e), v=0)
 
 
 @api_private_blueprint.route("/domain_metadata")

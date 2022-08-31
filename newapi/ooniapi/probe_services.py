@@ -517,7 +517,7 @@ def list_test_helpers() -> Response:
     probe_ipaddr = request.headers.get("X-Real-Ip", "0.0.0.0")
     try:
         last_oct = int(probe_ipaddr.rsplit(".", 1)[1])
-    except:
+    except Exception:
         last_oct = 0
     th0, th1 = last_oct % 2, (last_oct + 1) % 2
     j["web-connectivity"] = [
@@ -576,7 +576,6 @@ def serve_psiphon_config() -> Response:
       200:
         description: TODO
     """
-    log = current_app.logger
     err = _check_probe_token("psiphon")
     if err:
         return err
@@ -603,7 +602,6 @@ def serve_tor_targets() -> Response:
       200:
         description: TODO
     """
-    log = current_app.logger
     err = _check_probe_token("tor_targets")
     if err:
         return err

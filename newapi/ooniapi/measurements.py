@@ -34,7 +34,7 @@ from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
 from ooniapi.config import metrics
-from ooniapi.utils import cachedjson, jerror
+from ooniapi.utils import cachedjson, nocachejson, jerror
 from ooniapi.models import TEST_NAMES
 from ooniapi.database import query_click, query_click_one_row
 
