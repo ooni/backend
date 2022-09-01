@@ -1,3 +1,9 @@
+ooni-api (1.0.22) unstable; urgency=medium
+
+  * Update robots.txt
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 01 Sep 2022 11:56:14 +0100
+
 ooni-api (1.0.21) unstable; urgency=medium
 
   * Add query priority

@@ -132,6 +132,8 @@ def robots_txt() -> Response:
 User-agent: *
 Disallow: /api/_
 Disallow: /api/v1/aggregation
+Disallow: /api/v1/measurement_meta
+Disallow: /api/v1/raw_measurement
 Disallow: /api/v1/test-list/urls
 Disallow: /api/v1/torsf_stats
 Disallow: /files
