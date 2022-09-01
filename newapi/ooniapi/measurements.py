@@ -33,6 +33,7 @@ from psycopg2.extensions import QueryCanceledError  # debdeps: python3-psycopg2
 from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
+from ooniapi.auth import role_required, get_account_id_or_none
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson, nocachejson, jerror
 from ooniapi.models import TEST_NAMES
@@ -1068,6 +1069,13 @@ def param_input_or_none() -> Optional[str]:
     return p
 
 
+def param_measurement_uid() -> str:
+    p = request.args.get("measurement_uid")
+    if not p or len(p) < 10 or len(p) > 100:
+        raise BadRequest(f"Invalid measurement_uid field")
+    return p
+
+
 @api_msm_blueprint.route("/v1/aggregation")
 @metrics.timer("get_aggregated")
 def get_aggregated() -> Response:
@@ -1487,7 +1495,6 @@ def get_torsf_stats() -> Response:
 
 # # measurement feedback
 
-from ooniapi.auth import role_required, get_account_id, jerror
 from ooniapi.database import insert_click
 
 
@@ -1497,7 +1504,6 @@ CREATE TABLE msmt_feedback
     `measurement_uid` String,
     `account_id` String,
     `status` String,
-    `comment` String,
     `update_time` DateTime64(3) MATERIALIZED now64()
 )
 ENGINE = ReplacingMergeTree
@@ -1524,46 +1530,40 @@ valid_feedback_status = [
 ]
 
 
-@api_msm_blueprint.route("/v1/measurement_feedback")
+@api_msm_blueprint.route("/v1/measurement_feedback/<measurement_uid>")
 @metrics.timer("get_msmt_feedback")
-@role_required(["admin", "user"])
-def get_msmt_feedback() -> Response:
+def get_msmt_feedback(measurement_uid) -> Response:
     """Get measurement for the curred logged user for a given measurement
     ---
     produces:
       - application/json
-    consumes:
-      - application/json
     parameters:
-      - in: body
+      - name: measurement_uid
+        in: path
+        type: string
+        description: Measurement ID
+        minLength: 5
         required: true
-        schema:
-          type: object
-          properties:
-            measurement_uid:
-              type: string
-              description: Measurement ID
     responses:
       200:
-        description: status and comment or empty JSON
+        description: status summary
     """
+    account_id = get_account_id_or_none()
+    query = """SELECT status, account_id = :aid AS is_mine, count() AS cnt
+        FROM msmt_feedback FINAL
+        WHERE measurement_uid = :muid
+        GROUP BY status, is_mine
+    """
+    qp = dict(aid=account_id, muid=measurement_uid)
+    rows = query_click(sql.text(query), qp)
+    out = dict(summary={})
+    for row in rows:
+        status = row["status"]
+        if row["is_mine"]:
+            out["user_feedback"] = status
+        out["summary"][status] = out["summary"].get(status, 0) + row["cnt"]
 
-    def jparam(name):
-        return request.json.get(name, "").strip()
-
-    log = current_app.logger
-    account_id = get_account_id()
-    measurement_uid = jparam("measurement_uid")
-
-    query = """SELECT status, comment FROM msmt_feedback FINAL
-    WHERE account_id = :account_id AND measurement_uid = :measurement_uid
-    LIMIT 1"""
-    qp = dict(account_id=account_id, measurement_uid=measurement_uid)
-    row = query_click_one_row(sql.text(query), qp)
-    if row:
-        return cachedjson("0s", **row)
-
-    return cachedjson("0s")
+    return cachedjson("0s", **out)
 
 
 @api_msm_blueprint.route("/v1/submit_measurement_feedback", methods=["POST"])
@@ -1601,8 +1601,7 @@ def submit_msmt_feedback() -> Response:
     def jparam(name):
         return request.json.get(name, "").strip()
 
-    log = current_app.logger
-    account_id = get_account_id()
+    account_id = get_account_id_or_none()
     status = jparam("status")
     if status not in valid_feedback_status:
         return jerror("Invalid status")

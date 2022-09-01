@@ -156,6 +156,16 @@ def role_required(roles):
     return decorator
 
 
+def get_account_id_or_none() -> Optional[str]:
+    try:
+        token = request.cookies.get("ooni", "")
+        tok = decode_jwt(token, audience="user_auth")
+    except Exception:
+        return None
+
+    return tok["account_id"]
+
+
 def get_account_id() -> str:
     try:
         token = request.cookies.get("ooni", "")

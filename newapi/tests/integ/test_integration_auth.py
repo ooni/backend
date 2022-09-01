@@ -18,6 +18,7 @@ import pytest
 from freezegun import freeze_time  # debdeps: python3-freezegun
 
 import ooniapi.auth
+import ooniapi.database
 
 
 @pytest.fixture()
@@ -296,33 +297,56 @@ def test_msmt_feedbk_submit_valid2(log, client, mocksmtp):
 # # msmt_feedback
 
 
-def test_msmt_feedback_get_no_auth(client):
-    d = dict(measurement_uid="bogus_uid")
-    r = client.get("/api/v1/measurement_feedback", json=d)
-    assert r.json == {"error": "Authentication required"}
+@pytest.fixture(scope="session")
+def msmt_tbl(app):
+    query_del = """ALTER TABLE msmt_feedback DELETE
+        WHERE measurement_uid = 'bogus_uid'"""
+    query = "INSERT INTO msmt_feedback (measurement_uid, account_id, status) VALUES"
+    rows = [
+        ("bogus_uid", "bogus_acc_1", "ok"),
+        ("bogus_uid", "bogus_acc_2", "ok"),
+        ("bogus_uid", "bogus_acc_3", "blocked"),
+    ]
+    with app.app_context():
+        app.click.execute(query_del)
+        ooniapi.database.insert_click(query, rows)
 
 
-def test_msmt_feedback_submit_no_auth(log, client):
-    d = dict(status="foo", comment="", measurement_uid="bogus_uid")
+def test_msmt_feedback_get_no_auth(client, msmt_tbl):
+    r = client.get("/api/v1/measurement_feedback/bogus_uid")
+    assert r.json == {"summary": {"blocked": 1, "ok": 2}}
+
+
+def test_msmt_feedback_submit_no_auth(client, msmt_tbl):
+    d = dict(status="foo", measurement_uid="bogus_uid")
     r = client.post("/api/v1/submit_measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
 
+    r = client.get("/api/v1/measurement_feedback/nonexistent_uid")
+    assert r.json == {"summary": {}}
 
-def test_msmt_feedback_submit_valid_and_get(client, mocksmtp):
+
+def test_msmt_feedback_submit_valid_and_get(client, mocksmtp, msmt_tbl):
     # We are not logged in and not allowed to call this
-    d = dict(status="ok", comment="", measurement_uid="bogus_uid")
+    d = dict(status="ok", measurement_uid="bogus_uid")
     r = client.post("/api/v1/submit_measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
 
     # Log in as user
     _register_and_login(client, user_e)
+    d = dict(status="ok", measurement_uid="bogus_uid")
     r = client.post("/api/v1/submit_measurement_feedback", json=d)
     assert r.json == {}, r.json
 
     # Read it back
-    r = client.get("/api/v1/measurement_feedback", json=d)
-    assert r.json == {"comment": "", "status": "ok"}
+    r = client.get("/api/v1/measurement_feedback/bogus_uid")
+    assert r.json == {"summary": {"blocked": 1, "ok": 3}, "user_feedback": "ok"}
 
-    d = dict(measurement_uid="nonexistent_uid")
-    r = client.get("/api/v1/measurement_feedback", json=d)
-    assert r.json == {}
+    # Change feedback
+    d = dict(status="blocked", measurement_uid="bogus_uid")
+    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    assert r.json == {}, r.json
+
+    # Read it back again
+    r = client.get("/api/v1/measurement_feedback/bogus_uid")
+    assert r.json == {"summary": {"blocked": 2, "ok": 2}, "user_feedback": "blocked"}
