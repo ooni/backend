@@ -16,6 +16,7 @@ import geoip2.database  # type: ignore
 
 # python3-flask-cors has unnecessary dependencies :-/
 from ooniapi.rate_limit_quotas import FlaskLimiter
+from ooniapi.config import metrics
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
@@ -221,6 +222,14 @@ def create_app(*args, testmode=False, **kw):
         # TODO: ping database?
         # option httpchk GET /check
         # http-check expect string success
+
+    @app.before_request
+    def before_request():
+        metrics.incr("busy_workers_count")
+
+    @app.after_request
+    def after_request():
+        metrics.incr("busy_workers_count")
 
     if False:
         log.debug("Routes:")
