@@ -228,8 +228,9 @@ def create_app(*args, testmode=False, **kw):
         metrics.incr("busy_workers_count")
 
     @app.after_request
-    def after_request():
-        metrics.incr("busy_workers_count")
+    def after_request(resp):
+        metrics.decr("busy_workers_count")
+        return resp
 
     if False:
         log.debug("Routes:")
