@@ -55,7 +55,7 @@ Query = Union[str, TextClause, Select]
 
 
 def _run_query(query: Query, query_params: dict, query_prio=3):
-    settings = {"priority": query_prio}
+    settings = {"priority": query_prio, "max_execution_time": 28}
     if isinstance(query, (Select, TextClause)):
         query = str(query.compile(dialect=postgresql.dialect()))
     q = current_app.click.execute(
@@ -83,5 +83,5 @@ def query_click_one_row(
 
 def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
-    settings = {"priority": 1}  # query_prio
+    settings = {"priority": 1, "max_execution_time": 28}  # query_prio
     return current_app.click.execute(query, rows, types_check=True, settings=settings)
