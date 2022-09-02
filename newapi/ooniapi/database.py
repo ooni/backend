@@ -54,7 +54,7 @@ def init_clickhouse_db(app) -> None:
 Query = Union[str, TextClause, Select]
 
 
-def _run_query(query: Query, query_params: dict, query_prio=10):
+def _run_query(query: Query, query_params: dict, query_prio=3):
     settings = {"priority": query_prio}
     if isinstance(query, (Select, TextClause)):
         query = str(query.compile(dialect=postgresql.dialect()))
@@ -66,13 +66,13 @@ def _run_query(query: Query, query_params: dict, query_prio=10):
     return colnames, rows
 
 
-def query_click(query: Query, query_params: dict, query_prio=10) -> List[Dict]:
+def query_click(query: Query, query_params: dict, query_prio=3) -> List[Dict]:
     colnames, rows = _run_query(query, query_params, query_prio=query_prio)
     return [dict(zip(colnames, row)) for row in rows]
 
 
 def query_click_one_row(
-    query: Query, query_params: dict, query_prio=10
+    query: Query, query_params: dict, query_prio=3
 ) -> Optional[dict]:
     colnames, rows = _run_query(query, query_params, query_prio=query_prio)
     for row in rows:
@@ -83,5 +83,5 @@ def query_click_one_row(
 
 def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
-    settings = {"priority": 8}  # query_prio
+    settings = {"priority": 1}  # query_prio
     return current_app.click.execute(query, rows, types_check=True, settings=settings)
