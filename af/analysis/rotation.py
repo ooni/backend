@@ -515,7 +515,10 @@ def end_to_end_test(ipaddr: IP4a, fqdn: str) -> None:
     hdr = {"Host": fqdn, "Pragma": "no-cache"}
     log.info(f"Testing TH on {fqdn} using http_request and tcp_connect")
     r = requests.post(f"https://{ipaddr}", headers=hdr, verify=False, json=j)
-    if r.ok and sorted(r.json()) == ["dns", "http_request", "tcp_connect"]:
+    keys = set(r.json().keys())
+    expected = {"dns", "http_request", "tcp_connect"}
+    if r.ok and expected.issubset(keys):
+        # This is true when keys >= expected
         log.info(f"End-to-end test successful")
         return
 
