@@ -289,7 +289,7 @@ def test_msmt_feedbk_submit_valid2(log, client, mocksmtp):
     _register_and_login(client, user_e)
     # We are logged in with role "user"
     #
-    d = dict(status="foo", comment="")
+    d = dict(status="foo")
     r = client.post("/api/v1/submit_measurement_feedback", json=d)
     assert r.json == {"msg": "not implemented"}
 

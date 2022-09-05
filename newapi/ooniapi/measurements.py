@@ -1589,10 +1589,6 @@ def submit_msmt_feedback() -> Response:
               type: string
               description: Measurement status
               minLength: 2
-            comment:
-              type: string
-              description: Free-form description of the issue
-              maxLength: 300
     responses:
       200:
         description: Submission or update accepted
@@ -1606,9 +1602,8 @@ def submit_msmt_feedback() -> Response:
     if status not in valid_feedback_status:
         return jerror("Invalid status")
     measurement_uid = jparam("measurement_uid")
-    comment = jparam("comment")
 
-    query = "INSERT INTO msmt_feedback (measurement_uid, account_id, status, comment) VALUES"
-    query_params = [measurement_uid, account_id, status, comment]
+    query = "INSERT INTO msmt_feedback (measurement_uid, account_id, status) VALUES"
+    query_params = [measurement_uid, account_id, status]
     insert_click(query, [query_params])
     return cachedjson("0s")
