@@ -1566,7 +1566,7 @@ def get_msmt_feedback(measurement_uid) -> Response:
     return cachedjson("0s", **out)
 
 
-@api_msm_blueprint.route("/v1/submit_measurement_feedback", methods=["POST"])
+@api_msm_blueprint.route("/v1/measurement_feedback", methods=["POST"])
 @metrics.timer("submit_msmt_feedback")
 @role_required(["admin", "user"])
 def submit_msmt_feedback() -> Response:

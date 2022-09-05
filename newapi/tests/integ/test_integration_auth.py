@@ -290,7 +290,7 @@ def test_msmt_feedbk_submit_valid2(log, client, mocksmtp):
     # We are logged in with role "user"
     #
     d = dict(status="foo")
-    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    r = client.post("/api/v1/measurement_feedback", json=d)
     assert r.json == {"msg": "not implemented"}
 
 
@@ -319,7 +319,7 @@ def test_msmt_feedback_get_no_auth(client, msmt_tbl):
 
 def test_msmt_feedback_submit_no_auth(client, msmt_tbl):
     d = dict(status="foo", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    r = client.post("/api/v1/measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
 
     r = client.get("/api/v1/measurement_feedback/nonexistent_uid")
@@ -329,13 +329,13 @@ def test_msmt_feedback_submit_no_auth(client, msmt_tbl):
 def test_msmt_feedback_submit_valid_and_get(client, mocksmtp, msmt_tbl):
     # We are not logged in and not allowed to call this
     d = dict(status="ok", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    r = client.post("/api/v1/measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
 
     # Log in as user
     _register_and_login(client, user_e)
     d = dict(status="ok", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    r = client.post("/api/v1/measurement_feedback", json=d)
     assert r.json == {}, r.json
 
     # Read it back
@@ -344,7 +344,7 @@ def test_msmt_feedback_submit_valid_and_get(client, mocksmtp, msmt_tbl):
 
     # Change feedback
     d = dict(status="blocked", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/submit_measurement_feedback", json=d)
+    r = client.post("/api/v1/measurement_feedback", json=d)
     assert r.json == {}, r.json
 
     # Read it back again
