@@ -59,7 +59,7 @@ class Limiter:
             self._whitelisted_ipaddrs.add(ipaddress.ip_address(ipa))
 
         self.increment_quota_counters(1)
-        self.refresh_quota_counters_if_needed()
+        self.increase_quota_counters_if_needed()
 
     def increment_quota_counters(self, tdelta: int):
         """Delta: time from previous run in seconds"""
@@ -92,7 +92,7 @@ class Limiter:
             metrics.gauge(f"rate-limit-ipaddrs-{period}", size)
             print(size)
 
-    def refresh_quota_counters_if_needed(self):
+    def increase_quota_counters_if_needed(self):
         t = time.monotonic()
         delta = t - self._last_quota_update_time
         if delta > 3600:
@@ -192,7 +192,7 @@ class FlaskLimiter:
         if self._limiter.is_page_unmetered(request.path):
             return
 
-        self._limiter.refresh_quota_counters_if_needed()
+        self._limiter.increase_quota_counters_if_needed()
         # token = request.headers.get("Token", None)
         # if token:
         # check token validity
