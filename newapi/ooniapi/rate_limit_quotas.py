@@ -184,6 +184,7 @@ class FlaskLimiter:
         """Check rate limits before processing a request
         Refresh quota counters when needed
         """
+        metrics.incr("busy_workers_count")
         ipaddr = self._get_client_ipaddr()
         if self._limiter.is_ipaddr_whitelisted(ipaddr):
             return
@@ -215,6 +216,7 @@ class FlaskLimiter:
             self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
             q = self._limiter.get_minimum_across_quotas(ipaddr=ipaddr)
             response.headers.add("X-RateLimit-Remaining", int(q))
+            metrics.decr("busy_workers_count")
 
         except Exception as e:
             log.error(str(e), exc_info=True)
