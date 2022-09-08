@@ -166,7 +166,8 @@ def get_account_id_or_none() -> Optional[str]:
     return tok["account_id"]
 
 
-def get_account_id() -> str:
+def get_account_id():
+    # TODO: switch to get_account_id_or_none
     try:
         token = request.cookies.get("ooni", "")
         tok = decode_jwt(token, audience="user_auth")
