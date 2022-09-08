@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from dateutil.parser import parse as parse_date
 from io import StringIO
 from pathlib import Path
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from urllib.parse import urlparse
 import gzip
 import json
@@ -1556,7 +1556,7 @@ def get_msmt_feedback(measurement_uid) -> Response:
     """
     qp = dict(aid=account_id, muid=measurement_uid)
     rows = query_click(sql.text(query), qp)
-    out = dict(summary={})
+    out: Dict[str, Any] = dict(summary={})
     for row in rows:
         status = row["status"]
         if row["is_mine"]:
