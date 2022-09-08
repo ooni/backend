@@ -20,13 +20,28 @@ import time
 import ipaddress
 from typing import Dict, List, Optional, Tuple, Union, Set
 
+import lmdb  # debdeps: python3-lmdb
+
 from ooniapi.config import metrics
+
+LMDB_DIR = "/var/lib/ooniapi/lmdb"
 
 IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 IpAddrBucket = Dict[IpAddress, float]
 IpAddrBuckets = Tuple[IpAddrBucket, IpAddrBucket, IpAddrBucket]
 TokenBucket = Dict[str, float]
 TokenBuckets = Tuple[TokenBucket, TokenBucket, TokenBucket]
+
+class LMDB:
+    def __init__(self):
+        self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
+        self._dbmeta = self._env.open_db(b"meta")
+
+    def integer_sumupsert(self, name: str, delta: int):
+        key = name.encode()
+        with self._env.begin(db=self._dbmeta, write=True) as txn:
+            v = int(txn.get(key, 0))
+            txn.put(key, str(v + delta).encode())
 
 
 class Limiter:
@@ -42,6 +57,7 @@ class Limiter:
         labels = ("ipaddr_per_month", "ipaddr_per_week", "ipaddr_per_day")
         self._ipaddr_limits = [limits.get(x, None) for x in labels]
         self._token_limits = [limits.get(x, None) for x in labels]
+        self._lmdb = LMDB()
         self._ipaddr_buckets = ({}, {}, {})  # type: IpAddrBuckets
         self._token_buckets = ({}, {}, {})  # type: TokenBuckets
         self._token_check_callback = token_check_callback
@@ -185,6 +201,8 @@ class FlaskLimiter:
         Refresh quota counters when needed
         """
         metrics.incr("busy_workers_count")
+        self._limiter._lmdb.integer_sumupsert("busy_workers_count", 1)
+
         ipaddr = self._get_client_ipaddr()
         if self._limiter.is_ipaddr_whitelisted(ipaddr):
             return
@@ -217,6 +235,7 @@ class FlaskLimiter:
             q = self._limiter.get_minimum_across_quotas(ipaddr=ipaddr)
             response.headers.add("X-RateLimit-Remaining", int(q))
             metrics.decr("busy_workers_count")
+            self._limiter._lmdb.integer_sumupsert("busy_workers_count", -1)
 
         except Exception as e:
             log.error(str(e), exc_info=True)
