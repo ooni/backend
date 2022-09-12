@@ -19,6 +19,7 @@ Also provides a connector for Flask
 import time
 import ipaddress
 from typing import Dict, List, Optional, Tuple, Union, Set
+from sys import maxsize
 
 import lmdb  # debdeps: python3-lmdb
 
@@ -32,16 +33,47 @@ IpAddrBuckets = Tuple[IpAddrBucket, IpAddrBucket, IpAddrBucket]
 TokenBucket = Dict[str, float]
 TokenBuckets = Tuple[TokenBucket, TokenBucket, TokenBucket]
 
-class LMDB:
-    def __init__(self):
-        self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
-        self._dbmeta = self._env.open_db(b"meta")
 
-    def integer_sumupsert(self, name: str, delta: int):
-        key = name.encode()
-        with self._env.begin(db=self._dbmeta, write=True) as txn:
-            v = int(txn.get(key, 0))
-            txn.put(key, str(v + delta).encode())
+def ipa_lmdb(ipaddr: IpAddress) -> bytes:
+    return ipaddr.packed
+
+
+class LMDB:
+    def __init__(self, dbnames: tuple):
+        self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
+        dbnames2 = list(dbnames)
+        dbnames2.append("meta")
+        self._dbs = {}
+        for dbname in dbnames2:
+            self._dbs[dbname] = self._env.open_db(dbname.encode())
+
+    def purge_databases(self):
+        """Used for testing"""
+        raise NotImplementedError
+        # self._dbs[dbname] = self._env.open_db(dbname.encode())
+        # with self._env.begin(db=self._dbs[dbname], write=True) as txn:
+        #    txn.drop(self._dbs[dbname], delete=False)
+
+    def integer_sumupsert(self, dbname: str, key: str, delta: int, default=0):
+        """Sum delta to the value of "key", using a default value if missing
+        Return the new value
+        """
+        db = self._dbs[dbname]
+        if isinstance(key, str):
+            key2 = key.encode()
+        else:
+            key2 = key
+        with self._env.begin(db=db, write=True) as txn:
+            v = int(txn.get(key2, default))
+            v += delta
+            txn.put(key2, str(v).encode())
+
+        return v
+
+    def write_tnx(self, dbname="", db=None):
+        if dbname:
+            db = self._dbs[dbname]
+        return self._env.begin(db=db, write=True)
 
 
 class Limiter:
@@ -55,10 +87,11 @@ class Limiter:
     ):
         # Bucket sequence: month, week, day
         labels = ("ipaddr_per_month", "ipaddr_per_week", "ipaddr_per_day")
+        self._hours = [30 * 24, 7 * 24, 1 * 24]
+        self._labels = labels
         self._ipaddr_limits = [limits.get(x, None) for x in labels]
         self._token_limits = [limits.get(x, None) for x in labels]
-        self._lmdb = LMDB()
-        self._ipaddr_buckets = ({}, {}, {})  # type: IpAddrBuckets
+        self._lmdb = LMDB(dbnames=labels)
         self._token_buckets = ({}, {}, {})  # type: TokenBuckets
         self._token_check_callback = token_check_callback
         self._ipaddr_extraction_methods = ipaddr_methods
@@ -75,78 +108,63 @@ class Limiter:
             self._whitelisted_ipaddrs.add(ipaddress.ip_address(ipa))
 
         self.increment_quota_counters(1)
-        self.increase_quota_counters_if_needed()
+        self.increment_quota_counters_if_needed()
 
     def increment_quota_counters(self, tdelta: int):
-        """Delta: time from previous run in seconds"""
+        """Increment quota counters for every tracked ipaddr. When they exceed
+        the default value simply delete the key"""
         if tdelta <= 0:
             return
 
-        # TODO: use zip()
-        iterable = (
-            (30 * 24, self._ipaddr_limits[0], self._ipaddr_buckets[0]),
-            (7 * 24, self._ipaddr_limits[1], self._ipaddr_buckets[1]),
-            (1 * 24, self._ipaddr_limits[2], self._ipaddr_buckets[2]),
-        )
-        for hours, limit, bucket in iterable:
-            vdelta = limit / hours / 3600 * tdelta
-            to_delete = []
-            for k, v in bucket.items():
-                v += vdelta
-                if v >= limit:
-                    to_delete.append(k)
-                else:
-                    bucket[k] = v
+        # the value is stored as interger in milliseconds
+        iterable = zip(self._hours, self._ipaddr_limits, self.ipaddr_buckets)
+        for hours, limit, db in iterable:
+            vdelta = 1000 * tdelta * limit / hours / 3600
+            with self._lmdb._env.begin(db=db, write=True) as txn:
+                i = txn.cursor().iternext()
+                for raw_ipa, raw_val in i:
+                    v = int(raw_val) + vdelta
+                    if v >= limit:
+                        txn.pop(raw_ipa)
+                    else:
+                        txn.put(raw_ipa, str(v).encode())
 
-            for k in to_delete:
-                del bucket[k]
-
-    def _generate_bucket_stats(self):
-        periods = ("month", "week", "day")
-        for b, period in zip(self._ipaddr_buckets, periods):
-            size = len(b)
-            metrics.gauge(f"rate-limit-ipaddrs-{period}", size)
-            print(size)
-
-    def increase_quota_counters_if_needed(self):
+    def increment_quota_counters_if_needed(self):
         t = time.monotonic()
         delta = t - self._last_quota_update_time
         if delta > 3600:
             self.increment_quota_counters(delta)
             self._last_quota_update_time = t
-            self._generate_bucket_stats()
 
     def consume_quota(
         self, elapsed: float, ipaddr: Optional[IpAddress] = None, token=None
     ) -> None:
-        """Consume quota in seconds"""
+        """Consume quota in seconds. Return the lowest remaining value"""
         assert ipaddr or token
-        if ipaddr:
-            # TODO handle IPv6?
-            assert isinstance(ipaddr, ipaddress.IPv4Address)
-            for n, limit in enumerate(self._ipaddr_limits):
-                b = self._ipaddr_buckets[n]
-                b[ipaddr] = b.get(ipaddr, limit) - elapsed
-
-        else:
+        if not ipaddr:
             raise NotImplementedError()
 
-    def get_minimum_across_quotas(self, ipaddr=None, token=None) -> float:
-        assert ipaddr or token
-        if ipaddr:
-            iterable = zip(self._ipaddr_limits, self._ipaddr_buckets)
-            return min(bucket.get(ipaddr, limit) for limit, bucket in iterable)
+        # TODO handle IPv6?
+        assert isinstance(ipaddr, ipaddress.IPv4Address)
+        remaining = maxsize
+        z = zip(self._ipaddr_limits, self._labels)
+        for limit, dbname in z:
+            ipa = ipa_lmdb(ipaddr)
+            elapsed_ms = int(elapsed * 1000)  # milliseconds
+            v_ms = self._lmdb.integer_sumupsert(dbname, ipa, -elapsed_ms, default=limit)
+            v = int(v_ms / 1000)
+            if v < remaining:
+                remaining = v
 
-        else:
-            raise NotImplementedError()
+        return remaining
 
     def is_quota_available(self, ipaddr=None, token=None) -> bool:
-        """Check if all quota buckets for an ipaddr/token are > 0"""
-        # return False if any bucket reached 0
-        for bucket in self._ipaddr_buckets:
-            if ipaddr in bucket:
-                if bucket[ipaddr] <= 0:
-                    return False
+        """Checks if all quota buckets for an ipaddr/token are > 0"""
+        for db in self.ipaddr_buckets:
+            with self._lmdb._env.begin(db=db, write=False) as txn:
+                v = float(txn.get(ipa_lmdb(ipaddr), 999))
+            if v <= 0:
+                return False
 
         return True
 
@@ -164,9 +182,22 @@ class Limiter:
 
     def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[int, float]]:
         """Returns a summary of daily quotas with the lowest values"""
-        li = sorted((val, ipa) for ipa, val in self._ipaddr_buckets[2].items())
-        li = li[:n]
-        return [(int(ipa.packed[0]), val) for val, ipa in li]
+        db = self._lmdb._dbs["ipaddr_per_day"]
+        tmp = []
+        with self._lmdb._env.begin(db=db, write=False) as txn:
+            i = txn.cursor().iternext()
+            for raw_ipa, raw_val in i:
+                first_octect = int(raw_ipa[0])
+                val = int(raw_val) / 1000.0
+                tmp.append((val, first_octect))
+
+        tmp.sort()
+        tmp = tmp[:n]
+        return [(ipa, val) for val, ipa in tmp]
+
+    @property
+    def ipaddr_buckets(self):
+        return [self._lmdb._dbs[lab] for lab in self._labels]
 
 
 # # Flask-specific code # #
@@ -201,7 +232,7 @@ class FlaskLimiter:
         Refresh quota counters when needed
         """
         metrics.incr("busy_workers_count")
-        self._limiter._lmdb.integer_sumupsert("busy_workers_count", 1)
+        self._limiter._lmdb.integer_sumupsert("meta", "busy_workers_count", 1)
 
         ipaddr = self._get_client_ipaddr()
         if self._limiter.is_ipaddr_whitelisted(ipaddr):
@@ -210,7 +241,7 @@ class FlaskLimiter:
         if self._limiter.is_page_unmetered(request.path):
             return
 
-        self._limiter.increase_quota_counters_if_needed()
+        self._limiter.increment_quota_counters_if_needed()
         # token = request.headers.get("Token", None)
         # if token:
         # check token validity
@@ -231,11 +262,10 @@ class FlaskLimiter:
 
             assert response
             tdelta = time.monotonic() - self._request_start_time
-            self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
-            q = self._limiter.get_minimum_across_quotas(ipaddr=ipaddr)
-            response.headers.add("X-RateLimit-Remaining", int(q))
+            remaining = self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
+            response.headers.add("X-RateLimit-Remaining", int(remaining))
             metrics.decr("busy_workers_count")
-            self._limiter._lmdb.integer_sumupsert("busy_workers_count", -1)
+            self._limiter._lmdb.integer_sumupsert("meta", "busy_workers_count", -1)
 
         except Exception as e:
             log.error(str(e), exc_info=True)
