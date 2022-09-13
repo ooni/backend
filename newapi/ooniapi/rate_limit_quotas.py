@@ -44,7 +44,7 @@ class LMDB:
         self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
         dbnames2 = list(dbnames)
         dbnames2.append("meta")
-        self._dbs = {}
+        self._dbs: Dict[str, lmdb._Database] = {}
         for dbname in dbnames2:
             self._dbs[dbname] = self._env.open_db(dbname.encode())
 
