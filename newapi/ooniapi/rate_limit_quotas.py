@@ -67,7 +67,7 @@ class LMDB:
         with self._env.begin(db=db, write=True) as txn:
             v = int(txn.get(key2, default))
             v += delta
-            txn.put(key2, str(v).encode())
+            txn.put(key2, str(int(v)).encode())
 
         return v
 
@@ -128,7 +128,7 @@ class Limiter:
                     if v >= limit:
                         txn.pop(raw_ipa)
                     else:
-                        txn.put(raw_ipa, str(v).encode())
+                        txn.put(raw_ipa, str(int(v)).encode())
 
     def increment_quota_counters_if_needed(self):
         t = time.monotonic()
