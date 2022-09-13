@@ -32,6 +32,7 @@ IpAddrBucket = Dict[IpAddress, float]
 IpAddrBuckets = Tuple[IpAddrBucket, IpAddrBucket, IpAddrBucket]
 TokenBucket = Dict[str, float]
 TokenBuckets = Tuple[TokenBucket, TokenBucket, TokenBucket]
+StrBytes = Union[bytes, str]
 
 
 def ipa_lmdb(ipaddr: IpAddress) -> bytes:
@@ -54,7 +55,7 @@ class LMDB:
         # with self._env.begin(db=self._dbs[dbname], write=True) as txn:
         #    txn.drop(self._dbs[dbname], delete=False)
 
-    def integer_sumupsert(self, dbname: str, key: str, delta: int, default=0):
+    def integer_sumupsert(self, dbname: str, key: StrBytes, delta: int, default=0):
         """Sum delta to the value of "key", using a default value if missing
         Return the new value
         """
@@ -138,21 +139,22 @@ class Limiter:
 
     def consume_quota(
         self, elapsed: float, ipaddr: Optional[IpAddress] = None, token=None
-    ) -> None:
-        """Consume quota in seconds. Return the lowest remaining value"""
+    ) -> float:
+        """Consume quota in seconds. Return the lowest remaining value in
+        seconds"""
         assert ipaddr or token
         if not ipaddr:
             raise NotImplementedError()
 
         # TODO handle IPv6?
         assert isinstance(ipaddr, ipaddress.IPv4Address)
-        remaining = maxsize
+        remaining: float = maxsize
         z = zip(self._ipaddr_limits, self._labels)
         for limit, dbname in z:
             ipa = ipa_lmdb(ipaddr)
             elapsed_ms = int(elapsed * 1000)  # milliseconds
             v_ms = self._lmdb.integer_sumupsert(dbname, ipa, -elapsed_ms, default=limit)
-            v = int(v_ms / 1000)
+            v = v_ms / 1000
             if v < remaining:
                 remaining = v
 
@@ -219,7 +221,9 @@ class FlaskLimiter:
                     return ipaddress.ip_address(ipaddr)
 
             elif m == "socket":
-                return ipaddress.ip_address(request.remote_addr)
+                ipaddr = request.remote_addr
+                if ipaddr:
+                    return ipaddress.ip_address(ipaddr)
 
             else:
                 raise NotImplementedError(f"IP address method {m} is unknown")
