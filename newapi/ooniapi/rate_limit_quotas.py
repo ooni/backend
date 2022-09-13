@@ -239,6 +239,7 @@ class FlaskLimiter:
         """
         metrics.incr("busy_workers_count")
         self._limiter._lmdb.integer_sumupsert("meta", "busy_workers_count", 1)
+        self._request_start_time = time.monotonic()
 
         ipaddr = self._get_client_ipaddr()
         if self._limiter.is_ipaddr_whitelisted(ipaddr):
@@ -252,8 +253,7 @@ class FlaskLimiter:
         # if token:
         # check token validity
         if not self._limiter.is_quota_available(ipaddr=ipaddr):
-            flask.abort(429)
-        self._request_start_time = time.monotonic()
+            return '429 error', 429
 
     def _after_request_callback(self, response):
         """Consume quota and injects HTTP headers when responding to a request"""
