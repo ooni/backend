@@ -132,8 +132,6 @@ def setup() -> None:
         log.info("collectors: %s", conf.collector_hostnames)
         conf.s3_access_key = cp["DEFAULT"]["s3_access_key"].strip()
         conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
-        if conf.db_uri is None:
-            conf.db_uri = cp["DEFAULT"]["db_uri"].strip()
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
 
@@ -270,10 +268,7 @@ def process_measurements_from_s3() -> None:
     if conf.no_write_to_db:
         log.info("Skipping DB connection setup")
     else:
-        if conf.db_uri:
-            db.setup(conf)
-        if conf.clickhouse_url:
-            db.setup_clickhouse(conf)
+        db.setup_clickhouse(conf)
 
     msmt_cnt = 0
     for measurement_tup in s3feeder.stream_cans(conf, conf.start_day, conf.end_day):
@@ -1504,10 +1499,7 @@ def msm_processor(queue):
     if conf.no_write_to_db:
         log.info("Skipping DB connection setup")
     else:
-        if conf.db_uri:
-            db.setup(conf)
-        if conf.clickhouse_url:
-            db.setup_clickhouse(conf)
+        db.setup_clickhouse(conf)
 
     while True:
         msm_tup = queue.get()
@@ -1597,31 +1589,18 @@ def process_measurement(msm_tup) -> None:
         if conf.no_write_to_db:
             return
 
-        if conf.db_uri:
-            db.upsert_summary(
-                measurement,
-                scores,
-                anomaly,
-                confirmed,
-                failure,
-                msmt_uid,
-                sw_name,
-                sw_version,
-                platform,
-                conf.update,
-            )
-        if conf.clickhouse_url:
-            db.clickhouse_upsert_summary(
-                measurement,
-                scores,
-                anomaly,
-                confirmed,
-                failure,
-                msmt_uid,
-                sw_name,
-                sw_version,
-                platform,
-            )
+        db.clickhouse_upsert_summary(
+            measurement,
+            scores,
+            anomaly,
+            confirmed,
+            failure,
+            msmt_uid,
+            sw_name,
+            sw_version,
+            platform,
+        )
+
     except Exception as e:
         log.exception(e)
         metrics.incr("unhandled_exception")
