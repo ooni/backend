@@ -41,15 +41,6 @@ def extract_input_domain(msm: dict, test_name: str) -> tuple[str, str]:
     return input_, domain
 
 
-def query_click(query, query_params):
-    q = click_client.execute(query, query_params, with_column_types=True)
-    rows, coldata = q
-    colnames, coltypes = tuple(zip(*coldata))
-
-    for row in rows:
-        yield dict(zip(colnames, row))
-
-
 def _click_create_table_fastpath():
     # TODO: table creation should be done before starting workers
     sql = """
