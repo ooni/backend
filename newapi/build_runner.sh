@@ -28,6 +28,7 @@ apt-get install --no-install-recommends -qy \
   curl \
   git \
   gunicorn3 \
+  mypy \
   python3-boto3 \
   python3-clickhouse-driver \
   python3-filelock \
@@ -56,8 +57,6 @@ apt-get install --no-install-recommends -qy \
 apt-get autoremove -y
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-  #python3-lz4framed \
 
 mkdir -p /etc/ooni/
 cp api.conf.example /etc/ooni/api.conf
