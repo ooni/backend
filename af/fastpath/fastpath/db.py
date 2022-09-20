@@ -21,6 +21,8 @@ except ImportError:
 import ujson
 
 from fastpath.metrics import setup_metrics
+from fastpath.core import g_or as dget_or
+from fastpath.core import g as dget_n
 
 log = logging.getLogger("fastpath.db")
 metrics = setup_metrics(name="fastpath.db")
@@ -75,6 +77,45 @@ def _click_create_table_fastpath():
     ENGINE = ReplacingMergeTree
     ORDER BY (measurement_start_time, report_id, input)
     SETTINGS index_granularity = 8192;
+    """
+    rows = click_client.execute(sql)
+    log.debug(list(rows))
+
+
+def click_create_table_obs_openvpn():
+    sql = """
+    CREATE TABLE IF NOT EXISTS obs_openvpn
+    (
+        anomaly Bool,
+        bootstrap_time Float32,
+        confirmed Bool,
+        error String,
+        failure Bool,
+        input String,
+        measurement_start_time DateTime,
+        measurement_uid String,
+        obfuscation String,
+        platform String,
+        probe_asn Int32,
+        probe_cc String,
+        probe_network_name String,
+        provider String,
+        remote String,
+        report_id String,
+        resolver_asn Int32,
+        resolver_ip String,
+        resolver_network_name String,
+        software_name String,
+        software_version String,
+        success Bool,
+        tcp_connect_status_success Bool,
+        test_runtime Float32,
+        test_start_time DateTime,
+        transport String
+    )
+    ENGINE = ReplacingMergeTree
+    ORDER BY (measurement_start_time, report_id, input)
+    SETTINGS index_granularity = 8;
     """
     rows = click_client.execute(sql)
     log.debug(list(rows))
@@ -187,3 +228,94 @@ def clickhouse_upsert_summary(
     #         is_ssl_expected = "0"
     # else:
     #     is_ssl_expected = "2"
+
+
+@metrics.timer("clickhouse_upsert_openvpn_obs")
+def clickhouse_upsert_openvpn_obs(
+    msm,
+    scores,
+    measurement_uid: str,
+) -> None:
+    sql_insert = dedent(
+        """\
+    INSERT INTO obs_openvpn (
+    anomaly,
+    bootstrap_time,
+    confirmed,
+    error,
+    failure,
+    input,
+    measurement_start_time,
+    measurement_uid,
+    obfuscation,
+    platform,
+    probe_asn,
+    probe_cc,
+    probe_network_name,
+    provider,
+    remote,
+    report_id,
+    resolver_asn,
+    resolver_ip,
+    resolver_network_name,
+    software_name,
+    software_version,
+    success,
+    tcp_connect_status_success,
+    test_runtime,
+    test_start_time,
+    transport
+    ) VALUES
+        """
+    )
+
+    def nn(d: dict, k: str) -> str:
+        """Get string value and never return None"""
+        v = d.get(k)
+        return "" if v is None else v
+
+    def tf(v: bool) -> str:
+        return "t" if v else "f"
+
+    asn = int(msm["probe_asn"][2:])  # AS123
+    measurement_start_time = datetime.strptime(
+        msm["measurement_start_time"], "%Y-%m-%d %H:%M:%S"
+    )
+    test_start_time = datetime.strptime(msm["test_start_time"], "%Y-%m-%d %H:%M:%S")
+    tk = dget_or(msm, "test_keys", {})
+
+    anomaly = nn(msm, "success") == True
+    tcp_connect_status_success = "t" #FIXME
+    row = [
+        anomaly,
+        dget_or(tk, "bootstrap_time", 0),
+        "f",
+        nn(msm, "error"),
+        nn(msm, "failure"),
+        nn(msm, "input"),
+        measurement_start_time,
+        measurement_uid,
+        nn(tk, "obfuscation"),
+        nn(msm, "platform"),
+        asn,
+        nn(msm, "probe_cc"),
+        nn(msm, "probe_network_name"),
+        nn(tk, "provider"),
+        nn(tk, "remote"),
+        nn(msm, "report_id"),
+        nn(msm, "resolver_asn"),
+        nn(msm, "resolver_ip"),
+        nn(msm, "resolver_network_name"),
+        nn(msm, "software_name"),
+        nn(msm, "software_version"),
+        nn(msm, "success"),
+        tcp_connect_status_success,
+        dget_or(msm, "test_runtime", 0),
+        nn(tk, "transport"),
+    ]
+
+    settings = {"priority": 5}
+    try:
+        click_client.execute(sql_insert, [row], settings=settings)
+    except Exception:
+        log.error("Failed Clickhouse insert", exc_info=True)

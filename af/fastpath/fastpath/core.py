@@ -1423,6 +1423,25 @@ def score_riseupvpn(msm: dict) -> dict:
     return scores
 
 
+def score_openvpn(msm: dict) -> dict:
+    scores = init_scores()
+    tk = g_or(msm, "test_keys", {})
+    tstatus = tk.get("transport_status") or {}
+    obfs4 = tstatus.get("obfs4")
+    openvpn = tstatus.get("openvpn")
+    anomaly = (
+        tk.get("api_status") == "blocked"
+        or tk.get("ca_cert_status") is False
+        or obfs4 == "blocked"
+        or openvpn == "blocked"
+    )
+    if anomaly:
+        scores["blocking_general"] = 1.0
+
+    scores["extra"] = dict(test_runtime=msm.get("test_runtime"))
+    return scores
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm: dict) -> dict:
     """Calculates measurement scoring. Returns a scores dict"""
@@ -1469,6 +1488,8 @@ def score_measurement(msm: dict) -> dict:
             return score_torsf(msm)
         if tn == "riseupvpn":
             return score_riseupvpn(msm)
+        if tn == "openvpn":
+            return score_openvpn(msm)
 
         log.debug("Unsupported test name %s", tn)
         scores = init_scores()
@@ -1600,6 +1621,10 @@ def process_measurement(msm_tup) -> None:
             sw_version,
             platform,
         )
+
+        tn = measurement.get("test_name")
+        if tn == "openvpn":
+            db.clickhouse_upsert_openvpn_obs(measurement, scores, msmt_uid)
 
     except Exception as e:
         log.exception(e)

@@ -555,21 +555,35 @@ def test_score_torsf2():
     }
 
 
+def test_score_openvpn():
+    msm = loadj("torsf_2")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "extra": {"bootstrap_time": 78.980935917, "test_runtime": 79.196301917},
+    }
+
+
+
+
 # # Bug tests
 
 
 def test_bug_backend351():
     # https://api.ooni.io/api/v1/measurement/temp-id-386770148
-    msm = loadj("bug_351")
+    msm = loadj("openvpn")
     scores = fp.score_measurement(msm)
     assert scores == {
-        "blocking_general": 1.0,
+        "blocking_general": 0.0,
         "blocking_global": 0.0,
         "blocking_country": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "analysis": {"blocking_type": "http-failure"},
-        "accuracy": 0.0,
+        "extra": {"test_runtime": 33.264747693},
     }
 
 
