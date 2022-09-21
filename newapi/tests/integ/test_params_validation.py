@@ -49,6 +49,7 @@ def test_param_input_or_none_valid(app):
     valid_inputs = [
         "https://foo.org",
         "http://foo.org",
+        "https://8.8.4.4/dns-query",
         "dot://doh-de.blahdns.com/dns-query",
         "dot://8.8.8.8:853/",
         "dot://[2a00:5a60::ad2:0ff]:853",
@@ -60,9 +61,26 @@ def test_param_input_or_none_valid(app):
         "scramblesuit 83.212.101.3:443",
         "https://ru.wikipedia.org/wiki/Вторжение_России_на_Украину_(2022)",
         "obfs4 154.35.22.9:80 C73AD cert=gEWN/bS",
+        "obfs4 154.35.22.10:40348",
+        "1.1.1.1",
+        "178.62.197.82:443",
     ]
     for inp in valid_inputs:
         params = {"input": inp}
-        print(params)
         with app.test_request_context("/", query_string=params):
             assert apimsm.param_input_or_none() == inp
+
+
+def test_param_domain_or_none_valid(app):
+    valid_domains = [
+        "foo.org",
+        "8.8.4.4",
+        "doh-de.blahdns.com",
+        "8.8.8.8:853",
+        "[2a00:5a60::ad2:0ff]:853",
+        "stun.voip.blackberry.com:3478",
+    ]
+    for dom in valid_domains:
+        params = {"domain": dom}
+        with app.test_request_context("/", query_string=params):
+            assert apimsm.param_domain_or_none("domain") == dom

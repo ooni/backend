@@ -1,3 +1,9 @@
+ooni-api (1.0.27) unstable; urgency=medium
+
+  * Support filtering by ipaddr in aggregation
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 21 Sep 2022 13:36:20 +0100
+
 ooni-api (1.0.25) unstable; urgency=medium
 
   * Implemnent measurement feedback

@@ -7,6 +7,7 @@ from csv import DictWriter
 from datetime import datetime, timedelta
 from dateutil.parser import parse as parse_date
 from io import StringIO
+from ipaddress import ip_address as parse_ip_address
 from pathlib import Path
 from typing import Optional, List, Any, Dict
 from urllib.parse import urlparse
@@ -1012,18 +1013,37 @@ domain_matcher = re.compile(
 
 
 def validate_domain(p, name):
+    """Validates <domain|ipaddr>[:<port>]"""
     try:
         p = p.encode("idna").decode("ascii")
     except Exception:
         raise ValueError(f"Invalid characters in {name} field")
-    if not domain_matcher.match(p):
+    if domain_matcher.match(p):
+        return
+
+    if ":" in p:
+        p, port = p.rsplit(":", 1)
+        try:
+            int(port)
+        except:
+            raise ValueError(f"Invalid characters in {name} field")
+
+    if domain_matcher.match(p):
+        return
+
+    if p.startswith("[") and p.endswith("]"):
+        p = p[1:-1]
+
+    try:
+        parse_ip_address(p)
+    except Exception:
         raise ValueError(f"Invalid characters in {name} field")
 
 
-def param_domain(name):
+def param_domain_or_none(name) -> Optional[str]:
     p = request.args.get(name)
     if not p:
-        return p
+        return None
     validate_domain(p, name)
     return p
 
@@ -1180,9 +1200,9 @@ def get_aggregated() -> Response:
         axis_x = param_lowercase_underscore("axis_x")
         axis_y = param_lowercase_underscore("axis_y")
         category_code = param_uppercase("category_code")
-        domain = param_domain("domain")
-        inp = param_url("input")
         test_name = param_lowercase_underscore("test_name")
+        domain = param_domain_or_none("domain") or ""
+        inp = param_input_or_none() or ""
         probe_asn = param_asn("probe_asn")
         probe_cc = param_uppercase("probe_cc")
         since = param_date("since")
