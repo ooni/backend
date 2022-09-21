@@ -104,6 +104,25 @@ def test_aggregation_no_axis_domain_ipaddr(client):
     }, fjd(r)
 
 
+def test_aggregation_no_axis_input_ipaddr(client):
+    # 0-dimensional data
+    url = "aggregation?input=https://8.8.4.4/dns-query&since=2021-07-01&until=2022-09-21"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 0,
+            "confirmed_count": 0,
+            "failure_count": 9,
+            "measurement_count": 9,
+            "ok_count": 0,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
+
 def test_aggregation_no_axis_filter_by_category_code(client):
     # 0-dimensional data
     url = (
