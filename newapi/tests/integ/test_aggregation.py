@@ -12,7 +12,7 @@ def api(client, subpath, **kw):
         url += "?" + urlencode(kw)
 
     response = client.get(url)
-    assert response.status_code == 200
+    assert response.status_code == 200, response.data
     assert response.is_json
     return response.json
 
@@ -81,6 +81,24 @@ def test_aggregation_no_axis_domain(client):
             "failure_count": 0,
             "measurement_count": 21,
             "ok_count": 0,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
+def test_aggregation_no_axis_domain_ipaddr(client):
+    # 0-dimensional data
+    url = "aggregation?domain=8.8.4.4&since=2021-07-01&until=2021-07-10"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 1,
+            "confirmed_count": 0,
+            "failure_count": 1,
+            "measurement_count": 10,
+            "ok_count": 8,
         },
         "v": 0,
     }, fjd(r)
