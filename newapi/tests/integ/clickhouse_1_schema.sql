@@ -147,3 +147,14 @@ GROUP BY
     probe_cc,
     probe_asn,
     input;
+
+CREATE TABLE msmt_feedback
+(
+    `measurement_uid` String,
+    `account_id` String,
+    `status` String,
+    `update_time` DateTime64(3) MATERIALIZED now64()
+)
+ENGINE = ReplacingMergeTree
+ORDER BY (measurement_uid, account_id)
+SETTINGS index_granularity = 4;
