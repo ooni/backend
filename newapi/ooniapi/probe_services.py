@@ -15,6 +15,7 @@ import ujson
 from flask import Blueprint, current_app, request, Response
 
 import jwt.exceptions  # debdeps: python3-jwt
+import geoip2.errors  # debdeps: python3-geoip2
 
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson, nocachejson, jerror
@@ -76,6 +77,9 @@ def probe_geoip(probe_cc: str, asn: str) -> Tuple[Dict, str, int]:
         ipaddr = extract_probe_ipaddr()
         db_probe_cc = lookup_probe_cc(ipaddr)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr)
+        metrics.incr("geoip_ipaddr_found")
+    except geoip2.errors.AddressNotFoundError:
+        metrics.incr("geoip_ipaddr_not_found")
     except Exception as e:
         log.error(str(e), exc_info=True)
 
