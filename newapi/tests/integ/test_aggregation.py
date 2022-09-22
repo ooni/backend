@@ -106,16 +106,16 @@ def test_aggregation_no_axis_domain_ipaddr(client):
 
 def test_aggregation_no_axis_input_ipaddr(client):
     # 0-dimensional data
-    url = "aggregation?input=https://8.8.4.4/dns-query&since=2021-07-01&until=2022-09-21"
+    url = "aggregation?input=109.105.109.146:22&since=2021-07-08&until=2021-07-10"
     r = api(client, url)
     r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 0,
+            "anomaly_count": 2,
             "confirmed_count": 0,
-            "failure_count": 9,
-            "measurement_count": 9,
+            "failure_count": 0,
+            "measurement_count": 2,
             "ok_count": 0,
         },
         "v": 0,
