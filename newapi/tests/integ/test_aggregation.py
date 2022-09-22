@@ -30,9 +30,9 @@ def test_aggregation_no_axis_with_caching(client, log):
         "result": {
             "anomaly_count": 187,
             "confirmed_count": 0,
-            "failure_count": 2,
+            "failure_count": 5,
             "measurement_count": 1689,
-            'ok_count': 1500,
+            'ok_count': 1497,
         },
         "v": 0,
     }
@@ -50,7 +50,7 @@ def test_aggregation_no_axis_csv(client, log):
     expected = dedent(
         """\
         anomaly_count,confirmed_count,failure_count,measurement_count,ok_count
-        187,0,2,1689,1500
+        187,0,5,1689,1497
     """
     )
     assert r.data.decode().replace("\r", "") == expected
@@ -154,10 +154,10 @@ def test_aggregation_x_axis_only(client, log):
             {
                 "anomaly_count": 187,
                 "confirmed_count": 0,
-                "failure_count": 2,
+                "failure_count": 5,
                 "measurement_count": 1689,
                 "measurement_start_day": "2021-07-09",
-                "ok_count": 1500,
+                "ok_count": 1497,
             },
         ],
         "v": 0,
@@ -198,9 +198,9 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "anomaly_count": 371,
                 "blocking_type": "",
                 "confirmed_count": 0,
-                "failure_count": 452,
+                "failure_count": 717,
                 "measurement_count": 9622,
-                "ok_count": 8799,
+                "ok_count": 8534,
             },
             {
                 "anomaly_count": 94,
@@ -469,7 +469,7 @@ def test_aggregation_input(client):
 
 
 def test_aggregation_invalid_input(client):
-    url = "aggregation?since=2021-07-09&until=2021-07-10&input=https:///ccc.de/"
+    url = "aggregation?since=2021-07-09&until=2021-07-10&input=~!^{}"
     r = api(client, url)
     assert r == {"error": "Invalid characters in input field", "v": 0}
 
