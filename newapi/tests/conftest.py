@@ -50,6 +50,12 @@ def client(app):
             break
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limits(app):
+    # reset rate limits before each test
+    app.limiter._limiter._lmdb.purge_databases()
+
+
 def pytest_addoption(parser):
     parser.addoption("--ghpr", action="store_true", help="enable GitHub integ tests")
     parser.addoption("--proddb", action="store_true", help="uses data from prod DB")

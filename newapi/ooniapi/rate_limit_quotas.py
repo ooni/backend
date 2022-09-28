@@ -44,16 +44,17 @@ class LMDB:
         self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
         dbnames2 = list(dbnames)
         dbnames2.append("meta")
+        self._dbnames = dbnames2
         self._dbs: Dict[str, lmdb._Database] = {}
         for dbname in dbnames2:
             self._dbs[dbname] = self._env.open_db(dbname.encode())
 
     def purge_databases(self):
         """Used for testing"""
-        raise NotImplementedError
-        # self._dbs[dbname] = self._env.open_db(dbname.encode())
-        # with self._env.begin(db=self._dbs[dbname], write=True) as txn:
-        #    txn.drop(self._dbs[dbname], delete=False)
+        for dbname in self._dbnames:
+            self._dbs[dbname] = self._env.open_db(dbname.encode())
+            with self._env.begin(db=self._dbs[dbname], write=True) as txn:
+                txn.drop(self._dbs[dbname], delete=False)
 
     def integer_sumupsert(self, dbname: str, key: StrBytes, delta: int, default=0, minimum=maxsize):
         """Sum delta to the value of "key", using a default value if missing.
