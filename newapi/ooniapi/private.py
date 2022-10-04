@@ -20,6 +20,7 @@ from sqlalchemy import sql
 
 from werkzeug.exceptions import BadRequest
 
+from ooniapi.auth import role_required
 from ooniapi.database import query_click, query_click_one_row
 from ooniapi.models import TEST_GROUPS
 from ooniapi.countries import lookup_country
@@ -170,6 +171,7 @@ def api_private_countries() -> Response:
 
 
 @api_private_blueprint.route("/quotas_summary", methods=["GET"])
+@role_required(["admin"])
 def api_private_quotas_summary() -> Response:
     """Summary on rate-limiting quotas.
     [(first ipaddr octet, remaining daily quota), ... ]
