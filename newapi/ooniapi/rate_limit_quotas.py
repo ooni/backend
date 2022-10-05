@@ -56,7 +56,9 @@ class LMDB:
             with self._env.begin(db=self._dbs[dbname], write=True) as txn:
                 txn.drop(self._dbs[dbname], delete=False)
 
-    def integer_sumupsert(self, dbname: str, key: StrBytes, delta: int, default=0, minimum=maxsize):
+    def integer_sumupsert(
+        self, dbname: str, key: StrBytes, delta: int, default=0, minimum=maxsize
+    ):
         """Sum delta to the value of "key", using a default value if missing.
         Return the new value
         """
@@ -155,7 +157,10 @@ class Limiter:
         for limit, dbname in z:
             ipa = ipa_lmdb(ipaddr)
             elapsed_ms = int(elapsed * 1000)  # milliseconds
-            v_ms = self._lmdb.integer_sumupsert(dbname, ipa, -elapsed_ms, default=limit, minimum=0)
+            limit *= 1000
+            v_ms = self._lmdb.integer_sumupsert(
+                dbname, ipa, -elapsed_ms, default=limit, minimum=0
+            )
             v = v_ms / 1000
             if v < remaining:
                 remaining = v
@@ -256,7 +261,7 @@ class FlaskLimiter:
         # if token:
         # check token validity
         if not self._limiter.is_quota_available(ipaddr=ipaddr):
-            return '429 error', 429
+            return "429 error", 429
 
     def _after_request_callback(self, response):
         """Consume quota and injects HTTP headers when responding to a request"""
