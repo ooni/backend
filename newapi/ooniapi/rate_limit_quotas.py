@@ -189,6 +189,11 @@ class Limiter:
 
         return False
 
+    def _bytes_to_str_ipaddr(self, raw_ipa: bytes) -> str:
+        if len(raw_ipa) == 4:
+            return str(ipaddress.IPv4Address(raw_ipa))
+        return str(ipaddress.IPv6Address(raw_ipa))
+
     def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[int, float]]:
         """Returns a summary of daily quotas with the lowest values"""
         db = self._lmdb._dbs["ipaddr_per_day"]
@@ -196,12 +201,9 @@ class Limiter:
         with self._lmdb._env.begin(db=db, write=False) as txn:
             i = txn.cursor().iternext()
             for raw_ipa, raw_val in i:
+                ipa = self._bytes_to_str_ipaddr(raw_ipa)
                 val = int(raw_val) / 1000.0
-                if len(raw_ipa) == 4:
-                    ipa = ipaddress.IPv4Address(raw_ipa)
-                else:
-                    ipa = ipaddress.IPv6Address(raw_ipa)
-                tmp.append((val, str(ipa)))
+                tmp.append((val, ipa))
 
         tmp.sort()
         tmp = tmp[:n]
