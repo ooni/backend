@@ -120,15 +120,16 @@ class Limiter:
         if tdelta <= 0:
             return
 
-        # the value is stored as interger in milliseconds
         iterable = zip(self._hours, self._ipaddr_limits, self.ipaddr_buckets)
         for hours, limit, db in iterable:
-            vdelta = 1000 * tdelta * limit / hours / 3600
+            limitms = limit * 1000
+            # limitms, vdelta, raw_val are in milliseconds
+            vdelta = tdelta * limitms / hours / 3600
             with self._lmdb._env.begin(db=db, write=True) as txn:
                 i = txn.cursor().iternext()
                 for raw_ipa, raw_val in i:
                     v = int(raw_val) + vdelta
-                    if v >= limit:
+                    if v >= limitms:
                         txn.pop(raw_ipa)
                     else:
                         txn.put(raw_ipa, str(int(v)).encode())
@@ -149,8 +150,6 @@ class Limiter:
         if not ipaddr:
             raise NotImplementedError()
 
-        # TODO handle IPv6?
-        assert isinstance(ipaddr, ipaddress.IPv4Address)
         remaining: float = maxsize
         z = zip(self._ipaddr_limits, self._labels)
         for limit, dbname in z:
@@ -238,6 +237,9 @@ class FlaskLimiter:
         """Check rate limits before processing a request
         Refresh quota counters when needed
         """
+        if self._disabled:  # used in integration tests
+            return
+
         metrics.incr("busy_workers_count")
         self._limiter._lmdb.integer_sumupsert("meta", "busy_workers_count", 1)
         self._request_start_time = time.monotonic()
@@ -258,6 +260,9 @@ class FlaskLimiter:
 
     def _after_request_callback(self, response):
         """Consume quota and injects HTTP headers when responding to a request"""
+        if self._disabled:  # used in integration tests
+            return response
+
         log = current_app.logger
         try:
             ipaddr = self._get_client_ipaddr()
@@ -303,6 +308,7 @@ class FlaskLimiter:
         app.before_request(self._check_limits_callback)
         app.after_request(self._after_request_callback)
         app.extensions["limiter"] = self
+        self._disabled = False
 
     def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[int, float]]:
         return self._limiter.get_lowest_daily_quotas_summary(n)

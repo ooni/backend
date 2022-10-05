@@ -51,9 +51,10 @@ def client(app):
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limits(app):
-    # reset rate limits before each test
-    app.limiter._limiter._lmdb.purge_databases()
+def disable_rate_limits(app):
+    app.limiter._disabled = True
+    yield
+    app.limiter._disabled = False
 
 
 def pytest_addoption(parser):
