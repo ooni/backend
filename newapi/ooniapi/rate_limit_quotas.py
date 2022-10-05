@@ -196,9 +196,12 @@ class Limiter:
         with self._lmdb._env.begin(db=db, write=False) as txn:
             i = txn.cursor().iternext()
             for raw_ipa, raw_val in i:
-                first_octect = int(raw_ipa[0])
                 val = int(raw_val) / 1000.0
-                tmp.append((val, first_octect))
+                if len(raw_ipa) == 4:
+                    ipa = ipaddress.IPv4Address(raw_ipa)
+                else:
+                    ipa = ipaddress.IPv6Address(raw_ipa)
+                tmp.append((val, str(ipa)))
 
         tmp.sort()
         tmp = tmp[:n]
