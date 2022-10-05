@@ -183,8 +183,6 @@ def create_app(*args, testmode=False, **kw):
     init_clickhouse_db(app)
 
     # Setup rate limiting
-    # NOTE: the limits apply per-process. The number of processes is set in:
-    # https://github.com/ooni/sysadmin/blob/master/ansible/roles/ooni-measurements/tasks/main.yml
     limits = dict(
         ipaddr_per_month=60000,
         token_per_month=6000,
