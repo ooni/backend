@@ -85,8 +85,29 @@ def api(client, subpath, **kw):
 # # rate limiting / quotas # #
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
-def test_redirects_and_rate_limit_basic(client):
+@pytest.fixture()
+def enable_rate_limits(app):
+    # undo what the fixture "disable_rate_limits" in conftest.py where needed
+    # also reset the database before each test
+    app.limiter._disabled = False
+    app.limiter._limiter._lmdb.purge_databases()
+
+
+@pytest.fixture()
+def lower_rate_limits(app, enable_rate_limits):
+    # Access the rate limiter buckets directly
+    limits = app.limiter._limiter._ipaddr_limits
+    old, limits[0] = limits[0], 1
+    yield
+    limits[0] = old
+
+
+def test_redirects_and_rate_limit_basic(client, app, enable_rate_limits):
+    # test started with emtpy database
+    with app.app_context():
+        summary = app.limiter._limiter.get_lowest_daily_quotas_summary()
+        assert summary == []
+
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
     headers = {"X-Real-IP": "1.2.3.4"}
@@ -102,8 +123,16 @@ def test_redirects_and_rate_limit_basic(client):
         resp = client.get(p, headers=headers)
         assert int(resp.headers["X-RateLimit-Remaining"]) < limit
 
+    with app.app_context():
+        summary = app.limiter._limiter.get_lowest_daily_quotas_summary()
 
-def test_redirects_and_rate_limit_for_explorer(client):
+    assert len(summary) == 1
+    ipa_str, remaining = summary[0]
+    assert remaining < 4000
+    assert remaining > 3998
+
+
+def test_redirects_and_rate_limit_for_explorer(client, enable_rate_limits):
     # Special ipaddr: no rate limiting. No header is set by the server
     headers = {"X-Real-IP": "37.218.242.149"}
     resp = client.get("/stats", headers=headers)
@@ -115,7 +144,7 @@ def test_redirects_and_rate_limit_for_explorer(client):
     assert "X-RateLimit-Remaining" not in resp.headers
 
 
-def test_redirects_and_rate_limit_spin(client):
+def test_redirects_and_rate_limit_spin(client, enable_rate_limits):
     # Simulate a forwarded client with a different ipaddr
     # In production the API sits behind Nginx
     limit = 4000
@@ -124,30 +153,20 @@ def test_redirects_and_rate_limit_spin(client):
     while time.monotonic() < end_time:
         resp = client.get("/stats", headers=headers)
     assert abs(time.monotonic() - end_time) < 0.2
-    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 2
+    assert int(resp.headers["X-RateLimit-Remaining"]) == limit - 1
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
-def test_redirects_and_rate_limit_summary(client):
+# TODO
+@pytest.mark.skip("needs-admin-auth")
+def test_redirects_and_rate_limit_summary(client, enable_rate_limits):
     url = "quotas_summary"
     response = privapi(client, url)
     assert response == []
     response = privapi(client, url)
     assert len(response) == 1
-    assert response[0][0] == 127  # first octet from 127.0.0.1
-    assert int(response[0][1]) == 3999  # quota remaining in seconds
+    assert int(response[0][1]) == 3998  # quota remaining in seconds
 
 
-@pytest.fixture()
-def lower_rate_limits(app):
-    # Access the rate limiter buckets directly
-    limits = app.limiter._limiter._ipaddr_limits
-    old, limits[0] = limits[0], 1
-    yield
-    limits[0] = old
-
-
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")  # FIXME
 def test_redirects_and_rate_limit_spin_to_zero(client, lower_rate_limits):
     headers = {"X-Real-IP": "1.2.3.4"}
     end_time = time.monotonic() + 2
@@ -159,7 +178,6 @@ def test_redirects_and_rate_limit_spin_to_zero(client, lower_rate_limits):
     assert 0, "429 was never received"
 
 
-@pytest.mark.skip("SLOW")
 def test_redirects_and_rate_limit_spin_to_zero_unmetered(client, lower_rate_limits):
     headers = {"X-Real-IP": "1.2.3.4"}
     end_time = time.monotonic() + 2
