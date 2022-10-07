@@ -92,6 +92,7 @@ CITIZENLAB_CSV_HEADER = (
     "notes",
 )
 
+
 class BaseOONIException(HTTPException):
     code: int = 400
     err_str: str = "err_generic_ooni_exception"
@@ -119,55 +120,66 @@ class BadCategoryCode(BaseOONIException):
     err_str = "err_bad_category_code"
     description = "Invalid category code"
 
+
 class BadCategoryDescription(BaseOONIException):
     code = 400
     err_str = "err_bad_category_description"
     description = "Invalid category description"
+
 
 class BadDate(BaseOONIException):
     code = 400
     err_str = "err_bad_date"
     description = "Invalid date"
 
+
 class CountryNotSupported(BaseOONIException):
     code = 400
     err_str = "err_country_not_supported"
     description = "Country Not Supported"
+
 
 class InvalidCountryCode(BaseOONIException):
     code = 400
     err_str = "err_invalid_country_code"
     description = "Country code is invalid"
 
+
 class DuplicateURLError(BaseOONIException):
     code = 400
     err_str = "err_duplicate_url"
     description = "Duplicate URL"
+
 
 class DuplicateRuleError(BaseOONIException):
     code = 400
     err_str = "err_duplicate_rule"
     description = "Duplicate rule"
 
+
 class RuleNotFound(BaseOONIException):
     code = 404
     err_str = "err_rule_not_found"
     description = "Rule not found error"
+
 
 class CannotClosePR(BaseOONIException):
     code = 400
     err_str = "err_cannot_close_pr"
     description = "Unable to close PR. Please reload data."
 
+
 class CannotUpdateList(BaseOONIException):
     code = 400
     err_str = "err_cannot_update_list"
     description = "Unable to update. The URL list has changed in the meantime."
 
+
 class NoProposedChanges(BaseOONIException):
     code = 400
     err_str = "err_no_proposed_changes"
     description = "No changes are being proposed"
+
 
 def jerror(err, code=400):
     if isinstance(err, BaseOONIException):
@@ -194,7 +206,9 @@ class ProgressPrinter(git.RemoteProgress):
 
 
 class URLListManager:
-    def __init__(self, working_dir, github_user, github_token, push_repo, origin_repo):
+    def __init__(
+        self, working_dir, github_user, github_token, push_repo, origin_repo, account_id
+    ):
         self.working_dir = working_dir
         self.origin_repo = origin_repo
         self.push_repo = push_repo
@@ -202,8 +216,19 @@ class URLListManager:
         self.github_token = github_token
         self.repo_dir = self.working_dir / "test-lists"
         self.push_username = push_repo.split("/")[0]
-
+        # lock before init repo
+        self.get_user_lock(account_id)
         self.repo = self._init_repo()
+
+    def get_user_lock(self, account_id: str):
+        lockfile_dir = self.working_dir / "users" / account_id
+        lockfile_f = lockfile_dir / "state.lock"
+        lockfile_dir.mkdir(parents=True, exist_ok=True)  # no race cond. here
+        self._lock = FileLock(lockfile_f, timeout=5)
+        self._lock.acquire()  # released on URLListManager destruction
+
+    def __del__(self):
+        self._lock.release()
 
     def _init_repo(self):
         if not os.path.exists(self.repo_dir):
@@ -294,10 +319,6 @@ class URLListManager:
             )
         return git.Repo(repo_path)
 
-    def get_user_lock(self, account_id: str):
-        lockfile_f = self.working_dir / "users" / account_id / "state.lock"
-        return FileLock(lockfile_f, timeout=5)
-
     def get_test_list(self, account_id, country_code) -> List[Dict[str, str]]:
         country_code = country_code.lower()
         if len(country_code) != 2 and country_code != "global":
@@ -332,8 +353,7 @@ class URLListManager:
 
         if new_url in (r["url"] for r in rows):
             raise DuplicateURLError(
-                    description=f"{new_url} is duplicate",
-                    err_args={"url": new_url}
+                description=f"{new_url} is duplicate", err_args={"url": new_url}
             )
 
     def _pull_origin_repo(self):
@@ -467,57 +487,56 @@ class URLListManager:
             self._set_state(account_id, "IN_PROGRESS")
 
         repo = self._get_user_repo(account_id)
-        with self.get_user_lock(account_id):
-            csv_f = self._get_user_repo_path(account_id) / "lists" / f"{cc}.csv"
-            tmp_f = csv_f.with_suffix(".tmp")
+        csv_f = self._get_user_repo_path(account_id) / "lists" / f"{cc}.csv"
+        tmp_f = csv_f.with_suffix(".tmp")
 
-            if new_entry:
-                # Check for collisions:
-                if not old_entry:
-                    self._prevent_duplicate_url(account_id, cc, new_entry["url"])
+        if new_entry:
+            # Check for collisions:
+            if not old_entry:
+                self._prevent_duplicate_url(account_id, cc, new_entry["url"])
 
-                elif old_entry and new_entry["url"] != old_entry["url"]:
-                    # If the URL is being changed check for collisions
-                    self._prevent_duplicate_url(account_id, cc, new_entry["url"])
+            elif old_entry and new_entry["url"] != old_entry["url"]:
+                # If the URL is being changed check for collisions
+                self._prevent_duplicate_url(account_id, cc, new_entry["url"])
 
-            with csv_f.open() as in_f, tmp_f.open("w") as out_f:
-                reader = csv.DictReader(in_f)
-                writer = csv.DictWriter(
-                    out_f,
-                    quoting=csv.QUOTE_MINIMAL,
-                    lineterminator="\n",
-                    fieldnames=CITIZENLAB_CSV_HEADER,
-                )
-                writer.writeheader()
+        with csv_f.open() as in_f, tmp_f.open("w") as out_f:
+            reader = csv.DictReader(in_f)
+            writer = csv.DictWriter(
+                out_f,
+                quoting=csv.QUOTE_MINIMAL,
+                lineterminator="\n",
+                fieldnames=CITIZENLAB_CSV_HEADER,
+            )
+            writer.writeheader()
 
-                done = False
-                for row in reader:
-                    if row == old_entry:
-                        if new_entry:
-                            writer.writerow(new_entry)  # update entry
-                        else:
-                            pass  # delete entry
-                        done = True
-
+            done = False
+            for row in reader:
+                if row == old_entry:
+                    if new_entry:
+                        writer.writerow(new_entry)  # update entry
                     else:
-                        writer.writerow(row)
-
-                if new_entry and not old_entry:
-                    writer.writerow(new_entry)  # add new entry at end
+                        pass  # delete entry
                     done = True
 
-            if not done:
-                tmp_f.unlink()
-                raise CannotUpdateList()
+                else:
+                    writer.writerow(row)
 
-            log.debug(f"Writing {csv_f.as_posix()}")
-            tmp_f.rename(csv_f)
-            repo.index.add([csv_f.as_posix()])
-            repo.index.commit(comment)
+            if new_entry and not old_entry:
+                writer.writerow(new_entry)  # add new entry at end
+                done = True
 
-            self.write_changes_log(account_id, cc, old_entry, new_entry)
+        if not done:
+            tmp_f.unlink()
+            raise CannotUpdateList()
 
-            self._set_state(account_id, "IN_PROGRESS")
+        log.debug(f"Writing {csv_f.as_posix()}")
+        tmp_f.rename(csv_f)
+        repo.index.add([csv_f.as_posix()])
+        repo.index.commit(comment)
+
+        self.write_changes_log(account_id, cc, old_entry, new_entry)
+
+        self._set_state(account_id, "IN_PROGRESS")
 
     def _open_pr(self, branchname):
         """Opens PR. Returns API URL e.g.
@@ -574,13 +593,12 @@ class URLListManager:
         )
 
     def propose_changes(self, account_id: str) -> str:
-        with self.get_user_lock(account_id):
-            log.debug("proposing changes")
-            self._push_to_repo(account_id)
-            pr_id = self._open_pr(self._get_user_branchname(account_id))
-            self._set_pr_id(account_id, pr_id)
-            self._set_state(account_id, "PR_OPEN")
-            return pr_id
+        log.debug("proposing changes")
+        self._push_to_repo(account_id)
+        pr_id = self._open_pr(self._get_user_branchname(account_id))
+        self._set_pr_id(account_id, pr_id)
+        self._set_state(account_id, "PR_OPEN")
+        return pr_id
 
 
 def check_url(url):
@@ -616,7 +634,7 @@ def get_account_id():
     return request._account_id
 
 
-def get_url_list_manager():
+def get_url_list_manager(account_id):
     conf = current_app.config
     return URLListManager(
         working_dir=Path(conf["GITHUB_WORKDIR"]),
@@ -624,6 +642,7 @@ def get_url_list_manager():
         github_token=conf["GITHUB_TOKEN"],
         origin_repo=conf["GITHUB_ORIGIN_REPO"],
         push_repo=conf["GITHUB_PUSH_REPO"],
+        account_id=account_id,
     )
 
 
@@ -650,7 +669,7 @@ def get_test_list(country_code) -> Response:
     global log
     log = current_app.logger
     account_id = get_account_id()
-    ulm = get_url_list_manager()
+    ulm = get_url_list_manager(account_id)
     try:
         tl = ulm.get_test_list(account_id, country_code)
         return nocachejson(tl)
@@ -713,8 +732,7 @@ def url_submission_update_url() -> Response:
     global log
     log = current_app.logger
     account_id = get_account_id()
-
-    ulm = get_url_list_manager()
+    ulm = get_url_list_manager(account_id)
     rj = request.json
     new = rj["new_entry"]
     old = rj["old_entry"]
@@ -752,7 +770,7 @@ def get_workflow_state() -> Response:
     log = current_app.logger
     account_id = get_account_id()
     log.debug("get citizenlab workflow state")
-    ulm = get_url_list_manager()
+    ulm = get_url_list_manager(account_id)
     ulm.sync_state(account_id)
     state = ulm.get_state(account_id)
     if state in ("PR_OPEN"):
@@ -777,7 +795,7 @@ def get_changes() -> Response:
     log = current_app.logger
     account_id = get_account_id()
     log.debug("get citizenlab git diff")
-    ulm = get_url_list_manager()
+    ulm = get_url_list_manager(account_id)
     changes = ulm.read_changes_log(account_id)
     return nocachejson(changes=changes)
 
@@ -796,7 +814,7 @@ def post_propose_changes() -> Response:
     log = current_app.logger
     log.info("submitting citizenlab changes")
     account_id = get_account_id()
-    ulm = get_url_list_manager()
+    ulm = get_url_list_manager(account_id)
     try:
         pr_id = ulm.propose_changes(account_id)
         return nocachejson(pr_id=pr_id)
