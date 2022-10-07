@@ -7,11 +7,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 from typing import Dict, List, Optional
 import csv
+import json
 import logging
 import os
 import re
 import shutil
-import json
+import time
 
 from requests.auth import HTTPBasicAuth
 from filelock import FileLock  # debdeps: python3-filelock
@@ -22,6 +23,7 @@ import requests
 from sqlalchemy import sql
 
 from ooniapi.auth import role_required
+from ooniapi.config import metrics
 from ooniapi.database import query_click, query_click_one_row, insert_click
 from ooniapi.utils import nocachejson, cachedjson
 
@@ -224,11 +226,14 @@ class URLListManager:
         lockfile_dir = self.working_dir / "users" / account_id
         lockfile_f = lockfile_dir / "state.lock"
         lockfile_dir.mkdir(parents=True, exist_ok=True)  # no race cond. here
+        self._lock_time = time.monotonic_ns()
         self._lock = FileLock(lockfile_f, timeout=5)
         self._lock.acquire()  # released on URLListManager destruction
 
     def __del__(self):
         self._lock.release()
+        elapsed_ms = (time.monotonic_ns() - self._lock_time) * 1000_000
+        statsd.timing("citizenlab_lock_time", elapsed_ms)
 
     def _init_repo(self):
         if not os.path.exists(self.repo_dir):
