@@ -221,7 +221,7 @@ def mock_requests_open(monkeypatch):
         print(kw)
         return MKOpen()
 
-    monkeypatch.setattr(ooniapi.citizenlab.URLListManager, "push_to_repo", push)
+    monkeypatch.setattr(ooniapi.citizenlab.URLListManager, "_push_to_repo", push)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "post", req)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "patch", req)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "get", req)
@@ -238,7 +238,7 @@ def mock_requests_closed(monkeypatch):
         print(kw)
         return MKClosed()
 
-    monkeypatch.setattr(ooniapi.citizenlab.URLListManager, "push_to_repo", push)
+    monkeypatch.setattr(ooniapi.citizenlab.URLListManager, "_push_to_repo", push)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "post", req)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "patch", req)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "get", req)

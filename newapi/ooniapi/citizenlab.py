@@ -203,9 +203,9 @@ class URLListManager:
         self.repo_dir = self.working_dir / "test-lists"
         self.push_username = push_repo.split("/")[0]
 
-        self.repo = self.init_repo()
+        self.repo = self._init_repo()
 
-    def init_repo(self):
+    def _init_repo(self):
         if not os.path.exists(self.repo_dir):
             log.info(f"cloning {self.origin_repo} repository")
             url = f"https://github.com/{self.origin_repo}.git"
@@ -216,19 +216,19 @@ class URLListManager:
         repo.remotes.origin.pull(progress=ProgressPrinter())
         return repo
 
-    def get_user_repo_path(self, account_id) -> Path:
+    def _get_user_repo_path(self, account_id) -> Path:
         return self.working_dir / "users" / account_id / "test-lists"
 
-    def get_user_statefile_path(self, account_id) -> Path:
+    def _get_user_statefile_path(self, account_id) -> Path:
         return self.working_dir / "users" / account_id / "state"
 
-    def get_user_pr_path(self, account_id) -> Path:
+    def _get_user_pr_path(self, account_id) -> Path:
         return self.working_dir / "users" / account_id / "pr_id"
 
-    def get_user_changes_path(self, account_id) -> Path:
+    def _get_user_changes_path(self, account_id) -> Path:
         return self.working_dir / "users" / account_id / "changes.pickle"
 
-    def get_user_branchname(self, account_id: str) -> str:
+    def _get_user_branchname(self, account_id: str) -> str:
         return f"user-contribution/{account_id}"
 
     def get_state(self, account_id: str):
@@ -247,11 +247,11 @@ class URLListManager:
             being merged
         """
         try:
-            return self.get_user_statefile_path(account_id).read_text()
+            return self._get_user_statefile_path(account_id).read_text()
         except FileNotFoundError:
             return "CLEAN"
 
-    def set_state(self, account_id, state: str):
+    def _set_state(self, account_id, state: str):
         """
         This will record the current state of the pull request for the user to
         the statefile.
@@ -260,37 +260,37 @@ class URLListManager:
         assert state in ("IN_PROGRESS", "PR_OPEN", "CLEAN"), "Unexpected state"
         log.debug(f"setting state for {account_id} to {state}")
         if state == "CLEAN":
-            self.get_user_statefile_path(account_id).unlink()
-            self.get_user_pr_path(account_id).unlink()
+            self._get_user_statefile_path(account_id).unlink()
+            self._get_user_pr_path(account_id).unlink()
             return
 
-        with open(self.get_user_statefile_path(account_id), "w") as out_file:
+        with open(self._get_user_statefile_path(account_id), "w") as out_file:
             out_file.write(state)
 
-    def set_pr_id(self, account_id: str, pr_id):
-        self.get_user_pr_path(account_id).write_text(pr_id)
+    def _set_pr_id(self, account_id: str, pr_id):
+        self._get_user_pr_path(account_id).write_text(pr_id)
 
-    def get_pr_id(self, account_id: str):
+    def _get_pr_id(self, account_id: str):
         """Returns an API URL e.g.
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
         Raises if the PR was never opened
         """
-        return self.get_user_pr_path(account_id).read_text()
+        return self._get_user_pr_path(account_id).read_text()
 
     def get_pr_url(self, account_id: str):
         """Returns a browsable URL
         Raises if the PR was never opened
         """
-        apiurl = self.get_pr_id(account_id)
+        apiurl = self._get_pr_id(account_id)
         pr_num = apiurl.split("/")[-1]
         return f"https://github.com/{self.origin_repo}/pull/{pr_num}"
 
-    def get_user_repo(self, account_id: str):
-        repo_path = self.get_user_repo_path(account_id)
+    def _get_user_repo(self, account_id: str):
+        repo_path = self._get_user_repo_path(account_id)
         if not os.path.exists(repo_path):
             log.info(f"creating {repo_path}")
             self.repo.git.worktree(
-                "add", "-b", self.get_user_branchname(account_id), repo_path
+                "add", "-b", self._get_user_branchname(account_id), repo_path
             )
         return git.Repo(repo_path)
 
@@ -304,9 +304,9 @@ class URLListManager:
             raise InvalidCountryCode()
 
         self.sync_state(account_id)
-        self.pull_origin_repo()
+        self._pull_origin_repo()
 
-        repo_path = self.get_user_repo_path(account_id)
+        repo_path = self._get_user_repo_path(account_id)
         if not os.path.exists(repo_path):
             repo_path = self.repo_dir
 
@@ -325,7 +325,7 @@ class URLListManager:
         except FileNotFoundError:
             raise CountryNotSupported()
 
-    def prevent_duplicate_url(self, account_id, country_code, new_url):
+    def _prevent_duplicate_url(self, account_id, country_code, new_url):
         rows = self.get_test_list(account_id, country_code)
         if country_code != "global":
             rows.extend(self.get_test_list(account_id, "global"))
@@ -336,7 +336,7 @@ class URLListManager:
                     err_args={"url": new_url}
             )
 
-    def pull_origin_repo(self):
+    def _pull_origin_repo(self):
         self.repo.remotes.origin.pull(progress=ProgressPrinter())
 
     def sync_state(self, account_id):
@@ -347,30 +347,30 @@ class URLListManager:
             return
         if state == "IN_PROGRESS":
             return
-        if self.is_pr_resolved(account_id):
-            path = self.get_user_repo_path(account_id)
-            bname = self.get_user_branchname(account_id)
+        if self._is_pr_resolved(account_id):
+            path = self._get_user_repo_path(account_id)
+            bname = self._get_user_branchname(account_id)
             log.debug(f"Deleting {path}")
             try:
                 # TODO: investigate
                 shutil.rmtree(path)
                 self.repo.git.worktree("prune")
                 self.repo.delete_head(bname, force=True)
-                self.maybe_delete_changes_log(account_id)
+                self._maybe_delete_changes_log(account_id)
             except Exception as e:
                 log.info(f"Error deleting {path} {e}")
 
-            self.set_state(account_id, "CLEAN")
+            self._set_state(account_id, "CLEAN")
 
-    def maybe_delete_changes_log(self, account_id):
-        changes_log = self.get_user_changes_path(account_id)
+    def _maybe_delete_changes_log(self, account_id):
+        changes_log = self._get_user_changes_path(account_id)
         try:
             changes_log.unlink()
         except FileNotFoundError:
             pass
 
     def read_changes_log(self, account_id):
-        changes_log = self.get_user_changes_path(account_id)
+        changes_log = self._get_user_changes_path(account_id)
         try:
             with changes_log.open("rb") as in_file:
                 return json.load(in_file)
@@ -403,7 +403,7 @@ class URLListManager:
         elif old_entry:
             changeset[cc].append(dict(old_entry, **{"action": "delete"}))
 
-        with self.get_user_changes_path(account_id).open("w") as out_file:
+        with self._get_user_changes_path(account_id).open("w") as out_file:
             json.dump(changeset, out_file)
 
     def update(
@@ -444,7 +444,7 @@ class URLListManager:
         if old_entry == new_entry:
             raise NoProposedChanges()
 
-        self.pull_origin_repo()
+        self._pull_origin_repo()
         self.sync_state(account_id)
         state = self.get_state(account_id)
 
@@ -459,26 +459,26 @@ class URLListManager:
         # closed, it's released.
         if state in ("PR_OPEN"):
             try:
-                self.close_pr(account_id)
+                self._close_pr(account_id)
             except AssertionError:
                 # This might happen due to a race between the PR being closed
                 # and it being merged upstream
                 raise CannotClosePR()
-            self.set_state(account_id, "IN_PROGRESS")
+            self._set_state(account_id, "IN_PROGRESS")
 
-        repo = self.get_user_repo(account_id)
+        repo = self._get_user_repo(account_id)
         with self.get_user_lock(account_id):
-            csv_f = self.get_user_repo_path(account_id) / "lists" / f"{cc}.csv"
+            csv_f = self._get_user_repo_path(account_id) / "lists" / f"{cc}.csv"
             tmp_f = csv_f.with_suffix(".tmp")
 
             if new_entry:
                 # Check for collisions:
                 if not old_entry:
-                    self.prevent_duplicate_url(account_id, cc, new_entry["url"])
+                    self._prevent_duplicate_url(account_id, cc, new_entry["url"])
 
                 elif old_entry and new_entry["url"] != old_entry["url"]:
                     # If the URL is being changed check for collisions
-                    self.prevent_duplicate_url(account_id, cc, new_entry["url"])
+                    self._prevent_duplicate_url(account_id, cc, new_entry["url"])
 
             with csv_f.open() as in_f, tmp_f.open("w") as out_f:
                 reader = csv.DictReader(in_f)
@@ -517,9 +517,9 @@ class URLListManager:
 
             self.write_changes_log(account_id, cc, old_entry, new_entry)
 
-            self.set_state(account_id, "IN_PROGRESS")
+            self._set_state(account_id, "IN_PROGRESS")
 
-    def open_pr(self, branchname):
+    def _open_pr(self, branchname):
         """Opens PR. Returns API URL e.g.
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
         """
@@ -546,17 +546,17 @@ class URLListManager:
             log.error(f"Failed to retrieve URL for the PR {j}")
             raise
 
-    def close_pr(self, account_id):
-        pr_id = self.get_pr_id(account_id)
+    def _close_pr(self, account_id):
+        pr_id = self._get_pr_id(account_id)
         assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
         log.info(f"closing PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         r = requests.patch(pr_id, json={"state": "closed"}, auth=auth)
         assert r.status_code == 200
 
-    def is_pr_resolved(self, account_id) -> bool:
+    def _is_pr_resolved(self, account_id) -> bool:
         """Raises if the PR was never opened"""
-        pr_id = self.get_pr_id(account_id)
+        pr_id = self._get_pr_id(account_id)
         assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
         log.debug(f"Fetching PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
@@ -565,10 +565,10 @@ class URLListManager:
         assert "state" in j
         return j["state"] != "open"
 
-    def push_to_repo(self, account_id):
+    def _push_to_repo(self, account_id):
         log.debug("pushing branch to GitHub")
         self.repo.remotes.rworigin.push(
-            self.get_user_branchname(account_id),
+            self._get_user_branchname(account_id),
             progress=ProgressPrinter(),
             force=True,
         )
@@ -576,10 +576,10 @@ class URLListManager:
     def propose_changes(self, account_id: str) -> str:
         with self.get_user_lock(account_id):
             log.debug("proposing changes")
-            self.push_to_repo(account_id)
-            pr_id = self.open_pr(self.get_user_branchname(account_id))
-            self.set_pr_id(account_id, pr_id)
-            self.set_state(account_id, "PR_OPEN")
+            self._push_to_repo(account_id)
+            pr_id = self._open_pr(self._get_user_branchname(account_id))
+            self._set_pr_id(account_id, pr_id)
+            self._set_state(account_id, "PR_OPEN")
             return pr_id
 
 

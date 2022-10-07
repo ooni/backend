@@ -1,3 +1,9 @@
+ooni-api (1.0.29) unstable; urgency=medium
+
+  * Improve locking around citizenlab
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 07 Oct 2022 12:20:58 +0100
+
 ooni-api (1.0.28) unstable; urgency=medium
 
   * Add LMDB support
