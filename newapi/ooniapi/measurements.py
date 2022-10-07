@@ -1321,11 +1321,11 @@ def _clickhouse_aggregation(
         query_params["probe_asn"] = str(probe_asn)
 
     if since:
-        where.append(sql.text("measurement_start_time > :since"))
+        where.append(sql.text("measurement_start_time >= :since"))
         query_params["since"] = since
 
     if until:
-        where.append(sql.text("measurement_start_time <= :until"))
+        where.append(sql.text("measurement_start_time < :until"))
         query_params["until"] = until
 
     if test_name:
