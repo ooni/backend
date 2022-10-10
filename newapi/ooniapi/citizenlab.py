@@ -233,7 +233,7 @@ class URLListManager:
     def __del__(self):
         self._lock.release()
         elapsed_ms = (time.monotonic_ns() - self._lock_time) * 1000_000
-        statsd.timing("citizenlab_lock_time", elapsed_ms)
+        metrics.timing("citizenlab_lock_time", elapsed_ms)
 
     def _init_repo(self):
         if not os.path.exists(self.repo_dir):
