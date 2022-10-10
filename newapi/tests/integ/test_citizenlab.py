@@ -38,15 +38,16 @@ def usersession(client, app):
 
 
 def test_no_auth(client):
-    r = client.get("/api/v1/url-submission/test-list/global")
+    r = client.get("/api/_/url-submission/test-list/global")
     assert r.status_code == 401
 
 
 def list_global(client, usersession):
-    r = client.get("/api/v1/url-submission/test-list/global")
+    r = client.get("/api/_/url-submission/test-list/global")
     assert r.status_code == 200
-    assert r.json[0].keys() == {"url", "category_code", "date_added", "source", "notes"}
-    assert len(r.json) > 1000
+    tl = r.json["test_list"]
+    assert tl.keys() == {"url", "category_code", "date_added", "source", "notes"}
+    assert len(tl) > 1000
 
 
 def add_url(client, usersession, url, tmp_path):
@@ -67,17 +68,19 @@ def add_url(client, usersession, url, tmp_path):
     r = client.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 200, r.data
 
-    r = client.get("/api/v1/url-submission/test-list/us")
+    r = client.get("/api/_/url-submission/test-list/us")
     assert r.status_code == 200
-    en = [e for e in r.json if e["url"] == url]
+    tl = r.json["test_list"]
+    en = [e for e in tl if e["url"] == url]
     assert len(en) == 1
     assert en[0] == new_entry
 
 
 def lookup_and_delete_us_url(client, usersession, url):
-    r = client.get("/api/v1/url-submission/test-list/us")
+    r = client.get("/api/_/url-submission/test-list/us")
     assert r.status_code == 200
-    en = [e for e in r.json if e["url"] == url]
+    tl = r.json["test_list"]
+    en = [e for e in tl if e["url"] == url]
     assert len(en) == 1
     old_entry = en[0]
     assert sorted(old_entry) == [
@@ -122,10 +125,11 @@ def test_update_url_reject(client, usersession):
 
 
 def test_update_url_nochange(client, usersession):
-    r = client.get("/api/v1/url-submission/test-list/it")
+    r = client.get("/api/_/url-submission/test-list/it")
     assert r.status_code == 200
+    tl = r.json["test_list"]
 
-    fe = r.json[0]  # first entry
+    fe = tl[0]  # first entry
     old = {
         "url": fe["url"],
         "category_code": fe["category_code"],
@@ -143,10 +147,11 @@ def test_update_url_nochange(client, usersession):
 # TODO reset git
 # TODO open PR
 def update_url_basic(client, usersession):
-    r = client.get("/api/v1/url-submission/test-list/it")
+    r = client.get("/api/_/url-submission/test-list/it")
     assert r.status_code == 200
+    tl = r.json["test_list"]
 
-    fe = r.json[0]  # first entry
+    fe = tl[0]  # first entry
     old = {
         "url": fe["url"],
         "category_code": fe["category_code"],

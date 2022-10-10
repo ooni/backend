@@ -364,20 +364,17 @@ class URLListManager:
     def _pull_origin_repo(self):
         self.repo.remotes.origin.pull(progress=ProgressPrinter())
 
-    def sync_state(self, account_id):
+    def sync_state(self, account_id) -> str:
         state = self.get_state(account_id)
+        if state in ("CLEAN", "IN_PROGRESS"):
+            # we don't have to do anything
+            return state
 
-        # If the state is CLEAN or IN_PROGRESS we don't have to do anything
-        if state == "CLEAN":
-            return
-        if state == "IN_PROGRESS":
-            return
         if self._is_pr_resolved(account_id):
             path = self._get_user_repo_path(account_id)
             bname = self._get_user_branchname(account_id)
             log.debug(f"Deleting {path}")
             try:
-                # TODO: investigate
                 shutil.rmtree(path)
                 self.repo.git.worktree("prune")
                 self.repo.delete_head(bname, force=True)
@@ -386,6 +383,9 @@ class URLListManager:
                 log.info(f"Error deleting {path} {e}")
 
             self._set_state(account_id, "CLEAN")
+            state = "CLEAN"
+
+        return state
 
     def _maybe_delete_changes_log(self, account_id):
         changes_log = self._get_user_changes_path(account_id)
@@ -682,6 +682,49 @@ def get_test_list(country_code) -> Response:
         return jerror(e)
 
 
+@cz_blueprint.route("/api/_/url-submission/test-list/<country_code>", methods=["GET"])
+@role_required(["admin", "user"])
+def get_test_list_meta(country_code) -> Response:
+    """Fetch citizenlab URL list and additional metadata
+    ---
+    parameters:
+      - in: path
+        name: country_code
+        type: string
+        required: true
+        description: 2-letter country code or "global"
+    responses:
+      200:
+        description: URL list, state, changes
+        schema:
+          type: object
+          properties:
+            test_list:
+              type: object
+            changes:
+              type: object
+            state:
+              type: object
+            pr_url:
+              type: string
+    """
+    global log
+    log = current_app.logger
+    account_id = get_account_id()
+    try:
+        ulm = get_url_list_manager(account_id)
+        state = ulm.sync_state(account_id)
+        pr_url = None
+        if state == "PR_OPEN":
+            pr_url = ulm.get_pr_url(account_id)
+        changes = ulm.read_changes_log(account_id)
+        tl = ulm.get_test_list(account_id, country_code)
+        d = dict(test_list=tl, changes=changes, state=state, pr_url=pr_url)
+        return nocachejson(**d)
+    except BaseOONIException as e:
+        return jerror(e)
+
+
 @cz_blueprint.route("/api/v1/url-submission/update-url", methods=["POST"])
 @role_required(["admin", "user"])
 def url_submission_update_url() -> Response:
@@ -776,8 +819,7 @@ def get_workflow_state() -> Response:
     account_id = get_account_id()
     log.debug("get citizenlab workflow state")
     ulm = get_url_list_manager(account_id)
-    ulm.sync_state(account_id)
-    state = ulm.get_state(account_id)
+    state = ulm.sync_state(account_id)
     if state in ("PR_OPEN"):
         pr_url = ulm.get_pr_url(account_id)
         return nocachejson(state=state, pr_url=pr_url)
