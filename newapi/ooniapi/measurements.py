@@ -1550,7 +1550,7 @@ valid_feedback_status = [
 ]
 
 
-@api_msm_blueprint.route("/v1/measurement_feedback/<measurement_uid>")
+@api_msm_blueprint.route("/_/measurement_feedback/<measurement_uid>")
 @metrics.timer("get_msmt_feedback")
 def get_msmt_feedback(measurement_uid) -> Response:
     """Get measurement for the curred logged user for a given measurement
@@ -1586,7 +1586,7 @@ def get_msmt_feedback(measurement_uid) -> Response:
     return cachedjson("0s", **out)
 
 
-@api_msm_blueprint.route("/v1/measurement_feedback", methods=["POST"])
+@api_msm_blueprint.route("/_/measurement_feedback", methods=["POST"])
 @metrics.timer("submit_msmt_feedback")
 @role_required(["admin", "user"])
 def submit_msmt_feedback() -> Response:

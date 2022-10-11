@@ -285,15 +285,6 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
         assert r.status_code == 401
 
 
-def test_msmt_feedbk_submit_valid2(log, client, mocksmtp):
-    _register_and_login(client, user_e)
-    # We are logged in with role "user"
-    #
-    d = dict(status="foo")
-    r = client.post("/api/v1/measurement_feedback", json=d)
-    assert r.json == {"msg": "not implemented"}
-
-
 # # msmt_feedback
 
 
@@ -313,40 +304,40 @@ def msmt_tbl(app):
 
 
 def test_msmt_feedback_get_no_auth(client, msmt_tbl):
-    r = client.get("/api/v1/measurement_feedback/bogus_uid")
+    r = client.get("/api/_/measurement_feedback/bogus_uid")
     assert r.json == {"summary": {"blocked": 1, "ok": 2}}
 
 
 def test_msmt_feedback_submit_no_auth(client, msmt_tbl):
     d = dict(status="foo", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/measurement_feedback", json=d)
+    r = client.post("/api/_/measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
 
-    r = client.get("/api/v1/measurement_feedback/nonexistent_uid")
+    r = client.get("/api/_/measurement_feedback/nonexistent_uid")
     assert r.json == {"summary": {}}
 
 
 def test_msmt_feedback_submit_valid_and_get(client, mocksmtp, msmt_tbl):
     # We are not logged in and not allowed to call this
     d = dict(status="ok", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/measurement_feedback", json=d)
+    r = client.post("/api/_/measurement_feedback", json=d)
     assert r.json == {"error": "Authentication required"}
 
     # Log in as user
     _register_and_login(client, user_e)
     d = dict(status="ok", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/measurement_feedback", json=d)
+    r = client.post("/api/_/measurement_feedback", json=d)
     assert r.json == {}, r.json
 
     # Read it back
-    r = client.get("/api/v1/measurement_feedback/bogus_uid")
+    r = client.get("/api/_/measurement_feedback/bogus_uid")
     assert r.json == {"summary": {"blocked": 1, "ok": 3}, "user_feedback": "ok"}
 
     # Change feedback
     d = dict(status="blocked", measurement_uid="bogus_uid")
-    r = client.post("/api/v1/measurement_feedback", json=d)
+    r = client.post("/api/_/measurement_feedback", json=d)
     assert r.json == {}, r.json
 
     # Read it back again
-    r = client.get("/api/v1/measurement_feedback/bogus_uid")
+    r = client.get("/api/_/measurement_feedback/bogus_uid")
     assert r.json == {"summary": {"blocked": 2, "ok": 2}, "user_feedback": "blocked"}
