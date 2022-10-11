@@ -363,17 +363,26 @@ def show_countries_prioritization() -> Response:
         schema:
           type: object
     """
-    sql = """SELECT domain, url, cc, category_code, 0 AS msmt_cnt
-    FROM citizenlab WHERE cc != 'ZZ'
+    sql = """
+    SELECT domain, url, cc, category_code, msmt_cnt, anomaly_perc
+    FROM citizenlab
+    LEFT JOIN (
+        SELECT input, probe_cc, count() AS msmt_cnt,
+            toInt8(countIf(anomaly = 't') / msmt_cnt * 100) AS anomaly_perc
+        FROM fastpath
+        WHERE measurement_start_time > now() - interval 1 week
+        AND measurement_start_time < now()
+        GROUP BY input, probe_cc
+    ) AS x ON x.input = citizenlab.url AND x.probe_cc = UPPER(citizenlab.cc)
     """
-    cz = tuple(query_click(sa.text(sql), {}))
+    cz = tuple(query_click(sa.text(sql), {}))  # cc can be "ZZ" here
 
+    # Fetch priority rules and apply them to URLs
     sql = "SELECT category_code, cc, domain, url, priority FROM url_priorities"
     prio_rules = tuple(query_click(sa.text(sql), {}))
     li = compute_priorities(cz, prio_rules)
     for x in li:
         x.pop("weight")
-        x.pop("msmt_cnt")
         x["cc"] = x["cc"].upper()
 
     li = sorted(li, key=lambda x: (x["cc"], -x["priority"]))
