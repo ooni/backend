@@ -46,7 +46,7 @@ def list_global(client, usersession):
     r = client.get("/api/_/url-submission/test-list/global")
     assert r.status_code == 200
     tl = r.json["test_list"]
-    assert tl.keys() == {"url", "category_code", "date_added", "source", "notes"}
+    assert tl[0].keys() == {"url", "category_code", "date_added", "source", "notes"}
     assert len(tl) > 1000
 
 
