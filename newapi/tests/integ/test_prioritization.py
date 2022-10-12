@@ -63,9 +63,17 @@ def test_url_prioritization_category_codes(client):
 
 def test_show_countries_prioritization(client):
     c = getjson(client, "/api/_/show_countries_prioritization")
-    assert len(c) > 30000
+    assert len(c) > 10
     assert len(c) < 60000
-    assert sorted(c[0].keys()) == ["category_code", "cc", "domain", "priority", "url"]
+    assert sorted(c[0].keys()) == [
+        "anomaly_perc",
+        "category_code",
+        "cc",
+        "domain",
+        "msmt_cnt",
+        "priority",
+        "url",
+    ]
 
 
 def test_show_countries_prioritization_csv(client):
