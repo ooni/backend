@@ -456,8 +456,8 @@ def probe_login_post() -> Response:
     exp = datetime.utcnow() + timedelta(days=7)
     payload = {"registration_time": registration_time, "aud": "probe_token"}
     token = create_jwt(payload)
-    # expiration string used by the probe e.g. 2006-01-02T15:04:05Z07:00
-    expire = exp.strftime("%Y-%m-%dT%H:%M:%SZ00:00")
+    # expiration string used by the probe e.g. 2006-01-02T15:04:05Z
+    expire = exp.strftime("%Y-%m-%dT%H:%M:%SZ")
     return nocachejson(token=token, expire=expire)
 
 

@@ -718,7 +718,10 @@ def get_test_list_meta(country_code) -> Response:
         if state == "PR_OPEN":
             pr_url = ulm.get_pr_url(account_id)
         changes = ulm.read_changes_log(account_id)
-        tl = ulm.get_test_list(account_id, country_code)
+        try:
+            tl = ulm.get_test_list(account_id, country_code)
+        except CountryNotSupported:
+            tl = None
         d = dict(test_list=tl, changes=changes, state=state, pr_url=pr_url)
         return nocachejson(**d)
     except BaseOONIException as e:

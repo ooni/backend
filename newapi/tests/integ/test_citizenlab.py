@@ -50,6 +50,12 @@ def list_global(client, usersession):
     assert len(tl) > 1000
 
 
+def test_list_unsupported_country(client, usersession):
+    r = client.get("/api/_/url-submission/test-list/XY")
+    assert r.status_code == 200
+    assert r.json["test_list"] == None
+
+
 def add_url(client, usersession, url, tmp_path):
     new_entry = {
         "url": url,

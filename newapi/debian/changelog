@@ -1,3 +1,9 @@
+ooni-api (1.0.30) unstable; urgency=medium
+
+  * Handle unsupported test list
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 13 Oct 2022 09:37:39 +0100
+
 ooni-api (1.0.29) unstable; urgency=medium
 
   * Improve locking around citizenlab
