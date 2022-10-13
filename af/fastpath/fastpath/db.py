@@ -286,33 +286,34 @@ def clickhouse_upsert_openvpn_obs(
 
     anomaly = nn(msm, "success") == True
     tcp_connect_status_success = "t" #FIXME
-    row = [
-        anomaly,
-        dget_or(tk, "bootstrap_time", 0),
-        "f",
-        nn(msm, "error"),
-        nn(msm, "failure"),
-        nn(msm, "input"),
-        measurement_start_time,
-        measurement_uid,
-        nn(tk, "obfuscation"),
-        nn(msm, "platform"),
-        asn,
-        nn(msm, "probe_cc"),
-        nn(msm, "probe_network_name"),
-        nn(tk, "provider"),
-        nn(tk, "remote"),
-        nn(msm, "report_id"),
-        nn(msm, "resolver_asn"),
-        nn(msm, "resolver_ip"),
-        nn(msm, "resolver_network_name"),
-        nn(msm, "software_name"),
-        nn(msm, "software_version"),
-        nn(msm, "success"),
-        tcp_connect_status_success,
-        dget_or(msm, "test_runtime", 0),
-        nn(tk, "transport"),
-    ]
+    row = dict(
+      anomaly = anomaly,
+      bootstrap_time = dget_or(tk, "bootstrap_time", 0),
+      confirmed = "f",
+      error = nn(msm, "error"),
+      failure = nn(msm, "failure"),
+      input = nn(msm, "input"),
+      measurement_start_time = measurement_start_time,
+      measurement_uid = measurement_uid,
+      obfuscation = nn(tk, "obfuscation"),
+      platform = nn(msm, "platform"),
+      probe_asn = asn,
+      probe_cc = nn(msm, "probe_cc"),
+      probe_network_name = nn(msm, "probe_network_name"),
+      provider = nn(tk, "provider"),
+      remote = nn(tk, "remote"),
+      report_id = nn(msm, "report_id"),
+      resolver_asn = nn(msm, "resolver_asn"),
+      resolver_ip = nn(msm, "resolver_ip"),
+      resolver_network_name = nn(msm, "resolver_network_name"),
+      software_name = nn(msm, "software_name"),
+      software_version = nn(msm, "software_version"),
+      success = nn(msm, "success"),
+      tcp_connect_status_success = tcp_connect_status_success,
+      test_runtime = dget_or(msm, "test_runtime", 0),
+      test_start_time = test_start_time,
+      transport = nn(tk, "transport")
+    )
 
     settings = {"priority": 5}
     try:
