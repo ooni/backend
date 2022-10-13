@@ -651,37 +651,6 @@ def get_url_list_manager(account_id):
     )
 
 
-@cz_blueprint.route("/api/v1/url-submission/test-list/<country_code>", methods=["GET"])
-@role_required(["admin", "user"])
-def get_test_list(country_code) -> Response:
-    """Fetch citizenlab URL list
-    ---
-    parameters:
-      - in: path
-        name: country_code
-        type: string
-        required: true
-        description: 2-letter country code or "global"
-    responses:
-      200:
-        description: URL list
-        schema:
-          type: object
-          properties:
-            new_entry:
-              type: array
-    """
-    global log
-    log = current_app.logger
-    account_id = get_account_id()
-    ulm = get_url_list_manager(account_id)
-    try:
-        tl = ulm.get_test_list(account_id, country_code)
-        return nocachejson(tl)
-    except BaseOONIException as e:
-        return jerror(e)
-
-
 @cz_blueprint.route("/api/_/url-submission/test-list/<country_code>", methods=["GET"])
 @role_required(["admin", "user"])
 def get_test_list_meta(country_code) -> Response:
@@ -804,50 +773,6 @@ def url_submission_update_url() -> Response:
         return nocachejson(updated_entry=entry)
     except BaseOONIException as e:
         return jerror(e)
-
-
-@cz_blueprint.route("/api/v1/url-submission/state", methods=["GET"])
-@role_required(["admin", "user"])
-def get_workflow_state() -> Response:
-    """Get workflow state
-    ---
-    responses:
-      200:
-        description: New URL confirmation
-        schema:
-          type: object
-    """
-    global log
-    log = current_app.logger
-    account_id = get_account_id()
-    log.debug("get citizenlab workflow state")
-    ulm = get_url_list_manager(account_id)
-    state = ulm.sync_state(account_id)
-    if state in ("PR_OPEN"):
-        pr_url = ulm.get_pr_url(account_id)
-        return nocachejson(state=state, pr_url=pr_url)
-    return nocachejson(state=state)
-
-
-@cz_blueprint.route("/api/v1/url-submission/changes", methods=["GET"])
-@role_required(["admin", "user"])
-def get_changes() -> Response:
-    """Get changes the user has made to the test list so far
-    ---
-    responses:
-      200:
-        description: A dictionary keyed on the country codes with the list of
-            additions and deletions.
-        schema:
-          type: object
-    """
-    global log
-    log = current_app.logger
-    account_id = get_account_id()
-    log.debug("get citizenlab git diff")
-    ulm = get_url_list_manager(account_id)
-    changes = ulm.read_changes_log(account_id)
-    return nocachejson(changes=changes)
 
 
 @cz_blueprint.route("/api/v1/url-submission/submit", methods=["POST"])
