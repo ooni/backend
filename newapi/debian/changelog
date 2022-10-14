@@ -1,3 +1,9 @@
+ooni-api (1.0.31) unstable; urgency=medium
+
+  * Add probe registration/login metrics
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 14 Oct 2022 17:34:00 +0100
+
 ooni-api (1.0.30) unstable; urgency=medium
 
   * Handle unsupported test list

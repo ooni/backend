@@ -441,16 +441,20 @@ def probe_login_post() -> Response:
         dec = decode_jwt(token, audience="probe_login")
         registration_time = dec["iat"]
         log.info("probe login successful")
+        metrics.incr("probe_login_successful")
     except jwt.exceptions.MissingRequiredClaimError:
         log.info("probe login: invalid or missing claim")
+        metrics.incr("probe_login_failed")
         return jerror("Invalid credentials", code=401)
     except jwt.exceptions.InvalidSignatureError:
         log.info("probe login: invalid signature")
+        metrics.incr("probe_login_failed")
         return jerror("Invalid credentials", code=401)
     except jwt.exceptions.DecodeError:
         # Not a JWT token: treat it as a "legacy" login
         # return jerror("Invalid or missing credentials", code=401)
-        log.info("legacy probe login successful")
+        log.info("probe legacy login successful")
+        metrics.incr("probe_legacy_login_successful")
         registration_time = None
 
     exp = datetime.utcnow() + timedelta(days=7)
