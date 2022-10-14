@@ -267,12 +267,19 @@ class FlaskLimiter:
             return "429 error", 429
 
     def _after_request_callback(self, response):
-        """Consume quota and injects HTTP headers when responding to a request"""
+        """Consumes quota and injects HTTP headers when responding to a request
+        Also generates API call timing metrics
+        """
         if self._disabled:  # used in integration tests
             return response
 
         log = current_app.logger
         try:
+            tdelta = time.monotonic() - self._request_start_time
+            timer_path = request.path.split("?", 1)[0]
+            timer_path = "apicall_" + timer_path.replace("/", "__")
+            metrics.timing(timer_path, int(tdelta * 1000))  # ms
+
             ipaddr = self._get_client_ipaddr()
             if self._limiter.is_ipaddr_whitelisted(ipaddr):
                 return response
@@ -280,8 +287,6 @@ class FlaskLimiter:
             if self._limiter.is_page_unmetered(request.path):
                 return
 
-            assert response
-            tdelta = time.monotonic() - self._request_start_time
             remaining = self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
             response.headers.add("X-RateLimit-Remaining", int(remaining))
             metrics.decr("busy_workers_count")
