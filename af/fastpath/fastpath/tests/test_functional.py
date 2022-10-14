@@ -985,7 +985,7 @@ def test_score_psiphon(cans):
         # test version 0.3.1 has different mkeys than before
         mkeys = set(msm.keys())
         mkeys.discard("resolver_ip")  # Some msmts are missing this
-        assert len(mkeys) in (13, 15)
+        assert len(mkeys) in (13, 16)
         assert len(msm["test_keys"]) in (3, 6, 7)
         assert 1 < msm["test_keys"]["bootstrap_time"] < 500
         assert msm["test_keys"]["failure"] is None, msm
@@ -1066,6 +1066,7 @@ def test_score_http_invalid_request_line():
             "id",
             "input",
             "input_hashes",
+            "measurement_uid",
             "options",
             "probe_city",
             "report_filename",
