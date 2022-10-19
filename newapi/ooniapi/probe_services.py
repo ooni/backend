@@ -3,7 +3,7 @@ OONI Probe Services API
 """
 
 from base64 import b64encode
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from os import urandom
 from typing import Dict, Any, Tuple
 
@@ -339,6 +339,12 @@ Workflow:
 """
 
 
+def beginning_next_month() -> int:
+    d = date.today().replace(day=1) + timedelta(days=32)
+    ts = d.replace(day=1).strftime("%s")
+    return int(ts)
+
+
 @probe_services_blueprint.route("/api/v1/register", methods=["POST"])
 def probe_register() -> Response:
     """Probe Services: Register
@@ -389,10 +395,10 @@ def probe_register() -> Response:
     if not request.is_json:
         return jerror("error: JSON expected!")
 
-    now = datetime.utcnow()
     # client_id is a JWT token with "issued at" claim and
-    # "audience" claim
-    payload = {"iat": now, "aud": "probe_login"}
+    # "audience" claim. The "issued at" claim is rounded up.
+    issued_at = beginning_next_month()
+    payload = {"iat": issued_at, "aud": "probe_login"}
     client_id = create_jwt(payload)
     log.info("register successful")
     return nocachejson(client_id=client_id)
