@@ -130,7 +130,6 @@ def role_required(roles):
             if row:
                 threshold = row["threshold"]
                 iat = datetime.utcfromtimestamp(tok["iat"])
-                print((iat, threshold))
                 if iat < threshold:
                     return jerror("Authentication token expired", 401)
 
