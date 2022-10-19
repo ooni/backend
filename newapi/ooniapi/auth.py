@@ -367,7 +367,8 @@ def user_login() -> Response:
 """
 CREATE TABLE IF NOT EXISTS accounts (
     account_id text PRIMARY KEY,
-    role text
+    role text,
+    update_time DateTime DEFAULT now()
 );
 
 GRANT SELECT ON TABLE accounts TO amsapi;
