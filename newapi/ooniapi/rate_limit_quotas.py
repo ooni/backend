@@ -268,7 +268,6 @@ class FlaskLimiter:
 
     def _after_request_callback(self, response):
         """Consumes quota and injects HTTP headers when responding to a request
-        Also generates API call timing metrics
         """
         if self._disabled:  # used in integration tests
             return response
@@ -276,9 +275,10 @@ class FlaskLimiter:
         log = current_app.logger
         try:
             tdelta = time.monotonic() - self._request_start_time
-            timer_path = request.path.split("?", 1)[0]
-            timer_path = "apicall_" + timer_path.replace("/", "__")
-            metrics.timing(timer_path, int(tdelta * 1000))  # ms
+            # TODO: implement API call timing metrics
+            # timer_path = request.path.split("?", 1)[0]
+            # timer_path = "apicall_" + timer_path.replace("/", "__")
+            # metrics.timing(timer_path, int(tdelta * 1000))  # ms
 
             ipaddr = self._get_client_ipaddr()
             if self._limiter.is_ipaddr_whitelisted(ipaddr):
