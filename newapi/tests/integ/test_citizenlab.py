@@ -48,6 +48,7 @@ def list_global(client, usersession):
     tl = r.json["test_list"]
     assert tl[0].keys() == {"url", "category_code", "date_added", "source", "notes"}
     assert len(tl) > 1000
+    return r.json
 
 
 def test_list_unsupported_country(client, usersession):
@@ -193,8 +194,9 @@ def delete_url(client, usersession):
     assert r.status_code == 200, r.data
 
 
-def get_state(client):
-    r = client.get("/api/v1/url-submission/state")
+def get_state(client, cc="ie"):
+    # state is independent from cc
+    r = client.get(f"/api/_/url-submission/test-list/{cc}")
     assert r.status_code == 200
     return r.json["state"]
 
@@ -273,8 +275,8 @@ def _read_us_csv_file(tmp_path):
 def _test_checkout_update_submit(client, tmp_path):
     assert get_state(client) == "CLEAN"
 
-    list_global(client, usersession)
-    assert get_state(client) == "CLEAN"
+    r = list_global(client, usersession)
+    assert r["state"] == "CLEAN"
 
     url = "https://example-bogus-1.org/"
     add_url(client, usersession, url, tmp_path)
@@ -284,7 +286,7 @@ def _test_checkout_update_submit(client, tmp_path):
     assert csv[0] == "url,category_code,category_description,date_added,source,notes"
     assert url in csv[-1], "URL not found in the last line in the CSV file"
 
-    r = client.get("/api/v1/url-submission/changes")
+    r = client.get("/api/_/url-submission/test-list/us")
     assert r.status_code == 200
 
     assert len(r.json["changes"]["us"]) == 1
@@ -301,7 +303,7 @@ def _test_checkout_update_submit(client, tmp_path):
     # the test client believe that the PR has been merged.
     assert get_state(client) == "CLEAN"
 
-    r = client.get("/api/v1/url-submission/changes")
+    r = client.get("/api/_/url-submission/test-list/us")
     assert r.json["changes"] == {}
 
 def test_checkout_update_submit(
@@ -311,8 +313,8 @@ def test_checkout_update_submit(
 
     # Before getting the list URLListManager will check if the mock PR is done
     # (it is) and set the state to CLEAN
-    list_global(client, usersession)
-    assert get_state(client) == "CLEAN"
+    r = list_global(client, usersession)
+    assert r["state"] == "CLEAN"
 
 def test_propose_changes_then_update(
     clean_workdir, client, usersession, mock_requests_open, tmp_path
@@ -345,8 +347,8 @@ def test_propose_changes_then_update(
 def test_ghpr_checkout_update_submit(clean_workdir, client, usersession, tmp_path):
     _test_checkout_update_submit(client, tmp_path)
     # This is a *real* PR
-    list_global(client, usersession)
-    assert get_state(client) == "PR_OPEN"
+    r = list_global(client, usersession)
+    assert r["state"] == "PR_OPEN"
 
 
 # # Prioritization management # #
