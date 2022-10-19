@@ -224,6 +224,7 @@ class URLListManager:
         elapsed_ms = (time.monotonic_ns() - self._lock_time) / 1000_000
         metrics.timing("citizenlab_lock_time", elapsed_ms)
 
+    @metrics.timer("citizenlab_repo_init")
     def _init_repo(self):
         if not os.path.exists(self.repo_dir):
             log.info(f"cloning {self.origin_repo} repository")
@@ -350,9 +351,11 @@ class URLListManager:
                 description=f"{new_url} is duplicate", err_args={"url": new_url}
             )
 
+    @metrics.timer("citizenlab_repo_pull")
     def _pull_origin_repo(self):
         self.repo.remotes.origin.pull()
 
+    @metrics.timer("citizenlab_sync_state")
     def sync_state(self, account_id) -> str:
         state = self.get_state(account_id)
         if state in ("CLEAN", "IN_PROGRESS"):
@@ -532,6 +535,7 @@ class URLListManager:
 
         self._set_state(account_id, "IN_PROGRESS")
 
+    @metrics.timer("citizenlab_open_pr")
     def _open_pr(self, branchname):
         """Opens PR. Returns API URL e.g.
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
@@ -585,6 +589,7 @@ class URLListManager:
             force=True,
         )
 
+    @metrics.timer("citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
         log.debug("proposing changes")
         self._push_to_repo(account_id)
