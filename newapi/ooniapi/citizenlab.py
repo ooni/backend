@@ -196,17 +196,6 @@ def jerror(err, code=400):
     return make_response(jsonify(error=str(err)), code)
 
 
-class ProgressPrinter(git.RemoteProgress):
-    def update(self, op_code, cur_count, max_count=None, message=""):
-        print(
-            op_code,
-            cur_count,
-            max_count,
-            cur_count / (max_count or 100.0),
-            message or "NO MESSAGE",
-        )
-
-
 class URLListManager:
     def __init__(
         self, working_dir, github_user, github_token, push_repo, origin_repo, account_id
@@ -243,7 +232,7 @@ class URLListManager:
             url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
             repo.create_remote("rworigin", url)
         repo = git.Repo(self.repo_dir)
-        repo.remotes.origin.pull(progress=ProgressPrinter())
+        repo.remotes.origin.pull()
         return repo
 
     def _get_user_repo_path(self, account_id) -> Path:
@@ -362,7 +351,7 @@ class URLListManager:
             )
 
     def _pull_origin_repo(self):
-        self.repo.remotes.origin.pull(progress=ProgressPrinter())
+        self.repo.remotes.origin.pull()
 
     def sync_state(self, account_id) -> str:
         state = self.get_state(account_id)
@@ -593,7 +582,6 @@ class URLListManager:
         log.debug("pushing branch to GitHub")
         self.repo.remotes.rworigin.push(
             self._get_user_branchname(account_id),
-            progress=ProgressPrinter(),
             force=True,
         )
 
