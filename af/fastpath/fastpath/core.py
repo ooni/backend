@@ -1359,6 +1359,9 @@ def score_signal(msm: dict) -> dict:
     if tk.get("failed_operation", True) or tk.get("failure", True):
         scores["accuracy"] = 0.0
 
+    # https://github.com/ooni/probe/issues/2344
+    scores["accuracy"] = 0.0
+
     st = tk.get("signal_backend_status")
     if st == "ok":
         pass
