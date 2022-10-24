@@ -1,3 +1,9 @@
+ooni-api (1.0.32) unstable; urgency=medium
+
+  * Hide clickhouse stacktraces
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 24 Oct 2022 17:21:38 +0100
+
 ooni-api (1.0.31) unstable; urgency=medium
 
   * Add probe registration/login metrics

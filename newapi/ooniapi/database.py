@@ -1,8 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
+import logging
 from hashlib import shake_128
 from typing import Optional, List, Dict, Union
 import os
@@ -16,9 +12,12 @@ from sqlalchemy.sql.selectable import Select
 
 # debdeps: python3-clickhouse-driver
 from clickhouse_driver import Client as Clickhouse
+import clickhouse_driver.errors
 
 # query_time = Summary("query", "query", ["hash", ], registry=metrics.registry)
 Base = declarative_base()
+
+log = logging.getLogger()
 
 
 def _gen_application_name():  # pragma: no cover
@@ -58,9 +57,17 @@ def _run_query(query: Query, query_params: dict, query_prio=3):
     settings = {"priority": query_prio, "max_execution_time": 28}
     if isinstance(query, (Select, TextClause)):
         query = str(query.compile(dialect=postgresql.dialect()))
-    q = current_app.click.execute(
-        query, query_params, with_column_types=True, settings=settings
-    )
+    try:
+        q = current_app.click.execute(
+            query, query_params, with_column_types=True, settings=settings
+        )
+    except clickhouse_driver.errors.ServerException as e:
+        title = e.message.splitlines()[0]
+        if title.startswith("DB::Exception"):
+            log.info(e.message)
+            title = title.split(" ", 1)[1]
+        raise Exception(title)
+
     rows, coldata = q
     colnames, coltypes = tuple(zip(*coldata))
     return colnames, rows
