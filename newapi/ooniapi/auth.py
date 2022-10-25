@@ -72,7 +72,7 @@ def create_jwt(payload: dict) -> str:
         return token
 
 
-def decode_jwt(token, **kw):
+def decode_jwt(token: str, **kw) -> Dict:
     key = current_app.config["JWT_ENCRYPTION_KEY"]
     return jwt.decode(token, key, algorithms=["HS256"], **kw)
 
@@ -155,7 +155,7 @@ def role_required(roles):
     return decorator
 
 
-def get_client_token() -> Optional[str]:
+def get_client_token() -> Optional[Dict]:
     # Return decoded JWT from client
     try:
         bt = request.headers.get("Authorization", "")
@@ -173,6 +173,7 @@ def get_account_id_or_none() -> Optional[str]:
     tok = get_client_token()
     if tok:
         return tok["account_id"]
+    return None
 
 
 def get_account_id():
@@ -492,7 +493,7 @@ def get_account_metadata() -> Response:
           type: object
     """
     try:
-        tok = get_client_token()
+        tok = get_client_token() or {}
         return nocachejson(logged_in=True, role=tok["role"])
     except Exception:
         resp = make_response(jsonify(logged_in=False), 401)
