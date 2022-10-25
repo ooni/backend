@@ -72,7 +72,7 @@ def create_jwt(payload: dict) -> str:
         return token
 
 
-def decode_jwt(token: str, **kw) -> Dict:
+def decode_jwt(token: str, **kw) -> Dict[str, Any]:
     key = current_app.config["JWT_ENCRYPTION_KEY"]
     return jwt.decode(token, key, algorithms=["HS256"], **kw)
 
