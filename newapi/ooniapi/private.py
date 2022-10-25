@@ -76,6 +76,7 @@ def api_private_asn_by_month() -> Response:
     FROM fastpath
     WHERE measurement_start_time < toStartOfMonth(addMonths(now(), 1))
     AND measurement_start_time > toStartOfMonth(subtractMonths(now(), 24))
+    ;
     GROUP BY date ORDER BY date
     """
     li = list(query_click(q, {}))

@@ -58,7 +58,7 @@ def adminsession(client, app):
     # Mock out SMTP, register a user and log in
     with app.app_context():
         ooniapi.auth._set_account_role(admin_e, "admin")
-        _register_and_login(client, admin_e)
+        h = _register_and_login(client, admin_e)
         reset_smtp_mock()
         yield
         ooniapi.auth._delete_account_data(admin_e)
@@ -140,33 +140,37 @@ def _register_and_login(client, email_address):
 
     r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200, r.json
-    assert r.json == {"redirect_to": "https://explorer.ooni.org"}
+    assert r.json["redirect_to"] == "https://explorer.ooni.org"
+    assert "bearer" in r.json
     cookies = r.headers.getlist("Set-Cookie")
     assert len(cookies) == 1
     c = cookies[0]
     assert c.startswith("ooni=")
     assert c.endswith("; Secure; HttpOnly; SameSite=None; Path=/")
-    return {"Set-Cookie": c}
+    # client.cookie_jar.clear()  # temporary
+
+    return {"Authorization": "Bearer " + r.json["bearer"]}
 
 
 def test_user_register_and_logout(client, mocksmtp):
     assert client.get("/api/_/account_metadata").json == {
         "logged_in": False
     }  # not logged in
-    _register_and_login(client, user_e)
-    assert client.get("/api/_/account_metadata").json != {}  # logged in
-    r = client.post("/api/v1/user_logout")
+    h = _register_and_login(client, user_e)
+    j = client.get("/api/_/account_metadata", headers=h).json
+    assert j == {'logged_in': True, 'role': 'user'}  # logged in
+    r = client.post("/api/v1/user_logout", headers=j)
     assert r.status_code == 200
-    assert client.get("/api/_/account_metadata").json == {
-        "logged_in": False
-    }  # not logged in
+    # FIXME: simulates logout
+    j = client.get("/api/_/account_metadata").json
+    assert j == {"logged_in": False}
 
 
 def test_user_register_and_get_metadata(client, mocksmtp):
     r = client.get("/api/_/account_metadata")
     assert r.json == {"logged_in": False}
-    _register_and_login(client, user_e)
-    r = client.get("/api/_/account_metadata")
+    h = _register_and_login(client, user_e)
+    r = client.get("/api/_/account_metadata", headers=h)
     assert r.json == dict(role="user", logged_in=True)
 
 
@@ -176,7 +180,7 @@ def test_role_set_not_allowed(client, mocksmtp):
     r = client.post("/api/v1/set_account_role", json=d)
     assert r.status_code == 401
 
-    _register_and_login(client, user_e)
+    h = _register_and_login(client, user_e)
 
     # We are logged in with role "user" and still not allowed to call this
     d = dict(email_address=admin_e, role="admin")
@@ -188,7 +192,7 @@ def test_role_set_not_allowed(client, mocksmtp):
 
 
 def test_role_set_multiple(client, mocksmtp, integtest_admin):
-    _register_and_login(client, admin_e)
+    h = _register_and_login(client, admin_e)
 
     # We are logged in with role "admin"
     d = dict(email_address=admin_e, role="admin")
@@ -221,7 +225,7 @@ def test_role_set_multiple(client, mocksmtp, integtest_admin):
 
 @pytest.mark.skip("FIXME not deterministic, see auth.py  _delete_account_data")
 def test_role_set_with_expunged_token(client, mocksmtp, integtest_admin):
-    _register_and_login(client, admin_e)
+    h = _register_and_login(client, admin_e)
 
     d = dict(email_address="BOGUS_EMAIL_ADDR", role="admin")
     r = client.post("/api/v1/set_session_expunge", json=d)
@@ -250,7 +254,7 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
     # LOGIN_EXPIRY_DAYS = 7
     with freeze_time("2012-01-14"):
         ooniapi.auth._remove_from_session_expunge(admin_e)
-        _register_and_login(client, admin_e)
+        h = _register_and_login(client, admin_e)
         tok = decode_token(client)
         assert tok == {
             "nbf": 1326499200,
@@ -324,7 +328,7 @@ def test_msmt_feedback_submit_valid_and_get(client, mocksmtp, msmt_tbl):
     assert r.json == {"error": "Authentication required"}
 
     # Log in as user
-    _register_and_login(client, user_e)
+    h = _register_and_login(client, user_e)
     d = dict(status="ok", measurement_uid="bogus_uid")
     r = client.post("/api/_/measurement_feedback", json=d)
     assert r.json == {}, r.json

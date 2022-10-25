@@ -110,10 +110,10 @@ def role_required(roles):
         @cross_origin(origins=origins, supports_credentials=True)
         @wraps(func)
         def wrapper(*args, **kwargs):
-            token = request.cookies.get("ooni", "")
             try:
-                tok = decode_jwt(token, audience="user_auth")
-                del token
+                tok = get_client_token()
+                if tok is None:
+                    return jerror("Authentication required", 401)
                 if tok["role"] not in roles:
                     return jerror("Role not authorized", 401)
             except Exception:
@@ -155,22 +155,30 @@ def role_required(roles):
     return decorator
 
 
-def get_account_id_or_none() -> Optional[str]:
+def get_client_token() -> Optional[str]:
+    # Return decoded JWT from client
     try:
-        token = request.cookies.get("ooni", "")
-        tok = decode_jwt(token, audience="user_auth")
+        bt = request.headers.get("Authorization", "")
+        if bt.startswith("Bearer "):
+            token = bt[7:]
+        else:  # temporary
+            token = request.cookies.get("ooni", "")
+
+        return decode_jwt(token, audience="user_auth")
     except Exception:
         return None
 
-    return tok["account_id"]
+
+def get_account_id_or_none() -> Optional[str]:
+    tok = get_client_token()
+    if tok:
+        return tok["account_id"]
 
 
 def get_account_id():
     # TODO: switch to get_account_id_or_none
-    try:
-        token = request.cookies.get("ooni", "")
-        tok = decode_jwt(token, audience="user_auth")
-    except Exception:
+    tok = get_client_token()
+    if not tok:
         return jerror("Authentication required", 401)
 
     return tok["account_id"]
@@ -337,7 +345,7 @@ def user_login() -> Response:
         description: JWT token with aud=register
     responses:
       200:
-        description: JSON with "redirect_to" or "msg" key; set cookie
+        description: JSON with "bearer", "redirect_to" or "msg" key; set cookie
     """
     log = current_app.logger
     token = request.args.get("k", "")
@@ -356,7 +364,7 @@ def user_login() -> Response:
     redirect_to = dec.get("redirect_to", "")
 
     token = _create_session_token(dec["account_id"], role)
-    r = make_response(jsonify(redirect_to=redirect_to), 200)
+    r = make_response(jsonify(redirect_to=redirect_to, bearer=token), 200)
     set_JWT_cookie(r, token)
     r.cache_control.no_cache = True
     return r
@@ -484,8 +492,7 @@ def get_account_metadata() -> Response:
           type: object
     """
     try:
-        token = request.cookies.get("ooni", "")
-        tok = decode_jwt(token, audience="user_auth")
+        tok = get_client_token()
         return nocachejson(logged_in=True, role=tok["role"])
     except Exception:
         resp = make_response(jsonify(logged_in=False), 401)
