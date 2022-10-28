@@ -350,10 +350,7 @@ def user_login() -> Response:
     redirect_to = dec.get("redirect_to", "")
 
     token = _create_session_token(dec["account_id"], role)
-    r = make_response(jsonify(redirect_to=redirect_to, bearer=token), 200)
-    r.cache_control.no_cache = True
-    # TODO: use nocachejson
-    return r
+    return nocachejson(redirect_to=redirect_to, bearer=token)
 
 
 @metrics.timer("user_refresh_token")
