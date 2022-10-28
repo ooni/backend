@@ -52,15 +52,46 @@ def integtest_admin(app):
         ooniapi.auth._delete_account_data(admin_e)
 
 
+class AuthClient:
+    # wrap Flask http client to provide Authorization=Bearer header
+    def __init__(self, http_client, headers):
+        self._headers = headers
+        self._client = http_client
+
+    def get(self, *a, **kw):
+        return self._client.get(*a, **kw, headers=self._headers)
+
+    def post(self, *a, **kw):
+        return self._client.post(*a, **kw, headers=self._headers)
+
+    def discard_authorization_header(self):
+        self._headers.pop("Authorization")
+
+
+# setup_test_session mocks SMTP when the test session starts
+
+
+@pytest.fixture
+def usersession(client, app):
+    # Mock out SMTP, register a user and log in
+    user_e = "nick@localhost.local"
+    reset_smtp_mock()
+    with app.app_context():
+        headers = _register_and_login(client, user_e)
+    reset_smtp_mock()
+    yield AuthClient(client, headers)
+    reset_smtp_mock()
+
+
 @pytest.fixture
 def adminsession(client, app):
     # Access DB directly
     # Mock out SMTP, register a user and log in
     with app.app_context():
         ooniapi.auth._set_account_role(admin_e, "admin")
-        h = _register_and_login(client, admin_e)
+        headers= _register_and_login(client, admin_e)
         reset_smtp_mock()
-        yield
+        yield AuthClient(client, headers)
         ooniapi.auth._delete_account_data(admin_e)
         reset_smtp_mock()
 

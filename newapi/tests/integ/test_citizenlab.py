@@ -19,22 +19,8 @@ import ooniapi.citizenlab
 
 from .test_integration_auth import _register_and_login
 from .test_integration_auth import reset_smtp_mock, setup_test_session
-from .test_integration_auth import adminsession
+from .test_integration_auth import adminsession, usersession
 from tests.utils import *
-
-# setup_test_session mocks SMTP when the test session starts
-
-
-@pytest.fixture
-def usersession(client, app):
-    # Mock out SMTP, register a user and log in
-    user_e = "nick@localhost.local"
-    reset_smtp_mock()
-    with app.app_context():
-        _register_and_login(client, user_e)
-    reset_smtp_mock()
-    yield
-    reset_smtp_mock()
 
 
 def test_no_auth(client):
@@ -42,8 +28,8 @@ def test_no_auth(client):
     assert r.status_code == 401
 
 
-def list_global(client, usersession):
-    r = client.get("/api/_/url-submission/test-list/global")
+def list_global(usersession):
+    r = usersession.get("/api/_/url-submission/test-list/global")
     assert r.status_code == 200
     tl = r.json["test_list"]
     assert tl[0].keys() == {"url", "category_code", "date_added", "source", "notes"}
@@ -52,12 +38,12 @@ def list_global(client, usersession):
 
 
 def test_list_unsupported_country(client, usersession):
-    r = client.get("/api/_/url-submission/test-list/XY")
+    r = usersession.get("/api/_/url-submission/test-list/XY")
     assert r.status_code == 200
     assert r.json["test_list"] == None
 
 
-def add_url(client, usersession, url, tmp_path):
+def add_url(usersession, url, tmp_path):
     new_entry = {
         "url": url,
         "category_code": "FILE",
@@ -72,10 +58,10 @@ def add_url(client, usersession, url, tmp_path):
         comment="Integ test: add example URL",
     )
 
-    r = client.post("/api/v1/url-submission/update-url", json=d)
+    r = usersession.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 200, r.data
 
-    r = client.get("/api/_/url-submission/test-list/us")
+    r = usersession.get("/api/_/url-submission/test-list/us")
     assert r.status_code == 200
     tl = r.json["test_list"]
     en = [e for e in tl if e["url"] == url]
@@ -83,8 +69,8 @@ def add_url(client, usersession, url, tmp_path):
     assert en[0] == new_entry
 
 
-def lookup_and_delete_us_url(client, usersession, url):
-    r = client.get("/api/_/url-submission/test-list/us")
+def lookup_and_delete_us_url(usersession, url):
+    r = usersession.get("/api/_/url-submission/test-list/us")
     assert r.status_code == 200
     tl = r.json["test_list"]
     en = [e for e in tl if e["url"] == url]
@@ -104,7 +90,7 @@ def lookup_and_delete_us_url(client, usersession, url):
         comment="Integ test: delete URL",
     )
 
-    r = client.post("/api/v1/url-submission/update-url", json=d)
+    r = usersession.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 200, r.data
 
 
@@ -127,12 +113,12 @@ def test_update_url_reject(client, usersession):
         },
         comment="add HTTPS to the website url",
     )
-    r = client.post("/api/v1/url-submission/update-url", json=d)
+    r = usersession.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 400, r.data
 
 
 def test_update_url_nochange(client, usersession):
-    r = client.get("/api/_/url-submission/test-list/it")
+    r = usersession.get("/api/_/url-submission/test-list/it")
     assert r.status_code == 200
     tl = r.json["test_list"]
 
@@ -146,15 +132,15 @@ def test_update_url_nochange(client, usersession):
     }
     new = old
     d = dict(country_code="it", old_entry=old, new_entry=new, comment="")
-    r = client.post("/api/v1/url-submission/update-url", json=d)
+    r = usersession.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 400, r.data
     assert b"err_no_proposed_changes" in r.data
 
 
 # TODO reset git
 # TODO open PR
-def update_url_basic(client, usersession):
-    r = client.get("/api/_/url-submission/test-list/it")
+def update_url_basic(usersession):
+    r = usersession.get("/api/_/url-submission/test-list/it")
     assert r.status_code == 200
     tl = r.json["test_list"]
 
@@ -170,13 +156,13 @@ def update_url_basic(client, usersession):
     new["notes"] = "Bogus comment"
     assert new != old
     d = dict(country_code="it", old_entry=old, new_entry=new, comment="")
-    r = client.post("/api/v1/url-submission/update-url", json=d)
+    r = usersession.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 200, r.data
 
-    assert get_state(client) == "IN_PROGRESS"
+    assert get_state(usersession) == "IN_PROGRESS"
 
 
-def delete_url(client, usersession):
+def delete_url(usersession):
     d = dict(
         country_code="US",
         old_entry={
@@ -190,19 +176,19 @@ def delete_url(client, usersession):
         comment="delete example URL",
     )
 
-    r = client.post("/api/v1/url-submission/update-url", json=d)
+    r = usersession.post("/api/v1/url-submission/update-url", json=d)
     assert r.status_code == 200, r.data
 
 
-def get_state(client, cc="ie"):
+def get_state(usersession, cc="ie"):
     # state is independent from cc
-    r = client.get(f"/api/_/url-submission/test-list/{cc}")
+    r = usersession.get(f"/api/_/url-submission/test-list/{cc}")
     assert r.status_code == 200
     return r.json["state"]
 
 
-def test_pr_state(client, usersession):
-    assert get_state(client) == "CLEAN"
+def test_pr_state(usersession):
+    assert get_state(usersession) == "CLEAN"
 
 
 # # Tests with mocked-out GitHub # #
@@ -215,12 +201,14 @@ class MKOpen:
     def json():  # mock both openin a pr or checking its status
         return {"state": "open", "url": "https://testurl"}
 
+
 class MKClosed:
     status_code = 200
 
     @staticmethod
     def json():  # mock both openin a pr or checking its status
         return {"state": "closed", "url": "https://testurl"}
+
 
 @pytest.fixture
 def mock_requests_open(monkeypatch):
@@ -239,6 +227,7 @@ def mock_requests_open(monkeypatch):
     monkeypatch.setattr(ooniapi.citizenlab.requests, "patch", req)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "get", req)
 
+
 @pytest.fixture
 def mock_requests_closed(monkeypatch):
     def req(*a, **kw):
@@ -256,6 +245,7 @@ def mock_requests_closed(monkeypatch):
     monkeypatch.setattr(ooniapi.citizenlab.requests, "patch", req)
     monkeypatch.setattr(ooniapi.citizenlab.requests, "get", req)
 
+
 @pytest.fixture
 def clean_workdir(app, tmp_path):
     with app.app_context():
@@ -272,89 +262,91 @@ def _read_us_csv_file(tmp_path):
     return f.read_text().splitlines()
 
 
-def _test_checkout_update_submit(client, tmp_path):
-    assert get_state(client) == "CLEAN"
+def _test_checkout_update_submit(usersession, tmp_path):
+    assert get_state(usersession) == "CLEAN"
 
-    r = list_global(client, usersession)
+    r = list_global(usersession)
     assert r["state"] == "CLEAN"
 
     url = "https://example-bogus-1.org/"
-    add_url(client, usersession, url, tmp_path)
-    assert get_state(client) == "IN_PROGRESS"
+    add_url(usersession, url, tmp_path)
+    assert get_state(usersession) == "IN_PROGRESS"
 
     csv = _read_us_csv_file(tmp_path)
     assert csv[0] == "url,category_code,category_description,date_added,source,notes"
     assert url in csv[-1], "URL not found in the last line in the CSV file"
 
-    r = client.get("/api/_/url-submission/test-list/us")
+    r = usersession.get("/api/_/url-submission/test-list/us")
     assert r.status_code == 200
 
     assert len(r.json["changes"]["us"]) == 1
 
-    add_url(client, usersession, "https://example-bogus.org/", tmp_path)
-    lookup_and_delete_us_url(client, usersession, "https://example-bogus.org/")
+    add_url(usersession, "https://example-bogus.org/", tmp_path)
+    lookup_and_delete_us_url(usersession, "https://example-bogus.org/")
 
-    update_url_basic(client, usersession)
+    update_url_basic(usersession)
 
-    r = client.post("/api/v1/url-submission/submit")
+    r = usersession.post("/api/v1/url-submission/submit")
     assert r.status_code == 200
 
     # This is clean, because we are mocking the is_pr_resolved request, making
     # the test client believe that the PR has been merged.
-    assert get_state(client) == "CLEAN"
+    assert get_state(usersession) == "CLEAN"
 
-    r = client.get("/api/_/url-submission/test-list/us")
+    r = usersession.get("/api/_/url-submission/test-list/us")
     assert r.json["changes"] == {}
+
 
 def test_checkout_update_submit(
     clean_workdir, client, usersession, mock_requests_closed, tmp_path
 ):
-    _test_checkout_update_submit(client, tmp_path)
+    _test_checkout_update_submit(usersession, tmp_path)
 
     # Before getting the list URLListManager will check if the mock PR is done
     # (it is) and set the state to CLEAN
-    r = list_global(client, usersession)
+    r = list_global(usersession)
     assert r["state"] == "CLEAN"
+
 
 def test_propose_changes_then_update(
     clean_workdir, client, usersession, mock_requests_open, tmp_path
 ):
-    assert get_state(client) == "CLEAN"
+    assert get_state(usersession) == "CLEAN"
 
     url = "https://example-bogus-1.org/"
-    add_url(client, usersession, url, tmp_path)
-    assert get_state(client) == "IN_PROGRESS"
+    add_url(usersession, url, tmp_path)
+    assert get_state(usersession) == "IN_PROGRESS"
 
-    r = client.post("/api/v1/url-submission/submit")
+    r = usersession.post("/api/v1/url-submission/submit")
     assert r.status_code == 200
 
-    assert get_state(client) == "PR_OPEN"
+    assert get_state(usersession) == "PR_OPEN"
 
     url = "https://example-bogus-2.org/"
-    add_url(client, usersession, url, tmp_path)
-    assert get_state(client) == "IN_PROGRESS"
+    add_url(usersession, url, tmp_path)
+    assert get_state(usersession) == "IN_PROGRESS"
 
-    r = client.post("/api/v1/url-submission/submit")
+    r = usersession.post("/api/v1/url-submission/submit")
     assert r.status_code == 200
 
-    assert get_state(client) == "PR_OPEN"
+    assert get_state(usersession) == "PR_OPEN"
 
 
 # # Tests with real GitHub # #
 
 
 @pytest.mark.skipif(not pytest.run_ghpr, reason="use --ghpr to run")
-def test_ghpr_checkout_update_submit(clean_workdir, client, usersession, tmp_path):
-    _test_checkout_update_submit(client, tmp_path)
+def test_ghpr_checkout_update_submit(clean_workdir, usersession, tmp_path):
+    _test_checkout_update_submit(usersession, tmp_path)
     # This is a *real* PR
-    r = list_global(client, usersession)
+    r = list_global(usersession)
     assert r["state"] == "PR_OPEN"
 
 
 # # Prioritization management # #
 
 
-def test_url_priorities_crud(client, adminsession, url_prio_tblready):
+def test_url_priorities_crud(adminsession, url_prio_tblready):
     def match(url):
         # count how many times `url` appears in the list
         exp = {
@@ -364,7 +356,7 @@ def test_url_priorities_crud(client, adminsession, url_prio_tblready):
             "priority": 100,
             "url": url,
         }
-        r = client.get("/api/_/url-priorities/list")
+        r = adminsession.get("/api/_/url-priorities/list")
         assert r.status_code == 200, r.json
         match = [x for x in r.json["rules"] if x == exp]
         return len(match)
@@ -372,18 +364,18 @@ def test_url_priorities_crud(client, adminsession, url_prio_tblready):
     assert match("INTEG-TEST") == 0
     assert match("INTEG-TEST2") == 0
 
-    r = client.get("/api/_/url-priorities/list")
+    r = adminsession.get("/api/_/url-priorities/list")
     assert r.status_code == 200, r.json
     assert len(r.json["rules"]) > 20
 
     d = dict()
-    r = client.post("/api/_/url-priorities/update", json=d)
+    r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 400, r.json
 
     # Create
     xxx = dict(category_code="NEWS", priority=100, url="INTEG-TEST")
     d = dict(new_entry=xxx)
-    r = client.post("/api/_/url-priorities/update", json=d)
+    r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json
 
     # Ensure the new entry is present
@@ -391,20 +383,20 @@ def test_url_priorities_crud(client, adminsession, url_prio_tblready):
 
     # Fail to create a duplicate
     d = dict(new_entry=xxx)
-    r = client.post("/api/_/url-priorities/update", json=d)
+    r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 400, r.json
 
     # Update (change URL)
     yyy = dict(category_code="NEWS", priority=100, url="INTEG-TEST2")
     d = dict(old_entry=xxx, new_entry=yyy)
-    r = client.post("/api/_/url-priorities/update", json=d)
+    r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json
     assert match("INTEG-TEST") == 0
     assert match("INTEG-TEST2") == 1
 
     # Delete
     d = dict(old_entry=yyy)
-    r = client.post("/api/_/url-priorities/update", json=d)
+    r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json
     assert r.json == 1
 
@@ -427,13 +419,13 @@ def test_x(client, adminsession):
     yyy = dict(category_code="NEWS", priority=5, domain="www.leggo.it")
     zzz = dict(cc="it", priority=3, url="http://www.leggo.it/")
 
-    post(client, "/api/_/url-priorities/update", old_entry=xxx)
-    post(client, "/api/_/url-priorities/update", old_entry=yyy)
-    post(client, "/api/_/url-priorities/update", old_entry=zzz)
+    post(adminsession, "/api/_/url-priorities/update", old_entry=xxx)
+    post(adminsession, "/api/_/url-priorities/update", old_entry=yyy)
+    post(adminsession, "/api/_/url-priorities/update", old_entry=zzz)
 
-    post200(client, "/api/_/url-priorities/update", new_entry=xxx)
-    post200(client, "/api/_/url-priorities/update", new_entry=yyy)
-    post200(client, "/api/_/url-priorities/update", new_entry=zzz)
+    post200(adminsession, "/api/_/url-priorities/update", new_entry=xxx)
+    post200(adminsession, "/api/_/url-priorities/update", new_entry=yyy)
+    post200(adminsession, "/api/_/url-priorities/update", new_entry=zzz)
 
     ## XXX currently broken
     # r = client.get("/api/_/url-priorities/WIP")
@@ -442,9 +434,9 @@ def test_x(client, adminsession):
     #    if e["category_code"] == "NEWS" and e["cc"] == "it" and e["url"] == 'http://www.leggo.it/':
     #        assert e["priority"] == 118  # 4 rules matched
 
-    post200(client, "/api/_/url-priorities/update", old_entry=xxx)
-    post200(client, "/api/_/url-priorities/update", old_entry=yyy)
-    post200(client, "/api/_/url-priorities/update", old_entry=zzz)
+    post200(adminsession, "/api/_/url-priorities/update", old_entry=xxx)
+    post200(adminsession, "/api/_/url-priorities/update", old_entry=yyy)
+    post200(adminsession, "/api/_/url-priorities/update", old_entry=zzz)
 
 
 def test_url_prioritization(client):
