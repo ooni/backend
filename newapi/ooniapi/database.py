@@ -62,11 +62,8 @@ def _run_query(query: Query, query_params: dict, query_prio=3):
             query, query_params, with_column_types=True, settings=settings
         )
     except clickhouse_driver.errors.ServerException as e:
-        title = e.message.splitlines()[0]
-        if title.startswith("DB::Exception"):
-            log.info(e.message)
-            title = title.split(" ", 1)[1]
-        raise Exception(title)
+        log.info(e.message)
+        raise Exception("Database query error")
 
     rows, coldata = q
     colnames, coltypes = tuple(zip(*coldata))
