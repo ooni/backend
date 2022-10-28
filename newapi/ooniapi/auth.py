@@ -367,6 +367,8 @@ def user_refresh_token() -> Response:
     log = current_app.logger
     tok = get_client_token()
     # @role_required already checked for expunged tokens
+    if not tok:
+        return jerror("Invalid credentials", code=401)
     newtoken = _create_session_token(tok["account_id"], tok["role"], tok["login_time"])
     log.debug("user token refresh successful")
     return nocachejson(bearer=newtoken)
