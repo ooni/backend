@@ -142,13 +142,6 @@ def _register_and_login(client, email_address):
     assert r.status_code == 200, r.json
     assert r.json["redirect_to"] == "https://explorer.ooni.org"
     assert "bearer" in r.json
-    cookies = r.headers.getlist("Set-Cookie")
-    assert len(cookies) == 1
-    c = cookies[0]
-    assert c.startswith("ooni=")
-    assert c.endswith("; Secure; HttpOnly; SameSite=None; Path=/")
-    # client.cookie_jar.clear()  # temporary
-
     return {"Authorization": "Bearer " + r.json["bearer"]}
 
 
@@ -158,10 +151,8 @@ def test_user_register_and_logout(client, mocksmtp):
     }  # not logged in
     h = _register_and_login(client, user_e)
     j = client.get("/api/_/account_metadata", headers=h).json
-    assert j == {'logged_in': True, 'role': 'user'}  # logged in
-    r = client.post("/api/v1/user_logout", headers=j)
-    assert r.status_code == 200
-    # FIXME: simulates logout
+    assert j == {"logged_in": True, "role": "user"}  # logged in
+    # simulate logout by not using the token in variable "h"
     j = client.get("/api/_/account_metadata").json
     assert j == {"logged_in": False}
 
@@ -184,7 +175,7 @@ def test_role_set_not_allowed(client, mocksmtp):
 
     # We are logged in with role "user" and still not allowed to call this
     d = dict(email_address=admin_e, role="admin")
-    r = client.post("/api/v1/set_account_role", json=d)
+    r = client.post("/api/v1/set_account_role", json=d, headers=h)
     assert r.status_code == 401
 
     r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
@@ -196,30 +187,32 @@ def test_role_set_multiple(client, mocksmtp, integtest_admin):
 
     # We are logged in with role "admin"
     d = dict(email_address=admin_e, role="admin")
-    r = client.post("/api/v1/set_account_role", json=d)
+    r = client.post("/api/v1/set_account_role", json=d, headers=h)
     assert r.status_code == 200, r.json
 
     d = dict(email_address="BOGUS_EMAIL_ADDR", role="admin")
-    r = client.post("/api/v1/set_account_role", json=d)
+    r = client.post("/api/v1/set_account_role", json=d, headers=h)
     assert r.status_code == 400
 
     d = dict(email_address=admin_e, role="BOGUS_ROLE")
-    r = client.post("/api/v1/set_account_role", json=d)
+    r = client.post("/api/v1/set_account_role", json=d, headers=h)
     assert r.status_code == 400
 
-    r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
+    r = client.get("/api/v1/get_account_role/integtest@openobservatory.org", headers=h)
     assert r.status_code == 200
     assert r.json == {"role": "admin"}
 
-    r = client.get("/api/v1/get_account_role/BOGUS_EMAIL_ADDR")
+    r = client.get("/api/v1/get_account_role/BOGUS_EMAIL_ADDR", headers=h)
     assert r.status_code == 400
 
-    r = client.get("/api/v1/get_account_role/valid_but_not_found@example.org")
+    r = client.get(
+        "/api/v1/get_account_role/valid_but_not_found@example.org", headers=h
+    )
     assert r.status_code == 400
     assert r.json == {"error": "Account not found"}
 
     d = dict(email_address=admin_e, role="user")
-    r = client.post("/api/v1/set_account_role", json=d)
+    r = client.post("/api/v1/set_account_role", json=d, headers=h)
     assert r.status_code == 200
 
 
@@ -240,11 +233,13 @@ def test_role_set_with_expunged_token(client, mocksmtp, integtest_admin):
     assert r.status_code == 401
 
 
-def decode_token(client):
-    # Decode JWT token in the cookie jar
-    assert len(client.cookie_jar) == 1
-    cookie = list(client.cookie_jar)[0].value
-    tok = ooniapi.auth.decode_jwt(cookie, audience="user_auth")
+def decode_token(header):
+    # mimics auth.py:get_client_token()
+    assert isinstance(header, dict)
+    bt = header["Authorization"]
+    assert bt.startswith("Bearer ")
+    raw_token = bt[7:]
+    tok = ooniapi.auth.decode_jwt(raw_token, audience="user_auth")
     return tok
 
 
@@ -255,7 +250,7 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
     with freeze_time("2012-01-14"):
         ooniapi.auth._remove_from_session_expunge(admin_e)
         h = _register_and_login(client, admin_e)
-        tok = decode_token(client)
+        tok = decode_token(h)
         assert tok == {
             "nbf": 1326499200,
             "iat": 1326499200,
@@ -265,18 +260,21 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
             "login_time": 1326499200,
             "role": "admin",
         }
-        r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
+        r = client.get(
+            "/api/v1/get_account_role/integtest@openobservatory.org", headers=h
+        )
         assert r.status_code == 200
 
     with freeze_time("2012-01-15"):
-        # The session is still valid but the token will be replaced
-        r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
+        r = client.get(
+            "/api/v1/get_account_role/integtest@openobservatory.org", headers=h
+        )
         assert r.status_code == 200
         assert r.json == {"role": "admin"}
-        assert decode_token(client) == {
-            "nbf": 1326585600,
-            "iat": 1326585600,
-            "exp": 1326758400,
+        assert decode_token(h) == {
+            "nbf": 1326499200,
+            "iat": 1326499200,
+            "exp": 1326672000,
             "aud": "user_auth",
             "account_id": "71e398652ecfb1be6a2359923c7df008",
             "login_time": 1326499200,
@@ -285,7 +283,9 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
 
     with freeze_time("2012-02-01"):
         # The login is expired
-        r = client.get("/api/v1/get_account_role/integtest@openobservatory.org")
+        r = client.get(
+            "/api/v1/get_account_role/integtest@openobservatory.org", headers=h
+        )
         assert r.status_code == 401
 
 
@@ -330,18 +330,18 @@ def test_msmt_feedback_submit_valid_and_get(client, mocksmtp, msmt_tbl):
     # Log in as user
     h = _register_and_login(client, user_e)
     d = dict(status="ok", measurement_uid="bogus_uid")
-    r = client.post("/api/_/measurement_feedback", json=d)
+    r = client.post("/api/_/measurement_feedback", json=d, headers=h)
     assert r.json == {}, r.json
 
     # Read it back
-    r = client.get("/api/_/measurement_feedback/bogus_uid")
+    r = client.get("/api/_/measurement_feedback/bogus_uid", headers=h)
     assert r.json == {"summary": {"blocked": 1, "ok": 3}, "user_feedback": "ok"}
 
     # Change feedback
     d = dict(status="blocked", measurement_uid="bogus_uid")
-    r = client.post("/api/_/measurement_feedback", json=d)
+    r = client.post("/api/_/measurement_feedback", json=d, headers=h)
     assert r.json == {}, r.json
 
     # Read it back again
-    r = client.get("/api/_/measurement_feedback/bogus_uid")
+    r = client.get("/api/_/measurement_feedback/bogus_uid", headers=h)
     assert r.json == {"summary": {"blocked": 2, "ok": 2}, "user_feedback": "blocked"}
