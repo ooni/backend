@@ -73,6 +73,7 @@ def create_jwt(payload: dict) -> str:
 
 
 def decode_jwt(token: str, **kw) -> Dict[str, Any]:
+    # raises ExpiredSignatureError on expiration
     key = current_app.config["JWT_ENCRYPTION_KEY"]
     return jwt.decode(token, key, algorithms=["HS256"], **kw)
 
@@ -86,7 +87,6 @@ def hash_email_address(email_address: str) -> str:
 def role_required(roles):
     # Decorator requiring user to be logged in and have the right role.
     # Also:
-    #  refreshes the session cookie if needed
     #  explicitely set no-cache headers
     #  apply the cross_origin decorator to:
     #    - set CORS header to a trusted URL
@@ -106,6 +106,7 @@ def role_required(roles):
                 if tok["role"] not in roles:
                     return jerror("Role not authorized", 401)
             except Exception:
+                # catches ExpiredSignatureError
                 return jerror("Authentication required", 401)
 
             # check for session expunge
@@ -122,6 +123,9 @@ def role_required(roles):
                 if iat < threshold:
                     return jerror("Authentication token expired", 401)
 
+            # If needed we can add here a 2-tier expiration time: long for
+            # /api/v1/user_refresh_token and short for everything else
+
             # attach account_id to request
             request._account_id = account_id
             # run the HTTP route method
@@ -129,14 +133,6 @@ def role_required(roles):
             # Prevent an authenticated page to be cached and served to
             # unauthorized users
             resp.cache_control.no_cache = True
-
-            token_age = time.time() - tok["iat"]
-            if token_age > 600:  # refresh token if needed
-                newtoken = _create_session_token(
-                    tok["account_id"], tok["role"], tok["login_time"]
-                )
-                # FIXME
-
             return resp
 
         return wrapper
@@ -145,7 +141,7 @@ def role_required(roles):
 
 
 def get_client_token() -> Optional[Dict]:
-    # Return decoded JWT from client
+    # Returns decoded JWT from client or raises ExpiredSignatureError
     try:
         bt = request.headers.get("Authorization", "")
         if bt.startswith("Bearer "):
@@ -324,7 +320,7 @@ def _create_session_token(account_id: str, role: str, login_time=None) -> str:
 @auth_blueprint.route("/api/v1/user_login", methods=["GET"])
 @cross_origin(origins=origins, supports_credentials=True)
 def user_login() -> Response:
-    """Probe Services: login using a registration/login link
+    """Auth Services: login using a registration/login link
     ---
     parameters:
       - name: k
@@ -354,7 +350,26 @@ def user_login() -> Response:
     token = _create_session_token(dec["account_id"], role)
     r = make_response(jsonify(redirect_to=redirect_to, bearer=token), 200)
     r.cache_control.no_cache = True
+    # TODO: use nocachejson
     return r
+
+
+@metrics.timer("user_refresh_token")
+@auth_blueprint.route("/api/v1/user_refresh_token", methods=["GET"])
+@role_required(["admin", "user"])
+def user_refresh_token() -> Response:
+    """Auth services: refresh user token
+    ---
+    responses:
+      200:
+        description: JSON with "bearer" key
+    """
+    log = current_app.logger
+    tok = get_client_token()
+    # @role_required already checked for expunged tokens
+    newtoken = _create_session_token(tok["account_id"], tok["role"], tok["login_time"])
+    log.debug("user token refresh successful")
+    return nocachejson(bearer=newtoken)
 
 
 # TODO: add table setup
