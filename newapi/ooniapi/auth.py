@@ -341,6 +341,8 @@ def user_login() -> Response:
         return jerror("Invalid credential signature", code=401)
     except jwt.exceptions.DecodeError:
         return jerror("Invalid credentials", code=401)
+    except jwt.exceptions.ExpiredSignatureError:
+        return jerror("Expired token", code=401)
 
     log.info("user login successful")
     # Store account role in token to prevent frequent DB lookups
