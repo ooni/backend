@@ -477,7 +477,9 @@ def get_account_metadata() -> Response:
           type: object
     """
     try:
-        tok = get_client_token() or {}
+        tok = get_client_token()
+        if not tok:
+            raise Exception()
         return nocachejson(logged_in=True, role=tok["role"])
     except Exception:
         resp = make_response(jsonify(logged_in=False), 401)
