@@ -199,8 +199,8 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
                 "blocking_type": "",
                 "confirmed_count": 0,
                 "failure_count": 717,
-                "measurement_count": 9622,
-                "ok_count": 8534,
+                "measurement_count": 9625,
+                "ok_count": 8537,
             },
             {
                 "anomaly_count": 94,
