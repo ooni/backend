@@ -75,7 +75,8 @@ def create_jwt(payload: dict) -> str:
 def decode_jwt(token: str, **kw) -> Dict[str, Any]:
     # raises ExpiredSignatureError on expiration
     key = current_app.config["JWT_ENCRYPTION_KEY"]
-    return jwt.decode(token, key, algorithms=["HS256"], **kw)
+    tok = jwt.decode(token, key, algorithms=["HS256"], **kw)
+    return tok  # type: ignore
 
 
 def hash_email_address(email_address: str) -> str:
