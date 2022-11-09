@@ -573,15 +573,16 @@ def test_score_openvpn():
 
 def test_bug_backend351():
     # https://api.ooni.io/api/v1/measurement/temp-id-386770148
-    msm = loadj("openvpn")
+    msm = loadj("bug_351")
     scores = fp.score_measurement(msm)
     assert scores == {
-        "blocking_general": 0.0,
+        "blocking_general": 1.0,
         "blocking_global": 0.0,
         "blocking_country": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"test_runtime": 33.264747693},
+        "analysis": {"blocking_type": "http-failure"},
+        "accuracy": 0.0,
     }
 
 
