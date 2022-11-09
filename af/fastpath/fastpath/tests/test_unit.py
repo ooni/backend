@@ -556,7 +556,7 @@ def test_score_torsf2():
 
 
 def test_score_openvpn():
-    msm = loadj("torsf_2")
+    msm = loadj("openvpn")
     scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_country": 0.0,
@@ -564,10 +564,8 @@ def test_score_openvpn():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"bootstrap_time": 78.980935917, "test_runtime": 79.196301917},
+        "extra": {"test_runtime": 32.003161366},
     }
-
-
 
 
 # # Bug tests
