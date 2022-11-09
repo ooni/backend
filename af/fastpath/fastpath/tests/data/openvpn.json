@@ -2,84 +2,87 @@
   "annotations": {
     "architecture": "amd64",
     "engine_name": "ooniprobe-engine",
-    "engine_version": "3.16.0-alpha",
+    "engine_version": "3.17.0-alpha",
     "platform": "linux"
   },
   "data_format_version": "0.2.0",
-  "input": "vpn://openvpn.tunnelbear/?addr=212.129.18.154:443&transport=tcp",
-  "measurement_start_time": "2022-09-14 14:37:33",
+  "input": "vpn://openvpn.riseup/?addr=51.158.144.32:80&transport=tcp&obfs=none",
+  "measurement_start_time": "2022-10-21 09:12:18",
   "options": [
-    "Compress=comp-lzo-no",
+    "Obfuscation=none",
     "Cipher=AES-256-GCM",
-    "Auth=SHA256"
+    "Auth=SHA512",
+    "Compress="
   ],
-  "probe_asn": "AS29119",
-  "probe_cc": "ES",
+  "probe_asn": "AS4242",
+  "probe_cc": "UK",
   "probe_ip": "127.0.0.1",
-  "probe_network_name": "ServiHosting Networks S.L.",
-  "report_id": "20220914T143834Z_openvpn_ES_29119_n1_FV0tbY8ohK67hFQe",
-  "resolver_asn": "AS15169",
-  "resolver_ip": "172.253.2.197",
+  "probe_network_name": "UltraLettuce Networks S.L.",
+  "report_id": "",
+  "resolver_asn": "A3232",
+  "resolver_ip": "142.211.2.197",
   "resolver_network_name": "Google LLC",
   "software_name": "miniooni",
-  "software_version": "3.16.0-alpha",
+  "software_version": "3.17.0-alpha",
   "test_keys": {
-    "provider": "tunnelbear",
+    "provider": "riseup",
     "vpn_protocol": "openvpn",
     "transport": "tcp",
-    "remote": "212.129.18.154:443",
+    "remote": "51.158.144.32:80",
     "obfuscation": "none",
-    "bootstrap_time": 1.46414319,
+    "bootstrap_time": 0.37221659,
     "stages": [
       {
         "op_id": 0,
         "operation": "ready",
-        "t": 0.074
+        "t": 0.145
       },
       {
         "op_id": 1,
         "operation": "dial_done",
-        "t": 58.074
+        "t": 45.381
       },
       {
         "op_id": 3,
         "operation": "reset",
-        "t": 58.08
+        "t": 45.545
       },
       {
         "op_id": 4,
         "operation": "tls_conn",
-        "t": 112.646
+        "t": 100.436
       },
       {
         "op_id": 5,
         "operation": "tls_handshake",
-        "t": 112.65
+        "t": 100.437
       },
       {
         "op_id": 6,
         "operation": "tls_handshake_done",
-        "t": 291.535
+        "t": 155.885
       },
       {
         "op_id": 7,
         "operation": "data_init",
-        "t": 1464.16
+        "t": 372.136
       },
       {
         "op_id": 8,
         "operation": "vpn_handshake_done",
-        "t": 1464.163
+        "t": 372.14
       }
     ],
     "tcp_connect": {
-      "ip": "212.129.18.154",
-      "port": 443,
+      "ip": "51.158.144.32",
+      "port": 80,
       "status": {
         "failure": null,
         "success": true
       },
-      "t": 0.057904911
+      "t0": 0.000239501,
+      "t": 0.045310671,
+      "transaction_id": 1
     },
     "failure": null,
     "error": null,
@@ -89,123 +92,123 @@
         "sequence": [
           {
             "seq": 1,
-            "ttl": 118,
-            "rtt": 55.759
+            "ttl": 113,
+            "rtt": 62.61
           },
           {
             "seq": 2,
-            "ttl": 118,
-            "rtt": 55.884
+            "ttl": 113,
+            "rtt": 56.555
           },
           {
             "seq": 3,
-            "ttl": 118,
-            "rtt": 56.886
+            "ttl": 113,
+            "rtt": 57.764
           },
           {
             "seq": 4,
-            "ttl": 118,
-            "rtt": 55.576
+            "ttl": 113,
+            "rtt": 67.85
           },
           {
             "seq": 5,
-            "ttl": 118,
-            "rtt": 55.86
+            "ttl": 113,
+            "rtt": 64.811
           },
           {
             "seq": 6,
-            "ttl": 118,
-            "rtt": 55.913
+            "ttl": 113,
+            "rtt": 60.47
           },
           {
             "seq": 7,
-            "ttl": 118,
-            "rtt": 58.362
+            "ttl": 113,
+            "rtt": 64.607
           },
           {
             "seq": 8,
-            "ttl": 118,
-            "rtt": 55.855
+            "ttl": 113,
+            "rtt": 56.477
           },
           {
             "seq": 9,
-            "ttl": 118,
-            "rtt": 56.185
+            "ttl": 113,
+            "rtt": 60.208
           },
           {
             "seq": 10,
-            "ttl": 118,
-            "rtt": 56.031
+            "ttl": 113,
+            "rtt": 57.909
           }
         ],
         "pkt_rcv": 10,
         "pkt_snt": 10,
-        "min_rtt": 55.576,
-        "max_rtt": 58.362,
-        "avg_rtt": 56.231,
-        "std_rtt": 0.785,
+        "min_rtt": 56.477,
+        "max_rtt": 67.85,
+        "avg_rtt": 60.926,
+        "std_rtt": 3.717,
         "error": null
       },
       {
-        "target": "172.18.10.1",
+        "target": "10.41.0.1",
         "sequence": [
           {
             "seq": 1,
             "ttl": 64,
-            "rtt": 53.697
+            "rtt": 51.771
           },
           {
             "seq": 2,
             "ttl": 64,
-            "rtt": 53.723
+            "rtt": 51.983
           },
           {
             "seq": 3,
             "ttl": 64,
-            "rtt": 54.202
+            "rtt": 56.588
           },
           {
             "seq": 4,
             "ttl": 64,
-            "rtt": 53.576
+            "rtt": 60.096
           },
           {
             "seq": 5,
             "ttl": 64,
-            "rtt": 53.672
+            "rtt": 51.718
           },
           {
             "seq": 6,
             "ttl": 64,
-            "rtt": 56.197
+            "rtt": 48.734
           },
           {
             "seq": 7,
             "ttl": 64,
-            "rtt": 58.457
+            "rtt": 52.531
           },
           {
             "seq": 8,
             "ttl": 64,
-            "rtt": 54.06
+            "rtt": 52.642
           },
           {
             "seq": 9,
             "ttl": 64,
-            "rtt": 54.048
+            "rtt": 52.106
           },
           {
             "seq": 10,
             "ttl": 64,
-            "rtt": 54.275
+            "rtt": 107.01
           }
         ],
         "pkt_rcv": 10,
         "pkt_snt": 10,
-        "min_rtt": 53.576,
-        "max_rtt": 58.457,
-        "avg_rtt": 54.591,
-        "std_rtt": 1.476,
+        "min_rtt": 48.734,
+        "max_rtt": 107.01,
+        "avg_rtt": 58.518,
+        "std_rtt": 16.43,
         "error": null
       },
       {
@@ -213,61 +216,61 @@
         "sequence": [
           {
             "seq": 1,
-            "ttl": 55,
-            "rtt": 323.258
+            "ttl": 54,
+            "rtt": 329.409
           },
           {
             "seq": 2,
-            "ttl": 55,
-            "rtt": 322.859
+            "ttl": 54,
+            "rtt": 333.689
           },
           {
             "seq": 3,
-            "ttl": 55,
-            "rtt": 322.794
+            "ttl": 54,
+            "rtt": 340.251
           },
           {
             "seq": 4,
-            "ttl": 55,
-            "rtt": 323.622
+            "ttl": 54,
+            "rtt": 379.311
           },
           {
             "seq": 5,
-            "ttl": 55,
-            "rtt": 322.789
+            "ttl": 54,
+            "rtt": 327.153
           },
           {
             "seq": 6,
-            "ttl": 55,
-            "rtt": 323
+            "ttl": 54,
+            "rtt": 331.392
           },
           {
             "seq": 7,
-            "ttl": 55,
-            "rtt": 322.96
+            "ttl": 54,
+            "rtt": 330.347
           },
           {
             "seq": 8,
-            "ttl": 55,
-            "rtt": 323.48
+            "ttl": 54,
+            "rtt": 335.409
           },
           {
             "seq": 9,
-            "ttl": 55,
-            "rtt": 323.287
+            "ttl": 54,
+            "rtt": 342.488
           },
           {
             "seq": 10,
-            "ttl": 55,
-            "rtt": 322.618
+            "ttl": 54,
+            "rtt": 334.934
           }
         ],
         "pkt_rcv": 10,
         "pkt_snt": 10,
-        "min_rtt": 322.618,
-        "max_rtt": 323.622,
-        "avg_rtt": 323.067,
-        "std_rtt": 0.312,
+        "min_rtt": 327.153,
+        "max_rtt": 379.311,
+        "avg_rtt": 338.438,
+        "std_rtt": 14.347,
         "error": null
       }
     ],
@@ -280,7 +283,7 @@
           "headers": {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
           }
         },
         "response": {
@@ -289,21 +292,21 @@
             "connection": "keep-alive",
             "content-length": "23",
             "content-type": "application/json",
-            "date": "Wed, 14 Sep 2022 14:38:33 GMT",
+            "date": "Fri, 21 Oct 2022 09:12:18 GMT",
             "server": "Cowboy",
             "vary": "Origin",
             "via": "1.1 vegur"
           },
           "body": {
-            "data": "eyJpcCI6IjIxMi4xMjkuMTguMTU0In0=",
+            "data": "eyJpcCI6IjIxMi44My4xODIuMTI3In0=",
             "format": "base64"
           },
           "body_is_truncated": false,
           "x_body_length": 23,
           "x_body_is_utf8": true
         },
-        "t": 0.680102537,
-        "started": 0.000193589,
+        "t": 0.558008438,
+        "started": 8.3589e-05,
         "oddity": ""
       },
       {
@@ -314,7 +317,7 @@
           "headers": {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
           }
         },
         "response": {
@@ -325,11 +328,11 @@
             "bfcache-opt-in": "unload",
             "cache-control": "private, max-age=0",
             "content-type": "text/html; charset=UTF-8",
-            "date": "Wed, 14 Sep 2022 14:38:34 GMT",
+            "date": "Fri, 21 Oct 2022 09:12:18 GMT",
             "expires": "-1",
             "p3p": "CP=\"This is not a P3P policy! See g.co/p3phelp for more info.\"",
             "server": "gws",
-            "set-cookie": "AEC=AakniGPEG6gyIhIBrlBQ_yP4PUtIlSO9DI5ytXPcuocQJXYdq3CQsywnXy8; expires=Mon, 13-Mar-2023 14:38:34 GMT; path=/; domain=.google.com; Secure; HttpOnly; SameSite=lax",
+            "set-cookie": "AEC=AakniGMtY-ydpeSb5yT257GdEdNMWQOR4oobqcvRp4OtODlkSKzyPqeTkg; expires=Wed, 19-Apr-2023 09:12:18 GMT; path=/; domain=.google.com; Secure; HttpOnly; SameSite=lax",
             "strict-transport-security": "max-age=31536000",
             "x-frame-options": "SAMEORIGIN",
             "x-xss-protection": "0"
@@ -342,8 +345,8 @@
           "x_body_length": 100,
           "x_body_is_utf8": true
         },
-        "t": 1.093790481,
-        "started": 0.680299538,
+        "t": 0.946926271,
+        "started": 0.558104205,
         "oddity": ""
       }
     ],
@@ -352,7 +355,7 @@
     "success": true
   },
   "test_name": "openvpn",
-  "test_runtime": 33.264747693,
-  "test_start_time": "2022-09-14 14:37:00",
-  "test_version": "0.0.11"
+  "test_runtime": 32.003161366,
+  "test_start_time": "2022-10-21 09:11:46",
+  "test_version": "0.0.12"
 }
