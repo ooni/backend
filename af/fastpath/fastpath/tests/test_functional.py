@@ -1113,8 +1113,10 @@ def test_score_signal():
         scores = fp.score_measurement(msm)
         assert scores
         rid = msm["report_id"]
+        # Temporarily flag all msmts as failed
         if rid == "20210427T023145Z_signal_CN_24400_n1_ynto2TVYXtqxhtOo":
             assert scores == {
+                "accuracy": 0.0,
                 "analysis": {"signal_backend_failure": "generic_timeout_error"},
                 "blocking_general": 1.0,
                 "blocking_global": 0.0,
@@ -1124,6 +1126,7 @@ def test_score_signal():
             }
         elif rid == "20210427T000430Z_signal_AU_45671_n1_Zq1z77FuiG2IkqqC":
             assert scores == {
+                "accuracy": 0.0,
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
