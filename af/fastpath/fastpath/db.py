@@ -284,34 +284,44 @@ def clickhouse_upsert_openvpn_obs(
     tk = dget_or(msm, "test_keys", {})
 
     anomaly = nn(msm, "success") == True
-    tcp_connect_status_success = "t" #FIXME
+    tcp_connect_status_success = True  # FIXME
+    success = bool(nn(tk, "success"))
+    resolver_asn_str = nn(msm, "resolver_asn")
+    try:
+        if resolver_asn_str.startswith("AS"):
+            resolver_asn = int(resolver_asn_str[2:])
+        else:
+            resolver_asn = int(resolver_asn_str)
+    except Exception:
+        resolver_asn = 0
+
     row = dict(
-      anomaly = anomaly,
-      bootstrap_time = dget_or(tk, "bootstrap_time", 0),
-      confirmed = "f",
-      error = nn(msm, "error"),
-      failure = nn(msm, "failure"),
-      input = nn(msm, "input"),
-      measurement_start_time = measurement_start_time,
-      measurement_uid = measurement_uid,
-      obfuscation = nn(tk, "obfuscation"),
-      platform = nn(msm, "platform"),
-      probe_asn = asn,
-      probe_cc = nn(msm, "probe_cc"),
-      probe_network_name = nn(msm, "probe_network_name"),
-      provider = nn(tk, "provider"),
-      remote = nn(tk, "remote"),
-      report_id = nn(msm, "report_id"),
-      resolver_asn = nn(msm, "resolver_asn"),
-      resolver_ip = nn(msm, "resolver_ip"),
-      resolver_network_name = nn(msm, "resolver_network_name"),
-      software_name = nn(msm, "software_name"),
-      software_version = nn(msm, "software_version"),
-      success = nn(msm, "success"),
-      tcp_connect_status_success = tcp_connect_status_success,
-      test_runtime = dget_or(msm, "test_runtime", 0),
-      test_start_time = test_start_time,
-      transport = nn(tk, "transport")
+        anomaly=anomaly,
+        bootstrap_time=dget_or(tk, "bootstrap_time", 0),
+        confirmed=False,
+        error=nn(msm, "error"),
+        failure=False,
+        input=nn(msm, "input"),
+        measurement_start_time=measurement_start_time,
+        measurement_uid=measurement_uid,
+        obfuscation=nn(tk, "obfuscation"),
+        platform=nn(msm, "platform"),
+        probe_asn=asn,
+        probe_cc=nn(msm, "probe_cc"),
+        probe_network_name=nn(msm, "probe_network_name"),
+        provider=nn(tk, "provider"),
+        remote=nn(tk, "remote"),
+        report_id=nn(msm, "report_id"),
+        resolver_asn=resolver_asn,
+        resolver_ip=nn(msm, "resolver_ip"),
+        resolver_network_name=nn(msm, "resolver_network_name"),
+        software_name=nn(msm, "software_name"),
+        software_version=nn(msm, "software_version"),
+        success=success,
+        tcp_connect_status_success=tcp_connect_status_success,
+        test_runtime=dget_or(msm, "test_runtime", 0),
+        test_start_time=test_start_time,
+        transport=nn(tk, "transport"),
     )
 
     settings = {"priority": 5}
