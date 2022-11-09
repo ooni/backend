@@ -1,3 +1,9 @@
+fastpath (0.66) unstable; urgency=medium
+
+  * OpenVPN scoring and observation table MVP
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 09 Nov 2022 18:57:04 +0100
+
 fastpath (0.64) unstable; urgency=medium
 
   * Temporary workaround for whatsapp
