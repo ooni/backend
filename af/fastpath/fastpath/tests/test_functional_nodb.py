@@ -82,26 +82,27 @@ def test_score_openvpn():
     assert exe.call_count == 2
     query, qparams = exe.call_args_list[0].args
     query = query.replace("\n", " ").replace("  ", " ")
+    # The report_id is empty in the test data
     query_exp = "INSERT INTO fastpath ( measurement_uid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, scores, platform, anomaly, confirmed, msm_failure, domain, software_name, software_version ) VALUES "
     assert query == query_exp
     assert qparams == [
         [
             "bogus_uid",
-            "20220914T143834Z_openvpn_ES_29119_n1_FV0tbY8ohK67hFQe",
-            "vpn://openvpn.tunnelbear/?addr=212.129.18.154:443&transport=tcp",
-            "ES",
-            29119,
+            "",
+            "vpn://openvpn.riseup/?addr=51.158.144.32:80&transport=tcp&obfs=none",
+            "UK",
+            4242,
             "openvpn",
-            datetime.datetime(2022, 9, 14, 14, 37),
-            datetime.datetime(2022, 9, 14, 14, 37, 33),
-            '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"extra":{"test_runtime":33.264747693}}',
+            datetime.datetime(2022, 10, 21, 9, 11, 46),
+            datetime.datetime(2022, 10, 21, 9, 12, 18),
+            '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"extra":{"test_runtime":32.003161366}}',
             "",
             "f",
             "f",
             "f",
-            "openvpn.tunnelbear",
+            "openvpn.riseup",
             "miniooni",
-            "3.16.0-alpha",
+            "3.17.0-alpha",
         ]
     ]
 
@@ -111,30 +112,30 @@ def test_score_openvpn():
     assert qparams == [
         {
             "anomaly": False,
-            "bootstrap_time": 1.46414319,
+            "bootstrap_time": 0.37221659,
             "confirmed": "f",
             "error": "",
             "failure": "",
-            "input": "vpn://openvpn.tunnelbear/?addr=212.129.18.154:443&transport=tcp",
-            "measurement_start_time": datetime.datetime(2022, 9, 14, 14, 37, 33),
+            "input": "vpn://openvpn.riseup/?addr=51.158.144.32:80&transport=tcp&obfs=none",
+            "measurement_start_time": datetime.datetime(2022, 10, 21, 9, 12, 18),
             "measurement_uid": "bogus_uid",
             "obfuscation": "none",
             "platform": "",
-            "probe_asn": 29119,
-            "probe_cc": "ES",
-            "probe_network_name": "ServiHosting Networks S.L.",
-            "provider": "tunnelbear",
-            "remote": "212.129.18.154:443",
-            "report_id": "20220914T143834Z_openvpn_ES_29119_n1_FV0tbY8ohK67hFQe",
-            "resolver_asn": "AS15169",
-            "resolver_ip": "172.253.2.197",
+            "probe_asn": 4242,
+            "probe_cc": "UK",
+            "probe_network_name": "UltraLettuce Networks S.L.",
+            "provider": "riseup",
+            "remote": "51.158.144.32:80",
+            "report_id": "",
+            "resolver_asn": "A3232",
+            "resolver_ip": "142.211.2.197",
             "resolver_network_name": "Google LLC",
             "software_name": "miniooni",
-            "software_version": "3.16.0-alpha",
+            "software_version": "3.17.0-alpha",
             "success": "",
             "tcp_connect_status_success": "t",
-            "test_runtime": 33.264747693,
-            "test_start_time": datetime.datetime(2022, 9, 14, 14, 37),
+            "test_runtime": 32.003161366,
+            "test_start_time": datetime.datetime(2022, 10, 21, 9, 11, 46),
             "transport": "tcp",
-        }
+        },
     ]

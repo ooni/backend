@@ -49,6 +49,7 @@ from fastpath.metrics import setup_metrics
 import fastpath.portable_queue as queue
 
 import fastpath.utils
+from fastpath.utils import dget_or as g_or
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
@@ -376,13 +377,6 @@ def match_fingerprints(measurement) -> list:
                 log.debug("matched header prefix %s %r", msm_cc, prefix)
 
     return matches
-
-
-def g_or(d: dict, key: str, default):
-    """Dict getter: return 'default' if the key is missing or value is None"""
-    # Note: 'd.get(key) or default' returns 'default' on any falsy value
-    v = d.get(key)
-    return default if v is None else v
 
 
 def g(d, *keys, default=None):
@@ -1424,19 +1418,14 @@ def score_riseupvpn(msm: dict) -> dict:
 
 
 def score_openvpn(msm: dict) -> dict:
+    # Based on discussion with Ain on 2022-11-09. We are going to implement
+    # more complex scoring when the test is stable
     scores = init_scores()
-    tk = g_or(msm, "test_keys", {})
-    tstatus = tk.get("transport_status") or {}
-    obfs4 = tstatus.get("obfs4")
-    openvpn = tstatus.get("openvpn")
-    anomaly = (
-        tk.get("api_status") == "blocked"
-        or tk.get("ca_cert_status") is False
-        or obfs4 == "blocked"
-        or openvpn == "blocked"
-    )
-    if anomaly:
+    success = gn(msm, "test_keys", "success")
+    if success is False:
         scores["blocking_general"] = 1.0
+    elif success is None:
+        scores["accuracy"] = 0.0
 
     scores["extra"] = dict(test_runtime=msm.get("test_runtime"))
     return scores

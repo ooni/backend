@@ -1,7 +1,6 @@
 from datetime import datetime
 import csv
 import hashlib
-import ujson
 
 # TODO
 # Below are measurements for failing transparent http proxies:
@@ -1710,3 +1709,13 @@ def trivial_id(raw: bytes, msm: dict) -> str:
         ts = "00000000"
     tid = f"{VER}{ts}{h}"
     return tid
+
+
+# Getters for measurement dict
+
+
+def dget_or(d: dict, key: str, default):
+    """Dict getter: return 'default' if the key is missing or value is None"""
+    # Note: 'd.get(key) or default' returns 'default' on any falsy value
+    v = d.get(key)
+    return default if v is None else v

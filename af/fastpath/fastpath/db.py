@@ -21,8 +21,7 @@ except ImportError:
 import ujson
 
 from fastpath.metrics import setup_metrics
-from fastpath.core import g_or as dget_or
-from fastpath.core import g as dget_n
+from fastpath.utils import dget_or
 
 log = logging.getLogger("fastpath.db")
 metrics = setup_metrics(name="fastpath.db")
