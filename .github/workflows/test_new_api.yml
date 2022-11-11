@@ -35,6 +35,7 @@ jobs:
       #  run: docker ps -a
 
       - run: find / -name pytest.xml
+        if: success() || failure() # run even if previous step failed
 
       - name: Test report
         uses: dorny/test-reporter@v1
