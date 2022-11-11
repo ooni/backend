@@ -34,7 +34,7 @@ jobs:
       #  if: always()
       #  run: docker ps -a
 
-      - run: find / -name pytest.xml
+      - run: find / -name pytest.xml 2> /dev/null
         if: success() || failure() # run even if previous step failed
 
       - name: Test report
@@ -42,5 +42,5 @@ jobs:
         if: success() || failure() # run even if previous step failed
         with:
           name: Test report
-          path: '/app/pytest.xml'
+          path: '/home/runner/work/api/api/newapi/pytest.xml'
           reporter: java-junit     # compatible with pytest --junitxml
