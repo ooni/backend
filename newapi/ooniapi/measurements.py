@@ -1166,6 +1166,16 @@ def get_aggregated() -> Response:
         description: >-
           The end date of when measurement were run (ex.
           "2016-10-20T10:30:00")
+      - name: time_gran
+        in: query
+        type: string
+        description: Time granularity
+        enum:
+        - hour
+        - day
+        - week
+        - year
+        - auto
       - name: axis_x
         in: query
         type: string
@@ -1207,6 +1217,7 @@ def get_aggregated() -> Response:
         probe_cc = param_uppercase("probe_cc")
         since = param_date("since")
         until = param_date("until")
+        time_gran = param("time_gran", "auto").lower()
         if test_name and test_name not in TEST_NAMES:
             raise ValueError("Invalid test name")
 
@@ -1283,16 +1294,37 @@ def get_aggregated() -> Response:
     if axis_x == axis_y and axis_x is not None:
         raise ValueError("Axis X and Y cannot be the same")
 
-    def group_by_date(since, until, cols, colnames, group_by):
+    def group_by_date(since, until, time_gran, cols, colnames, group_by):
         if since and until:
-            delta = abs((until - since).days)
+            delta = until - since
         else:
-            delta = 0
+            delta = None
 
-        # TODO: add a granularity parameter and a check around query weight /
-        # / response size. Also add support in CSV format.
-        granularity = ("day", "toDate")
-        tcol, fun = granularity
+        ranges = (
+            (7, ("hour", "day", "auto")),
+            (30, ("day", "week", "auto")),
+            (365, ("day", "week", "month", "auto")),
+        )
+        if delta is None or delta <= timedelta():
+            raise Exception("Invalid since and until values")
+
+        for thresh, allowed in ranges:
+            if delta > timedelta(days=thresh):
+                continue
+            assert time_gran in allowed
+            if time_gran == "auto":
+                time_gran = allowed[0]
+            break
+
+        # TODO: check around query weight / response size.
+        # Also add support in CSV format.
+        gmap = dict(
+            hour="toStartOfHour",
+            day="toDate",
+            week="toStartOfWeek",
+            month="toStartOfMonth",
+        )
+        fun = gmap[time_gran]
         tcol = "measurement_start_day"  # TODO: support dynamic axis names
         cols.append(sql.text(f"{fun}(measurement_start_time) AS {tcol}"))
         colnames.append(tcol)
@@ -1309,15 +1341,19 @@ def get_aggregated() -> Response:
         group_by.append(column(axis))
 
     group_by: List = []
-    if axis_x == "measurement_start_day":
-        group_by_date(since, until, cols, colnames, group_by)
-    elif axis_x:
-        add_axis(axis_x, cols, colnames, group_by)
+    try:
+        if axis_x == "measurement_start_day":
+            group_by_date(since, until, time_gran, cols, colnames, group_by)
+        elif axis_x:
+            add_axis(axis_x, cols, colnames, group_by)
 
-    if axis_y == "measurement_start_day":
-        group_by_date(since, until, cols, colnames, group_by)
-    elif axis_y:
-        add_axis(axis_y, cols, colnames, group_by)
+        if axis_y == "measurement_start_day":
+            group_by_date(since, until, time_gran, cols, colnames, group_by)
+        elif axis_y:
+            add_axis(axis_y, cols, colnames, group_by)
+
+    except Exception as e:
+        return jerror(str(e), v=0)
 
     # Assemble query
     if category_code or axis_x == "category_code" or axis_y == "category_code":
@@ -1374,8 +1410,6 @@ def get_aggregated() -> Response:
 
     except Exception as e:
         return jerror(str(e), v=0)
-
-
 
 
 def validate_axis_name(axis):

@@ -32,7 +32,7 @@ def test_aggregation_no_axis_with_caching(client, log):
             "confirmed_count": 0,
             "failure_count": 5,
             "measurement_count": 1689,
-            'ok_count': 1497,
+            "ok_count": 1497,
         },
         "v": 0,
     }
@@ -122,7 +122,6 @@ def test_aggregation_no_axis_input_ipaddr(client):
     }, fjd(r)
 
 
-
 def test_aggregation_no_axis_filter_by_category_code(client):
     # 0-dimensional data
     url = (
@@ -145,7 +144,7 @@ def test_aggregation_no_axis_filter_by_category_code(client):
 
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
-    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_gran=day&axis_x=measurement_start_day"
     r = api(client, url)
     r.pop("db_stats", None)
     expected = {
@@ -158,6 +157,43 @@ def test_aggregation_x_axis_only(client, log):
                 "measurement_count": 1689,
                 "measurement_start_day": "2021-07-09",
                 "ok_count": 1497,
+            },
+        ],
+        "v": 0,
+    }
+    assert r == expected, fjd(r)
+
+
+def test_aggregation_x_axis_only_invalid_range(client, log):
+    # 1 dimension: X
+    url = "aggregation?since=2022-07-09&until=2021-07-11&time_gran=day&axis_x=measurement_start_day"
+    r = client.get(f"/api/v1/{url}")
+    assert r.status_code == 400
+
+
+def test_aggregation_x_axis_only_hour(client, log):
+    # 1 dimension: X
+    url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    expected = {
+        "dimension_count": 1,
+        "result": [
+            {
+                "anomaly_count": 714,
+                "confirmed_count": 9,
+                "failure_count": 731,
+                "measurement_count": 9990,
+                "measurement_start_day": "2021-07-09T00:00:00Z",
+                "ok_count": 8536,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09T01:00:00Z",
+                "ok_count": 1,
             },
         ],
         "v": 0,
@@ -333,7 +369,7 @@ def test_aggregation_foo(client):
 def test_aggregation_x_axis_only_csv_2d(client, log):
     # 2-dimensional data: day vs ASN
     dom = "www.cabofrio.rj.gov.br"
-    url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
+    url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&time_gran=day&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 200
     assert not r.is_json
