@@ -1216,58 +1216,6 @@ def get_aggregated() -> Response:
     except Exception as e:
         return jerror(str(e), v=0, code=200)
 
-    r = _clickhouse_aggregation(
-        resp_format,
-        download,
-        since,
-        until,
-        inp,
-        domain,
-        category_code,
-        probe_cc,
-        probe_asn,
-        test_name,
-        axis_x,
-        axis_y,
-    )
-    return r
-
-
-def validate_axis_name(axis):
-    # TODO: use swagger instead?
-    valid = (
-        "category_code",
-        "input",
-        "measurement_start_day",
-        "probe_asn",
-        "probe_cc",
-        "blocking_type",
-        "domain",
-    )
-    if axis not in valid:
-        raise ValueError("Invalid axis name")
-
-
-def set_dload(resp, fname: str):
-    """Add header to make response downloadable"""
-    resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
-
-
-def _clickhouse_aggregation(
-    resp_format: str,
-    download: bool,
-    since,
-    until,
-    inp: ostr,
-    domain: ostr,
-    category_code: ostr,
-    probe_cc: ostr,
-    probe_asn: Optional[int],
-    test_name: ostr,
-    axis_x: ostr,
-    axis_y: ostr,
-):
-    log = current_app.logger
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
     cacheable = until and until < datetime.now() - timedelta(hours=72)
     cacheable = False  # FIXME
@@ -1426,6 +1374,28 @@ def _clickhouse_aggregation(
 
     except Exception as e:
         return jerror(str(e), v=0)
+
+
+
+
+def validate_axis_name(axis):
+    # TODO: use swagger instead?
+    valid = (
+        "category_code",
+        "input",
+        "measurement_start_day",
+        "probe_asn",
+        "probe_cc",
+        "blocking_type",
+        "domain",
+    )
+    if axis not in valid:
+        raise ValueError("Invalid axis name")
+
+
+def set_dload(resp, fname: str):
+    """Add header to make response downloadable"""
+    resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
 
 
 @api_msm_blueprint.route("/v1/torsf_stats")
