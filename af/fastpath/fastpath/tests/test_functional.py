@@ -1108,33 +1108,36 @@ def test_score_http_invalid_request_line():
 
 
 def test_score_signal():
-    for can_fn, msm in minicans("signal", date(2021, 4, 27), date(2021, 4, 27), 100):
+    for can_fn, msm in minicans("signal", date(2021, 4, 27), date(2021, 4, 27), 1):
         assert msm["test_name"] == "signal"
         scores = fp.score_measurement(msm)
         assert scores
         rid = msm["report_id"]
-        # Temporarily flag all msmts as failed
-        if rid == "20210427T023145Z_signal_CN_24400_n1_ynto2TVYXtqxhtOo":
+        if rid == "20210427T000430Z_signal_AU_45671_n1_Zq1z77FuiG2IkqqC":
             assert scores == {
-                "accuracy": 0.0,
-                "analysis": {"signal_backend_failure": "generic_timeout_error"},
-                "blocking_general": 1.0,
-                "blocking_global": 0.0,
-                "blocking_country": 0.0,
-                "blocking_isp": 0.0,
-                "blocking_local": 0.0,
-            }
-        elif rid == "20210427T000430Z_signal_AU_45671_n1_Zq1z77FuiG2IkqqC":
-            assert scores == {
-                "accuracy": 0.0,
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
             }
-        # No failure was found
-        # elif "accuracy" in scores:
+
+
+def test_score_signal_newer():
+    for can_fn, msm in minicans("signal", date(2022, 11, 17), date(2022, 11, 18), 1):
+        assert msm["test_name"] == "signal"
+        scores = fp.score_measurement(msm)
+        if msm["measurement_uid"] == "20221117002725.926127_AE_signal_718505fece16c5ea":
+            # https://github.com/ooni/probe/issues/2344
+            assert scores == {
+                "accuracy": 0.0,
+                "analysis": {"signal_backend_failure": "ssl_unknown_authority"},
+                "blocking_general": 1.0,
+                "blocking_global": 0.0,
+                "blocking_country": 0.0,
+                "blocking_isp": 0.0,
+                "blocking_local": 0.0,
+            }
 
 
 def test_score_stunreachability():

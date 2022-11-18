@@ -25,6 +25,7 @@ import sys
 import time
 import yaml
 
+from pkg_resources import parse_version
 import ujson  # debdeps: python3-ujson
 
 try:
@@ -1360,7 +1361,15 @@ def score_signal(msm: dict) -> dict:
         scores["accuracy"] = 0.0
 
     # https://github.com/ooni/probe/issues/2344
-    scores["accuracy"] = 0.0
+    tv = g_or(msm, "test_version", "0.0.0")
+    try:
+        if parse_version(tv) < parse_version("0.2.2"):
+            start_time = msm.get("measurement_start_time")
+            start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            if start_time >= datetime(2022, 10, 19):
+                scores["accuracy"] = 0.0
+    except Exception:
+        scores["accuracy"] = 0.0
 
     st = tk.get("signal_backend_status")
     if st == "ok":

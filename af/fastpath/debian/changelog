@@ -1,3 +1,9 @@
+fastpath (0.63) unstable; urgency=medium
+
+  * Handle fixed Signal tests
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 18 Nov 2022 11:26:19 +0000
+
 fastpath (0.62) unstable; urgency=medium
 
   * Temporarily flag signal msmts as failed

@@ -454,6 +454,22 @@ def test_score_http_requests():
     }
 
 
+# # test_name: signal
+
+
+def test_score_signal():
+    # https://explorer.ooni.org/measurement/20221118T104419Z_signal_IT_30722_n1_Q02UUAiiHlVU0VE6
+    msm = loadj("signal_022")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # test_name: stunreachability
 
 
@@ -549,7 +565,7 @@ def test_bug_backend352():
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
         "analysis": {"blocking_type": "dns"},
-        "confirmed": True
+        "confirmed": True,
     }
 
 
