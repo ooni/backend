@@ -1252,7 +1252,7 @@ def get_aggregated() -> Response:
     ]
     table = sql.table("fastpath")
     where = []
-    query_params = {}
+    query_params: Dict[str, Any] = {}
 
     if domain:
         where.append(sql.text("domain = :domain"))
@@ -1477,7 +1477,7 @@ def get_torsf_stats() -> Response:
     ]
     table = sql.table("fastpath")
     where = [sql.text("test_name = 'torsf'")]
-    query_params = {}
+    query_params: Dict[str, Any] = {}
 
     if probe_cc:
         where.append(sql.text("probe_cc = :probe_cc"))
