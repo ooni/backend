@@ -1169,7 +1169,7 @@ def get_aggregated() -> Response:
       - name: time_gran
         in: query
         type: string
-        description: Time granularity
+        description: Time granularity. Used only when the X or Y axis represent time.
         enum:
         - hour
         - day
