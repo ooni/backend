@@ -1174,6 +1174,7 @@ def get_aggregated() -> Response:
         - hour
         - day
         - week
+        - month
         - year
         - auto
       - name: axis_x
