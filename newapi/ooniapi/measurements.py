@@ -1301,10 +1301,12 @@ def get_aggregated() -> Response:
         else:
             delta = None
 
+        # on time_gran = "auto" or empty the smallest allowed gran. is used
         ranges = (
             (7, ("hour", "day", "auto")),
             (30, ("day", "week", "auto")),
             (365, ("day", "week", "month", "auto")),
+            (9999999, ("week", "month", "year", "auto")),
         )
         if delta is None or delta <= timedelta():
             raise Exception("Invalid since and until values")
@@ -1312,7 +1314,10 @@ def get_aggregated() -> Response:
         for thresh, allowed in ranges:
             if delta > timedelta(days=thresh):
                 continue
-            assert time_gran in allowed
+            if time_gran not in allowed:
+                a = ", ".join(allowed)
+                msg = f"Choose time_gran between {a} for the given time range"
+                raise Exception(msg)
             if time_gran == "auto":
                 time_gran = allowed[0]
             break

@@ -171,6 +171,24 @@ def test_aggregation_x_axis_only_invalid_range(client, log):
     assert r.status_code == 400
 
 
+def test_aggregation_x_axis_only_invalid_time_gran_too_small(client, log):
+    # 1 dimension: X
+    url = "aggregation?since=2020-07-09&until=2022-07-11&time_gran=day&axis_x=measurement_start_day"
+    r = client.get(f"/api/v1/{url}")
+    assert r.status_code == 400
+    exp = "Choose time_gran between week, month, year, auto for the given time range"
+    assert r.json["error"] == exp
+
+
+def test_aggregation_x_axis_only_invalid_time_gran_too_large(client, log):
+    # 1 dimension: X
+    url = "aggregation?since=2022-07-09&until=2022-07-11&time_gran=year&axis_x=measurement_start_day"
+    r = client.get(f"/api/v1/{url}")
+    assert r.status_code == 400
+    exp = "Choose time_gran between hour, day, auto for the given time range"
+    assert r.json["error"] == exp
+
+
 def test_aggregation_x_axis_only_hour(client, log):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
