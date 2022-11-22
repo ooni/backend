@@ -106,8 +106,6 @@ def test_score_openvpn():
     ]
 
     query, qparams = exe.call_args_list[1].args
-    query = query.replace("\n", " ").replace("  ", " ")
-    query_exp = "INSERT INTO obs_openvpn ( anomaly, bootstrap_time, confirmed, error, failure, input, measurement_start_time, measurement_uid, obfuscation, platform, probe_asn, probe_cc, probe_network_name, provider, remote, report_id, resolver_asn, resolver_ip, resolver_network_name, software_name, software_version, success, tcp_connect_status_success, test_runtime, test_start_time, transport ) VALUES"
     assert qparams == [
         {
             "anomaly": False,
@@ -116,8 +114,11 @@ def test_score_openvpn():
             "error": "",
             "failure": False,
             "input": "vpn://openvpn.riseup/?addr=198.252.153.109:443&transport=tcp&obfs=obfs4",
+            "last_handshake_transaction_id": 8,
             "measurement_start_time": datetime.datetime(2022, 11, 21, 17, 22, 49),
             "measurement_uid": "bogus_uid",
+            "minivpn_version": "(devel)",
+            "obfs4_version": "(devel)",
             "obfuscation": "obfs4",
             "platform": "",
             "probe_asn": 9009,
@@ -132,9 +133,16 @@ def test_score_openvpn():
             "software_name": "miniooni",
             "software_version": "3.17.0-alpha",
             "success": True,
+            "success_handshake": True,
+            "success_icmp": True,
+            "success_urlgrab": True,
             "tcp_connect_status_success": True,
             "test_runtime": 37.975210163,
             "test_start_time": datetime.datetime(2022, 11, 21, 17, 22, 11),
             "transport": "tcp",
         },
     ]
+
+    cols = ", ".join(qparams[0].keys())
+    q = query.replace("\n", " ").replace("  ", " ")
+    assert q == f"INSERT INTO obs_openvpn ( {cols} ) VALUES "

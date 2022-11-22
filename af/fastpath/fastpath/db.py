@@ -91,8 +91,11 @@ def click_create_table_obs_openvpn():
         error String,
         failure Bool,
         input String,
+        last_handshake_transaction_id Uint8,
         measurement_start_time DateTime,
         measurement_uid String,
+        minivpn_version String,
+        obfs4_version String,
         obfuscation String,
         platform String,
         probe_asn Int32,
@@ -107,6 +110,9 @@ def click_create_table_obs_openvpn():
         software_name String,
         software_version String,
         success Bool,
+        success_handshake Bool,
+        success_icmp Bool,
+        success_urlgrab Bool,
         tcp_connect_status_success Bool,
         test_runtime Float32,
         test_start_time DateTime,
@@ -244,8 +250,11 @@ def clickhouse_upsert_openvpn_obs(
     error,
     failure,
     input,
+    last_handshake_transaction_id,
     measurement_start_time,
     measurement_uid,
+    minivpn_version,
+    obfs4_version,
     obfuscation,
     platform,
     probe_asn,
@@ -260,6 +269,9 @@ def clickhouse_upsert_openvpn_obs(
     software_name,
     software_version,
     success,
+    success_handshake,
+    success_icmp,
+    success_urlgrab,
     tcp_connect_status_success,
     test_runtime,
     test_start_time,
@@ -295,6 +307,12 @@ def clickhouse_upsert_openvpn_obs(
     except Exception:
         resolver_asn = 0
 
+    nes = tk.get("network_events")
+    try:
+        last_transaction_id = max(e["transaction_id"] for e in nes)
+    except Exception:
+        last_transaction_id = 0
+
     row = dict(
         anomaly=anomaly,
         bootstrap_time=dget_or(tk, "bootstrap_time", 0),
@@ -302,8 +320,11 @@ def clickhouse_upsert_openvpn_obs(
         error=nn(msm, "error"),
         failure=False,
         input=nn(msm, "input"),
+        last_handshake_transaction_id=last_transaction_id,
         measurement_start_time=measurement_start_time,
         measurement_uid=measurement_uid,
+        minivpn_version=nn(tk, "minivpn_version"),
+        obfs4_version=nn(tk, "obfs4_version"),
         obfuscation=nn(tk, "obfuscation"),
         platform=nn(msm, "platform"),
         probe_asn=asn,
@@ -318,6 +339,9 @@ def clickhouse_upsert_openvpn_obs(
         software_name=nn(msm, "software_name"),
         software_version=nn(msm, "software_version"),
         success=success,
+        success_handshake=bool(tk.get("success_handshake")),
+        success_icmp=bool(tk.get("success_icmp")),
+        success_urlgrab=bool(tk.get("success_urlgrab")),
         tcp_connect_status_success=tcp_connect_status_success,
         test_runtime=dget_or(msm, "test_runtime", 0),
         test_start_time=test_start_time,
