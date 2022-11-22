@@ -298,6 +298,7 @@ def clickhouse_upsert_openvpn_obs(
     anomaly = nn(msm, "success") == True
     tcp_connect_status_success = True  # FIXME
     success = bool(nn(tk, "success"))
+    failure = bool(nn(tk, "failure"))
     resolver_asn_str = nn(msm, "resolver_asn")
     try:
         if resolver_asn_str.startswith("AS"):
@@ -318,7 +319,7 @@ def clickhouse_upsert_openvpn_obs(
         bootstrap_time=dget_or(tk, "bootstrap_time", 0),
         confirmed=False,
         error=nn(msm, "error"),
-        failure=False,
+        failure=failure,
         input=nn(msm, "input"),
         last_handshake_transaction_id=last_transaction_id,
         measurement_start_time=measurement_start_time,
