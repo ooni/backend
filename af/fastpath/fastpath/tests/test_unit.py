@@ -564,7 +564,7 @@ def test_score_openvpn():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"test_runtime": 32.003161366},
+        "extra": {"test_runtime": 37.975210163},
     }
 
 
