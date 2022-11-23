@@ -113,7 +113,6 @@ def click_create_table_obs_openvpn():
         success_handshake Bool,
         success_icmp Bool,
         success_urlgrab Bool,
-        tcp_connect_status_success Bool,
         test_runtime Float32,
         test_start_time DateTime,
         transport String
@@ -272,7 +271,6 @@ def clickhouse_upsert_openvpn_obs(
     success_handshake,
     success_icmp,
     success_urlgrab,
-    tcp_connect_status_success,
     test_runtime,
     test_start_time,
     transport
@@ -296,7 +294,6 @@ def clickhouse_upsert_openvpn_obs(
     tk = dget_or(msm, "test_keys", {})
 
     anomaly = nn(msm, "success") == True
-    tcp_connect_status_success = True  # FIXME
     success = bool(nn(tk, "success"))
     failure = bool(nn(tk, "failure"))
     resolver_asn_str = nn(msm, "resolver_asn")
@@ -343,7 +340,6 @@ def clickhouse_upsert_openvpn_obs(
         success_handshake=bool(tk.get("success_handshake")),
         success_icmp=bool(tk.get("success_icmp")),
         success_urlgrab=bool(tk.get("success_urlgrab")),
-        tcp_connect_status_success=tcp_connect_status_success,
         test_runtime=dget_or(msm, "test_runtime", 0),
         test_start_time=test_start_time,
         transport=nn(tk, "transport"),

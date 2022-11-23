@@ -136,7 +136,6 @@ def test_score_openvpn():
             "success_handshake": True,
             "success_icmp": True,
             "success_urlgrab": True,
-            "tcp_connect_status_success": True,
             "test_runtime": 37.975210163,
             "test_start_time": datetime.datetime(2022, 11, 21, 17, 22, 11),
             "transport": "tcp",
