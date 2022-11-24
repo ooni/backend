@@ -111,7 +111,7 @@ def test_score_openvpn():
             "anomaly": False,
             "bootstrap_time": 1.5671859910000001,
             "confirmed": False,
-            "failure": False,
+            "failure": "",
             "input": "vpn://openvpn.riseup/?addr=198.252.153.109:443&transport=tcp&obfs=obfs4",
             "last_handshake_transaction_id": 8,
             "measurement_start_time": datetime.datetime(2022, 11, 21, 17, 22, 49),

@@ -88,7 +88,7 @@ def click_create_table_obs_openvpn():
         anomaly Bool,
         bootstrap_time Float32,
         confirmed Bool,
-        failure Bool,
+        failure String,
         input String,
         last_handshake_transaction_id Uint8,
         measurement_start_time DateTime,
@@ -293,7 +293,7 @@ def clickhouse_upsert_openvpn_obs(
 
     anomaly = nn(msm, "success") == True
     success = bool(nn(tk, "success"))
-    failure = bool(nn(tk, "failure"))
+    failure = nn(tk, "failure")
     resolver_asn_str = nn(msm, "resolver_asn")
     try:
         if resolver_asn_str.startswith("AS"):
