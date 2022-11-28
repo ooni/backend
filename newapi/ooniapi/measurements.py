@@ -1166,7 +1166,7 @@ def get_aggregated() -> Response:
         description: >-
           The end date of when measurement were run (ex.
           "2016-10-20T10:30:00")
-      - name: time_gran
+      - name: time_grain
         in: query
         type: string
         description: Time granularity. Used only when the X or Y axis represent time.
@@ -1218,7 +1218,7 @@ def get_aggregated() -> Response:
         probe_cc = param_uppercase("probe_cc")
         since = param_date("since")
         until = param_date("until")
-        time_gran = param("time_gran", "auto").lower()
+        time_grain = param("time_grain", "auto").lower()
         if test_name and test_name not in TEST_NAMES:
             raise ValueError("Invalid test name")
 
@@ -1295,13 +1295,13 @@ def get_aggregated() -> Response:
     if axis_x == axis_y and axis_x is not None:
         raise ValueError("Axis X and Y cannot be the same")
 
-    def group_by_date(since, until, time_gran, cols, colnames, group_by):
+    def group_by_date(since, until, time_grain, cols, colnames, group_by):
         if since and until:
             delta = until - since
         else:
             delta = None
 
-        # on time_gran = "auto" or empty the smallest allowed gran. is used
+        # on time_grain = "auto" or empty the smallest allowed gran. is used
         ranges = (
             (7, ("hour", "day", "auto")),
             (30, ("day", "week", "auto")),
@@ -1314,12 +1314,12 @@ def get_aggregated() -> Response:
         for thresh, allowed in ranges:
             if delta > timedelta(days=thresh):
                 continue
-            if time_gran not in allowed:
+            if time_grain not in allowed:
                 a = ", ".join(allowed)
-                msg = f"Choose time_gran between {a} for the given time range"
+                msg = f"Choose time_grain between {a} for the given time range"
                 raise Exception(msg)
-            if time_gran == "auto":
-                time_gran = allowed[0]
+            if time_grain == "auto":
+                time_grain = allowed[0]
             break
 
         # TODO: check around query weight / response size.
@@ -1330,7 +1330,7 @@ def get_aggregated() -> Response:
             week="toStartOfWeek",
             month="toStartOfMonth",
         )
-        fun = gmap[time_gran]
+        fun = gmap[time_grain]
         tcol = "measurement_start_day"  # TODO: support dynamic axis names
         cols.append(sql.text(f"{fun}(measurement_start_time) AS {tcol}"))
         colnames.append(tcol)
@@ -1349,12 +1349,12 @@ def get_aggregated() -> Response:
     group_by: List = []
     try:
         if axis_x == "measurement_start_day":
-            group_by_date(since, until, time_gran, cols, colnames, group_by)
+            group_by_date(since, until, time_grain, cols, colnames, group_by)
         elif axis_x:
             add_axis(axis_x, cols, colnames, group_by)
 
         if axis_y == "measurement_start_day":
-            group_by_date(since, until, time_gran, cols, colnames, group_by)
+            group_by_date(since, until, time_grain, cols, colnames, group_by)
         elif axis_y:
             add_axis(axis_y, cols, colnames, group_by)
 

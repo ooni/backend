@@ -144,7 +144,7 @@ def test_aggregation_no_axis_filter_by_category_code(client):
 
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
-    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_gran=day&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
     r = api(client, url)
     r.pop("db_stats", None)
     expected = {
@@ -166,26 +166,26 @@ def test_aggregation_x_axis_only(client, log):
 
 def test_aggregation_x_axis_only_invalid_range(client, log):
     # 1 dimension: X
-    url = "aggregation?since=2022-07-09&until=2021-07-11&time_gran=day&axis_x=measurement_start_day"
+    url = "aggregation?since=2022-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
 
 
-def test_aggregation_x_axis_only_invalid_time_gran_too_small(client, log):
+def test_aggregation_x_axis_only_invalid_time_grain_too_small(client, log):
     # 1 dimension: X
-    url = "aggregation?since=2020-07-09&until=2022-07-11&time_gran=day&axis_x=measurement_start_day"
+    url = "aggregation?since=2020-07-09&until=2022-07-11&time_grain=day&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
-    exp = "Choose time_gran between week, month, year, auto for the given time range"
+    exp = "Choose time_grain between week, month, year, auto for the given time range"
     assert r.json["error"] == exp
 
 
-def test_aggregation_x_axis_only_invalid_time_gran_too_large(client, log):
+def test_aggregation_x_axis_only_invalid_time_grain_too_large(client, log):
     # 1 dimension: X
-    url = "aggregation?since=2022-07-09&until=2022-07-11&time_gran=year&axis_x=measurement_start_day"
+    url = "aggregation?since=2022-07-09&until=2022-07-11&time_grain=year&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
-    exp = "Choose time_gran between hour, day, auto for the given time range"
+    exp = "Choose time_grain between hour, day, auto for the given time range"
     assert r.json["error"] == exp
 
 
@@ -387,7 +387,7 @@ def test_aggregation_foo(client):
 def test_aggregation_x_axis_only_csv_2d(client, log):
     # 2-dimensional data: day vs ASN
     dom = "www.cabofrio.rj.gov.br"
-    url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&time_gran=day&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
+    url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&time_grain=day&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 200
     assert not r.is_json
