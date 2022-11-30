@@ -35,6 +35,7 @@ from configparser import ConfigParser
 from datetime import datetime, timedelta
 from pathlib import Path
 from site import getsitepackages
+import time
 import logging
 import os
 import sys
@@ -305,7 +306,7 @@ def load_country_name_map():
     return d
 
 
-def create_table(click):
+def create_tables(click) -> None:
     sql = """
 CREATE TABLE IF NOT EXISTS blocking_status
 (
@@ -320,6 +321,7 @@ CREATE TABLE IF NOT EXISTS blocking_status
     `status` String,
     `old_status` String,
     `change` Float32,
+    `stability` Float32,
     `update_time` DateTime64(0) MATERIALIZED now64()
 )
 ENGINE = ReplacingMergeTree
@@ -346,7 +348,7 @@ SETTINGS index_granularity = 4
 
 
 @metrics.timer("rebuild_status")
-def rebuild_status(click, start_date, end_date, services):
+def rebuild_status(click, start_date, end_date, services) -> None:
     log.info("Truncate blocking_status")
     sql = "TRUNCATE TABLE blocking_status"
     click.execute(sql)
@@ -389,18 +391,33 @@ GROUP BY test_name, input, probe_cc, probe_asn;
 @metrics.timer("run_detection")
 def run_detection(click, start_date, end_date, services):
     # log.info(f"Running detection from {start_date} to {end_date}")
+    # FIXME DEBUG
+    t0 = time.monotonic()
+
+    sql = """SELECT count() AS cnt FROM fastpath
+ WHERE test_name IN ['web_connectivity']
+ AND msm_failure = 'f'
+ AND measurement_start_time >= %(start_date)s
+ AND measurement_start_time < %(end_date)s
+ AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
+    """
+    d = dict(start_date=start_date, end_date=end_date)
+    got_it = bool(click.execute(sql, d)[0][0])
+
+    # TODO description
     sql = """
 INSERT INTO blocking_status (test_name, input, probe_cc, probe_asn,
-  confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status, old_status, change)
+  confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status, old_status, change, stability)
 SELECT test_name, input, probe_cc, probe_asn,
   confirmed_perc, pure_anomaly_perc, accessible_perc, totcnt AS cnt,
   multiIf(
-    accessible_perc < 80, 'BLOCKED',
-    accessible_perc > 95, 'OK',
+    accessible_perc < 80 AND stability > 0.95, 'BLOCKED',
+    accessible_perc > 95 AND stability > 0.97, 'OK',
     x.status)
   AS status,
   x.status AS old_status,
-  if(status = x.status, x.change * %(tau)f, 1) AS change
+  if(status = x.status, x.change * %(tau)f, 1) AS change,
+  stability
 FROM
 (
 SELECT
@@ -416,14 +433,21 @@ SELECT
  (new.pure_anomaly_perc * new.cnt * %(mu)f +
   blocking_status.pure_anomaly_perc * blocking_status.cnt * %(tau)f) / totcnt AS pure_anomaly_perc,
  (new.accessible_perc * new.cnt * %(mu)f +
-  blocking_status.accessible_perc * blocking_status.cnt * %(tau)f) / totcnt AS accessible_perc
-FROM
+  blocking_status.accessible_perc * blocking_status.cnt * %(tau)f) / totcnt AS accessible_perc,
+
+ ( cos(3.14/2*(new.accessible_perc - blocking_status.accessible_perc)/100) * 0.7 +
+  blocking_status.stability * 0.3) AS stability
+
+FROM blocking_status FINAL
+
+FULL OUTER JOIN
 (
  SELECT test_name, input, probe_cc, probe_asn,
   countIf(confirmed = 't') * 100 / cnt AS confirmed_perc,
   countIf(anomaly = 't') * 100 / cnt - confirmed_perc AS pure_anomaly_perc,
   countIf(anomaly = 'f') * 100 / cnt AS accessible_perc,
-  count() AS cnt
+  count() AS cnt,
+  0 AS stability
  FROM fastpath
  WHERE test_name IN ['web_connectivity']
  AND msm_failure = 'f'
@@ -433,12 +457,11 @@ FROM
  GROUP BY test_name, input, probe_cc, probe_asn
 ) AS new
 
-FULL OUTER JOIN
-    (SELECT * FROM blocking_status FINAL) AS blocking_status
 ON
  new.input = blocking_status.input
  AND new.probe_cc = blocking_status.probe_cc
  AND new.probe_asn = blocking_status.probe_asn
+ AND new.test_name = blocking_status.test_name
 ) AS x
 """
     tau = 0.985
@@ -446,6 +469,17 @@ ON
     urls = sorted(set(u for urls in services.values() for u in urls))
     d = dict(start_date=start_date, end_date=end_date, tau=tau, mu=mu, urls=urls)
     click.execute(sql, d)
+
+    return
+
+    sql = """SELECT accessible_perc, cnt, status, stability FROM blocking_status FINAL
+ WHERE probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
+    """
+    if got_it:
+        it = list(click.execute(sql)[0])
+        it.append(str(start_date))
+        # it.append(time.monotonic() - t0)
+        print(repr(it) + ",")
 
 
 @metrics.timer("extract_changes")
@@ -466,17 +500,18 @@ def extract_changes(click, run_date):
     AND old_status != ''
     AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
     """
-    # DEBUG
-    li = click.execute(sql)
-    for tn, inp, cc, asn, old_status, status in li:
-        log.info(f"{run_date} {old_status} -> {status} in {cc} {asn} {inp}")
+    # FIXME DEBUG
+    if 0:
+        li = click.execute(sql)
+        for tn, inp, cc, asn, old_status, status in li:
+            log.info(f"{run_date} {old_status} -> {status} in {cc} {asn} {inp}")
 
 
 @metrics.timer("process_historical_data")
 def process_historical_data(click, start_date, end_date, interval, services):
     """Process past data"""
     log.info(f"Running process_historical_data from {start_date} to {end_date}")
-    create_table(click)
+    create_tables(click)
     run_date = start_date + interval
     rebuild_status(click, start_date, run_date, services)
     while run_date < end_date:
@@ -492,13 +527,8 @@ def process_historical_data(click, start_date, end_date, interval, services):
 def main():
     setup()
     log.info("Starting")
-    # global cc_to_country_name
     # cc_to_country_name = load_country_name_map()
     click = Clickhouse.from_url(conf.db_uri)
-    # start_date = datetime(2022, 2, 20)
-    # end_date = start_date + timedelta(days=20)
-    # end_date = start_date + timedelta(minutes=120)
-    # interval = timedelta(minutes=30 * 4)
     # FIXME: configure services
     services = {
         "Facebook": ["https://www.facebook.com/"],
