@@ -856,7 +856,9 @@ def score_measurement_whatsapp(msm: dict) -> dict:
                 status_code = resp.get("code", 0)
                 location_header_list = get_http_header(resp, "Location")
                 if status_code != 302:
-                    webapp_accessible = False
+                    # Temporary workaround 2022-12-02
+                    # webapp_accessible = False
+                    scores["accuracy"] = 0.0
                 elif "https://web.whatsapp.com/" not in location_header_list:
                     webapp_accessible = False
 

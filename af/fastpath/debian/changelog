@@ -1,3 +1,9 @@
+fastpath (0.64) unstable; urgency=medium
+
+  * Temporary workaround for whatsapp
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 02 Dec 2022 13:30:09 +0000
+
 fastpath (0.63) unstable; urgency=medium
 
   * Handle fixed Signal tests

@@ -231,6 +231,28 @@ def test_score_http_invalid_request_line_1():
     json.dumps(msm)  # should not raise
 
 
+# # test_name: whatsapp
+
+
+def test_score_whatsapp_failure():
+    # Before 2022-12-02 we expected HTTP code 302
+    msm = loadj("whatsapp")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "accuracy": 0.0,
+        "analysis": {
+            "registration_server_accessible": True,
+            "whatsapp_endpoints_accessible": True,
+            "whatsapp_web_accessible": True,
+        },
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # test_name: web_connectivity
 
 
