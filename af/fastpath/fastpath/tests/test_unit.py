@@ -239,7 +239,6 @@ def test_score_whatsapp_failure():
     msm = loadj("whatsapp")
     scores = fp.score_measurement(msm)
     assert scores == {
-        "accuracy": 0.0,
         "analysis": {
             "registration_server_accessible": True,
             "whatsapp_endpoints_accessible": True,
