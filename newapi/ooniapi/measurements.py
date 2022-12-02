@@ -1306,7 +1306,7 @@ def get_aggregated() -> Response:
             (7, ("hour", "day", "auto")),
             (30, ("day", "week", "auto")),
             (365, ("day", "week", "month", "auto")),
-            (9999999, ("week", "month", "year", "auto")),
+            (9999999, ("day", "week", "month", "year", "auto")),
         )
         if delta is None or delta <= timedelta():
             raise Exception("Invalid since and until values")
