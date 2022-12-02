@@ -847,21 +847,6 @@ def score_measurement_whatsapp(msm: dict) -> dict:
             # has unexpected contents
             # Also note bug https://github.com/ooni/probe-legacy/issues/60
 
-        elif url == "http://web.whatsapp.com/":
-            webapp_accessible = True
-            if b.get("failure", True) not in (None, "", False):
-                webapp_accessible = False
-            else:
-                resp = b.get("response", {})
-                status_code = resp.get("code", 0)
-                location_header_list = get_http_header(resp, "Location")
-                if status_code != 302:
-                    # Temporary workaround 2022-12-02
-                    # webapp_accessible = False
-                    scores["accuracy"] = 0.0
-                elif "https://web.whatsapp.com/" not in location_header_list:
-                    webapp_accessible = False
-
         elif url == "https://v.whatsapp.net/v2/register":
             # In case of connection failure "response" might be empty
             registration_accessible = b.get("failure") is None
