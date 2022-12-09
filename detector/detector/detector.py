@@ -24,6 +24,9 @@ Events are defined as changes between blocking and non-blocking on single
 CC / test_name / input tuples
 
 Runs as a service "detector" in a systemd unit and sandbox
+
+The --reprocess mode is only for debugging and it's destructive to
+the blocking_* DB tables.
 """
 
 # Compatible with Python3.9 - linted with Black
@@ -35,7 +38,7 @@ from configparser import ConfigParser
 from datetime import datetime, timedelta
 from pathlib import Path
 from site import getsitepackages
-import time
+from urllib.parse import urlunsplit, urlencode
 import logging
 import os
 import sys
@@ -43,7 +46,7 @@ import sys
 from systemd.journal import JournalHandler  # debdeps: python3-systemd
 import ujson  # debdeps: python3-ujson
 import feedgenerator  # debdeps: python3-feedgenerator
-import statsd
+import statsd  # debdeps: python3-statsd
 
 from clickhouse_driver import Client as Clickhouse
 
@@ -51,19 +54,28 @@ from clickhouse_driver import Client as Clickhouse
 log = logging.getLogger("detector")
 metrics = statsd.StatsClient("localhost", 8125, prefix="detector")
 
-DEFAULT_STARTTIME = datetime(2016, 1, 1)
-
 PKGDIR = getsitepackages()[-1]
+DBURI = "clickhouse://detector:detector@localhost/default"
 
 conf = None
+click = None
 cc_to_country_name = None  # set by load_country_name_map
+
+
+def query(*a, **kw):
+    settings = {}
+    if conf.reprocess:
+        settings["log_query"] = 0
+    else:
+        log.info(a)
+    return click.execute(*a, settings=settings, **kw)
 
 
 def parse_date(d):
     return datetime.strptime(d, "%Y-%m-%d")
 
 
-def setup_dirs(conf, root):
+def setup_dirs(root):
     """Setup directories, creating them if needed"""
     conf.vardir = root / "var/lib/detector"
     conf.outdir = conf.vardir / "output"
@@ -86,20 +98,17 @@ def setup_dirs(conf, root):
         p.mkdir(parents=True, exist_ok=True)
 
 
-DBURI = "clickhouse://detector:detector@localhost/default"
-
-
 def setup():
     os.environ["TZ"] = "UTC"
     global conf
     ap = ArgumentParser(__doc__)
-    ap.add_argument("--devel", action="store_true", help="Devel mode")
-    ap.add_argument("-v", action="store_true", help="Debug verbosity")
     # FIXME args used for debugging
-    ap.add_argument("--repro", action="store_true", help="Reprocess events")
+    ap.add_argument("--devel", action="store_true", help="Devel mode")
+    ap.add_argument("-v", action="store_true", help="High verbosity")
+    ap.add_argument("--reprocess", action="store_true", help="Reprocess events")
     ap.add_argument("--start-date", type=lambda d: parse_date(d))
     ap.add_argument("--end-date", type=lambda d: parse_date(d))
-    ap.add_argument("--interval-mins", type=int, default=30)
+    ap.add_argument("--interval-mins", type=int, default=10)
     ap.add_argument("--db-uri", default=DBURI, help="Database hostname")
     conf = ap.parse_args()
     if conf.devel:
@@ -114,119 +123,41 @@ def setup():
     # Run inside current directory in devel mode
     root = Path(os.getcwd()) if conf.devel else Path("/")
     conf.conffile = root / "etc/ooni/detector.conf"
-    if 0:  # FIXME
+    setup_dirs(root)
+    if 0:  # TODO
         log.info("Using conf file %r", conf.conffile.as_posix())
         cp = ConfigParser()
         with open(conf.conffile) as f:
             cp.read_file(f)
             conf.db_uri = conf.db_uri or cp["DEFAULT"]["clickhouse_url"]
-        setup_dirs(conf, root)
 
 
-Change = namedtuple(
-    "Change",
-    [
-        "probe_cc",
-        "test_name",
-        "input",
-        "blocked",
-        "mean",
-        "measurement_start_time",
-        "tid",
-        "report_id",
-    ],
-)
-
-
-def explorer_url(c: Change) -> str:
-    return f"https://explorer.ooni.org/measurement/{c.report_id}?input={c.input}"
-
-
-# TODO: regenerate RSS feeds (only) once after the warmup terminates
+def explorer_mat_url(test_name, inp, probe_cc, probe_asn, t) -> str:
+    since = str(t - timedelta(days=7))
+    until = str(t + timedelta(days=7))
+    p = dict(
+        test_name=test_name,
+        axis_x="measurement_start_day",
+        since=since,
+        until=until,
+        probe_asn=f"AS{probe_asn}",
+        probe_cc=probe_cc,
+        input=inp,
+    )
+    return urlunsplit(("https", "explorer.ooni.org", "/chart/mat", urlencode(p), ""))
 
 
 @metrics.timer("write_feed")
 def write_feed(feed, p: Path) -> None:
     """Write out RSS feed atomically"""
     tmp_p = p.with_suffix(".tmp")
-    with tmp_p.open("w") as f:
-        feed.write(f, "utf-8")
-
+    tmp_p.write_text(feed)
     tmp_p.rename(p)
 
 
-global_feed_cache = deque(maxlen=1000)
-
-
-@metrics.timer("update_rss_feed_global")
-def update_rss_feed_global(change: Change) -> None:
-    """Generate RSS feed for global events and write it in
-    /var/lib/detector/rss/global.xml
-    """
-    # The files are served by Nginx
-    global global_feed_cache
-    if not change.input:
-        return
-    global_feed_cache.append(change)
-    feed = feedgenerator.Rss201rev2Feed(
-        title="OONI events",
-        link="https://explorer.ooni.org",
-        description="Blocked services and websites detected by OONI",
-        language="en",
-    )
-    for c in global_feed_cache:
-        un = "" if c.blocked else "un"
-        country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
-        feed.add_item(
-            title=f"{c.input} {un}blocked in {country}",
-            link=explorer_url(c),
-            description=f"Change detected on {c.measurement_start_time}",
-            pubdate=c.measurement_start_time,
-            updateddate=datetime.utcnow(),
-        )
-    write_feed(feed, conf.rssdir / "global.xml")
-
-
-by_cc_feed_cache = {}
-
-
-@metrics.timer("update_rss_feed_by_country")
-def update_rss_feed_by_country(change: Change) -> None:
-    """Generate RSS feed for events grouped by country and write it in
-    /var/lib/detector/rss/by-country/<CC>.xml
-    """
-    # The files are served by Nginx
-    global by_cc_feed_cache
-    if not change.input:
-        return
-    cc = change.probe_cc
-    if cc not in by_cc_feed_cache:
-        by_cc_feed_cache[cc] = deque(maxlen=1000)
-    by_cc_feed_cache[cc].append(change)
-    feed = feedgenerator.Rss201rev2Feed(
-        title=f"OONI events in {cc}",
-        link="https://explorer.ooni.org",
-        description="Blocked services and websites detected by OONI",
-        language="en",
-    )
-    for c in by_cc_feed_cache[cc]:
-        un = "" if c.blocked else "un"
-        country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
-        feed.add_item(
-            title=f"{c.input} {un}blocked in {country}",
-            link=explorer_url(c),
-            description=f"Change detected on {c.measurement_start_time}",
-            pubdate=c.measurement_start_time,
-            updateddate=datetime.utcnow(),
-        )
-    write_feed(feed, conf.rssdir_by_cc / f"{cc}.xml")
-
-
-@metrics.timer("update_rss_feeds_by_cc_tname_inp")
-def update_rss_feeds_by_cc_tname_inp(events, hashfname):
-    """Generate RSS feed by cc / test_name / input and write
-    /var/lib/detector/rss/cc-type-inp/<hash>.xml
-    """
+@metrics.timer("generate_rss_feed")
+def generate_rss_feed(events):
+    """Generate RSS feed into /var/lib/detector/rss/<fname>.xml"""
     # The files are served by Nginx
     feed = feedgenerator.Rss201rev2Feed(
         title="OONI events",
@@ -234,57 +165,39 @@ def update_rss_feeds_by_cc_tname_inp(events, hashfname):
         description="Blocked services and websites detected by OONI",
         language="en",
     )
-    # TODO: render date properly and add blocked/unblocked
-    # TODO: put only recent events in the feed (based on the latest event time)
-    for e in events:
-        if not e["input"]:
-            continue
-
-        country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
+    for test_name, inp, probe_cc, probe_asn, status, time in events:
+        # country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
+        status2 = "unblocked" if status == "OK" else "blocked"
+        link = explorer_mat_url(test_name, inp, probe_cc, probe_asn, time)
         feed.add_item(
-            title=f"{c.input} {un}blocked in {country}",
-            link=explorer_url(c),
-            description=f"Change detected on {c.measurement_start_time}",
-            pubdate=c.measurement_start_time,
+            title=f"{inp} {status2} in {probe_cc} AS{probe_asn}",
+            link=link,
+            description=f"Change detected on {time}",
+            pubdate=time,
             updateddate=datetime.utcnow(),
         )
 
-    write_feed(feed, conf.rssdir / f"{hashfname}.xml")
+    return feed.writeString("utf-8")
 
 
-@metrics.timer("upsert_change")
-def upsert_change(change):
-    """Create / update RSS and JSON files with a new change"""
-    # Create DB tables in future if needed
-    if not change.report_id:
-        log.error("Empty report_id")
-        return
-
-    try:
-        update_rss_feed_global(change)
-        update_rss_feed_by_country(change)
-    except Exception as e:
-        log.error(e, exc_info=1)
-
-    # TODO: currently unused
-    return
-
-    # Append change to a list in a JSON file
-    # It contains all the block/unblock events for a given cc/test_name/input
-    hashfname = basefn(change.probe_cc, change.test_name, change.input)
-    events_f = conf.eventdir / f"{hashfname}.json"
-    if events_f.is_file():
-        with events_f.open() as f:
-            ecache = ujson.load(f)
-    else:
-        ecache = dict(format=1, blocking_events=[])
-
-    ecache["blocking_events"].append(change._asdict())
-    log.info("Saving %s", events_f)
-    with events_f.open("w") as f:
-        ujson.dump(ecache, f)
-
-    update_rss_feeds_by_cc_tname_inp(ecache["blocking_events"], hashfname)
+@metrics.timer("rebuild_feeds")
+def rebuild_feeds(changes):
+    """Rebuild whole feeds"""
+    # Changes are rare enough that running a query on blocking_events for each
+    # changes is not too heavy
+    sql = """SELECT test_name, input, probe_cc, probe_asn, status, time
+        FROM blocking_events
+        WHERE test_name = %(test_name)s AND input = %(inp)s
+        AND probe_cc = %(cc)s AND probe_asn = %(asn)s
+        ORDER BY time
+    """
+    for test_name, inp, probe_cc, probe_asn in changes:
+        d = dict(test_name=test_name, inp=inp, cc=probe_cc, asn=probe_asn)
+        events = query(sql, d)
+        fname = f"{probe_cc}-AS{probe_asn}"
+        log.info(f"Generating feed for {fname}")
+        feed = generate_rss_feed(events, fname)
+        write_feed(feed, conf.rssdir / f"{fname}.xml")
 
 
 def load_country_name_map():
@@ -306,7 +219,8 @@ def load_country_name_map():
     return d
 
 
-def create_tables(click) -> None:
+def create_tables() -> None:
+    # Requires admin privileges
     sql = """
 CREATE TABLE IF NOT EXISTS blocking_status
 (
@@ -328,7 +242,7 @@ ENGINE = ReplacingMergeTree
 ORDER BY (test_name, input, probe_cc, probe_asn)
 SETTINGS index_granularity = 4
 """
-    click.execute(sql)
+    query(sql)
     sql = """
 CREATE TABLE IF NOT EXISTS blocking_events
 (
@@ -344,18 +258,23 @@ ENGINE = ReplacingMergeTree
 ORDER BY (test_name, input, probe_cc, probe_asn, time)
 SETTINGS index_granularity = 4
 """
-    click.execute(sql)
+    query(sql)
+    sql = "CREATE USER IF NOT EXISTS detector IDENTIFIED WITH plaintext_password BY 'detector'"
+    query(sql)
+    query("GRANT SELECT,INSERT,OPTIMIZE,SHOW ON blocking_status TO detector")
+    query("GRANT SELECT,INSERT,OPTIMIZE,SHOW ON blocking_events TO detector")
+    query("GRANT SELECT ON * TO detector")
 
 
 @metrics.timer("rebuild_status")
 def rebuild_status(click, start_date, end_date, services) -> None:
     log.info("Truncate blocking_status")
     sql = "TRUNCATE TABLE blocking_status"
-    click.execute(sql)
+    query(sql)
 
     log.info("Truncate blocking_events")
     sql = "TRUNCATE TABLE blocking_events"
-    click.execute(sql)
+    query(sql)
 
     log.info("Fill status")
     sql = """
@@ -384,27 +303,27 @@ AND measurement_start_time < %(end_date)s
 GROUP BY test_name, input, probe_cc, probe_asn;
 """
     urls = sorted(set(u for urls in services.values() for u in urls))
-    click.execute(sql, dict(start_date=start_date, end_date=end_date, urls=urls))
+    query(sql, dict(start_date=start_date, end_date=end_date, urls=urls))
     log.info("Fill done")
 
 
 @metrics.timer("run_detection")
-def run_detection(click, start_date, end_date, services):
-    # log.info(f"Running detection from {start_date} to {end_date}")
-    # FIXME DEBUG
-    t0 = time.monotonic()
+def run_detection(start_date, end_date, services) -> None:
+    if not conf.reprocess:
+        log.info(f"Running detection from {start_date} to {end_date}")
 
-    sql = """SELECT count() AS cnt FROM fastpath
- WHERE test_name IN ['web_connectivity']
- AND msm_failure = 'f'
- AND measurement_start_time >= %(start_date)s
- AND measurement_start_time < %(end_date)s
- AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
-    """
-    d = dict(start_date=start_date, end_date=end_date)
-    got_it = bool(click.execute(sql, d)[0][0])
+    if 0 and conf.reprocess:
+        sql = """SELECT count() AS cnt FROM fastpath
+    WHERE test_name IN ['web_connectivity']
+    AND msm_failure = 'f'
+    AND measurement_start_time >= %(start_date)s
+    AND measurement_start_time < %(end_date)s
+    AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
+        """
+        d = dict(start_date=start_date, end_date=end_date)
+        log_example = bool(query(sql, d)[0][0])
 
-    # TODO description
+    # TODO add description
     sql = """
 INSERT INTO blocking_status (test_name, input, probe_cc, probe_asn,
   confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status, old_status, change, stability)
@@ -468,22 +387,19 @@ ON
     mu = 1 - tau
     urls = sorted(set(u for urls in services.values() for u in urls))
     d = dict(start_date=start_date, end_date=end_date, tau=tau, mu=mu, urls=urls)
-    click.execute(sql, d)
+    query(sql, d)
 
-    return
-
-    sql = """SELECT accessible_perc, cnt, status, stability FROM blocking_status FINAL
- WHERE probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
-    """
-    if got_it:
-        it = list(click.execute(sql)[0])
+    if 0 and conf.reprocess and log_example:
+        sql = """SELECT accessible_perc, cnt, status, stability FROM blocking_status FINAL
+        WHERE probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
+        """
+        it = list(query(sql)[0])
         it.append(str(start_date))
-        # it.append(time.monotonic() - t0)
         print(repr(it) + ",")
 
 
 @metrics.timer("extract_changes")
-def extract_changes(click, run_date):
+def extract_changes(run_date):
     sql = """
     INSERT INTO blocking_events (test_name, input, probe_cc, probe_asn, status,
     time)
@@ -492,7 +408,19 @@ def extract_changes(click, run_date):
     WHERE status != old_status
     AND old_status != ''
     """
-    li = click.execute(sql, dict(t=run_date))
+    query(sql, dict(t=run_date))
+
+    # TODO: simplify?
+    # https://github.com/mymarilyn/clickhouse-driver/issues/221
+    sql = """
+    SELECT test_name, input, probe_cc, probe_asn
+    FROM blocking_status FINAL
+    WHERE status != old_status
+    """
+    if not conf.reprocess:
+        sql += " AND old_status != ''"
+    sql += " AND old_status != ''"
+    changes = query(sql, dict(t=run_date))
 
     sql = """SELECT test_name, input, probe_cc, probe_asn, old_status, status
     FROM blocking_status FINAL
@@ -500,47 +428,64 @@ def extract_changes(click, run_date):
     AND old_status != ''
     AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
     """
-    # FIXME DEBUG
-    if 0:
-        li = click.execute(sql)
+    if conf.reprocess:
+        li = query(sql)
         for tn, inp, cc, asn, old_status, status in li:
             log.info(f"{run_date} {old_status} -> {status} in {cc} {asn} {inp}")
 
+    return changes
+
 
 @metrics.timer("process_historical_data")
-def process_historical_data(click, start_date, end_date, interval, services):
+def process_historical_data(start_date, end_date, interval, services):
     """Process past data"""
     log.info(f"Running process_historical_data from {start_date} to {end_date}")
-    create_tables(click)
     run_date = start_date + interval
     rebuild_status(click, start_date, run_date, services)
     while run_date < end_date:
-        # bscnt = click.execute("SELECT count() FROM blocking_status FINAL")[0][0]
-        # log.info(bscnt)
-        run_detection(click, run_date, run_date + interval, services)
-        extract_changes(click, run_date)
+        run_detection(run_date, run_date + interval, services)
+        changes = extract_changes(run_date)
+        if changes:
+            rebuild_feeds(changes)
         run_date += interval
 
     log.debug("Done")
 
 
+def gen_stats():
+    sql = "SELECT count() FROM blocking_status FINAL"
+    bss = query(sql)[0][0]
+    metrics.gauge("blocking_status_tblsize", bss)
+    sql = "SELECT count() FROM blocking_events"
+    bes = query(sql)[0][0]
+    metrics.gauge("blocking_events_tblsize", bes)
+
+
 def main():
+    global click
     setup()
     log.info("Starting")
     # cc_to_country_name = load_country_name_map()
     click = Clickhouse.from_url(conf.db_uri)
+    # create_tables()
     # FIXME: configure services
     services = {
         "Facebook": ["https://www.facebook.com/"],
         "Twitter": ["https://twitter.com/"],
     }
-    if conf.repro:
+    if conf.reprocess:
         assert conf.start_date and conf.end_date, "Dates not set"
-        process_historical_data(
-            click, conf.start_date, conf.end_date, conf.interval, services
-        )
-    # FIXME: implement timed run
-    # FIXME: implement feed generators
+        process_historical_data(conf.start_date, conf.end_date, conf.interval, services)
+        return
+
+    end_date = datetime.utcnow()
+    start_date = end_date - conf.interval
+    run_detection(start_date, end_date, services)
+    changes = extract_changes(end_date)
+    if changes:
+        rebuild_feeds(changes)
+    gen_stats()
+    log.info("Done")
 
 
 if __name__ == "__main__":
