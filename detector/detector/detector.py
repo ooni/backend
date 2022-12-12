@@ -3,20 +3,13 @@
 """
 OONI Event detector
 
-Run sequence:
-
 Fetch historical msmt from the fastpath tables
 
 Analise msmt score with moving average to detect blocking/unblocking
+See the run_detection function for details
 
-Save outputs to local directories:
-    - RSS feed                                      /var/lib/detector/rss/
-        rss/global.xml                All events, globally
-        rss/by-country/<CC>.xml       Events by country
-        rss/type-inp/<hash>.xml       Events by test_name and input
-        rss/cc-type-inp/<hash>.xml    Events by CC, test_name and input
-    - JSON files with block/unblock events          /var/lib/detector/events/
-    - JSON files with current blocking status       /var/lib/detector/status/
+Save RSS feeds to local directories:
+  - /var/lib/detector/rss/<fname>.xml    Events by CC, ASN, test_name and input
 
 The tree under /var/lib/detector/ is served by Nginx with the exception of _internal
 
@@ -33,7 +26,6 @@ the blocking_* DB tables.
 # debdeps: python3-setuptools
 
 from argparse import ArgumentParser
-from collections import namedtuple, deque
 from configparser import ConfigParser
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -194,6 +186,7 @@ def rebuild_feeds(changes):
     for test_name, inp, probe_cc, probe_asn in changes:
         d = dict(test_name=test_name, inp=inp, cc=probe_cc, asn=probe_asn)
         events = query(sql, d)
+        # FIXME: add test_name and input
         fname = f"{probe_cc}-AS{probe_asn}"
         log.info(f"Generating feed for {fname}")
         feed = generate_rss_feed(events, fname)
@@ -306,13 +299,54 @@ GROUP BY test_name, input, probe_cc, probe_asn;
     query(sql, dict(start_date=start_date, end_date=end_date, urls=urls))
     log.info("Fill done")
 
-
+#
+# The blocking event detector is meant to run frequently in order to
+# provide fast response to events - currently every 10 mins.
+# As the amount of probes and measuraments increases, extracting all the
+# required data for multiple inputs/CCs/ASNs and past weeks/months could
+# become too CPU and memory-intensive for the database and the detector.
+# Therefore we run the detection on the database side as much as possible.
+# The current version uses moving averages stored in a status table
+# `blocking_status`.
+# Detection is performed on test_name+probe_cc+probe_asn+input aka "TCAI"
+# following query. It's easier to read the query from the bottom up:
+#  - Select data from the fastpath table for the last time window, counting
+#    the percentages of confirmed, anomaly-but-not-confirmed etc. --> As "new"
+#  - Select stored related moving averages etc. from blocking_status.
+#    FINAL is required to avoid duplicates due to table updates.
+#  - Join the two queries on TCAI
+#  - Run SELECT to compute new values:
+#    - The empty(blocking_status... parts are simply picking the right
+#      value in case the entry is missing from blocking_status (TCAI never
+#      seen before) or not in fastpath (no recent msmts for a given TCAI)
+#    - Weighted percentages e.g.
+#      (new_confirmed_perc * msmt count * μ + stored_perc * blocking_status.cnt * 𝜏) / totcnt
+#      Where: 𝜏 < 1, μ = 1 - t  are used to combine old vs new values,
+#       blocking_status.cnt is an averaged count of seen msmts representing how
+#       "meaningful" the confirmed percentage in the blocking_status table is.
+#    - Stability: compares the current and stored accessible/ confirmed/etc
+#        percentage. 1 if there is no change, 0 for maximally fast change.
+#        (Initialized as 0 for new TCAI)
+#  - Then run another SELECT to:
+#    - Set `status` based on accessible thresholds and stability
+#      We don't want to trigger a spurius change if accessibility rates
+#      floating a lot.
+#    - Set `change` if the detected status is different from the past
+#  - INSERT: Finally store the TCAI, the moving averages, msmt count, change,
+#    stability in blocking_status to use it in the next cycle.
+#
+#  As the INSERT does not returns the rows, we select them in extract_changes
+#  (with FINAL) to record them into `blocking_events`.
+#  If there are changes we then extract the whole history for each changed
+#  TCAI in rebuild_feeds.
+#
 @metrics.timer("run_detection")
 def run_detection(start_date, end_date, services) -> None:
     if not conf.reprocess:
         log.info(f"Running detection from {start_date} to {end_date}")
 
     if 0 and conf.reprocess:
+        # Used for debugging
         sql = """SELECT count() AS cnt FROM fastpath
     WHERE test_name IN ['web_connectivity']
     AND msm_failure = 'f'
@@ -323,7 +357,7 @@ def run_detection(start_date, end_date, services) -> None:
         d = dict(start_date=start_date, end_date=end_date)
         log_example = bool(query(sql, d)[0][0])
 
-    # TODO add description
+    # FIXME:   new.cnt * %(mu)f + blocking_status.cnt * %(tau)f AS totcnt
     sql = """
 INSERT INTO blocking_status (test_name, input, probe_cc, probe_asn,
   confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status, old_status, change, stability)
@@ -422,6 +456,7 @@ def extract_changes(run_date):
     sql += " AND old_status != ''"
     changes = query(sql, dict(t=run_date))
 
+    # Debugging
     sql = """SELECT test_name, input, probe_cc, probe_asn, old_status, status
     FROM blocking_status FINAL
     WHERE status != old_status
@@ -453,6 +488,7 @@ def process_historical_data(start_date, end_date, interval, services):
 
 
 def gen_stats():
+    """Generate gauge metrics showing the table sizes"""
     sql = "SELECT count() FROM blocking_status FINAL"
     bss = query(sql)[0][0]
     metrics.gauge("blocking_status_tblsize", bss)
@@ -465,6 +501,7 @@ def main():
     global click
     setup()
     log.info("Starting")
+    # TODO: use country names
     # cc_to_country_name = load_country_name_map()
     click = Clickhouse.from_url(conf.db_uri)
     # create_tables()
@@ -484,6 +521,7 @@ def main():
     changes = extract_changes(end_date)
     if changes:
         rebuild_feeds(changes)
+        # TODO: create an index of available RSS feeds
     gen_stats()
     log.info("Done")
 
