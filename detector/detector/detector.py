@@ -362,7 +362,7 @@ def run_detection(start_date, end_date, services) -> None:
 INSERT INTO blocking_status (test_name, input, probe_cc, probe_asn,
   confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status, old_status, change, stability)
 SELECT test_name, input, probe_cc, probe_asn,
-  confirmed_perc, pure_anomaly_perc, accessible_perc, totcnt AS cnt,
+  confirmed_perc, pure_anomaly_perc, accessible_perc, movingcnt AS cnt,
   multiIf(
     accessible_perc < 80 AND stability > 0.95, 'BLOCKED',
     accessible_perc > 95 AND stability > 0.97, 'OK',
@@ -378,16 +378,13 @@ SELECT
  empty(blocking_status.input) ? new.input : blocking_status.input AS input,
  empty(blocking_status.probe_cc) ? new.probe_cc : blocking_status.probe_cc AS probe_cc,
  (blocking_status.probe_asn = 0) ? new.probe_asn : blocking_status.probe_asn AS probe_asn,
- new.cnt * %(mu)f + blocking_status.cnt * %(tau)f AS totcnt,
+ new.cnt * %(mu)f + blocking_status.cnt * %(tau)f AS movingcnt,
  blocking_status.status,
  blocking_status.change,
- (new.confirmed_perc * new.cnt * %(mu)f +
-  blocking_status.confirmed_perc * blocking_status.cnt * %(tau)f) / totcnt AS confirmed_perc,
- (new.pure_anomaly_perc * new.cnt * %(mu)f +
-  blocking_status.pure_anomaly_perc * blocking_status.cnt * %(tau)f) / totcnt AS pure_anomaly_perc,
- (new.accessible_perc * new.cnt * %(mu)f +
-  blocking_status.accessible_perc * blocking_status.cnt * %(tau)f) / totcnt AS accessible_perc,
-
+ new.cnt + blocking_status.cnt AS totcnt,
+ new.confirmed_perc    * new.cnt/totcnt * %(mu)f + blocking_status.confirmed_perc    * blocking_status.cnt/totcnt * %(tau)f AS confirmed_perc,
+ new.pure_anomaly_perc * new.cnt/totcnt * %(mu)f + blocking_status.pure_anomaly_perc * blocking_status.cnt/totcnt * %(tau)f AS pure_anomaly_perc,
+ new.accessible_perc   * new.cnt/totcnt * %(mu)f + blocking_status.accessible_perc   * blocking_status.cnt/totcnt * %(tau)f AS accessible_perc,
  ( cos(3.14/2*(new.accessible_perc - blocking_status.accessible_perc)/100) * 0.7 +
   blocking_status.stability * 0.3) AS stability
 
