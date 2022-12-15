@@ -2,15 +2,14 @@ Source: detector
 Section: python
 Priority: optional
 Maintainer: Federico Ceratto <federico@debian.org>
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: debhelper-compat (= 13),
  python3,
- dh-systemd (>= 1.5),
  dh-python,
  python3-clickhouse-driver,
  python3-setuptools,
  python3-statsd,
  python3-systemd
-Standards-Version: 4.1.3
+Standards-Version: 4.6.0
 
 Package: detector
 Architecture: all
