@@ -189,7 +189,7 @@ def rebuild_feeds(changes):
         # FIXME: add test_name and input
         fname = f"{probe_cc}-AS{probe_asn}"
         log.info(f"Generating feed for {fname}")
-        feed = generate_rss_feed(events, fname)
+        feed = generate_rss_feed(events)
         write_feed(feed, conf.rssdir / f"{fname}.xml")
 
 
