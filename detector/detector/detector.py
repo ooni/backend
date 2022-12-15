@@ -385,8 +385,9 @@ SELECT
  new.confirmed_perc    * new.cnt/totcnt * %(mu)f + blocking_status.confirmed_perc    * blocking_status.cnt/totcnt * %(tau)f AS confirmed_perc,
  new.pure_anomaly_perc * new.cnt/totcnt * %(mu)f + blocking_status.pure_anomaly_perc * blocking_status.cnt/totcnt * %(tau)f AS pure_anomaly_perc,
  new.accessible_perc   * new.cnt/totcnt * %(mu)f + blocking_status.accessible_perc   * blocking_status.cnt/totcnt * %(tau)f AS accessible_perc,
- ( cos(3.14/2*(new.accessible_perc - blocking_status.accessible_perc)/100) * 0.7 +
-  blocking_status.stability * 0.3) AS stability
+ if(new.cnt > 0,
+  cos(3.14/2*(new.accessible_perc - blocking_status.accessible_perc)/100) * 0.7 + blocking_status.stability * 0.3,
+  blocking_status.stability) AS stability
 
 FROM blocking_status FINAL
 
