@@ -13,6 +13,7 @@ setup(
     entry_points={
         "console_scripts": [
             "analysis=analysis.analysis:main",
+            "ooni-db-backup=ooni_db_backup:main",
             "rotation=rotation:main",
         ]
     },

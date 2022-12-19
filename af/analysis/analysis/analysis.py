@@ -40,7 +40,6 @@ import os
 import logging
 import sys
 
-from analysis import backup_to_s3
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
@@ -77,7 +76,6 @@ def parse_args() -> Namespace:
         action="store_true",
         help="Dry run, supported only by some commands",
     )
-    ap.add_argument("--backup-db", action="store_true", help="Backup DB to S3")
     # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
@@ -106,11 +104,6 @@ def main() -> None:
         Path("./var/lib/analysis") if conf.devel else Path("/var/lib/analysis")
     )
     os.makedirs(conf.output_directory, exist_ok=True)
-
-    if conf.backup_db:
-        backup_to_s3.log = log
-        backup_to_s3.run_backup(conf, cp)
-        return
 
     try:
         if conf.update_citizenlab:

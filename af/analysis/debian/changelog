@@ -1,3 +1,9 @@
+analysis (1.7) unstable; urgency=medium
+
+  * Implement Clickhouse S3 backup
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 16 Dec 2022 12:29:46 +0000
+
 analysis (1.6) unstable; urgency=medium
 
   * Keep rotated VMs history

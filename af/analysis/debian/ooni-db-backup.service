@@ -4,7 +4,7 @@ Wants=ooni-db-backup.timer
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/analysis --backup-db
+ExecStart=/usr/bin/ooni-db-backup
 
 [Install]
 WantedBy=multi-user.target
