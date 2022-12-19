@@ -223,7 +223,7 @@ def export_table(
     log.info(f"exporting {tblname} as {s3path}")
     log.info(sql)
     t0 = perf_counter()
-    r = click.execute(sql, kw)
+    click.execute(sql, kw)
     delta_ms = int((perf_counter() - t0) * 1000)
     metrics.gauge(f"table_{tblname}_backup_time_ms", delta_ms)
     log.info("table backup completed")
@@ -247,7 +247,7 @@ def run_export(conf) -> None:
         export_table(click, aws_id, aws_secret, baseurl, tblname)
         sleep(5)
 
-    return #FIXME
+    return  # FIXME
     aws_id = conf["private_aws_access_key_id"]
     aws_secret = conf["private_aws_secret_access_key"]
     bucket_name = conf["private_bucket_name"]
