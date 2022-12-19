@@ -8,7 +8,7 @@ NAME = "analysis"
 setup(
     name=NAME,
     python_requires=">=3.7.0",
-    py_modules=["rotation"],
+    py_modules=["rotation", "ooni_db_backup"],
     packages=["analysis"],
     entry_points={
         "console_scripts": [
