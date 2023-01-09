@@ -102,7 +102,7 @@ def test_check_in_basic(client):
     assert cc == "US"
 
     # psiphon and tor configurations
-    assert sorted(c["conf"]) == ["psiphon", "tor"]
+    assert sorted(c["conf"]) == ["features", "psiphon", "tor"]
 
 
 def test_check_in_url_category_news(client):
