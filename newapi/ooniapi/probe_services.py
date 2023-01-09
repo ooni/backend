@@ -176,6 +176,7 @@ def check_in() -> Response:
           properties:
             v:
               type: integer
+              description: response format version
             probe_cc:
               type: string
               description: probe CC inferred from GeoIP or ZZ
@@ -188,8 +189,19 @@ def check_in() -> Response:
             utc_time:
               type: string
               description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
+            conf:
+              type: object
+              description: auxiliary configuration parameters
+              psiphon:
+                type: object
+              tor:
+                type: object
+              features:
+                type: object
+                description: feature flags
             tests:
               type: object
+              description: test-specific configuration
               properties:
                 web_connectivity:
                   type: object
@@ -256,10 +268,18 @@ def check_in() -> Response:
     try:
         torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
         psconf = _load_json(current_app.config["PSIPHON_CONFFILE"])
-        conf = dict(tor=torconf, psiphon=psconf)
+        conf = dict(tor=torconf, psiphon=psconf, features={})
     except Exception as e:
         log.error(str(e), exc_info=True)
-        conf = {}
+        conf = dict(features={})
+
+    try:
+        ipaddr = extract_probe_ipaddr()
+        n = int(ipaddr.split(".", 2)[1])
+        if n in (30, 31):
+            conf["features"]["webconnectivity_0.5"] = True
+    except Exception:
+        pass
 
     resp["tests"] = {
         "web_connectivity": {"urls": test_items},

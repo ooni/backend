@@ -1,3 +1,9 @@
+ooni-api (1.0.35) unstable; urgency=medium
+
+  * Add feature flagging
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 09 Jan 2023 17:41:05 +0000
+
 ooni-api (1.0.34) unstable; urgency=medium
 
   * Implement MAT granularity
