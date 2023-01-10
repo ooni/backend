@@ -274,9 +274,10 @@ def check_in() -> Response:
         conf = dict(features={})
 
     try:
+        # set webconnectivity_0.5 feature flag for some probes
         ipaddr = extract_probe_ipaddr()
         n = int(ipaddr.split(".", 2)[1])
-        if n in (30, 31):
+        if n in (34,):
             conf["features"]["webconnectivity_0.5"] = True
     except Exception:
         pass
