@@ -7,6 +7,9 @@ jobs:
     runs-on: "ubuntu-20.04"
     container: debian:10
     steps:
+      - name: Change Owner of Container Working Directory
+        run: chown root:root .
+
       - name: Install git
         run: |
           apt-get update -q
