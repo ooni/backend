@@ -566,11 +566,6 @@ def list_test_helpers() -> Response:
         schema:
           type: object
     """
-    # TODO(bassosimone): document in the above Swagger the returned
-    # type once ooni/probe-cli can handle them okay. Currently, we
-    # have code assuming a generic dictionary and we'd like to merge
-    # https://github.com/ooni/probe-cli/pull/234 _before_ engaging
-    # in further refactoring for correctness.
     conf = generate_test_helpers_conf()
     return cachedjson("0s", **conf)
 
