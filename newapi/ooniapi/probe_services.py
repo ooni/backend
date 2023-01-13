@@ -287,6 +287,8 @@ def check_in() -> Response:
     if octect in (34,):
         conf["features"]["webconnectivity_0.5"] = True
 
+    conf["test-helpers"] = generate_test_helpers_conf()
+
     resp["tests"] = {
         "web_connectivity": {"urls": test_items},
     }
@@ -497,25 +499,9 @@ def probe_login_post() -> Response:
     return nocachejson(token=token, expire=expire)
 
 
-@probe_services_blueprint.route("/api/v1/test-helpers")
-@metrics.timer("list_test_helpers")
-def list_test_helpers() -> Response:
-    """Probe Services: List test helpers
-    ---
-    produces:
-      - application/json
-    responses:
-      200:
-        description: A single user item
-        schema:
-          type: object
-    """
-    # TODO(bassosimone): document in the above Swagger the returned
-    # type once ooni/probe-cli can handle them okay. Currently, we
-    # have code assuming a generic dictionary and we'd like to merge
-    # https://github.com/ooni/probe-cli/pull/234 _before_ engaging
-    # in further refactoring for correctness.
-    j = {
+def generate_test_helpers_conf() -> Dict:
+    # Load-balance test helpers deterministically
+    conf = {
         "dns": [
             {"address": "37.218.241.93:57004", "type": "legacy"},
             {"address": "37.218.241.93:57004", "type": "legacy"},
@@ -553,10 +539,9 @@ def list_test_helpers() -> Response:
             },
         ],
     }
-    # Load-balance test helpers deterministically
     last_oct = extract_probe_ipaddr_octect(3, 0)
     th0, th1 = last_oct % 2, (last_oct + 1) % 2
-    j["web-connectivity"] = [
+    conf["web-connectivity"] = [
         {"address": f"https://{th0}.th.ooni.org", "type": "https"},
         {"address": f"https://{th1}.th.ooni.org", "type": "https"},
         {
@@ -565,8 +550,29 @@ def list_test_helpers() -> Response:
             "type": "cloudfront",
         },
     ]
+    return conf
 
-    return cachedjson("0s", **j)
+
+@probe_services_blueprint.route("/api/v1/test-helpers")
+@metrics.timer("list_test_helpers")
+def list_test_helpers() -> Response:
+    """Probe Services: List test helpers
+    ---
+    produces:
+      - application/json
+    responses:
+      200:
+        description: A single user item
+        schema:
+          type: object
+    """
+    # TODO(bassosimone): document in the above Swagger the returned
+    # type once ooni/probe-cli can handle them okay. Currently, we
+    # have code assuming a generic dictionary and we'd like to merge
+    # https://github.com/ooni/probe-cli/pull/234 _before_ engaging
+    # in further refactoring for correctness.
+    conf = generate_test_helpers_conf()
+    return cachedjson("0s", **conf)
 
 
 def _check_probe_token(desc):
