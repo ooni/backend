@@ -65,6 +65,20 @@ def test_index(client):
 # # Follow the order in ooniapi/probe_services.py
 
 
+## Functional tests
+
+
+def test_extract_probe_ipaddr_octect(app):
+    with app.test_request_context("/", headers={"X-Forwarded-For": "1.2.3.4"}):
+        assert ooniapi.probe_services.extract_probe_ipaddr() == "1.2.3.4"
+        assert ooniapi.probe_services.extract_probe_ipaddr_octect(0, 0) == 1
+        assert ooniapi.probe_services.extract_probe_ipaddr_octect(3, 0) == 4
+        assert ooniapi.probe_services.extract_probe_ipaddr_octect(77, -1) == -1
+
+    with app.test_request_context("/", headers={"X-Real-IP": "1.2.3.4"}):
+        assert ooniapi.probe_services.extract_probe_ipaddr() == "1.2.3.4"
+
+
 ## Test /api/v1/check-in
 
 
@@ -160,18 +174,20 @@ def test_check_in_url_prioritization_category_codes(client, citizenlab_tblready)
 
     assert set(r["url"] for r in c["results"])
 
+
 def test_check_in_geoip(client):
     j = dict(
         on_wifi=True,
         charging=False,
     )
     headers = [
-        ('X-Forwarded-For', '192.33.4.12') # The IP address of c.root-servers.net
+        ("X-Forwarded-For", "192.33.4.12")  # The IP address of c.root-servers.net
     ]
     c = client.post("/api/v1/check-in", json=j, headers=headers).json
     assert c["probe_cc"] == "US"
     assert c["probe_asn"] == "AS2149"
     assert c["probe_network_name"] is not None
+
 
 # # Test /api/v1/collectors
 

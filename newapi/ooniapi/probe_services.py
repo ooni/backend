@@ -52,6 +52,15 @@ def extract_probe_ipaddr() -> str:
     return request.remote_addr
 
 
+def extract_probe_ipaddr_octect(pos: int, default: int) -> int:
+    """Extracts an octect from the probe ipaddr"""
+    try:
+        ipaddr = extract_probe_ipaddr()
+        return int(ipaddr.split(".")[pos])
+    except Exception:
+        return default
+
+
 def lookup_probe_network(ipaddr: str) -> Tuple[str, str]:
     resp = current_app.geoip_asn_reader.asn(ipaddr)
     return (
@@ -273,14 +282,10 @@ def check_in() -> Response:
         log.error(str(e), exc_info=True)
         conf = dict(features={})
 
-    try:
-        # set webconnectivity_0.5 feature flag for some probes
-        ipaddr = extract_probe_ipaddr()
-        n = int(ipaddr.split(".", 2)[1])
-        if n in (34,):
-            conf["features"]["webconnectivity_0.5"] = True
-    except Exception:
-        pass
+    # set webconnectivity_0.5 feature flag for some probes
+    octect = extract_probe_ipaddr_octect(1, 0)
+    if octect in (34,):
+        conf["features"]["webconnectivity_0.5"] = True
 
     resp["tests"] = {
         "web_connectivity": {"urls": test_items},
@@ -549,11 +554,7 @@ def list_test_helpers() -> Response:
         ],
     }
     # Load-balance test helpers deterministically
-    probe_ipaddr = extract_probe_ipaddr()
-    try:
-        last_oct = int(probe_ipaddr.rsplit(".", 1)[1])
-    except Exception:
-        last_oct = 0
+    last_oct = extract_probe_ipaddr_octect(3, 0)
     th0, th1 = last_oct % 2, (last_oct + 1) % 2
     j["web-connectivity"] = [
         {"address": f"https://{th0}.th.ooni.org", "type": "https"},
