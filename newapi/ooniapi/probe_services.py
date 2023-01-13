@@ -287,7 +287,7 @@ def check_in() -> Response:
     if octect in (34,):
         conf["features"]["webconnectivity_0.5"] = True
 
-    conf["test-helpers"] = generate_test_helpers_conf()
+    conf["test_helpers"] = generate_test_helpers_conf()
 
     resp["tests"] = {
         "web_connectivity": {"urls": test_items},

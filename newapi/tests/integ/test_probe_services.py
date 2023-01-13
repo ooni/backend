@@ -116,7 +116,7 @@ def test_check_in_basic(client):
     assert cc == "US"
 
     # psiphon and tor configurations
-    assert sorted(c["conf"]) == ["features", "psiphon", "tor"]
+    assert sorted(c["conf"]) == ["features", "psiphon", "test_helpers", "tor"]
 
 
 def test_check_in_url_category_news(client):
@@ -125,7 +125,8 @@ def test_check_in_url_category_news(client):
         charging=True,
         web_connectivity=dict(category_codes=["NEWS"]),
     )
-    c = postj(client, "/api/v1/check-in", **j)
+    with patch("ooniapi.probe_services._load_json", new_callable=mock_load_json):
+        c = postj(client, "/api/v1/check-in", **j)
     assert c["v"] == 1
     urls = c["tests"]["web_connectivity"]["urls"]
     assert len(urls), urls
