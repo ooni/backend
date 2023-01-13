@@ -28,19 +28,20 @@ jobs:
         run: make initdb
 
       - name: Run all tests
-        run: T="--show-capture=no -s -vv --junitxml=pytest.xml" make tests
+        run: T="--show-capture=no -s -vv" make tests
+        #run: T="--show-capture=no -s -vv --junitxml=pytest.xml" make tests
 
       #- name: debug docker
       #  if: always()
       #  run: docker ps -a
 
-      - run: find / -name pytest.xml 2> /dev/null
-        if: success() || failure() # run even if previous step failed
+      # - run: find / -name pytest.xml 2> /dev/null
+      #   if: success() || failure() # run even if previous step failed
 
-      - name: Test report
-        uses: dorny/test-reporter@v1
-        if: success() || failure() # run even if previous step failed
-        with:
-          name: Test report
-          path: '/home/runner/work/api/api/newapi/pytest.xml'
-          reporter: java-junit     # compatible with pytest --junitxml
+      # - name: Test report
+      #   uses: dorny/test-reporter@v1
+      #   if: success() || failure() # run even if previous step failed
+      #   with:
+      #     name: Test report
+      #     path: '/home/runner/work/api/api/newapi/pytest.xml'
+      #     reporter: java-junit     # compatible with pytest --junitxml
