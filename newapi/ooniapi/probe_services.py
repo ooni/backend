@@ -549,7 +549,7 @@ def list_test_helpers() -> Response:
         ],
     }
     # Load-balance test helpers deterministically
-    probe_ipaddr = request.headers.get("X-Real-Ip", "0.0.0.0")
+    probe_ipaddr = extract_probe_ipaddr()
     try:
         last_oct = int(probe_ipaddr.rsplit(".", 1)[1])
     except Exception:
