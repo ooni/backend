@@ -1,3 +1,9 @@
+ooni-api (1.0.37) unstable; urgency=medium
+
+  * Add test-helpers data to check-in
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 13 Jan 2023 11:30:31 +0000
+
 ooni-api (1.0.35) unstable; urgency=medium
 
   * Add feature flagging
