@@ -201,10 +201,6 @@ def check_in() -> Response:
             conf:
               type: object
               description: auxiliary configuration parameters
-              psiphon:
-                type: object
-              tor:
-                type: object
               features:
                 type: object
                 description: feature flags
@@ -274,13 +270,7 @@ def check_in() -> Response:
         test_items = []
 
     metrics.gauge("check-in-test-list-count", len(test_items))
-    try:
-        torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
-        psconf = _load_json(current_app.config["PSIPHON_CONFFILE"])
-        conf = dict(tor=torconf, psiphon=psconf, features={})
-    except Exception as e:
-        log.error(str(e), exc_info=True)
-        conf = dict(features={})
+    conf = dict(features={})
 
     # set webconnectivity_0.5 feature flag for some probes
     octect = extract_probe_ipaddr_octect(1, 0)
