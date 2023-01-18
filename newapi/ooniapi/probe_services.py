@@ -270,7 +270,7 @@ def check_in() -> Response:
         test_items = []
 
     metrics.gauge("check-in-test-list-count", len(test_items))
-    conf = dict(features={})
+    conf: Dict[str, Any] = dict(features={})
 
     # set webconnectivity_0.5 feature flag for some probes
     octect = extract_probe_ipaddr_octect(1, 0)
