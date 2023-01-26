@@ -126,9 +126,10 @@ def query_with_retries(click, sql: str, kw: dict, pause_s=5, tries=100) -> float
             click.execute(sql, kw)
             return perf_counter() - t0
         except Exception as e:
-            log.debug(e)
+            log.error(e)
             if try_n == (tries - 1):
                 raise e
+            log.info("retrying")
             sleep(pause_s)
 
 
