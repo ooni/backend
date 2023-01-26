@@ -52,6 +52,7 @@ sql_incremental = """
 """
 
 
+# #  currently unused # #
 @metrics.timer("run_backup")
 def run_backup(conf) -> None:
     aws_id = conf["public_aws_access_key_id"]
@@ -60,7 +61,7 @@ def run_backup(conf) -> None:
     baseurl = f"https://{bucket_name}.s3.amazonaws.com/clickhouse_backup/"
     click = Clickhouse.from_url(conf["clickhouse_url"])
 
-    for tblname, tbl_setting in conf["tables"].items():
+    for tblname, tbl_setting in conf["backup_tables"].items():
         if tbl_setting == "ignore":
             log.info(f"Skipping {tblname}")
             continue
@@ -108,6 +109,29 @@ def describe_table(click, tblname):
     return s_colnames, s_blob
 
 
+def fastpath_has_rows(click, kw) -> bool:
+    sql = """SELECT count() FROM fastpath
+    WHERE toYYYYMM(measurement_start_time) = %(yyyymm)s"""
+    s = click.execute(sql, kw)
+    if not s:
+        return False
+    return s[0][0] > 0
+
+
+def query_with_retries(click, sql: str, kw: dict, pause_s=5, tries=100) -> float:
+    """Try query `tries` times. Return query duration"""
+    for try_n in range(tries):
+        try:
+            t0 = perf_counter()
+            click.execute(sql, kw)
+            return perf_counter() - t0
+        except Exception as e:
+            log.debug(e)
+            if try_n == (tries - 1):
+                raise e
+            sleep(pause_s)
+
+
 def export_fastpath(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
     tblname = "fastpath"
     s_colnames, s_blob = describe_table(click, tblname)
@@ -121,11 +145,12 @@ def export_fastpath(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
     SELECT ##colnames##
     FROM fastpath
     WHERE toYYYYMM(measurement_start_time) = %(yyyymm)s
-    SETTINGS s3_max_connections=4, max_insert_threads=4,
+    SETTINGS s3_max_connections=1, max_insert_threads=1,
     s3_min_upload_part_size=50100100;
     """
+    sql = basesql.replace("##colnames##", s_colnames)
     delta_ms = 0
-    for year in range(2012, 2024):
+    for year in range(2012, 2030):
         for month in range(1, 13):
             yyyymm = f"{year}{month:02}"
             s3path = f"{baseurl}/csv/{tblname}_{yyyymm}.csv.zstd"
@@ -136,12 +161,11 @@ def export_fastpath(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
                 yyyymm=yyyymm,
                 s_blob=s_blob,
             )
-            sql = basesql.replace("##colnames##", s_colnames)
+            if not fastpath_has_rows(click, kw):
+                continue
             log.info(f"exporting {tblname} {yyyymm}")
-            t0 = perf_counter()
-            log.info(sql)
-            click.execute(sql, kw)
-            delta_ms += int((perf_counter() - t0) * 1000)
+            elapsed_s = query_with_retries(click, sql, kw)
+            delta_ms += int(elapsed_s * 1000)
             metrics.gauge(f"table_{tblname}_backup_time_ms", delta_ms)
             sleep(10)
 
@@ -164,6 +188,7 @@ def export_jsonl(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
     SETTINGS s3_max_connections=4, max_insert_threads=4,
     s3_min_upload_part_size=50100100;
     """
+    sql = basesql.replace("##colnames##", s_colnames)
     delta_ms = 0
     chunk_size = 100_000_000
     chunk_num = 0
@@ -177,12 +202,12 @@ def export_jsonl(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
             offset=chunk_num * chunk_size,
             s_blob=s_blob,
         )
+        # FIXME
         sql = "SELECT count() FROM jsonl LIMIT %(limit)s OFFSET %(offset)s"
         r = click.execute(sql, kw)
         if not r or not r[0][0]:
             break
 
-        sql = basesql.replace("##colnames##", s_colnames)
         log.info(f"exporting {tblname} chunk {chunk_num}")
         t0 = perf_counter()
         log.info(sql)
@@ -231,8 +256,7 @@ def export_table(
 
 @metrics.timer("run_export")
 def run_export(conf) -> None:
-    """Export tables to S3 as zstd compressed CSV with colum names
-    """
+    """Export tables to S3 as zstd compressed CSV with colum names"""
     aws_id = conf["public_aws_access_key_id"]
     aws_secret = conf["public_aws_secret_access_key"]
     bucket_name = conf["public_bucket_name"]
@@ -240,18 +264,10 @@ def run_export(conf) -> None:
     click = Clickhouse.from_url(conf["clickhouse_url"])
 
     export_fastpath(click, aws_id, aws_secret, baseurl)
-    export_jsonl(click, aws_id, aws_secret, baseurl)
+    #export_jsonl(click, aws_id, aws_secret, baseurl)
 
-    tblnames = ("citizenlab", "msmt_feedback")
-    for tblname in tblnames:
-        export_table(click, aws_id, aws_secret, baseurl, tblname)
-        sleep(5)
-
-    return  # FIXME
-    aws_id = conf["private_aws_access_key_id"]
-    aws_secret = conf["private_aws_secret_access_key"]
-    bucket_name = conf["private_bucket_name"]
-    tblnames = ("test_helper_instances" "url_priorities")
+    # Export small tables
+    tblnames = ("citizenlab", )
     for tblname in tblnames:
         export_table(click, aws_id, aws_secret, baseurl, tblname)
         sleep(5)
