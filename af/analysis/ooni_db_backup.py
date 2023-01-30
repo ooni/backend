@@ -18,9 +18,14 @@ Metrix prefix: db-backup
 
 import json
 import logging
+import os
+import os.path
+import subprocess
 import sys
 
 from time import perf_counter, sleep
+
+import boto3  # debdeps: python3-boto3
 
 try:
     from systemd.journal import JournalHandler  # debdeps: python3-systemd
@@ -32,12 +37,17 @@ except ImportError:
 from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 from clickhouse_driver import Client as Clickhouse
 
+for x in ("urllib3", "botocore", "s3transfer"):
+    logging.getLogger(x).setLevel(logging.INFO)
+
+
 metrics = setup_metrics(name="db-backup")
 log = logging.getLogger("ooni-db-backup")
 
-# TODO backup schema
+# TODO: backup schema
 
-# backup implemented in release 22.10, 2022-10-25
+# TODO: move to the native BACKUP syntax
+# implemented in release 22.10, 2022-10-25
 sql_base = """
     BACKUP TABLE %(tblname)s TO
     S3(%(s3path_base)s, %(aws_id)s, %(aws_secret)s)
@@ -109,10 +119,10 @@ def describe_table(click, tblname):
     return s_colnames, s_blob
 
 
-def fastpath_has_rows(click, kw) -> bool:
+def fastpath_has_rows(click, yyyymm) -> bool:
     sql = """SELECT count() FROM fastpath
     WHERE toYYYYMM(measurement_start_time) = %(yyyymm)s"""
-    s = click.execute(sql, kw)
+    s = click.execute(sql, dict(yyyymm=yyyymm))
     if not s:
         return False
     return s[0][0] > 0
@@ -133,92 +143,88 @@ def query_with_retries(click, sql: str, kw: dict, pause_s=5, tries=100) -> float
             sleep(pause_s)
 
 
-def export_fastpath(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
-    tblname = "fastpath"
-    s_colnames, s_blob = describe_table(click, tblname)
-    assert s_blob.startswith("measurement_uid String, ")
-    # s_colnames is a string to be placed into ##colnames## without quotes
-    basesql = """
-    INSERT INTO FUNCTION s3(%(s3path)s, %(aws_id)s, %(aws_secret)s,
-        'CSVWithNames',
-        %(s_blob)s
-    )
-    SELECT ##colnames##
-    FROM fastpath
-    WHERE toYYYYMM(measurement_start_time) = %(yyyymm)s
-    SETTINGS s3_max_connections=1, max_insert_threads=1,
-    s3_min_upload_part_size=50100100;
+def export_fastpath(click, s3_client, bucket_name: str, data_cnt: int) -> int:
+    """Exports fastpath to a set of CSV.zstd files on S3.
+    Chunk table across the primary index to prevent heavy queries.
     """
-    sql = basesql.replace("##colnames##", s_colnames)
-    delta_ms = 0
+    tblname = "fastpath"
+    # TODO use dedicated directory
+    t0 = perf_counter()
     for year in range(2012, 2030):
         for month in range(1, 13):
             yyyymm = f"{year}{month:02}"
-            s3path = f"{baseurl}/csv/{tblname}_{yyyymm}.csv.zstd"
-            kw = dict(
-                aws_id=aws_id,
-                aws_secret=aws_secret,
-                s3path=s3path,
-                yyyymm=yyyymm,
-                s_blob=s_blob,
-            )
-            if not fastpath_has_rows(click, kw):
+            if not fastpath_has_rows(click, yyyymm):
+                log.info(f"Skipping {yyyymm}: no rows")
                 continue
+
+            tmpfn = f"/tmp/clickhouse_{tblname}_{yyyymm}.csv.zstd"
+            try:
+                os.remove(tmpfn)
+                log.info(f"Leftover {tmpfn} removed")
+            except FileNotFoundError:
+                pass
+            cmd = f"""clickhouse-client -q "SELECT * FROM fastpath WHERE toYYYYMM(measurement_start_time) = '{yyyymm}' FORMAT CSVWithNames" | zstd > {tmpfn}"""
             log.info(f"exporting {tblname} {yyyymm}")
-            elapsed_s = query_with_retries(click, sql, kw)
-            delta_ms += int(elapsed_s * 1000)
+            log.info(cmd)
+            subprocess.check_output(cmd, shell=True)
+            s3path = f"clickhouse_export/csv/{tblname}_{yyyymm}.csv.zstd"
+            size = upload_to_s3(s3_client, bucket_name, tmpfn, s3path)
+            os.remove(tmpfn)
+
+            data_cnt += size
+            metrics.gauge("uploaded_bytes_tot", data_cnt)
+            delta_ms = int((perf_counter() - t0) * 1000)
             metrics.gauge(f"table_{tblname}_backup_time_ms", delta_ms)
-            sleep(10)
+            sleep(5)
 
-    log.info("table backup completed")
+    log.info(f"{tblname} table backup completed")
+    return data_cnt
 
 
-def export_jsonl(click, aws_id: str, aws_secret: str, baseurl: str) -> None:
-    tblname = "jsonl"
-    s_colnames, s_blob = describe_table(click, tblname)
-    assert s_blob.startswith("report_id String, ")
-    # s_colnames is a string to be placed into ##colnames## without quotes.
-    # jsonl is indexed by report_id: chuck using LIMIT / OFFSET instead
-    basesql = """
-    INSERT INTO FUNCTION s3(%(s3path)s, %(aws_id)s, %(aws_secret)s,
-        'CSVWithNames',
-        %(s_blob)s
-    )
-    SELECT ##colnames##
-    FROM jsonl
-    SETTINGS s3_max_connections=4, max_insert_threads=4,
-    s3_min_upload_part_size=50100100;
+def export_jsonl(click, s3_client, bucket_name: str, data_cnt: int) -> int:
+    """Exports jsonl to a set of CSV.zstd files on S3.
+    Chunk table to prevent heavy queries and large files.
     """
-    sql = basesql.replace("##colnames##", s_colnames)
-    delta_ms = 0
+    tblname = "jsonl"
     chunk_size = 100_000_000
     chunk_num = 0
+    done = False
+    # TODO use dedicated directory
+    t0 = perf_counter()
     while True:
-        s3path = f"{baseurl}/csv/{tblname}_{chunk_num:05}.csv.zstd"
-        kw = dict(
-            aws_id=aws_id,
-            aws_secret=aws_secret,
-            s3path=s3path,
-            limit=chunk_size,
-            offset=chunk_num * chunk_size,
-            s_blob=s_blob,
-        )
-        # FIXME
-        sql = "SELECT count() FROM jsonl LIMIT %(limit)s OFFSET %(offset)s"
-        r = click.execute(sql, kw)
-        if not r or not r[0][0]:
-            break
+        tmpfn = f"/tmp/clickhouse_{tblname}_{chunk_num}.csv.zstd"
+        try:
+            os.remove(tmpfn)
+            log.info(f"Leftover {tmpfn} removed")
+        except FileNotFoundError:
+            pass
+        off = chunk_num * chunk_size
+        cmd = f"""clickhouse-client -q "SELECT * FROM jsonl LIMIT {chunk_size} OFFSET {off} FORMAT CSVWithNames" | zstd > {tmpfn}"""
+        log.info(f"exporting {tblname} {chunk_size}")
+        log.info(cmd)
+        subprocess.check_output(cmd, shell=True)
+        size = os.path.getsize(tmpfn)
+        if size > 120:
+            # hacky threshold that should work reliably unless we add many
+            # more columns to the table
+            s3path = f"clickhouse_export/csv/{tblname}_{chunk_num}.csv.zstd"
+            size = upload_to_s3(s3_client, bucket_name, tmpfn, s3path)
+        else:
+            done = True
 
-        log.info(f"exporting {tblname} chunk {chunk_num}")
-        t0 = perf_counter()
-        log.info(sql)
-        r = click.execute(sql, kw)
-        delta_ms += int((perf_counter() - t0) * 1000)
+        os.remove(tmpfn)
+
+        data_cnt += size
+        metrics.gauge("uploaded_bytes_tot", data_cnt)
+        delta_ms = int((perf_counter() - t0) * 1000)
         metrics.gauge(f"table_{tblname}_backup_time_ms", delta_ms)
+        if done:
+            break
+        sleep(5)
         chunk_num += 1
-        sleep(10)
 
-    log.info("table backup completed")
+    log.info(f"{tblname} table backup completed")
+    return data_cnt
 
 
 def export_table(
@@ -252,7 +258,24 @@ def export_table(
     click.execute(sql, kw)
     delta_ms = int((perf_counter() - t0) * 1000)
     metrics.gauge(f"table_{tblname}_backup_time_ms", delta_ms)
-    log.info("table backup completed")
+    log.info(f"{tblname} table backup completed")
+
+
+def create_s3_client(aws_id: str, aws_secret: str):
+    return boto3.client(
+        "s3",
+        aws_access_key_id=aws_id,
+        aws_secret_access_key=aws_secret,
+    )
+
+
+@metrics.timer("upload_to_s3")
+def upload_to_s3(s3_client, bucket_name: str, fn: str, s3path: str) -> int:
+    size = os.path.getsize(fn)
+    log.info(f"Uploading {s3path} to S3. Size: {size / 2**20} MB")
+    s3_client.upload_file(fn, bucket_name, s3path)
+    log.info("Upload completed")
+    return size
 
 
 @metrics.timer("run_export")
@@ -261,14 +284,18 @@ def run_export(conf) -> None:
     aws_id = conf["public_aws_access_key_id"]
     aws_secret = conf["public_aws_secret_access_key"]
     bucket_name = conf["public_bucket_name"]
-    baseurl = f"https://{bucket_name}.s3.amazonaws.com/clickhouse_export/"
     click = Clickhouse.from_url(conf["clickhouse_url"])
+    s3_client = create_s3_client(aws_id, aws_secret)
 
-    export_fastpath(click, aws_id, aws_secret, baseurl)
-    #export_jsonl(click, aws_id, aws_secret, baseurl)
+    # "INSERT INTO FUNCTION s3(...)" fails on large tables so we use a
+    # temporary file instead.
+    data_cnt = 0
+    data_cnt = export_fastpath(click, s3_client, bucket_name, data_cnt)
+    data_cnt = export_jsonl(click, s3_client, bucket_name, data_cnt)
 
     # Export small tables
-    tblnames = ("citizenlab", )
+    baseurl = f"https://{bucket_name}.s3.amazonaws.com/clickhouse_export/"
+    tblnames = ("citizenlab",)
     for tblname in tblnames:
         export_table(click, aws_id, aws_secret, baseurl, tblname)
         sleep(5)
