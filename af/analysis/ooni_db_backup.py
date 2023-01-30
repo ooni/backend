@@ -292,11 +292,11 @@ def run_export(conf) -> None:
     data_cnt = export_jsonl(click, s3_client, bucket_name, data_cnt)
 
     # Export small tables
-    baseurl = f"https://{bucket_name}.s3.amazonaws.com/clickhouse_export/"
-    tblnames = ("citizenlab",)
-    for tblname in tblnames:
-        export_table(click, aws_id, aws_secret, baseurl, tblname)
-        sleep(5)
+    # baseurl = f"https://{bucket_name}.s3.amazonaws.com/clickhouse_export/"
+    # tblnames = ("citizenlab",)
+    # for tblname in tblnames:
+    #     export_table(click, aws_id, aws_secret, baseurl, tblname)
+    #     sleep(5)
 
 
 def main() -> None:
