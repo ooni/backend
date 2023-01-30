@@ -240,8 +240,6 @@ def export_table(
     )
     SELECT ##colnames##
     FROM ##tblname##
-    SETTINGS s3_max_connections=4, max_insert_threads=4,
-    s3_min_upload_part_size=50100100;
     """
     s3path = f"{baseurl}/csv/{tblname}.csv.zstd"
     kw = dict(
