@@ -200,7 +200,7 @@ def export_jsonl(click, s3_client, bucket_name: str, data_cnt: int) -> int:
             pass
         off = chunk_num * chunk_size
         cmd = f"""clickhouse-client -q "SELECT * FROM jsonl LIMIT {chunk_size} OFFSET {off} FORMAT CSVWithNames" | zstd > {tmpfn}"""
-        log.info(f"exporting {tblname} {chunk_size}")
+        log.info(f"exporting {tblname} {chunk_num}")
         log.info(cmd)
         subprocess.check_output(cmd, shell=True)
         size = os.path.getsize(tmpfn)
