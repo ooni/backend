@@ -53,6 +53,7 @@ except ImportError:
 from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 
 from analysis.citizenlab_test_lists_updater import update_citizenlab_test_lists
+from analysis.fingerprints_updater import update_fingerprints
 
 
 # Global conf
@@ -66,6 +67,9 @@ def parse_args() -> Namespace:
     ap = ArgumentParser("Analysis script " + __doc__)
     ap.add_argument(
         "--update-citizenlab", action="store_true", help="Update citizenlab test lists"
+    )
+    ap.add_argument(
+        "--update-fingerprints", action="store_true", help="Update fingerprints"
     )
     ap.add_argument(
         "--dry-run",
@@ -109,6 +113,8 @@ def main() -> None:
     try:
         if conf.update_citizenlab:
             update_citizenlab_test_lists(conf)
+        elif conf.update_fingerprints:
+            update_fingerprints(conf)
 
     except Exception as e:
         log.error(str(e), exc_info=e)

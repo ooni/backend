@@ -14,6 +14,8 @@ import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
 from fastpath.normalize import iter_yaml_msmt_normalized
 
+import mock_fingerprints
+
 
 scores_failed = {
     "accuracy": 0.0,
@@ -76,14 +78,39 @@ def test_g_or():
     assert fp.g_or({"x": 0}, "x", "y") == 0
 
 
-def test_match_fingerprints_no_match():
-    fp.setup_fingerprints()
+@pytest.fixture
+def fprints():
+    fp.fingerprints = mock_fingerprints.fingerprints
+    yield
+    fp.fingerprints = None
+
+
+def test_match_fingerprints_no_match(fprints):
+    assert fp.fingerprints
+    assert fp.fingerprints["IN"] == {
+        "body_match": [
+            {"body_match": "The page you have requested has been blocked", "locality": "country"},
+            {"body_match": "http://www.airtel.in/dot/?dpid=", "locality": "isp"},
+        ],
+        "header_full": [{"header_full": "GoAhead-Webs", "header_name": "server", "locality": "local"}],
+        "header_prefix": [
+            {
+                "header_name": "via",
+                "header_prefix": "1.1 ironport1.iitj.ac.in:80 (Cisco-WSA/",
+                "locality": "local",
+            },
+            {
+                "header_name": "via",
+                "header_prefix": "1.1 ironport2.iitj.ac.in:80 (Cisco-WSA/",
+                "locality": "local",
+            },
+        ],
+    }
     msm = {"probe_cc": "IE", "test_keys": {"requests": []}}
     assert fp.match_fingerprints(msm) == []
 
 
-def test_match_fingerprints_match_country():
-    fp.setup_fingerprints()
+def test_match_fingerprints_match_country(fprints):
     msm = {
         "probe_cc": "MY",
         "test_keys": {"requests": [{"response": {"body": "foo ... Makluman/Notification ... foo"}}]},
@@ -92,8 +119,7 @@ def test_match_fingerprints_match_country():
     assert matches == [{"body_match": "Makluman/Notification", "locality": "country"}]
 
 
-def test_match_dns_fingerprints_match_country():
-    fp.setup_fingerprints()
+def test_match_dns_fingerprints_match_country(fprints):
     msm = {
         "probe_cc": "TR",
         "test_keys": {
@@ -117,8 +143,7 @@ def test_match_dns_fingerprints_match_country():
     assert matches == [{"dns_full": "195.175.254.2", "locality": "country"}]
 
 
-def test_match_fingerprints_dict_body():
-    fp.setup_fingerprints()
+def test_match_fingerprints_dict_body(fprints):
     # from 20200108T054856Z-web_connectivity-20200109T102441Z_AS42610_613KNyjuQqiuloY1a391dhZccSDz9M1MD30P6EpUIWSByjcq4T-AS42610-RU-probe-0.2.0.json
     msm = {
         "probe_cc": "MY",
@@ -138,15 +163,13 @@ def test_match_fingerprints_dict_body():
     assert fp.match_fingerprints(msm) == []
 
 
-def test_match_fingerprints_b64_hdr():
+def test_match_fingerprints_b64_hdr(fprints):
     msm = loadj("web_connectivity_b64_hdr.json")
-    fp.setup_fingerprints()
     assert fp.match_fingerprints(msm) == []
 
 
-def test_score_web_connectivity_dns_ir_fingerprint():
+def test_score_web_connectivity_dns_ir_fingerprint(fprints):
     msm = loadj("web_connectivity_ir_fp")
-    fp.setup_fingerprints()
     matches = fp.match_fingerprints(msm)
     assert matches == [{"dns_full": "10.10.34.36", "locality": "country"}]
     scores = fp.score_measurement(msm)
@@ -255,7 +278,7 @@ def test_score_whatsapp_failure():
 # # test_name: web_connectivity
 
 
-def test_score_measurement_simple():
+def test_score_measurement_simple(fprints):
     msm = {
         "input": "foo",
         "measurement_start_time": "",
@@ -277,8 +300,7 @@ def test_score_measurement_simple():
     }
 
 
-def test_score_measurement_confirmed():
-    fp.setup_fingerprints()
+def test_score_measurement_confirmed(fprints):
     msm = {
         "input": "foo",
         "measurement_start_time": "",
@@ -304,9 +326,8 @@ def test_score_measurement_confirmed():
     }
 
 
-def test_score_web_connectivity_odd_hdr():
+def test_score_web_connectivity_odd_hdr(fprints):
     # Header containing a nested dict
-    fp.setup_fingerprints()
     msm = loadj("web_connectivity_odd_hdr")
     scores = fp.score_measurement(msm)
     assert scores == {
@@ -319,9 +340,8 @@ def test_score_web_connectivity_odd_hdr():
     }
 
 
-def test_score_web_connectivity_no_body():
+def test_score_web_connectivity_no_body(fprints):
     # SSL cert verify failed, body key is missing
-    fp.setup_fingerprints()
     msm = loadj("web_connectivity_no_body")
     scores = fp.score_measurement(msm)
     assert scores == {
@@ -333,22 +353,21 @@ def test_score_web_connectivity_no_body():
     }
 
 
-def test_score_web_connectivity_b64_incorrect():
+def test_score_web_connectivity_b64_incorrect(fprints):
     # response->body->data is replaced with a short string with
     # incorrect padding
-    fp.setup_fingerprints()
     msm = loadj("web_connectivity_b64_incorrect")
     scores = fp.score_measurement(msm)
     assert scores
 
 
-def test_score_web_connectivity_bug_610():
+def test_score_web_connectivity_bug_610(fprints):
     msm = loadj("web_connectivity_null")
     scores = fp.score_measurement(msm)
     assert scores == scores_failed
 
 
-def test_score_web_connectivity_bug_610_2():
+def test_score_web_connectivity_bug_610_2(fprints):
     msm = loadj("web_connectivity_null2")
     scores = fp.score_measurement(msm)
     assert scores == scores_failed
@@ -571,7 +590,7 @@ def test_score_openvpn():
 # # Bug tests
 
 
-def test_bug_backend351():
+def test_bug_backend351(fprints):
     # https://api.ooni.io/api/v1/measurement/temp-id-386770148
     msm = loadj("bug_351")
     scores = fp.score_measurement(msm)
@@ -586,7 +605,7 @@ def test_bug_backend351():
     }
 
 
-def test_bug_backend352():
+def test_bug_backend352(fprints):
     # https://github.com/ooni/backend/issues/352
     # https://explorer.ooni.org/measurement/20200302T130853Z_AS197207_WIN8WWfSysccyZSG06Z5AaMJjSzrvxaq7UOiTnasi52k9D77T3?input=https%3A%2F%2Ffa.wikipedia.org
     msm = loadj("bug_352")
@@ -603,7 +622,7 @@ def test_bug_backend352():
     }
 
 
-def test_bug_requests_None():
+def test_bug_requests_None(fprints):
     # caused traceback:
     # File "/usr/lib/python3.7/dist-packages/fastpath/core.py", line 295, in match_fingerprints
     # for req in test_keys.get("requests", ()):
@@ -620,7 +639,7 @@ def test_bug_requests_None():
     }
 
 
-def test_bug_test_keys_None():
+def test_bug_test_keys_None(fprints):
     msm = loadj("test_keys_none")
     scores = fp.score_measurement(msm)
     assert scores == {
@@ -633,7 +652,7 @@ def test_bug_test_keys_None():
     }
 
 
-def test_bug_various_keys_missing():
+def test_bug_various_keys_missing(fprints):
     msm = {
         "data_format_version": "0.2.0",
         "input": "http://mail.google.com",
@@ -694,3 +713,53 @@ def test_get_http_header():
         "http://example.com",
         "http://example2.com",
     ]
+
+
+def test_extract_expected_countries():
+    for inp, out in [
+        ("", ["ZZ"]),
+        (",RU", ["RU"]),
+        ("AU,DE,DK,FR ", ["AU", "DE", "DK", "FR"]),
+    ]:
+        assert fp.extract_expected_countries(inp) == out
+
+
+def load_fprint_json(t):
+    with Path(f"fastpath/tests/data/fingerprints_{t}.json").open() as f:
+        return json.load(f)
+
+
+def test_prepare_fingerprints():
+    dns_fp = [
+        {
+            "name": "ooni.by_4",
+            "scope": "isp",
+            "other_names": "cl.dns_isp_by_mts",
+            "location_found": "dns",
+            "pattern_type": "full",
+            "pattern": "134.17.0.7",
+            "confidence_no_fp": 5,
+            "expected_countries": "BY",
+        }
+    ]
+    http_fp = load_fprint_json("http")
+    fps = fp.prepare_fingerprints(dns_fp, http_fp)
+    assert fps["IN"] == {
+        "body_match": [
+            {"locality": "country", "body_match": "The page you have requested has been blocked"},
+            {"locality": "isp", "body_match": "http://www.airtel.in/dot/?dpid="},
+        ],
+        "header_prefix": [
+            {
+                "locality": "local",
+                "header_name": "via",
+                "header_prefix": "1.1 ironport1.iitj.ac.in:80 (Cisco-WSA/",
+            },
+            {
+                "locality": "local",
+                "header_name": "via",
+                "header_prefix": "1.1 ironport2.iitj.ac.in:80 (Cisco-WSA/",
+            },
+        ],
+        "header_full": [{"locality": "local", "header_name": "server", "header_full": "GoAhead-Webs"}],
+    }

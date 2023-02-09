@@ -11,10 +11,11 @@ import fastpath.core as core
 import fastpath.db
 from test_unit import loadj
 
+import mock_fingerprints
 
 @pytest.fixture(autouse=True, scope="session")
 def fprints():
-    core.setup_fingerprints()
+    core.fingerprints = mock_fingerprints.fingerprints
     yield
     core.fingerprint = None
 

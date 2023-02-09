@@ -60,6 +60,7 @@ metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
 fingerprints: Dict[str, Dict[str, list]]
+fingerprints_update_time = 0
 
 
 def parse_date(d: str):
@@ -266,10 +267,8 @@ def prepare_for_json_normalize(report) -> None:
 
 def process_measurements_from_s3() -> None:
     """Pull measurements from S3 and process them"""
-    if conf.no_write_to_db:
-        log.info("Skipping DB connection setup")
-    else:
-        db.setup_clickhouse(conf)
+    db.setup_clickhouse(conf)
+    update_fingerprints_if_needed()
 
     msmt_cnt = 0
     for measurement_tup in s3feeder.stream_cans(conf, conf.start_day, conf.end_day):
@@ -1507,10 +1506,9 @@ def unwrap_msmt(post):
 
 def msm_processor(queue):
     """Measurement processor worker"""
-    if conf.no_write_to_db:
-        log.info("Skipping DB connection setup")
-    else:
-        db.setup_clickhouse(conf)
+    # Each spawned worker process has its own clickhouse connection
+    db.setup_clickhouse(conf)
+    update_fingerprints_if_needed()
 
     while True:
         msm_tup = queue.get()
@@ -1519,6 +1517,7 @@ def msm_processor(queue):
             return
 
         process_measurement(msm_tup)
+        update_fingerprints_if_needed()
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
@@ -1679,35 +1678,135 @@ def core():
         clean_caches()
 
 
-def setup_fingerprints():
-    """Setup fingerprints lookup dictionary
+def extract_expected_countries(ec):
+    ecs = set(cc.upper() for cc in ec.strip().split(","))
+    ecs.discard("")
+    if not ecs:
+        ecs = ["ZZ"]
+    return sorted(ecs)
+
+
+SCOPE_TO_LOCALITY = {
+    "inst": "local",
+    "isp": "isp",
+    "nat": "country",
+    "prod": "general",
+}
+
+
+def add_fingerprint(fp, fingerprints):
+
+    if not fp["location_found"] in ("body", "dns"):
+        if not fp["location_found"].startswith("header."):
+            return
+
+    pat_type = fp["pattern_type"]
+    location = fp["location_found"]
+    if pat_type not in ("contains", "prefix", "full", "regexp"):
+        return
+
+    scopes = ("fp", "injb", "inst", "isp", "nat", "prod", "prov", "vbw")
+    if fp["scope"] not in scopes:
+        return
+
+    if fp["scope"] not in SCOPE_TO_LOCALITY:
+        return
+
+    ccs = extract_expected_countries(fp["expected_countries"])
+    item = {k: fp[k] for k in ("pattern",)}
+
+    item = {}
+    item["locality"] = SCOPE_TO_LOCALITY[fp["scope"]]
+
+    sel = None
+    if location == "body":
+        if pat_type == "contains":
+            sel = "body_match"
+            item["body_match"] = fp["pattern"]
+
+        elif pat_type == "regexp":
+            return  # unsupported
+
+        elif pat_type == "full":
+            return  # unsupported
+
+    elif location == "dns":
+        if pat_type == "full":
+            sel = "dns_full"
+            item["dns_full"] = fp["pattern"]
+
+        else:
+            raise NotImplementedError("Unexpected pattern")
+
+    elif location.startswith("header."):
+        item["header_name"] = location[7:].lower()
+        if pat_type == "full":
+            sel = "header_full"
+            item["header_full"] = fp["pattern"]
+
+        elif pat_type == "prefix":
+            sel = "header_prefix"
+            item["header_prefix"] = fp["pattern"]
+
+        elif pat_type == "contains":
+            return  # unsupported
+
+    if sel is None:
+        raise Exception("Unexpected fingerprint format")
+
+    for cc in ccs:
+        fingerprints.setdefault(cc, {}).setdefault(sel, []).append(item)
+
+
+@metrics.timer("prepare_fingerprints")
+def prepare_fingerprints(dns_fp, http_fp):
+    """
+    Pre-process fingerprints to speed up lookup
     "ZZ" applies a fingerprint globally
     """
-    # pre-process fingerprints to speed up lookup
-    global fingerprints
-    # cc -> fprint_type -> list of dicts
+    fplist = dns_fp + http_fp
+    # fingerprint dict:
+    # <CC>|ZZ -> body_match|header_prefix|header_full|dns_full -> [fp, ... ]
+    # fp dict: header_name|header_prefix|body_match -> <value>
     fingerprints = {
         "ZZ": {"body_match": [], "header_prefix": [], "header_full": [], "dns_full": []}
     }
-    for cc, fprints in fastpath.utils.fingerprints.items():
-        d = fingerprints.setdefault(cc, {})
-        for fp in fprints:
-            assert fp["locality"] in LOCALITY_VALS, fp["locality"]
-            if "body_match" in fp:
-                d.setdefault("body_match", []).append(fp)
-            elif "header_prefix" in fp:
-                fp["header_name"] = fp["header_name"].lower()
-                d.setdefault("header_prefix", []).append(fp)
-            elif "header_full" in fp:
-                fp["header_name"] = fp["header_name"].lower()
-                d.setdefault("header_full", []).append(fp)
-            elif "dns_full" in fp:
-                d.setdefault("dns_full", []).append(fp)
+    for fp in fplist:
+        try:
+            add_fingerprint(fp, fingerprints)
+        except Exception:
+            log.error(f"Unable to extract fingerprint {fp}", exc_info=True)
+
+    return fingerprints
+
+
+def update_fingerprints_if_needed() -> None:
+    """Fetches the fingerprints table, process the fps and updates global vars"""
+    global fingerprints
+    global fingerprints_update_time
+
+    if fingerprints_update_time == 0:
+        # first run. Prepare staggered run.
+        try:
+            mp_id = mp.current_process()._identity[0]
+            delta = (mp_id * 10) % 600
+            log.info(f"Fingerprint update for worker {mp_id} with stagger {delta}s")
+        except IndexError:
+            delta = 0  # Running without multiprocessing
+        fingerprints_update_time = time.time() + 3600 + delta
+
+    elif fingerprints_update_time > time.time():
+        fingerprints_update_time += 3600
+
+    else:
+        return  # too early
+
+    dns_fp, http_fp = db.fetch_fingerprints()
+    fingerprints = prepare_fingerprints(dns_fp, http_fp)
 
 
 def main():
     setup()
-    setup_fingerprints()
     log.info("Starting")
     core()
 

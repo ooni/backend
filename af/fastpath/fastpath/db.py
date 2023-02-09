@@ -135,7 +135,7 @@ def setup_clickhouse(conf) -> None:
     click_client = Clickhouse.from_url(conf.clickhouse_url)
     rows = click_client.execute("SELECT version()")
     log.debug(f"Clickhouse version: {rows[0][0]}")
-    _click_create_table_fastpath()
+    # FIXME _click_create_table_fastpath()
 
 
 @metrics.timer("clickhouse_upsert_summary")
@@ -262,6 +262,7 @@ def clickhouse_upsert_openvpn_obs(
     scores,
     measurement_uid: str,
 ) -> None:
+    global click_client
     sql_insert = dedent(
         """\
     INSERT INTO obs_openvpn (
@@ -370,3 +371,31 @@ def clickhouse_upsert_openvpn_obs(
         click_client.execute(sql_insert, [row], settings=settings)
     except Exception:
         log.error("Failed Clickhouse insert", exc_info=True)
+
+
+def query(query, query_params, query_prio=5):
+    global click_client
+    settings = {"priority": query_prio, "max_execution_time": 28}
+    q = click_client.execute(
+        query, query_params, with_column_types=True, settings=settings
+    )
+    rows, coldata = q
+    colnames, coltypes = tuple(zip(*coldata))
+    return [dict(zip(colnames, row)) for row in rows]
+
+
+@metrics.timer("fetch_fingerprints")
+def fetch_fingerprints() -> None:
+    sql = """
+    SELECT name, scope, other_names, location_found, pattern_type,
+        pattern, confidence_no_fp, expected_countries
+    FROM fingerprints_dns
+    """
+    dns_fp = query(sql, {})
+    sql = """
+    SELECT name, scope, other_names, location_found, pattern_type,
+        pattern, confidence_no_fp, expected_countries
+    FROM fingerprints_http
+    """
+    http_fp = query(sql, {})
+    return dns_fp, http_fp

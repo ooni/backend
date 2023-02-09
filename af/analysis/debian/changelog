@@ -1,4 +1,10 @@
-analysis (1.4) UNRELEASED; urgency=medium
+analysis (1.5) unstable; urgency=medium
+
+  * Pull fingerprints from github
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Feb 2023 17:35:12 +0000
+
+analysis (1.4) unstable; urgency=medium
 
   * Filter by preferred regions
 

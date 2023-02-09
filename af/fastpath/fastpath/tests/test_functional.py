@@ -17,6 +17,8 @@ import pytest  # debdeps: python3-pytest
 import fastpath.core as fp
 import fastpath.s3feeder as s3feeder
 
+import mock_fingerprints
+
 log = logging.getLogger()
 
 # The fixtures download cans from S3 to a local directory
@@ -245,7 +247,7 @@ def setup_module(module):
     fp.conf.update = False
     fp.conf.interact = False
     fp.setup_dirs(fp.conf, Path(os.getcwd()))
-    fp.setup_fingerprints()
+    fp.fingerprints = mock_fingerprints.fingerprints
 
 
 def test_telegram(cans):
