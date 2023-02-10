@@ -1554,9 +1554,10 @@ valid_feedback_status = [
     "blocked.tcp",
     "blocked.tls",
     "ok",
-    "ok.unreachable",
-    "ok.broken",
-    "ok.parked",
+    "broken",
+    "broken.parked",
+    "broken.down",
+    "broken.other",
 ]
 
 
