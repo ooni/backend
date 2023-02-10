@@ -1,3 +1,9 @@
+ooni-api (1.0.39) unstable; urgency=medium
+
+  * Enable web connectivity 0.5 for more networks
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 10 Feb 2023 12:05:29 +0000
+
 ooni-api (1.0.38) unstable; urgency=medium
 
   * Remove Tor and Psiphon confs from check-in
