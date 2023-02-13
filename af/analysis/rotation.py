@@ -217,13 +217,29 @@ def destroy_drained_droplets(
         droplet.destroy()
 
 
+def pick_regions(api, live_regions: set) -> list:
+    """Pick regions that are available and have no droplet yet"""
+    available_regions = set(
+        r.slug for r in api.get_all_regions() if r.available is True
+    )
+    # Pick only regions with good, unfiltered network connectivity
+    acceptable_regions = set(("ams3", "fra1", "lon1", "nyc3", "sfo3", "tor1"))
+    ok_regions = acceptable_regions.intersection(available_regions)
+    best_regions = ok_regions - live_regions
+    if not len(best_regions):
+        log.crit("No regions available!")
+        raise Exception("No regions available")
+    if len(best_regions):
+        return best_regions
+    log.info(f"No 'best' region available")
+    return list(ok_regions)
+
+
 @metrics.timer("spawn_new_droplet")
 def spawn_new_droplet(api, dig_oc_token: str, live_regions, conf):
-    regions = set(r.slug for r in api.get_all_regions() if r.available is True)
-    preferred_regions = regions - live_regions
+    regions = pick_regions(api)
 
     ssh_keys = api.get_all_sshkeys()
-    # log.debug(ssh_keys)
     img = conf["image_name"]
     assert img
     size_slug = conf["size_slug"]
@@ -232,7 +248,7 @@ def spawn_new_droplet(api, dig_oc_token: str, live_regions, conf):
         user_data = f.read()
     for attempt in range(20):
         name = datetime.utcnow().strftime("roaming-th-%Y%m%d%H%M%S")
-        region = random.choice(list(preferred_regions or regions))
+        region = random.choice(regions)
         log.info(f"Trying to spawn {name} in {region}")
         try:
             droplet = digitalocean.Droplet(

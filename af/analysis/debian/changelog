@@ -1,3 +1,9 @@
+analysis (1.4) UNRELEASED; urgency=medium
+
+  * Filter by preferred regions
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 13 Feb 2023 16:33:38 +0000
+
 analysis (1.3) unstable; urgency=medium
 
   * Support new TH
