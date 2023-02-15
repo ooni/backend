@@ -68,7 +68,7 @@ from datetime import datetime
 from functools import wraps
 from subprocess import check_output
 from pathlib import Path
-from ipaddress import IPv4Address as IP4a, IPv6Address as IP6a
+from ipaddress import IPv4Address as IP4a
 import logging
 import random
 import sys
@@ -208,7 +208,7 @@ def destroy_drained_droplets(
     name, rdn, draining_at = rows[0]
     to_delete = [d for d in live_droplets if d.name == name]
     if not to_delete:
-        log.error("{name} found in database but not listed in live droplets")
+        log.error(f"{name} found in database but not found on Digital Ocean")
         return
 
     for droplet in to_delete:
@@ -231,7 +231,7 @@ def pick_regions(api, live_regions: set) -> list:
         raise Exception("No regions available")
     if len(best_regions):
         return best_regions
-    log.info(f"No 'best' region available")
+    log.info(f"No 'best' region available. Falling back to {ok_regions}")
     return list(ok_regions)
 
 
@@ -418,7 +418,7 @@ def ssh_wait_droplet_warmup(ipaddr: str) -> None:
             check_output(cmd)
             log.info("Flag file found")
             return
-        except:
+        except Exception:
             log.debug("Flag file not found")
             time.sleep(5)
 
