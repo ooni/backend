@@ -150,7 +150,7 @@ def clickhouse_upsert_summary(
     test_version: str,
     architecture: str,
     engine_name: str,
-    engine_version: str
+    engine_version: str,
 ) -> None:
     """Insert a row in the fastpath table. Overwrite an existing one."""
     sql_insert = dedent(
@@ -197,29 +197,28 @@ def clickhouse_upsert_summary(
         msm["measurement_start_time"], "%Y-%m-%d %H:%M:%S"
     )
     test_start_time = datetime.strptime(msm["test_start_time"], "%Y-%m-%d %H:%M:%S")
-    # TODO: switch row to dict
-    row = [
-        measurement_uid,
-        nn(msm, "report_id"),
-        input_,
-        nn(msm, "probe_cc"),
-        asn,
-        test_name,
-        test_start_time,
-        measurement_start_time,
-        ujson.dumps(scores),
-        nn(msm, "platform"),
-        tf(anomaly),
-        tf(confirmed),
-        tf(msm_failure),
-        domain,
-        nn(msm, "software_name"),
-        nn(msm, "software_version"),
-        test_version,
-        architecture,
-        engine_name,
-        engine_version,
-    ]
+    row = dict(
+        measurement_uid=measurement_uid,
+        report_id=nn(msm, "report_id"),
+        input=input_,
+        probe_cc=nn(msm, "probe_cc"),
+        probe_asn=asn,
+        test_name=test_name,
+        test_start_time=test_start_time,
+        measurement_start_time=measurement_start_time,
+        scores=ujson.dumps(scores),
+        platform=nn(msm, "platform"),
+        anomaly=tf(anomaly),
+        confirmed=tf(confirmed),
+        msm_failure=tf(msm_failure),
+        domain=domain,
+        software_name=nn(msm, "software_name"),
+        software_version=nn(msm, "software_version"),
+        test_version=test_version,
+        architecture=architecture,
+        engine_name=engine_name,
+        engine_version=engine_version,
+    )
 
     settings = {"priority": 5}
     try:
