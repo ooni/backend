@@ -230,7 +230,7 @@ def pick_regions(api, live_regions: set) -> list:
         log.crit("No regions available!")
         raise Exception("No regions available")
     if len(best_regions):
-        return best_regions
+        return list(best_regions)
     log.info(f"No 'best' region available. Falling back to {ok_regions}")
     return list(ok_regions)
 
