@@ -237,7 +237,7 @@ def pick_regions(api, live_regions: set) -> list:
 
 @metrics.timer("spawn_new_droplet")
 def spawn_new_droplet(api, dig_oc_token: str, live_regions, conf):
-    regions = pick_regions(api)
+    regions = pick_regions(api, live_regions)
 
     ssh_keys = api.get_all_sshkeys()
     img = conf["image_name"]
