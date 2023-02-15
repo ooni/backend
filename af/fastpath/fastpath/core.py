@@ -1588,16 +1588,21 @@ def process_measurement(msm_tup) -> None:
             log.debug(
                 f"Storing {msmt_uid} {rid} {inp} A{int(anomaly)} F{int(failure)} C{int(confirmed)}"
             )
-        sw_name = measurement.get("software_name", "unknown")
-        sw_version = measurement.get("software_version", "unknown")
-        platform = "unset"
-        if "annotations" in measurement and isinstance(
-            measurement["annotations"], dict
-        ):
-            platform = measurement["annotations"].get("platform", "unset")
 
         if conf.no_write_to_db:
             return
+
+        sw_name = measurement.get("software_name", "unknown")
+        sw_version = measurement.get("software_version", "unknown")
+        test_version = g_or(measurement, "test_version", "")
+
+        annot = measurement.get("annotations")
+        if not isinstance(annot, dict):
+            annot = {}
+        platform = g_or(annot, "platform", "unset")
+        architecture = g_or(annot, "architecture", "")
+        engine_name = g_or(annot, "engine_name", "")
+        engine_version = g_or(annot, "engine_version", "")
 
         db.clickhouse_upsert_summary(
             measurement,
@@ -1609,6 +1614,10 @@ def process_measurement(msm_tup) -> None:
             sw_name,
             sw_version,
             platform,
+            test_version,
+            architecture,
+            engine_name,
+            engine_version
         )
 
         tn = measurement.get("test_name")

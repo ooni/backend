@@ -46,7 +46,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
     assert exe.called_once
     query, qparams = exe.call_args[0]
     query = query.replace("\n", " ").replace("  ", " ")
-    query_exp = "INSERT INTO fastpath ( measurement_uid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, scores, platform, anomaly, confirmed, msm_failure, domain, software_name, software_version ) VALUES "
+    query_exp = "INSERT INTO fastpath ( measurement_uid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, scores, platform, anomaly, confirmed, msm_failure, domain, software_name, software_version, test_version, architecture, engine_name, engine_version ) VALUES "
     assert query == query_exp
     assert qparams == [
         [
@@ -66,7 +66,11 @@ def test_score_web_connectivity_bug_610_2(fprints):
             "yooz.ir",
             "ooniprobe-android",
             "3.7.0",
-        ]
+            "0.4.1",
+            "arm",
+            "ooniprobe-engine",
+            "3.15.2",
+        ],
     ]
 
 
@@ -82,7 +86,7 @@ def test_score_openvpn():
     assert exe.call_count == 2
     query, qparams = exe.call_args_list[0].args
     query = query.replace("\n", " ").replace("  ", " ")
-    query_exp = "INSERT INTO fastpath ( measurement_uid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, scores, platform, anomaly, confirmed, msm_failure, domain, software_name, software_version ) VALUES "
+    query_exp = "INSERT INTO fastpath ( measurement_uid, report_id, input, probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, scores, platform, anomaly, confirmed, msm_failure, domain, software_name, software_version, test_version, architecture, engine_name, engine_version ) VALUES "
     assert query == query_exp
     assert qparams == [
         [
@@ -101,6 +105,10 @@ def test_score_openvpn():
             "f",
             "openvpn.riseup",
             "miniooni",
+            "3.17.0-alpha",
+            "0.0.16",
+            "amd64",
+            "ooniprobe-engine",
             "3.17.0-alpha",
         ],
     ]

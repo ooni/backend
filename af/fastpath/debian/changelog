@@ -1,3 +1,9 @@
+fastpath (0.67) unstable; urgency=medium
+
+  * Extract more values from measurements
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 15 Feb 2023 18:08:49 +0000
+
 fastpath (0.66) unstable; urgency=medium
 
   * OpenVPN scoring and observation table MVP

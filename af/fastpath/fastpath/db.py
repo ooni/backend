@@ -9,7 +9,6 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 
 from datetime import datetime
 from textwrap import dedent
-from typing import Optional
 from urllib.parse import urlparse
 import logging
 
@@ -71,7 +70,11 @@ def _click_create_table_fastpath():
         `page_len_ratio` Float32,
         `server_cc` String,
         `server_asn` Int8,
-        `server_as_name` String
+        `server_as_name` String,
+        `test_version` String,
+        `architecture` String,
+        `engine_name` String,
+        `engine_version` String
     )
     ENGINE = ReplacingMergeTree
     ORDER BY (measurement_start_time, report_id, input)
@@ -144,6 +147,10 @@ def clickhouse_upsert_summary(
     software_name: str,
     software_version: str,
     platform: str,
+    test_version: str,
+    architecture: str,
+    engine_name: str,
+    engine_version: str
 ) -> None:
     """Insert a row in the fastpath table. Overwrite an existing one."""
     sql_insert = dedent(
@@ -164,7 +171,11 @@ def clickhouse_upsert_summary(
     msm_failure,
     domain,
     software_name,
-    software_version
+    software_version,
+    test_version,
+    architecture,
+    engine_name,
+    engine_version
     ) VALUES
         """
     )
@@ -186,6 +197,7 @@ def clickhouse_upsert_summary(
         msm["measurement_start_time"], "%Y-%m-%d %H:%M:%S"
     )
     test_start_time = datetime.strptime(msm["test_start_time"], "%Y-%m-%d %H:%M:%S")
+    # TODO: switch row to dict
     row = [
         measurement_uid,
         nn(msm, "report_id"),
@@ -203,6 +215,10 @@ def clickhouse_upsert_summary(
         domain,
         nn(msm, "software_name"),
         nn(msm, "software_version"),
+        test_version,
+        architecture,
+        engine_name,
+        engine_version,
     ]
 
     settings = {"priority": 5}
@@ -291,7 +307,7 @@ def clickhouse_upsert_openvpn_obs(
     test_start_time = datetime.strptime(msm["test_start_time"], "%Y-%m-%d %H:%M:%S")
     tk = dget_or(msm, "test_keys", {})
 
-    anomaly = nn(msm, "success") == True
+    anomaly = nn(msm, "success") is True
     success = bool(nn(tk, "success"))
     failure = nn(tk, "failure")
     resolver_asn_str = nn(msm, "resolver_asn")
