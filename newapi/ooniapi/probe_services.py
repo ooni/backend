@@ -2,10 +2,11 @@
 OONI Probe Services API
 """
 
+import ipaddress
 from base64 import b64encode
 from datetime import datetime, timedelta, date
 from os import urandom
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 
 from pathlib import Path
 from hashlib import sha512
@@ -489,6 +490,31 @@ def probe_login_post() -> Response:
     return nocachejson(token=token, expire=expire)
 
 
+def round_robin_web_test_helpers() -> List[Dict]:
+    """Round robin test helpers based on the probe ipaddr.
+    0.th is special and gets only 10% of the traffic.
+    """
+    try:
+        ipa = extract_probe_ipaddr()
+        # ipaddr as (large) integer representation (v4 or v6)
+        q = int(ipaddress.ip_address(ipa))
+        q = q % 100
+    except Exception:
+        q = 12  # pick 1.th
+
+    if q < 10:
+        shift = 0
+    else:
+        shift = q % 3 + 1
+
+    out = []
+    for n in range(4):
+        n = (n + shift) % 4
+        out.append({"address": f"https://{n}.th.ooni.org", "type": "https"})
+
+    return out
+
+
 def generate_test_helpers_conf() -> Dict:
     # Load-balance test helpers deterministically
     conf = {
@@ -529,17 +555,14 @@ def generate_test_helpers_conf() -> Dict:
             },
         ],
     }
-    last_oct = extract_probe_ipaddr_octect(3, 0)
-    th0, th1 = last_oct % 2, (last_oct + 1) % 2
-    conf["web-connectivity"] = [
-        {"address": f"https://{th0}.th.ooni.org", "type": "https"},
-        {"address": f"https://{th1}.th.ooni.org", "type": "https"},
+    conf["web-connectivity"] = round_robin_web_test_helpers()
+    conf["web-connectivity"].append(
         {
             "address": "https://d33d1gs9kpq1c5.cloudfront.net",
             "front": "d33d1gs9kpq1c5.cloudfront.net",
             "type": "cloudfront",
-        },
-    ]
+        }
+    )
     return conf
 
 
