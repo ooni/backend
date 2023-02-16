@@ -148,6 +148,7 @@ def clickhouse_upsert_summary(
     software_version: str,
     platform: str,
     test_version: str,
+    test_runtime: float,
     architecture: str,
     engine_name: str,
     engine_version: str,
@@ -173,6 +174,7 @@ def clickhouse_upsert_summary(
     software_name,
     software_version,
     test_version,
+    test_runtime,
     architecture,
     engine_name,
     engine_version
@@ -215,6 +217,7 @@ def clickhouse_upsert_summary(
         software_name=nn(msm, "software_name"),
         software_version=nn(msm, "software_version"),
         test_version=test_version,
+        test_runtime=test_runtime,
         architecture=architecture,
         engine_name=engine_name,
         engine_version=engine_version,

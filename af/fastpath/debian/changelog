@@ -1,3 +1,9 @@
+fastpath (0.68) unstable; urgency=medium
+
+  * Extract test runtime
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 16 Feb 2023 18:31:31 +0000
+
 fastpath (0.67) unstable; urgency=medium
 
   * Extract more values from measurements
