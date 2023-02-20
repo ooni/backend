@@ -28,7 +28,12 @@ CREATE TABLE default.fastpath
     `page_len_ratio` Float32,
     `server_cc` String,
     `server_asn` Int8,
-    `server_as_name` String
+    `server_as_name` String,
+    `test_version` String,
+    `test_runtime` Float32,
+    `architecture` String,
+    `engine_name` String,
+    `engine_version` String
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_start_time, report_id, input)
