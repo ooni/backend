@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   clickhouse:
-    image: yandex/clickhouse-server:21.8.12
+    image: clickhouse/clickhouse-server:22.8.13.20
     hostname: clickhouse
     container_name: clickhouse
     ports:
