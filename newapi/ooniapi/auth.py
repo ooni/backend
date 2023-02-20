@@ -47,6 +47,7 @@ Workflow:
     - call bookmarked searches/urls/msmts entry points using the cookie
 
 Configuration parameters:
+    ACCOUNT_ID_HASHING_KEY
     BASE_URL
     JWT_ENCRYPTION_KEY
     MAIL_SERVER
@@ -80,7 +81,7 @@ def decode_jwt(token: str, **kw) -> Dict[str, Any]:
 
 
 def hash_email_address(email_address: str) -> str:
-    key = current_app.config["JWT_ENCRYPTION_KEY"].encode()
+    key = current_app.config["ACCOUNT_ID_HASHING_KEY"].encode()
     em = email_address.encode()
     return hashlib.blake2b(em, key=key, digest_size=16).hexdigest()
 

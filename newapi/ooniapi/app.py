@@ -58,7 +58,9 @@ class FlaskJSONEncoder(json.JSONEncoder):
 
 def validate_conf(app, conffile):
     """Fail early if the app configuration looks incorrect"""
+    # TODO: fallback to reasonable defaults as much as possible instead
     conf_keys = (
+        "ACCOUNT_ID_HASHING_KEY",
         "BASE_URL",
         "COLLECTORS",
         "COLLECTOR_ID",

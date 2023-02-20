@@ -1,3 +1,9 @@
+ooni-api (1.0.41) unstable; urgency=medium
+
+  * Split account ID hashing / JWT secrets
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Feb 2023 14:40:57 +0000
+
 ooni-api (1.0.40) unstable; urgency=medium
 
   * Implement round robin on 4 test helpers
