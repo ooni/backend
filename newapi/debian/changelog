@@ -1,3 +1,9 @@
+ooni-api (1.0.42) unstable; urgency=medium
+
+  * Fix keys for user reporting mechanism
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 21 Feb 2023 17:46:09 +0000
+
 ooni-api (1.0.41) unstable; urgency=medium
 
   * Split account ID hashing / JWT secrets
