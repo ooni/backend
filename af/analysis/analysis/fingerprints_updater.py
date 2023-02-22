@@ -7,7 +7,9 @@ Local test run:
 """
 
 from argparse import Namespace
+from urllib.request import urlopen
 import logging
+import csv
 
 from clickhouse_driver import Client as Clickhouse
 
@@ -20,17 +22,31 @@ DNS_URL = f"{BASE_URL}/ooni/blocking-fingerprints/main/fingerprints_dns.csv"
 
 log = logging.getLogger("analysis.fingerprints_updater")
 metrics = setup_metrics(name="fingerprints_updater")
+progress_cnt = 0
 
 
-def progress(n: int, msg: str) -> None:
-    metrics.gauge("fingerprints_update_progress", n)
-    log.info(msg)
+def progress(msg: str) -> None:
+    global progress_cnt
+    metrics.gauge("fingerprints_update_progress", progress_cnt)
+    log.info(f"{progress_cnt} msg")
+    progress_cnt += 1
+
+
+@metrics.timer("fetch_csv")
+def fetch_csv(url):
+    resp = urlopen(url)
+    if resp.status != 200:
+        raise Exception(f"Failed to fetch {url}")
+    lines = [x.decode("utf-8") for x in resp.readlines()]
+    log.info(f"Fetched {len(lines)} lines")
+    rows = csv.DictReader(lines)
+    return [r for r in rows]
 
 
 def update_fingerprints(conf: Namespace) -> None:
-    progress(0, "starting")
+    progress("starting")
     assert not conf.dry_run, "Dry run mode not supported"
-    click = Clickhouse("localhost", user="citizenlab")
+    click = Clickhouse.from_url(conf.db_uri)
 
     q = "DROP TABLE IF EXISTS fingerprints_dns_tmp"
     click.execute(q)
@@ -51,26 +67,23 @@ def update_fingerprints(conf: Namespace) -> None:
     ) ENGINE = EmbeddedRocksDB PRIMARY KEY(name)
     """
     click.execute(q)
+    progress("fingerprints_dns_tmp recreated")
 
     log.info(f"Ingesting {DNS_URL}")
+    data = fetch_csv(DNS_URL)
+    for row in data:
+        row["confidence_no_fp"] = int(row["confidence_no_fp"])
+    progress("CSV data fetched")
+
     q = """
     INSERT INTO fingerprints_dns_tmp
-    SELECT * FROM url(%(url)s, 'CSVWithNames',
-    'name String,
-    scope String,
-    other_names String,
-    location_found String,
-    pattern_type String,
-    pattern String,
-    confidence_no_fp UInt8,
-    expected_countries String,
-    source String,
-    exp_url String,
-    notes String'
-    )
+        (name, scope, other_names, location_found, pattern_type, pattern,
+        confidence_no_fp, expected_countries, source, exp_url, notes)
+    VALUES
     """
-    click.execute(q, dict(url=DNS_URL))
-    progress(1, "fingerprints_dns_tmp filled")
+    click.execute(q, data)
+    # click.execute(q, data, types_check=True)
+    progress("fingerprints_dns_tmp filled")
 
     r = click.execute("SELECT count() FROM fingerprints_dns_tmp")
     row_cnt = r[0][0]
@@ -80,7 +93,6 @@ def update_fingerprints(conf: Namespace) -> None:
     q = "DROP TABLE IF EXISTS fingerprints_http_tmp"
     click.execute(q)
 
-    # FIXME remove injb and prov
     q = """
     CREATE TABLE fingerprints_http_tmp (
         name String,
@@ -97,26 +109,22 @@ def update_fingerprints(conf: Namespace) -> None:
     ) ENGINE = EmbeddedRocksDB PRIMARY KEY(name)
     """
     click.execute(q)
+    progress("fingerprints_http_tmp recreated")
 
     log.info(f"Ingesting {HTTP_URL}")
+    data = fetch_csv(HTTP_URL)
+    for row in data:
+        row["confidence_no_fp"] = int(row["confidence_no_fp"])
+    progress("CSV data fetched")
+
     q = """
     INSERT INTO fingerprints_http_tmp
-    SELECT * FROM url(%(url)s, 'CSVWithNames',
-    'name String,
-    scope String,
-    other_names String,
-    location_found String,
-    pattern_type String,
-    pattern String,
-    confidence_no_fp UInt8,
-    expected_countries String,
-    source String,
-    exp_url String,
-    notes String'
-    )
+        (name, scope, other_names, location_found, pattern_type, pattern,
+        confidence_no_fp, expected_countries, source, exp_url, notes)
+    VALUES
     """
-    click.execute(q, dict(url=HTTP_URL))
-    progress(2, "fingerprints_http_tmp filled")
+    click.execute(q, data)
+    progress("fingerprints_http_tmp filled")
 
     r = click.execute("SELECT count() FROM fingerprints_dns_tmp")
     row_cnt = r[0][0]
@@ -126,9 +134,9 @@ def update_fingerprints(conf: Namespace) -> None:
     log.info("Swapping tables")
     q = "EXCHANGE TABLES fingerprints_dns_tmp AND fingerprints_dns"
     click.execute(q)
-    progress(3, "fingerprints_dns ready")
+    progress("fingerprints_dns ready")
 
     log.info("Swapping tables")
     q = "EXCHANGE TABLES fingerprints_http_tmp AND fingerprints_http"
     click.execute(q)
-    progress(4, "fingerprints_http ready")
+    progress("fingerprints_http ready")

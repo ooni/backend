@@ -80,6 +80,7 @@ def parse_args() -> Namespace:
     # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
+    ap.add_argument("--db-uri", help="Override DB URI", default="clickhouse://localhost/default")
     return ap.parse_args()
 
 
