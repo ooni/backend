@@ -16,7 +16,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, TypedDict
 import binascii
 import logging
 import multiprocessing as mp
@@ -48,7 +48,6 @@ import fastpath.db as db
 from fastpath.metrics import setup_metrics
 import fastpath.portable_queue as queue
 
-import fastpath.utils
 from fastpath.utils import dget_or as g_or
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
@@ -59,8 +58,28 @@ log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
-fingerprints: Dict[str, Dict[str, list]]
 fingerprints_update_time = 0
+
+FINGERPRINT_SCOPE_TO_LOCALITY = {
+    "inst": "local",
+    "isp": "isp",
+    "nat": "country",
+    "prod": "general",
+}
+
+
+class Fingerprint(TypedDict):
+    name: str
+    scope: str
+    other_names: str
+    location_found: str
+    pattern_type: str
+    pattern: str
+    confidence_no_fp: int
+    expected_countries: str
+
+
+fingerprints: Dict[str, list[Fingerprint]] = dict(dns=[], http=[])
 
 
 def parse_date(d: str):
@@ -284,6 +303,69 @@ def process_measurements_from_s3() -> None:
                 return
 
 
+def match_http_body_fingerprints(resp, matches) -> None:
+    # Match HTTP body if found
+    body = resp.get("body")
+    if isinstance(body, dict):
+        if "data" in body and body.get("format", "") == "base64":
+            log.debug("Decoding base64 body")
+            body = b64decode(body["data"])
+            # returns bytes. bm.encode() below is faster that decoding it
+        else:
+            logbug(2, "incorrect body of type dict", {})
+            return
+
+    if body is None:
+        return
+
+    for fp in fingerprints["http"]:
+        if fp["location_found"] != "body":
+            continue
+        tb = time.time()
+        bm = fp["pattern"]
+        if isinstance(body, bytes):
+            idx = body.find(bm.encode())
+        else:
+            idx = body.find(bm)
+
+        if idx != -1:
+            matches.append(fp)
+            log.debug("matched body fp %s", fp["name"])
+            # Used for statistics
+            metrics.gauge("fingerprint_body_match_location", idx)
+
+        per_s("fingerprints_bytes", len(body), tb)
+
+
+def match_http_headers_fingerprints(resp, matches) -> None:
+    # Match HTTP headers if found
+    headers = g_or(resp, "headers", {})
+    if not headers:
+        return
+    headers = {h.lower(): v for h, v in headers.items()}
+    for fp in fingerprints["http"]:
+        loc_found = fp["location_found"]
+        if not loc_found.startswith("header."):
+            continue
+        pat_type = fp["pattern_type"]
+        hname = loc_found[8:]
+        if pat_type == "full":
+            if headers.get(hname) == fp["pattern"]:
+                matches.append(fp)
+                log.debug("matched header full %s", fp["name"])
+
+        elif pat_type == "prefix":
+            prefix = fp["pattern"]
+            v = headers.get(hname)
+            if isinstance(v, dict) and v.get("format") == "base64":
+                log.debug("Decoding base64 header")
+                data = b64decode(v.get("data", ""))
+                v = data.decode("latin1")
+            if isinstance(v, str) and v.startswith(prefix):
+                matches.append(fp)
+                log.debug("matched header prefix %s", fp["name"])
+
+
 @metrics.timer("match_fingerprints")
 def match_fingerprints(measurement) -> list:
     """Match fingerprints against HTTP headers, bodies and DNS.
@@ -291,18 +373,15 @@ def match_fingerprints(measurement) -> list:
     """
     msm_cc = measurement["probe_cc"]
 
-    zzfps = fingerprints["ZZ"]
-    ccfps = fingerprints.get(msm_cc, {})
-
     test_keys = measurement.get("test_keys")
     if test_keys is None:
         return []
 
     matches = []
-    queries = test_keys.get("queries", ()) or ()
+    queries = g_or(test_keys, "queries", ())
     for q in queries:
-        for answer in q.get("answers", ()) or ():
-            for fp in zzfps["dns_full"] + ccfps.get("dns_full", []):
+        for answer in g_or(q, "answers", ()):
+            for fp in fingerprints["dns"]:
                 addr = ""
                 if "ipv4" in answer:
                     addr = answer["ipv4"]
@@ -310,70 +389,17 @@ def match_fingerprints(measurement) -> list:
                     addr = answer["hostname"]
                 elif "ipv6" in answer:
                     addr = answer["ipv6"]
-                if fp["dns_full"] == addr:
+                if addr == fp["pattern"]:
                     matches.append(fp)
 
-    requests = test_keys.get("requests", ()) or ()
+    requests = g_or(test_keys, "requests", ())
     for req in requests:
-        r = req.get("response")
-        if r is None:
+        resp = req.get("response")
+        if resp is None:
             continue
 
-        # Match HTTP body if found
-        body = r.get("body")
-
-        if isinstance(body, dict):
-            if "data" in body and body.get("format", "") == "base64":
-                log.debug("Decoding base64 body")
-                body = b64decode(body["data"])
-                # returns bytes. bm.encode() below is faster that decoding it
-
-            else:
-                logbug(2, "incorrect body of type dict", measurement)
-                body = None
-
-        if body is not None:
-            for fp in zzfps["body_match"] + ccfps.get("body_match", []):
-                # fp: {"body_match": "...", "locality": "..."}
-                tb = time.time()
-                bm = fp["body_match"]
-                if isinstance(body, bytes):
-                    idx = body.find(bm.encode())
-                else:
-                    idx = body.find(bm)
-
-                if idx != -1:
-                    matches.append(fp)
-                    log.debug("matched body fp %s %r at pos %d", msm_cc, bm, idx)
-                    # Used for statistics
-                    metrics.gauge("fingerprint_body_match_location", idx)
-
-                per_s("fingerprints_bytes", len(body), tb)
-
-        del body
-
-        # Match HTTP headers if found
-        headers = r.get("headers", {})
-        if not headers:
-            continue
-        headers = {h.lower(): v for h, v in headers.items()}
-        for fp in zzfps["header_full"] + ccfps.get("header_full", []):
-            name = fp["header_name"]
-            if name in headers and headers[name] == fp["header_full"]:
-                matches.append(fp)
-                log.debug("matched header full fp %s %r", msm_cc, fp["header_full"])
-
-        for fp in zzfps["header_prefix"] + ccfps.get("header_prefix", []):
-            name = fp["header_name"]
-            prefix = fp["header_prefix"]
-            v = headers.get(name)
-            if isinstance(v, dict) and v.get("format") == "base64":
-                log.debug("Decoding base64 header")
-                data = b64decode(v.get("data", ""))
-                v = data.decode("latin1")
-            if isinstance(v, str) and v.startswith(prefix):
-                matches.append(fp)
-                log.debug("matched header prefix %s %r", msm_cc, prefix)
+        match_http_body_fingerprints(resp, matches)
+        match_http_headers_fingerprints(resp, matches)
 
     return matches
 
@@ -917,9 +943,10 @@ def score_web_connectivity(msm, matches) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
-    for m in matches:
-        l = "blocking_" + m["locality"]
-        scores[l] += 1.0
+    for fp in matches:
+        loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
+        loc = "blocking_" + loc
+        scores[loc] += 1.0
 
     # "title_match" is often missing from the raw msmt
     # e.g. 20190912T145602Z_AS9908_oXVmdAo2BZ2Z6uXDdatwL9cN5oiCllrzpGWKY49PlM4vEB03X7
@@ -1248,71 +1275,26 @@ def score_http_requests(msm: dict) -> dict:
     if not reachable:
         scores["blocking_general"] = 1.0
 
-    zzfps = fingerprints["ZZ"]
-    msm_cc = msm.get("probe_cc")
-    ccfps = fingerprints.get(msm_cc, {})
-
     # Scan for fingerprint matches in the HTTP body and the HTTP headers
     # One request is from the probe and one is over Tor. If the latter
     # is blocked the msmt is failed.
     tk = g_or(msm, "test_keys", {})
-    requests = tk.get("requests", []) or []
-    for r in requests:
-        is_tor = gn(r, "request", "tor", "is_tor")
-        body = gn(r, "response", "body")
-        if is_tor is None or body is None:
+    requests = g_or(tk, "requests", [])
+    matches = []
+    for req in requests:
+        is_tor = gn(req, "request", "tor", "is_tor")
+        resp = g_or(req, "response", {})
+        body = gn(req, "response", "body")
+        match_http_body_fingerprints(resp, matches)
+        match_http_headers_fingerprints(resp, matches)
+
+    if matches:
+        if is_tor:
             scores["accuracy"] = 0.0
-            log.debug(f"Incorrect measurement t2 {rid} {inp}")
-            return scores
+            log.debug(f"Failed measurement t1 {rid} {inp}")
 
-        if isinstance(body, dict):
-            # TODO: is this needed?
-            if "data" in body and g_or(body, "format", "") == "base64":
-                log.debug("Decoding base64 body")
-                body = b64decode(body["data"])
-
-            else:
-                logbug(3, "incorrect body of type dict", msm)
-                body = None
-
-        for fp in zzfps["body_match"] + g_or(ccfps, "body_match", []):
-            bm = fp["body_match"]
-            if isinstance(body, bytes):
-                idx = body.find(bm.encode())
-            else:
-                idx = body.find(bm)
-
-            if idx != -1:
-                if is_tor:
-                    scores["accuracy"] = 0.0
-                    log.debug(f"Failed measurement t1 {rid} {inp}")
-                    return scores
-                scores["confirmed"] = True
-                log.debug("matched body fp %s %r at pos %d", msm_cc, bm, idx)
-
-        # Match HTTP headers if found
-        headers = g_or(r, "headers", {})
-        headers = {h.lower(): v for h, v in headers.items()}
-        for fp in zzfps["header_full"] + g_or(ccfps, "header_full", []):
-            name = fp["header_name"]
-            if name in headers and headers[name] == fp["header_full"]:
-                if is_tor:
-                    scores["accuracy"] = 0.0
-                    log.debug(f"Failed measurement t2 {rid} {inp}")
-                    return scores
-                scores["confirmed"] = True
-                log.debug("matched header full fp %s %r", msm_cc, fp["header_full"])
-
-        for fp in zzfps["header_prefix"] + g_or(ccfps, "header_prefix", []):
-            name = fp["header_name"]
-            prefix = fp["header_prefix"]
-            if name in headers and headers[name].startswith(prefix):
-                if is_tor:
-                    scores["accuracy"] = 0.0
-                    log.debug(f"Failed measurement {rid} {inp}")
-                    return scores
-                scores["confirmed"] = True
-                log.debug("matched header prefix %s %r", msm_cc, prefix)
+        else:
+            scores["confirmed"] = True
 
     return scores
 
@@ -1621,7 +1603,7 @@ def process_measurement(msm_tup) -> None:
             test_runtime,
             architecture,
             engine_name,
-            engine_version
+            engine_version,
         )
 
         tn = measurement.get("test_name")
@@ -1686,98 +1668,11 @@ def extract_expected_countries(ec):
     return sorted(ecs)
 
 
-SCOPE_TO_LOCALITY = {
-    "inst": "local",
-    "isp": "isp",
-    "nat": "country",
-    "prod": "general",
-}
-
-
-def add_fingerprint(fp, fingerprints):
-
-    if not fp["location_found"] in ("body", "dns"):
-        if not fp["location_found"].startswith("header."):
-            return
-
-    pat_type = fp["pattern_type"]
-    location = fp["location_found"]
-    if pat_type not in ("contains", "prefix", "full", "regexp"):
-        return
-
-    scopes = ("fp", "injb", "inst", "isp", "nat", "prod", "prov", "vbw")
-    if fp["scope"] not in scopes:
-        return
-
-    if fp["scope"] not in SCOPE_TO_LOCALITY:
-        return
-
-    ccs = extract_expected_countries(fp["expected_countries"])
-    item = {k: fp[k] for k in ("pattern",)}
-
-    item = {}
-    item["locality"] = SCOPE_TO_LOCALITY[fp["scope"]]
-
-    sel = None
-    if location == "body":
-        if pat_type == "contains":
-            sel = "body_match"
-            item["body_match"] = fp["pattern"]
-
-        elif pat_type == "regexp":
-            return  # unsupported
-
-        elif pat_type == "full":
-            return  # unsupported
-
-    elif location == "dns":
-        if pat_type == "full":
-            sel = "dns_full"
-            item["dns_full"] = fp["pattern"]
-
-        else:
-            raise NotImplementedError("Unexpected pattern")
-
-    elif location.startswith("header."):
-        item["header_name"] = location[7:].lower()
-        if pat_type == "full":
-            sel = "header_full"
-            item["header_full"] = fp["pattern"]
-
-        elif pat_type == "prefix":
-            sel = "header_prefix"
-            item["header_prefix"] = fp["pattern"]
-
-        elif pat_type == "contains":
-            return  # unsupported
-
-    if sel is None:
-        raise Exception("Unexpected fingerprint format")
-
-    for cc in ccs:
-        fingerprints.setdefault(cc, {}).setdefault(sel, []).append(item)
-
-
 @metrics.timer("prepare_fingerprints")
 def prepare_fingerprints(dns_fp, http_fp):
-    """
-    Pre-process fingerprints to speed up lookup
-    "ZZ" applies a fingerprint globally
-    """
-    fplist = dns_fp + http_fp
-    # fingerprint dict:
-    # <CC>|ZZ -> body_match|header_prefix|header_full|dns_full -> [fp, ... ]
-    # fp dict: header_name|header_prefix|body_match -> <value>
-    fingerprints = {
-        "ZZ": {"body_match": [], "header_prefix": [], "header_full": [], "dns_full": []}
-    }
-    for fp in fplist:
-        try:
-            add_fingerprint(fp, fingerprints)
-        except Exception:
-            log.error(f"Unable to extract fingerprint {fp}", exc_info=True)
-
-    return fingerprints
+    dns = [Fingerprint(**fp) for fp in dns_fp]
+    http = [Fingerprint(**fp) for fp in http_fp]
+    return dict(dns=dns, http=http)
 
 
 def update_fingerprints_if_needed() -> None:

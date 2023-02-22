@@ -11,13 +11,15 @@ import fastpath.core as core
 import fastpath.db
 from test_unit import loadj
 
-import mock_fingerprints
 
 @pytest.fixture(autouse=True, scope="session")
 def fprints():
-    core.fingerprints = mock_fingerprints.fingerprints
+    """Populates the fingerprints global variable"""
+    dns_fp = loadj("fingerprints_dns")
+    http_fp = loadj("fingerprints_http")
+    core.fingerprints = core.prepare_fingerprints(dns_fp, http_fp)
     yield
-    core.fingerprint = None
+    core.fingerprints = None
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -37,6 +39,76 @@ def mockdb():
     fastpath.db.click_client = Mock()
     yield
     fastpath.db.click_client = None
+
+
+# # fingerprints # #
+
+
+def test_prepare_fingerprints():
+    dns_fp = loadj("fingerprints_dns")
+    http_fp = loadj("fingerprints_http")
+    q = core.prepare_fingerprints(dns_fp, http_fp)
+    assert core.fingerprints == q
+
+
+def test_fetch_fingerprints():
+    dns_fp, http_fp = fastpath.db.fetch_fingerprints()
+
+    exe = fastpath.db.click_client.execute
+    assert exe.called_once
+    query, qparams = exe.call_args[0]
+    query = query.replace("\n", " ").replace("  ", " ")
+    query_exp = (
+        "INSERT INTO fastpath ( measurement_uid, report_id, input, "
+        "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
+        "scores, platform, anomaly, confirmed, msm_failure, domain, software_name, "
+        "software_version, test_version, test_runtime, architecture, engine_name, "
+        "engine_version ) VALUES "
+    )
+    assert query == query_exp
+    assert qparams == []
+
+
+def test_fetch_fingerprints(fprints):
+    exe = fastpath.db.click_client.execute
+    coldata = (
+        ("name", "String"),
+        ("scope", "String"),
+        ("other_names", "String"),
+        ("location_found", "String"),
+        ("pattern_type", "String"),
+        ("pattern", "String"),
+        ("confidence_no_fp", "String"),
+        ("expected_countries", "String"),
+    )
+    exe.return_value = [
+        [
+            ("ooni.by_4", "isp", "cl.dns_isp_by_mts", "dns", "full", "134.17.0.7", 5, "BY"),
+        ],
+        coldata,
+    ]
+
+    dns_fp, http_fp = fastpath.db.fetch_fingerprints()
+
+    assert exe.called_once
+    query, qparams = exe.call_args[0]
+    query = " ".join(query.split())
+    assert query == (
+        "SELECT name, scope, other_names, location_found, pattern_type, "
+        "pattern, confidence_no_fp, expected_countries FROM fingerprints_http"
+    )
+    assert dns_fp == [
+        {
+            "confidence_no_fp": 5,
+            "expected_countries": "BY",
+            "location_found": "dns",
+            "name": "ooni.by_4",
+            "other_names": "cl.dns_isp_by_mts",
+            "pattern": "134.17.0.7",
+            "pattern_type": "full",
+            "scope": "isp",
+        }
+    ]
 
 
 def test_score_web_connectivity_bug_610_2(fprints):

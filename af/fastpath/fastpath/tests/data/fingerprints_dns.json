@@ -1,0 +1,1502 @@
+[
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "BY",
+    "location_found": "dns",
+    "name": "ooni.by_4",
+    "other_names": "cl.dns_isp_by_mts",
+    "pattern": "134.17.0.7",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_0",
+    "other_names": "cl.dns_nat_cn_poison_01",
+    "pattern": "8.7.198.45",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_1",
+    "other_names": "cl.dns_nat_cn_poison_02",
+    "pattern": "37.61.54.158",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_2",
+    "other_names": "cl.dns_nat_cn_poison_03",
+    "pattern": "46.82.174.68",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_3",
+    "other_names": "cl.dns_nat_cn_poison_04",
+    "pattern": "78.16.49.15",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_4",
+    "other_names": "cl.dns_nat_cn_poison_05",
+    "pattern": "93.46.8.89",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_5",
+    "other_names": "cl.dns_nat_cn_poison_06",
+    "pattern": "159.106.121.75",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_6",
+    "other_names": "cl.dns_nat_cn_poison_07,cl.dns_nat_cn_poison_09,ooni.cn_8",
+    "pattern": "203.98.7.65",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_7",
+    "other_names": "cl.dns_nat_cn_poison_08",
+    "pattern": "59.24.3.173",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "CN",
+    "location_found": "dns",
+    "name": "ooni.cn_9",
+    "other_names": "cl.dns_nat_cn_poison_10",
+    "pattern": "243.185.187.39",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "IR",
+    "location_found": "dns",
+    "name": "ooni.ir_4",
+    "other_names": "cl.dns_nat_ir_inject_1",
+    "pattern": "10.10.34.34",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "IR",
+    "location_found": "dns",
+    "name": "ooni.ir_5",
+    "other_names": "cl.dns_nat_ir_inject_2",
+    "pattern": "10.10.34.35",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "MM",
+    "location_found": "dns",
+    "name": "ooni.mm_2",
+    "other_names": "cl.dns_isp_mm_myanmarnet_block",
+    "pattern": "59.153.90.11",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "MM",
+    "location_found": "dns",
+    "name": "ooni.mm_3",
+    "other_names": "cl.dns_nat_mm_transportcomms_block",
+    "pattern": "167.172.4.60",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "MN",
+    "location_found": "dns",
+    "name": "ooni.mn_0",
+    "other_names": "cl.dns_nat_mn_crc",
+    "pattern": "218.100.84.78",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "MY",
+    "location_found": "dns",
+    "name": "ooni.my_2",
+    "other_names": "cl.dns_nat_my_violates",
+    "pattern": "175.139.142.25",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PK",
+    "location_found": "dns",
+    "name": "ooni.pk_3",
+    "other_names": "cl.dns_isp_pk_nayatel_surfsafely",
+    "pattern": "203.82.48.83",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PK",
+    "location_found": "dns",
+    "name": "ooni.pk_4",
+    "other_names": "cl.dns_isp_pk_nayatel_safeweb",
+    "pattern": "203.82.48.86",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PL",
+    "location_found": "dns",
+    "name": "ooni.pl_2",
+    "other_names": "",
+    "pattern": "145.237.235.240",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PL",
+    "location_found": "dns",
+    "name": "ooni.pl_3",
+    "other_names": "",
+    "pattern": "195.187.6.33",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PL",
+    "location_found": "dns",
+    "name": "ooni.pl_4",
+    "other_names": "",
+    "pattern": "195.187.6.34",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PL",
+    "location_found": "dns",
+    "name": "ooni.pl_5",
+    "other_names": "",
+    "pattern": "195.187.6.35",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PL",
+    "location_found": "dns",
+    "name": "ooni.pl_6",
+    "other_names": "",
+    "pattern": "78.133.250.166",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "PL",
+    "location_found": "dns",
+    "name": "ooni.pl_7",
+    "other_names": "",
+    "pattern": "195.116.107.98",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TH",
+    "location_found": "dns",
+    "name": "ooni.th_9",
+    "other_names": "cl.dns_nat_th_mdes_illegal",
+    "pattern": "125.26.170.3",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_6",
+    "other_names": "cl.dns_nat_tr_poison",
+    "pattern": "195.175.254.2",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_7",
+    "other_names": "cl.dns_isp_tr_turknet_familyprofile",
+    "pattern": "193.192.98.41",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_8",
+    "other_names": "cl.dns_isp_tr_turknet_socialmedia",
+    "pattern": "193.192.98.42",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_9",
+    "other_names": "cl.dns_isp_tr_turknet_chat",
+    "pattern": "193.192.98.43",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_4",
+    "other_names": "cl.dns_prod_cleanbrowsing_1",
+    "pattern": "185.228.168.254",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_5",
+    "other_names": "cl.dns_prod_cleanbrowsing_2",
+    "pattern": "207.246.127.171",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_6",
+    "other_names": "cl.dns_prod_cleanbrowsing_3",
+    "pattern": "45.77.77.148",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_7",
+    "other_names": "cl.dns_prod_flashstart",
+    "pattern": "185.236.104.104",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_8",
+    "other_names": "cl.dns_prod_smartdns_proxy",
+    "pattern": "54.242.237.204",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_9",
+    "other_names": "cl.dns_prod_cloudveil",
+    "pattern": "45.32.203.129",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_39",
+    "other_names": "cl.dns_prod_id_nawala",
+    "pattern": "180.131.146.7",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_40",
+    "other_names": "cl.dns_isp_id_sehat_telkomsel_baik",
+    "pattern": "202.3.219.209",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_41",
+    "other_names": "cl.dns_isp_id_sehat_tri_cname",
+    "pattern": "restricted.tri.co.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_42",
+    "other_names": "cl.dns_isp_id_sehat_tri_ip",
+    "pattern": "116.206.10.31",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_43",
+    "other_names": "cl.dns_isp_id_sehat_telkom_uzone",
+    "pattern": "36.86.63.185",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_44",
+    "other_names": "cl.dns_isp_id_sehat_telkom_uzone_mercusuar",
+    "pattern": "internet-positif.org",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_45",
+    "other_names": "cl.dns_isp_id_sehat_telkom_bltsel_cname",
+    "pattern": "mypage.blocked.bltsel",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_46",
+    "other_names": "cl.dns_isp_id_sehat_telkom_bltsel_ip",
+    "pattern": "114.121.254.4",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_47",
+    "other_names": "cl.dns_isp_id_sehat_tri_blockpage",
+    "pattern": "180.214.232.61",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_48",
+    "other_names": "cl.dns_isp_id_sehat_bolt_block",
+    "pattern": "202.62.29.1",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_49",
+    "other_names": "cl.dns_isp_id_sehat_myrepublic_block",
+    "pattern": "103.47.132.195",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_50",
+    "other_names": "cl.dns_isp_id_sehat_cbn_block",
+    "pattern": "internetsehataman.cbn.net.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_51",
+    "other_names": "cl.dns_isp_id_sehat_xl_block",
+    "pattern": "blockpage.xl.co.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_52",
+    "other_names": "cl.dns_isp_id_sehat_crypto_negatif",
+    "pattern": "202.52.141.98",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_53",
+    "other_names": "cl.dns_isp_id_sehat_jlm_negatif",
+    "pattern": "150.107.140.200",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_54",
+    "other_names": "cl.dns_isp_id_sehat_starnet_light",
+    "pattern": "103.14.16.18",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_55",
+    "other_names": "cl.dns_isp_id_sehat_starnet_dark",
+    "pattern": "113.197.108.236",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_56",
+    "other_names": "cl.dns_isp_id_sehat_citra",
+    "pattern": "202.65.113.54",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_57",
+    "other_names": "cl.dns_isp_id_sehat_argon",
+    "pattern": "103.195.19.54",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_58",
+    "other_names": "cl.dns_isp_id_sehat_sumberdata",
+    "pattern": "103.10.120.3",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_59",
+    "other_names": "cl.dns_isp_id_sehat_fibernet",
+    "pattern": "27.123.220.197",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_60",
+    "other_names": "cl.dns_isp_id_sehat_gooptix",
+    "pattern": "103.108.159.238",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_61",
+    "other_names": "cl.dns_isp_id_sehat_ltn",
+    "pattern": "103.126.10.252",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_62",
+    "other_names": "cl.dns_isp_id_sehat_utaramedia",
+    "pattern": "103.142.60.250",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_63",
+    "other_names": "cl.dns_isp_id_sehat_bitsnet",
+    "pattern": "103.19.56.2",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_64",
+    "other_names": "cl.dns_isp_id_sehat_winetmedia",
+    "pattern": "103.70.68.68",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_65",
+    "other_names": "cl.dns_isp_id_sehat_foxlinemedia",
+    "pattern": "103.83.96.242",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_66",
+    "other_names": "cl.dns_isp_id_sehat_hypernet_1",
+    "pattern": "114.129.22.33",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_67",
+    "other_names": "cl.dns_isp_id_sehat_hypernet_2",
+    "pattern": "114.129.23.9",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_68",
+    "other_names": "cl.dns_isp_id_sehat_netsafeindosat_1",
+    "pattern": "netsafe.indosatm2.com",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_69",
+    "other_names": "cl.dns_isp_id_sehat_netsafeindosat_2",
+    "pattern": "114.6.128.8",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_70",
+    "other_names": "cl.dns_isp_id_sehat_nusanet",
+    "pattern": "150.107.151.151",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_71",
+    "other_names": "cl.dns_isp_id_sehat_myrepublic",
+    "pattern": "158.140.186.3",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_72",
+    "other_names": "cl.dns_isp_id_sehat_firstmedia",
+    "pattern": "internetpositif3.firstmedia.com",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_73",
+    "other_names": "cl.dns_isp_id_sehat_melsa",
+    "pattern": "filter.melsa.net.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_74",
+    "other_names": "cl.dns_isp_id_sehat_ptcentrin",
+    "pattern": "block.centrin.net.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_75",
+    "other_names": "cl.dns_isp_id_sehat_lintasarta",
+    "pattern": "202.152.4.67",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_76",
+    "other_names": "cl.dns_isp_id_sehat_circleone",
+    "pattern": "202.165.36.253",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_77",
+    "other_names": "cl.dns_isp_id_sehat_biznet",
+    "pattern": "202.169.44.80",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_78",
+    "other_names": "cl.dns_isp_id_sehat_starcom",
+    "pattern": "202.50.202.50",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_79",
+    "other_names": "cl.dns_isp_id_sehat_iforte",
+    "pattern": "trustpositif.iforte.net.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_80",
+    "other_names": "cl.dns_isp_id_sehat_varnion_1",
+    "pattern": "202.56.160.131",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_81",
+    "other_names": "cl.dns_isp_id_sehat_varnion_2",
+    "pattern": "202.56.160.132",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_82",
+    "other_names": "cl.dns_isp_id_sehat_varnion_3",
+    "pattern": "203.99.130.131",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_83",
+    "other_names": "cl.dns_isp_id_sehat_idnic_1",
+    "pattern": "203.119.13.75",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_84",
+    "other_names": "cl.dns_isp_id_sehat_idnic_2",
+    "pattern": "203.119.13.76",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_85",
+    "other_names": "cl.dns_isp_id_sehat_hanastar",
+    "pattern": "203.160.56.38",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_86",
+    "other_names": "cl.dns_isp_id_comnets",
+    "pattern": "220.247.168.195",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_87",
+    "other_names": "cl.dns_isp_id_sehat_transhybrid_1",
+    "pattern": "58.147.184.141",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_88",
+    "other_names": "cl.dns_isp_id_sehat_transhybrid_2",
+    "pattern": "58.147.185.131",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_89",
+    "other_names": "cl.dns_isp_id_sehat_first",
+    "pattern": "202.73.99.3",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_90",
+    "other_names": "cl.dns_isp_id_sehat_gmedia_cname",
+    "pattern": "xblock.gmedia.net.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_91",
+    "other_names": "cl.dns_isp_id_sehat_gmedia_ip",
+    "pattern": "49.128.177.13",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_92",
+    "other_names": "cl.dns_isp_id_sehat_smartfren",
+    "pattern": "internetsehat.smartfren.com",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_93",
+    "other_names": "cl.dns_isp_id_sehat_mncplay",
+    "pattern": "internetpositif.mncplaymedia.com",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_94",
+    "other_names": "cl.dns_inst_id_sehat_telkomuniversity",
+    "pattern": "dnssehat.telkomuniversity.ac.id",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_95",
+    "other_names": "cl.dns_nat_id_trustpositif",
+    "pattern": "trustpositif.kominfo.go.id",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_83",
+    "other_names": "cl.dns_prod_ru_netpolice",
+    "pattern": "159.255.26.69",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_84",
+    "other_names": "cl.dns_prod_skydns_1",
+    "pattern": "193.58.251.1",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_85",
+    "other_names": "cl.dns_prod_skydns_2",
+    "pattern": "193.58.251.11",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_86",
+    "other_names": "cl.dns_prod_skydns_3",
+    "pattern": "95.217.66.240",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_87",
+    "other_names": "cl.dns_prod_yandex_security_check",
+    "pattern": "93.158.134.250",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_88",
+    "other_names": "cl.dns_isp_rostelecom_blocksystem",
+    "pattern": "217.148.54.171",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_89",
+    "other_names": "cl.dns_isp_ru_rkn_skynet",
+    "pattern": "185.37.129.10",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_90",
+    "other_names": "cl.dns_isp_ru_rkn_naukanet,cl.dns_isp_ru_rkn_zencom,ooni.ru_91",
+    "pattern": "46.175.31.250",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_92",
+    "other_names": "cl.dns_isp_ru_rkn_mastertel",
+    "pattern": "83.69.208.124",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_93",
+    "other_names": "cl.dns_isp_ru_rkn_netbynet",
+    "pattern": "212.1.226.59",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_94",
+    "other_names": "cl.dns_isp_ru_rkn_smoltelecom",
+    "pattern": "37.44.40.254",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_95",
+    "other_names": "cl.dns_isp_ru_rkn_enforta",
+    "pattern": "87.241.223.133",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_96",
+    "other_names": "cl.dns_isp_ru_rkn_ertelecom",
+    "pattern": "5.3.3.17",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_97",
+    "other_names": "",
+    "pattern": "62.33.207.196",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "RU",
+    "location_found": "dns",
+    "name": "ooni.ru_98",
+    "other_names": "",
+    "pattern": "62.33.207.197",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_10",
+    "other_names": "cl.dns_isp_tr_turknet_game",
+    "pattern": "193.192.98.45",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_11",
+    "other_names": "cl.dns_isp_tr_turknet_chat_and_socialmedia",
+    "pattern": "193.192.98.46",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_12",
+    "other_names": "cl.dns_isp_tr_turknet_game_and_socialmedia",
+    "pattern": "193.192.98.47",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_13",
+    "other_names": "cl.dns_isp_tr_turknet_game_and_chat",
+    "pattern": "193.192.98.48",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "TR",
+    "location_found": "dns",
+    "name": "ooni.tr_14",
+    "other_names": "cl.dns_isp_tr_turknet_game_chat_socialmedia",
+    "pattern": "193.192.98.49",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_10",
+    "other_names": "cl.dns_prod_dnswatch_1",
+    "pattern": "3.93.224.57",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_11",
+    "other_names": "cl.dns_prod_dnswatch_2",
+    "pattern": "52.206.227.167",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": ",ZZ",
+    "location_found": "dns",
+    "name": "ooni.zz_12",
+    "other_names": "cl.dns_prod_safedns",
+    "pattern": "195.46.39.11",
+    "pattern_type": "full",
+    "scope": "inst"
+  },
+  {
+    "confidence_no_fp": 0,
+    "expected_countries": "CO",
+    "location_found": "dns",
+    "name": "ooni.co_nat_1",
+    "other_names": "",
+    "pattern": "190.85.224.131",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_br_1234",
+    "other_names": "",
+    "pattern": "1.2.3.4",
+    "pattern_type": "full",
+    "scope": "vbw"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "IR",
+    "location_found": "dns",
+    "name": "ooni.ir_ipv6_1",
+    "other_names": "",
+    "pattern": "d0::11",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_100",
+    "other_names": "",
+    "pattern": "36.86.63.185",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_101",
+    "other_names": "",
+    "pattern": "112.215.37.181",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_102",
+    "other_names": "",
+    "pattern": "114.4.66.127",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_103",
+    "other_names": "",
+    "pattern": "118.98.96.151",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_104",
+    "other_names": "",
+    "pattern": "118.97.116.27",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_105",
+    "other_names": "",
+    "pattern": "180.214.232.61",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_106",
+    "other_names": "",
+    "pattern": "202.3.219.209",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_107",
+    "other_names": "",
+    "pattern": "202.62.29.1",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_108",
+    "other_names": "",
+    "pattern": "202.73.99.3",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 5,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_dns_109",
+    "other_names": "",
+    "pattern": "210.210.178.70",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_br_allzero",
+    "other_names": "",
+    "pattern": "0.0.0.0",
+    "pattern_type": "full",
+    "scope": "vbw"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_kominfo_1",
+    "other_names": "",
+    "pattern": "139.255.196.196",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_kominfo_2",
+    "other_names": "",
+    "pattern": "103.154.123.132",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_br_localhost",
+    "other_names": "",
+    "pattern": "127.0.0.1",
+    "pattern_type": "full",
+    "scope": "vbw"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_prod_fortidns",
+    "other_names": "",
+    "pattern": "208.91.112.55",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_prod_opendns_1",
+    "other_names": "",
+    "pattern": "146.112.61.106",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_prod_opendns_2",
+    "other_names": "",
+    "pattern": "208.69.32.164",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_prod_securely_1",
+    "other_names": "",
+    "pattern": "204.110.220.2",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "",
+    "location_found": "dns",
+    "name": "cl.dns_prod_securely_2",
+    "other_names": "",
+    "pattern": "52.52.63.90",
+    "pattern_type": "full",
+    "scope": "prod"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "IR",
+    "location_found": "dns",
+    "name": "ooni.ir_10dot10_ipv4_1",
+    "other_names": "",
+    "pattern": "10.10.34.36",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "AU",
+    "location_found": "dns",
+    "name": "cl.dns_isp_au_tpg_block",
+    "other_names": "",
+    "pattern": "202.136.99.184",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "IT",
+    "location_found": "dns",
+    "name": "cl.dns_nat_it_adm_block",
+    "other_names": "",
+    "pattern": "217.175.53.72",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "CA",
+    "location_found": "dns",
+    "name": "cl.dns_isp_ca_shaw_block",
+    "other_names": "",
+    "pattern": "64.59.135.158",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "IT",
+    "location_found": "dns",
+    "name": "cl.dns_nat_it_agcom_block",
+    "other_names": "",
+    "pattern": "83.224.65.74",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "SG",
+    "location_found": "dns",
+    "name": "cl.dns_isp_sg_starhub_block",
+    "other_names": "",
+    "pattern": "202.156.3.53",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "CA",
+    "location_found": "dns",
+    "name": "cl.dns_isp_ca_teksavvy_block",
+    "other_names": "",
+    "pattern": "206.248.146.244",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "AU",
+    "location_found": "dns",
+    "name": "cl.dns_isp_au_telstra_block_1",
+    "other_names": "",
+    "pattern": "101.167.166.53",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "AU",
+    "location_found": "dns",
+    "name": "cl.dns_isp_au_telstra_block_2",
+    "other_names": "",
+    "pattern": "101.167.164.53",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_internet_positif_remala_1",
+    "other_names": "",
+    "pattern": "101.255.1.226",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "ID",
+    "location_found": "dns",
+    "name": "ooni.id_internet_positif_remala_2",
+    "other_names": "",
+    "pattern": "101.255.0.226",
+    "pattern_type": "full",
+    "scope": "nat"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "CA",
+    "location_found": "dns",
+    "name": "cl.dns_isp_ca_rogers_tva_telus_block",
+    "other_names": "",
+    "pattern": "67.43.226.22",
+    "pattern_type": "full",
+    "scope": "isp"
+  },
+  {
+    "confidence_no_fp": 10,
+    "expected_countries": "CA",
+    "location_found": "dns",
+    "name": "cl.dns_isp_ca_rogers_tva_telus_block_2",
+    "other_names": "",
+    "pattern": "173.209.39.114",
+    "pattern_type": "full",
+    "scope": "isp"
+  }
+]

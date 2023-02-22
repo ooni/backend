@@ -11,10 +11,9 @@ import json
 from fastpath.utils import trivial_id
 from fastpath.db import extract_input_domain
 import fastpath.core as fp
+import fastpath.core as core
 import fastpath.s3feeder as s3feeder
 from fastpath.normalize import iter_yaml_msmt_normalized
-
-import mock_fingerprints
 
 
 scores_failed = {
@@ -80,32 +79,17 @@ def test_g_or():
 
 @pytest.fixture
 def fprints():
-    fp.fingerprints = mock_fingerprints.fingerprints
+    """Populates the fingerprints global variable"""
+    dns_fp = loadj("fingerprints_dns")
+    http_fp = loadj("fingerprints_http")
+    core.fingerprints = core.prepare_fingerprints(dns_fp, http_fp)
     yield
     fp.fingerprints = None
 
 
 def test_match_fingerprints_no_match(fprints):
-    assert fp.fingerprints
-    assert fp.fingerprints["IN"] == {
-        "body_match": [
-            {"body_match": "The page you have requested has been blocked", "locality": "country"},
-            {"body_match": "http://www.airtel.in/dot/?dpid=", "locality": "isp"},
-        ],
-        "header_full": [{"header_full": "GoAhead-Webs", "header_name": "server", "locality": "local"}],
-        "header_prefix": [
-            {
-                "header_name": "via",
-                "header_prefix": "1.1 ironport1.iitj.ac.in:80 (Cisco-WSA/",
-                "locality": "local",
-            },
-            {
-                "header_name": "via",
-                "header_prefix": "1.1 ironport2.iitj.ac.in:80 (Cisco-WSA/",
-                "locality": "local",
-            },
-        ],
-    }
+    assert fp.fingerprints["dns"]
+    assert fp.fingerprints["http"]
     msm = {"probe_cc": "IE", "test_keys": {"requests": []}}
     assert fp.match_fingerprints(msm) == []
 
@@ -116,7 +100,19 @@ def test_match_fingerprints_match_country(fprints):
         "test_keys": {"requests": [{"response": {"body": "foo ... Makluman/Notification ... foo"}}]},
     }
     matches = fp.match_fingerprints(msm)
-    assert matches == [{"body_match": "Makluman/Notification", "locality": "country"}]
+    assert matches == [
+        {
+            "confidence_no_fp": 5,
+            "expected_countries": "MY",
+            "location_found": "body",
+            "name": "ooni.my_0",
+            "other_names": "",
+            "pattern": "Makluman/Notification",
+            "pattern_type": "contains",
+            "scope": "nat",
+        },
+    ]
+    # {"body_match": "Makluman/Notification", "locality": "country"}]
 
 
 def test_match_dns_fingerprints_match_country(fprints):
@@ -140,7 +136,18 @@ def test_match_dns_fingerprints_match_country(fprints):
         },
     }
     matches = fp.match_fingerprints(msm)
-    assert matches == [{"dns_full": "195.175.254.2", "locality": "country"}]
+    assert matches == [
+        {
+            "confidence_no_fp": 5,
+            "expected_countries": "TR",
+            "location_found": "dns",
+            "name": "ooni.tr_6",
+            "other_names": "cl.dns_nat_tr_poison",
+            "pattern": "195.175.254.2",
+            "pattern_type": "full",
+            "scope": "nat",
+        },
+    ]
 
 
 def test_match_fingerprints_dict_body(fprints):
@@ -171,7 +178,18 @@ def test_match_fingerprints_b64_hdr(fprints):
 def test_score_web_connectivity_dns_ir_fingerprint(fprints):
     msm = loadj("web_connectivity_ir_fp")
     matches = fp.match_fingerprints(msm)
-    assert matches == [{"dns_full": "10.10.34.36", "locality": "country"}]
+    assert matches == [
+        {
+            "confidence_no_fp": 10,
+            "expected_countries": "IR",
+            "location_found": "dns",
+            "name": "ooni.ir_10dot10_ipv4_1",
+            "other_names": "",
+            "pattern": "10.10.34.36",
+            "pattern_type": "full",
+            "scope": "nat",
+        },
+    ]
     scores = fp.score_measurement(msm)
     assert scores == {
         "blocking_general": 2.0,
@@ -724,11 +742,6 @@ def test_extract_expected_countries():
         assert fp.extract_expected_countries(inp) == out
 
 
-def load_fprint_json(t):
-    with Path(f"fastpath/tests/data/fingerprints_{t}.json").open() as f:
-        return json.load(f)
-
-
 def test_prepare_fingerprints():
     dns_fp = [
         {
@@ -742,24 +755,19 @@ def test_prepare_fingerprints():
             "expected_countries": "BY",
         }
     ]
-    http_fp = load_fprint_json("http")
-    fps = fp.prepare_fingerprints(dns_fp, http_fp)
-    assert fps["IN"] == {
-        "body_match": [
-            {"locality": "country", "body_match": "The page you have requested has been blocked"},
-            {"locality": "isp", "body_match": "http://www.airtel.in/dot/?dpid="},
-        ],
-        "header_prefix": [
+    fps = fp.prepare_fingerprints(dns_fp, [])
+    assert fps == {
+        "dns": [
             {
-                "locality": "local",
-                "header_name": "via",
-                "header_prefix": "1.1 ironport1.iitj.ac.in:80 (Cisco-WSA/",
-            },
-            {
-                "locality": "local",
-                "header_name": "via",
-                "header_prefix": "1.1 ironport2.iitj.ac.in:80 (Cisco-WSA/",
-            },
+                "confidence_no_fp": 5,
+                "expected_countries": "BY",
+                "location_found": "dns",
+                "name": "ooni.by_4",
+                "other_names": "cl.dns_isp_by_mts",
+                "pattern": "134.17.0.7",
+                "pattern_type": "full",
+                "scope": "isp",
+            }
         ],
-        "header_full": [{"locality": "local", "header_name": "server", "header_full": "GoAhead-Webs"}],
+        "http": [],
     }
