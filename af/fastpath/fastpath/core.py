@@ -16,7 +16,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, TypedDict
+from typing import Any, Dict, List, TypedDict
 import binascii
 import logging
 import multiprocessing as mp
@@ -1282,7 +1282,7 @@ def score_http_requests(msm: dict) -> dict:
     # is blocked the msmt is failed.
     tk = g_or(msm, "test_keys", {})
     requests = g_or(tk, "requests", [])
-    matches = []
+    matches: List[Dict] = []
     for req in requests:
         is_tor = gn(req, "request", "tor", "is_tor")
         resp = g_or(req, "response", {})
@@ -1326,9 +1326,12 @@ def score_signal(msm: dict) -> dict:
     try:
         if parse_version(tv) < parse_version("0.2.2"):
             start_time = msm.get("measurement_start_time")
-            start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-            if start_time >= datetime(2022, 10, 19):
+            if start_time is None:
                 scores["accuracy"] = 0.0
+            else:
+                start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                if start_time >= datetime(2022, 10, 19):
+                    scores["accuracy"] = 0.0
     except Exception:
         scores["accuracy"] = 0.0
 
@@ -1691,7 +1694,7 @@ def update_fingerprints_if_needed() -> None:
             log.info(f"Fingerprint update for worker {mp_id} with stagger {delta}s")
         except IndexError:
             delta = 0  # Running without multiprocessing
-        fingerprints_update_time = time.time() + 3600 + delta
+        fingerprints_update_time = int(time.time()) + 3600 + delta
 
     elif fingerprints_update_time > time.time():
         fingerprints_update_time += 3600

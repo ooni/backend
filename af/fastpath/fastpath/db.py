@@ -10,6 +10,7 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 from datetime import datetime
 from textwrap import dedent
 from urllib.parse import urlparse
+from typing import List, Tuple
 import logging
 
 try:
@@ -28,7 +29,7 @@ metrics = setup_metrics(name="fastpath.db")
 click_client: Clickhouse
 
 
-def extract_input_domain(msm: dict, test_name: str) -> tuple[str, str]:
+def extract_input_domain(msm: dict, test_name: str) -> Tuple[str, str]:
     """Extract domain and handle special case meek_fronted_requests_test"""
     input_ = msm.get("input") or ""
     if test_name == "meek_fronted_requests_test" and isinstance(input_, list):
@@ -41,7 +42,7 @@ def extract_input_domain(msm: dict, test_name: str) -> tuple[str, str]:
     return input_, domain
 
 
-def _click_create_table_fastpath():
+def _click_create_table_fastpath() -> None:
     # TODO: table creation should be done before starting workers
     sql = """
     CREATE TABLE IF NOT EXISTS fastpath
@@ -86,7 +87,7 @@ def _click_create_table_fastpath():
     log.debug(list(rows))
 
 
-def click_create_table_obs_openvpn():
+def click_create_table_obs_openvpn() -> None:
     sql = """
     CREATE TABLE IF NOT EXISTS obs_openvpn
     (
@@ -258,9 +259,7 @@ def clickhouse_upsert_summary(
 
 @metrics.timer("clickhouse_upsert_openvpn_obs")
 def clickhouse_upsert_openvpn_obs(
-    msm,
-    scores,
-    measurement_uid: str,
+    msm: dict, scores: dict, measurement_uid: str
 ) -> None:
     global click_client
     sql_insert = dedent(
@@ -373,7 +372,7 @@ def clickhouse_upsert_openvpn_obs(
         log.error("Failed Clickhouse insert", exc_info=True)
 
 
-def query(query, query_params, query_prio=5):
+def query(query: str, query_params: dict, query_prio=5):
     global click_client
     settings = {"priority": query_prio, "max_execution_time": 28}
     q = click_client.execute(
@@ -385,7 +384,7 @@ def query(query, query_params, query_prio=5):
 
 
 @metrics.timer("fetch_fingerprints")
-def fetch_fingerprints() -> None:
+def fetch_fingerprints() -> Tuple[List, List]:
     sql = """
     SELECT name, scope, other_names, location_found, pattern_type,
         pattern, confidence_no_fp, expected_countries
