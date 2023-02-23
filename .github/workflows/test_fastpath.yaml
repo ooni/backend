@@ -23,8 +23,10 @@ jobs:
       - name: Run tests
         run: |
           cd af/fastpath
-          PYTHONPATH=. pytest-3 -v --junitxml=junit/test-results.xml --cov=fastpath --cov-report=xml --cov-report=html \
-            --cov-report=term fastpath/tests/test_unit.py fastpath/tests/test_functional.py
+          PYTHONPATH=. pytest-3 -v --cov=fastpath --cov-report=term \
+          fastpath/tests/test_functional.py \
+          fastpath/tests/test_functional_nodb.py \
+          fastpath/tests/test_unit.py
 
       - name: Archive code coverage HTML pages
         uses: actions/upload-artifact@v2
