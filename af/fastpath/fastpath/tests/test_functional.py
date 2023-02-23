@@ -9,12 +9,14 @@ from pathlib import Path
 from unittest.mock import MagicMock
 import logging
 import os
+import json
 import time
 
 import ujson
 import pytest  # debdeps: python3-pytest
 
 import fastpath.core as fp
+import fastpath.core as core
 import fastpath.s3feeder as s3feeder
 
 import mock_fingerprints
@@ -32,6 +34,22 @@ log = logging.getLogger()
 # s3cmd ls s3://ooni-data-eu-fra
 
 BUCKET_NAME = "ooni-data"
+
+
+def loadj(fn):
+    f = Path("fastpath/tests/data") / fn
+    t = f.with_suffix(".json").read_text()
+    return json.loads(t)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def fprints():
+    """Populates the fingerprints global variable"""
+    dns_fp = loadj("fingerprints_dns")
+    http_fp = loadj("fingerprints_http")
+    core.fingerprints = core.prepare_fingerprints(dns_fp, http_fp)
+    yield
+    core.fingerprints = None
 
 
 @pytest.fixture
@@ -513,7 +531,6 @@ def test_score_measurement_hhfm_large(cans):
 
 
 def disabled_test_score_measurement_hhfm_stats(cans):
-
     can = cans["hhfm_2019_10_27"]
     # Distribution of request->failure values in this can
     #

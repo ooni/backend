@@ -84,7 +84,7 @@ def fprints():
     http_fp = loadj("fingerprints_http")
     core.fingerprints = core.prepare_fingerprints(dns_fp, http_fp)
     yield
-    fp.fingerprints = None
+    core.fingerprints = None
 
 
 def test_match_fingerprints_no_match(fprints):
