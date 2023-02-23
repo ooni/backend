@@ -937,6 +937,8 @@ def score_web_connectivity(msm, matches) -> dict:
     scores = init_scores()  # type: Dict[str, Any]
     if len(matches):
         scores["confirmed"] = True
+        scores["fingerprints"] = matches
+
     tk = g_or(msm, "test_keys", {})
     if tk is None:
         logbug(9, "test_keys is None", msm)
@@ -946,7 +948,7 @@ def score_web_connectivity(msm, matches) -> dict:
     for fp in matches:
         loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
         loc = "blocking_" + loc
-        scores[loc] += 1.0
+        scores[loc] = 1.0
 
     # "title_match" is often missing from the raw msmt
     # e.g. 20190912T145602Z_AS9908_oXVmdAo2BZ2Z6uXDdatwL9cN5oiCllrzpGWKY49PlM4vEB03X7
@@ -1295,6 +1297,7 @@ def score_http_requests(msm: dict) -> dict:
 
         else:
             scores["confirmed"] = True
+            scores["fingerprints"] = matches
 
     return scores
 

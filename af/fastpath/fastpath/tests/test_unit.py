@@ -199,6 +199,18 @@ def test_score_web_connectivity_dns_ir_fingerprint(fprints):
         "blocking_local": 0.0,
         "confirmed": True,
         "analysis": {"blocking_type": "dns"},
+        "fingerprints": [
+            {
+                "confidence_no_fp": 10,
+                "expected_countries": "IR",
+                "location_found": "dns",
+                "name": "ooni.ir_10dot10_ipv4_1",
+                "other_names": "",
+                "pattern": "10.10.34.36",
+                "pattern_type": "full",
+                "scope": "nat",
+            }
+        ],
     }
 
 
@@ -341,6 +353,18 @@ def test_score_measurement_confirmed(fprints):
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
         "confirmed": True,
+        "fingerprints": [
+            {
+                "confidence_no_fp": 5,
+                "expected_countries": "IT",
+                "location_found": "body",
+                "name": "ooni.it_0",
+                "other_names": "",
+                "pattern": "GdF Stop Page",
+                "pattern_type": "contains",
+                "scope": "nat",
+            }
+        ],
     }
 
 
@@ -637,6 +661,18 @@ def test_bug_backend352(fprints):
         "blocking_local": 0.0,
         "analysis": {"blocking_type": "dns"},
         "confirmed": True,
+        "fingerprints": [
+            {
+                "confidence_no_fp": 10,
+                "expected_countries": "IR",
+                "location_found": "dns",
+                "name": "ooni.ir_10dot10_ipv4_1",
+                "other_names": "",
+                "pattern": "10.10.34.36",
+                "pattern_type": "full",
+                "scope": "nat",
+            }
+        ],
     }
 
 

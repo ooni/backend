@@ -699,11 +699,34 @@ def test_score_web_connectivity_simple(cans):
             "http://www.ohchr.org/",
         ): {
             "scores": {
-                "blocking_country": 0.0,
-                "blocking_general": 0.0,
+                "blocking_general": 1.0,
                 "blocking_global": 0.0,
+                "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
+                "confirmed": True,
+                "fingerprints": [
+                    {
+                        "confidence_no_fp": 5,
+                        "expected_countries": "",
+                        "location_found": "body",
+                        "name": "cp.fp_x_document_moved",
+                        "other_names": "",
+                        "pattern": "<head><title>Document Moved</title></head>",
+                        "pattern_type": "contains",
+                        "scope": "fp",
+                    },
+                    {
+                        "confidence_no_fp": 5,
+                        "expected_countries": "",
+                        "location_found": "body",
+                        "name": "cp.fp_x_document_moved",
+                        "other_names": "",
+                        "pattern": "<head><title>Document Moved</title></head>",
+                        "pattern_type": "contains",
+                        "scope": "fp",
+                    },
+                ],
             }
         },
         (
@@ -717,6 +740,19 @@ def test_score_web_connectivity_simple(cans):
                 "blocking_global": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
+                "confirmed": True,
+                "fingerprints": [
+                    {
+                        "confidence_no_fp": 5,
+                        "expected_countries": "",
+                        "location_found": "body",
+                        "name": "cp.fp_x_redirect_just",
+                        "other_names": "",
+                        "pattern": "redirect",
+                        "pattern_type": "contains",
+                        "scope": "fp",
+                    }
+                ],
             }
         },
         (
@@ -761,7 +797,7 @@ def test_score_web_connectivity_simple(cans):
 
         exp = expected.pop((rid, inp))
         if "scores" in exp:
-            assert scores == exp["scores"]
+            assert scores == exp["scores"], scores
 
     assert len(expected) == 0, "Not all expected measurements were tested"
 
