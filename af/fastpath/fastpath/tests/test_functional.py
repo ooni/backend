@@ -19,8 +19,6 @@ import fastpath.core as fp
 import fastpath.core as core
 import fastpath.s3feeder as s3feeder
 
-import mock_fingerprints
-
 log = logging.getLogger()
 
 # The fixtures download cans from S3 to a local directory
@@ -265,7 +263,6 @@ def setup_module(module):
     fp.conf.update = False
     fp.conf.interact = False
     fp.setup_dirs(fp.conf, Path(os.getcwd()))
-    fp.fingerprints = mock_fingerprints.fingerprints
 
 
 def test_telegram(cans):
@@ -643,6 +640,7 @@ def test_score_tor():
 
 
 def test_score_http_requests():
+    assert core.fingerprints
     cnt = 0
     for can_fn, msm in s3msmts("http_requests", date(2016, 12, 29), date(2016, 12, 29)):
         assert msm["test_name"] == "http_requests"
