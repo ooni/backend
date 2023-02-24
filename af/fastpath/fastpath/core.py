@@ -76,7 +76,7 @@ class Fingerprint(TypedDict):
     pattern_type: str
     pattern: str
     confidence_no_fp: int
-    expected_countries: str
+    expected_countries: list
 
 
 fingerprints: Dict[str, list[Fingerprint]] = dict(dns=[], http=[])
@@ -303,6 +303,17 @@ def process_measurements_from_s3() -> None:
                 return
 
 
+def minifp(fp: Fingerprint) -> Dict[str, Any]:
+    fields = (
+        "name",
+        "scope",
+        "location_found",
+        "confidence_no_fp",
+        "expected_countries",
+    )
+    return {k: v for k, v in fp.items() if k in fields}
+
+
 def match_http_body_fingerprints(resp, matches) -> None:
     # Match HTTP body if found
     body = resp.get("body")
@@ -329,7 +340,7 @@ def match_http_body_fingerprints(resp, matches) -> None:
             idx = body.find(bm)
 
         if idx != -1:
-            matches.append(fp)
+            matches.append(minifp(fp))
             log.debug("matched body fp %s", fp["name"])
             # Used for statistics
             metrics.gauge("fingerprint_body_match_location", idx)
@@ -351,7 +362,7 @@ def match_http_headers_fingerprints(resp, matches) -> None:
         hname = loc_found[8:]
         if pat_type == "full":
             if headers.get(hname) == fp["pattern"]:
-                matches.append(fp)
+                matches.append(minifp(fp))
                 log.debug("matched header full %s", fp["name"])
 
         elif pat_type == "prefix":
@@ -362,7 +373,7 @@ def match_http_headers_fingerprints(resp, matches) -> None:
                 data = b64decode(v.get("data", ""))
                 v = data.decode("latin1")
             if isinstance(v, str) and v.startswith(prefix):
-                matches.append(fp)
+                matches.append(minifp(fp))
                 log.debug("matched header prefix %s", fp["name"])
 
 
@@ -930,25 +941,31 @@ def score_vanilla_tor(msm: dict) -> dict:
 
 
 @metrics.timer("score_web_connectivity")
-def score_web_connectivity(msm, matches) -> dict:
+def score_web_connectivity(msm: dict, matches: list) -> dict:
     """Calculate measurement scoring for web connectivity
     Returns a scores dict
     """
     scores = init_scores()  # type: Dict[str, Any]
-    if len(matches):
-        scores["confirmed"] = True
-        scores["fingerprints"] = matches
-
     tk = g_or(msm, "test_keys", {})
     if tk is None:
         logbug(9, "test_keys is None", msm)
         scores["accuracy"] = 0.0
         return scores
 
+    if matches:
+        scores["fingerprints"] = [minifp(fp) for fp in matches]
+
+    probe_cc = g_or(msm, "probe_cc", "ZZ").upper()
     for fp in matches:
-        loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
-        loc = "blocking_" + loc
-        scores[loc] = 1.0
+        if (
+            probe_cc in fp["expected_countries"]
+            or not fp["expected_countries"]
+            or fp["scope"] in ("isp", "nat")
+        ):
+            loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
+            loc = "blocking_" + loc
+            scores[loc] = 1.0
+            scores["confirmed"] = True
 
     # "title_match" is often missing from the raw msmt
     # e.g. 20190912T145602Z_AS9908_oXVmdAo2BZ2Z6uXDdatwL9cN5oiCllrzpGWKY49PlM4vEB03X7
@@ -1282,22 +1299,29 @@ def score_http_requests(msm: dict) -> dict:
     # is blocked the msmt is failed.
     tk = g_or(msm, "test_keys", {})
     requests = g_or(tk, "requests", [])
-    matches: List[Dict] = []
+    matches: List[Fingerprint] = []
     for req in requests:
         is_tor = gn(req, "request", "tor", "is_tor")
+        if is_tor:
+            continue
         resp = g_or(req, "response", {})
-        body = gn(req, "response", "body")
         match_http_body_fingerprints(resp, matches)
         match_http_headers_fingerprints(resp, matches)
 
     if matches:
-        if is_tor:
-            scores["accuracy"] = 0.0
-            log.debug(f"Failed measurement t1 {rid} {inp}")
+        scores["fingerprints"] = [minifp(fp) for fp in matches]
 
-        else:
+    probe_cc = g_or(msm, "probe_cc", "ZZ").upper()
+    for fp in matches:
+        if (
+            probe_cc in fp["expected_countries"]
+            or not fp["expected_countries"]
+            or fp["scope"] in ("isp", "nat")
+        ):
+            loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
+            loc = "blocking_" + loc
+            scores[loc] = 1.0
             scores["confirmed"] = True
-            scores["fingerprints"] = matches
 
     return scores
 
@@ -1676,6 +1700,12 @@ def extract_expected_countries(ec):
 
 @metrics.timer("prepare_fingerprints")
 def prepare_fingerprints(dns_fp, http_fp):
+    for fp in dns_fp + http_fp:
+        exp = set(fp["expected_countries"].strip().split(","))
+        exp.discard("")
+        exp.discard("ZZ")
+        fp["expected_countries"] = sorted(exp)
+
     dns = [Fingerprint(**fp) for fp in dns_fp]
     http = [Fingerprint(**fp) for fp in http_fp]
     return dict(dns=dns, http=http)

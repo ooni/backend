@@ -103,12 +103,9 @@ def test_match_fingerprints_match_country(fprints):
     assert matches == [
         {
             "confidence_no_fp": 5,
-            "expected_countries": "MY",
+            "expected_countries": ["MY"],
             "location_found": "body",
             "name": "ooni.my_0",
-            "other_names": "",
-            "pattern": "Makluman/Notification",
-            "pattern_type": "contains",
             "scope": "nat",
         },
     ]
@@ -139,7 +136,7 @@ def test_match_dns_fingerprints_match_country(fprints):
     assert matches == [
         {
             "confidence_no_fp": 5,
-            "expected_countries": "TR",
+            "expected_countries": ["TR"],
             "location_found": "dns",
             "name": "ooni.tr_6",
             "other_names": "cl.dns_nat_tr_poison",
@@ -181,7 +178,7 @@ def test_score_web_connectivity_dns_ir_fingerprint(fprints):
     assert matches == [
         {
             "confidence_no_fp": 10,
-            "expected_countries": "IR",
+            "expected_countries": ["IR"],
             "location_found": "dns",
             "name": "ooni.ir_10dot10_ipv4_1",
             "other_names": "",
@@ -202,12 +199,9 @@ def test_score_web_connectivity_dns_ir_fingerprint(fprints):
         "fingerprints": [
             {
                 "confidence_no_fp": 10,
-                "expected_countries": "IR",
+                "expected_countries": ["IR"],
                 "location_found": "dns",
                 "name": "ooni.ir_10dot10_ipv4_1",
-                "other_names": "",
-                "pattern": "10.10.34.36",
-                "pattern_type": "full",
                 "scope": "nat",
             }
         ],
@@ -356,12 +350,9 @@ def test_score_measurement_confirmed(fprints):
         "fingerprints": [
             {
                 "confidence_no_fp": 5,
-                "expected_countries": "IT",
+                "expected_countries": ["IT"],
                 "location_found": "body",
                 "name": "ooni.it_0",
-                "other_names": "",
-                "pattern": "GdF Stop Page",
-                "pattern_type": "contains",
                 "scope": "nat",
             }
         ],
@@ -664,12 +655,9 @@ def test_bug_backend352(fprints):
         "fingerprints": [
             {
                 "confidence_no_fp": 10,
-                "expected_countries": "IR",
+                "expected_countries": ["IR"],
                 "location_found": "dns",
                 "name": "ooni.ir_10dot10_ipv4_1",
-                "other_names": "",
-                "pattern": "10.10.34.36",
-                "pattern_type": "full",
                 "scope": "nat",
             }
         ],
@@ -796,7 +784,7 @@ def test_prepare_fingerprints():
         "dns": [
             {
                 "confidence_no_fp": 5,
-                "expected_countries": "BY",
+                "expected_countries": ["BY"],
                 "location_found": "dns",
                 "name": "ooni.by_4",
                 "other_names": "cl.dns_isp_by_mts",

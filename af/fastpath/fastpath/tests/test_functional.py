@@ -708,22 +708,16 @@ def test_score_web_connectivity_simple(cans):
                 "fingerprints": [
                     {
                         "confidence_no_fp": 5,
-                        "expected_countries": "",
+                        "expected_countries": [],
                         "location_found": "body",
                         "name": "cp.fp_x_document_moved",
-                        "other_names": "",
-                        "pattern": "<head><title>Document Moved</title></head>",
-                        "pattern_type": "contains",
                         "scope": "fp",
                     },
                     {
                         "confidence_no_fp": 5,
-                        "expected_countries": "",
+                        "expected_countries": [],
                         "location_found": "body",
                         "name": "cp.fp_x_document_moved",
-                        "other_names": "",
-                        "pattern": "<head><title>Document Moved</title></head>",
-                        "pattern_type": "contains",
                         "scope": "fp",
                     },
                 ],
@@ -744,12 +738,9 @@ def test_score_web_connectivity_simple(cans):
                 "fingerprints": [
                     {
                         "confidence_no_fp": 5,
-                        "expected_countries": "",
+                        "expected_countries": [],
                         "location_found": "body",
                         "name": "cp.fp_x_redirect_just",
-                        "other_names": "",
-                        "pattern": "redirect",
-                        "pattern_type": "contains",
                         "scope": "fp",
                     }
                 ],
