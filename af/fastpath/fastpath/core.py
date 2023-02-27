@@ -388,6 +388,7 @@ def g(d, *keys, default=None):
 
 
 def gn(d, *a):
+    """Item getter that supports nested keys. Defaults to None"""
     return g(d, *a, default=None)
 
 
@@ -1604,6 +1605,7 @@ def process_measurement(msm_tup) -> None:
         architecture = g_or(annot, "architecture", "")
         engine_name = g_or(annot, "engine_name", "")
         engine_version = g_or(annot, "engine_version", "")
+        blocking_type = g(scores, "analysis", "blocking_type", default="")
 
         db.clickhouse_upsert_summary(
             measurement,
@@ -1611,6 +1613,7 @@ def process_measurement(msm_tup) -> None:
             anomaly,
             confirmed,
             failure,
+            blocking_type,
             msmt_uid,
             sw_name,
             sw_version,

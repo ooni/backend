@@ -49,7 +49,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
     query_exp = (
         "INSERT INTO fastpath ( measurement_uid, report_id, input, "
         "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
-        "scores, platform, anomaly, confirmed, msm_failure, domain, software_name, "
+        "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version ) VALUES "
     )
@@ -69,6 +69,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
             "anomaly": "f",
             "confirmed": "f",
             "msm_failure": "t",
+            "blocking_type": "",
             "domain": "yooz.ir",
             "software_name": "ooniprobe-android",
             "software_version": "3.7.0",
@@ -96,7 +97,7 @@ def test_score_openvpn():
     query_exp = (
         "INSERT INTO fastpath ( measurement_uid, report_id, input, "
         "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
-        "scores, platform, anomaly, confirmed, msm_failure, domain, software_name, "
+        "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version ) VALUES "
     )
@@ -116,6 +117,7 @@ def test_score_openvpn():
             "anomaly": "f",
             "confirmed": "f",
             "msm_failure": "f",
+            "blocking_type": "",
             "domain": "openvpn.riseup",
             "software_name": "miniooni",
             "software_version": "3.17.0-alpha",
