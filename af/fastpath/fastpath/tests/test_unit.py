@@ -324,6 +324,21 @@ def test_score_measurement_simple(fprints):
     }
 
 
+def test_is_confirmed():
+    matched = core.Fingerprint(expected_countries=["IT"], scope="bogus")
+    assert core.is_confirmed("IT", matched)
+
+    matched = core.Fingerprint(expected_countries=["FR"], scope="bogus")
+    assert not core.is_confirmed("IT", matched)
+
+    # Do not match ZZ
+    matched = core.Fingerprint(expected_countries=["ZZ"], scope="bogus")
+    assert not core.is_confirmed("ZZ", matched)
+
+    matched = core.Fingerprint(expected_countries=[], scope="nat")
+    assert core.is_confirmed("IT", matched)
+
+
 def test_score_measurement_confirmed(fprints):
     msm = {
         "input": "foo",

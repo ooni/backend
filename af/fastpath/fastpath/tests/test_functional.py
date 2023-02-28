@@ -699,12 +699,11 @@ def test_score_web_connectivity_simple(cans):
             "http://www.ohchr.org/",
         ): {
             "scores": {
-                "blocking_general": 1.0,
+                "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
-                "confirmed": True,
                 "fingerprints": [
                     {
                         "confidence_no_fp": 5,
@@ -734,7 +733,6 @@ def test_score_web_connectivity_simple(cans):
                 "blocking_global": 0.0,
                 "blocking_isp": 0.0,
                 "blocking_local": 0.0,
-                "confirmed": True,
                 "fingerprints": [
                     {
                         "confidence_no_fp": 5,
@@ -788,12 +786,9 @@ def test_score_web_connectivity_simple(cans):
 
         exp = expected.pop((rid, inp))
         if "scores" in exp:
-            assert scores == exp["scores"], scores
+            assert scores == exp["scores"], (rid, inp, scores)
 
     assert len(expected) == 0, "Not all expected measurements were tested"
-
-
-# 20170128T062626Z_AS7418_6kv1cZCRLIPSuVMYHsqQpZzfKhlEEWPagKuGTObnPtqjTcgXRc
 
 
 @pytest.mark.skip(reason="FIXME")

@@ -940,6 +940,20 @@ def score_vanilla_tor(msm: dict) -> dict:
     return scores
 
 
+def is_confirmed(probe_cc: str, fp: Fingerprint) -> bool:
+    """Checks if a matching fingerprint represents confiremed blocking"""
+    if probe_cc != "ZZ" and probe_cc in fp["expected_countries"]:
+        # The fingerprint matches a specific country
+        return True
+
+    if fp["scope"] in ("isp", "nat"):
+        # Any fingerprint with such scopes matches even if
+        # expected_countries is empty or contains unrelated CCs
+        return True
+
+    return False
+
+
 @metrics.timer("score_web_connectivity")
 def score_web_connectivity(msm: dict, matches: list) -> dict:
     """Calculate measurement scoring for web connectivity
@@ -957,11 +971,7 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
 
     probe_cc = g_or(msm, "probe_cc", "ZZ").upper()
     for fp in matches:
-        if (
-            probe_cc in fp["expected_countries"]
-            or not fp["expected_countries"]
-            or fp["scope"] in ("isp", "nat")
-        ):
+        if is_confirmed(probe_cc, fp):
             loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
             loc = "blocking_" + loc
             scores[loc] = 1.0
@@ -1313,11 +1323,7 @@ def score_http_requests(msm: dict) -> dict:
 
     probe_cc = g_or(msm, "probe_cc", "ZZ").upper()
     for fp in matches:
-        if (
-            probe_cc in fp["expected_countries"]
-            or not fp["expected_countries"]
-            or fp["scope"] in ("isp", "nat")
-        ):
+        if is_confirmed(probe_cc, fp):
             loc = g_or(FINGERPRINT_SCOPE_TO_LOCALITY, fp["scope"], "general")
             loc = "blocking_" + loc
             scores[loc] = 1.0
@@ -1703,6 +1709,7 @@ def prepare_fingerprints(dns_fp, http_fp):
     for fp in dns_fp + http_fp:
         exp = set(fp["expected_countries"].strip().split(","))
         exp.discard("")
+        # Discard ZZ as we don't handle it currently
         exp.discard("ZZ")
         fp["expected_countries"] = sorted(exp)
 
