@@ -28,7 +28,7 @@ progress_cnt = 0
 def progress(msg: str) -> None:
     global progress_cnt
     metrics.gauge("fingerprints_update_progress", progress_cnt)
-    log.info(f"{progress_cnt} msg")
+    log.info(f"{progress_cnt} {msg}")
     progress_cnt += 1
 
 
