@@ -61,6 +61,7 @@ conf = Namespace()
 
 log = logging.getLogger("analysis")
 metrics = setup_metrics(name="analysis")
+DB_URI = "clickhouse://api:api@localhost/default"
 
 
 def parse_args() -> Namespace:
@@ -80,7 +81,7 @@ def parse_args() -> Namespace:
     # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
-    ap.add_argument("--db-uri", help="Override DB URI", default="clickhouse://localhost/default")
+    ap.add_argument("--db-uri", help="Override DB URI", default=DB_URI)
     return ap.parse_args()
 
 
