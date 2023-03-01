@@ -126,7 +126,7 @@ def update_fingerprints(conf: Namespace) -> None:
     click.execute(q, data)
     progress("fingerprints_http_tmp filled")
 
-    r = click.execute("SELECT count() FROM fingerprints_dns_tmp")
+    r = click.execute("SELECT count() FROM fingerprints_http_tmp")
     row_cnt = r[0][0]
     metrics.gauge("fingerprints_http_tmp_len", row_cnt)
     assert 100 < row_cnt < 50_000
