@@ -1699,19 +1699,16 @@ def core():
 def extract_expected_countries(ec):
     ecs = set(cc.upper() for cc in ec.strip().split(","))
     ecs.discard("")
-    if not ecs:
-        ecs = ["ZZ"]
+    # Discard ZZ as we don't handle it currently
+    ecs.discard("ZZ")
     return sorted(ecs)
 
 
 @metrics.timer("prepare_fingerprints")
 def prepare_fingerprints(dns_fp, http_fp):
     for fp in dns_fp + http_fp:
-        exp = set(fp["expected_countries"].strip().split(","))
-        exp.discard("")
-        # Discard ZZ as we don't handle it currently
-        exp.discard("ZZ")
-        fp["expected_countries"] = sorted(exp)
+        exp = extract_expected_countries(fp["expected_countries"])
+        fp["expected_countries"] = exp
 
     dns = [Fingerprint(**fp) for fp in dns_fp]
     http = [Fingerprint(**fp) for fp in http_fp]

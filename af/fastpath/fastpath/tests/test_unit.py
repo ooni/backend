@@ -774,7 +774,7 @@ def test_get_http_header():
 
 def test_extract_expected_countries():
     for inp, out in [
-        ("", ["ZZ"]),
+        ("", []),
         (",RU", ["RU"]),
         ("AU,DE,DK,FR ", ["AU", "DE", "DK", "FR"]),
     ]:
