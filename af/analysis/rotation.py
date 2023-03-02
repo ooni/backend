@@ -162,17 +162,8 @@ def drain_droplet_in_db_table(click, dr, rdn: str, dns_zone: str) -> None:
     insert(click, "test_helper_instances", cols)
 
     now = datetime.utcnow()
-    cols = dict(
-        dns_zone=dns_zone,
-        draining_at=now,
-        rdn=rdn,
-        ipaddr=dr.ip_address,
-        ipv6addr=dr.ip_v6_address,
-        name=dr.name,
-        provider="Digital Ocean",
-        region=dr.region["slug"],
-        sign=1,
-    )
+    cols["draining_at"] = now
+    cols["sign"] = 1
     insert(click, "test_helper_instances", cols)
     optimize_table(click, "test_helper_instances")
 
