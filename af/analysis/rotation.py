@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-Spaws and rotates hosts on Digital Ocean. Runs a setup script on the host
-at first boot.
+Spaws and rotates hosts on Digital Ocean.
+- Select datacenters and spawn VMs
+- Runs a setup script on the host at first boot
+- Keeps a list of live and old hosts in a dedicated db table
+- Create SSL certificates using the Digital Ocean API
+- Performs end-to-end test on newly created VMs
+- Update DNS to publish new services
+- Drain and destroy old VMs
+
 Reads /etc/ooni/rotation.conf
-Keeps a list of live hosts in a dedicated db table.
 Runs as a SystemD timer.
 
 Interfaces, APIs and stateful contents:
@@ -24,6 +30,7 @@ CREATE TABLE test_helper_instances
     `ipaddr` IPv4,
     `ipv6addr` IPv6,
     `draining_at` Nullable(DateTime('UTC')),
+    `destroyed_at` Nullable(DateTime('UTC')),
     `sign` Int8
 )
 ENGINE = CollapsingMergeTree(sign)
@@ -120,6 +127,9 @@ def retry(func):
     return wrapped
 
 
+# # Database helpers
+
+
 def insert(click, table: str, cols: dict) -> None:
     cs = ", ".join(sorted(cols.keys()))
     q = f"INSERT INTO {table} ({cs}) VALUES"
@@ -136,58 +146,66 @@ def optimize_table(click, tblname: str) -> None:
 def add_droplet_to_db_table(click, dr, rdn, dns_zone) -> None:
     cols = dict(
         dns_zone=dns_zone,
-        rdn=rdn,
         ipaddr=dr.ip_address,
         ipv6addr=dr.ip_v6_address,
         name=dr.name,
         provider="Digital Ocean",
+        rdn=rdn,
         region=dr.region["slug"],
         sign=1,
     )
     insert(click, "test_helper_instances", cols)
-    optimize_table(click, "test_helper_instances")
 
 
-def drain_droplet_in_db_table(click, dr, rdn: str, dns_zone: str) -> None:
+def drain_droplet_in_db_table(click, now, dr, rdn: str, dns_zone: str) -> None:
     cols = dict(
         dns_zone=dns_zone,
-        rdn=rdn,
         ipaddr=dr.ip_address,
         ipv6addr=dr.ip_v6_address,
         name=dr.name,
         provider="Digital Ocean",
+        rdn=rdn,
         region=dr.region["slug"],
         sign=-1,
     )
-    insert(click, "test_helper_instances", cols)
+    insert(click, "test_helper_instances", cols.copy())
 
-    now = datetime.utcnow()
     cols["draining_at"] = now
     cols["sign"] = 1
     insert(click, "test_helper_instances", cols)
     optimize_table(click, "test_helper_instances")
 
 
-def delete_droplet_from_db_table(
-    click, dr, rdn: str, draining_at, dns_zone: str
+def destroy_droplet_in_db_table(
+    click, dr, rdn: str, draining_at, now, dns_zone: str
 ) -> None:
+    # NOTE: doing updates using 1/-1 signs is scalable on multiple hosts but
+    # error-prone
     cols = dict(
         dns_zone=dns_zone,
         draining_at=draining_at,
-        rdn=rdn,
         ipaddr=dr.ip_address,
         ipv6addr=dr.ip_v6_address,
         name=dr.name,
         provider="Digital Ocean",
+        rdn=rdn,
         region=dr.region["slug"],
         sign=-1,
     )
+    insert(click, "test_helper_instances", cols.copy())
+
+    cols["destroyed_at"] = now
+    cols["sign"] = 1
     insert(click, "test_helper_instances", cols)
+    optimize_table(click, "test_helper_instances")
+
+
+# # End
 
 
 @metrics.timer("destroy_drained_droplets")
 def destroy_drained_droplets(
-    click, api, draining_time_minutes: int, live_droplets: list, dns_zone: str
+    click, draining_time_minutes: int, live_droplets: list, dns_zone: str
 ) -> None:
     q = """SELECT name, rdn, draining_at FROM test_helper_instances
         FINAL
@@ -212,7 +230,8 @@ def destroy_drained_droplets(
 
     for droplet in to_delete:
         log.info(f"Destroying {droplet.name} droplet")
-        delete_droplet_from_db_table(click, droplet, rdn, draining_at, dns_zone)
+        now = datetime.utcnow()
+        destroy_droplet_in_db_table(click, droplet, rdn, draining_at, now, dns_zone)
         droplet.destroy()
 
 
@@ -322,7 +341,8 @@ def drain_droplet(click, dns_zone, active_droplets: list, rows: list) -> str:
     oldest = by_age[0]
     rdn = [row[1] for row in rows if row[0] == oldest.name][0]
     log.info(f"Draining {oldest.name} {rdn}.{dns_zone} droplet")
-    drain_droplet_in_db_table(click, oldest, rdn, dns_zone)
+    now = datetime.utcnow()
+    drain_droplet_in_db_table(click, now, oldest, rdn, dns_zone)
     return rdn
 
 
@@ -576,7 +596,7 @@ def main() -> None:
 
     # Avoid failure modes where we destroy all VMs or create unlimited amounts
     # or churn too quickly
-    destroy_drained_droplets(click, api, draining_time_minutes, live_droplets, dns_zone)
+    destroy_drained_droplets(click, draining_time_minutes, live_droplets, dns_zone)
 
     if len(droplets) > wanted_droplet_num + 5:
         log.error("Unexpected amount of running droplets")
