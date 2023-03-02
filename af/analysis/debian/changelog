@@ -1,3 +1,9 @@
+analysis (1.6) unstable; urgency=medium
+
+  * Keep rotated VMs history
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 02 Mar 2023 13:27:34 +0000
+
 analysis (1.5) unstable; urgency=medium
 
   * Pull fingerprints from github
