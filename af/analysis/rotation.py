@@ -127,6 +127,12 @@ def insert(click, table: str, cols: dict) -> None:
     click.execute(q, [cols])
 
 
+def optimize_table(click, tblname: str) -> None:
+    q = f"OPTIMIZE TABLE {tblname} FINAL"
+    log.info(q)
+    click.execute(q)
+
+
 def add_droplet_to_db_table(click, dr, rdn, dns_zone) -> None:
     cols = dict(
         dns_zone=dns_zone,
@@ -139,6 +145,7 @@ def add_droplet_to_db_table(click, dr, rdn, dns_zone) -> None:
         sign=1,
     )
     insert(click, "test_helper_instances", cols)
+    optimize_table(click, "test_helper_instances")
 
 
 def drain_droplet_in_db_table(click, dr, rdn: str, dns_zone: str) -> None:
@@ -167,6 +174,7 @@ def drain_droplet_in_db_table(click, dr, rdn: str, dns_zone: str) -> None:
         sign=1,
     )
     insert(click, "test_helper_instances", cols)
+    optimize_table(click, "test_helper_instances")
 
 
 def delete_droplet_from_db_table(
