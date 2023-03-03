@@ -1730,7 +1730,7 @@ def update_fingerprints_if_needed() -> None:
             delta = 0  # Running without multiprocessing
         fingerprints_update_time = int(time.time()) + 3600 + delta
 
-    elif fingerprints_update_time > time.time():
+    elif fingerprints_update_time < time.time():
         fingerprints_update_time += 3600
 
     else:
