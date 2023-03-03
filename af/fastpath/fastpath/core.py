@@ -134,7 +134,7 @@ def setup() -> None:
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="fastpath"))
     log.setLevel(logging.DEBUG if conf.debug else logging.INFO)
-    logging.getLogger("clickhouse_driver.connection").setLevel(logging.WARNING)
+    # logging.getLogger("clickhouse_driver.connection").setLevel(logging.WARNING)
 
     if conf.ccs:
         conf.ccs = set(cc.strip() for cc in conf.ccs.split(","))
@@ -1736,6 +1736,7 @@ def update_fingerprints_if_needed() -> None:
     else:
         return  # too early
 
+    log.info("Updating fingerprints")
     dns_fp, http_fp = db.fetch_fingerprints()
     fingerprints = prepare_fingerprints(dns_fp, http_fp)
 
