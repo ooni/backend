@@ -973,6 +973,19 @@ def param_lowercase_underscore(name) -> ostr:
     return p
 
 
+def param_lowercase_underscore_m(name) -> List[str]:
+    p = request.args.get(name)
+    if p is None:
+        return []
+    accepted = string.ascii_lowercase + "_,"
+    validate(p, accepted)
+    out = [i for i in p.split() if i != ""]
+    for tn in out:
+        if tn not in TEST_NAMES:
+            raise ValueError("Invalid test name")
+    return out
+
+
 def param_uppercase(name) -> ostr:
     p = request.args.get(name)
     validate(p, string.ascii_uppercase)
@@ -988,6 +1001,32 @@ def param_asn(name: str) -> Optional[int]:
         return int(p)
 
     return None
+
+
+def param_asn_m(name="probe_asn") -> List[str]:
+    p = request.args.get(name)
+    if p is None:
+        return []
+
+    try:
+        ASNs = commasplit(p)
+        out = [i[2:] if i.startswith("AS") else i for i in ASNs]
+        [int(i) for i in out]
+    except ValueError:
+        raise ValueError(f"Invalid ASN value in parameter {name}")
+    return out
+
+
+def param_probe_cc_m(name="probe_cc") -> List[int]:
+    p = request.args.get(name)
+    if p is None:
+        return []
+    validate(p, string.ascii_uppercase + ",")
+    ccs = commasplit(p)
+    for cc in ccs:
+        if len(cc) != 2:
+            raise ValueError(f"Invalid CC value in parameter {name}")
+    return ccs
 
 
 def param_date(name: str) -> Optional[datetime]:
@@ -1012,7 +1051,7 @@ domain_matcher = re.compile(
 )
 
 
-def validate_domain(p, name):
+def validate_domain(p, name: str) -> None:
     """Validates <domain|ipaddr>[:<port>]"""
     try:
         p = p.encode("idna").decode("ascii")
@@ -1046,6 +1085,23 @@ def param_domain_or_none(name) -> Optional[str]:
         return None
     validate_domain(p, name)
     return p
+
+
+def commasplit(p: str) -> List[str]:
+    assert p is not None
+    out = set(p.split(","))
+    out.discard("")
+    return sorted(out)
+
+
+def param_domain_m(name="domain") -> List[str]:
+    p = request.args.get(name)
+    if not p:
+        return []
+    out = commasplit(p)
+    for d in out:
+        validate_domain(d, name)
+    return out
 
 
 def param_url(name):
@@ -1094,6 +1150,9 @@ def param_measurement_uid() -> str:
     if not p or len(p) < 10 or len(p) > 100:
         raise BadRequest(f"Invalid measurement_uid field")
     return p
+
+
+# end of parameter parsers
 
 
 @api_msm_blueprint.route("/v1/aggregation")
@@ -1211,16 +1270,14 @@ def get_aggregated() -> Response:
         axis_x = param_lowercase_underscore("axis_x")
         axis_y = param_lowercase_underscore("axis_y")
         category_code = param_uppercase("category_code")
-        test_name = param_lowercase_underscore("test_name")
-        domain = param_domain_or_none("domain") or ""
+        test_name_s = param_lowercase_underscore_m("test_name")
+        domain_s = param_domain_m()
         inp = param_input_or_none() or ""
-        probe_asn = param_asn("probe_asn")
-        probe_cc = param_uppercase("probe_cc")
+        probe_asn_s = param_asn_m()
+        probe_cc_s = param_probe_cc_m()
         since = param_date("since")
         until = param_date("until")
         time_grain = param("time_grain", "auto").lower()
-        if test_name and test_name not in TEST_NAMES:
-            raise ValueError("Invalid test name")
 
         resp_format = param("format", "JSON").upper()
         download = param("download", "").lower() == "true"
@@ -1255,9 +1312,9 @@ def get_aggregated() -> Response:
     where = []
     query_params: Dict[str, Any] = {}
 
-    if domain:
-        where.append(sql.text("domain = :domain"))
-        query_params["domain"] = domain
+    if domain_s:
+        where.append(sql.text("domain IN :domains"))
+        query_params["domains"] = domain_s
 
     if inp:
         where.append(sql.text("input = :input"))
@@ -1266,19 +1323,19 @@ def get_aggregated() -> Response:
     if category_code:
         where.append(sql.text("citizenlab.category_code = :category_code"))
         query_params["category_code"] = category_code
-        if probe_cc:
-            where.append(sql.text("(citizenlab.cc = :lcc OR citizenlab.cc = 'ZZ')"))
-            query_params["lcc"] = probe_cc.lower()
+        if probe_cc_s:
+            where.append(sql.text("(citizenlab.cc IN :lccs OR citizenlab.cc = 'ZZ')"))
+            query_params["lccs"] = [cc.lower() for cc in probe_cc_s]
         else:
             where.append(sql.text("citizenlab.cc = 'ZZ'"))
 
-    if probe_cc:
-        where.append(sql.text("probe_cc = :probe_cc"))
-        query_params["probe_cc"] = probe_cc
+    if probe_cc_s:
+        where.append(sql.text("probe_cc IN :probe_cc_s"))
+        query_params["probe_cc_s"] = probe_cc_s
 
-    if probe_asn is not None:
-        where.append(sql.text("probe_asn = :probe_asn"))
-        query_params["probe_asn"] = str(probe_asn)
+    if probe_asn_s:
+        where.append(sql.text("probe_asn IN :probe_asn_s"))
+        query_params["probe_asn_s"] = probe_asn_s
 
     if since:
         where.append(sql.text("measurement_start_time >= :since"))
@@ -1288,9 +1345,9 @@ def get_aggregated() -> Response:
         where.append(sql.text("measurement_start_time < :until"))
         query_params["until"] = until
 
-    if test_name:
-        where.append(sql.text("test_name = :test_name"))
-        query_params["test_name"] = test_name
+    if test_name_s:
+        where.append(sql.text("test_name IN :test_name_s"))
+        query_params["test_name_s"] = test_name_s
 
     if axis_x == axis_y and axis_x is not None:
         raise ValueError("Axis X and Y cannot be the same")
@@ -1556,7 +1613,7 @@ valid_feedback_status = [
     "ok",
     "down",
     "down.unreachable",
-    "down.misconfigured"
+    "down.misconfigured",
 ]
 
 
