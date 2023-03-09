@@ -24,7 +24,7 @@ jobs:
       - name: Build docker image
         run: make build
 
-      - name: Setup database fixtures
+      - name: Setup database fixtures and run fastpath to populate the DB
         run: make initdb
 
       - name: Run all tests

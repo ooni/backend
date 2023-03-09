@@ -61,7 +61,9 @@ def pytest_addoption(parser):
     parser.addoption("--ghpr", action="store_true", help="enable GitHub integ tests")
     parser.addoption("--proddb", action="store_true", help="uses data from prod DB")
     parser.addoption("--create-db", action="store_true", help="populate the DB")
-    parser.addoption("--inject-msmts", action="store_true", help="populate the DB with fresh data")
+    parser.addoption(
+        "--inject-msmts", action="store_true", help="populate the DB with fresh data"
+    )
 
 
 def pytest_configure(config):
@@ -90,7 +92,7 @@ def checkout_pipeline(tmpdir_factory):
     if d.isdir():
         shutil.rmtree(d)
     cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
-    #cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch reprocessor-ch -q {d}"
+    # cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch reprocessor-ch -q {d}"
     print(cmd)
     cmd = cmd.split()
     subprocess.run(cmd, check=True, stdout=PIPE, stderr=PIPE).stdout
@@ -117,19 +119,33 @@ def run_clickhouse_sql_scripts(app):
             click.execute(q)
 
 
-def _run_fastpath(fpdir, dburi, start, end, limit):
+def _run_fastpath(fpdir: Path, start: str, end: str, limit: int) -> None:
     fprun = fpdir / "run_fastpath"
-    cmd = [fprun.as_posix(), "--noapi", "--devel", "--db-uri", dburi]
+    cmd = [fprun.as_posix(), "--noapi", "--devel"]
     cmd.extend(["--start-day", start, "--end-day", end, "--stop-after", str(limit)])
     subprocess.run(cmd, check=True, cwd=fpdir)
 
 
-def run_fastpath(log, pipeline_dir, dburi, clickhouse_url):
+def run_fingerprint_update(log, pipeline_dir: Path, clickhouse_url: str) -> None:
+    log.info("Importing fingerprints")
+    rdir = pipeline_dir / "af" / "analysis"
+    runner = rdir / "run_analysis"
+    cmd = [
+        runner.as_posix(),
+        "--update-fingerprints",
+        "--devel",
+        "--db-uri",
+        clickhouse_url,
+    ]
+    log.info(cmd)
+    subprocess.run(cmd, check=True, cwd=rdir)
+
+
+def run_fastpath(log, pipeline_dir: Path, clickhouse_url: str) -> None:
     """Run fastpath from S3"""
     fpdir = pipeline_dir / "af" / "fastpath"
     conffile = fpdir / "etc/ooni/fastpath.conf"
     conffile.parent.mkdir(parents=True)
-    # PG is disabled
     conf = f"""
         [DEFAULT]
         collectors = localhost
@@ -144,14 +160,13 @@ def run_fastpath(log, pipeline_dir, dburi, clickhouse_url):
     log.info("Running fastpath to populate 'yesterday'")
     _run_fastpath(
         fpdir,
-        dburi,
         (date.today() - timedelta(days=1)).strftime("%Y-%m-%d"),
         date.today().strftime("%Y-%m-%d"),
         3000,
     )
 
     log.info("Running fastpath to populate 2021-07-9")
-    _run_fastpath(fpdir, dburi, "2021-07-09", "2021-07-10", 10000)
+    _run_fastpath(fpdir, "2021-07-09", "2021-07-10", 10000)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -163,11 +178,10 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
 
     clickhouse_url = app.config["CLICKHOUSE_URL"]
     assert any([x in clickhouse_url for x in ("localhost", "clickhouse")])
-    # TODO: remove dburi
-    dburi = ""
     log = app.logger
     run_clickhouse_sql_scripts(app)
-    run_fastpath(log, checkout_pipeline, dburi, clickhouse_url)
+    run_fingerprint_update(log, checkout_pipeline, clickhouse_url)
+    run_fastpath(log, checkout_pipeline, clickhouse_url)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -181,12 +195,6 @@ def connect_to_clickhouse(app):
 def inject_msmts(app, checkout_pipeline):
     if not pytest.inject_msmts:
         return
-
-
-
-
-
-
 
 
 # # Fixtures used by test files # #
