@@ -29,11 +29,13 @@ CREATE TABLE default.fastpath
     `server_cc` String,
     `server_asn` Int8,
     `server_as_name` String,
+    `update_time` DateTime64(3) MATERIALIZED now64(),
     `test_version` String,
     `test_runtime` Float32,
     `architecture` String,
     `engine_name` String,
-    `engine_version` String
+    `engine_version` String,
+    `blocking_type` String
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_start_time, report_id, input)
