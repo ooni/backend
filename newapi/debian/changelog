@@ -1,3 +1,9 @@
+ooni-api (1.0.43) unstable; urgency=medium
+
+  * Update test DB setup
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Mar 2023 09:23:06 +0100
+
 ooni-api (1.0.42) unstable; urgency=medium
 
   * Fix keys for user reporting mechanism
