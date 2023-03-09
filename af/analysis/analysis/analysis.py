@@ -86,9 +86,9 @@ def parse_args() -> Namespace:
 def main() -> None:
     global conf
     log.info("Analysis starting")
-    cp = ConfigParser()
-    with open("/etc/ooni/analysis.conf") as f:
-        cp.read_file(f)
+    # cp = ConfigParser()
+    # with open("/etc/ooni/analysis.conf") as f:
+    #     cp.read_file(f)
 
     conf = parse_args()
     if conf.devel or conf.stdout or not has_systemd:
