@@ -22,7 +22,7 @@ initdb:
 	# Setup database fixtures
 	# Fetch fingerprints from github
 	# run fastpath to populate the DB
-	docker-compose run --rm api python3 -m pytest --setup-only --create-db
+	docker-compose run --rm api python3 -m pytest --setup-only --create-db -s
 
 tests: .state/docker-build
 	docker-compose run --rm api python3 -m pytest $(T) $(TESTARGS)

@@ -93,9 +93,8 @@ def checkout_pipeline(tmpdir_factory):
         shutil.rmtree(d)
     cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
     # cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch reprocessor-ch -q {d}"
-    print(cmd)
     cmd = cmd.split()
-    subprocess.run(cmd, check=True, stdout=PIPE, stderr=PIPE).stdout
+    runcmd(cmd, Path('.'))
     return Path(d)
 
 
@@ -123,8 +122,19 @@ def _run_fastpath(fpdir: Path, start: str, end: str, limit: int) -> None:
     fprun = fpdir / "run_fastpath"
     cmd = [fprun.as_posix(), "--noapi", "--devel"]
     cmd.extend(["--start-day", start, "--end-day", end, "--stop-after", str(limit)])
-    subprocess.run(cmd, check=True, cwd=fpdir)
+    runcmd(cmd, fpdir)
 
+
+def runcmd(cmd: str,wd: Path) -> None:
+    print("Running " + " ".join(cmd))
+    p = subprocess.run(cmd, cwd=wd)
+    if p.returncode != 0:
+        print("=" * 60)
+        print(p.stderr)
+        print("=" * 60)
+        print(p.stdout)
+        print("=" * 60)
+        sys.exit(1)
 
 def run_fingerprint_update(log, pipeline_dir: Path, clickhouse_url: str) -> None:
     log.info("Importing fingerprints")
@@ -137,8 +147,7 @@ def run_fingerprint_update(log, pipeline_dir: Path, clickhouse_url: str) -> None
         "--db-uri",
         clickhouse_url,
     ]
-    log.info(cmd)
-    subprocess.run(cmd, check=True, cwd=rdir)
+    runcmd(cmd, rdir)
 
 
 def run_fastpath(log, pipeline_dir: Path, clickhouse_url: str) -> None:
