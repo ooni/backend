@@ -1017,7 +1017,7 @@ def param_asn_m(name="probe_asn") -> List[str]:
     return out
 
 
-def param_probe_cc_m(name="probe_cc") -> List[int]:
+def param_probe_cc_m(name="probe_cc") -> List[str]:
     p = request.args.get(name)
     if p is None:
         return []
@@ -1547,9 +1547,8 @@ def get_torsf_stats() -> Response:
         query_params["probe_cc"] = probe_cc
 
     if since:
-        since = parse_date(since)
         where.append(sql.text("measurement_start_time > :since"))
-        query_params["since"] = str(since)
+        query_params["since"] = str(parse_date(since))
 
     if until:
         until_td = parse_date(until)
