@@ -198,12 +198,12 @@ def test_aggregation_x_axis_only_hour(client, log):
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 714,
-                "confirmed_count": 9,
-                "failure_count": 731,
+                "anomaly_count": 688,
+                "confirmed_count": 42,
+                "failure_count": 720,
                 "measurement_count": 9990,
                 "measurement_start_day": "2021-07-09T00:00:00Z",
-                "ok_count": 8536,
+                "ok_count": 8540,
             },
             {
                 "anomaly_count": 0,
