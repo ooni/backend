@@ -606,11 +606,11 @@ def test_list_measurements_filter_flags_fastpath(
     GROUP BY anomaly, confirmed, failure
     ORDER BY anomaly, confirmed, failure ASC;
     ┌─count()─┬─anomaly─┬─confirmed─┬─failure─┐
-    │    8796 │ f       │ f         │ f       │
-    │     454 │ f       │ f         │ t       │
-    │     714 │ t       │ f         │ f       │
+    │    8538 │ f       │ f         │ f       │
+    │     705 │ f       │ f         │ t       │
+    │     688 │ t       │ f         │ f       │
     │      13 │ t       │ f         │ t       │
-    │       9 │ t       │ t         │ f       │
+    │      42 │ t       │ t         │ f       │
     │       2 │ t       │ t         │ t       │
     └─────────┴─────────┴───────────┴─────────┘
     """
@@ -625,7 +625,7 @@ def test_list_measurements_filter_flags_fastpath(
         assert r["failure"] == failure, r
 
     i = anomaly * 4 + confirmed * 2 + failure * 1
-    thresholds = [100, 100, 0, 0, 100, 13, 9, 2]
+    thresholds = [100, 100, 0, 0, 100, 13, 42, 2]
     assert len(response["results"]) == thresholds[i], len(response["results"])
 
 
