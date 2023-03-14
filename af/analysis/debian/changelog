@@ -1,3 +1,9 @@
+analysis (1.8) unstable; urgency=medium
+
+  * Add ASN updater
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 14 Mar 2023 19:08:41 +0100
+
 analysis (1.7) unstable; urgency=medium
 
   * Implement Clickhouse S3 backup
