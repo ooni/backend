@@ -907,3 +907,24 @@ def api_private_domain_metadata() -> Response:
 
     j = dict(category_code=category_code, canonical_domain=canonical_domain)
     return cachedjson("2h", **j)
+
+@api_private_blueprint.route("/asnmeta")
+def api_private_asnmeta() -> Response:
+    asn = request.args.get("asn")
+    if asn is None:
+        raise BadRequest("missing asn")
+
+    q = """SELECT
+    org_name
+    FROM asnmeta
+    WHERE asn = %(asn)d
+    ORDER BY changed DESC
+    LIMIT 1
+    """
+    org_name = "Unknown"
+    res = query_click_one_row(sql.text(q), dict(asn=asn))
+    if res:
+        org_name = res["org_name"]
+
+    j = dict(org_name=org_name)
+    return cachedjson("2h", **j)
