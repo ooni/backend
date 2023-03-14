@@ -142,6 +142,80 @@ def test_aggregation_no_axis_filter_by_category_code(client):
     }, fjd(r)
 
 
+def test_aggregation_no_axis_filter_multi_domain(client):
+    # 0-dimensional data
+    url = (
+        "aggregation?domain=twitter.com,facebook.com&since=2021-07-09&until=2021-07-10"
+    )
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 0,
+            "confirmed_count": 0,
+            "failure_count": 1,
+            "measurement_count": 16,
+            "ok_count": 15,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
+def test_aggregation_no_axis_filter_multi_probe_asn(client):
+    # 0-dimensional dat
+    url = "aggregation?probe_asn=AS3303,AS8167&since=2021-07-09&until=2021-07-10"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 187,
+            "confirmed_count": 0,
+            "failure_count": 5,
+            "measurement_count": 1689,
+            "ok_count": 1497,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
+def test_aggregation_no_axis_filter_multi_probe_cc(client):
+    # 0-dimensional data
+    url = "aggregation?probe_cc=BR,GB&since=2021-07-09&until=2021-07-10"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 123,
+            "confirmed_count": 0,
+            "failure_count": 92,
+            "measurement_count": 2435,
+            "ok_count": 2220,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
+def test_aggregation_no_axis_filter_multi_test_name(client):
+    # 0-dimensional data
+    url = "aggregation?testn_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 688,
+            "confirmed_count": 42,
+            "failure_count": 720,
+            "measurement_count": 9991,
+            "ok_count": 8541,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
