@@ -17,6 +17,7 @@ def test_asnmeta_updater():
 
     mock_client = MagicMock()
     asnmeta_updater.Clickhouse.from_url.return_value = mock_client
+
     def mocked_execute(q, data=None, **kw):
         if q == "SELECT count() FROM asnmeta_tmp":
             return [[250_000]]
@@ -25,6 +26,7 @@ def test_asnmeta_updater():
             assert len(data) > 250_000
 
         return [[]]
+
     mock_client.execute.side_effect = mocked_execute
 
     conf = Mock()
