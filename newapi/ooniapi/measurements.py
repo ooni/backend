@@ -1396,6 +1396,7 @@ def get_aggregated() -> Response:
 
     def add_axis(axis, cols, colnames, group_by):
         if axis == "blocking_type":
+            # TODO: use blocking_type column
             t = "JSONExtractString(scores, 'analysis', 'blocking_type') AS blocking_type"
             cols.append(sql.text(t))
         else:

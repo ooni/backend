@@ -240,6 +240,13 @@ def test_aggregation_x_axis_domain(client, log):
     assert False, "Msmt not found"
 
 
+def test_aggregation_x_axis_without_since(client, log):
+    # 1 dimension: X
+    url = "aggregation?probe_cc=CH&probe_asn=AS3303&until=2021-07-10&axis_x=measurement_start_day"
+    r = client.get(f"/api/v1/{url}")
+    assert r.status_code == 400
+
+
 @pytest.mark.skip("To be fixed in future")
 def test_aggregation_y_axis_only_blocking_type(client, log):
     # 1 dimension: Y: blocking_type
