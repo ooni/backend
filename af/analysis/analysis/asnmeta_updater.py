@@ -40,12 +40,13 @@ def fetch_data() -> List[dict]:
     for asn, history in j.items():
         asn = int(asn)
         for v in history:
+            changed = datetime.strptime(v[2], "%Y%m%d").date()
             rows.append(
                 {
                     "asn": asn,
                     "org_name": v[0],
                     "cc": v[1],
-                    "changed": datetime.strptime(v[2], "%Y%m%d").date(),
+                    "changed": changed,
                     "aut_name": v[3],
                     "source": v[4],
                 }
@@ -78,7 +79,7 @@ def update_asnmeta(conf: Namespace) -> None:
 
     log.info(f"Ingesting {AS_ORG_MAP_URL}")
     data = fetch_data()
-    progress("JSON data fetched")
+    progress(f"JSON data fetched: {len(data)} items")
 
     q = """
     INSERT INTO asnmeta_tmp
