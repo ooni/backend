@@ -38,14 +38,14 @@ def fetch_data():
     for asn, history in j.items():
         asn = int(asn)
         for v in history:
-            rows.append((
-                asn,
-                v[0], # org_name
-                v[1], # cc,
-                datetime.strptime(v[2], "%Y%m%d").date(), # changed
-                v[3], # aut_name
-                v[4] # source
-            ))
+            rows.append({
+                "asn": asn,
+                "org_name": v[0],
+                "cc": v[1],
+                "changed": datetime.strptime(v[2], "%Y%m%d").date(),
+                "aut_name": v[3],
+                "source": v[4]
+            })
     del j
     return rows
 
