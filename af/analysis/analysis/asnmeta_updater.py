@@ -7,9 +7,10 @@ Local test run:
 
 from argparse import Namespace
 from datetime import datetime
+from typing import List
 from urllib.request import urlopen
-import logging
 import json
+import logging
 
 from clickhouse_driver import Client as Clickhouse
 
@@ -30,10 +31,10 @@ def progress(msg: str) -> None:
 
 
 @metrics.timer("fetch_data")
-def fetch_data():
+def fetch_data() -> List[dict]:
     resp = urlopen(AS_ORG_MAP_URL)
     if resp.status != 200:
-        raise Exception(f"Failed to fetch {url}")
+        raise Exception(f"Failed to fetch {AS_ORG_MAP_URL}")
     j = json.load(resp)
     rows = []
     for asn, history in j.items():
