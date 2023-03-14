@@ -53,6 +53,7 @@ from analysis.metrics import setup_metrics  # debdeps: python3-statsd
 
 from analysis.citizenlab_test_lists_updater import update_citizenlab_test_lists
 from analysis.fingerprints_updater import update_fingerprints
+from analysis.asnmeta_updater import update_asnmeta
 
 
 # Global conf
@@ -70,6 +71,9 @@ def parse_args() -> Namespace:
     )
     ap.add_argument(
         "--update-fingerprints", action="store_true", help="Update fingerprints"
+    )
+    ap.add_argument(
+        "--update-asnmeta", action="store_true", help="Update asn metadata"
     )
     ap.add_argument(
         "--dry-run",
@@ -110,6 +114,8 @@ def main() -> None:
             update_citizenlab_test_lists(conf)
         elif conf.update_fingerprints:
             update_fingerprints(conf)
+        elif conf.update_asnmeta:
+            update_asnmeta(conf)
 
     except Exception as e:
         log.error(str(e), exc_info=e)
