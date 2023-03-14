@@ -21,6 +21,7 @@ log = logging.getLogger("analysis.asnmeta_updater")
 metrics = setup_metrics(name="asnmeta_updater")
 progress_cnt = 0
 
+
 def progress(msg: str) -> None:
     global progress_cnt
     metrics.gauge("asnmeta_update_progress", progress_cnt)
@@ -38,16 +39,19 @@ def fetch_data():
     for asn, history in j.items():
         asn = int(asn)
         for v in history:
-            rows.append({
-                "asn": asn,
-                "org_name": v[0],
-                "cc": v[1],
-                "changed": datetime.strptime(v[2], "%Y%m%d").date(),
-                "aut_name": v[3],
-                "source": v[4]
-            })
+            rows.append(
+                {
+                    "asn": asn,
+                    "org_name": v[0],
+                    "cc": v[1],
+                    "changed": datetime.strptime(v[2], "%Y%m%d").date(),
+                    "aut_name": v[3],
+                    "source": v[4],
+                }
+            )
     del j
     return rows
+
 
 def update_asnmeta(conf: Namespace) -> None:
     progress("starting")

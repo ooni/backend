@@ -72,9 +72,7 @@ def parse_args() -> Namespace:
     ap.add_argument(
         "--update-fingerprints", action="store_true", help="Update fingerprints"
     )
-    ap.add_argument(
-        "--update-asnmeta", action="store_true", help="Update asn metadata"
-    )
+    ap.add_argument("--update-asnmeta", action="store_true", help="Update asn metadata")
     ap.add_argument(
         "--dry-run",
         action="store_true",
