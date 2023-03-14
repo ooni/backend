@@ -1282,6 +1282,10 @@ def get_aggregated() -> Response:
         resp_format = param("format", "JSON").upper()
         download = param("download", "").lower() == "true"
         assert resp_format in ("JSON", "CSV")
+
+        if axis_x is not None:
+            assert axis_x != axis_y, "Axis X and Y cannot be the same"
+
     except Exception as e:
         return jerror(str(e), v=0, code=200)
 
@@ -1348,9 +1352,6 @@ def get_aggregated() -> Response:
     if test_name_s:
         where.append(sql.text("test_name IN :test_name_s"))
         query_params["test_name_s"] = test_name_s
-
-    if axis_x == axis_y and axis_x is not None:
-        raise ValueError("Axis X and Y cannot be the same")
 
     def group_by_date(since, until, time_grain, cols, colnames, group_by):
         if since and until:

@@ -326,6 +326,13 @@ def test_aggregation_x_axis_y_axis(client, log):
     assert len(r["result"]) == 2140
 
 
+def test_aggregation_x_axis_y_axis_are_the_same(client, log):
+    # 2-dimensional data
+    url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc&axis_y=probe_cc&test_name=web_connectivity"
+    r = api(client, url)
+    assert r == {"error": "Axis X and Y cannot be the same", "v": 0}
+
+
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_two_axis_too_big(client, log):
     url = "aggregation?since=2021-10-14&until=2021-10-15&test_name=web_connectivity&axis_x=measurement_start_day&axis_y=input"
