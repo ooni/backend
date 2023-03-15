@@ -973,7 +973,7 @@ def param_lowercase_underscore(name) -> ostr:
     return p
 
 
-def param_lowercase_underscore_m(name) -> List[str]:
+def param_test_name_m(name) -> List[str]:
     p = request.args.get(name)
     if p is None:
         return []
@@ -1246,7 +1246,7 @@ def get_aggregated() -> Response:
         axis_x = param_lowercase_underscore("axis_x")
         axis_y = param_lowercase_underscore("axis_y")
         category_code = param_uppercase("category_code")
-        test_name_s = param_lowercase_underscore_m("test_name")
+        test_name_s = param_test_name_m("test_name")
         domain_s = param_domain_m()
         inp = param_input_or_none() or ""
         probe_asn_s = param_asn_m()
