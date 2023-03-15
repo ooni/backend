@@ -1456,13 +1456,14 @@ def get_aggregated() -> Response:
 def validate_axis_name(axis):
     # TODO: use swagger instead?
     valid = (
+        "blocking_type",
         "category_code",
+        "domain",
         "input",
         "measurement_start_day",
         "probe_asn",
         "probe_cc",
-        "blocking_type",
-        "domain",
+        "test_name",
     )
     if axis not in valid:
         raise ValueError("Invalid axis name")

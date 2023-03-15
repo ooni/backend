@@ -216,6 +216,35 @@ def test_aggregation_no_axis_filter_multi_test_name(client):
     }, fjd(r)
 
 
+def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
+    # 1-dimensional: test_name
+    url = "aggregation?test_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10&axis_x=test_name"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 1,
+        "result": [
+            {
+                "anomaly_count": 317,
+                "confirmed_count": 42,
+                "failure_count": 339,
+                "measurement_count": 8488,
+                "ok_count": 7790,
+                "test_name": "web_connectivity",
+            },
+            {
+                "anomaly_count": 2,
+                "confirmed_count": 0,
+                "failure_count": 1,
+                "measurement_count": 59,
+                "ok_count": 56,
+                "test_name": "whatsapp",
+            },
+        ],
+        "v": 0,
+    }, fjd(r)
+
+
 def test_aggregation_no_axis_filter_multi_test_name_invalid(client):
     # 0-dimensional data
     url = (
