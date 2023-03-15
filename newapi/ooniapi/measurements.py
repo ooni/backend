@@ -979,10 +979,11 @@ def param_lowercase_underscore_m(name) -> List[str]:
         return []
     accepted = string.ascii_lowercase + "_,"
     validate(p, accepted)
-    out = [i for i in p.split() if i != ""]
+    out = [i for i in p.split(",") if i != ""]
+    out = sorted(set(out))
     for tn in out:
         if tn not in TEST_NAMES:
-            raise ValueError("Invalid test name")
+            raise ValueError(f"Invalid test name '{tn}'")
     return out
 
 
@@ -1170,7 +1171,7 @@ def get_aggregated() -> Response:
         in: query
         type: string
         minLength: 3
-        description: The domain to search measurements for
+        description: Domain to search measurements for, comma separated
       - name: category_code
         in: query
         type: string
@@ -1178,41 +1179,16 @@ def get_aggregated() -> Response:
       - name: probe_cc
         in: query
         type: string
-        description: The two letter country code
+        description: Two letter capitalized country codes, comma separated
         minLength: 2
       - name: probe_asn
         in: query
         type: string
-        description: the Autonomous system number in the format "ASXXX"
+        description: Autonomous system number in the format ASxxx, comma separated
       - name: test_name
         in: query
         type: string
-        description: The name of the test
-        enum:
-        - bridge_reachability
-        - dash
-        - dns_consistency
-        - dnscheck
-        - facebook_messenger
-        - http_header_field_manipulation
-        - http_host
-        - http_invalid_request_line
-        - http_requests
-        - meek_fronted_requests_test
-        - multi_protocol_traceroute
-        - ndt
-        - psiphon
-        - riseupvpn
-        - signal
-        - stunreachability
-        - tcp_connect
-        - telegram
-        - tor
-        - torsf
-        - urlgetter
-        - vanilla_tor
-        - web_connectivity
-        - whatsapp
+        description: Name of the tests, comma separated
       - name: since
         in: query
         type: string

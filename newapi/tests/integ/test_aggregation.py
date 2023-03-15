@@ -200,20 +200,30 @@ def test_aggregation_no_axis_filter_multi_probe_cc(client):
 
 def test_aggregation_no_axis_filter_multi_test_name(client):
     # 0-dimensional data
-    url = "aggregation?testn_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10"
+    url = "aggregation?test_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10"
     r = api(client, url)
     r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 688,
+            "anomaly_count": 319,
             "confirmed_count": 42,
-            "failure_count": 720,
-            "measurement_count": 9991,
-            "ok_count": 8541,
+            "failure_count": 340,
+            "measurement_count": 8547,
+            "ok_count": 7846,
         },
         "v": 0,
     }, fjd(r)
+
+
+def test_aggregation_no_axis_filter_multi_test_name_invalid(client):
+    # 0-dimensional data
+    url = (
+        "aggregation?test_name=web_connectivity,bogus&since=2021-07-09&until=2021-07-10"
+    )
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {"error": "Invalid test name 'bogus'", "v": 0}
 
 
 def test_aggregation_x_axis_only(client, log):
