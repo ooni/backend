@@ -199,3 +199,15 @@ CREATE TABLE default.fingerprints_http
 )
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY name;
+
+CREATE TABLE asnmeta
+(
+    `asn` UInt32,
+    `org_name` String,
+    `cc` String,
+    `changed` Date,
+    `aut_name` String,
+    `source` String
+)
+ENGINE = MergeTree
+ORDER BY (asn, changed);
