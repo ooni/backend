@@ -1,3 +1,9 @@
+ooni-api (1.0.45) unstable; urgency=medium
+
+  * Expose ANS metadata
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 15 Mar 2023 10:51:18 +0000
+
 ooni-api (1.0.44) unstable; urgency=medium
 
   * MAT: accept multiple values
