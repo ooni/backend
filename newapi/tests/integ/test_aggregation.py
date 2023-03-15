@@ -571,10 +571,8 @@ def test_aggregation_xy_axis_category_code(client, log):
 
 
 def test_aggregation_psiphon(client):
-    r = api(
-        client,
-        "aggregation?probe_cc=BR&since=2021-07-09&until=2021-07-10&test_name=psiphon",
-    )
+    url = "aggregation?probe_cc=BR&since=2021-07-09&until=2021-07-10&test_name=psiphon"
+    r = api(client, url)
     r.pop("db_stats", None)
     assert r == {
         "dimension_count": 0,
@@ -590,8 +588,8 @@ def test_aggregation_psiphon(client):
 
 
 def test_aggregation_test_name(client):
-    r = client.get(f"/api/v1/aggregation?test_name=BOGUS")
-    assert r.status_code == 400
+    r = api(client, "aggregation?test_name=BOGUS")
+    assert r == {"error": "Invalid characters", "v": 0}
 
 
 def test_aggregation_input(client):
