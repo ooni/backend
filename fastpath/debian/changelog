@@ -1,3 +1,9 @@
+fastpath (0.73) unstable; urgency=medium
+
+  * Increase fastpath worker count
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 22 Mar 2023 10:30:12 +0000
+
 fastpath (0.72) unstable; urgency=medium
 
   * Support browser_web tests

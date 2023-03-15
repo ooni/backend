@@ -52,7 +52,7 @@ from fastpath.utils import dget_or as g_or
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = 3
+NUM_WORKERS = 12
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
