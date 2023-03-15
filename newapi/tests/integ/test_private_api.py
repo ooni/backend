@@ -312,3 +312,11 @@ def test_private_api_circumvention_runtime_stats(client, log):
     assert resp["v"] == 0
     assert "error" not in resp, resp
     assert len(resp["results"]) > 3, resp
+
+
+# # /asnmeta
+
+
+def test_private_api_ansmeta(client, log):
+    resp = privapi(client, "asnmeta?asn=0")
+    assert resp == {'org_name': 'Unknown'}
