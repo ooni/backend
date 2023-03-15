@@ -46,13 +46,14 @@ from fastpath.localhttpfeeder import start_http_api
 import fastpath.db as db
 
 from fastpath.metrics import setup_metrics
-import fastpath.portable_queue as queue
 
 from fastpath.utils import dget_or as g_or
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
 NUM_WORKERS = 12
+
+queue = mp.Queue(NUM_WORKERS * 5)
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")

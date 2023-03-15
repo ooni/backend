@@ -5,7 +5,6 @@
 Receive measurements by listening on localhost
 """
 
-import time
 from gunicorn.app.base import BaseApplication
 
 API_PORT = 8472
@@ -35,9 +34,8 @@ def start_http_api(queue):
             assert path.startswith("/2")
             msmt_uid = path[1:]
             data = environ["wsgi.input"].read()
-            while queue.qsize() >= 5000:
-                time.sleep(0.1)
-            queue.put((data, None, msmt_uid))
+            msm_tup = (data, None, msmt_uid)
+            queue.put(msm_tup, block=True)
 
         start_response("200 OK", [])
         return [b""]
