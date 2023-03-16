@@ -1,0 +1,26 @@
+{
+  "annotations": {
+    "engine_name": "miniooni",
+    "engine_version": "0.10.0",
+    "platform": "linux"
+  },
+  "data_format_version": "0.2.0",
+  "input": "http://mail.google.com",
+  "measurement_start_time": "2021-01-21 09:28:29",
+  "probe_asn": "AS8075",
+  "probe_cc": "US",
+  "probe_ip": "127.0.0.1",
+  "probe_network_name": "Microsoft Corporation",
+  "report_id": "20210121T092829Z_webconnectivity_US_8075_n1_K8Vv8aSpoYfW3wqf",
+  "resolver_asn": "AS8075",
+  "resolver_ip": "13.89.169.74",
+  "resolver_network_name": "Microsoft Corporation",
+  "software_name": "miniooni",
+  "software_version": "0.1.0-dev",
+  "test_keys": null,
+  "test_name": "web_connectivity",
+  "test_runtime": 0.000227145,
+  "test_start_time": "2021-01-21 09:28:28",
+  "test_version": "0.0.1"
+}
+

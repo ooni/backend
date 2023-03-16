@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+
+"""
+Software deployer with staging pipeline
+
+"""
+# TODO: implement promote
+# TODO: refresh badge on deploy
+# TODO: support /etc/machine-info DEPLOYMENT
+#  https://www.freedesktop.org/software/systemd/man/machine-info.html
+
+from argparse import ArgumentParser
+from configparser import ConfigParser
+from pathlib import Path
+from subprocess import PIPE
+from tempfile import NamedTemporaryFile
+import subprocess
+import sys
+
+try:
+    from debian import debian_support
+    version_compare = debian_support.version_compare
+except ImportError:
+    import apt_pkg
+    apt_pkg.init_system()
+    version_compare = apt_pkg.version_compare
+
+
+def find_conf():
+    p = Path.cwd()
+    while p != Path("/"):
+        for fn in ("deployer.ini", ".deployer.ini"):
+            conf_file = p / fn
+            if conf_file.exists():
+                return conf_file
+        p = p.parent
+
+    print("Configuration file deployer.ini not found")
+    sys.exit(1)
+
+
+def load_conf():
+    cf = find_conf()
+    p = ConfigParser()
+    p.read(cf)
+    stages = {}
+    for sn in p["environment"]["stages"].split():
+        hosts = p[f"stage:{sn}"]["hosts"].split()
+        stages[sn] = hosts
+
+    c = dict(
+        deb_packages=p["environment"]["deb_packages"].split(),
+        badges_path=p["environment"]["badges_path"].strip(),
+        stages=stages,
+    )
+    return c
+
+
+def gen_badge(pkg, ver):
+    tpl = """
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="20">
+  <linearGradient id="b" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <mask id="a">
+    <rect width="{width}" height="20" rx="3" fill="#fff"/>
+  </mask>
+  <g mask="url(#a)">
+    <path fill="#555" d="M0 0h{pkg_width}v20H0z"/>
+    <path fill="#97CA00" d="M{pkg_width} 0h{ver_width}v20H{pkg_width}z"/>
+    <path fill="url(#b)" d="M0 0h{width}v20H0z"/>
+  </g>
+  <g fill="#fff" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+    <text x="4" y="15" fill="#010101" fill-opacity=".3">{pkg}</text>
+    <text x="4" y="14">{pkg}</text>
+    <text x="{ver_x}" y="15" fill="#010101" fill-opacity=".3">{ver}</text>
+    <text x="{ver_x}" y="14">{ver}</text>
+  </g>
+</svg>
+"""
+    pw = len(pkg) * 7 + 8
+    vw = len(ver) * 7 + 8
+    return tpl.format(
+        pkg=pkg, ver=ver, width=pw + vw, pkg_width=pw, ver_x=pw + 4, ver_width=vw
+    )
+
+
+def write_badge(path, hn, pkg, ver):
+    badge = gen_badge(pkg, ver)
+    with NamedTemporaryFile() as tmpf:
+        tmpf.write(badge.encode())
+        tmpf.flush()
+        cmd = ["scp", "-C", "-B", tmpf.name, f"{hn}:~/{pkg}.svg"]
+        subprocess.run(cmd, timeout=300)
+        cmd = ["ssh", hn, "sudo", "mv", f"{pkg}.svg", f"{path}/{pkg}.svg"]
+        subprocess.run(cmd, timeout=300)
+        cmd = ["ssh", hn, "sudo", "chmod", "a+r", f"{path}/{pkg}.svg"]
+        subprocess.run(cmd, timeout=300)
+
+
+def fetch_host_packages_versions(conf, hn):
+    o = {}
+    cmd = ["ssh", hn, "-T", "dpkg-query", "--show"] + conf["deb_packages"]
+    out = subprocess.run(cmd, timeout=30, stdout=PIPE)
+    for line in out.stdout.decode().splitlines():
+        if "\t" not in line:
+            continue
+        pkg, ver = line.split()
+        o[pkg] = ver
+
+    return o
+
+
+def fetch_packages_versions(conf):
+    status = {}  # stage -> hostname -> package -> version
+    for stage, hosts in conf["stages"].items():
+        status[stage] = {}
+        for hn in hosts:
+            status[stage][hn] = fetch_host_packages_versions(conf, hn)
+    return status
+
+
+def print_status(conf):
+    status = fetch_packages_versions(conf)
+
+    print()
+    stage_names = conf["stages"].keys()
+    hdr = "{:^15}  " * (len(stage_names) + 1)
+    print(hdr.format("Package", *stage_names))
+    # ➛ ➜ ➔ ➝ ➞ ➟ ➠ ➧ ➨  ►  ➢ ➣ ➤   ⟿     ✅
+    for pkg in conf["deb_packages"]:
+        tpl = "{:15}  "
+        versions = []
+        for stage in stage_names:
+            for hn in status[stage]:
+                ver = status[stage][hn].get(pkg, "")
+                if versions == []:
+                    tpl += "   {:15}"
+                else:
+                    prev = versions[-1]
+                    compare = version_compare(prev or 0, ver or 0)
+                    if compare > 0:
+                        tpl += " \033[0;32m►►\033[0m  {:15}"
+                    elif compare == 0:
+                        tpl += "     {:15}"
+                    else:
+                        tpl += " \033[0;31m⚠\033[0m   {:15}"
+                        # tpl += " \033[0;31m✘\033[0m   {:15}"
+
+                versions.append(ver)
+                break
+
+        print(tpl.format(pkg, *versions))
+
+    print()
+    return status
+
+
+def parse_args(conf, first_stage):
+    # deploy <pkgname> [<stage> [<version>]]]
+    # promote <pkgname> [<stage>]]]
+    ap = ArgumentParser()
+    subp = ap.add_subparsers(dest="command")
+    add_p = subp.add_parser("deploy")
+    add_p.add_argument("pkgname")
+    add_p.add_argument("stage", nargs="?", default=first_stage)
+    add_p.add_argument("version", nargs="?")
+
+    subp.add_parser("refresh_badges")
+    return ap.parse_args()
+
+
+def apt_update(hn):
+    cmd = ["ssh", hn, "sudo", "apt-get", "update"]
+    subprocess.run(cmd, timeout=300)
+
+
+def apt_install(hn, pkgname, version):
+    if version is None:
+        cmd = ["ssh", hn, "sudo", "apt-get", "install", pkgname]
+    else:
+        cmd = ["ssh", hn, "sudo", "apt-get", "install", f"{pkgname}={version}"]
+    subprocess.run(cmd, timeout=3600)
+
+
+def deploy(conf, args, status):
+    assert args.pkgname in conf["deb_packages"], "Unknown package name"
+    assert args.stage in conf["stages"], "Unknown stage"
+    # a) first deployment
+    # b) upgrade to latest version
+    # c) upgrade to given version
+    for hn in status[args.stage]:
+        print(f" ---- {hn} ----")
+        apt_update(hn)
+
+    for hn in status[args.stage]:
+        if args.pkgname not in status[args.stage][hn][args.pkgname]:
+            apt_install(hn, args.pkgname, args.version)
+        else:
+            status[args.stage][hn][args.pkgname]
+            apt_install(hn, args.pkgname, args.version)
+
+
+def main():
+    conf = load_conf()
+    first_stage = tuple(conf["stages"].keys())[0]
+    args = parse_args(conf, first_stage)
+    status = print_status(conf)
+
+    if args.command == "deploy":
+        deploy(conf, args, status)
+        print_status(conf)
+
+    elif args.command == "refresh_badges":
+        path = conf["badges_path"]
+        for stage in status:
+            for hn, d in status[stage].items():
+                for pkg, ver in d.items():
+                    write_badge(path, hn, pkg, ver)
+
+
+if __name__ == "__main__":
+    main()

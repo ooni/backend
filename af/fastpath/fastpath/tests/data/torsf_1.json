@@ -1,0 +1,28 @@
+{
+    "annotations": {
+        "engine_name": "ooniprobe-engine",
+        "engine_version": "3.11.0-alpha",
+        "platform": "macos"
+    },
+    "data_format_version": "0.2.0",
+    "input": null,
+    "measurement_start_time": "2021-07-14 09:56:16",
+    "probe_asn": "AS30722",
+    "probe_cc": "IT",
+    "probe_ip": "127.0.0.1",
+    "probe_network_name": "Vodafone Italia S.p.A.",
+    "report_id": "",
+    "resolver_asn": "AS30722",
+    "resolver_ip": "5.90.15.248",
+    "resolver_network_name": "Vodafone Italia S.p.A.",
+    "software_name": "miniooni",
+    "software_version": "3.11.0-alpha",
+    "test_keys": {
+        "bootstrap_time": 0,
+        "failure": "generic_timeout_error"
+    },
+    "test_name": "torsf",
+    "test_runtime": 300.00461155,
+    "test_start_time": "2021-07-14 09:56:16",
+    "test_version": "0.1.0"
+}

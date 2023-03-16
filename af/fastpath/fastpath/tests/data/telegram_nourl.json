@@ -1,0 +1,806 @@
+{
+  "software_name": "miniooni",
+  "software_version": "0.1.0-dev",
+  "test_runtime": 4.975730579,
+  "test_start_time": "2019-12-03 12:23:13",
+  "resolver_ip": "5.90.15.248",
+  "test_keys": {
+    "tcp_connect": [
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.171.5",
+        "port": 443
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.167.99",
+        "port": 80
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.167.99",
+        "port": 443
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.167.51",
+        "port": 80
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.175.100",
+        "port": 443
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.167.91",
+        "port": 443
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.171.5",
+        "port": 80
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.175.50",
+        "port": 443
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.167.51",
+        "port": 443
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.175.50",
+        "port": 80
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.175.100",
+        "port": 80
+      },
+      {
+        "status": {
+          "failure": null,
+          "success": true
+        },
+        "ip": "149.154.167.91",
+        "port": 80
+      }
+    ],
+    "telegram_web_failure": null,
+    "telegram_http_blocking": false,
+    "telegram_web_status": "ok",
+    "requests": [
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.171.5:443",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.171.5:443"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:16 GMT",
+            "Content-Length": "181",
+            "Content-Type": "text/html",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Content-Length",
+              "181"
+            ],
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:16 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Host": "web.telegram.org",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "web.telegram.org"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Content-Length": "1587",
+            "Accept-Ranges": "bytes",
+            "Expires": "Tue, 03 Dec 2019 13:22:00 GMT",
+            "Server": "nginx/1.16.1",
+            "Last-Modified": "Thu, 19 Sep 2019 21:44:08 GMT",
+            "Connection": "keep-alive",
+            "Etag": "\"5d83f6a8-633\"",
+            "Cache-Control": "max-age=3600",
+            "Date": "Tue, 03 Dec 2019 12:22:00 GMT",
+            "Content-Type": "text/html",
+            "Age": "74"
+          },
+          "headers_list": [
+            [
+              "Server",
+              "nginx/1.16.1"
+            ],
+            [
+              "Content-Length",
+              "1587"
+            ],
+            [
+              "Expires",
+              "Tue, 03 Dec 2019 13:22:00 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Etag",
+              "\"5d83f6a8-633\""
+            ],
+            [
+              "Accept-Ranges",
+              "bytes"
+            ],
+            [
+              "Age",
+              "74"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:22:00 GMT"
+            ],
+            [
+              "Last-Modified",
+              "Thu, 19 Sep 2019 21:44:08 GMT"
+            ],
+            [
+              "Cache-Control",
+              "max-age=3600"
+            ],
+            [
+              "Connection",
+              "keep-alive"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Host": "web.telegram.org",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "web.telegram.org"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Content-Length": "1587",
+            "Strict-Transport-Security": "max-age=35768000",
+            "Accept-Ranges": "bytes",
+            "Expires": "Tue, 03 Dec 2019 13:23:15 GMT",
+            "Server": "nginx/1.16.1",
+            "Last-Modified": "Thu, 19 Sep 2019 21:44:08 GMT",
+            "Connection": "keep-alive",
+            "Etag": "\"5d83f6a8-633\"",
+            "Cache-Control": "max-age=3600",
+            "Date": "Tue, 03 Dec 2019 12:23:15 GMT",
+            "Content-Type": "text/html"
+          },
+          "headers_list": [
+            [
+              "Cache-Control",
+              "max-age=3600"
+            ],
+            [
+              "Strict-Transport-Security",
+              "max-age=35768000"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Last-Modified",
+              "Thu, 19 Sep 2019 21:44:08 GMT"
+            ],
+            [
+              "Etag",
+              "\"5d83f6a8-633\""
+            ],
+            [
+              "Expires",
+              "Tue, 03 Dec 2019 13:23:15 GMT"
+            ],
+            [
+              "Accept-Ranges",
+              "bytes"
+            ],
+            [
+              "Server",
+              "nginx/1.16.1"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:15 GMT"
+            ],
+            [
+              "Content-Length",
+              "1587"
+            ],
+            [
+              "Connection",
+              "keep-alive"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.167.51",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.167.51"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:14 GMT",
+            "Connection": "keep-alive",
+            "Content-Type": "text/html",
+            "Content-Length": "181",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ],
+            [
+              "Connection",
+              "keep-alive"
+            ],
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:14 GMT"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.175.100:443",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Content-Length",
+              "0"
+            ],
+            [
+              "Host",
+              "149.154.175.100:443"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:15 GMT",
+            "Content-Length": "181",
+            "Content-Type": "text/html",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Content-Length",
+              "181"
+            ],
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:15 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.167.91:443",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.167.91:443"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:18 GMT",
+            "Content-Length": "181",
+            "Content-Type": "text/html",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:18 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.171.5",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.171.5"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:13 GMT",
+            "Connection": "keep-alive",
+            "Content-Type": "text/html",
+            "Content-Length": "181",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:13 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ],
+            [
+              "Connection",
+              "keep-alive"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.175.50:443",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.175.50:443"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:15 GMT",
+            "Content-Length": "181",
+            "Content-Type": "text/html",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:15 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.167.51:443",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.167.51:443"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:14 GMT",
+            "Content-Length": "181",
+            "Content-Type": "text/html",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:14 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.175.50",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.175.50"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:15 GMT",
+            "Connection": "keep-alive",
+            "Content-Type": "text/html",
+            "Content-Length": "181",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Connection",
+              "keep-alive"
+            ],
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:15 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.175.100",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.175.100"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:15 GMT",
+            "Connection": "keep-alive",
+            "Content-Type": "text/html",
+            "Content-Length": "181",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:15 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ],
+            [
+              "Connection",
+              "keep-alive"
+            ],
+            [
+              "Server",
+              "nginx/0.3.33"
+            ]
+          ]
+        }
+      },
+      {
+        "failure": null,
+        "request": {
+          "headers": {
+            "Content-Length": "0",
+            "Host": "149.154.167.91",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+          },
+          "headers_list": [
+            [
+              "Host",
+              "149.154.167.91"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+            ],
+            [
+              "Content-Length",
+              "0"
+            ]
+          ]
+        },
+        "response": {
+          "headers": {
+            "Date": "Tue, 03 Dec 2019 12:23:17 GMT",
+            "Connection": "keep-alive",
+            "Content-Type": "text/html",
+            "Content-Length": "181",
+            "Server": "nginx/0.3.33"
+          },
+          "headers_list": [
+            [
+              "Server",
+              "nginx/0.3.33"
+            ],
+            [
+              "Date",
+              "Tue, 03 Dec 2019 12:23:17 GMT"
+            ],
+            [
+              "Content-Type",
+              "text/html"
+            ],
+            [
+              "Content-Length",
+              "181"
+            ],
+            [
+              "Connection",
+              "keep-alive"
+            ]
+          ]
+        }
+      }
+    ],
+    "telegram_tcp_blocking": false
+  },
+  "data_format_version": "0.3.0",
+  "measurement_start_time": "2019-12-03 12:23:13",
+  "test_version": "0.0.3",
+  "test_name": "telegram",
+  "probe_ip": "127.0.0.1",
+  "report_id": "20191203T122313Z_AS30722_53QEjcU6gIhMdgN3YCbEi7JQ5RYjdql8PEjy4rd2BtwEnbSpEQ",
+  "probe_asn": "AS30722",
+  "probe_cc": "IT"
+}

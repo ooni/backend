@@ -1,0 +1,366 @@
+{
+  "annotations": {
+    "architecture": "amd64",
+    "engine_name": "ooniprobe-engine",
+    "engine_version": "3.17.0-alpha",
+    "platform": "linux"
+  },
+  "data_format_version": "0.2.0",
+  "extensions": {
+    "httpt": 0
+  },
+  "input": "vpn://openvpn.riseup/?addr=198.252.153.109:443&transport=tcp&obfs=obfs4",
+  "measurement_start_time": "2022-11-21 17:22:49",
+  "options": [
+    "Cipher=AES-256-GCM",
+    "Auth=SHA512",
+    "Compress=",
+    "Obfuscation=obfs4"
+  ],
+  "probe_asn": "AS9009",
+  "probe_cc": "RO",
+  "probe_ip": "127.0.0.1",
+  "probe_network_name": "M247 Ltd",
+  "report_id": "",
+  "resolver_asn": "AS9009",
+  "resolver_ip": "185.45.15.210",
+  "resolver_network_name": "M247 Ltd",
+  "software_name": "miniooni",
+  "software_version": "3.17.0-alpha",
+  "test_keys": {
+    "provider": "riseup",
+    "vpn_protocol": "openvpn",
+    "transport": "tcp",
+    "remote": "198.252.153.109:443",
+    "obfuscation": "obfs4",
+    "bootstrap_time": 1.5671859910000001,
+    "network_events": [
+      {
+        "transaction_id": 0,
+        "operation": "ready",
+        "t": 0.12
+      },
+      {
+        "transaction_id": 1,
+        "operation": "dial_done",
+        "t": 515.117
+      },
+      {
+        "transaction_id": 2,
+        "operation": "vpn_handshake_start",
+        "t": 515.118
+      },
+      {
+        "transaction_id": 3,
+        "operation": "reset",
+        "t": 515.119
+      },
+      {
+        "transaction_id": 5,
+        "operation": "tls_handshake_start",
+        "t": 771.98
+      },
+      {
+        "transaction_id": 6,
+        "operation": "tls_handshake_done",
+        "t": 1041.248
+      },
+      {
+        "transaction_id": 7,
+        "operation": "data_init",
+        "t": 1567.111
+      },
+      {
+        "transaction_id": 8,
+        "operation": "vpn_handshake_done",
+        "t": 1567.114
+      }
+    ],
+    "last_handshake_transaction_id": 8,
+    "tcp_connect": {
+      "ip": "198.252.153.109",
+      "port": 443,
+      "status": {
+        "failure": null,
+        "success": true
+      },
+      "t0": 0.000424974,
+      "t": 0.258504018
+    },
+    "failure": null,
+    "icmp_pings": [
+      {
+        "target": "8.8.8.8",
+        "sequence": [
+          {
+            "seq": 1,
+            "ttl": 121,
+            "rtt": 255.168
+          },
+          {
+            "seq": 2,
+            "ttl": 121,
+            "rtt": 257.614
+          },
+          {
+            "seq": 4,
+            "ttl": 121,
+            "rtt": 256.957
+          },
+          {
+            "seq": 5,
+            "ttl": 121,
+            "rtt": 257.894
+          },
+          {
+            "seq": 6,
+            "ttl": 121,
+            "rtt": 1952.461
+          },
+          {
+            "seq": 7,
+            "ttl": 121,
+            "rtt": 1382.493
+          },
+          {
+            "seq": 8,
+            "ttl": 121,
+            "rtt": 429.14
+          },
+          {
+            "seq": 9,
+            "ttl": 121,
+            "rtt": 433.099
+          },
+          {
+            "seq": 10,
+            "ttl": 121,
+            "rtt": 1175.273
+          }
+        ],
+        "pkt_rcv": 9,
+        "pkt_snt": 10,
+        "min_rtt": 255.168,
+        "max_rtt": 1952.461,
+        "avg_rtt": 711.122,
+        "std_rtt": 595.274,
+        "failure": null
+      },
+      {
+        "target": "10.41.0.1",
+        "sequence": [
+          {
+            "seq": 2,
+            "ttl": 64,
+            "rtt": 434.066
+          },
+          {
+            "seq": 3,
+            "ttl": 64,
+            "rtt": 431.661
+          },
+          {
+            "seq": 4,
+            "ttl": 64,
+            "rtt": 432.937
+          },
+          {
+            "seq": 5,
+            "ttl": 64,
+            "rtt": 428.673
+          },
+          {
+            "seq": 6,
+            "ttl": 64,
+            "rtt": 429.713
+          },
+          {
+            "seq": 7,
+            "ttl": 64,
+            "rtt": 426.291
+          },
+          {
+            "seq": 8,
+            "ttl": 64,
+            "rtt": 424.651
+          },
+          {
+            "seq": 9,
+            "ttl": 64,
+            "rtt": 1091.933
+          },
+          {
+            "seq": 10,
+            "ttl": 64,
+            "rtt": 421.675
+          }
+        ],
+        "pkt_rcv": 9,
+        "pkt_snt": 10,
+        "min_rtt": 421.675,
+        "max_rtt": 1091.933,
+        "avg_rtt": 502.4,
+        "std_rtt": 208.466,
+        "failure": null
+      },
+      {
+        "target": "163.7.134.112",
+        "sequence": [
+          {
+            "seq": 1,
+            "ttl": 56,
+            "rtt": 562.198
+          },
+          {
+            "seq": 2,
+            "ttl": 56,
+            "rtt": 557.722
+          },
+          {
+            "seq": 3,
+            "ttl": 56,
+            "rtt": 557.061
+          },
+          {
+            "seq": 4,
+            "ttl": 56,
+            "rtt": 539.17
+          },
+          {
+            "seq": 5,
+            "ttl": 56,
+            "rtt": 541.216
+          },
+          {
+            "seq": 6,
+            "ttl": 56,
+            "rtt": 526.353
+          },
+          {
+            "seq": 7,
+            "ttl": 56,
+            "rtt": 523.954
+          },
+          {
+            "seq": 8,
+            "ttl": 56,
+            "rtt": 515.543
+          },
+          {
+            "seq": 9,
+            "ttl": 56,
+            "rtt": 512.221
+          },
+          {
+            "seq": 10,
+            "ttl": 56,
+            "rtt": 528.066
+          }
+        ],
+        "pkt_rcv": 10,
+        "pkt_snt": 10,
+        "min_rtt": 512.221,
+        "max_rtt": 562.198,
+        "avg_rtt": 536.35,
+        "std_rtt": 17.096,
+        "failure": null
+      }
+    ],
+    "requests": [
+      {
+        "failure": null,
+        "request": {
+          "body": "",
+          "body_is_truncated": false,
+          "headers_list": [
+            [
+              "Accept",
+              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            ],
+            [
+              "Accept-Language",
+              "en-US,en;q=0.9"
+            ],
+            [
+              "Host",
+              "api.ipify.org"
+            ],
+            [
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
+            ]
+          ],
+          "headers": {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Host": "api.ipify.org",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
+          },
+          "method": "GET",
+          "tor": {
+            "exit_ip": null,
+            "exit_name": null,
+            "is_tor": false
+          },
+          "x_transport": "tcp",
+          "url": "https://api.ipify.org/?format=json"
+        },
+        "response": {
+          "body": "{\"ip\":\"198.252.153.28\"}",
+          "body_is_truncated": false,
+          "code": 200,
+          "headers_list": [
+            [
+              "Connection",
+              "keep-alive"
+            ],
+            [
+              "Content-Length",
+              "23"
+            ],
+            [
+              "Content-Type",
+              "application/json"
+            ],
+            [
+              "Date",
+              "Mon, 21 Nov 2022 17:22:49 GMT"
+            ],
+            [
+              "Server",
+              "Cowboy"
+            ],
+            [
+              "Vary",
+              "Origin"
+            ],
+            [
+              "Via",
+              "1.1 vegur"
+            ]
+          ],
+          "headers": {
+            "Connection": "keep-alive",
+            "Content-Length": "23",
+            "Content-Type": "application/json",
+            "Date": "Mon, 21 Nov 2022 17:22:49 GMT",
+            "Server": "Cowboy",
+            "Vary": "Origin",
+            "Via": "1.1 vegur"
+          }
+        },
+        "t": 1.742338739
+      }
+    ],
+    "minivpn_version": "(devel)",
+    "obfs4_version": "(devel)",
+    "success_handshake": true,
+    "success_icmp": true,
+    "success_urlgrab": true,
+    "success": true
+  },
+  "test_name": "openvpn",
+  "test_runtime": 37.975210163,
+  "test_start_time": "2022-11-21 17:22:11",
+  "test_version": "0.0.16"
+}

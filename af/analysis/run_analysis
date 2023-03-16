@@ -1,0 +1,3 @@
+#!/usr/bin/env python3
+from analysis.analysis import main
+main()

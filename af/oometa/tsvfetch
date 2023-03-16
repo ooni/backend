@@ -1,0 +1,55 @@
+#!/bin/bash -ex
+#
+# The script fetches tables slices corresponding to single bucket
+# from remote # MetaDB instance.
+#
+
+set -o pipefail
+
+# Create tables to fetch only one-bucked-sized slice of the data:
+suffix="181230"
+date="2018-12-30"
+
+psql.hkgmetadb <<EOF
+create table if not exists autoclaved_no_${suffix} as select autoclaved_no from autoclaved where bucket_date = '${date}';
+create table if not exists report_no_${suffix} as select report_no from report where autoclaved_no in (select * from autoclaved_no_${suffix});
+create table if not exists msm_no_${suffix} as select msm_no from measurement where report_no in (select * from report_no_${suffix});
+create index if not exists autoclaved_no_${suffix}_idx on autoclaved_no_${suffix} (autoclaved_no);
+analyze autoclaved_no_${suffix};
+create index if not exists report_no_${suffix}_idx on report_no_${suffix} (report_no);
+analyze report_no_${suffix};
+create index if not exists msm_no_${suffix}_idx on msm_no_${suffix} (msm_no);
+analyze msm_no_${suffix};
+EOF
+
+while [ $(psql.amsmetadb --tuples-only --no-align -c "select count(*) from pg_class where relname = 'msm_no_${suffix}_idx'") -eq 0 ] ; do
+    sleep 2 # replication lag
+done
+
+psql_copy() {
+    query="$1"
+    file="$2"
+    if [ ! -f "./tsv/$file" ]; then
+        psql.amsmetadb -U shovel -c "\\copy (${query}) to './tsv/${file}'"
+    fi
+}
+
+psql_copy "select * from autoclaved where autoclaved_no in (select * from autoclaved_no_${suffix})" autoclaved.tsv
+psql_copy "select * from report where report_no in (select * from report_no_${suffix})" report.tsv
+
+psql_copy "select * from residual where residual_no in (select distinct residual_no from measurement where msm_no in (select * from msm_no_${suffix}))" residual.tsv
+
+# have msm_no
+for tbl in measurement dns_a http_control http_request http_request_fp http_verdict tcp vanilla_tor; do
+    psql_copy "select * from ${tbl} where msm_no in (select * from msm_no_${suffix})" ${tbl}.tsv
+done
+
+# full copy
+for tbl in badblob badmeta badrow domain fingerprint input repeated_report software; do
+    psql_copy "select * from ${tbl}" ${tbl}.tsv
+done
+
+# badblob - 4 rows, bucket_date
+# badmeta - empty
+# badrow - 59 rows, manual review needed
+# originas -- is irrelevant table and should probably be dropped as it's not updated

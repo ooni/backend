@@ -1,0 +1,32 @@
+---
+data_format_version: 0.1.0
+input_hashes: []
+options: []
+probe_asn: AS7472
+probe_cc: SG
+probe_city: null
+probe_ip: 127.0.0.1
+report_id: xeBBNSMO0e6GtMx9nq6SsG6qGDrgrvdey6aOVBjX2USB7FHMfr5kNISRc3sJ8CIM
+software_name: ooniprobe
+software_version: 1.3.2
+start_time: 1532619434.0
+test_helpers: {backend: 37.218.247.110}
+test_name: http_invalid_request_line
+test_start_time: '2018-07-26 23:37:23'
+test_version: '0.2'
+...
+---
+input: null
+received:
+- ''
+- "GET / HTTP/vwj\n\r"
+- !!binary |
+  ABu62TJ/AADAc+AgQXk5TGwgSHhNN1YKDQ==
+- ''
+sent: ["I5A6 / HTTP/1.1\n\r", "GET / HTTP/vwj\n\r", "GfOyM KZjv2 Ay9Ll HxM7V\n\r",
+  "cg8LzCUAvyX0YfQTLZCjKPqmFLXIZrXSbXnQ5VC8eZ6rHbIZSv1lsm6WYQnazvHbGHTuDjX6CIHZJIffruFdmaX8TxmK8hzJzArkfoKiqCvFvqeqIpwqQEI8zf1DGYFgWhPEeBqufC2FxAVbsflTgEK1I7xnxphUS0GOCn6vijjHuz2RqfQAcOBnwSB9PEDD0MxqzyGlITxXOBFeb1BQvPi8LY5OgUolgJ8VZ8wcB7Z9m0RMtNOpsizSovZBLx8mLWntp9TJWzh95TxZQ75vsKzoS2na5xxLACC257iWqYAUFmNaYFJhOlCeZz7Vy8xr6IRtzK8UzCD66FpYuavd8p286vdTuBVbUKm1VlyPdE3EwMaxmIKZDn9nFptPm0XLNM2uUc42WOdyPND6m1Odzaht6XqGhB7VGOdYatTQPuw5BBlet3YoHtlOTivU42eEGhlTEytGWaHvhx3icGScbStybbo98B472uOUGOn8Z0YVIQYOqnwuROqGHzfe8GhufHTuH0iAUYot8HMBjYCeZunvMLFR7SdZlgIvNB3RTWRizMPoA3v7KcYTzzcV5pFWnbBOqYHg4JelDntLYdDv4VWlKiDScmat2LGTOCUZ2nlBAUtFr98c0ACbnJFT2djxm3Ix9lBJ54NQ4R2SLqWedVWvwmlYC9k3U9O9VDBI9h08BL6zxU3n0GPh9yTl5TLnl8pKDxQgBcC5Jd0AVjd3ISqn5X6L8t2fWOnyw4bgFrzeCkUt08YXH4sXUOBundBqRBzZn9iJlIi7KEI39Jbf7Zpv0rnuyBevtrTjcpCSB4CK1NX8T4U9FUWbHDfzzYkXWId76AHnIJBwPWCCDf6XQA4buyLxl9iJHsugq06942TV1iQciABqDm1rbscw4j46M0n1shx6nkFEHlLBnc0kqNogWxBGpqxCNjGZTzMsURrMyokiwdCszTmGOGsV7qym7l7Di8V6jLeoY6dq76kvnqN20kMLVfNJDyHvFCnA2OuX8kFMKhbkTV0XXtmTFbTo\
+    \ / HTTP/1.1\n\r"]
+tampering: true
+test_runtime: 8.056843996047974
+test_start_time: 1532620222.0
+...

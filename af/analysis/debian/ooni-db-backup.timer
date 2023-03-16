@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up database tables
+Requires=ooni-db-backup.service
+
+[Timer]
+Unit=ooni-db-backup.service
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

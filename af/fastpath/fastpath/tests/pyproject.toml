@@ -1,0 +1,4 @@
+# Black configuration for unit/integ test files
+[tool.black]
+line-length = 110
+target-version = ['py39']

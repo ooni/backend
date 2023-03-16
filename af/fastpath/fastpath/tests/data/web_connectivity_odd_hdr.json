@@ -1,0 +1,129 @@
+{
+  "software_name": "ooniprobe-android",
+  "software_version": "1.1.4",
+  "test_runtime": 7.01813697814941,
+  "test_start_time": "2017-05-16 13:10:51",
+  "test_name": "web_connectivity",
+  "test_keys": {
+    "accessible": false,
+    "control": {
+      "tcp_connect": {
+        "61.183.1.186:80": {
+          "status": true,
+          "failure": null
+        }
+      },
+      "http_request": {
+        "body_length": -1,
+        "failure": "dns_lookup_error",
+        "status_code": -1,
+        "headers": {}
+      },
+      "dns": {
+        "failure": "dns_name_error",
+        "addrs": []
+      }
+    },
+    "control_failure": null,
+    "retries": null,
+    "http_experiment_failure": "http_invalid_redirect_url",
+    "socksproxy": null,
+    "agent": "redirect",
+    "headers_match": null,
+    "client_resolver": "111.175.221.38",
+    "tcp_connect": [
+      {
+        "status": {
+          "failure": null,
+          "success": true,
+          "blocked": false
+        },
+        "ip": "61.183.1.186",
+        "port": 80
+      }
+    ],
+    "dns_consistency": "inconsistent",
+    "dns_experiment_failure": null,
+    "body_proportion": 0,
+    "queries": [
+      {
+        "engine": "system",
+        "resolver_hostname": null,
+        "query_type": "A",
+        "hostname": "www.efindlove.com",
+        "answers": [
+          {
+            "ipv4": "61.183.1.186",
+            "answer_type": "A",
+            "ttl": 0
+          }
+        ],
+        "failure": null,
+        "resolver_port": null
+      }
+    ],
+    "body_length_match": null,
+    "requests": [
+      {
+        "failure": "http_invalid_redirect_url",
+        "request": {
+          "body": "",
+          "headers": {
+            "Accept-Language": "en-US;q=0.8,en;q=0.5",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
+          },
+          "url": "http://www.efindlove.com/",
+          "method": "GET",
+          "tor": {
+            "is_tor": false,
+            "exit_name": null,
+            "exit_ip": null
+          }
+        },
+        "response": {
+          "body": "",
+          "headers": {
+            "Date": "Tue, 16 May 2017 13:12:28 GMT",
+            "Content-Length": "0",
+            "Location": {
+              "data": "aHR0cDovL3NlYXJjaC4xMTRzby5jbi9zZWFyY2hfd2ViLmh0bWw/aWQ9MTY4AA==",
+              "format": "base64"
+            },
+            "Server": "ymag"
+          },
+          "response_line": "HTTP/1.1 302 Found",
+          "code": 302
+        }
+      }
+    ],
+    "title_match": null,
+    "blocking": "dns",
+    "status_code_match": null
+  },
+  "probe_ip": "27.19.191.196",
+  "id": "00625f0c-fe92-4cb4-812e-7bd743561f0b",
+  "data_format_version": "0.2.0",
+  "measurement_start_time": "2017-05-16 13:11:40",
+  "options": [],
+  "test_version": "0.0.1",
+  "input_hashes": [],
+  "input": "http://www.efindlove.com",
+  "probe_city": null,
+  "report_id": "20170516T131058Z_AS4134_N1zKxPjDEpG22R0WFkQdtZ9Z47vBUvENsbGTMS8YHYO1LT2a7i",
+  "probe_asn": "AS4134",
+  "annotations": {
+    "platform": "android",
+    "engine_version_full": "v0.6.6",
+    "engine_version": "0.6.6",
+    "engine_name": "libmeasurement_kit"
+  },
+  "test_helpers": {
+    "backend": {
+      "type": "https",
+      "address": "https://b.web-connectivity.th.ooni.io"
+    }
+  },
+  "probe_cc": "CN",
+  "measurement_uid": "01201705167c104b698173927d63aadf48fb2fa1"
+}

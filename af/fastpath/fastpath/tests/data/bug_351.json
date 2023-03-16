@@ -1,0 +1,124 @@
+{
+  "annotations": {
+    "platform": "linux"
+  },
+  "backend_version": null,
+  "bucket_date": "2020-02-29",
+  "data_format_version": "0.2.0",
+  "id": "b6b5e56a-3513-4cd1-92a3-516ba7d3eaf6",
+  "input": "https://fa.wikipedia.org/",
+  "input_hashes": [],
+  "measurement_start_time": "2020-02-29 01:51:41",
+  "options": [
+    "--file",
+    "$citizenlab_${probe_cc}_urls"
+  ],
+  "probe_asn": "AS5390",
+  "probe_cc": "NL",
+  "probe_city": null,
+  "probe_ip": "127.0.0.1",
+  "report_filename": "2020-02-29/20200229T014315Z-NL-AS5390-web_connectivity-20200229T014316Z_AS5390_bByhuFiqtRyhhfSSkkoFybwU7dQorWUP45zEjJdwjd0LIYmFLJ-0.2.0-probe.json",
+  "report_id": "20200229T014316Z_AS5390_bByhuFiqtRyhhfSSkkoFybwU7dQorWUP45zEjJdwjd0LIYmFLJ",
+  "software_name": "ooniprobe",
+  "software_version": "2.2.0",
+  "test_helpers": {
+    "backend": {
+      "address": "httpo://y3zq5fwelrzkkv3s.onion",
+      "type": "onion"
+    }
+  },
+  "test_keys": {
+    "accessible": false,
+    "agent": "redirect",
+    "blocking": "http-failure",
+    "body_length_match": null,
+    "client_resolver": "0.0.0.0",
+    "control": {
+      "dns": {
+        "addrs": [
+          "dyna.wikimedia.org",
+          "91.198.174.192"
+        ],
+        "failure": null
+      },
+      "http_request": {
+        "body_length": 127734,
+        "failure": null,
+        "headers": {
+          "Accept-Ranges": "bytes",
+          "Age": "38646",
+          "Backend-Timing": "D=140953 t=1582902458777131",
+          "Cache-Control": "private, s-maxage=0, max-age=0, must-revalidate",
+          "Content-Type": "text/html; charset=UTF-8",
+          "Content-language": "fa",
+          "Date": "Fri, 28 Feb 2020 15:07:38 GMT",
+          "Last-Modified": "Fri, 28 Feb 2020 15:04:36 GMT",
+          "P3P": "CP=\"See https://fa.wikipedia.org/wiki/Special:CentralAutoLogin/P3P for more info.\"",
+          "Server": "mw1251.eqiad.wmnet",
+          "Server-Timing": "cache;desc=\"hit-front\"",
+          "Set-Cookie": "WMF-Last-Access=29-Feb-2020;Path=/;HttpOnly;secure;Expires=Wed, 01 Apr 2020 00:00:00 GMT",
+          "Strict-Transport-Security": "max-age=106384710; includeSubDomains; preload",
+          "Vary": "Accept-Encoding,Cookie,Authorization",
+          "X-ATS-Timestamp": "1582902459",
+          "X-Cache": "cp3064 miss, cp3064 hit/330",
+          "X-Cache-Status": "hit-front",
+          "X-Client-IP": "37.218.247.47",
+          "X-Content-Type-Options": "nosniff",
+          "X-Powered-By": "PHP/7.2.26-1+0~20191218.33+debian9~1.gbpb5a340+wmf1",
+          "X-Varnish": "189328748 548738152"
+        },
+        "status_code": 200,
+        "title": "  "
+      },
+      "tcp_connect": {
+        "91.198.174.192:443": {
+          "failure": null,
+          "status": true
+        }
+      }
+    },
+    "control_failure": null,
+    "dns_consistency": "consistent",
+    "dns_experiment_failure": null,
+    "headers_match": null,
+    "http_experiment_failure": "unknown_failure 'ascii' codec can't decode byte 0xd9 in position 101: ordinal not in range(128)",
+    "queries": [
+      {
+        "answers": [
+          {
+            "answer_type": "CNAME",
+            "hostname": "dyna.wikimedia.org"
+          },
+          {
+            "answer_type": "A",
+            "ipv4": "91.198.174.192"
+          }
+        ],
+        "failure": null,
+        "hostname": "fa.wikipedia.org",
+        "query_type": "A",
+        "resolver_hostname": null,
+        "resolver_port": null
+      }
+    ],
+    "requests": [],
+    "retries": 1,
+    "socksproxy": null,
+    "status_code_match": null,
+    "tcp_connect": [
+      {
+        "ip": "91.198.174.192",
+        "port": 443,
+        "status": {
+          "blocked": false,
+          "failure": null,
+          "success": true
+        }
+      }
+    ]
+  },
+  "test_name": "web_connectivity",
+  "test_runtime": 2.1714069843,
+  "test_start_time": "2020-02-29 01:43:15",
+  "test_version": "0.3.0"
+}

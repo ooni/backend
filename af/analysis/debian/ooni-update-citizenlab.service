@@ -1,0 +1,11 @@
+[Unit]
+Description=Update citizenlab test lists
+Wants=ooni-update-citizenlab.timer
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/analysis --update-citizenlab
+
+[Install]
+WantedBy=multi-user.target
+

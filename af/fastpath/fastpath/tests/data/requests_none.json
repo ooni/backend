@@ -1,0 +1,91 @@
+{
+  "annotations": {
+    "assets_version": "20201112191431",
+    "engine_name": "ooniprobe-engine",
+    "engine_version": "0.20.2",
+    "platform": "windows"
+  },
+  "data_format_version": "0.2.0",
+  "input": "http://www.wikispaces.com/",
+  "measurement_start_time": "2021-01-20 19:57:49",
+  "probe_asn": "AS6855",
+  "probe_cc": "SK",
+  "probe_ip": "127.0.0.1",
+  "probe_network_name": "Slovak Telecom, a. s.",
+  "report_id": "20210120T185357Z_webconnectivity_SK_6855_n1_tMTz8mUon0GijTHW",
+  "resolver_asn": "AS13335",
+  "resolver_ip": "127.0.0.2",
+  "resolver_network_name": "Cloudflare, Inc.",
+  "software_name": "ooniprobe-desktop",
+  "software_version": "3.1.1",
+  "test_helpers": {
+    "backend": {
+      "address": "https://wcth.ooni.io",
+      "type": "https"
+    }
+  },
+  "test_keys": {
+    "accessible": false,
+    "agent": "redirect",
+    "blocking": "dns",
+    "body_length_match": null,
+    "body_proportion": 0,
+    "client_resolver": "127.0.0.2",
+    "control": {
+      "dns": {
+        "addrs": [
+          "wikispaces.com"
+        ],
+        "failure": null
+      },
+      "http_request": {
+        "body_length": -1,
+        "failure": "dns_lookup_error",
+        "headers": {},
+        "status_code": -1,
+        "title": ""
+      },
+      "tcp_connect": {}
+    },
+    "control_failure": null,
+    "dns_consistency": "inconsistent",
+    "dns_experiment_failure": "dns_nxdomain_error",
+    "headers_match": null,
+    "http_experiment_failure": null,
+    "queries": [
+      {
+        "answers": null,
+        "engine": "system",
+        "failure": "dns_nxdomain_error",
+        "hostname": "www.wikispaces.com",
+        "query_type": "A",
+        "resolver_address": "",
+        "resolver_hostname": null,
+        "resolver_port": null,
+        "t": 0.0659948
+      },
+      {
+        "answers": null,
+        "engine": "system",
+        "failure": "dns_nxdomain_error",
+        "hostname": "www.wikispaces.com",
+        "query_type": "AAAA",
+        "resolver_address": "",
+        "resolver_hostname": null,
+        "resolver_port": null,
+        "t": 0.0659948
+      }
+    ],
+    "requests": null,
+    "retries": null,
+    "socksproxy": null,
+    "status_code_match": null,
+    "tcp_connect": null,
+    "title_match": null,
+    "x_status": 2080
+  },
+  "test_name": "web_connectivity",
+  "test_runtime": 0.3129936,
+  "test_start_time": "2021-01-20 18:53:55",
+  "test_version": "0.1.0"
+}

@@ -1,0 +1,18 @@
+{
+  "ver": 0,
+  "action": "export",
+  "public_aws_access_key_id": "<REPLACEME>",
+  "public_aws_secret_access_key": "<REPLACEME>",
+  "public_bucket_name": "ooni-data-eu-fra-test",
+  "clickhouse_url": "clickhouse://localhost/default",
+  "__clickhouse_url": "clickhouse://fastpath:fastpath@localhost/default",
+  "__description": "tables can be backed up as: ignore, full, incremental, partition",
+  "backup_tables": {
+    "citizenlab": "full",
+    "fastpath": "ignore",
+    "jsonl": "ignore",
+    "msmt_feedback": "full",
+    "test_helper_instances": "full",
+    "url_priorities": "full"
+  }
+}

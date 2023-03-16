@@ -1,0 +1,16 @@
+
+== Counters table
+
+Table definition in../oometa/021-create-counters-table.install.sql
+
+==== Use cases
+
+* Showing global statistics and counts in Explorer, replacing the ooexp* tables
+* list_measurements in Explorer: estimate the number of results before running heavy queries
+* Manually run aggregation queries
+* Converted into a dataframe with Pandas on jupiter for analysis
+
+==== Update process
+
+It is updated by the analysis process
+

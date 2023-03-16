@@ -1,0 +1,357 @@
+fastpath (0.71) unstable; urgency=medium
+
+  * Bugfix on fingerprint update and logging
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 03 Mar 2023 10:36:35 +0000
+
+fastpath (0.70) unstable; urgency=medium
+
+  * Use fingerprints from database
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Feb 2023 17:36:05 +0000
+
+fastpath (0.69) unstable; urgency=medium
+
+  * Extract blocking type
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 27 Feb 2023 18:12:55 +0000
+
+fastpath (0.68) unstable; urgency=medium
+
+  * Extract test runtime
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 16 Feb 2023 18:31:31 +0000
+
+fastpath (0.67) unstable; urgency=medium
+
+  * Extract more values from measurements
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 15 Feb 2023 18:08:49 +0000
+
+fastpath (0.66) unstable; urgency=medium
+
+  * OpenVPN scoring and observation table MVP
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 09 Nov 2022 18:57:04 +0100
+
+fastpath (0.64) unstable; urgency=medium
+
+  * Temporary workaround for whatsapp
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 02 Dec 2022 13:30:09 +0000
+
+fastpath (0.63) unstable; urgency=medium
+
+  * Handle fixed Signal tests
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 18 Nov 2022 11:26:19 +0000
+
+fastpath (0.62) unstable; urgency=medium
+
+  * Temporarily flag signal msmts as failed
+    https://github.com/ooni/probe/issues/2344
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 21 Oct 2022 10:40:00 +0100
+
+fastpath (0.61) unstable; urgency=medium
+
+  * Set priority in database insert query
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 31 Aug 2022 17:46:46 +0100
+
+fastpath (0.60) unstable; urgency=medium
+
+  * Fix backend #610 again. Add tests
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 16 Aug 2022 09:49:51 +0100
+
+fastpath (0.59) unstable; urgency=medium
+
+  * Mark blocking=null, accessible=null webconn as failed
+    https://github.com/ooni/backend/issues/610
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Aug 2022 17:51:47 +0100
+
+fastpath (0.58) unstable; urgency=medium
+
+  * Add DNS fingerprints for Iran
+    https://github.com/ooni/backend/issues/543
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Aug 2022 12:45:45 +0100
+
+fastpath (0.57) unstable; urgency=medium
+
+  * Improve reprocessor
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 24 Feb 2022 16:45:44 +0000
+
+fastpath (0.56) unstable; urgency=medium
+
+  * Handle RiseUp VPS transport_status set to None
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 21 Feb 2022 19:12:37 +0000
+
+fastpath (0.54) unstable; urgency=medium
+
+  * Make Clickhouse dependency optional
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 11 Feb 2022 11:31:06 +0000
+
+fastpath (0.53) unstable; urgency=medium
+
+  * Add stunreachability scoring
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 27 Jan 2022 12:07:31 +0000
+
+fastpath (0.52) unstable; urgency=medium
+
+  * Upsert measurement to Clickhouse as well
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 18 Nov 2021 18:39:14 +0000
+
+fastpath (0.51) unstable; urgency=medium
+
+  * Extract test runtime from pluggable transport measurements
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 30 Nov 2021 17:49:15 +0000
+
+fastpath (0.48) unstable; urgency=medium
+
+  * Bump up python version
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Nov 2021 19:24:34 +0000
+
+fastpath (0.47) unstable; urgency=medium
+
+  * Handle http whatsapp
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 11 Nov 2021 09:17:02 +0000
+
+fastpath (0.46) unstable; urgency=medium
+
+  * Flag measurements from the future
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Nov 2021 12:38:06 +0000
+
+fastpath (0.45) unstable; urgency=medium
+
+  * Minor fix
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 12 Oct 2021 12:03:30 +0100
+
+fastpath (0.44) unstable; urgency=medium
+
+  * Score RiseUp VPN
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 08 Oct 2021 17:12:23 +0100
+
+fastpath (0.43) unstable; urgency=medium
+
+  * Support filtering minicans
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 14 Sep 2021 20:11:53 +0100
+
+fastpath (0.42) unstable; urgency=medium
+
+  * Add pluggable transport support
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 21 Jul 2021 19:26:30 +0100
+
+fastpath (0.41) unstable; urgency=medium
+
+  * Reprocessor: delete files
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 25 Jun 2021 12:43:57 +0100
+
+fastpath (0.40) unstable; urgency=medium
+
+  * Add reprocessing tool
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 21 Jun 2021 17:12:18 +0100
+
+fastpath (0.39) unstable; urgency=medium
+
+  * Cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 02 Jun 2021 12:34:31 +0100
+
+fastpath (0.38) unstable; urgency=medium
+
+  * Add Signal scoring
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 28 Apr 2021 22:42:26 +0100
+
+fastpath (0.36) unstable; urgency=medium
+
+  * Support minicans and YAML
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 03 Feb 2021 20:39:38 +0000
+
+fastpath (0.35) unstable; urgency=medium
+
+  * Handle test_keys->requests set to None
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 20 Jan 2021 20:25:34 +0000
+
+fastpath (0.34) unstable; urgency=medium
+
+  * Cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 16 Nov 2020 12:16:18 +0000
+
+fastpath (0.33) unstable; urgency=medium
+
+  * Ignore CC=ZZ and ASN=0
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 02 Nov 2020 21:35:14 +0000
+
+fastpath (0.32) unstable; urgency=medium
+
+  * Update conf management
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 03 Aug 2020 15:46:41 +0100
+
+fastpath (0.30) unstable; urgency=medium
+
+  * Support Tor tests
+    https://github.com/ooni/backend/issues/210
+    https://github.com/ooni/spec/blob/master/nettests/ts-023-tor.md
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 12 Jun 2020 19:09:23 +0100
+
+fastpath (0.29) unstable; urgency=medium
+
+  * Trim S3 cache immediately
+  * Sshfeeder fixes
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 25 May 2020 12:35:26 +0100
+
+fastpath (0.28) unstable; urgency=medium
+
+  * Add file trimming safety
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 05 May 2020 18:10:21 +0100
+
+fastpath (0.27) unstable; urgency=medium
+
+  * Stream cans
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 01 May 2020 13:36:08 +0100
+
+fastpath (0.26) unstable; urgency=medium
+
+  * Improve file trimming
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 08 Apr 2020 10:46:56 +0100
+
+fastpath (0.25) unstable; urgency=medium
+
+  * URL prioritization: populate citizenlab table
+    https://github.com/ooni/backend/issues/361
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 14 Apr 2020 21:51:49 +0100
+
+fastpath (0.23) unstable; urgency=medium
+
+  * Keep rows in fastpath table
+    https://github.com/ooni/backend/issues/233
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 06 Apr 2020 17:15:59 +0100
+
+fastpath (0.22) unstable; urgency=medium
+
+  * Handle http_invalid_request_line (middlebox detection)
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 06 Apr 2020 15:59:38 +0100
+
+fastpath (0.21) unstable; urgency=medium
+
+  * Improve type checking and log_ingestion_delay
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 06 Mar 2020 17:40:42 +0000
+
+fastpath (0.20) unstable; urgency=medium
+
+  * Handle blocking types in web_connectivity #352
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 02 Mar 2020 17:39:49 +0000
+
+fastpath (0.19) unstable; urgency=medium
+
+  * Allow importing domain_input_updater
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 24 Feb 2020 13:43:21 +0000
+
+fastpath (0.18) unstable; urgency=medium
+
+  * WhatsApp bug workaround
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 20 Feb 2020 15:33:56 +0000
+
+fastpath (0.16) unstable; urgency=medium
+
+  * Add fingerprints
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 14 Feb 2020 16:59:15 +0000
+
+fastpath (0.14) unstable; urgency=medium
+
+  * Score Tor
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 23 Jan 2020 16:21:34 +0000
+
+fastpath (0.13) unstable; urgency=medium
+
+  * Do not score title_match=False #360
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 23 Jan 2020 16:21:17 +0000
+
+fastpath (0.12) unstable; urgency=medium
+
+  * Install domain_input_updater executable
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Jan 2020 12:23:04 +0000
+
+fastpath (0.11) unstable; urgency=medium
+
+  * Retry SSH connections on failure
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Jan 2020 12:22:35 +0000
+
+fastpath (0.10) unstable; urgency=medium
+
+  * Add Tor and Psiphon enum values
+  * Handle missing input msmt field
+  * Switch S3 bucket
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Jan 2020 15:40:40 +0000
+
+fastpath (0.9) unstable; urgency=medium
+
+  * Handle dict body
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Jan 2020 14:51:48 +0000
+
+fastpath (0.8) unstable; urgency=medium
+
+  * Add anomaly and confirmed columns
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Jan 2020 14:51:39 +0000
+
+fastpath (0.7) unstable; urgency=medium
+
+  * Improve metrics
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 19 Nov 2019 12:18:21 +0000
+
+fastpath (0.6) unstable; urgency=medium
+
+  * Improve old file deletion
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 15 Nov 2019 19:48:51 +0000
+
+fastpath (0.5) unstable; urgency=medium
+
+  * Log to stdout, fix queue.close
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 15 Nov 2019 19:48:10 +0000

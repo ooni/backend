@@ -1,0 +1,10 @@
+[Unit]
+Description=Update citizenlab
+Requires=ooni-update-citizenlab.service
+
+[Timer]
+Unit=ooni-update-citizenlab.service
+OnCalendar=*-*-* *:00/30
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Update ASN metadata
+Requires=ooni-update-asn-metadata.service
+
+[Timer]
+Unit=ooni-update-asn-metadata.service
+OnCalendar=weekly
+
+[Install]
+WantedBy=timers.target

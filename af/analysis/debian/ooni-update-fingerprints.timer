@@ -1,0 +1,10 @@
+[Unit]
+Description=Update fingerprints
+Requires=ooni-update-fingerprints.service
+
+[Timer]
+Unit=ooni-update-fingerprints.service
+OnCalendar=hourly
+
+[Install]
+WantedBy=timers.target

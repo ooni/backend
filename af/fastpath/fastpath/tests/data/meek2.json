@@ -1,0 +1,62 @@
+{
+  "annotations": {
+    "platform": "macos"
+  },
+  "data_format_version": "0.2.0",
+  "id": "433371e0-531a-4341-830d-6c28e268ea96",
+  "input": [
+    "ajax.aspnetcdn.com",
+    "meek.azureedge.net"
+  ],
+  "input_hashes": [],
+  "measurement_start_time": "2021-01-22 12:46:42",
+  "options": [],
+  "probe_asn": "AS30722",
+  "probe_cc": "IT",
+  "probe_city": null,
+  "probe_ip": "127.0.0.1",
+  "report_id": "20210122T124642Z_meekfrontedrequeststest_IT_30722_n1_CixzPWzzTJJdvcSO",
+  "software_name": "ooniprobe",
+  "software_version": "2.3.0",
+  "test_helpers": {},
+  "test_keys": {
+    "agent": "agent",
+    "requests": [
+      {
+        "failure": null,
+        "request": {
+          "body": null,
+          "headers": {
+            "Host": "meek.azureedge.net"
+          },
+          "method": "GET",
+          "tor": {
+            "exit_ip": null,
+            "exit_name": null,
+            "is_tor": false
+          },
+          "url": "https://ajax.aspnetcdn.com"
+        },
+        "response": {
+          "body": "I’m just a happy little web server.\n",
+          "code": 200,
+          "headers": {
+            "Accept-Ranges": "bytes",
+            "Age": "473669",
+            "Content-Type": "text/plain; charset=utf-8",
+            "Date": "Fri, 22 Jan 2021 12:46:42 GMT",
+            "Last-Modified": "Sun, 17 Jan 2021 01:12:13 GMT",
+            "Server": "ECAcc (mil/6CA5)",
+            "X-Cache": "HIT"
+          }
+        }
+      }
+    ],
+    "socksproxy": null,
+    "success": true
+  },
+  "test_name": "meek_fronted_requests_test",
+  "test_runtime": 0.0967831612,
+  "test_start_time": "2021-01-22 12:46:41",
+  "test_version": "0.2.0"
+}

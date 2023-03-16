@@ -1,0 +1,77 @@
+{
+  "backend_version": "1.0.2",
+  "bucket_date": "2014-11-02",
+  "data_format_version": "0.2.0",
+  "id": "123316da-874a-8415-541f-e23b05f4097e",
+  "input": "http://extratorrent.com",
+  "input_hashes": [
+    "fcb09853f54171ccccfde1fa4f26515de1d5ecc505bb39890430a39858def707"
+  ],
+  "measurement_start_time": "2014-11-02 22:07:47",
+  "options": [
+    "-f",
+    "citizenlab-urls-global.txt"
+  ],
+  "probe_asn": "AS6830",
+  "probe_cc": "AT",
+  "probe_city": "Vienna",
+  "probe_ip": "127.0.0.1",
+  "report_filename": "2014-11-02/20141102T220018Z-AT-AS6830-http_requests-no_report_id-0.1.0-probe.yaml.lz4",
+  "report_id": "20141102T220018Z_OzDkiPoJMVjHItjneYOuZgiQSkowBczRIkecwerbgMOMAqxDwt",
+  "software_name": "ooniprobe",
+  "software_version": "1.2.2",
+  "test_helpers": null,
+  "test_keys": {
+    "agent": "agent",
+    "body_length_match": null,
+    "body_proportion": null,
+    "control_failure": null,
+    "experiment_failure": null,
+    "factor": 0.8,
+    "headers_diff": [
+      "Content-Type",
+      "Transfer-Encoding",
+      "Content-Length",
+      "Expires",
+      "Cache-Control",
+      "Location"
+    ],
+    "headers_match": false,
+    "requests": [
+      {
+        "request": {
+          "body": null,
+          "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7"
+          },
+          "method": "GET",
+          "tor": {
+            "exit_ip": null,
+            "exit_name": null,
+            "is_tor": false
+          },
+          "url": "http://extratorrent.com"
+        },
+        "response": {
+          "body": "",
+          "code": 301,
+          "headers": {
+            "CF-RAY": "1833fd88e6cd0a24-VIE",
+            "Connection": "close",
+            "Content-Length": "0",
+            "Date": "Sun, 02 Nov 2014 23:07:48 GMT",
+            "Location": "http://extratorrent.cc/",
+            "Server": "cloudflare-nginx",
+            "Set-Cookie": "__cfduid=dceb43cc4e3dff4110e98ae32ff2653f61414969667989; expires=Mon, 23-Dec-2019 23:50:00 GMT; path=/; domain=.extratorrent.com; HttpOnly"
+          }
+        },
+        "response_length": "0"
+      }
+    ],
+    "socksproxy": null
+  },
+  "test_name": "http_requests",
+  "test_runtime": 0.7404861450195312,
+  "test_start_time": "2014-11-02 22:00:18",
+  "test_version": "0.2.4"
+}
