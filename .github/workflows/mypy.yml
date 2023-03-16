@@ -1,4 +1,4 @@
-name: Mypy API test
+name: Run mypy on API
 on:
   pull_request:
     paths:
@@ -7,7 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: debian:10
+    container: debian:11
 
     steps:
       - name: Check out repository code
@@ -20,10 +20,6 @@ jobs:
           rm -f /etc/apt/sources.list.d/*
           cat <<EOF | tee /etc/apt/sources.list
           deb http://deb-ci.ooni.org unstable main
-          deb [trusted=yes] http://deb.debian.org/debian buster main contrib non-free
-          deb [trusted=yes] http://deb.debian.org/debian buster-backports main contrib non-free
-          deb [trusted=yes] http://deb.debian.org/debian buster-updates main contrib non-free
-          deb [trusted=yes] http://deb.debian.org/debian-security/ buster/updates main contrib non-free
           EOF
           apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
 

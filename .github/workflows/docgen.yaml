@@ -1,4 +1,4 @@
-name: Docgen
+name: Generate documentation
 on: [push, pull_request]
 
 permissions:
