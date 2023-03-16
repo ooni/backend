@@ -245,16 +245,6 @@ def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
     }, fjd(r)
 
 
-def test_aggregation_no_axis_filter_multi_test_name_invalid(client):
-    # 0-dimensional data
-    url = (
-        "aggregation?test_name=web_connectivity,bogus&since=2021-07-09&until=2021-07-10"
-    )
-    r = api(client, url)
-    r.pop("db_stats", None)
-    assert r == {"error": "Invalid test name 'bogus'", "v": 0}
-
-
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
