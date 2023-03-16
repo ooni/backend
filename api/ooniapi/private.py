@@ -112,7 +112,7 @@ def api_private_test_names() -> Response:
       '200':
         description: TODO
     """
-    # TODO: merge this and models.py:TEST_GROUPS
+    # TODO: eventually drop this, once we see nobody is using it
     TEST_NAMES = {
         "bridge_reachability": "Bridge Reachability",
         "dash": "DASH",
