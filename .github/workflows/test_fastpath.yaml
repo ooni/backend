@@ -1,5 +1,8 @@
 name: Test Fastpath
-on: [push, pull_request]
+on:
+  pull_request:
+    paths:
+        - 'fastpath/**'
 
 # Run only local tests
 
@@ -22,7 +25,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cd af/fastpath
+          cd fastpath
           PYTHONPATH=. pytest-3 -v --cov=fastpath --cov-report=term \
           fastpath/tests/test_functional.py \
           fastpath/tests/test_functional_nodb.py \
@@ -32,4 +35,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: coverage
-          path: af/fastpath/htmlcov
+          path: fastpath/htmlcov

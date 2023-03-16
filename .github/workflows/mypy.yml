@@ -1,5 +1,8 @@
-name: Mypy test
-on: [push, pull_request]
+name: Mypy API test
+on:
+  pull_request:
+    paths:
+        - 'api/**'
 
 jobs:
   test:
@@ -31,4 +34,4 @@ jobs:
 
       - name: Run tests
         # see the mypy.ini file
-        run: cd newapi && mypy ooniapi/**/*.py
+        run: cd api && mypy ooniapi/**/*.py
