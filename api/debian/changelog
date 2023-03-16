@@ -1,3 +1,10 @@
+ooni-api (1.0.47) unstable; urgency=medium
+
+  * Add domains and networks endpoints
+  * Remove aggregation test_name check
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 16 Mar 2023 21:32:01 +0000
+
 ooni-api (1.0.46) unstable; urgency=medium
 
   * Test CI
