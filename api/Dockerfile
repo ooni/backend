@@ -4,9 +4,9 @@ ENV PYTHONPATH /app/
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN mkdir /scripts
-COPY newapi/build_runner.sh /scripts
-COPY newapi/debian/ooni_download_geoip.py /scripts
-COPY newapi/api.conf.example /scripts
+COPY build_runner.sh /scripts
+COPY debian/ooni_download_geoip.py /scripts
+COPY api.conf.example /scripts
 WORKDIR /scripts
 
 # Run runner setup
@@ -18,7 +18,7 @@ RUN ./ooni_download_geoip.py
 RUN rm -rf /scripts
 
 # Copy code and conf into the container
-COPY newapi /app/
+COPY . /app/
 # Set our work directory to our app directory
 WORKDIR /app/
 

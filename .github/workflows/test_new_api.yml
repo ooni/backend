@@ -22,10 +22,10 @@ jobs:
           limit-access-to-actor: true
 
       - name: Build docker image
-        run: make build
+        run: cd api && make build
 
       - name: Setup database fixtures and run fastpath to populate the DB
-        run: make initdb
+        run: cd api && make initdb
 
       - name: Run all tests
         run: T="--show-capture=no -s -vv" make tests
