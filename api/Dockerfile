@@ -18,7 +18,7 @@ RUN ./ooni_download_geoip.py
 RUN rm -rf /scripts
 
 # Copy code and conf into the container
-COPY . /app/
+COPY * /app/
 # Set our work directory to our app directory
 WORKDIR /app/
 
