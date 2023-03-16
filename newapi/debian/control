@@ -1,0 +1,51 @@
+Source: ooni-api
+Section: python
+Priority: optional
+Maintainer: Federico Ceratto <federico@debian.org>
+Build-Depends: debhelper-compat (= 12),
+ dh-python,
+ dh-systemd (>= 1.5),
+ python3,
+ python3-boto3,
+ python3-lz4,
+ python3-psycopg2,
+ python3-setuptools,
+ python3-setproctitle,
+ python3-statsd,
+ python3-systemd,
+ python3-ujson
+Standards-Version: 4.5.1
+
+Package: ooni-api
+Architecture: all
+Depends: ${misc:Depends},
+ ${python3:Depends},
+ curl,
+ gunicorn3,
+ libjs-bootstrap4,
+ nginx | nginx-light,
+ python3-boto3,
+ python3-clickhouse-driver,
+ python3-filelock,
+ python3-flasgger,
+ python3-flask,
+ python3-flask-cors,
+ python3-flask-restful,
+ python3-geoip2,
+ python3-git,
+ python3-jwt,
+ python3-lmdb,
+ python3-lz4,
+ python3-psycopg2,
+ python3-setuptools,
+ python3-sqlalchemy,
+ python3-sqlalchemy-ext,
+ python3-sqlalchemy-utils,
+ python3-statsd,
+ python3-systemd,
+ python3-ujson,
+Suggests:
+ python3-freezegun,
+ python3-pytest
+Description: OONI API
+ OONI API

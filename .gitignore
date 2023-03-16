@@ -1,0 +1,25 @@
+.DS_Store
+*.py[co]
+__pycache__
+
+.coverage
+.cache/
+.idea/
+.state/
+.vscode/
+
+ooni_measurements.db
+/data/
+
+node_modules/
+package-lock.json
+
+# Travis secrets
+secrets/id_rsa_travis
+secrets/secrets.env
+secrets/secrets.tar
+config/secrets.env
+
+make.conf
+venv/
+.tox

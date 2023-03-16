@@ -1,0 +1,318 @@
+{
+  "128.31.0.39:9101": {
+    "address": "128.31.0.39:9101",
+    "name": "moria1",
+    "fingerprint": "9695DFC35FFEB861329B9F1AB04C46397020CE31",
+    "protocol": "or_port_dirauth"
+  },
+  "128.31.0.39:9131": {
+    "address": "128.31.0.39:9131",
+    "name": "moria1",
+    "fingerprint": "9695DFC35FFEB861329B9F1AB04C46397020CE31",
+    "protocol": "dir_port"
+  },
+  "86.59.21.38:443": {
+    "address": "86.59.21.38:443",
+    "name": "tor26",
+    "fingerprint": "847B1F850344D7876491A54892F904934E4EB85D",
+    "protocol": "or_port_dirauth"
+  },
+  "86.59.21.38:80": {
+    "address": "86.59.21.38:80",
+    "name": "tor26",
+    "fingerprint": "847B1F850344D7876491A54892F904934E4EB85D",
+    "protocol": "dir_port"
+  },
+  "45.66.33.45:443": {
+    "address": "45.66.33.45:443",
+    "name": "dizum",
+    "fingerprint": "7EA6EAD6FD83083C538F44038BBFA077587DD755",
+    "protocol": "or_port_dirauth"
+  },
+  "45.66.33.45:80": {
+    "address": "45.66.33.45:80",
+    "name": "dizum",
+    "fingerprint": "7EA6EAD6FD83083C538F44038BBFA077587DD755",
+    "protocol": "dir_port"
+  },
+  "66.111.2.131:9001": {
+    "address": "66.111.2.131:9001",
+    "name": "Serge",
+    "fingerprint": "BA44A889E64B93FAA2B114E02C2A279A8555C533",
+    "protocol": "or_port_dirauth"
+  },
+  "66.111.2.131:9030": {
+    "address": "66.111.2.131:9030",
+    "name": "Serge",
+    "fingerprint": "BA44A889E64B93FAA2B114E02C2A279A8555C533",
+    "protocol": "dir_port"
+  },
+  "131.188.40.189:443": {
+    "address": "131.188.40.189:443",
+    "name": "gabelmoo",
+    "fingerprint": "F2044413DAC2E02E3D6BCF4735A19BCA1DE97281",
+    "protocol": "or_port_dirauth"
+  },
+  "131.188.40.189:80": {
+    "address": "131.188.40.189:80",
+    "name": "gabelmoo",
+    "fingerprint": "F2044413DAC2E02E3D6BCF4735A19BCA1DE97281",
+    "protocol": "dir_port"
+  },
+  "193.23.244.244:443": {
+    "address": "193.23.244.244:443",
+    "name": "dannenberg",
+    "fingerprint": "7BE683E65D48141321C5ED92F075C55364AC7123",
+    "protocol": "or_port_dirauth"
+  },
+  "193.23.244.244:80": {
+    "address": "193.23.244.244:80",
+    "name": "dannenberg",
+    "fingerprint": "7BE683E65D48141321C5ED92F075C55364AC7123",
+    "protocol": "dir_port"
+  },
+  "171.25.193.9:80": {
+    "address": "171.25.193.9:80",
+    "name": "maatuska",
+    "fingerprint": "BD6A829255CB08E66FBE7D3748363586E46B3810",
+    "protocol": "or_port_dirauth"
+  },
+  "171.25.193.9:443": {
+    "address": "171.25.193.9:443",
+    "name": "maatuska",
+    "fingerprint": "BD6A829255CB08E66FBE7D3748363586E46B3810",
+    "protocol": "dir_port"
+  },
+  "154.35.175.225:443": {
+    "address": "154.35.175.225:443",
+    "name": "Faravahar",
+    "fingerprint": "CF6D0AAFB385BE71B8E111FC5CFF4B47923733BC",
+    "protocol": "or_port_dirauth"
+  },
+  "154.35.175.225:80": {
+    "address": "154.35.175.225:80",
+    "name": "Faravahar",
+    "fingerprint": "CF6D0AAFB385BE71B8E111FC5CFF4B47923733BC",
+    "protocol": "dir_port"
+  },
+  "199.58.81.140:443": {
+    "address": "199.58.81.140:443",
+    "name": "longclaw",
+    "fingerprint": "74A910646BCEEFBCD2E874FC1DC997430F968145",
+    "protocol": "or_port_dirauth"
+  },
+  "199.58.81.140:80": {
+    "address": "199.58.81.140:80",
+    "name": "longclaw",
+    "fingerprint": "74A910646BCEEFBCD2E874FC1DC997430F968145",
+    "protocol": "dir_port"
+  },
+  "204.13.164.118:443": {
+    "address": "204.13.164.118:443",
+    "name": "bastet",
+    "fingerprint": "24E2F139121D4394C54B5BCC368B3B411857C413",
+    "protocol": "or_port_dirauth"
+  },
+  "204.13.164.118:80": {
+    "address": "204.13.164.118:80",
+    "name": "bastet",
+    "fingerprint": "24E2F139121D4394C54B5BCC368B3B411857C413",
+    "protocol": "dir_port"
+  },
+  "3fa772a44e07856b4c70e958b2f6dc8a29450a823509d5dbbf8b884e7fb5bb9d": {
+    "address": "192.95.36.142:443",
+    "fingerprint": "CDF2E852BF539B82BD10E27E9115A31734E378C2",
+    "params": {
+      "cert": [
+        "qUVQ0srL1JI/vO6V6m/24anYXiJD3QP2HgzUKQtQ7GRqqUvs7P+tG43RtAqdhLOALP7DJQ"
+      ],
+      "iat-mode": [
+        "1"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "99e9adc8bba0d60982dbc655b5e8735d88ad788905c3713a39eff3224b617eeb": {
+    "address": "38.229.1.78:80",
+    "fingerprint": "C8CBDB2464FC9804A69531437BCF2BE31FDD2EE4",
+    "params": {
+      "cert": [
+        "Hmyfd2ev46gGY7NoVxA9ngrPF2zCZtzskRTzoWXbxNkzeVnGFPWmrTtILRyqCTjHR+s9dg"
+      ],
+      "iat-mode": [
+        "1"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "9d735c6e70512123ab2c2fe966446b2345b352c512e9fb359f4b1673236e4d4a": {
+    "address": "38.229.33.83:80",
+    "fingerprint": "0BAC39417268B96B9F514E7F63FA6FBA1A788955",
+    "params": {
+      "cert": [
+        "VwEFpk9F/UN9JED7XpG1XOjm/O8ZCXK80oPecgWnNDZDv5pdkhq1OpbAH0wNqOT6H6BmRQ"
+      ],
+      "iat-mode": [
+        "1"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "548eebff71da6128321c3bc1c3ec12b5bfff277ef5cde32709a33e207b57f3e2": {
+    "address": "37.218.245.14:38224",
+    "fingerprint": "D9A82D2F9C2F65A18407B1D2B764F130847F8B5D",
+    "params": {
+      "cert": [
+        "bjRaMrr1BRiAW8IE9U5z27fQaYgOhX1UCmOpg2pFpoMvo6ZgQMzLsaTzzQNTlm7hNcb+Sg"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "d2d6e34abeda851f7cd37138ffafcce992b2ccdb0f263eb90ab75d7adbd5eeba": {
+    "address": "85.31.186.98:443",
+    "fingerprint": "011F2599C0E9B27EE74B353155E244813763C3E5",
+    "params": {
+      "cert": [
+        "ayq0XzCwhpdysn5o0EyDUbmSOx3X/oTEbzDMvczHOdBJKlvIdHHLJGkZARtT4dcBFArPPg"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "b8de51da541ced804840b1d8fd24d5ff1cfdf07eae673dae38c2bc2cce594ddd": {
+    "address": "85.31.186.26:443",
+    "fingerprint": "91A6354697E6B02A386312F68D82CF86824D3606",
+    "params": {
+      "cert": [
+        "PBwr+S8JTVZo6MPdHnkTwXJPILWADLqfMGoVvhZClMq/Urndyd42BwX9YFJHZnBB3H0XCw"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "bc7bc5fb57052ee5252e807443b9ab67307dbdb5ce79187c4360182a300dd0f8": {
+    "address": "144.217.20.138:80",
+    "fingerprint": "FB70B257C162BF1038CA669D568D76F5B7F0BABB",
+    "params": {
+      "cert": [
+        "vYIV5MgrghGQvZPIi1tJwnzorMgqgmlKaB77Y3Z9Q/v94wZBOAXkW+fdx4aSxLVnKO+xNw"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "5aeb9e43b43fc8a809b8d25aae968395a5ceea0e677caaf56e1c0a2ba002f5b5": {
+    "address": "193.11.166.194:27015",
+    "fingerprint": "2D82C2E354D531A68469ADF7F878FA6060C6BACA",
+    "params": {
+      "cert": [
+        "4TLQPJrTSaDffMK7Nbao6LC7G9OW/NHkUwIdjLSS3KYf0Nv4/nQiiI8dY2TcsQx01NniOg"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "2d7292b5163fb7de5b24cd04032c93a2d4c454431de3a00b5a6d4a3309529e49": {
+    "address": "193.11.166.194:27020",
+    "fingerprint": "86AC7B8D430DAC4117E9F42C9EAED18133863AAF",
+    "params": {
+      "cert": [
+        "0LDeJH4JzMDtkJJrFphJCiPqKx7loozKN7VNfuukMGfHO0Z8OGdzHVkhVAOfo1mUdv9cMg"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "b7c0e3f183ad85a6686ec68344765cec57906b215e7b82a98a9ca013cb980efa": {
+    "address": "193.11.166.194:27025",
+    "fingerprint": "1AE2C08904527FEA90C4C4F8C1083EA59FBC6FAF",
+    "params": {
+      "cert": [
+        "ItvYZzW5tn6v3G4UnQa6Qz04Npro6e81AP70YujmK/KXwDFPTs3aHXcHp4n8Vt6w/bv8cA"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "4a330634c5d678887f0f7c299490af43a6ac9fa944a6cc2140ab264c9ec124a0": {
+    "address": "209.148.46.65:443",
+    "fingerprint": "74FAD13168806246602538555B5521A0383A1875",
+    "params": {
+      "cert": [
+        "ssH+9rP8dG2NLDN2XuFw63hIO/9MNNinLmxQDpVa+7kTOa9/m+tGWT1SmSYpQ9uTBGa6Hw"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "49116bf72d336bb8724fd3a06a5afa7bbd4e7baef35fbcdb9a98d13e702270ad": {
+    "address": "146.57.248.225:22",
+    "fingerprint": "10A6CD36A537FCE513A322361547444B393989F0",
+    "params": {
+      "cert": [
+        "K1gDtDAIcUfeLqbstggjIw2rtgIKqdIhUlHp82XRqNSq/mtAjp1BIC9vHKJ2FAEpGssTPw"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "75fe96d641a078fee06529af376d7f8c92757596e48558d5d02baa1e10321d10": {
+    "address": "45.145.95.6:27015",
+    "fingerprint": "C5B7CD6946FF10C5B3E89691A7D3F2C122D2117C",
+    "params": {
+      "cert": [
+        "TD7PbUO0/0k6xYHMPW3vJxICfkMZNdkRrb63Zhl5j9dW3iRGiCx0A7mPhe5T2EDzQ35+Zw"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "f855ba38d517d8589c16e1333ac23c6e516532cf036ab6f47b15030b40a3b6a6": {
+    "address": "[2a0c:4d80:42:702::1]:27015",
+    "fingerprint": "C5B7CD6946FF10C5B3E89691A7D3F2C122D2117C",
+    "params": {
+      "cert": [
+        "TD7PbUO0/0k6xYHMPW3vJxICfkMZNdkRrb63Zhl5j9dW3iRGiCx0A7mPhe5T2EDzQ35+Zw"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  },
+  "fa69b2ee7a7c8975af2452ecd566f67a6459d397a4cefc30be86a670675cdc23": {
+    "address": "51.222.13.177:80",
+    "fingerprint": "5EDAC3B810E12B01F6FD8050D2FD3E277B289A08",
+    "params": {
+      "cert": [
+        "2uplIpLQ0q9+0qMFrK5pkaYRDOe460LL9WHBvatgkuRr/SL31wBOEupaMMJ6koRE6Ld0ew"
+      ],
+      "iat-mode": [
+        "0"
+      ]
+    },
+    "protocol": "obfs4"
+  }
+}
+

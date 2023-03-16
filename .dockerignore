@@ -1,0 +1,7 @@
+.git/*
+.idea
+node_modules
+__pycache__
+*.pyc
+secrets/
+config/secrets.env

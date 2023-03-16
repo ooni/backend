@@ -1,0 +1,527 @@
+ooni-api (1.0.45) unstable; urgency=medium
+
+  * Expose ANS metadata
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 15 Mar 2023 10:51:18 +0000
+
+ooni-api (1.0.44) unstable; urgency=medium
+
+  * MAT: accept multiple values
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 08 Mar 2023 13:15:03 +0100
+
+ooni-api (1.0.43) unstable; urgency=medium
+
+  * Update test DB setup
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Mar 2023 09:23:06 +0100
+
+ooni-api (1.0.42) unstable; urgency=medium
+
+  * Fix keys for user reporting mechanism
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 21 Feb 2023 17:46:09 +0000
+
+ooni-api (1.0.41) unstable; urgency=medium
+
+  * Split account ID hashing / JWT secrets
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Feb 2023 14:40:57 +0000
+
+ooni-api (1.0.40) unstable; urgency=medium
+
+  * Implement round robin on 4 test helpers
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 15 Feb 2023 14:19:33 +0000
+
+ooni-api (1.0.39) unstable; urgency=medium
+
+  * Enable web connectivity 0.5 for more networks
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 10 Feb 2023 12:05:29 +0000
+
+ooni-api (1.0.38) unstable; urgency=medium
+
+  * Remove Tor and Psiphon confs from check-in
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 18 Jan 2023 12:54:46 +0000
+
+ooni-api (1.0.37) unstable; urgency=medium
+
+  * Add test-helpers data to check-in
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 13 Jan 2023 11:30:31 +0000
+
+ooni-api (1.0.35) unstable; urgency=medium
+
+  * Add feature flagging
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 09 Jan 2023 17:41:05 +0000
+
+ooni-api (1.0.34) unstable; urgency=medium
+
+  * Implement MAT granularity
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 18 Nov 2022 17:43:45 +0000
+
+ooni-api (1.0.33) unstable; urgency=medium
+
+  * Support Authorization Bearer header
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 25 Oct 2022 18:56:17 +0100
+
+ooni-api (1.0.32) unstable; urgency=medium
+
+  * Hide clickhouse stacktraces
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 24 Oct 2022 17:21:38 +0100
+
+ooni-api (1.0.31) unstable; urgency=medium
+
+  * Add probe registration/login metrics
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 14 Oct 2022 17:34:00 +0100
+
+ooni-api (1.0.30) unstable; urgency=medium
+
+  * Handle unsupported test list
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 13 Oct 2022 09:37:39 +0100
+
+ooni-api (1.0.29) unstable; urgency=medium
+
+  * Improve locking around citizenlab
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 07 Oct 2022 12:20:58 +0100
+
+ooni-api (1.0.28) unstable; urgency=medium
+
+  * Add LMDB support
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 08 Sep 2022 13:59:45 +0100
+
+ooni-api (1.0.27) unstable; urgency=medium
+
+  * Support filtering by ipaddr in aggregation
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 21 Sep 2022 13:36:20 +0100
+
+ooni-api (1.0.25) unstable; urgency=medium
+
+  * Implement measurement feedback
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 05 Sep 2022 16:16:01 +0100
+
+ooni-api (1.0.24) unstable; urgency=medium
+
+  * Update query priority, other fixes
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 02 Sep 2022 14:24:57 +0100
+
+ooni-api (1.0.22) unstable; urgency=medium
+
+  * Update robots.txt
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 01 Sep 2022 11:56:14 +0100
+
+ooni-api (1.0.21) unstable; urgency=medium
+
+  * Add query priority
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 31 Aug 2022 14:51:12 +0100
+
+ooni-api (1.0.20) unstable; urgency=medium
+
+  * Show computed priorities
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 29 Aug 2022 17:39:22 +0100
+
+ooni-api (1.0.19) unstable; urgency=medium
+
+  * Filter incoming queries better
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 17 Aug 2022 14:17:25 +0100
+
+ooni-api (1.0.17) unstable; urgency=medium
+
+  * Support redirect_to in registration
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 05 Aug 2022 15:13:19 +0100
+
+ooni-api (1.0.15) unstable; urgency=medium
+
+  * Reprocessing-related cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 27 Jun 2022 22:03:39 +0100
+
+ooni-api (1.0.14) unstable; urgency=medium
+
+  * Filter prioritization query by week, add debugging
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 23 Jun 2022 12:18:05 +0100
+
+ooni-api (1.0.13) unstable; urgency=medium
+
+  * Update check_report_id to return True
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 22 Jun 2022 16:20:04 +0100
+
+ooni-api (1.0.12) unstable; urgency=medium
+
+  * Use new test helpers for all traffic
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 16 Jun 2022 16:08:24 +0100
+
+ooni-api (1.0.11) unstable; urgency=medium
+
+  * Generate test-list using ASN
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 08 Jun 2022 12:57:38 +0100
+
+ooni-api (1.0.10) unstable; urgency=medium
+
+  * Improve get_account_metadata
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 01 Jun 2022 20:22:31 +0100
+
+ooni-api (1.0.9) unstable; urgency=medium
+
+  * Bump up version
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 24 May 2022 12:13:37 +0100
+
+ooni-api (1.0.8) unstable; urgency=medium
+
+  * Remove nickname
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 18 May 2022 19:36:21 +0100
+
+ooni-api (1.0.7) unstable; urgency=medium
+
+  * Remove PostgreSQL-related code
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 16 May 2022 13:43:09 +0100
+
+ooni-api (1.0.6) unstable; urgency=medium
+
+  * Check in: add support for returning probe_cc and probe_asn
+
+ -- Arturo Filasto <arturo@ooni.org>  Tue, 10 May 2022 15:17:40 +0000
+
+ooni-api (1.0.5) unstable; urgency=medium
+
+  * Add logout
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 12 May 2022 18:40:39 +0100
+
+ooni-api (1.0.4) unstable; urgency=medium
+
+  * Switch more networks to new test helper
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 24 Mar 2022 18:58:30 +0000
+
+ooni-api (1.0.3) unstable; urgency=medium
+
+  * Set HTTP content type in aggregation
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 11 May 2022 17:15:07 +0100
+
+ooni-api (1.0.2) unstable; urgency=medium
+
+  * Bump up version
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 01 Feb 2022 19:47:40 +0000
+
+ooni-api (1.0.1) unstable; urgency=medium
+
+  * Add stunreachability
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 27 Jan 2022 16:32:13 +0000
+
+ooni-api (1.0.0) unstable; urgency=medium
+
+  * Support Clickhouse
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 14 Oct 2021 18:11:37 +0100
+
+ooni-api (0.49.5) unstable; urgency=medium
+
+  * Uploader: write measurement UID in jsonl table
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 09 Dec 2021 14:30:40 +0000
+
+ooni-api (0.49) unstable; urgency=medium
+
+  * Fix logic of citizenlab URL submission backend
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Nov 2021 16:28:57 +0000
+
+ooni-api (0.48) unstable; urgency=medium
+
+  * Switch selected networks to new test helper
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 15 Nov 2021 13:41:56 +0000
+
+ooni-api (0.47) unstable; urgency=medium
+
+  * Bump up gunicorn workers
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Nov 2021 11:37:30 +0000
+
+ooni-api (0.46) unstable; urgency=medium
+
+  * Add debugging around PR opening
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 11 Oct 2021 14:20:17 +0100
+
+ooni-api (0.45) unstable; urgency=medium
+
+  * Fix category filtering
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 03 Sep 2021 18:34:11 +0100
+
+ooni-api (0.44) unstable; urgency=medium
+
+  * Fix prioritization
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 25 Aug 2021 21:04:25 +0100
+
+ooni-api (0.43) unstable; urgency=medium
+
+  * Add pluggable transport support
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 29 Jul 2021 14:22:37 +0100
+
+ooni-api (0.42) unstable; urgency=medium
+
+  * Set SameSite=None cookie
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 28 Jul 2021 17:24:14 +0100
+
+ooni-api (0.41) unstable; urgency=medium
+
+  * Improve tests
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 14 Jul 2021 18:52:42 +0100
+
+ooni-api (0.40) unstable; urgency=medium
+
+  * Fix worktree
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 20 Jul 2021 15:04:11 +0100
+
+ooni-api (0.39) unstable; urgency=medium
+
+  * Add test.ooni.org/io to CORS
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 19 Jul 2021 15:09:09 +0100
+
+ooni-api (0.38) unstable; urgency=medium
+
+  * More CORS
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 23 Jun 2021 22:21:20 +0100
+
+ooni-api (0.37) unstable; urgency=medium
+
+  * jsonl lookup bugfix
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 23 Jun 2021 13:26:36 +0100
+
+ooni-api (0.36) unstable; urgency=medium
+
+  * Configure CORS
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 21 Jun 2021 19:02:13 +0100
+
+ooni-api (0.35) unstable; urgency=medium
+
+  * Citizenlab: handle deletion, change format
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 14 Jun 2021 19:50:09 +0100
+
+ooni-api (0.34) unstable; urgency=medium
+
+  * Support reprocessed jsonl
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 14 Jun 2021 13:35:28 +0100
+
+ooni-api (0.33) unstable; urgency=medium
+
+  * More fixes for citizenlab URL submission
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 03 Jun 2021 17:28:47 +0100
+
+ooni-api (0.32) unstable; urgency=medium
+
+  * Fixes for citizenlab URL submission
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 03 Jun 2021 14:58:28 +0100
+
+ooni-api (0.31) unstable; urgency=medium
+
+  * Fix CORS
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 31 May 2021 13:50:04 +0100
+
+ooni-api (0.30) unstable; urgency=medium
+
+  * Switch to counters_test_list
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 26 May 2021 13:23:56 +0100
+
+ooni-api (0.29) unstable; urgency=medium
+
+  * Get logged user data
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 25 May 2021 16:42:05 +0100
+
+ooni-api (0.28) unstable; urgency=medium
+
+  * Serve Tor and Psiphon configuration
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 19 May 2021 15:49:39 +0100
+
+ooni-api (0.27) unstable; urgency=medium
+
+  * Implement login prototype
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 11 Mar 2021 20:10:31 +0000
+
+ooni-api (0.26) unstable; urgency=medium
+
+  * Better test-list generation metrics
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 08 Apr 2021 14:35:19 +0100
+
+ooni-api (0.25) unstable; urgency=medium
+
+  * Support Signal test
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 05 Apr 2021 19:23:24 +0100
+
+ooni-api (0.24) unstable; urgency=medium
+
+  * Pick the right msmt in _fetch_measurement_body_on_disk
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 19 Mar 2021 18:21:20 +0100
+
+ooni-api (0.23) unstable; urgency=medium
+
+  * Fix undefined log call in private API endpoint
+
+ -- Arturo Filasto <arturo@openobservatory.org>  Tue, 16 Mar 2021 14:38:02 +0000
+
+ooni-api (0.22) unstable; urgency=medium
+
+  * Fix aggregation input filter
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Mar 2021 13:51:02 +0000
+
+ooni-api (0.21) unstable; urgency=medium
+
+  * Improve API docs
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 09 Feb 2021 13:25:22 +0000
+
+ooni-api (0.20) unstable; urgency=medium
+
+  * Support legacy tests in _fetch_measurement_body
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 08 Feb 2021 13:25:01 +0000
+
+ooni-api (0.19) unstable; urgency=medium
+
+  * Fix pagination
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 26 Jan 2021 14:45:07 +0000
+
+ooni-api (0.18) unstable; urgency=medium
+
+  * Fix measurement uid timestamp
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 26 Jan 2021 14:44:54 +0000
+
+ooni-api (0.17) unstable; urgency=medium
+
+  * Improve check-in. [skip 0.16 as an experiment]
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 07 Jan 2021 19:00:37 +0000
+
+ooni-api (0.15) unstable; urgency=medium
+
+  * Bump up test-list/urls limit
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 14 Dec 2020 12:28:54 +0000
+
+ooni-api (0.14) unstable; urgency=medium
+
+  * Fix get_recent_test_coverage
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 04 Dec 2020 16:21:51 +0000
+
+ooni-api (0.13) unstable; urgency=medium
+
+  * add dnscheck, urlgetter experiment names
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 02 Dec 2020 16:12:30 +0000
+
+ooni-api (0.12) unstable; urgency=medium
+
+  * Add reactive test-lists
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 01 Dec 2020 12:03:46 +0000
+
+ooni-api (0.11) unstable; urgency=medium
+
+  * Add check-in API
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 25 Nov 2020 19:43:08 +0000
+
+ooni-api (0.10) unstable; urgency=medium
+
+  * Add riseupvpn test name
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 10 Nov 2020 20:56:26 +0000
+
+ooni-api (0.9) unstable; urgency=medium
+
+  * Update rate limits
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 09 Nov 2020 17:29:42 +0000
+
+ooni-api (0.7) unstable; urgency=medium
+
+  * Fix collector name
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 06 Nov 2020 13:02:10 +0000
+
+ooni-api (0.6) unstable; urgency=medium
+
+  * Reject AS=0 or cc=ZZ submissions
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 03 Nov 2020 12:55:17 +0000
+
+ooni-api (0.5) unstable; urgency=medium
+
+  * Hide ASN=0 from list_measurements
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 02 Nov 2020 17:10:15 +0000
+
+ooni-api (0.3) unstable; urgency=medium
+
+  * Bugfix
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 22 Oct 2020 17:48:37 +0100
+
+ooni-api (0.2) unstable; urgency=medium
+
+  * Tweak query
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 20 Oct 2020 16:09:09 +0100
+
+ooni-api (0.1) unstable; urgency=medium
+
+  * Initial version
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 12 Jun 2020 19:09:23 +0100

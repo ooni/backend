@@ -1,0 +1,10 @@
+
+=== New OONI API ===
+
+Haproxy (local or remote)
+ -> Nginx (provides TLS termination and proxy forwarding)
+  -> Gunicorn
+   -> API
+
+Deployed as ooni-api package
+Configured from /etc/ooni/api.conf

@@ -1,0 +1,12 @@
+[Unit]
+Description=Upload raw OONI measurements to S3
+Requires=ooni-api-uploader.service
+
+[Timer]
+Unit=ooni-api-uploader.service
+# run every hour at 10 minutes past the hour
+OnCalendar=*-*-* *:10
+#OnCalendar=*-*-* *:00/5
+
+[Install]
+WantedBy=timers.target

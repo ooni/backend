@@ -1,0 +1,12 @@
+[Unit]
+Description=Download geoip databases
+Requires=ooni-download-geoip.service
+
+[Timer]
+Unit=ooni-download-geoip.service
+OnActiveSec=0
+# run every week on Sunday
+OnCalendar=Sun *-*-* 00:00:00
+
+[Install]
+WantedBy=timers.target
