@@ -264,7 +264,12 @@ def render_blockdiag(diag: str) -> str:
     inp.flush()
     out = NamedTemporaryFile("r")
     cmd = ["/usr/bin/blockdiag3", "-T", "svg", "-o", out.name, inp.name]
-    check_call(cmd)
+    try:
+        check_call(cmd)
+    except Exception as e:
+        print(f"Unable to render diagram: {e}")
+        print(f"------ diagram code ------\n{diag}\n------- end ------")
+        sys.exit(1)
     svg = out.read()
     _, _, svg = svg.split("\n", 2)
     return svg
@@ -273,7 +278,8 @@ def render_blockdiag(diag: str) -> str:
 def process_diagrams(md: str) -> str:
     """Extract diagrams and replace them with SVG/PNG images"""
     out = ""
-    for block in md.split("\nblockdiag {"):
+    blocks = md.split("\nblockdiag {")[1:]
+    for block in blocks:
         try:
             diag, post = block.split("\n}", 1)
             diag = "blockdiag {\n" + diag + "\n}\n"
@@ -364,6 +370,7 @@ def main():
     elif markup_format == "markdown":
         print("Rendering MarkDown files")
         for f in glob_ext(ignored, "md"):
+            print(f"Reading {f}")
             md = f.read_text()
             md = process_diagrams(md)
             render_markdown(f, md)

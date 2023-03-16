@@ -1,3 +1,9 @@
+ooni-api (1.0.46) unstable; urgency=medium
+
+  * Test CI
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 16 Mar 2023 14:20:32 +0000
+
 ooni-api (1.0.45) unstable; urgency=medium
 
   * Expose ANS metadata

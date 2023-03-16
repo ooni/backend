@@ -1,13 +1,12 @@
 import os
-import os.path
 import pytest
 import sys
 import shutil
 import subprocess
 from datetime import date, timedelta
-from textwrap import dedent
-from subprocess import PIPE
 from pathlib import Path
+from textwrap import dedent
+from typing import List
 
 import flask
 from clickhouse_driver import Client as Clickhouse
@@ -94,7 +93,7 @@ def checkout_pipeline(tmpdir_factory):
     cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
     # cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch reprocessor-ch -q {d}"
     cmd = cmd.split()
-    runcmd(cmd, Path('.'))
+    runcmd(cmd, Path("."))
     return Path(d)
 
 
@@ -125,7 +124,7 @@ def _run_fastpath(fpdir: Path, start: str, end: str, limit: int) -> None:
     runcmd(cmd, fpdir)
 
 
-def runcmd(cmd: str,wd: Path) -> None:
+def runcmd(cmd: List[str], wd: Path) -> None:
     print("Running " + " ".join(cmd))
     p = subprocess.run(cmd, cwd=wd)
     if p.returncode != 0:
@@ -135,6 +134,7 @@ def runcmd(cmd: str,wd: Path) -> None:
         print(p.stdout)
         print("=" * 60)
         sys.exit(1)
+
 
 def run_fingerprint_update(log, pipeline_dir: Path, clickhouse_url: str) -> None:
     log.info("Importing fingerprints")
