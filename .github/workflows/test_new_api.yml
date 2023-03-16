@@ -28,7 +28,7 @@ jobs:
         run: cd api && make initdb
 
       - name: Run all tests
-        run: T="--show-capture=no -s -vv" make tests
+        run: cd api && T="--show-capture=no -s -vv" make tests
         #run: T="--show-capture=no -s -vv --junitxml=pytest.xml" make tests
 
       #- name: debug docker
