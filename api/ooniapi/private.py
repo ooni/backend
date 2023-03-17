@@ -937,9 +937,10 @@ def api_private_asnmeta() -> Response:
     org_name = res["org_name"] if res else "Unknown"
     return cachedjson("2h", org_name=org_name)
 
+
 @api_private_blueprint.route("/networks")
 def api_private_networks() -> Response:
-    """List all networks for which we have measurements
+    """List all networks that have measurements
     ---
     responses:
       200:
@@ -973,6 +974,7 @@ def api_private_networks() -> Response:
     except Exception as e:
         return jerror(str(e), v=0)
 
+
 @api_private_blueprint.route("/domains")
 def api_private_domains() -> Response:
     """List all the domains in the test-lists with their measurement count
@@ -981,19 +983,23 @@ def api_private_domains() -> Response:
       200:
         description: JSON object
     """
-
     # Nested ORDER BY cc ASC
     # is used to prioritize the category code of a domain in
     # the global list (cc=ZZ)
     q = """
-    SELECT
-    any(category_code),
-    domain FROM (
+    SELECT domain AS domain_name, category_code, measurement_count
+    FROM (
         SELECT domain, category_code
         FROM citizenlab
-        ORDER BY cc ASC
-    )
-    GROUP BY domain
+        GROUP BY domain, category_code
+    ) AS cz
+    LEFT JOIN (
+        SELECT domain, count() AS measurement_count
+        FROM fastpath
+        GROUP BY domain
+    ) AS fp
+    ON (fp.domain == cz.domain)
+    ORDER BY domain_name
     """
     try:
         results = query_click(sql.text(q), {})
