@@ -31,8 +31,8 @@ from sqlalchemy import sql as sa
 
 from ooniapi.config import metrics
 from ooniapi.database import query_click
-from ooniapi.measurements import param_asn, _convert_to_csv
-from ooniapi.utils import cachedjson
+from ooniapi.urlparams import param_asn
+from ooniapi.utils import cachedjson, convert_to_csv
 
 prio_bp = Blueprint("prio", "probe_services_prio")
 
@@ -390,7 +390,7 @@ def show_countries_prioritization() -> Response:
     param = request.args.get
     resp_format = param("format", "JSON").upper()
     if resp_format == "CSV":
-        csv_data = _convert_to_csv(li)
+        csv_data = convert_to_csv(li)
         response = make_response(csv_data)
         response.headers["Content-Type"] = "text/csv"
         return response
