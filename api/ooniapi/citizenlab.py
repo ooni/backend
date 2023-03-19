@@ -794,7 +794,6 @@ def post_propose_changes() -> Response:
 
 
 @cz_blueprint.route("/api/_/url-priorities/list", methods=["GET"])
-@role_required(["admin"])
 def list_url_priorities() -> Response:
     """List URL priority rules
     ---
