@@ -13,6 +13,7 @@ from flask.json import jsonify
 from ooniapi.auth import auth_blueprint
 from ooniapi.citizenlab import cz_blueprint
 from ooniapi.private import api_private_blueprint
+from ooniapi.aggregation import aggregation_blueprint
 from ooniapi.measurements import api_msm_blueprint
 from ooniapi.pages import pages_blueprint
 from ooniapi.probe_services import probe_services_blueprint
@@ -21,7 +22,7 @@ from ooniapi.prio import prio_bp
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 
-#def render_problem_exception(exception):
+# def render_problem_exception(exception):
 #    response = exception.to_problem()
 #    return FlaskApi.get_response(response)
 
@@ -46,6 +47,7 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 #    )
 #    return FlaskApi.get_response(response)
 
+
 def render_generic_exception(exception):
     """Log a traceback and return code 500 with a simple JSON
     The CORS header is set as usual. Without this, an error could lead to browsers
@@ -53,9 +55,7 @@ def render_generic_exception(exception):
     """
     # TODO: render_template 500.html instead?
     current_app.logger.error(f"Exception: {exception}")
-    current_app.logger.error(
-        "".join(traceback.format_tb(exception.__traceback__))
-    )
+    current_app.logger.error("".join(traceback.format_tb(exception.__traceback__)))
     try:
         return make_response(jsonify(error=str(exception)), 500)
     except:
@@ -69,13 +69,10 @@ def page_not_found(e):
 def bad_request(e):
     return render_template("400.html", exception=e), 400
 
+
 def register(app):
-
-    #app.register_blueprint(api_docs_blueprint, url_prefix="/api")
-
-    # Measurements API:
+    app.register_blueprint(aggregation_blueprint, url_prefix="/api")
     app.register_blueprint(api_msm_blueprint, url_prefix="/api")
-    #app.register_blueprint(connexion_api.blueprint)
     app.register_blueprint(auth_blueprint, url_prefix="")
     app.register_blueprint(cz_blueprint, url_prefix="")
 
@@ -89,9 +86,7 @@ def register(app):
     app.register_blueprint(probe_services_blueprint, url_prefix="")
     app.register_blueprint(prio_bp, url_prefix="")
 
-
     if "PYTEST_CURRENT_TEST" not in os.environ:
-
         app.register_error_handler(Exception, render_generic_exception)
         app.errorhandler(404)(page_not_found)
         app.errorhandler(400)(bad_request)
