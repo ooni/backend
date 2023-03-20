@@ -37,7 +37,6 @@ from urllib.parse import urljoin, urlencode
 from ooniapi.auth import role_required, get_account_id_or_none
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson, nocachejson, jerror
-from ooniapi.models import TEST_NAMES
 from ooniapi.database import query_click, query_click_one_row
 
 from flask import Blueprint
@@ -981,9 +980,6 @@ def param_test_name_m(name) -> List[str]:
     validate(p, accepted)
     out = [i for i in p.split(",") if i != ""]
     out = sorted(set(out))
-    for tn in out:
-        if tn not in TEST_NAMES:
-            raise ValueError(f"Invalid test name '{tn}'")
     return out
 
 

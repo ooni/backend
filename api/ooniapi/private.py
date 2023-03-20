@@ -112,7 +112,7 @@ def api_private_test_names() -> Response:
       '200':
         description: TODO
     """
-    # TODO: merge this and models.py:TEST_GROUPS
+    # TODO: eventually drop this, once we see nobody is using it
     TEST_NAMES = {
         "bridge_reachability": "Bridge Reachability",
         "dash": "DASH",
@@ -936,3 +936,73 @@ def api_private_asnmeta() -> Response:
     res = query_click_one_row(sql.text(q), dict(asn=asn))
     org_name = res["org_name"] if res else "Unknown"
     return cachedjson("2h", org_name=org_name)
+
+
+@api_private_blueprint.route("/networks")
+def api_private_networks() -> Response:
+    """List all networks that have measurements
+    ---
+    responses:
+      200:
+        description: JSON object
+    """
+    q = """
+    SELECT probe_asn, cnt, org_name FROM (
+        SELECT
+        COUNT() as cnt,
+        probe_asn
+        FROM fastpath
+        GROUP BY probe_asn
+    ) as cnts
+
+    LEFT JOIN (
+        SELECT
+        any(org_name) as org_name,
+        asn
+        FROM (
+            SELECT org_name, asn
+            FROM asnmeta
+            ORDER BY changed DESC
+        )
+        GROUP BY asn
+    ) as asorgs
+    ON (asorgs.asn = cnts.probe_asn)
+    """
+    try:
+        results = query_click(sql.text(q), {})
+        return cachedjson("2h", v=0, results=results)
+    except Exception as e:
+        return jerror(str(e), v=0)
+
+
+@api_private_blueprint.route("/domains")
+def api_private_domains() -> Response:
+    """List all the domains in the test-lists with their measurement count
+    ---
+    responses:
+      200:
+        description: JSON object
+    """
+    # Nested ORDER BY cc ASC
+    # is used to prioritize the category code of a domain in
+    # the global list (cc=ZZ)
+    q = """
+    SELECT domain AS domain_name, category_code, measurement_count
+    FROM (
+        SELECT domain, category_code
+        FROM citizenlab
+        GROUP BY domain, category_code
+    ) AS cz
+    LEFT JOIN (
+        SELECT domain, count() AS measurement_count
+        FROM fastpath
+        GROUP BY domain
+    ) AS fp
+    ON (fp.domain == cz.domain)
+    ORDER BY domain_name
+    """
+    try:
+        results = query_click(sql.text(q), {})
+        return cachedjson("2h", v=0, results=results)
+    except Exception as e:
+        return jerror(str(e), v=0)

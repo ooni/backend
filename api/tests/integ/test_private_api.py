@@ -319,4 +319,26 @@ def test_private_api_circumvention_runtime_stats(client, log):
 
 def test_private_api_ansmeta(client, log):
     resp = privapi(client, "asnmeta?asn=0")
-    assert resp == {'org_name': 'Unknown'}
+    assert resp == {"org_name": "Unknown"}
+
+
+# # /networks
+
+
+def test_private_api_networks(client, log):
+    resp = privapi(client, "networks")
+    assert resp["v"] == 0
+    assert len(resp["results"]) > 50
+    assert resp["results"][0] == {"cnt": 380, "org_name": "", "probe_asn": 58224}
+
+
+# # /domains
+
+
+def test_private_api_domains(client, log):
+    resp = privapi(client, "domains")
+    assert resp["v"] == 0
+    rows = resp["results"]
+    assert len(rows) > 5
+    assert sorted(rows[0]) == ["category_code", "domain_name", "measurement_count"]
+    assert "twitter.com" in [r["domain_name"] for r in rows]
