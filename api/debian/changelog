@@ -1,3 +1,9 @@
+ooni-api (1.0.48) unstable; urgency=medium
+
+  * Cleanup
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Mar 2023 11:49:12 +0000
+
 ooni-api (1.0.47) unstable; urgency=medium
 
   * Add domains and networks endpoints
