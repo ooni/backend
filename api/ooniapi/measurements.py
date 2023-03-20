@@ -527,31 +527,6 @@ def list_measurements() -> Response:
         in: query
         type: string
         description: The name of the test
-        enum:
-        - bridge_reachability
-        - dash
-        - dns_consistency
-        - dnscheck
-        - facebook_messenger
-        - http_header_field_manipulation
-        - http_host
-        - http_invalid_request_line
-        - http_requests
-        - meek_fronted_requests_test
-        - multi_protocol_traceroute
-        - ndt
-        - psiphon
-        - riseupvpn
-        - signal
-        - stunreachability
-        - tcp_connect
-        - telegram
-        - tor
-        - torsf
-        - urlgetter
-        - vanilla_tor
-        - web_connectivity
-        - whatsapp
       - name: category_code
         in: query
         type: string
