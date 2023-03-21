@@ -1,7 +1,4 @@
-import os
 import pytest
-import sys
-import shutil
 import subprocess
 from datetime import date, timedelta
 from pathlib import Path
@@ -73,32 +70,7 @@ def pytest_configure(config):
     pytest.inject_msmts = config.getoption("--inject-msmts")
 
 
-@pytest.fixture(scope="session")
-def setup_database_part_1():
-    # Create database and users.
-    # Executed as a dependency of setup_database_part_2
-    # Drop and recreate database if exists.
-    if not pytest.create_db:
-        return
-
-
-@pytest.fixture(scope="session")
-def checkout_pipeline(tmpdir_factory):
-    """Clone pipeline repo to then run fastpath from S3 and citizenlab importer"""
-    if not pytest.create_db and not pytest.inject_msmts:
-        return
-    d = tmpdir_factory.mktemp("pipeline")
-    if d.isdir():
-        shutil.rmtree(d)
-    cmd = f"git clone --depth 1 https://github.com/ooni/pipeline -q {d}"
-    # cmd = f"git clone --depth 1 https://github.com/ooni/pipeline --branch reprocessor-ch -q {d}"
-    cmd = cmd.split()
-    runcmd(cmd, Path("."))
-    return Path(d)
-
-
 def run_clickhouse_sql_scripts(app):
-    log = app.logger
     clickhouse_url = app.config["CLICKHOUSE_URL"]
     click = Clickhouse.from_url(clickhouse_url)
     tables = click.execute("SHOW TABLES")
@@ -126,19 +98,22 @@ def _run_fastpath(fpdir: Path, start: str, end: str, limit: int) -> None:
 
 def runcmd(cmd: List[str], wd: Path) -> None:
     print("Running " + " ".join(cmd))
-    p = subprocess.run(cmd, cwd=wd)
+    try:
+        p = subprocess.run(cmd, cwd=wd)
+    except Exception as e:
+        pytest.exit(e, returncode=1)
     if p.returncode != 0:
         print("=" * 60)
         print(p.stderr)
         print("=" * 60)
         print(p.stdout)
         print("=" * 60)
-        sys.exit(1)
+        pytest.exit("error", returncode=1)
 
 
-def run_fingerprint_update(log, pipeline_dir: Path, clickhouse_url: str) -> None:
+def run_fingerprint_update(log, repo_dir: Path, clickhouse_url: str) -> None:
     log.info("Importing fingerprints")
-    rdir = pipeline_dir / "af" / "analysis"
+    rdir = repo_dir / "analysis"
     runner = rdir / "run_analysis"
     cmd = [
         runner.as_posix(),
@@ -150,9 +125,9 @@ def run_fingerprint_update(log, pipeline_dir: Path, clickhouse_url: str) -> None
     runcmd(cmd, rdir)
 
 
-def run_fastpath(log, pipeline_dir: Path, clickhouse_url: str) -> None:
+def run_fastpath(log, repo_dir: Path, clickhouse_url: str) -> None:
     """Run fastpath from S3"""
-    fpdir = pipeline_dir / "af" / "fastpath"
+    fpdir = repo_dir / "fastpath"
     conffile = fpdir / "etc/ooni/fastpath.conf"
     conffile.parent.mkdir(parents=True)
     conf = f"""
@@ -179,7 +154,7 @@ def run_fastpath(log, pipeline_dir: Path, clickhouse_url: str) -> None:
 
 
 @pytest.fixture(autouse=True, scope="session")
-def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
+def setup_database(app):
     # Create tables, indexes and so on
     # This part needs the "app" object
     if not pytest.create_db:
@@ -189,8 +164,9 @@ def setup_database_part_2(setup_database_part_1, app, checkout_pipeline):
     assert any([x in clickhouse_url for x in ("localhost", "clickhouse")])
     log = app.logger
     run_clickhouse_sql_scripts(app)
-    run_fingerprint_update(log, checkout_pipeline, clickhouse_url)
-    run_fastpath(log, checkout_pipeline, clickhouse_url)
+    repo_dir = Path("/repo")  # see docker-compose.yml
+    run_fingerprint_update(log, repo_dir, clickhouse_url)
+    run_fastpath(log, repo_dir, clickhouse_url)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -201,7 +177,7 @@ def connect_to_clickhouse(app):
 
 
 @pytest.fixture(autouse=True, scope="session")
-def inject_msmts(app, checkout_pipeline):
+def inject_msmts(app):
     if not pytest.inject_msmts:
         return
 

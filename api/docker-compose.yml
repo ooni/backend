@@ -20,6 +20,7 @@ services:
     command: gunicorn3 --reuse-port ooniapi.wsgi -b 0.0.0.0:8000
     volumes:
       - ./:/app
+      - ../:/repo
     ports:
       - "8000:8000"
     depends_on:
