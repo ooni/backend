@@ -647,7 +647,7 @@ def test_score_browser_web():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"browser_name": "chrome"},
+        "extra": {"browser_name": "chrome", "load_time_ms": 357.40000000037253},
     }
 
 
@@ -660,7 +660,7 @@ def test_score_browser_web_error():
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
-        "extra": {"browser_name": "chrome"},
+        "extra": {"browser_name": "chrome", "load_time_ms": 680},
     }
 
 

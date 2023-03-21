@@ -188,7 +188,7 @@ def test_score_browser_web(fprints):
             "probe_asn": 577,
             "probe_cc": "CA",
             "report_id": "20230320T182635Z_browserweb_CA_577_n1_k3Fvk1o9okE1w7w7",
-            "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"extra":{"browser_name":"chrome"}}',
+            "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"extra":{"browser_name":"chrome","load_time_ms":357.40000000037253}}',
             "software_name": "ooniprobe-web",
             "software_version": "0.1.0",
             "test_name": "browser_web",

@@ -1462,7 +1462,8 @@ def score_browser_web(msm: dict) -> dict:
         scores["accuracy"] = 0.0
 
     bn = g_or(tk, "browser_name", "")
-    scores["extra"] = dict(browser_name=bn)
+    lt = g_or(tk, "load_time_ms", 0)
+    scores["extra"] = dict(browser_name=bn, load_time_ms=lt)
 
     return scores
 
