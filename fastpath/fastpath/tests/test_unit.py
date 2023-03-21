@@ -635,6 +635,35 @@ def test_score_openvpn():
     }
 
 
+# # test_name: browser_web
+
+
+def test_score_browser_web():
+    msm = loadj("browser_web")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "extra": {"browser_name": "chrome"},
+    }
+
+
+def test_score_browser_web_error():
+    msm = loadj("browser_web_error")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "extra": {"browser_name": "chrome"},
+    }
+
+
 # # Bug tests
 
 

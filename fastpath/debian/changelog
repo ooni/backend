@@ -1,3 +1,9 @@
+fastpath (0.72) unstable; urgency=medium
+
+  * Support browser_web tests
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 20 Mar 2023 18:34:15 +0000
+
 fastpath (0.71) unstable; urgency=medium
 
   * Bugfix on fingerprint update and logging
