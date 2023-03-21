@@ -1,0 +1,20 @@
+{
+  "software_name": "ooniprobe-web",
+  "software_version": "0.1.0",
+  "test_start_time": "2023-03-20 18:26:35",
+  "test_name": "browser_web",
+  "test_version": "0.1.0",
+  "data_format_version": "0.2.0",
+  "report_id": "20230320T182635Z_browserweb_CA_577_n1_k3Fvk1o9okE1w7w7",
+  "measurement_start_time": "2023-03-20 18:27:13",
+  "probe_asn": "AS577",
+  "probe_cc": "CA",
+  "probe_network_name": "Bell Canada",
+  "input": "https://app.wire.com/",
+  "test_runtime": 0.68,
+  "test_keys": {
+    "result": "error",
+    "load_time_ms": 680,
+    "browser_name": "chrome"
+  }
+}

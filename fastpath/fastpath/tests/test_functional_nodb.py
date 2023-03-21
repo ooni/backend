@@ -155,6 +155,50 @@ def test_score_web_connectivity_bug_610_2(fprints):
     ]
 
 
+def test_score_browser_web(fprints):
+    msm = loadj("browser_web")
+    core.process_measurement((None, msm, "bogus_uid"))
+
+    exe = fastpath.db.click_client.execute
+    assert exe.called_once
+    query, qparams = exe.call_args[0]
+    query = query.replace("\n", " ").replace("  ", " ")
+    query_exp = (
+        "INSERT INTO fastpath ( measurement_uid, report_id, input, "
+        "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
+        "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
+        "software_version, test_version, test_runtime, architecture, engine_name, "
+        "engine_version ) VALUES "
+    )
+    assert query == query_exp
+    assert qparams == [
+        {
+            "anomaly": "f",
+            "architecture": "",
+            "blocking_type": "",
+            "confirmed": "f",
+            "domain": "www.viber.com",
+            "engine_name": "",
+            "engine_version": "",
+            "input": "https://www.viber.com/",
+            "measurement_start_time": datetime.datetime(2023, 3, 20, 18, 27, 2),
+            "measurement_uid": "bogus_uid",
+            "msm_failure": "f",
+            "platform": "",
+            "probe_asn": 577,
+            "probe_cc": "CA",
+            "report_id": "20230320T182635Z_browserweb_CA_577_n1_k3Fvk1o9okE1w7w7",
+            "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"extra":{"browser_name":"chrome","load_time_ms":357.40000000037253}}',
+            "software_name": "ooniprobe-web",
+            "software_version": "0.1.0",
+            "test_name": "browser_web",
+            "test_runtime": 0.35740000000037253,
+            "test_start_time": datetime.datetime(2023, 3, 20, 18, 26, 35),
+            "test_version": "0.1.0",
+        },
+    ]
+
+
 # # observations
 
 

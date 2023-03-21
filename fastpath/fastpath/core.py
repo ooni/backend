@@ -1449,6 +1449,26 @@ def score_openvpn(msm: dict) -> dict:
     return scores
 
 
+def score_browser_web(msm: dict) -> dict:
+    # https://github.com/ooni/spec/blob/master/nettests/ts-036-browser_web.md
+    scores = init_scores()
+    tk = g_or(msm, "test_keys", {})
+    res = g_or(tk, "result", "")
+    if res == "ok":
+        pass
+    elif res == "error":
+        scores["blocking_general"] = 1.0
+    else:
+        scores["accuracy"] = 0.0
+
+    bn = g_or(tk, "browser_name", "")
+    lt = g_or(tk, "load_time_ms", 0)
+    scores["extra"] = dict(browser_name=bn, load_time_ms=lt)
+
+    return scores
+
+
+
 @metrics.timer("score_measurement")
 def score_measurement(msm: dict) -> dict:
     """Calculates measurement scoring. Returns a scores dict"""
@@ -1497,6 +1517,8 @@ def score_measurement(msm: dict) -> dict:
             return score_riseupvpn(msm)
         if tn == "openvpn":
             return score_openvpn(msm)
+        if tn == "browser_web":
+            return score_browser_web(msm)
 
         log.debug("Unsupported test name %s", tn)
         scores = init_scores()
