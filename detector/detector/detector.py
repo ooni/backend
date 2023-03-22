@@ -26,10 +26,12 @@ the blocking_* DB tables.
 # debdeps: python3-setuptools
 
 from argparse import ArgumentParser
-from configparser import ConfigParser
+
+# from configparser import ConfigParser
 from datetime import datetime, timedelta
 from pathlib import Path
 from site import getsitepackages
+from typing import Generator, Tuple, Optional, Any, Dict
 from urllib.parse import urlunsplit, urlencode
 import logging
 import os
@@ -40,18 +42,29 @@ import ujson  # debdeps: python3-ujson
 import feedgenerator  # debdeps: python3-feedgenerator
 import statsd  # debdeps: python3-statsd
 
+import pandas as pd  # debdeps: python3-pandas
+import numpy as np  # debdeps: python3-numpy
+
 from clickhouse_driver import Client as Clickhouse
+
+try:
+    from tqdm import tqdm
+except ImportError:
+
+    def tqdm(x):  # type: ignore
+        return x
 
 
 log = logging.getLogger("detector")
 metrics = statsd.StatsClient("localhost", 8125, prefix="detector")
 
-PKGDIR = getsitepackages()[-1]
 DBURI = "clickhouse://detector:detector@localhost/default"
+TCAI = ["test_name", "probe_cc", "probe_asn", "input"]
+tTCAI = ["t", "test_name", "probe_cc", "probe_asn", "input"]
 
-conf = None
-click = None
-cc_to_country_name = None  # set by load_country_name_map
+conf: Any = None
+click: Clickhouse = None
+cc_to_country_name: Dict[str, str] = {}  # CC-> name, see load_country_name_map
 
 
 def query(*a, **kw):
@@ -63,11 +76,11 @@ def query(*a, **kw):
     return click.execute(*a, settings=settings, **kw)
 
 
-def parse_date(d):
-    return datetime.strptime(d, "%Y-%m-%d")
+def parse_date(d: str) -> datetime:
+    return datetime.strptime(d, "%Y-%m-%d %H:%M")
 
 
-def setup_dirs(root):
+def setup_dirs(root: Path) -> None:
     """Setup directories, creating them if needed"""
     conf.vardir = root / "var/lib/detector"
     conf.outdir = conf.vardir / "output"
@@ -94,13 +107,13 @@ def setup():
     os.environ["TZ"] = "UTC"
     global conf
     ap = ArgumentParser(__doc__)
-    # FIXME args used for debugging
+    # TODO cleanup args used for debugging
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("-v", action="store_true", help="High verbosity")
     ap.add_argument("--reprocess", action="store_true", help="Reprocess events")
     ap.add_argument("--start-date", type=lambda d: parse_date(d))
     ap.add_argument("--end-date", type=lambda d: parse_date(d))
-    ap.add_argument("--interval-mins", type=int, default=10)
+    ap.add_argument("--interval-mins", type=int, default=60)
     ap.add_argument("--db-uri", default=DBURI, help="Database hostname")
     conf = ap.parse_args()
     if conf.devel:
@@ -114,17 +127,22 @@ def setup():
     conf.interval = timedelta(minutes=conf.interval_mins)
     # Run inside current directory in devel mode
     root = Path(os.getcwd()) if conf.devel else Path("/")
-    conf.conffile = root / "etc/ooni/detector.conf"
     setup_dirs(root)
-    if 0:  # TODO
-        log.info("Using conf file %r", conf.conffile.as_posix())
-        cp = ConfigParser()
-        with open(conf.conffile) as f:
-            cp.read_file(f)
-            conf.db_uri = conf.db_uri or cp["DEFAULT"]["clickhouse_url"]
+    # conf.conffile = root / "etc/ooni/detector.conf"
+    # log.info("Using conf file %r", conf.conffile.as_posix())
+    # cp = ConfigParser()
+    # with open(conf.conffile) as f:
+    #     cp.read_file(f)
+    #     conf.db_uri = conf.db_uri or cp["DEFAULT"]["clickhouse_url"]
 
 
-def explorer_mat_url(test_name, inp, probe_cc, probe_asn, t) -> str:
+# # RSS feed generation
+
+
+def explorer_mat_url(
+    test_name: str, inp: str, probe_cc: str, probe_asn: int, t: datetime
+) -> str:
+    """Generates a link to the MAT to display an event"""
     since = str(t - timedelta(days=7))
     until = str(t + timedelta(days=7))
     p = dict(
@@ -148,54 +166,76 @@ def write_feed(feed, p: Path) -> None:
 
 
 @metrics.timer("generate_rss_feed")
-def generate_rss_feed(events):
-    """Generate RSS feed into /var/lib/detector/rss/<fname>.xml"""
-    # The files are served by Nginx
+def generate_rss_feed(events: pd.DataFrame, update_time: datetime) -> Tuple[str, Path]:
+    """
+    Generate RSS feed for a single TCAI into /var/lib/detector/rss/<fname>.xml
+    The files are then served by Nginx
+    """
+    x = events.iloc[0]
+    minp = x.input.replace("://", "_").replace("/", "_")
+    fname = f"{x.test_name}-{x.probe_cc}-AS{x.probe_asn}-{minp}"
+    log.info(f"Generating feed for {fname}. {len(events)} events.")
+
     feed = feedgenerator.Rss201rev2Feed(
         title="OONI events",
         link="https://explorer.ooni.org",
         description="Blocked services and websites detected by OONI",
         language="en",
     )
-    for test_name, inp, probe_cc, probe_asn, status, time in events:
-        # country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
-        status2 = "unblocked" if status == "OK" else "blocked"
-        link = explorer_mat_url(test_name, inp, probe_cc, probe_asn, time)
+    for e in events.itertuples():
+        cc = e.probe_cc.upper()
+        country = cc_to_country_name.get(cc, cc)
+        status2 = "unblocked" if e.status == "OK" else "blocked"
+        link = explorer_mat_url(e.test_name, e.input, e.probe_cc, e.probe_asn, e.time)
         feed.add_item(
-            title=f"{inp} {status2} in {probe_cc} AS{probe_asn}",
+            title=f"{e.input} {status2} in {e.probe_cc} AS{e.probe_asn}",
             link=link,
-            description=f"Change detected on {time}",
-            pubdate=time,
-            updateddate=datetime.utcnow(),
+            description=f"Change detected on {e.time}",
+            pubdate=e.time,
+            updateddate=update_time,
         )
 
-    return feed.writeString("utf-8")
+    path = conf.rssdir / f"{fname}.xml"
+    return feed.writeString("utf-8"), path
 
 
 @metrics.timer("rebuild_feeds")
-def rebuild_feeds(changes):
-    """Rebuild whole feeds"""
+def rebuild_feeds(events: pd.DataFrame) -> int:
+    """Rebuild whole feeds for each TCAI"""
+    # When generated in real time "events" only contains the recent events for
+    # each TCAI. We need the full history.
     # Changes are rare enough that running a query on blocking_events for each
-    # changes is not too heavy
-    sql = """SELECT test_name, input, probe_cc, probe_asn, status, time
+    # change is not too heavy
+    cnt = 0
+    sql = """SELECT test_name, probe_cc, probe_asn, input, time, status
         FROM blocking_events
         WHERE test_name = %(test_name)s AND input = %(inp)s
         AND probe_cc = %(cc)s AND probe_asn = %(asn)s
         ORDER BY time
     """
-    for test_name, inp, probe_cc, probe_asn in changes:
-        d = dict(test_name=test_name, inp=inp, cc=probe_cc, asn=probe_asn)
-        events = query(sql, d)
-        # FIXME: add test_name and input
-        fname = f"{probe_cc}-AS{probe_asn}"
-        log.info(f"Generating feed for {fname}")
-        feed = generate_rss_feed(events)
-        write_feed(feed, conf.rssdir / f"{fname}.xml")
+    unique_tcais = events[TCAI].drop_duplicates()
+    update_time = datetime.utcnow()
+    for x in unique_tcais.itertuples():
+        d = dict(test_name=x.test_name, inp=x.input, cc=x.probe_cc, asn=x.probe_asn)
+        history = click.query_dataframe(sql, d)
+        if len(history):
+            feed_data, path = generate_rss_feed(history, update_time)
+            write_feed(feed_data, path)
+            cnt += len(history)
+
+    return cnt
 
 
-def load_country_name_map():
-    """Load country-list.json and create a lookup dictionary"""
-    fi = f"{PKGDIR}/detector/data/country-list.json"
+# # Initialization
+
+
+def load_country_name_map(devel: bool) -> dict:
+    """Loads country-list.json and creates a lookup dictionary"""
+    if devel:
+        fi = "data/country-list.json"
+    else:
+        pkgdir = getsitepackages()[-1]
+        fi = f"{pkgdir}/detector/data/country-list.json"
     log.info("Loading %s", fi)
     with open(fi) as f:
         clist = ujson.load(f)
@@ -259,234 +299,130 @@ SETTINGS index_granularity = 4
     query("GRANT SELECT ON * TO detector")
 
 
-@metrics.timer("rebuild_status")
-def rebuild_status(click, start_date, end_date, services) -> None:
-    log.info("Truncate blocking_status")
-    sql = "TRUNCATE TABLE blocking_status"
-    query(sql)
+def reprocess_inner(
+    gen, time_slots_cnt: int, collect_hist=False
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    #    df = pd.DataFrame({'Courses': pd.Series(dtype='str'),
+    #                   'Fee': pd.Series(dtype='int'),
+    #                   'Duration': pd.Series(dtype='str'),
+    #                   'Discount': pd.Series(dtype='float')})
+    status = pd.DataFrame(
+        columns=[
+            "status",
+            "old_status",
+            "change",
+            "stability",
+            "test_name",
+            "probe_cc",
+            "probe_asn",
+            "input",
+            "accessible_perc",
+            "cnt",
+            "confirmed_perc",
+            "pure_anomaly_perc",
+        ]
+    )
+    status.set_index(TCAI, inplace=True)
+    events_tmp = []
+    status_history_tmp = []
 
-    log.info("Truncate blocking_events")
-    sql = "TRUNCATE TABLE blocking_events"
-    query(sql)
+    log.info(f"Processing {time_slots_cnt} time slots")
+    for new in tqdm(gen, total=time_slots_cnt):
+        assert "Unnamed: 0" not in sorted(new.columns), sorted(new.columns)
+        # assert new.index.names == TCAI, new.index.names
+        status, events = process_data(status, new)
+        if events is not None and len(events):
+            events_tmp.append(events)
+        if collect_hist:
+            status_history_tmp.append(status)
 
-    log.info("Fill status")
-    sql = """
-INSERT INTO blocking_status (test_name, input, probe_cc, probe_asn,
-  confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status)
-  SELECT
-    test_name,
-    input,
-    probe_cc,
-    probe_asn,
-    (countIf(confirmed = 't') * 100) / cnt AS confirmed_perc,
-    ((countIf(anomaly = 't') * 100) / cnt) - confirmed_perc AS pure_anomaly_perc,
-    (countIf(anomaly = 'f') * 100) / cnt AS accessible_perc,
-    count() AS cnt,
-    multiIf(
-        accessible_perc < 70, 'BLOCKED',
-        accessible_perc > 90, 'OK',
-        'UNKNOWN')
-    AS status
-FROM fastpath
-WHERE test_name IN ['web_connectivity']
-AND msm_failure = 'f'
-AND input IN %(urls)s
-AND measurement_start_time >= %(start_date)s
-AND measurement_start_time < %(end_date)s
-GROUP BY test_name, input, probe_cc, probe_asn;
-"""
-    urls = sorted(set(u for urls in services.values() for u in urls))
-    query(sql, dict(start_date=start_date, end_date=end_date, urls=urls))
-    log.info("Fill done")
-
-#
-# The blocking event detector is meant to run frequently in order to
-# provide fast response to events - currently every 10 mins.
-# As the amount of probes and measuraments increases, extracting all the
-# required data for multiple inputs/CCs/ASNs and past weeks/months could
-# become too CPU and memory-intensive for the database and the detector.
-# Therefore we run the detection on the database side as much as possible.
-# The current version uses moving averages stored in a status table
-# `blocking_status`.
-# Detection is performed on test_name+probe_cc+probe_asn+input aka "TCAI"
-# following query. It's easier to read the query from the bottom up:
-#  - Select data from the fastpath table for the last time window, counting
-#    the percentages of confirmed, anomaly-but-not-confirmed etc. --> As "new"
-#  - Select stored related moving averages etc. from blocking_status.
-#    FINAL is required to avoid duplicates due to table updates.
-#  - Join the two queries on TCAI
-#  - Run SELECT to compute new values:
-#    - The empty(blocking_status... parts are simply picking the right
-#      value in case the entry is missing from blocking_status (TCAI never
-#      seen before) or not in fastpath (no recent msmts for a given TCAI)
-#    - Weighted percentages e.g.
-#      (new_confirmed_perc * msmt count * μ + stored_perc * blocking_status.cnt * 𝜏) / totcnt
-#      Where: 𝜏 < 1, μ = 1 - t  are used to combine old vs new values,
-#       blocking_status.cnt is an averaged count of seen msmts representing how
-#       "meaningful" the confirmed percentage in the blocking_status table is.
-#    - Stability: compares the current and stored accessible/ confirmed/etc
-#        percentage. 1 if there is no change, 0 for maximally fast change.
-#        (Initialized as 0 for new TCAI)
-#  - Then run another SELECT to:
-#    - Set `status` based on accessible thresholds and stability
-#      We don't want to trigger a spurius change if accessibility rates
-#      floating a lot.
-#    - Set `change` if the detected status is different from the past
-#  - INSERT: Finally store the TCAI, the moving averages, msmt count, change,
-#    stability in blocking_status to use it in the next cycle.
-#
-#  As the INSERT does not returns the rows, we select them in extract_changes
-#  (with FINAL) to record them into `blocking_events`.
-#  If there are changes we then extract the whole history for each changed
-#  TCAI in rebuild_feeds.
-#
-@metrics.timer("run_detection")
-def run_detection(start_date, end_date, services) -> None:
-    if not conf.reprocess:
-        log.info(f"Running detection from {start_date} to {end_date}")
-
-    if 0 and conf.reprocess:
-        # Used for debugging
-        sql = """SELECT count() AS cnt FROM fastpath
-    WHERE test_name IN ['web_connectivity']
-    AND msm_failure = 'f'
-    AND measurement_start_time >= %(start_date)s
-    AND measurement_start_time < %(end_date)s
-    AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
-        """
-        d = dict(start_date=start_date, end_date=end_date)
-        log_example = bool(query(sql, d)[0][0])
-
-    # FIXME:   new.cnt * %(mu)f + blocking_status.cnt * %(tau)f AS totcnt
-    sql = """
-INSERT INTO blocking_status (test_name, input, probe_cc, probe_asn,
-  confirmed_perc, pure_anomaly_perc, accessible_perc, cnt, status, old_status, change, stability)
-SELECT test_name, input, probe_cc, probe_asn,
-  confirmed_perc, pure_anomaly_perc, accessible_perc, movingcnt AS cnt,
-  multiIf(
-    accessible_perc < 80 AND stability > 0.95, 'BLOCKED',
-    accessible_perc > 95 AND stability > 0.97, 'OK',
-    x.status)
-  AS status,
-  x.status AS old_status,
-  if(status = x.status, x.change * %(tau)f, 1) AS change,
-  stability
-FROM
-(
-SELECT
- empty(blocking_status.test_name) ? new.test_name : blocking_status.test_name AS test_name,
- empty(blocking_status.input) ? new.input : blocking_status.input AS input,
- empty(blocking_status.probe_cc) ? new.probe_cc : blocking_status.probe_cc AS probe_cc,
- (blocking_status.probe_asn = 0) ? new.probe_asn : blocking_status.probe_asn AS probe_asn,
- new.cnt * %(mu)f + blocking_status.cnt * %(tau)f AS movingcnt,
- blocking_status.status,
- blocking_status.change,
- new.cnt + blocking_status.cnt AS totcnt,
- new.confirmed_perc    * new.cnt/totcnt * %(mu)f + blocking_status.confirmed_perc    * blocking_status.cnt/totcnt * %(tau)f AS confirmed_perc,
- new.pure_anomaly_perc * new.cnt/totcnt * %(mu)f + blocking_status.pure_anomaly_perc * blocking_status.cnt/totcnt * %(tau)f AS pure_anomaly_perc,
- new.accessible_perc   * new.cnt/totcnt * %(mu)f + blocking_status.accessible_perc   * blocking_status.cnt/totcnt * %(tau)f AS accessible_perc,
- if(new.cnt > 0,
-  cos(3.14/2*(new.accessible_perc - blocking_status.accessible_perc)/100) * 0.7 + blocking_status.stability * 0.3,
-  blocking_status.stability) AS stability
-
-FROM blocking_status FINAL
-
-FULL OUTER JOIN
-(
- SELECT test_name, input, probe_cc, probe_asn,
-  countIf(confirmed = 't') * 100 / cnt AS confirmed_perc,
-  countIf(anomaly = 't') * 100 / cnt - confirmed_perc AS pure_anomaly_perc,
-  countIf(anomaly = 'f') * 100 / cnt AS accessible_perc,
-  count() AS cnt,
-  0 AS stability
- FROM fastpath
- WHERE test_name IN ['web_connectivity']
- AND msm_failure = 'f'
- AND measurement_start_time >= %(start_date)s
- AND measurement_start_time < %(end_date)s
- AND input IN %(urls)s
- GROUP BY test_name, input, probe_cc, probe_asn
-) AS new
-
-ON
- new.input = blocking_status.input
- AND new.probe_cc = blocking_status.probe_cc
- AND new.probe_asn = blocking_status.probe_asn
- AND new.test_name = blocking_status.test_name
-) AS x
-"""
-    tau = 0.985
-    mu = 1 - tau
-    urls = sorted(set(u for urls in services.values() for u in urls))
-    d = dict(start_date=start_date, end_date=end_date, tau=tau, mu=mu, urls=urls)
-    query(sql, d)
-
-    if 0 and conf.reprocess and log_example:
-        sql = """SELECT accessible_perc, cnt, status, stability FROM blocking_status FINAL
-        WHERE probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
-        """
-        it = list(query(sql)[0])
-        it.append(str(start_date))
-        print(repr(it) + ",")
-
-
-@metrics.timer("extract_changes")
-def extract_changes(run_date):
-    sql = """
-    INSERT INTO blocking_events (test_name, input, probe_cc, probe_asn, status,
-    time)
-    SELECT test_name, input, probe_cc, probe_asn, status, %(t)s AS time
-    FROM blocking_status FINAL
-    WHERE status != old_status
-    AND old_status != ''
-    """
-    query(sql, dict(t=run_date))
-
-    # TODO: simplify?
-    # https://github.com/mymarilyn/clickhouse-driver/issues/221
-    sql = """
-    SELECT test_name, input, probe_cc, probe_asn
-    FROM blocking_status FINAL
-    WHERE status != old_status
-    """
-    if not conf.reprocess:
-        sql += " AND old_status != ''"
-    sql += " AND old_status != ''"
-    changes = query(sql, dict(t=run_date))
-
-    # Debugging
-    sql = """SELECT test_name, input, probe_cc, probe_asn, old_status, status
-    FROM blocking_status FINAL
-    WHERE status != old_status
-    AND old_status != ''
-    AND probe_asn = 135300 and probe_cc = 'MM' AND input = 'https://twitter.com/'
-    """
-    if conf.reprocess:
-        li = query(sql)
-        for tn, inp, cc, asn, old_status, status in li:
-            log.info(f"{run_date} {old_status} -> {status} in {cc} {asn} {inp}")
-
-    return changes
+    if events_tmp:
+        events = pd.concat(events_tmp)
+    else:
+        events = None
+    status_history = pd.concat(status_history_tmp) if collect_hist else None
+    return events, status, status_history
 
 
 @metrics.timer("process_historical_data")
-def process_historical_data(start_date, end_date, interval, services):
-    """Process past data"""
+def process_historical_data(
+    start_date: datetime,
+    end_date: datetime,
+    interval: timedelta,
+    services: dict,
+    probe_cc=None,
+    collect_hist=False,
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    """Processes past data. Rebuilds blocking_status table and events
+    Keeps blocking_status and blocking_events in memory during the run.
+    """
     log.info(f"Running process_historical_data from {start_date} to {end_date}")
-    run_date = start_date + interval
-    rebuild_status(click, start_date, run_date, services)
-    while run_date < end_date:
-        run_detection(run_date, run_date + interval, services)
-        changes = extract_changes(run_date)
-        if changes:
-            rebuild_feeds(changes)
-        run_date += interval
+    urls = sorted(set(u for urls in services.values() for u in urls))
+    time_slots_cnt = int((end_date - interval - start_date) / interval)
 
-    log.debug("Done")
+    gen = gen_input(click, start_date, end_date, interval, urls)
+    events, status, status_history = reprocess_inner(gen, time_slots_cnt)
+
+    log.debug("Replacing blocking_status table")
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
+
+    tmp_s = status.reset_index()  # .convert_dtypes()
+    click.insert_dataframe("INSERT INTO blocking_status VALUES", tmp_s)
+
+    log.debug("Replacing blocking_events table")
+    click.execute("TRUNCATE TABLE blocking_events SYNC")
+    if events is not None and len(events):
+        sql = "INSERT INTO blocking_events VALUES"
+        click.insert_dataframe(sql, events.reset_index(drop=True))
+
+    log.info("Done")
+    return events, status, status_history
+
+
+@metrics.timer("process_fresh_data")
+def process_fresh_data(
+    start_date: datetime,
+    end_date: datetime,
+    interval: timedelta,
+    services: dict,
+    probe_cc=None,
+    collect_hist=False,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Processes current data."""
+    log.info(f"Running process_fresh_data from {start_date} to {end_date}")
+    urls = sorted(set(u for urls in services.values() for u in urls))
+
+    status = load_blocking_status()
+
+    gen = gen_input(click, start_date, end_date, interval, urls)
+    new = None
+    for x in gen:
+        new = x
+        pass
+
+    if new is None or len(new) == 0:
+        log.error("Empty measurament batch received")
+        sys.exit(1)
+
+    log.info(f"New rows: {len(new)} Status rows: {len(status)}")
+    status, events = process_data(status, new)
+
+    log.debug("Replacing blocking_status table")
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
+    tmp_s = status.reset_index()  # .convert_dtypes()
+    click.insert_dataframe("INSERT INTO blocking_status VALUES", tmp_s)
+
+    log.debug("Appending to blocking_events table")
+    if events is not None and len(events):
+        sql = "INSERT INTO blocking_events VALUES"
+        click.insert_dataframe(sql, events.reset_index(drop=True))
+
+    log.info("Done")
+    return events, status
 
 
 def gen_stats():
-    """Generate gauge metrics showing the table sizes"""
+    """Generates gauge metrics showing the table sizes"""
     sql = "SELECT count() FROM blocking_status FINAL"
     bss = query(sql)[0][0]
     metrics.gauge("blocking_status_tblsize", bss)
@@ -495,31 +431,256 @@ def gen_stats():
     metrics.gauge("blocking_events_tblsize", bes)
 
 
+def process_data(
+    blocking_status: pd.DataFrame, new: pd.DataFrame
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Detects blocking. The inputs are the current blocking status and a df
+    with new data from a single timeslice.
+    Returns an updated blocking status and a df with new blocking events.
+    """
+    if len(blocking_status) == 0 and len(new) == 0:
+        return blocking_status, []
+
+    m = blocking_status.merge(new, how="outer", on=TCAI, suffixes=("_BS", ""))
+    assert "index" not in m.columns
+    m = m.reset_index().set_index(TCAI)  # performance improvement?
+    assert m.index.names == TCAI
+
+    m["input_cnt"] = m.cnt
+    m = m.fillna(value=dict(cnt=0, cnt_BS=0, accessible_perc_BS=m.accessible_perc))
+    tau = 0.9
+    mu = 1 - tau
+
+    mavg_cnt = m.cnt * (1 - tau) + m.cnt_BS * tau
+    totcnt = m.cnt + m.cnt_BS
+
+    # cp = (new.confirmed_perc * new.cnt * mu + blocking_status.confirmed_perc * blocking_status.cnt * tau / totcnt #AS confirmed_perc,
+    # ap = (new.pure_anomaly_perc * new.cnt * mu + blocking_status.pure_anomaly_perc * blocking_status.cnt * tau) / totcnt #AS pure_anomaly_perc,
+    # NOTE: using fillna(0) on percentages looks like a bug but the value is going to be ignored due to the cnt set to 0
+
+    m["input_ap"] = m.accessible_perc
+    tmp_ap = m.accessible_perc.fillna(m.accessible_perc_BS)
+    delta = (tmp_ap - m.accessible_perc_BS) / 100
+
+    # Weight the amount of datapoints in the current timeslot with
+    nu = m.cnt / (m.cnt + m.cnt_BS)
+    nu = nu * tau
+
+    m.accessible_perc = (
+        m.accessible_perc.fillna(m.accessible_perc_BS) * (1 - nu)
+        + m.accessible_perc_BS * nu
+    )
+
+    # Stability moves slowly towards 1 when accessible_perc is constant over
+    # time but drop quickly towards 0 when accessible_perc changes a lot.
+    # It is later on used to decide when we are confident enough to make
+    # statements on BLOCKED/OK status. It is also immediately set to 0 when we
+    # detect a blocking change event to mitigate flapping.
+    s_def = 0.7  # default stability
+    stability_thr = 0.8  # threshold to consider a TCAI stable
+    gtau = 0.99  # moving average tau for
+    btau = 0.7
+
+    stability = np.cos(3.14 / 2 * delta)
+    m["stab_insta"] = stability  # used for charting
+    good = stability * (1 - gtau) + m.stability.fillna(s_def) * gtau
+    gstable = stability >= stability_thr
+    m.loc[gstable, "stability"] = good[gstable]
+
+    bad = stability * (1 - btau) + m.stability.fillna(s_def) * btau
+    bstable = stability < stability_thr
+    m.loc[bstable, "stability"] = bad[bstable]
+
+    m.status = m.status.fillna("UNKNOWN")
+    m.old_status = m.status.fillna("UNKNOWN")
+
+    # Use different stability thresholds for OK vs BLOCKED?
+    stable = (m.stability > 0.98) & (stability > 0.98)
+    m.loc[(m.accessible_perc < 80) & stable, "status"] = "BLOCKED"
+    m.loc[(m.accessible_perc > 95) & stable, "status"] = "OK"
+
+    # Detect status changes AKA events
+    # Always use braces on both expressions
+    sel = (m.status != m.old_status) & (m.old_status != "UNKNOWN")
+    ww = m[sel]
+    if len(ww):
+        ww = ww[["status", "old_status"]]
+        # Drop stability to 0 after an event to prevent noisy detection
+        m.loc[sel, "stability"] = 0
+
+    events = m[sel][["status", "old_status"]]
+    if conf.devel:
+        exp_cols = [
+            "old_status",
+            "status",
+        ]
+        assert sorted(events.columns) == exp_cols, sorted(events.columns)
+
+    m.confirmed_perc.fillna(m.confirmed_perc_BS, inplace=True)
+    m.pure_anomaly_perc.fillna(m.pure_anomaly_perc_BS, inplace=True)
+    # m.accessible_perc.fillna(m.accessible_perc_BS, inplace=True)
+    m = m.drop(
+        [
+            "confirmed_perc_BS",
+            "pure_anomaly_perc_BS",
+            "accessible_perc_BS",
+            "cnt",
+            "cnt_BS",
+        ],
+        axis=1,
+    )
+
+    # moving average on cnt
+    m["cnt"] = mavg_cnt
+    assert m.index.names == TCAI
+
+    # m.reset_index(inplace=True)
+    # if "index" in m.columns:
+    #    m.drop(["index"], axis=1, inplace=True)
+
+    # if conf.devel:
+    #    exp_cols = [
+    #        "accessible_perc",
+    #        "change",
+    #        "cnt",
+    #        "confirmed_perc",
+    #        "input",
+    #        "input_ap",
+    #        "input_cnt",
+    #        "old_status",
+    #        "probe_asn",
+    #        "probe_cc",
+    #        "pure_anomaly_perc",
+    #        "stab_insta",
+    #        "stability",
+    #        "status",
+    #        "test_name",
+    #    ]
+    #    assert exp_cols == sorted(m.columns), sorted(m.columns)
+
+    return m, events
+
+
+def gen_input(
+    click,
+    start_date: datetime,
+    end_date: datetime,
+    interval: timedelta,
+    urls: list[str],
+) -> Generator[pd.DataFrame, None, None]:
+    """Queries the fastpath table for measurament counts grouped by TCAI.
+    Yields a dataframe for each time interval. Use read-ahead where needed
+    to speed up reprocessing.
+    """
+    assert start_date < end_date
+    assert interval == timedelta(minutes=60)
+    read_ahead = interval * 6 * 24
+    sql = """
+    SELECT test_name, probe_cc, probe_asn, input,
+      countIf(confirmed = 't') * 100 / cnt AS confirmed_perc,
+      countIf(anomaly = 't') * 100 / cnt - confirmed_perc AS pure_anomaly_perc,
+      countIf(anomaly = 'f') * 100 / cnt AS accessible_perc,
+      count() AS cnt,
+      toStartOfHour(measurement_start_time) AS t
+    FROM fastpath
+    WHERE test_name IN ['web_connectivity']
+    AND msm_failure = 'f'
+    AND measurement_start_time >= %(start_date)s
+    AND measurement_start_time < %(end_date)s
+    AND input IN %(urls)s
+    GROUP BY test_name, probe_cc, probe_asn, input, t
+    ORDER BY t
+    """
+    cache = None
+    t = start_date
+    while t < end_date:
+        # Load chunk from DB doing read-ahead (if needed)
+        partial_end_date = min(end_date, t + read_ahead)
+        d = dict(start_date=t, end_date=partial_end_date, urls=urls)
+        log.info(f"Querying fastpath from {t} to {partial_end_date}")
+        cache = click.query_dataframe(sql, d)
+        while t < partial_end_date:
+            out = cache[cache.t == t]
+            if len(out):
+                out = out.drop(["t"], axis=1)
+                log.info(f"Returning {len(out)} rows {t}")
+                yield out
+            t += interval
+
+
+def load_blocking_status() -> pd.DataFrame:
+    """Loads the current blocking status into a dataframe."""
+    log.debug("Loading blocking status")
+    sql = """SELECT status, old_status, change, stability,
+        test_name, probe_cc, probe_asn, input,
+        accessible_perc, cnt, confirmed_perc, pure_anomaly_perc
+        FROM blocking_status FINAL
+    """
+    return click.query_dataframe(sql)
+
+
+def reprocess_data_from_df(idf, debug=False):
+    """Reprocess data using Pandas. Used for testing."""
+    assert len(idf.index.names) == 5
+    assert "Unnamed: 0" not in sorted(idf.columns), sorted(idf.columns)
+    timeslots = idf.reset_index().t.unique()
+
+    def gen():
+        for tslot in timeslots:
+            new = idf[idf.index.get_level_values(0) == tslot]
+            assert len(new.index.names) == 5, new.index.names
+            assert "Unnamed: 0" not in sorted(new.columns), sorted(new.columns)
+            yield new
+
+    events, status, status_history = reprocess_inner(gen(), len(timeslots), True)
+    assert status.index.names == TCAI
+    return events, status, status_history
+
+
 def main():
     global click
     setup()
     log.info("Starting")
-    # TODO: use country names
-    # cc_to_country_name = load_country_name_map()
+    cc_to_country_name = load_country_name_map(conf.devel)
     click = Clickhouse.from_url(conf.db_uri)
+    if "use_numpy" not in conf.db_uri:
+        log.error("Add use_numpy to db_uri")
+        return
+
     # create_tables()
-    # FIXME: configure services
+    # TODO: configure services
     services = {
         "Facebook": ["https://www.facebook.com/"],
         "Twitter": ["https://twitter.com/"],
+        "YouTube": ["https://www.youtube.com/"],
+        "Instagram": ["https://www.instagram.com/"],
     }
     if conf.reprocess:
         assert conf.start_date and conf.end_date, "Dates not set"
-        process_historical_data(conf.start_date, conf.end_date, conf.interval, services)
+        events, status, _ = process_historical_data(
+            conf.start_date, conf.end_date, conf.interval, services
+        )
+        s = status.reset_index()
+        # log.info((s.accessible_perc, s.cnt, s.status))
         return
 
-    end_date = datetime.utcnow()
-    start_date = end_date - conf.interval
-    run_detection(start_date, end_date, services)
-    changes = extract_changes(end_date)
-    if changes:
-        rebuild_feeds(changes)
+    else:
+        # Process fresh data
+        if conf.end_date is None:
+            conf.end_date = datetime.utcnow()
+            conf.start_date = conf.end_date - conf.interval
+        events, status = process_fresh_data(
+            conf.start_date, conf.end_date, conf.interval, services
+        )
+        log.info(f"Events: {len(events)}")
+        # s = status.reset_index()
+        #log.info((s.accessible_perc, s.cnt, s.status))
+
+    if events is not None and len(events):
+        log.info("Rebuilding feeds")
+        rebuild_feeds(events)
         # TODO: create an index of available RSS feeds
+
     gen_stats()
     log.info("Done")
 
