@@ -214,7 +214,7 @@ def clickhouse_upsert_summary(
         test_start_time=test_start_time,
         measurement_start_time=measurement_start_time,
         scores=ujson.dumps(scores),
-        platform=nn(msm, "platform"),
+        platform=platform,
         anomaly=tf(anomaly),
         confirmed=tf(confirmed),
         msm_failure=tf(msm_failure),
