@@ -1,3 +1,9 @@
+fastpath (0.74) unstable; urgency=medium
+
+  * Fix platform extraction
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 22 Mar 2023 12:53:28 +0000
+
 fastpath (0.73) unstable; urgency=medium
 
   * Increase fastpath worker count
