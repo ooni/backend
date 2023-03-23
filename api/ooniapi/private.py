@@ -983,9 +983,8 @@ def api_private_domains() -> Response:
       200:
         description: JSON object
     """
-    # Nested ORDER BY cc ASC
-    # is used to prioritize the category code of a domain in
-    # the global list (cc=ZZ)
+    # The nested ORDER BY lower(cc) puts global entries (cc=ZZ) on top so that
+    # any(category_code) picks it up as the most meaningful category code.
     q = """
     SELECT domain AS domain_name, category_code, measurement_count
     FROM (
@@ -994,7 +993,7 @@ def api_private_domains() -> Response:
         domain FROM (
             SELECT domain, category_code
             FROM citizenlab
-            ORDER BY lower(cc) = 'ZZ' DESC
+            ORDER BY lower(cc) != 'zz'
         )
         GROUP BY domain
     ) AS cz

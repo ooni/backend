@@ -341,4 +341,7 @@ def test_private_api_domains(client, log):
     rows = resp["results"]
     assert len(rows) > 5
     assert sorted(rows[0]) == ["category_code", "domain_name", "measurement_count"]
-    assert "twitter.com" in [r["domain_name"] for r in rows]
+    d = {r["domain_name"]: r["category_code"] for r in rows}
+    assert d["facebook.com"] == "GRP"
+    assert d["ncac.org"] == "NEWS"
+    assert d["twitter.com"] == "GRP"
