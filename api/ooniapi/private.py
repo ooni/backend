@@ -994,7 +994,7 @@ def api_private_domains() -> Response:
         domain FROM (
             SELECT domain, category_code
             FROM citizenlab
-            ORDER BY cc ASC
+            ORDER BY lower(cc) = 'ZZ' DESC
         )
         GROUP BY domain
     ) AS cz
