@@ -989,9 +989,14 @@ def api_private_domains() -> Response:
     q = """
     SELECT domain AS domain_name, category_code, measurement_count
     FROM (
-        SELECT domain, category_code
-        FROM citizenlab
-        GROUP BY domain, category_code
+        SELECT
+        any(category_code) as category_code,
+        domain FROM (
+            SELECT domain, category_code
+            FROM citizenlab
+            ORDER BY cc ASC
+        )
+        GROUP BY domain
     ) AS cz
     LEFT JOIN (
         SELECT domain, count() AS measurement_count
