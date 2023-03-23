@@ -1,3 +1,9 @@
+ooni-api (1.0.51) unstable; urgency=medium
+
+  * Fix domain listing query
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 23 Mar 2023 18:17:38 +0000
+
 ooni-api (1.0.50) unstable; urgency=medium
 
   * Remove test_name check from list measurements
