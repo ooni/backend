@@ -1000,6 +1000,7 @@ def api_private_domains() -> Response:
     LEFT JOIN (
         SELECT domain, count() AS measurement_count
         FROM fastpath
+        WHERE test_name = 'web_connectivity'
         GROUP BY domain
     ) AS fp
     ON (fp.domain == cz.domain)
