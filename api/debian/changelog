@@ -1,3 +1,9 @@
+ooni-api (1.0.52) unstable; urgency=medium
+
+  * Fix measurement count
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 31 Mar 2023 11:15:22 +0100
+
 ooni-api (1.0.51) unstable; urgency=medium
 
   * Fix domain listing query
