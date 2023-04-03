@@ -1,0 +1,1884 @@
+{
+    "definitions": {},
+    "info": {
+        "description": "powered by Flasgger",
+        "termsOfService": "/tos",
+        "title": "A swagger API",
+        "version": "0.0.1"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Landing page"
+            }
+        },
+        "/api/_/account_metadata": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "Username and role if logged in.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Get account metadata for logged-in users"
+            }
+        },
+        "/api/_/asn_by_month": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": [
+                            {
+                                "date": "2018-08-31",
+                                "value": 4411
+                            },
+                            "..."
+                        ]
+                    }
+                },
+                "summary": "Network count by month"
+            }
+        },
+        "/api/_/asnmeta": {
+            "get": {
+                "description": "Sources: ansmeta db table<br/>",
+                "parameters": [
+                    {
+                        "description": "ASN",
+                        "in": "query",
+                        "name": "asn",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JSON object"
+                    }
+                },
+                "summary": "Look up organization name by ASN"
+            }
+        },
+        "/api/_/check_report_id": {
+            "get": {
+                "description": "Used by https://github.com/ooni/probe/issues/1034<br/>",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "report_id",
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Always returns True.",
+                        "schema": {
+                            "example": {
+                                "found": true,
+                                "v": 0
+                            },
+                            "properties": {
+                                "found": {
+                                    "description": true,
+                                    "type": "boolean"
+                                },
+                                "v": {
+                                    "description": "version number of this response",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Legacy. Used to check if a report_id existed in the fastpath table."
+            }
+        },
+        "/api/_/circumvention_runtime_stats": {
+            "get": {
+                "description": "grouped by date, country, test_name.<br/>",
+                "responses": {
+                    "200": {
+                        "description": "List of dicts with keys probe_cc and cnt"
+                    }
+                },
+                "summary": "Runtime statistics on protocols used for circumvention,"
+            }
+        },
+        "/api/_/circumvention_stats_by_country": {
+            "get": {
+                "description": "grouped by country.<br/>",
+                "responses": {
+                    "200": {
+                        "description": "List of dicts with keys probe_cc and cnt"
+                    }
+                },
+                "summary": "Aggregated statistics on protocols used for circumvention,"
+            }
+        },
+        "/api/_/countries": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": {
+                            "countries": [
+                                {
+                                    "alpha_2": "x",
+                                    "count": "y",
+                                    "name": "z"
+                                },
+                                "..."
+                            ]
+                        }
+                    }
+                },
+                "summary": "Summary of countries"
+            }
+        },
+        "/api/_/countries_by_month": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Countries count by month"
+            }
+        },
+        "/api/_/country_overview": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": {
+                            "first_bucket_date": "2012-12-01",
+                            "measurement_count": 6659891,
+                            "network_count": 333
+                        }
+                    }
+                },
+                "summary": "Country-specific overview"
+            }
+        },
+        "/api/_/debug_prioritization": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Two letter, uppercase country code",
+                        "in": "query",
+                        "name": "probe_cc",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Comma separated list of URL categories, all uppercase",
+                        "in": "query",
+                        "name": "category_codes",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Probe ASN",
+                        "in": "query",
+                        "name": "probe_asn",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Maximum number of URLs to return",
+                        "in": "query",
+                        "name": "limit",
+                        "type": "integer"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "URL test list and debug data",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Generate prioritization debug data"
+            }
+        },
+        "/api/_/domains": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "JSON object"
+                    }
+                },
+                "summary": "List all the domains in the test-lists with their measurement count"
+            }
+        },
+        "/api/_/global_overview": {
+            "get": {
+                "description": "Sources: global_stats db table<br/>",
+                "responses": {
+                    "200": {
+                        "description": "JSON struct TODO"
+                    }
+                },
+                "summary": "Provide global summary of measurements"
+            }
+        },
+        "/api/_/global_overview_by_month": {
+            "get": {
+                "description": "Sources: global_by_month db table<br/>",
+                "responses": {
+                    "200": {
+                        "description": "JSON struct TODO"
+                    }
+                },
+                "summary": "Provide global summary of measurements"
+            }
+        },
+        "/api/_/im_networks": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Instant messaging networks statistics"
+            }
+        },
+        "/api/_/im_stats": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Instant messaging statistics"
+            }
+        },
+        "/api/_/measurement_feedback": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "measurement_uid": {
+                                    "description": "Measurement ID",
+                                    "type": "string"
+                                },
+                                "status": {
+                                    "description": "Measurement status",
+                                    "minLength": 2,
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Submission or update accepted"
+                    }
+                },
+                "summary": "Submit measurement feedback. Only for registered users."
+            }
+        },
+        "/api/_/measurement_feedback/{measurement_uid}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Measurement ID",
+                        "in": "path",
+                        "minLength": 5,
+                        "name": "measurement_uid",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "status summary"
+                    }
+                },
+                "summary": "Get measurement for the curred logged user for a given measurement"
+            }
+        },
+        "/api/_/network_stats": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The two letter country code",
+                        "in": "query",
+                        "name": "probe_cc",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Network speed statistics - not implemented"
+            }
+        },
+        "/api/_/networks": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "JSON object"
+                    }
+                },
+                "summary": "List all networks that have measurements"
+            }
+        },
+        "/api/_/show_countries_prioritization": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Output format, JSON (default) or CSV\n",
+                        "enum": [
+                            "JSON",
+                            "CSV"
+                        ],
+                        "in": "query",
+                        "name": "format",
+                        "type": "string"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "URL test list and debug data",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Show computed priorities excluding global entries"
+            }
+        },
+        "/api/_/test_coverage": {
+            "get": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "minLength": 2,
+                        "name": "probe_cc",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"network_coverage: [...], \"test_coverage\": [...]}"
+                    }
+                },
+                "summary": "Return number of measurements per day across test categories"
+            }
+        },
+        "/api/_/test_names": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Provides test names and descriptions to Explorer"
+            }
+        },
+        "/api/_/url-priorities/list": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "type": "string"
+                    }
+                },
+                "summary": "List URL priority rules"
+            }
+        },
+        "/api/_/url-priorities/update": {
+            "post": {
+                "description": "Empty new_entry: delete existing rule. The current value needs to be sent<br/>back as \"old_entry\" as a check against race conditions<br/>",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "add new URL",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "new_entry": {
+                                    "properties": {
+                                        "category_code": {
+                                            "type": "string"
+                                        },
+                                        "cc": {
+                                            "type": "string"
+                                        },
+                                        "domain": {
+                                            "type": "string"
+                                        },
+                                        "priority": {
+                                            "type": "integer"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "old_entry": {
+                                    "properties": {
+                                        "category_code": {
+                                            "type": "string"
+                                        },
+                                        "cc": {
+                                            "type": "string"
+                                        },
+                                        "domain": {
+                                            "type": "string"
+                                        },
+                                        "priority": {
+                                            "type": "integer"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "type": "string"
+                    }
+                },
+                "summary": "Add/update/delete an URL priority rule. Empty old_entry: create new rule."
+            }
+        },
+        "/api/_/url-submission/test-list/{country_code}": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "2-letter country code or \"global\"",
+                        "in": "path",
+                        "name": "country_code",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "URL list, state, changes",
+                        "schema": {
+                            "properties": {
+                                "changes": {
+                                    "type": "object"
+                                },
+                                "pr_url": {
+                                    "type": "string"
+                                },
+                                "state": {
+                                    "type": "object"
+                                },
+                                "test_list": {
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Fetch citizenlab URL list and additional metadata"
+            }
+        },
+        "/api/_/vanilla_tor_stats": {
+            "get": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "minLength": 2,
+                        "name": "probe_cc",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Tor statistics over ASN for a given CC"
+            }
+        },
+        "/api/_/website_networks": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The two letter country code",
+                        "in": "query",
+                        "name": "probe_cc",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/api/_/website_stats": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/api/_/website_urls": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/api/v1/aggregation": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The input (for example a URL or IP address) to search measurements for",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "input",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Domain to search measurements for, comma separated",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "domain",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The category code from the citizenlab list",
+                        "in": "query",
+                        "name": "category_code",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Two letter capitalized country codes, comma separated",
+                        "in": "query",
+                        "minLength": 2,
+                        "name": "probe_cc",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Autonomous system number in the format ASxxx, comma separated",
+                        "in": "query",
+                        "name": "probe_asn",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Name of the tests, comma separated",
+                        "in": "query",
+                        "name": "test_name",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The start date of when measurements were run (ex. \"2016-10-20T10:30:00\")",
+                        "in": "query",
+                        "name": "since",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The end date of when measurement were run (ex. \"2016-10-20T10:30:00\")",
+                        "in": "query",
+                        "name": "until",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Time granularity. Used only when the X or Y axis represent time.",
+                        "enum": [
+                            "hour",
+                            "day",
+                            "week",
+                            "month",
+                            "year",
+                            "auto"
+                        ],
+                        "in": "query",
+                        "name": "time_grain",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The dimension on the x axis e.g. measurement_start_day\n",
+                        "in": "query",
+                        "name": "axis_x",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The dimension on the y axis e.g. probe_cc\n",
+                        "in": "query",
+                        "name": "axis_y",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Output format, JSON (default) or CSV\n",
+                        "enum": [
+                            "JSON",
+                            "CSV"
+                        ],
+                        "in": "query",
+                        "name": "format",
+                        "type": "string"
+                    },
+                    {
+                        "description": "If we should be triggering a file download",
+                        "in": "query",
+                        "name": "download",
+                        "type": "boolean"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns aggregated counters"
+                    }
+                },
+                "summary": "Aggregate counters data"
+            }
+        },
+        "/api/v1/check-in": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "description": "probe_asn and probe_cc are not provided if unknown",
+                        "in": "body",
+                        "name": "probe self-description",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "charging": {
+                                    "description": "set only on devices with battery; true when charging",
+                                    "type": "boolean"
+                                },
+                                "on_wifi": {
+                                    "type": "boolean"
+                                },
+                                "platform": {
+                                    "example": "android",
+                                    "type": "string"
+                                },
+                                "probe_asn": {
+                                    "description": "ASN, two uppercase letters followed by number",
+                                    "example": "AS1234",
+                                    "type": "string"
+                                },
+                                "probe_cc": {
+                                    "description": "Two letter, uppercase country code",
+                                    "example": "IT",
+                                    "type": "string"
+                                },
+                                "run_type": {
+                                    "description": "timed or manual",
+                                    "example": "timed",
+                                    "type": "string"
+                                },
+                                "software_name": {
+                                    "example": "ooniprobe",
+                                    "type": "string"
+                                },
+                                "software_version": {
+                                    "example": "0.0.1",
+                                    "type": "string"
+                                },
+                                "web_connectivity": {
+                                    "properties": {
+                                        "category_codes": {
+                                            "description": "List/array of URL categories, all uppercase",
+                                            "items": {
+                                                "example": "NEWS",
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Give a URL test list to a probe running web_connectivity tests; additional data for other tests;",
+                        "schema": {
+                            "properties": {
+                                "conf": {
+                                    "description": "auxiliary configuration parameters",
+                                    "features": {
+                                        "description": "feature flags",
+                                        "type": "object"
+                                    },
+                                    "type": "object"
+                                },
+                                "probe_asn": {
+                                    "description": "probe ASN inferred from GeoIP or AS0",
+                                    "type": "string"
+                                },
+                                "probe_cc": {
+                                    "description": "probe CC inferred from GeoIP or ZZ",
+                                    "type": "string"
+                                },
+                                "probe_network_name": {
+                                    "description": "probe network name inferred from GeoIP or None",
+                                    "type": "string"
+                                },
+                                "tests": {
+                                    "description": "test-specific configuration",
+                                    "properties": {
+                                        "web_connectivity": {
+                                            "properties": {
+                                                "report_id": {
+                                                    "type": "string"
+                                                },
+                                                "urls": {
+                                                    "items": {
+                                                        "properties": {
+                                                            "category_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "country_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "url": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "type": "array"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "utc_time": {
+                                    "description": "current UTC time as YYYY-mm-ddTHH:MM:SSZ",
+                                    "type": "string"
+                                },
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Probe Services: check-in. Probes ask for tests to be run"
+            }
+        },
+        "/api/v1/collectors": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "List available collectors"
+                    }
+                },
+                "summary": "Probe Services: list collectors"
+            }
+        },
+        "/api/v1/get_account_role/{email_address}": {
+            "get": {
+                "description": "Only for admins.<br/>",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "email_address",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role or error message",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "security": {
+                    "cookieAuth": {
+                        "in": "cookie",
+                        "name": "ooni",
+                        "type": "JWT"
+                    }
+                },
+                "summary": "Get account role. Return an error message if the account is not found."
+            }
+        },
+        "/api/v1/login": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Username and password",
+                        "in": "body",
+                        "name": "auth data",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "password": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "expire": {
+                                            "description": "Expiration time",
+                                            "type": "string"
+                                        },
+                                        "token": {
+                                            "description": "Token",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Auth object"
+                    }
+                },
+                "summary": "Probe Services: login"
+            }
+        },
+        "/api/v1/measurement/{measurement_id}": {
+            "get": {
+                "description": "Returns only the measurement without extra data from the database<br/>",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "measurement_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "triggers a file download",
+                        "in": "query",
+                        "name": "download",
+                        "type": "boolean"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns the JSON blob for the specified measurement"
+                    }
+                },
+                "summary": "Get one measurement by measurement_id,"
+            }
+        },
+        "/api/v1/measurement_meta": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The report_id to search measurements for",
+                        "example": "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "report_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "description": "The input (for example a URL or IP address) to search measurements for",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "input",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Include JSON measurement data",
+                        "in": "query",
+                        "name": "full",
+                        "type": "boolean"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns measurement metadata, optionally including the raw measurement body",
+                        "schema": {
+                            "example": {
+                                "anomaly": false,
+                                "confirmed": false,
+                                "failure": false,
+                                "input": null,
+                                "measurement_start_time": "2021-02-08T23:31:46Z",
+                                "probe_asn": 36947,
+                                "probe_cc": "DZ",
+                                "report_id": "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a",
+                                "scores": "{}",
+                                "test_name": "ndt",
+                                "test_start_time": "2021-02-08T23:31:43Z"
+                            },
+                            "properties": {
+                                "anomaly": {
+                                    "type": "boolean"
+                                },
+                                "category_code": {
+                                    "type": "string"
+                                },
+                                "confirmed": {
+                                    "type": "boolean"
+                                },
+                                "failure": {
+                                    "type": "boolean"
+                                },
+                                "input": {
+                                    "type": "string"
+                                },
+                                "measurement_start_time": {
+                                    "type": "string"
+                                },
+                                "probe_asn": {
+                                    "type": "integer"
+                                },
+                                "probe_cc": {
+                                    "type": "string"
+                                },
+                                "raw_measurement": {
+                                    "type": "string"
+                                },
+                                "report_id": {
+                                    "type": "string"
+                                },
+                                "scores": {
+                                    "type": "string"
+                                },
+                                "test_name": {
+                                    "type": "string"
+                                },
+                                "test_start_time": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Get metadata on one measurement by measurement_id + input"
+            }
+        },
+        "/api/v1/measurements": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The report_id to search measurements for",
+                        "in": "query",
+                        "name": "report_id",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The input (for example a URL or IP address) to search measurements for",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "input",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The domain to search measurements for",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "domain",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The two letter country code",
+                        "in": "query",
+                        "name": "probe_cc",
+                        "type": "string"
+                    },
+                    {
+                        "description": "the Autonomous system number in the format \"ASXXX\"",
+                        "in": "query",
+                        "name": "probe_asn",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The name of the test",
+                        "in": "query",
+                        "name": "test_name",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The category code from the citizenlab list",
+                        "in": "query",
+                        "name": "category_code",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The start date of when measurements were run (ex. \"2016-10-20T10:30:00\")",
+                        "in": "query",
+                        "name": "since",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The end date of when measurement were run (ex. \"2016-10-20T10:30:00\")",
+                        "in": "query",
+                        "name": "until",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Return results only strictly greater than the provided index",
+                        "in": "query",
+                        "name": "since_index",
+                        "type": "string"
+                    },
+                    {
+                        "collectionFormat": "csv",
+                        "description": "Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).\n",
+                        "in": "query",
+                        "items": {
+                            "type": "string"
+                        },
+                        "name": "confirmed",
+                        "type": "string"
+                    },
+                    {
+                        "collectionFormat": "csv",
+                        "description": "Measurements that require special attention (it's likely to be a case of blocking), however it has not necessarily been confirmed\n",
+                        "in": "query",
+                        "items": {
+                            "type": "string"
+                        },
+                        "name": "anomaly",
+                        "type": "string"
+                    },
+                    {
+                        "collectionFormat": "csv",
+                        "description": "There was an error in the measurement (the control request failed, there was a bug, etc.).\nDefault is to consider it both true or false (`failure=true,false`)\n",
+                        "in": "query",
+                        "items": {
+                            "type": "string"
+                        },
+                        "name": "failure",
+                        "type": "string"
+                    },
+                    {
+                        "description": "By which key the results should be ordered by (default: `null`)",
+                        "enum": [
+                            "test_start_time",
+                            "measurement_start_time",
+                            "input",
+                            "probe_cc",
+                            "probe_asn",
+                            "test_name"
+                        ],
+                        "in": "query",
+                        "name": "order_by",
+                        "type": "string"
+                    },
+                    {
+                        "description": "If the order should be ascending or descending (one of: `asc` or `desc`)",
+                        "enum": [
+                            "asc",
+                            "desc",
+                            "ASC",
+                            "DESC"
+                        ],
+                        "in": "query",
+                        "name": "order",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Offset into the result set (default: 0)",
+                        "in": "query",
+                        "name": "offset",
+                        "type": "integer"
+                    },
+                    {
+                        "description": "Number of records to return (default: 100)",
+                        "in": "query",
+                        "name": "limit",
+                        "type": "integer"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns the list of measurement IDs for the specified criteria",
+                        "schema": {
+                            "$ref": "#/definitions/MeasurementList"
+                        }
+                    }
+                },
+                "summary": "Search for measurements using only the database. Provide pagination."
+            }
+        },
+        "/api/v1/raw_measurement": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The report_id to search measurements for",
+                        "in": "query",
+                        "name": "report_id",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The input (for example a URL or IP address) to search measurements for",
+                        "in": "query",
+                        "minLength": 3,
+                        "name": "input",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "raw measurement body, served as JSON file to be dowloaded"
+                    }
+                },
+                "summary": "Get raw measurement body by measurement_id + input"
+            }
+        },
+        "/api/v1/register": {
+            "post": {
+                "description": "Probes send a random string called password and receive a client_id<br/>The client_id/password tuple is saved by the probe and long-lived<br/><br/>",
+                "parameters": [
+                    {
+                        "description": "Registration data",
+                        "in": "body",
+                        "name": "register data",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "password": {
+                                    "type": "string"
+                                },
+                                "platform": {
+                                    "type": "string"
+                                },
+                                "probe_asn": {
+                                    "type": "string"
+                                },
+                                "probe_cc": {
+                                    "type": "string"
+                                },
+                                "software_name": {
+                                    "type": "string"
+                                },
+                                "software_version": {
+                                    "type": "string"
+                                },
+                                "supported_tests": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "token": {
+                                            "description": "client_id",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Registration confirmation"
+                    }
+                },
+                "summary": "Probe Services: Register"
+            }
+        },
+        "/api/v1/set_account_role": {
+            "post": {
+                "description": "Only for admins.<br/>",
+                "parameters": [
+                    {
+                        "description": "data as HTML form or JSON",
+                        "in": "body",
+                        "name": "email address and role",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "email_address": {
+                                    "type": "string"
+                                },
+                                "role": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Confirmation"
+                    }
+                },
+                "security": {
+                    "cookieAuth": {
+                        "in": "cookie",
+                        "name": "ooni",
+                        "type": "JWT"
+                    }
+                },
+                "summary": "Set a role to a given account identified by an email address."
+            }
+        },
+        "/api/v1/set_session_expunge": {
+            "post": {
+                "description": "Only for admins.<br/>",
+                "parameters": [
+                    {
+                        "description": "data as HTML form or JSON",
+                        "in": "body",
+                        "name": "email address",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "email_address": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Confirmation"
+                    }
+                },
+                "security": {
+                    "cookieAuth": {
+                        "in": "cookie",
+                        "name": "ooni",
+                        "type": "JWT"
+                    }
+                },
+                "summary": "Force refreshing all session tokens for a given account."
+            }
+        },
+        "/api/v1/test-helpers": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A single user item",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Probe Services: List test helpers"
+            }
+        },
+        "/api/v1/test-list/psiphon-config": {
+            "get": {
+                "description": "Requires a probe_token JWT provided by /api/v1/login<br/>",
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Probe Services: Psiphon data"
+            }
+        },
+        "/api/v1/test-list/tor-targets": {
+            "get": {
+                "description": "Requires a probe_token JWT provided by /api/v1/login<br/>",
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Probe Services: Tor targets"
+            }
+        },
+        "/api/v1/test-list/urls": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Two letter, uppercase country code",
+                        "in": "query",
+                        "name": "country_code",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Two letter, uppercase country code (alternative to country_code)",
+                        "in": "query",
+                        "name": "probe_cc",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Comma separated list of URL categories, all uppercase",
+                        "in": "query",
+                        "name": "category_codes",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Maximum number of URLs to return",
+                        "in": "query",
+                        "name": "limit",
+                        "type": "integer"
+                    },
+                    {
+                        "description": "Include measurement counts and priority",
+                        "in": "query",
+                        "name": "debug",
+                        "type": "boolean"
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "URL test list",
+                        "schema": {
+                            "properties": {
+                                "metadata": {
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "results": {
+                                    "items": {
+                                        "properties": {
+                                            "category_code": {
+                                                "type": "string"
+                                            },
+                                            "country_code": {
+                                                "type": "string"
+                                            },
+                                            "url": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Generate test URL list with prioritization"
+            }
+        },
+        "/api/v1/torsf_stats": {
+            "get": {
+                "description": "Average / percentiles / total_count grouped by day<br/>Either group-by or filter by probe_cc<br/>Returns a format similar to get_aggregated<br/>",
+                "parameters": [
+                    {
+                        "description": "The two letter country code",
+                        "in": "query",
+                        "minLength": 2,
+                        "name": "probe_cc",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The start date of when measurements were run (ex. \"2016-10-20T10:30:00\")",
+                        "in": "query",
+                        "name": "since",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The end date of when measurement were run (ex. \"2016-10-20T10:30:00\")",
+                        "in": "query",
+                        "name": "until",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns aggregated counters"
+                    }
+                },
+                "summary": "Tor Pluggable Transports statistics"
+            }
+        },
+        "/api/v1/url-submission/submit": {
+            "post": {
+                "responses": {
+                    "200": {
+                        "description": "Pull request number",
+                        "type": "object"
+                    }
+                },
+                "summary": "Propose changes: open a Pull Request on GitHub"
+            }
+        },
+        "/api/v1/url-submission/update-url": {
+            "post": {
+                "description": "to be sent back as \"old_entry\" as a check against race conditions.<br/>Empty old_entry: create new rule. Empty new_entry: delete existing rule.<br/>",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "comment": {
+                                    "type": "string"
+                                },
+                                "country_code": {
+                                    "type": "string"
+                                },
+                                "new_entry": {
+                                    "properties": {
+                                        "category_code": {
+                                            "type": "string"
+                                        },
+                                        "date_added": {
+                                            "type": "string"
+                                        },
+                                        "notes": {
+                                            "type": "string"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "user": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "old_entry": {
+                                    "properties": {
+                                        "category_code": {
+                                            "type": "string"
+                                        },
+                                        "date_added": {
+                                            "type": "string"
+                                        },
+                                        "notes": {
+                                            "type": "string"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "user": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "New URL confirmation",
+                        "schema": {
+                            "properties": {
+                                "updated_entry": {
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Create/update/delete a Citizenlab URL entry. The current value needs"
+            }
+        },
+        "/api/v1/user_login": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "JWT token with aud=register",
+                        "in": "query",
+                        "name": "k",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JSON with \"bearer\", \"redirect_to\" or \"msg\" key"
+                    }
+                },
+                "summary": "Auth Services: login using a registration/login link"
+            }
+        },
+        "/api/v1/user_refresh_token": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "JSON with \"bearer\" key"
+                    }
+                },
+                "summary": "Auth services: refresh user token"
+            }
+        },
+        "/api/v1/user_register": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "Registration data as HTML form or JSON",
+                        "in": "body",
+                        "name": "register data",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "email_address": {
+                                    "type": "string"
+                                },
+                                "redirect_to": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Confirmation"
+                    }
+                },
+                "summary": "Auth Services: start email-based user registration"
+            }
+        },
+        "/bouncer/net-tests": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "open report data",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "net-tests": {
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Probe Services: (legacy)"
+            }
+        },
+        "/files": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/files/by_country": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/files/by_country/{country_code}": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/files/by_date": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/files/by_date/{date}": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/health": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "Status"
+                    }
+                },
+                "summary": "Health check"
+            }
+        },
+        "/report": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "open report data",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "data_format_version": {
+                                    "type": "string"
+                                },
+                                "format": {
+                                    "type": "string"
+                                },
+                                "probe_asn": {
+                                    "type": "string"
+                                },
+                                "probe_cc": {
+                                    "type": "string"
+                                },
+                                "software_name": {
+                                    "type": "string"
+                                },
+                                "software_version": {
+                                    "type": "string"
+                                },
+                                "test_name": {
+                                    "type": "string"
+                                },
+                                "test_start_time": {
+                                    "type": "string"
+                                },
+                                "test_version": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Open report confirmation",
+                        "schema": {
+                            "properties": {
+                                "backend_version": {
+                                    "type": "string"
+                                },
+                                "report_id": {
+                                    "type": "string"
+                                },
+                                "supported_formats": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Probe Services: Open report"
+            }
+        },
+        "/report/{report_id}": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "example": "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a",
+                        "in": "path",
+                        "minLength": 10,
+                        "name": "report_id",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "content": {
+                                    "type": "object"
+                                },
+                                "format": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Acknowledge",
+                        "schema": {
+                            "example": {
+                                "measurement_uid": "20210208220710.181572_MA_ndt_7888edc7748936bf"
+                            },
+                            "properties": {
+                                "measurement_uid": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Probe Services: Submit measurement"
+            }
+        },
+        "/report/{report_id}/close": {
+            "post": {
+                "responses": {
+                    "200": {
+                        "description": "Close a report"
+                    }
+                },
+                "summary": "Probe Services: Close report"
+            }
+        },
+        "/robots.txt": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "robots.txt content"
+                    }
+                },
+                "summary": "Robots.txt"
+            }
+        },
+        "/stats": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/{date}": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "TODO"
+            }
+        },
+        "/{date}/{report_file}": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "TODO"
+                    }
+                },
+                "summary": "Legacy entry point"
+            }
+        }
+    },
+    "swagger": "2.0"
+}

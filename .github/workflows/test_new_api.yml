@@ -24,6 +24,9 @@ jobs:
       - name: Build docker image
         run: cd api && make build
 
+      - name: Check apispec.json
+        run: cd api && tools/check_apispec_changes
+
       - name: Setup database fixtures and run fastpath to populate the DB
         run: cd api && make initdb
 

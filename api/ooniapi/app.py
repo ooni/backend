@@ -177,7 +177,6 @@ def create_app(*args, testmode=False, **kw):
 
     app = Flask(__name__)
     app.json_encoder = FlaskJSONEncoder
-    log = app.logger
 
     # Order matters
     init_app(app, testmode=testmode)
@@ -222,10 +221,16 @@ def create_app(*args, testmode=False, **kw):
         # option httpchk GET /check
         # http-check expect string success
 
-    if False:
-        log.debug("Routes:")
-        for r in app.url_map.iter_rules():
-            log.debug(f" {r.match} ")
-        log.debug("----")
-
     return app
+
+
+if __name__ == "__main__":
+    # Fetch the swagger API spec locally, save it and exit.
+    app = create_app()
+    with app.test_client() as client:
+        j = client.get("/apispec_1.json").json
+    fn = "apispec.json"
+    with open(fn, "w") as f:
+        json.dump(j, f, indent=4, sort_keys=True)
+
+    print(f"{fn} written")
