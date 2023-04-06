@@ -378,6 +378,67 @@ def test_get_measurement_meta_full(client):
     assert data
 
 
+def test_get_measurement_meta_by_uid(client):
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    response = api(client, f"measurement_meta?measurement_uid={uid}")
+    assert response == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": False,
+        "input": "https://www.backtrack-linux.org/",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
+        "report_id": "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3",
+        "test_name": "web_connectivity",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
+    }
+
+def test_get_measurement_meta_by_uid(client):
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    response = api(client, f"measurement_meta?measurement_uid={uid}")
+    assert response == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": False,
+        "input": "https://www.backtrack-linux.org/",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
+        "report_id": "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3",
+        "test_name": "web_connectivity",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
+    }
+
+
+def test_get_measurement_meta_by_uid_full(client):
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    response = api(client, f"measurement_meta?measurement_uid={uid}&full=True")
+    data = response.pop("raw_measurement")
+    assert response == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": False,
+        "input": "https://www.backtrack-linux.org/",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
+        "report_id": "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3",
+        "test_name": "web_connectivity",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
+    }
+    assert data
+
+
 def test_get_raw_measurement(client):
     rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
     inp = "https://www.backtrack-linux.org/"

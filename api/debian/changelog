@@ -1,3 +1,9 @@
+ooni-api (1.0.54) unstable; urgency=medium
+
+  * Support fetching measurement metadata and raw body by measurement_uid
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 06 Apr 2023 16:26:25 +0100
+
 ooni-api (1.0.53) unstable; urgency=medium
 
   * Extract swagger file
