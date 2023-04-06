@@ -927,24 +927,6 @@
                 "summary": "Get one measurement by measurement_id,"
             }
         },
-        "/api/v1/measurement_body_by_uid": {
-            "get": {
-                "parameters": [
-                    {
-                        "description": "The measurement_uid to search measurements for",
-                        "in": "query",
-                        "name": "measurement_uid",
-                        "type": "string"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "raw measurement body, served as JSON file to be dowloaded"
-                    }
-                },
-                "summary": "Get raw measurement body by measurement_uid"
-            }
-        },
         "/api/v1/measurement_meta": {
             "get": {
                 "parameters": [
@@ -1201,6 +1183,12 @@
                         "in": "query",
                         "minLength": 3,
                         "name": "input",
+                        "type": "string"
+                    },
+                    {
+                        "description": "The measurement_uid to search measurements for",
+                        "in": "query",
+                        "name": "measurement_uid",
                         "type": "string"
                     }
                 ],
