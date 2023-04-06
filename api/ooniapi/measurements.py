@@ -188,6 +188,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
     """
     Fetch jsonl from S3, decompress it, extract single msmt
     """
+    # TODO: switch to _fetch_measurement_body_by_uid
     if measurement_uid is not None:
         try:
             s3path, linenum = measurement_uid_to_s3path_linenum(measurement_uid)
@@ -198,7 +199,7 @@ def _fetch_jsonl_measurement_body_clickhouse(
     else:
         try:
             inp = input or ""  # NULL/None input is stored as ''
-            s3path, linenum = report_id_input_to_s3path_linenum(report_id, input)
+            s3path, linenum = report_id_input_to_s3path_linenum(report_id, inp)
         except Exception:
             log.error(f"Measurement {report_id} {inp} not found in jsonl")
             return None
@@ -249,7 +250,8 @@ def _fetch_measurement_body_by_uid(msmt_uid: str) -> bytes:
         return body
 
     log.debug(f"Fetching body for UID {msmt_uid} from jsonl on S3")
-    return _fetch_jsonl_measurement_body(None, None, msmt_uid)
+    s3path, linenum = measurement_uid_to_s3path_linenum(msmt_uid)
+    return _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
 
 
 @metrics.timer("_fetch_measurement_body_from_hosts")
