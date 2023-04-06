@@ -39,6 +39,7 @@ from ooniapi.urlparams import (
     param_input_or_none,
     param_report_id,
     param_report_id_or_none,
+    param_measurement_uid,
 )
 
 from flask import Blueprint
@@ -62,8 +63,9 @@ class QueryTimeoutError(HTTPException):
     description = "The database query timed out.\nTry changing the query parameters."
 
 
-class MsmtNotFound(Exception):
-    pass
+class MsmtNotFound(HTTPException):
+    code = 500
+    description = "Measurement not found"
 
 
 @api_msm_blueprint.route("/")
@@ -78,14 +80,31 @@ def list_files() -> Response:
     return cachedjson("1d", msg="not implemented")
 
 
+def measurement_uid_to_s3path_linenum(measurement_uid: str):
+    # TODO: cleanup this
+    query = """SELECT s3path, linenum FROM jsonl
+        PREWHERE (report_id, input) IN (
+            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid
+        )
+        LIMIT 1"""
+    query_params = dict(uid=measurement_uid)
+    lookup = query_click_one_row(sql.text(query), query_params, query_prio=3)
+    if lookup is None:
+        raise MsmtNotFound
+
+    s3path = lookup["s3path"]
+    linenum = lookup["linenum"]
+    return s3path, linenum
+
+
 @metrics.timer("get_measurement")
-@api_msm_blueprint.route("/v1/measurement/<measurement_id>")
-def get_measurement(measurement_id) -> Response:
+@api_msm_blueprint.route("/v1/measurement/<measurement_uid>")
+def get_measurement(measurement_uid) -> Response:
     """Get one measurement by measurement_id,
     Returns only the measurement without extra data from the database
     ---
     parameters:
-      - name: measurement_id
+      - name: measurement_uid
         in: path
         required: true
         type: string
@@ -98,33 +117,26 @@ def get_measurement(measurement_id) -> Response:
         description: Returns the JSON blob for the specified measurement
     """
     log = current_app.logger
+    assert measurement_uid
     param = request.args.get
-    assert measurement_id
     download = param("download", "").lower() == "true"
-    query = """SELECT s3path, linenum FROM jsonl
-        PREWHERE (report_id, input) IN (
-            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid
-        )
-        LIMIT 1"""
-    query_params = dict(uid=measurement_id)
-    lookup = query_click_one_row(sql.text(query), query_params, query_prio=3)
-    if lookup is None:
-        return jerror("Incorrect or inexistent measurement_id")
+    try:
+        s3path, linenum = measurement_uid_to_s3path_linenum(measurement_uid)
+    except MsmtNotFound:
+        return jerror("Incorrect or inexistent measurement_uid")
 
-    s3path = lookup["s3path"]
-    linenum = lookup["linenum"]
     log.debug(f"Fetching file {s3path} from S3")
     try:
         body = _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
     except Exception:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
-        return jerror("Incorrect or inexistent measurement_id")
+        return jerror("Incorrect or inexistent measurement_uid")
 
     resp = make_response(body)
     resp.mimetype = "application/json"
     resp.cache_control.max_age = 3600
     if download:
-        set_dload(resp, f"ooni_measurement-{measurement_id}.json")
+        set_dload(resp, f"ooni_measurement-{measurement_uid}.json")
 
     return resp
 
@@ -151,30 +163,48 @@ def _fetch_jsonl_measurement_body_from_s3(
     raise MsmtNotFound
 
 
+def report_id_input_to_s3path_linenum(report_id: str, input: str):
+    query = """SELECT s3path, linenum FROM jsonl
+        PREWHERE report_id = :report_id AND input = :inp
+        LIMIT 1"""
+    query_params = dict(inp=input, report_id=report_id)
+    lookup = query_click_one_row(sql.text(query), query_params, query_prio=3)
+
+    if lookup is None:
+        m = f"Missing row in jsonl table: {report_id} {input}"
+        log.error(m)
+        metrics.incr("msmt_not_found_in_jsonl")
+        raise MsmtNotFound
+
+    s3path = lookup["s3path"]
+    linenum = lookup["linenum"]
+    return s3path, linenum
+
+
 @metrics.timer("_fetch_jsonl_measurement_body_clickhouse")
 def _fetch_jsonl_measurement_body_clickhouse(
-    report_id: str, input: Optional[str], measurement_uid
+    report_id: str, input: Optional[str], measurement_uid: Optional[str]
 ) -> Optional[bytes]:
     """
     Fetch jsonl from S3, decompress it, extract single msmt
     """
-    inp = input or ""  # NULL/None input is stored as ''
-    query = """SELECT s3path, linenum FROM jsonl
-        PREWHERE report_id = :report_id AND input = :inp
-        LIMIT 1"""
-    query_params = dict(inp=inp, report_id=report_id)
-    lookup = query_click_one_row(sql.text(query), query_params, query_prio=3)
+    if measurement_uid is not None:
+        try:
+            s3path, linenum = measurement_uid_to_s3path_linenum(measurement_uid)
+        except MsmtNotFound:
+            log.error(f"Measurement {measurement_uid} not found in jsonl")
+            return None
 
-    if lookup is None:
-        m = f"Missing row in jsonl table: {report_id} {input} {measurement_uid}"
-        log.error(m)
-        metrics.incr("msmt_not_found_in_jsonl")
-        return None
+    else:
+        try:
+            inp = input or ""  # NULL/None input is stored as ''
+            s3path, linenum = report_id_input_to_s3path_linenum(report_id, input)
+        except Exception:
+            log.error(f"Measurement {report_id} {inp} not found in jsonl")
+            return None
 
-    s3path = lookup["s3path"]
-    linenum = lookup["linenum"]
-    log.debug(f"Fetching file {s3path} from S3")
     try:
+        log.debug(f"Fetching file {s3path} from S3")
         return _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
     except Exception:  # pragma: no cover
         log.error(f"Failed to fetch file {s3path} from S3")
@@ -209,6 +239,17 @@ def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes
         return None
     body = _unwrap_post(post)
     return ujson.dumps(body).encode()
+
+
+def _fetch_measurement_body_by_uid(msmt_uid: str) -> bytes:
+    """Fetch measurement body from either disk or jsonl on S3"""
+    log.debug(f"Fetching body for UID {msmt_uid}")
+    body = _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid)
+    if body is not None:
+        return body
+
+    log.debug(f"Fetching body for UID {msmt_uid} from jsonl on S3")
+    return _fetch_jsonl_measurement_body(None, None, msmt_uid)
 
 
 @metrics.timer("_fetch_measurement_body_from_hosts")
@@ -251,13 +292,14 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
 
 @metrics.timer("fetch_measurement_body")
 def _fetch_measurement_body(
-    report_id: str, input: Optional[str], measurement_uid
+    report_id: str, input: Optional[str], measurement_uid: str
 ) -> bytes:
     """Fetch measurement body from either:
     - local measurement spool dir (.post files)
     - JSONL files on S3
     - remote measurement spool dir (another API/collector host)
     """
+    # TODO: uid_cleanup
     log.debug(f"Fetching body for {report_id} {input}")
     u_count = report_id.count("_")
     # 5: Current format e.g.
@@ -268,6 +310,7 @@ def _fetch_measurement_body(
         ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y%m%d%H%M")
         fresh = measurement_uid > ts
 
+    # Do the fetching in different orders based on the likelyhood of success
     if new_format and fresh:
         body = (
             _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
@@ -306,7 +349,7 @@ def genurl(path: str, **kw) -> str:
 @api_msm_blueprint.route("/v1/raw_measurement")
 @metrics.timer("get_raw_measurement")
 def get_raw_measurement() -> Response:
-    """Get raw measurement body by measurement_id + input
+    """Get raw measurement body by report_id + input
     ---
     parameters:
       - name: report_id
@@ -338,6 +381,54 @@ def get_raw_measurement() -> Response:
     return resp
 
 
+@api_msm_blueprint.route("/v1/measurement_body_by_uid")
+@metrics.timer("measurement_body_by_uid")
+def get_measurement_body_by_uid() -> Response:
+    """Get raw measurement body by measurement_uid
+    ---
+    parameters:
+      - name: measurement_uid
+        in: query
+        type: string
+        description: The measurement_uid to search measurements for
+    responses:
+      '200':
+        description: raw measurement body, served as JSON file to be dowloaded
+    """
+    # This is used by Explorer to let users download msmts
+    param = request.args.get
+    msmt_uid = param_measurement_uid()
+    # TODO: uid_cleanup
+    msmt_meta = _get_measurement_meta_by_uid(msmt_uid)
+    body = _fetch_measurement_body(
+        msmt_meta["report_id"], msmt_meta["input"], msmt_meta["measurement_uid"]
+    )
+    resp = make_response(body)
+    resp.headers.set("Content-Type", "application/json")
+    resp.cache_control.max_age = 24 * 3600
+    return resp
+
+
+def format_msmt_meta(msmt_meta: dict) -> dict:
+    keys = (
+        "input",
+        "measurement_start_time",
+        "measurement_uid",
+        "report_id",
+        "test_name",
+        "test_start_time",
+        "probe_asn",
+        "probe_cc",
+        "scores",
+    )
+    out = {k: msmt_meta[k] for k in keys}
+    out["category_code"] = msmt_meta.get("category_code", None)
+    out["anomaly"] = msmt_meta["anomaly"] == "t"
+    out["confirmed"] = msmt_meta["confirmed"] == "t"
+    out["failure"] = msmt_meta["msm_failure"] == "t"
+    return out
+
+
 @metrics.timer("get_measurement_meta_clickhouse")
 def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> dict:
     # Given report_id + input, fetch measurement data from fastpath table
@@ -362,44 +453,48 @@ def _get_measurement_meta_clickhouse(report_id: str, input_: Optional[str]) -> d
         # https://github.com/ooni/explorer/issues/495
         return {}  # unwanted
 
-    keys = (
-        "input",
-        "measurement_start_time",
-        "measurement_uid",
-        "report_id",
-        "test_name",
-        "test_start_time",
-        "probe_asn",
-        "probe_cc",
-        "scores",
-    )
-    out = {k: msmt_meta[k] for k in keys}
-    out["category_code"] = msmt_meta.get("category_code", None)
-    out["anomaly"] = msmt_meta["anomaly"] == "t"
-    out["confirmed"] = msmt_meta["confirmed"] == "t"
-    out["failure"] = msmt_meta["msm_failure"] == "t"
-    return out
+    return format_msmt_meta(msmt_meta)
+
+
+@metrics.timer("get_measurement_meta_by_uid")
+def _get_measurement_meta_by_uid(measurement_uid: str) -> dict:
+    query = """SELECT * FROM fastpath
+        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+        WHERE measurement_uid = :uid
+        LIMIT 1
+    """
+    query_params = dict(uid=measurement_uid)
+    msmt_meta = query_click_one_row(sql.text(query), query_params, query_prio=3)
+    if not msmt_meta:
+        return {}  # measurement not found
+    if msmt_meta["probe_asn"] == 0:
+        # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
+        # https://github.com/ooni/explorer/issues/495
+        return {}  # unwanted
+
+    return format_msmt_meta(msmt_meta)
 
 
 @api_msm_blueprint.route("/v1/measurement_meta")
 @metrics.timer("get_measurement_meta")
 def get_measurement_meta() -> Response:
-    """Get metadata on one measurement by measurement_id + input
+    """Get metadata on one measurement by measurement_uid or report_id + input
     ---
     produces:
       - application/json
     parameters:
+      - name: measurement_uid
+        in: query
+        type: string
+        description: The measurement ID, mutually exclusive with report_id + input
       - name: report_id
         in: query
         type: string
         description: The report_id to search measurements for
-        minLength: 3
-        required: True
         example: 20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a
       - name: input
         in: query
         type: string
-        minLength: 3 # `input` is handled by pg_trgm
         description: The input (for example a URL or IP address) to search measurements for
       - name: full
         in: query
@@ -455,13 +550,16 @@ def get_measurement_meta() -> Response:
     # TODO: input can be '' or NULL in the fastpath table - fix it
     # TODO: see integ tests for TODO items
     param = request.args.get
-    report_id = param_report_id()
-    input_ = param_input_or_none()
-
     full = param("full", "").lower() in ("true", "1", "yes")
-    log.info(f"get_measurement_meta '{report_id}' '{input_}'")
-
-    msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
+    try:
+        msmt_uid = param_measurement_uid()
+        log.info(f"get_measurement_meta {msmt_uid}")
+        msmt_meta = _get_measurement_meta_by_uid(msmt_uid)
+    except Exception:
+        report_id = param_report_id()
+        input_ = param_input_or_none()
+        log.info(f"get_measurement_meta {report_id} {input_}")
+        msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
 
     assert isinstance(msmt_meta, dict)
     if not full:
@@ -471,7 +569,10 @@ def get_measurement_meta() -> Response:
         return cachedjson("1m", raw_measurement="", **msmt_meta)
 
     try:
-        body = _fetch_measurement_body(report_id, input_, msmt_meta["measurement_uid"])
+        # TODO: uid_cleanup
+        body = _fetch_measurement_body(
+            msmt_meta["report_id"], msmt_meta["input"], msmt_meta["measurement_uid"]
+        )
         assert isinstance(body, bytes)
         body = body.decode()
     except Exception as e:
