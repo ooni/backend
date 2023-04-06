@@ -363,32 +363,6 @@ def get_raw_measurement() -> Response:
         type: string
         minLength: 3
         description: The input (for example a URL or IP address) to search measurements for
-    responses:
-      '200':
-        description: raw measurement body, served as JSON file to be dowloaded
-    """
-    # This is used by Explorer to let users download msmts
-    param = request.args.get
-    report_id = param_report_id()
-    input_ = param("input")
-
-    # _fetch_measurement_body needs the UID
-    msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
-    measurement_uid = msmt_meta["measurement_uid"]
-
-    body = _fetch_measurement_body(report_id, input_, measurement_uid)
-    resp = make_response(body)
-    resp.headers.set("Content-Type", "application/json")
-    resp.cache_control.max_age = 24 * 3600
-    return resp
-
-
-@api_msm_blueprint.route("/v1/measurement_body_by_uid")
-@metrics.timer("measurement_body_by_uid")
-def get_measurement_body_by_uid() -> Response:
-    """Get raw measurement body by measurement_uid
-    ---
-    parameters:
       - name: measurement_uid
         in: query
         type: string
@@ -398,17 +372,30 @@ def get_measurement_body_by_uid() -> Response:
         description: raw measurement body, served as JSON file to be dowloaded
     """
     # This is used by Explorer to let users download msmts
-    param = request.args.get
-    msmt_uid = param_measurement_uid()
-    # TODO: uid_cleanup
-    msmt_meta = _get_measurement_meta_by_uid(msmt_uid)
-    body = _fetch_measurement_body(
-        msmt_meta["report_id"], msmt_meta["input"], msmt_meta["measurement_uid"]
-    )
-    resp = make_response(body)
+    try:
+        msmt_uid = param_measurement_uid()
+        # TODO: uid_cleanup
+        msmt_meta = _get_measurement_meta_by_uid(msmt_uid)
+    except Exception:
+        report_id = param_report_id()
+        param = request.args.get
+        input_ = param("input")
+        # _fetch_measurement_body needs the UID
+        msmt_meta = _get_measurement_meta_clickhouse(report_id, input_)
+
+    if msmt_meta:
+        body = _fetch_measurement_body(
+            msmt_meta["report_id"], msmt_meta["input"], msmt_meta["measurement_uid"]
+        )
+        resp = make_response(body)
+    else:
+        resp = make_response({})
+
     resp.headers.set("Content-Type", "application/json")
     resp.cache_control.max_age = 24 * 3600
     return resp
+
+
 
 
 def format_msmt_meta(msmt_meta: dict) -> dict:
@@ -935,14 +922,8 @@ def _list_measurements_click(
         rows = query_click(query, query_params)
         tmpresults = []
         for row in rows:
-            if row["input"] in (None, ""):
-                url = genurl("/api/v1/raw_measurement", report_id=row["report_id"])
-            else:
-                url = genurl(
-                    "/api/v1/raw_measurement",
-                    report_id=row["report_id"],
-                    input=row["input"],
-                )
+            msmt_uid = row["measurement_uid"]
+            url = genurl("/api/v1/raw_measurement", measurement_uid=msmt_uid)
             tmpresults.append(
                 {
                     "measurement_url": url,

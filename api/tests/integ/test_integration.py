@@ -397,6 +397,7 @@ def test_get_measurement_meta_by_uid(client):
         "category_code": "",
     }
 
+
 def test_get_measurement_meta_by_uid_full(client):
     uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
     response = api(client, f"measurement_meta?measurement_uid={uid}&full=True")
@@ -424,6 +425,18 @@ def test_get_raw_measurement(client):
     inp = "https://www.backtrack-linux.org/"
     r = api(client, f"raw_measurement?report_id={rid}&input={inp}")
     assert len(r.keys()) == 20
+
+
+def test_get_measurement_body_by_uid(client):
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    r = api(client, f"raw_measurement?measurement_uid={uid}")
+    assert len(r.keys()) == 20
+
+
+def test_get_measurement_body_by_uid_missing(client):
+    uid = "20210709005529.664022_MY_webconnectivity_bogusbogusbogusb"
+    r = api(client, f"raw_measurement?measurement_uid={uid}")
+    assert len(r.keys()) == 0
 
 
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
@@ -483,7 +496,7 @@ def test_list_measurements_one(client):
         "failure": False,
         "input": inp,
         "measurement_start_time": "2021-07-09T00:55:13Z",
-        "measurement_url": "https://api.ooni.io/api/v1/raw_measurement?report_id=20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3&input=https%3A%2F%2Fwww.backtrack-linux.org%2F",
+        "measurement_url": "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
         "probe_asn": "AS4818",
         "probe_cc": "MY",
         "report_id": rid,
