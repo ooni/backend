@@ -902,13 +902,13 @@
                 "summary": "Probe Services: login"
             }
         },
-        "/api/v1/measurement/{measurement_id}": {
+        "/api/v1/measurement/{measurement_uid}": {
             "get": {
                 "description": "Returns only the measurement without extra data from the database<br/>",
                 "parameters": [
                     {
                         "in": "path",
-                        "name": "measurement_id",
+                        "name": "measurement_uid",
                         "required": true,
                         "type": "string"
                     },
@@ -927,22 +927,43 @@
                 "summary": "Get one measurement by measurement_id,"
             }
         },
+        "/api/v1/measurement_body_by_uid": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "The measurement_uid to search measurements for",
+                        "in": "query",
+                        "name": "measurement_uid",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "raw measurement body, served as JSON file to be dowloaded"
+                    }
+                },
+                "summary": "Get raw measurement body by measurement_uid"
+            }
+        },
         "/api/v1/measurement_meta": {
             "get": {
                 "parameters": [
                     {
+                        "description": "The measurement ID, mutually exclusive with report_id + input",
+                        "in": "query",
+                        "name": "measurement_uid",
+                        "type": "string"
+                    },
+                    {
                         "description": "The report_id to search measurements for",
                         "example": "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a",
                         "in": "query",
-                        "minLength": 3,
                         "name": "report_id",
-                        "required": true,
                         "type": "string"
                     },
                     {
                         "description": "The input (for example a URL or IP address) to search measurements for",
                         "in": "query",
-                        "minLength": 3,
                         "name": "input",
                         "type": "string"
                     },
@@ -1018,7 +1039,7 @@
                         }
                     }
                 },
-                "summary": "Get metadata on one measurement by measurement_id + input"
+                "summary": "Get metadata on one measurement by measurement_uid or report_id + input"
             }
         },
         "/api/v1/measurements": {
@@ -1188,7 +1209,7 @@
                         "description": "raw measurement body, served as JSON file to be dowloaded"
                     }
                 },
-                "summary": "Get raw measurement body by measurement_id + input"
+                "summary": "Get raw measurement body by report_id + input"
             }
         },
         "/api/v1/register": {
