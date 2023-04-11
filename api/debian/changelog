@@ -1,3 +1,9 @@
+ooni-api (1.0.55) unstable; urgency=medium
+
+  * Compare measurement and probe ipaddr CC/ASN
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 11 Apr 2023 18:25:31 +0100
+
 ooni-api (1.0.54) unstable; urgency=medium
 
   * Support fetching measurement metadata and raw body by measurement_uid
