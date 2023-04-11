@@ -813,9 +813,12 @@ def compare_probe_msmt_cc_asn(cc: str, asn: str):
     Generates a metric.
     """
     try:
+        cc = cc.upper()
         ipaddr = extract_probe_ipaddr()
         db_probe_cc = lookup_probe_cc(ipaddr)
         db_asn, _ = lookup_probe_network(ipaddr)
+        if db_asn.startswith("AS"):
+            db_asn = db_asn[2:]
         if db_probe_cc == cc and db_asn == asn:
             metrics.incr("probe_cc_asn_match")
         else:
