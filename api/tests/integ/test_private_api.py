@@ -345,3 +345,38 @@ def test_private_api_domains(client, log):
     assert d["facebook.com"] == "GRP"
     assert d["ncac.org"] == "NEWS"
     assert d["twitter.com"] == "GRP"
+
+
+# # /check-in
+
+from mock import patch
+
+
+def postj(client, url, **kw):
+    response = client.post(url, json=kw)
+    assert response.status_code == 200
+    assert response.is_json
+    return response.json
+
+
+def test_private_check_in_basic(client):
+    j = dict(
+        probe_cc="US",
+        probe_asn="AS1234",
+        on_wifi=True,
+        charging=False,
+    )
+    with patch("ooniapi.probe_services._load_json", new_callable=mock_load_json):
+        c = postj(client, "/api/v1/check-in", **j)
+
+    assert c["v"] == 1
+    urls = c["tests"]["web_connectivity"]["urls"]
+    assert len(urls) > 1, urls
+
+    webc_rid = c["tests"]["web_connectivity"]["report_id"]
+    ts, stn, cc, asn_i, _coll, _rand = webc_rid.split("_")
+    assert int(asn_i) == 1234
+    assert stn == "webconnectivity"
+    assert cc == "US"
+
+    assert sorted(c["conf"]) == ["features", "test_helpers"]

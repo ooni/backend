@@ -1011,3 +1011,194 @@ def api_private_domains() -> Response:
         return cachedjson("2h", v=0, results=results)
     except Exception as e:
         return jerror(str(e), v=0)
+
+
+@api_private_blueprint.route("/check-in", methods=["POST"])
+def private_api_check_in() -> Response:
+    """Private check-in.
+    ---
+    produces:
+      - application/json
+    consumes:
+      - application/json
+    parameters:
+      - in: body
+        name: probe self-description
+        required: true
+        schema:
+          type: object
+          properties:
+            probe_cc:
+              type: string
+              description: Two letter, uppercase country code
+              example: IT
+            probe_asn:
+              type: string
+              description: ASN, two uppercase letters followed by number
+              example: AS1234
+            platform:
+              type: string
+              example: android
+            software_name:
+              type: string
+              example: ooniprobe
+            software_version:
+              type: string
+              example: 0.0.1
+            on_wifi:
+              type: boolean
+            charging:
+              description: set only on devices with battery; true when charging
+              type: boolean
+            run_type:
+              type: string
+              description: timed or manual
+              example: timed
+
+            web_connectivity:
+              type: object
+              properties:
+                category_codes:
+                  description: List/array of URL categories, all uppercase
+                  type: array
+                  items:
+                    type: string
+                    example: NEWS
+        description: probe_asn and probe_cc are not provided if unknown
+
+    responses:
+      '200':
+        description: Give a URL test list to a probe running web_connectivity
+          tests; additional data for other tests;
+        schema:
+          type: object
+          properties:
+            v:
+              type: integer
+              description: response format version
+            probe_cc:
+              type: string
+              description: probe CC inferred from GeoIP or ZZ
+            probe_asn:
+              type: string
+              description: probe ASN inferred from GeoIP or AS0
+            probe_network_name:
+              type: string
+              description: probe network name inferred from GeoIP or None
+            utc_time:
+              type: string
+              description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
+            conf:
+              type: object
+              description: auxiliary configuration parameters
+              features:
+                type: object
+                description: feature flags
+            nettests:
+              type: array
+              items:
+                type: object
+                description: test-specific configuration
+                properties:
+                  test_name: string
+                  report_id: string
+                  targets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        attributes:
+                          type: object
+                        input: string
+                        options:
+                          type: object
+
+    """
+    log = current_app.logger
+    # TODO: Implement throttling
+    data = req_json()
+    run_type = data.get("run_type", "timed")
+    charging = data.get("charging", True)
+    probe_cc = data.get("probe_cc", "ZZ").upper()
+    probe_asn = data.get("probe_asn", "AS0")
+
+    resp, probe_cc, asn_i = probe_geoip(probe_cc, probe_asn)
+
+    # On run_type=manual preserve the old behavior: test the whole list
+    # On timed runs test few URLs, especially when on battery
+    if run_type == "manual":
+        url_limit = 9999  # same as prio.py
+    elif charging:
+        url_limit = 100
+    else:
+        url_limit = 20
+
+    if "web_connectivity" in data:
+        catcodes = data["web_connectivity"].get("category_codes", [])
+        if isinstance(catcodes, str):
+            category_codes = catcodes.split(",")
+        else:
+            category_codes = catcodes
+
+    else:
+        category_codes = []
+
+    for c in category_codes:
+        assert c.isalpha()
+
+    try:
+        test_items, _1, _2 = generate_test_list(
+            probe_cc, category_codes, asn_i, url_limit, False
+        )
+    except Exception as e:
+        log.error(e, exc_info=True)
+        # TODO: use same failover as prio.py:list_test_urls
+        # failover_generate_test_list runs without any database interaction
+        # test_items = failover_generate_test_list(country_code, category_codes, limit)
+        test_items = []
+
+    metrics.gauge("check-in-test-list-count", len(test_items))
+    conf: Dict[str, Any] = dict(features={})
+
+    # set webconnectivity_0.5 feature flag for some probes
+    octect = extract_probe_ipaddr_octect(1, 0)
+    if octect in (34, 239):
+        conf["features"]["webconnectivity_0.5"] = True
+
+    conf["test_helpers"] = generate_test_helpers_conf()
+
+    resp["tests"] = {
+        "web_connectivity": {"urls": test_items},
+    }
+    resp["conf"] = conf
+    resp["utc_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    test_names = (
+        "bridge_reachability",
+        "dash",
+        "dns_consistency",
+        "dnscheck",
+        "facebook_messenger",
+        "http_header_field_manipulation",
+        "http_host",
+        "http_invalid_request_line",
+        "http_requests",
+        "meek_fronted_requests_test",
+        "multi_protocol_traceroute",
+        "ndt",
+        "psiphon",
+        "riseupvpn",
+        "tcp_connect",
+        "telegram",
+        "tor",
+        "urlgetter",
+        "vanilla_tor",
+        "web_connectivity",
+        "whatsapp",
+    )
+    for tn in test_names:
+        rid = generate_report_id(tn, probe_cc, asn_i)
+        resp["tests"].setdefault(tn, {})  # type: ignore
+        resp["tests"][tn]["report_id"] = rid  # type: ignore
+
+    return nocachejson(**resp)
