@@ -758,9 +758,9 @@ def list_measurements() -> Response:
     INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
 
     ## Create fastpath columns for query
-    # TODO castscores,   coalesce inputas ""
+    # TODO cast scores, coalesce input as ""
     fpwhere = []
-    query_params = {}
+    query_params: Dict[str, Any] = {}
 
     # Populate WHERE clauses and query_params dict
 
