@@ -574,17 +574,6 @@ def get_measurement_meta() -> Response:
 # # Listing measurements
 
 
-def _merge_results(tmpresults):
-    """Trim list_measurements() outputs that share the same report_id/input"""
-    resultsmap = {}
-    for r in tmpresults:
-        k = (r["report_id"], r["input"])
-        if k not in resultsmap:
-            resultsmap[k] = r
-
-    return tuple(resultsmap.values())
-
-
 @api_msm_blueprint.route("/v1/measurements")
 @metrics.timer("list_measurements")
 def list_measurements() -> Response:
@@ -705,8 +694,6 @@ def list_measurements() -> Response:
     # - lang: 'curl'
     #    source: |
     #    curl "https://api.ooni.io/api/v1/measurements?probe_cc=IT&confirmed=true&since=2017-09-01"
-    # TODO: list_measurements and get_measurement will be simplified and
-    # made faster by OOID: https://github.com/ooni/pipeline/issues/48
     param = request.args.get
     report_id = param_report_id_or_none()
     probe_asn = param_asn("probe_asn")  # int / None
@@ -747,8 +734,7 @@ def list_measurements() -> Response:
     input_ = request.args.get("input")
     domain = request.args.get("domain")
 
-    # Set reasonable since/until ranges if not specified. When looking up by
-    # report_id a BTREE is used and since/until are not beneficial.
+    # Set reasonable since/until ranges if not specified.
     try:
         if until is None:
             if report_id is None:
@@ -767,44 +753,8 @@ def list_measurements() -> Response:
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
 
-    return _list_measurements_click(
-        since,
-        until,
-        report_id,
-        probe_cc,
-        probe_asn,
-        test_name,
-        anomaly,
-        confirmed,
-        failure,
-        input_,
-        domain,
-        category_code,
-        order,
-        order_by,
-        limit,
-        offset,
-    )
+    # # Perform query
 
-
-def _list_measurements_click(
-    since,
-    until,
-    report_id: ostr,
-    probe_cc: ostr,
-    probe_asn: Optional[int],
-    test_name: ostr,
-    anomaly,
-    confirmed,
-    failure,
-    input_: ostr,
-    domain: ostr,
-    category_code,
-    order: ostr,
-    order_by,
-    limit,
-    offset,
-) -> Response:
     INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
 
     ## Create fastpath columns for query
@@ -870,11 +820,9 @@ def _list_measurements_click(
         fpwhere.append(sql.text("fastpath.confirmed = 'f'"))
 
     if failure is True:
-        # residual_no is never NULL, msm_failure is always NULL
         fpwhere.append(sql.text("fastpath.msm_failure = 't'"))
 
     elif failure is False:
-        # on success measurement.exc is NULL
         fpwhere.append(sql.text("fastpath.msm_failure = 'f'"))
 
     fpq_table = sql.table("fastpath")
@@ -899,10 +847,6 @@ def _list_measurements_click(
             fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
     fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
-    # .limit(offset + limit)
-
-    # SELECT * FROM fastpath  WHERE measurement_start_time <= '2019-01-01T00:00:00'::timestamp AND probe_cc = 'YT' ORDER BY test_start_time desc   LIMIT 100 OFFSET 0;
-    # is using BRIN and running slowly
 
     if order_by is None:
         order_by = "measurement_start_time"
@@ -920,12 +864,13 @@ def _list_measurements_click(
 
     try:
         rows = query_click(query, query_params)
-        tmpresults = []
+        results = []
         for row in rows:
             msmt_uid = row["measurement_uid"]
             url = genurl("/api/v1/raw_measurement", measurement_uid=msmt_uid)
-            tmpresults.append(
+            results.append(
                 {
+                    "measurement_uid": msmt_uid,
                     "measurement_url": url,
                     "report_id": row["report_id"],
                     "probe_cc": row["probe_cc"],
@@ -949,9 +894,6 @@ def _list_measurements_click(
 
         raise exc
 
-    # For each report_id / input tuple, we want at most one entry.
-    results = _merge_results(tmpresults)
-
     # Replace the special value INULL for "input" with None
     for i, r in enumerate(results):
         if r["input"] == INULL:
@@ -963,7 +905,7 @@ def _list_measurements_click(
 
     # We got less results than what we expected, we know the count and that
     # we are done
-    if len(tmpresults) < limit:
+    if len(results) < limit:
         count = offset + len(results)
         pages = math.ceil(count / limit)
         next_url = None
