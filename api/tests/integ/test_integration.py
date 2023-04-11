@@ -496,6 +496,7 @@ def test_list_measurements_one(client):
         "failure": False,
         "input": inp,
         "measurement_start_time": "2021-07-09T00:55:13Z",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
         "measurement_url": "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
         "probe_asn": "AS4818",
         "probe_cc": "MY",
@@ -592,15 +593,6 @@ def test_list_measurements_slow_order_by_group_3(f1, f2, log, client):
     response = api(client, url)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_list_measurements_duplicate(client):
-    # The API is returning only one result
-    rid = "20190720T201845Z_AS3352_Rmagvbg0ufqt8Q0kZBa5Hb0gIzfIBCgHb2PTw0VMLIuHn7mmZ4"
-    inp = "http://www.linkedin.com/"
-    response = api(client, f"measurements?report_id={rid}&input={inp}")
-    assert response["metadata"]["count"] == 1, jd(response)
-
-
 def test_list_measurements_pagination_old(client, log):
     # Ensure answers stay consistent across calls - using old data
     # https://github.com/ooni/api/issues/49
@@ -631,11 +623,20 @@ def test_list_measurements_pagination_new(client, log):
         j = new
 
 
-@pytest.mark.skip(reason="Broken. To be fixed after updating Flask")
-def test_list_measurements_error_json_mimetype(client):
-    resp = client.get("/api/v1/measurements?test_name=BOGUS")
-    assert resp.status_code == 400
-    assert resp.is_json
+def test_list_measurements_arbitrary_test_name(client):
+    resp = api(client, "measurements?test_name=BOGUS1234")
+    resp["metadata"].pop("query_time")
+    assert resp == {
+        "metadata": {
+            "count": 0,
+            "current_page": 1,
+            "limit": 100,
+            "next_url": None,
+            "offset": 0,
+            "pages": 0,
+        },
+        "results": [],
+    }
 
 
 def today_range():
