@@ -28,8 +28,12 @@ from ooniapi.models import TEST_GROUPS
 from ooniapi.prio import generate_test_list
 from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
 
-from ooniapi.probe_services import probe_geoip, extract_probe_ipaddr_octect, \
-    generate_test_helpers_conf, generate_report_id
+from ooniapi.probe_services import (
+    probe_geoip,
+    extract_probe_ipaddr_octect,
+    generate_test_helpers_conf,
+    generate_report_id,
+)
 
 # The private API is exposed under the prefix /api/_
 # e.g. https://api.ooni.io/api/_/test_names
@@ -1152,7 +1156,7 @@ def private_api_check_in() -> Response:
         assert c.isalpha()
 
     try:
-        test_items, _1, _2 = generate_test_list(
+        webconn_test_items, _1, _2 = generate_test_list(
             probe_cc, category_codes, asn_i, url_limit, False
         )
     except Exception as e:
@@ -1160,9 +1164,9 @@ def private_api_check_in() -> Response:
         # TODO: use same failover as prio.py:list_test_urls
         # failover_generate_test_list runs without any database interaction
         # test_items = failover_generate_test_list(country_code, category_codes, limit)
-        test_items = []
+        webconn_test_items = []
 
-    metrics.gauge("check-in-test-list-count", len(test_items))
+    metrics.gauge("check-in-test-list-count", len(webconn_test_items))
     conf: Dict[str, Any] = dict(features={})
 
     # set webconnectivity_0.5 feature flag for some probes
@@ -1172,9 +1176,6 @@ def private_api_check_in() -> Response:
 
     conf["test_helpers"] = generate_test_helpers_conf()
 
-    resp["tests"] = {
-        "web_connectivity": {"urls": test_items},
-    }
     resp["conf"] = conf
     resp["utc_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -1201,9 +1202,24 @@ def private_api_check_in() -> Response:
         "web_connectivity",
         "whatsapp",
     )
+    resp["nettests"] = []
+    # Add one example for each nettest
     for tn in test_names:
         rid = generate_report_id(tn, probe_cc, asn_i)
-        resp["tests"].setdefault(tn, {})  # type: ignore
-        resp["tests"][tn]["report_id"] = rid  # type: ignore
+        targets = []
+        if tn == "web_connectivity":
+            for d in webconn_test_items:
+                tgt = {
+                    "attributes": {
+                        "category_code": d["category_code"],
+                        "country_code": d["country_code"],
+                    },
+                    "input": d["url"],
+                    "options": {},
+                }
+                targets.append(tgt)
+
+        block = {"test_name": tn, "report_id": rid, "targets": targets}
+        resp["nettests"].append(block)
 
     return nocachejson(**resp)

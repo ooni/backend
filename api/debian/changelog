@@ -1,3 +1,9 @@
+ooni-api (1.0.56) unstable; urgency=medium
+
+  * Add experimental private check-in
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 12 Apr 2023 16:36:16 +0100
+
 ooni-api (1.0.55) unstable; urgency=medium
 
   * Compare measurement and probe ipaddr CC/ASN

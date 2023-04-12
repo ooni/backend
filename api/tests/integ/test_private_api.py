@@ -372,13 +372,8 @@ def test_private_check_in_basic(client):
         c = postj(client, "/api/_/check-in", **j)
 
     assert c["v"] == 2
-    urls = c["tests"]["web_connectivity"]["urls"]
-    assert len(urls) > 1, "No urls returned"
-
-    webc_rid = c["tests"]["web_connectivity"]["report_id"]
-    ts, stn, cc, asn_i, _coll, _rand = webc_rid.split("_")
-    assert int(asn_i) == 1234
-    assert stn == "webconnectivity"
-    assert cc == "US"
-
-    assert sorted(c["conf"]) == ["features", "test_helpers"]
+    assert c["nettests"]
+    for t in c["nettests"]:
+        if t["test_name"] == "web_connectivity":
+            break
+    assert 0, t
