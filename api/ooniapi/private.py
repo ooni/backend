@@ -1225,7 +1225,7 @@ def private_api_check_in() -> Response:
                 tgt = {"attributes": {}, "input": url, "options": {}}
                 targets.append(tgt)
         elif tn == "stunreachability":
-            for d in webconn_test_items:
+            for url in stunreachability_inputs:
                 tgt = {"attributes": {}, "input": url, "options": {}}
                 targets.append(tgt)
 
