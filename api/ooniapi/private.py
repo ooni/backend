@@ -23,6 +23,7 @@ from werkzeug.exceptions import BadRequest
 from ooniapi.auth import role_required
 from ooniapi.config import metrics
 from ooniapi.countries import lookup_country
+from ooniapi.data import dnscheck_inputs, stunreachability_inputs
 from ooniapi.database import query_click, query_click_one_row
 from ooniapi.models import TEST_GROUPS
 from ooniapi.prio import generate_test_list
@@ -1198,6 +1199,7 @@ def private_api_check_in() -> Response:
         "telegram",
         "tor",
         "urlgetter",
+        "stunreachability",
         "vanilla_tor",
         "web_connectivity",
         "whatsapp",
@@ -1217,6 +1219,14 @@ def private_api_check_in() -> Response:
                     "input": d["url"],
                     "options": {},
                 }
+                targets.append(tgt)
+        elif tn == "dnscheck":
+            for url in dnscheck_inputs:
+                tgt = {"attributes": {}, "input": url, "options": {}}
+                targets.append(tgt)
+        elif tn == "stunreachability":
+            for d in webconn_test_items:
+                tgt = {"attributes": {}, "input": url, "options": {}}
                 targets.append(tgt)
 
         block = {"test_name": tn, "report_id": rid, "targets": targets}
