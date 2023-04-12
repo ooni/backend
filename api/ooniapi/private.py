@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
-from typing import Dict
+from typing import Dict, Any
 
 import logging
 import math
