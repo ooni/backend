@@ -21,10 +21,15 @@ from sqlalchemy import sql
 from werkzeug.exceptions import BadRequest
 
 from ooniapi.auth import role_required
+from ooniapi.config import metrics
+from ooniapi.countries import lookup_country
 from ooniapi.database import query_click, query_click_one_row
 from ooniapi.models import TEST_GROUPS
-from ooniapi.countries import lookup_country
-from ooniapi.utils import cachedjson, nocachejson, jerror
+from ooniapi.prio import generate_test_list
+from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
+
+from ooniapi.probe_services import probe_geoip, extract_probe_ipaddr_octect, \
+    generate_test_helpers_conf, generate_report_id
 
 # The private API is exposed under the prefix /api/_
 # e.g. https://api.ooni.io/api/_/test_names
@@ -1015,7 +1020,7 @@ def api_private_domains() -> Response:
 
 @api_private_blueprint.route("/check-in", methods=["POST"])
 def private_api_check_in() -> Response:
-    """Private check-in.
+    """Private, experimental check-in
     ---
     produces:
       - application/json
@@ -1054,7 +1059,6 @@ def private_api_check_in() -> Response:
               type: string
               description: timed or manual
               example: timed
-
             web_connectivity:
               type: object
               properties:
@@ -1123,6 +1127,7 @@ def private_api_check_in() -> Response:
     probe_asn = data.get("probe_asn", "AS0")
 
     resp, probe_cc, asn_i = probe_geoip(probe_cc, probe_asn)
+    resp["v"] = 2
 
     # On run_type=manual preserve the old behavior: test the whole list
     # On timed runs test few URLs, especially when on battery

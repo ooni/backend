@@ -5,6 +5,8 @@
 
 import pytest
 
+from tests.utils import mock_load_json
+
 
 def privapi(client, subpath):
     response = client.get(f"/api/_/{subpath}")
@@ -367,11 +369,11 @@ def test_private_check_in_basic(client):
         charging=False,
     )
     with patch("ooniapi.probe_services._load_json", new_callable=mock_load_json):
-        c = postj(client, "/api/v1/check-in", **j)
+        c = postj(client, "/api/_/check-in", **j)
 
-    assert c["v"] == 1
+    assert c["v"] == 2
     urls = c["tests"]["web_connectivity"]["urls"]
-    assert len(urls) > 1, urls
+    assert len(urls) > 1, "No urls returned"
 
     webc_rid = c["tests"]["web_connectivity"]["report_id"]
     ts, stn, cc, asn_i, _coll, _rand = webc_rid.split("_")

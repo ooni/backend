@@ -1,10 +1,10 @@
-import pytest
-import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 from textwrap import dedent
 from typing import List
+import subprocess
 
+import pytest
 import flask
 from clickhouse_driver import Client as Clickhouse
 
