@@ -808,6 +808,25 @@ def open_report() -> Response:
     )
 
 
+def compare_probe_msmt_cc_asn(cc: str, asn: str):
+    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
+    Generates a metric.
+    """
+    try:
+        cc = cc.upper()
+        ipaddr = extract_probe_ipaddr()
+        db_probe_cc = lookup_probe_cc(ipaddr)
+        db_asn, _ = lookup_probe_network(ipaddr)
+        if db_asn.startswith("AS"):
+            db_asn = db_asn[2:]
+        if db_probe_cc == cc and db_asn == asn:
+            metrics.incr("probe_cc_asn_match")
+        else:
+            metrics.incr("probe_cc_asn_nomatch")
+    except Exception:
+        pass
+
+
 @probe_services_blueprint.route("/report/<report_id>", methods=["POST"])
 @metrics.timer("receive_measurement")
 def receive_measurement(report_id) -> Response:
@@ -893,6 +912,7 @@ def receive_measurement(report_id) -> Response:
     msmt_f_tmp.rename(msmt_f)
     metrics.incr("receive_measurement_count")
 
+    compare_probe_msmt_cc_asn(cc, asn)
     try:
         url = f"http://127.0.0.1:8472/{msmt_uid}"
         urlopen(url, data, 59)
