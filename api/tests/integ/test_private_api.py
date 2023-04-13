@@ -374,6 +374,61 @@ def test_private_check_in_basic(client):
     assert c["v"] == 2
     assert c["nettests"]
     for t in c["nettests"]:
-        if t["test_name"] == "web_connectivity":
+        assert sorted(t) == ["report_id", "targets", "test_name"]
+
+    for t in c["nettests"]:
+        if t["test_name"] == "dnscheck":
+            assert t["targets"]
+            assert t["targets"][0] == {
+                "attributes": {},
+                "input": "https://dns.google/dns-query",
+                "options": {},
+            }
             break
-    assert 0, t
+
+    for t in c["nettests"]:
+        if t["test_name"] == "stunreachability":
+            assert t["targets"]
+            assert t["targets"][0] == {
+                "attributes": {},
+                "input": "stun://stun.voip.blackberry.com:3478",
+                "options": {},
+            }
+            break
+
+    exp = [
+        "bridge_reachability",
+        "dash",
+        "dns_consistency",
+        "dnscheck",
+        "dnsping",
+        "echcheck",
+        "facebook_messenger",
+        "http_header_field_manipulation",
+        "http_host",
+        "http_invalid_request_line",
+        "http_requests",
+        "meek_fronted_requests_test",
+        "multi_protocol_traceroute",
+        "ndt",
+        "portfiltering",
+        "psiphon",
+        "quicping",
+        "riseupvpn",
+        "signal",
+        "simplequicping",
+        "sniblocking",
+        "stunreachability",
+        "tcp_connect",
+        "tcpping",
+        "telegram",
+        "tlsmiddlebox",
+        "tlsping",
+        "tor",
+        "torsf",
+        "urlgetter",
+        "vanilla_tor",
+        "web_connectivity",
+        "whatsapp",
+    ]
+    assert sorted([t["test_name"] for t in c["nettests"]]) == exp
