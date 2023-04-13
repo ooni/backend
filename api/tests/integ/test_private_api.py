@@ -5,6 +5,8 @@
 
 import pytest
 
+from tests.utils import mock_load_json
+
 
 def privapi(client, subpath):
     response = client.get(f"/api/_/{subpath}")
@@ -345,3 +347,88 @@ def test_private_api_domains(client, log):
     assert d["facebook.com"] == "GRP"
     assert d["ncac.org"] == "NEWS"
     assert d["twitter.com"] == "GRP"
+
+
+# # /check-in
+
+from mock import patch
+
+
+def postj(client, url, **kw):
+    response = client.post(url, json=kw)
+    assert response.status_code == 200
+    assert response.is_json
+    return response.json
+
+
+def test_private_check_in_basic(client):
+    j = dict(
+        probe_cc="US",
+        probe_asn="AS1234",
+        on_wifi=True,
+        charging=False,
+    )
+    with patch("ooniapi.probe_services._load_json", new_callable=mock_load_json):
+        c = postj(client, "/api/_/check-in", **j)
+
+    assert c["v"] == 2
+    assert c["nettests"]
+    for t in c["nettests"]:
+        assert sorted(t) == ["report_id", "targets", "test_name"]
+
+    for t in c["nettests"]:
+        if t["test_name"] == "dnscheck":
+            assert t["targets"]
+            assert t["targets"][0] == {
+                "attributes": {},
+                "input": "https://dns.google/dns-query",
+                "options": {},
+            }
+            break
+
+    for t in c["nettests"]:
+        if t["test_name"] == "stunreachability":
+            assert t["targets"]
+            assert t["targets"][0] == {
+                "attributes": {},
+                "input": "stun://stun.voip.blackberry.com:3478",
+                "options": {},
+            }
+            break
+
+    exp = [
+        "bridge_reachability",
+        "dash",
+        "dns_consistency",
+        "dnscheck",
+        "dnsping",
+        "echcheck",
+        "facebook_messenger",
+        "http_header_field_manipulation",
+        "http_host",
+        "http_invalid_request_line",
+        "http_requests",
+        "meek_fronted_requests_test",
+        "multi_protocol_traceroute",
+        "ndt",
+        "portfiltering",
+        "psiphon",
+        "quicping",
+        "riseupvpn",
+        "signal",
+        "simplequicping",
+        "sniblocking",
+        "stunreachability",
+        "tcp_connect",
+        "tcpping",
+        "telegram",
+        "tlsmiddlebox",
+        "tlsping",
+        "tor",
+        "torsf",
+        "urlgetter",
+        "vanilla_tor",
+        "web_connectivity",
+        "whatsapp",
+    ]
+    assert sorted([t["test_name"] for t in c["nettests"]]) == exp

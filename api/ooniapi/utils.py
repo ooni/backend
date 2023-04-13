@@ -1,8 +1,10 @@
 from csv import DictWriter
 from datetime import datetime
-from flask import make_response, Response
+from flask import request, make_response, Response
 from flask.json import jsonify
 from io import StringIO
+
+import ujson
 
 ISO_TIMESTAMP_SHORT = "%Y%m%dT%H%M%SZ"
 OONI_EPOCH = datetime(2012, 12, 5)
@@ -53,3 +55,10 @@ def convert_to_csv(r) -> str:
     result = csvf.getvalue()
     csvf.close()
     return result
+
+def req_json():
+    # Some probes are not setting the JSON mimetype.
+    # if request.is_json():
+    #    return request.json
+    # TODO: switch to request.get_json(force=True) ?
+    return ujson.loads(request.data)

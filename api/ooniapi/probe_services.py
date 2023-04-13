@@ -19,20 +19,12 @@ import jwt.exceptions  # debdeps: python3-jwt
 import geoip2.errors  # debdeps: python3-geoip2
 
 from ooniapi.config import metrics
-from ooniapi.utils import cachedjson, nocachejson, jerror
+from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
 
 from ooniapi.auth import create_jwt, decode_jwt
 from ooniapi.prio import generate_test_list
 
 probe_services_blueprint = Blueprint("ps_api", "probe_services")
-
-
-def req_json():
-    # Some probes are not setting the JSON mimetype.
-    # if request.is_json():
-    #    return request.json
-    # TODO: switch to request.get_json(force=True) ?
-    return ujson.loads(request.data)
 
 
 def generate_report_id(test_name, cc: str, asn_i: int) -> str:
