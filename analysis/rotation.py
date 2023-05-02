@@ -207,14 +207,15 @@ def destroy_droplet_in_db_table(
 def destroy_drained_droplets(
     click, draining_time_minutes: int, live_droplets: list, dns_zone: str
 ) -> None:
+    # Pick droplets to be destroyed
     q = """SELECT name, rdn, draining_at FROM test_helper_instances
         FINAL
         WHERE provider = 'Digital Ocean'
         AND dns_zone = %(dns_zone)s
         AND draining_at IS NOT NULL
+        AND destroyed_at IS NULL
         AND draining_at < NOW() - interval %(mins)s minute
         ORDER BY draining_at
-        LIMIT 1
     """
     log.info(q)
     rows = click.execute(q, dict(dns_zone=dns_zone, mins=draining_time_minutes))
@@ -222,17 +223,17 @@ def destroy_drained_droplets(
         log.info("No droplet to destroy")
         return
 
-    name, rdn, draining_at = rows[0]
-    to_delete = [d for d in live_droplets if d.name == name]
-    if not to_delete:
-        log.error(f"{name} found in database but not found on Digital Ocean")
-        return
+    for name, rdn, draining_at in rows:
+        to_delete = [d for d in live_droplets if d.name == name]
+        if not to_delete:
+            log.error(f"{name} found in database but not found on Digital Ocean")
+            continue
 
-    for droplet in to_delete:
-        log.info(f"Destroying {droplet.name} droplet")
-        now = datetime.utcnow()
-        destroy_droplet_in_db_table(click, droplet, rdn, draining_at, now, dns_zone)
-        droplet.destroy()
+        for droplet in to_delete:
+            log.info(f"Destroying {droplet.name} droplet")
+            now = datetime.utcnow()
+            destroy_droplet_in_db_table(click, droplet, rdn, draining_at, now, dns_zone)
+            droplet.destroy()
 
 
 def pick_regions(api, live_regions: set) -> list:
@@ -245,7 +246,7 @@ def pick_regions(api, live_regions: set) -> list:
     ok_regions = acceptable_regions.intersection(available_regions)
     best_regions = ok_regions - live_regions
     if not len(best_regions):
-        log.crit("No regions available!")
+        log.error("No regions available!")
         raise Exception("No regions available")
     if len(best_regions):
         return list(best_regions)
@@ -457,12 +458,14 @@ def delete_dns_record(api, zone: str, name: str, ip_address, rtype, dig_oc_token
     log.error(f"{name} {ip_address} not found")
 
 
-def update_or_create_dns_record(api, zone, name, rtype, ip_address, records):
+def update_or_create_dns_record(
+    api, zone: str, name: str, rtype: str, ip_address, records
+) -> None:
     ip_address = str(ip_address)
     x = [r for r in records if r.name == name and r.type == rtype]
     if x:
         x = x[0]
-        url = f"domains/{zone}/records/{x.id}"
+        url = f"domains/{zone}/records/{x.id}"  # type: ignore
         changes = dict(data=ip_address)
         m = f"Updating existing DNS record {x.id} {rtype} {name} {zone} {ip_address}"
         log.info(m)
@@ -562,6 +565,18 @@ def end_to_end_test(ipaddr: IP4a, fqdn: str) -> None:
     raise Exception("End to end test failed")
 
 
+def list_regions_with_live_droplets(click, dns_zone: str) -> set[str]:
+    q = """SELECT DISTINCT(region) FROM test_helper_instances
+        FINAL
+        WHERE provider = 'Digital Ocean'
+        AND dns_zone = %(dns_zone)s
+        AND draining_at IS NULL
+        """
+    log.info(q)
+    rows = click.execute(q, dict(dns_zone=dns_zone))
+    return set(r[0] for r in rows)
+
+
 @metrics.timer("run_time")
 def main() -> None:
     conf = load_conf()
@@ -577,7 +592,7 @@ def main() -> None:
     assert Path(setup_script_path).is_file()
     assert Path(certbot_creds).is_file()
     assert Path(nginx_conf).is_file()
-    dns_zone = conf["dns_zone"].strip(".")
+    dns_zone: str = conf["dns_zone"].strip(".")
     assert dns_zone
 
     click = Clickhouse("localhost", user="rotation")
@@ -612,7 +627,7 @@ def main() -> None:
 
     # Spawn a new droplet
     log.info(f"Spawning droplet be become {rdn}.{dns_zone}")
-    live_regions = set(d.region["slug"] for d in droplets)
+    live_regions = list_regions_with_live_droplets(click, dns_zone)
     new_droplet = spawn_new_droplet(api, dig_oc_token, live_regions, conf)
     log.info(f"Droplet {new_droplet.name} ready at {new_droplet.ip_address}")
     add_droplet_to_db_table(click, new_droplet, rdn, dns_zone)
