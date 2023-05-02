@@ -207,14 +207,15 @@ def destroy_droplet_in_db_table(
 def destroy_drained_droplets(
     click, draining_time_minutes: int, live_droplets: list, dns_zone: str
 ) -> None:
+    # Pick droplets to be destroyed
     q = """SELECT name, rdn, draining_at FROM test_helper_instances
         FINAL
         WHERE provider = 'Digital Ocean'
         AND dns_zone = %(dns_zone)s
         AND draining_at IS NOT NULL
+        AND destroyed_at IS NULL
         AND draining_at < NOW() - interval %(mins)s minute
         ORDER BY draining_at
-        LIMIT 1
     """
     log.info(q)
     rows = click.execute(q, dict(dns_zone=dns_zone, mins=draining_time_minutes))
@@ -222,17 +223,17 @@ def destroy_drained_droplets(
         log.info("No droplet to destroy")
         return
 
-    name, rdn, draining_at = rows[0]
-    to_delete = [d for d in live_droplets if d.name == name]
-    if not to_delete:
-        log.error(f"{name} found in database but not found on Digital Ocean")
-        return
+    for name, rdn, draining_at in rows:
+        to_delete = [d for d in live_droplets if d.name == name]
+        if not to_delete:
+            log.error(f"{name} found in database but not found on Digital Ocean")
+            continue
 
-    for droplet in to_delete:
-        log.info(f"Destroying {droplet.name} droplet")
-        now = datetime.utcnow()
-        destroy_droplet_in_db_table(click, droplet, rdn, draining_at, now, dns_zone)
-        droplet.destroy()
+        for droplet in to_delete:
+            log.info(f"Destroying {droplet.name} droplet")
+            now = datetime.utcnow()
+            destroy_droplet_in_db_table(click, droplet, rdn, draining_at, now, dns_zone)
+            droplet.destroy()
 
 
 def pick_regions(api, live_regions: set) -> list:
@@ -245,7 +246,7 @@ def pick_regions(api, live_regions: set) -> list:
     ok_regions = acceptable_regions.intersection(available_regions)
     best_regions = ok_regions - live_regions
     if not len(best_regions):
-        log.crit("No regions available!")
+        log.error("No regions available!")
         raise Exception("No regions available")
     if len(best_regions):
         return list(best_regions)
