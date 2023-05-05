@@ -876,8 +876,15 @@ def initialize_url_priorities_if_needed():
     return r
 
 
-def validate_url_prio_rule_dict(r: dict):
-    assert sorted(r.keys()) == ["category_code", "cc", "domain", "priority", "url"]
+def prepare_url_prio_rule_dict(d: dict):
+    # Use an explicit marker "*" to represent "match everything" because NULL
+    # cannot be used in UNIQUE constraints; also "IS NULL" is difficult to
+    # handle in query generation. See match_prio_rule(...)
+    for k in ["category_code", "cc", "domain", "url"]:
+        if d.get(k, "") == "":
+            d[k] = "*"
+
+    assert sorted(d.keys()) == ["category_code", "cc", "domain", "priority", "url"]
 
 
 def update_url_priority_click(old: dict, new: dict):
@@ -960,21 +967,11 @@ def post_update_url_priority() -> Response:
     if not old and not new:
         return jerror(NoProposedChanges())
 
-    # Use an explicit marker "*" to represent "match everything" because NULL
-    # cannot be used in UNIQUE constraints; also "IS NULL" is difficult to
-    # handle in query generation. See match_prio_rule(...)
-    for k in ["category_code", "cc", "domain", "url", "priority"]:
-        if old and k not in old:
-            old[k] = "*"
-        if new and k not in new:
-            new[k] = "*"
-
-    assert old or new
     if old:
-        validate_url_prio_rule_dict(old)
+        prepare_url_prio_rule_dict(old)
 
     if new:
-        validate_url_prio_rule_dict(new)
+        prepare_url_prio_rule_dict(new)
 
     try:
         update_url_priority_click(old, new)
