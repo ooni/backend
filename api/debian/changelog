@@ -1,3 +1,9 @@
+ooni-api (1.0.57) unstable; urgency=medium
+
+  * Add defaults to URL prio UI
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 05 May 2023 17:23:39 +0100
+
 ooni-api (1.0.56) unstable; urgency=medium
 
   * Add experimental private check-in
