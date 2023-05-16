@@ -89,3 +89,10 @@ def insert_click(query, rows: list) -> int:
     assert isinstance(rows, list)
     settings = {"priority": 1, "max_execution_time": 300}  # query_prio
     return current_app.click.execute(query, rows, types_check=True, settings=settings)
+
+
+def optimize_table(tblname: str) -> None:
+    settings = {"priority": 1, "max_execution_time": 300}  # query_prio
+    sql = f"OPTIMIZE TABLE {tblname} FINAL"
+    current_app.click.execute(sql, {}, settings=settings)
+

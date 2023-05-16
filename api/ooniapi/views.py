@@ -10,14 +10,15 @@ from flask import current_app, render_template
 from flask import make_response
 from flask.json import jsonify
 
+from ooniapi.aggregation import aggregation_blueprint
 from ooniapi.auth import auth_blueprint
 from ooniapi.citizenlab import cz_blueprint
-from ooniapi.private import api_private_blueprint
-from ooniapi.aggregation import aggregation_blueprint
+from ooniapi.incidents import inc_blueprint
 from ooniapi.measurements import api_msm_blueprint
 from ooniapi.pages import pages_blueprint
-from ooniapi.probe_services import probe_services_blueprint
 from ooniapi.prio import prio_bp
+from ooniapi.private import api_private_blueprint
+from ooniapi.probe_services import probe_services_blueprint
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -75,6 +76,7 @@ def register(app):
     app.register_blueprint(api_msm_blueprint, url_prefix="/api")
     app.register_blueprint(auth_blueprint, url_prefix="")
     app.register_blueprint(cz_blueprint, url_prefix="")
+    app.register_blueprint(inc_blueprint, url_prefix="")
 
     # Private API
     app.register_blueprint(api_private_blueprint, url_prefix="/api/_")

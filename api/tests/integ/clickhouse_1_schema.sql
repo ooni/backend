@@ -211,3 +211,26 @@ CREATE TABLE asnmeta
 )
 ENGINE = MergeTree
 ORDER BY (asn, changed);
+
+CREATE TABLE IF NOT EXISTS default.incidents
+(
+    `update_time` DateTime DEFAULT now(),
+    `start_time` DateTime DEFAULT now(),
+    `end_time` Nullable(DateTime),
+    `creator_account_id` FixedString(32),
+    `reported_by` String,
+    `id` String,
+    `title` String,
+    `text` String,
+    `event_type` LowCardinality(String),
+    `published` UInt8,
+    `deleted` UInt8 DEFAULT 0,
+    `CCs` Array(FixedString(2)),
+    `ASNs` Array(Int32),
+    `domains` Array(String),
+    `tags` Array(String),
+    `links` Array(String)
+)
+ENGINE = ReplacingMergeTree(update_time)
+ORDER BY (id)
+SETTINGS index_granularity = 1;

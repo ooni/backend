@@ -5,7 +5,7 @@ Citizenlab CRUD API
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
-from typing import Dict, List, Optional
+from typing import Dict, List
 import csv
 import json
 import logging
@@ -17,11 +17,11 @@ import time
 from requests.auth import HTTPBasicAuth
 from filelock import FileLock  # debdeps: python3-filelock
 from flask import Blueprint, current_app, request, make_response, jsonify, Response
-from werkzeug.exceptions import HTTPException
 import git  # debdeps: python3-git
 import requests
 from sqlalchemy import sql
 
+from ooniapi.errors import *
 from ooniapi.auth import role_required
 from ooniapi.config import metrics
 from ooniapi.database import query_click, query_click_one_row, insert_click
@@ -93,107 +93,6 @@ CITIZENLAB_CSV_HEADER = (
     "source",
     "notes",
 )
-
-
-class BaseOONIException(HTTPException):
-    code: int = 400
-    err_str: str = "err_generic_ooni_exception"
-    err_args: Optional[Dict[str, str]] = None
-    description: str = "Generic OONI error"
-
-    def __init__(
-        self,
-        description: Optional[str] = None,
-        err_args: Optional[Dict[str, str]] = None,
-    ):
-        super().__init__(description=description)
-        if err_args is not None:
-            self.err_args = err_args
-
-
-class BadURL(BaseOONIException):
-    code = 400
-    err_str = "err_bad_url"
-    description = "Invalid URL"
-
-
-class BadCategoryCode(BaseOONIException):
-    code = 400
-    err_str = "err_bad_category_code"
-    description = "Invalid category code"
-
-
-class BadCategoryDescription(BaseOONIException):
-    code = 400
-    err_str = "err_bad_category_description"
-    description = "Invalid category description"
-
-
-class BadDate(BaseOONIException):
-    code = 400
-    err_str = "err_bad_date"
-    description = "Invalid date"
-
-
-class CountryNotSupported(BaseOONIException):
-    code = 400
-    err_str = "err_country_not_supported"
-    description = "Country Not Supported"
-
-
-class InvalidCountryCode(BaseOONIException):
-    code = 400
-    err_str = "err_invalid_country_code"
-    description = "Country code is invalid"
-
-
-class DuplicateURLError(BaseOONIException):
-    code = 400
-    err_str = "err_duplicate_url"
-    description = "Duplicate URL"
-
-
-class DuplicateRuleError(BaseOONIException):
-    code = 400
-    err_str = "err_duplicate_rule"
-    description = "Duplicate rule"
-
-
-class RuleNotFound(BaseOONIException):
-    code = 404
-    err_str = "err_rule_not_found"
-    description = "Rule not found error"
-
-
-class CannotClosePR(BaseOONIException):
-    code = 400
-    err_str = "err_cannot_close_pr"
-    description = "Unable to close PR. Please reload data."
-
-
-class CannotUpdateList(BaseOONIException):
-    code = 400
-    err_str = "err_cannot_update_list"
-    description = "Unable to update. The URL list has changed in the meantime."
-
-
-class NoProposedChanges(BaseOONIException):
-    code = 400
-    err_str = "err_no_proposed_changes"
-    description = "No changes are being proposed"
-
-
-def jerror(err, code=400):
-    if isinstance(err, BaseOONIException):
-        err_j = {
-            "error": err.description,
-            "err_str": err.err_str,
-        }
-        if err.err_args:
-            err_j["err_args"] = err.err_args
-        return make_response(jsonify(err_j), err.code)
-
-    return make_response(jsonify(error=str(err)), code)
 
 
 class URLListManager:
