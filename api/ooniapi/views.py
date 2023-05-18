@@ -15,6 +15,7 @@ from ooniapi.auth import auth_blueprint
 from ooniapi.citizenlab import cz_blueprint
 from ooniapi.incidents import inc_blueprint
 from ooniapi.measurements import api_msm_blueprint
+from ooniapi.oonirun import oonirun_blueprint
 from ooniapi.pages import pages_blueprint
 from ooniapi.prio import prio_bp
 from ooniapi.private import api_private_blueprint
@@ -77,6 +78,7 @@ def register(app):
     app.register_blueprint(auth_blueprint, url_prefix="")
     app.register_blueprint(cz_blueprint, url_prefix="")
     app.register_blueprint(inc_blueprint, url_prefix="")
+    app.register_blueprint(oonirun_blueprint, url_prefix="")
 
     # Private API
     app.register_blueprint(api_private_blueprint, url_prefix="/api/_")

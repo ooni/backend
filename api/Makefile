@@ -9,6 +9,7 @@ TESTARGS ?= \
 	tests/integ/test_incidents.py \
 	tests/integ/test_integration.py \
 	tests/integ/test_integration_auth.py \
+	tests/integ/test_oonirun.py \
 	tests/integ/test_params_validation.py \
 	tests/integ/test_prioritization.py \
 	tests/integ/test_private_api.py \

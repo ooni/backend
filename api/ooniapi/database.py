@@ -96,3 +96,10 @@ def optimize_table(tblname: str) -> None:
     sql = f"OPTIMIZE TABLE {tblname} FINAL"
     current_app.click.execute(sql, {}, settings=settings)
 
+
+def raw_query(query: Query, query_params: dict, query_prio=1):
+    settings = {"priority": query_prio, "max_execution_time": 300}
+    q = current_app.click.execute(
+        query, query_params, with_column_types=True, settings=settings
+    )
+    return q
