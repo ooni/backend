@@ -599,6 +599,9 @@ def gen_input(
         d = dict(start_date=t, end_date=partial_end_date, urls=urls)
         log.info(f"Querying fastpath from {t} to {partial_end_date}")
         cache = click.query_dataframe(sql, d)
+        if len(cache) == 0:
+            t = partial_end_date
+            continue
         while t < partial_end_date:
             out = cache[cache.t == t]
             if len(out):
