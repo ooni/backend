@@ -59,7 +59,6 @@ log = logging.getLogger("detector")
 metrics = statsd.StatsClient("localhost", 8125, prefix="detector")
 
 DBURI = "clickhouse://detector:detector@localhost/default?use_numpy=True"
-DBURI = "clickhouse://192.168.0.131/default?use_numpy=True"
 TCAI = ["test_name", "probe_cc", "probe_asn", "input"]
 tTCAI = ["t", "test_name", "probe_cc", "probe_asn", "input"]
 
