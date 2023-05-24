@@ -4,8 +4,7 @@ Requires=detector.service
 
 [Timer]
 Unit=detector.service
-# Every 10 mins
-OnCalendar=*:00/10:00
+OnCalendar=*-*-* *:10:00
 Persistent=true
 
 [Install]

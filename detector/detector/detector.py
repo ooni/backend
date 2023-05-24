@@ -51,7 +51,7 @@ try:
     from tqdm import tqdm
 except ImportError:
 
-    def tqdm(x):  # type: ignore
+    def tqdm(x, *a, **kw):  # type: ignore
         return x
 
 
@@ -59,6 +59,7 @@ log = logging.getLogger("detector")
 metrics = statsd.StatsClient("localhost", 8125, prefix="detector")
 
 DBURI = "clickhouse://detector:detector@localhost/default?use_numpy=True"
+DBURI = "clickhouse://192.168.0.131/default?use_numpy=True"
 TCAI = ["test_name", "probe_cc", "probe_asn", "input"]
 tTCAI = ["t", "test_name", "probe_cc", "probe_asn", "input"]
 
@@ -118,7 +119,7 @@ def setup():
     conf = ap.parse_args()
     if conf.devel:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
-        lvl = logging.DEBUG if conf.v else logging.INFO
+        lvl = logging.DEBUG if conf.v else logging.DEBUG
         logging.basicConfig(stream=sys.stdout, level=lvl, format=format)
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="detector"))
@@ -184,6 +185,7 @@ def generate_rss_feed(events: pd.DataFrame, update_time: datetime) -> Tuple[str,
     )
     for e in events.itertuples():
         cc = e.probe_cc.upper()
+        # TODO use country
         country = cc_to_country_name.get(cc, cc)
         status2 = "unblocked" if e.status == "OK" else "blocked"
         link = explorer_mat_url(e.test_name, e.input, e.probe_cc, e.probe_asn, e.time)
@@ -231,14 +233,17 @@ def rebuild_feeds(events: pd.DataFrame) -> int:
 
 def load_country_name_map(devel: bool) -> dict:
     """Loads country-list.json and creates a lookup dictionary"""
-    if devel:
-        fi = "data/country-list.json"
-    else:
+    try:
+        fi = "detector/data/country-list.json"
+        log.info("Loading %s", fi)
+        with open(fi) as f:
+            clist = ujson.load(f)
+    except FileNotFoundError:
         pkgdir = getsitepackages()[-1]
         fi = f"{pkgdir}/detector/data/country-list.json"
-    log.info("Loading %s", fi)
-    with open(fi) as f:
-        clist = ujson.load(f)
+        log.info("Loading %s", fi)
+        with open(fi) as f:
+            clist = ujson.load(f)
 
     # The file is deployed with the detector: crash out if it's broken
     d = {}
@@ -299,13 +304,7 @@ SETTINGS index_granularity = 4
     query("GRANT SELECT ON * TO detector")
 
 
-def reprocess_inner(
-    gen, time_slots_cnt: int, collect_hist=False
-) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
-    #    df = pd.DataFrame({'Courses': pd.Series(dtype='str'),
-    #                   'Fee': pd.Series(dtype='int'),
-    #                   'Duration': pd.Series(dtype='str'),
-    #                   'Discount': pd.Series(dtype='float')})
+def create_empty_status_df() -> pd.DataFrame:
     status = pd.DataFrame(
         columns=[
             "status",
@@ -323,6 +322,17 @@ def reprocess_inner(
         ]
     )
     status.set_index(TCAI, inplace=True)
+    return status
+
+
+def reprocess_inner(
+    gen, time_slots_cnt: int, collect_hist=False
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    #    df = pd.DataFrame({'Courses': pd.Series(dtype='str'),
+    #                   'Fee': pd.Series(dtype='int'),
+    #                   'Duration': pd.Series(dtype='str'),
+    #                   'Discount': pd.Series(dtype='float')})
+    status = create_empty_status_df()
     events_tmp = []
     status_history_tmp = []
 
@@ -407,13 +417,33 @@ def process_fresh_data(
     log.info(f"New rows: {len(new)} Status rows: {len(status)}")
     status, events = process_data(status, new)
 
-    log.debug("Replacing blocking_status table")
-    click.execute("TRUNCATE TABLE blocking_status SYNC")
-    tmp_s = status.reset_index()  # .convert_dtypes()
+    assert len(status)
+
+    log.debug("Updating blocking_status table")
+    # click.execute("TRUNCATE TABLE blocking_status SYNC")
+
+    wanted_cols = [
+        "test_name",
+        "input",
+        "probe_cc",
+        "probe_asn",
+        "confirmed_perc",
+        "pure_anomaly_perc",
+        "accessible_perc",
+        "cnt",
+        "status",
+        "old_status",
+        "change",
+        "stability",
+    ]
+    status.status.fillna("UNKNOWN", inplace=True)
+    status.old_status.fillna("UNKNOWN", inplace=True)
+    status.change.fillna(0, inplace=True)
+    tmp_s = status.reset_index()[wanted_cols].convert_dtypes()
     click.insert_dataframe("INSERT INTO blocking_status VALUES", tmp_s)
 
-    log.debug("Appending to blocking_events table")
     if events is not None and len(events):
+        log.debug(f"Appending {len(events)} events to blocking_events table")
         sql = "INSERT INTO blocking_events VALUES"
         click.insert_dataframe(sql, events.reset_index(drop=True))
 
@@ -449,11 +479,9 @@ def process_data(
     m["input_cnt"] = m.cnt
     m = m.fillna(value=dict(cnt=0, cnt_BS=0, accessible_perc_BS=m.accessible_perc))
     tau = 0.9
-    mu = 1 - tau
 
     mavg_cnt = m.cnt * (1 - tau) + m.cnt_BS * tau
-    totcnt = m.cnt + m.cnt_BS
-
+    # totcnt = m.cnt + m.cnt_BS
     # cp = (new.confirmed_perc * new.cnt * mu + blocking_status.confirmed_perc * blocking_status.cnt * tau / totcnt #AS confirmed_perc,
     # ap = (new.pure_anomaly_perc * new.cnt * mu + blocking_status.pure_anomaly_perc * blocking_status.cnt * tau) / totcnt #AS pure_anomaly_perc,
     # NOTE: using fillna(0) on percentages looks like a bug but the value is going to be ignored due to the cnt set to 0
@@ -601,6 +629,7 @@ def gen_input(
         cache = click.query_dataframe(sql, d)
         if len(cache) == 0:
             t = partial_end_date
+            log.info("No data")
             continue
         while t < partial_end_date:
             out = cache[cache.t == t]
@@ -619,7 +648,12 @@ def load_blocking_status() -> pd.DataFrame:
         accessible_perc, cnt, confirmed_perc, pure_anomaly_perc
         FROM blocking_status FINAL
     """
-    return click.query_dataframe(sql)
+    blocking_status = click.query_dataframe(sql)
+    if len(blocking_status) == 0:
+        log.info("Starting with empty blocking_status")
+        blocking_status = create_empty_status_df()
+
+    return blocking_status
 
 
 def reprocess_data_from_df(idf, debug=False):
@@ -670,14 +704,15 @@ def main():
     else:
         # Process fresh data
         if conf.end_date is None:
-            conf.end_date = datetime.utcnow()
+            # Beginning of current UTC hour
+            conf.end_date = datetime(*datetime.utcnow().timetuple()[:4])
             conf.start_date = conf.end_date - conf.interval
         events, status = process_fresh_data(
             conf.start_date, conf.end_date, conf.interval, services
         )
         log.info(f"Events: {len(events)}")
         # s = status.reset_index()
-        #log.info((s.accessible_perc, s.cnt, s.status))
+        # log.info((s.accessible_perc, s.cnt, s.status))
 
     if events is not None and len(events):
         log.info("Rebuilding feeds")
