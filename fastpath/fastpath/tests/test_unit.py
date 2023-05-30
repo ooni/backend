@@ -558,6 +558,22 @@ def test_score_signal():
     }
 
 
+def test_score_signal_679():
+    # https://explorer.ooni.org/m/20230530180835.892478_US_signal_b091ac0f3794bbcd
+    # https://github.com/ooni/backend/issues/679
+    msm = loadj("signal_679")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "accuracy": 0.0,
+        "analysis": {"signal_backend_failure": "android_dns_cache_no_data"},
+        "blocking_country": 0.0,
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
 # # test_name: stunreachability
 
 
