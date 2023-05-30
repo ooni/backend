@@ -1352,9 +1352,10 @@ def score_signal(msm: dict) -> dict:
     if tk.get("failed_operation", True) or tk.get("failure", True):
         scores["accuracy"] = 0.0
 
-    # https://github.com/ooni/probe/issues/2344
-    tv = g_or(msm, "test_version", "0.0.0")
+
     try:
+        # https://github.com/ooni/probe/issues/2344
+        tv = g_or(msm, "test_version", "0.0.0")
         if parse_version(tv) < parse_version("0.2.2"):
             start_time = msm.get("measurement_start_time")
             if start_time is None:
@@ -1363,6 +1364,17 @@ def score_signal(msm: dict) -> dict:
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 if start_time >= datetime(2022, 10, 19):
                     scores["accuracy"] = 0.0
+
+        # https://github.com/ooni/backend/issues/679
+        # engine_version < 3.17.2 and measurement_start_time > 2023-05-02
+        annot = g_or(msm, "annotations", {})
+        ev = g_or(annot, "engine_version", "0.0.0")
+        if parse_version(ev) < parse_version("3.17.2"):
+            st = g_or(msm, "measurement_start_time", "2023-05-05 00:00:00")
+            start_time = datetime.strptime(st, "%Y-%m-%d %H:%M:%S")
+            if start_time >= datetime(2023, 5, 2):
+                scores["accuracy"] = 0.0
+
     except Exception:
         scores["accuracy"] = 0.0
 
