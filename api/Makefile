@@ -27,4 +27,7 @@ initdb:
 tests: .state/docker-build
 	docker-compose run --rm api python3 -m pytest $(T) $(TESTARGS)
 
-.PHONY: build initdb tests serve
+run-local:
+	docker-compose run --service-ports --rm api
+
+.PHONY: build initdb tests serve run-local
