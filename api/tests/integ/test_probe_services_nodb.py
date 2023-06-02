@@ -189,12 +189,12 @@ def test_check_in_url_category_multi(client, mocks):
             d[cco] = 0
         d[cco] += 1
 
-    assert d == {'FILE': 10, 'MILX': 3, 'NEWS': 87}
+    assert d == {"FILE": 10, "MILX": 3, "NEWS": 87}
     webc_rid = c["tests"]["web_connectivity"]["report_id"]
     ts, stn, cc, asn_i, _coll, _rand = webc_rid.split("_")
     assert int(asn_i) == 0
     assert stn == "webconnectivity"
-    #assert cc == "ZZ"
+    # assert cc == "ZZ"
 
 
 @pytest.mark.skip(reason="broken")
@@ -237,12 +237,13 @@ def test_check_in_geoip(client, mocks):
         charging=False,
     )
     headers = [
-        ('X-Forwarded-For', '192.33.4.12') # The IP address of c.root-servers.net
+        ("X-Forwarded-For", "192.33.4.12")  # The IP address of c.root-servers.net
     ]
     c = client.post("/api/v1/check-in", json=j, headers=headers).json
     assert c["probe_cc"] == "US"
     assert c["probe_asn"] == "AS2149"
     assert c["probe_network_name"] is not None
+
 
 # # Test /api/v1/collectors
 
@@ -485,3 +486,20 @@ def test_collector_close_report(client, mocks):
 
 
 # Test-list related tests are in test_prioritization.py
+
+
+def test_geolookup(client):
+    li = ["::1", "1.2.3.4", "5.6.7.8"]
+    r = postj(client, "/api/v1/geolookup", addresses=li)
+    assert r == {
+        "geolocation": {
+            "::1": {"as_name": None, "asn": None, "cc": None},
+            "1.2.3.4": {"as_name": None, "asn": None, "cc": "AU"},
+            "5.6.7.8": {
+                "as_name": "Telefonica Germany GmbH & Co.OHG",
+                "asn": 6805,
+                "cc": "DE",
+            },
+        },
+        "v": 1,
+    }

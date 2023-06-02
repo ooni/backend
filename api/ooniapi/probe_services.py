@@ -6,7 +6,7 @@ import ipaddress
 from base64 import b64encode
 from datetime import datetime, timedelta, date
 from os import urandom
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 
 from pathlib import Path
 from hashlib import sha512
@@ -924,3 +924,57 @@ def close_report(report_id) -> Response:
         description: Close a report
     """
     return cachedjson("1h")
+
+
+@probe_services_blueprint.route("/api/v1/geolookup", methods=["POST"])
+def geolookup() -> Response:
+    """Probe Services: geolookup for multiple IP addresses
+    ---
+    parameters:
+      - in: body
+        name: IP addresses
+        required: true
+        schema:
+          type: object
+          properties:
+            addresses:
+              type: array
+              items:
+                type: string
+                description: IP address
+                example: 1.2.3.4
+    responses:
+      '200':
+        schema:
+          type: object
+          properties:
+            v:
+              type: integer
+              description: response format version
+            geolocation:
+              type: object
+    """
+    log = current_app.logger
+    try:
+        req = req_json()
+    except Exception as e:
+        return jerror("JSON expected")
+
+    addrs = req.get("addresses", [])
+    d = {}
+    cc: Optional[str]
+    for ipaddr in addrs:
+        try:
+            cc = lookup_probe_cc(ipaddr)
+        except geoip2.errors.AddressNotFoundError:
+            cc = None
+        try:
+            lookup = current_app.geoip_asn_reader.asn(ipaddr)
+            asn = lookup.autonomous_system_number
+            as_name = lookup.autonomous_system_organization
+        except geoip2.errors.AddressNotFoundError:
+            asn = as_name = None
+
+        d[ipaddr] = dict(cc=cc, asn=asn, as_name=as_name)
+
+    return nocachejson(v=1, geolocation=d)
