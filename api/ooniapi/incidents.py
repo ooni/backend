@@ -41,7 +41,7 @@ log: logging.Logger
 # in the old dict during update/delete.
 # "deleted" will be used automatically by Clickhouse version 23.3
 #
-# The table creation is in tests/integ/clickhouse_1_schema.sql
+# The table creation for CI purposes is in tests/integ/clickhouse_1_schema.sql
 
 inc_blueprint = Blueprint("incidents_api", "incidents")
 
