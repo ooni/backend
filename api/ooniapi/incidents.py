@@ -100,7 +100,7 @@ def search_list_incidents() -> Response:
 @metrics.timer("show_incident")
 @inc_blueprint.route("/api/v1/incidents/show/<string:incident_id>", methods=["GET"])
 def show_incident(incident_id: str) -> Response:
-    """Returns an incident, with cacheing
+    """Returns an incident
     ---
     parameters:
       - name: id
@@ -133,6 +133,7 @@ def show_incident(incident_id: str) -> Response:
             return jerror("Not found")
         inc = q[0]
         inc["published"] = bool(inc["published"])
+        # TODO: cache if possible
         return nocachejson(incident=inc, v=1)
     except BaseOONIException as e:
         return jerror(e)
