@@ -23,7 +23,7 @@ from ooniapi.utils import nocachejson, cachedjson, generate_random_intuid
 
 log: logging.Logger
 
-# The table creation is in tests/integ/clickhouse_1_schema.sql
+# The table creation for CI purposes is in tests/integ/clickhouse_1_schema.sql
 
 oonirun_blueprint = Blueprint("oonirun_api", "oonirun")
 
