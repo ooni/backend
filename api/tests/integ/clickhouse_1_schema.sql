@@ -8,7 +8,7 @@ CREATE TABLE default.fastpath
     `report_id` String,
     `input` String,
     `probe_cc` String,
-    `probe_asn` Int32,
+    `probe_asn` UInt32,
     `test_name` String,
     `test_start_time` DateTime,
     `measurement_start_time` DateTime,
@@ -133,7 +133,7 @@ CREATE MATERIALIZED VIEW default.counters_asn_test_list
 (
     `week` DateTime,
     `probe_cc` String,
-    `probe_asn` UInt64,
+    `probe_asn` UInt32,
     `input` String,
     `msmt_cnt` UInt64
 )
@@ -211,3 +211,42 @@ CREATE TABLE asnmeta
 )
 ENGINE = MergeTree
 ORDER BY (asn, changed);
+
+CREATE TABLE IF NOT EXISTS default.incidents
+(
+    `update_time` DateTime DEFAULT now(),
+    `start_time` DateTime DEFAULT now(),
+    `end_time` Nullable(DateTime),
+    `creator_account_id` FixedString(32),
+    `reported_by` String,
+    `id` String,
+    `title` String,
+    `text` String,
+    `event_type` LowCardinality(String),
+    `published` UInt8,
+    `deleted` UInt8 DEFAULT 0,
+    `CCs` Array(FixedString(2)),
+    `ASNs` Array(UInt32),
+    `domains` Array(String),
+    `tags` Array(String),
+    `links` Array(String)
+)
+ENGINE = ReplacingMergeTree(update_time)
+ORDER BY (id)
+SETTINGS index_granularity = 1;
+
+CREATE TABLE IF NOT EXISTS default.oonirun
+(
+    `id` UInt64,
+    `creation_time` DateTime DEFAULT now(),
+    `creator_account_id` FixedString(32),
+    `archived` UInt8 DEFAULT 0,
+    `descriptor` String,
+    `name` String,
+    `description` String,
+    `author` String
+)
+ENGINE = ReplacingMergeTree(creation_time)
+ORDER BY (creation_time, id)
+SETTINGS index_granularity = 1;
+

@@ -1,4 +1,5 @@
 import json
+from urllib.parse import urlencode
 from pathlib import Path
 
 
@@ -36,3 +37,15 @@ def mock_load_json():
         raise NotImplementedError(f"Unexpected fname to be mocked out: {fn}")
 
     return load_json
+
+
+def api(client, subpath, **kw):
+    url = f"/api/v1/{subpath}"
+    if kw:
+        assert "?" not in url
+        url += "?" + urlencode(kw)
+
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.is_json
+    return response.json

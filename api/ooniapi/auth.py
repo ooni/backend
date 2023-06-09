@@ -155,10 +155,19 @@ def get_client_token() -> Optional[Dict]:
 
 
 def get_account_id_or_none() -> Optional[str]:
+    """Returns None for unlogged users"""
     tok = get_client_token()
     if tok:
         return tok["account_id"]
     return None
+
+
+def get_account_id_or_raise() -> str:
+    """Raise exception for unlogged users"""
+    tok = get_client_token()
+    if tok:
+        return tok["account_id"]
+    raise Exception
 
 
 def get_account_id():
@@ -168,6 +177,13 @@ def get_account_id():
         return jerror("Authentication required", 401)
 
     return tok["account_id"]
+
+
+def get_client_role() -> str:
+    """Raise exception for unlogged users"""
+    tok = get_client_token()
+    assert tok
+    return tok["role"]
 
 
 def _send_email(dest_addr: str, msg: EmailMessage) -> None:
@@ -260,6 +276,7 @@ def user_register() -> Response:
     """
     log = current_app.logger
     req = request.json if request.is_json else request.form
+    assert req
     email_address = req.get("email_address", "").strip().lower()
     if not email_address:
         return jerror("Invalid request")
@@ -436,6 +453,7 @@ def set_account_role() -> Response:
     """
     log = current_app.logger
     req = request.json if request.is_json else request.form
+    assert req
     role = req.get("role", "").strip().lower()
     email_address = req.get("email_address", "").strip().lower()
     if EMAIL_RE.fullmatch(email_address) is None:
@@ -551,6 +569,7 @@ def set_session_expunge() -> Response:
     """
     log = current_app.logger
     req = request.json if request.is_json else request.form
+    assert req
     email_address = req.get("email_address", "").strip().lower()
     if EMAIL_RE.fullmatch(email_address) is None:
         return jerror("Invalid email address")

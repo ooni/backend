@@ -1,8 +1,11 @@
 from csv import DictWriter
 from datetime import datetime
+from io import StringIO
+from os import urandom
+from sys import byteorder
+
 from flask import request, make_response, Response
 from flask.json import jsonify
-from io import StringIO
 
 import ujson
 
@@ -56,9 +59,19 @@ def convert_to_csv(r) -> str:
     csvf.close()
     return result
 
+
 def req_json():
     # Some probes are not setting the JSON mimetype.
     # if request.is_json():
     #    return request.json
     # TODO: switch to request.get_json(force=True) ?
     return ujson.loads(request.data)
+
+
+def generate_random_intuid(current_app) -> int:
+    try:
+        collector_id = int(current_app.config["COLLECTOR_ID"])
+    except ValueError:
+        collector_id = 0
+    randint = int.from_bytes(urandom(4), byteorder)
+    return randint * 100 + collector_id

@@ -1,7 +1,20 @@
 #
 # This file is used to run tests manually and from .github/workflows/test_new_api.yml
 #
-TESTARGS ?= tests/functional/test_private_explorer.py tests/integ/test_aggregation.py tests/integ/test_citizenlab.py tests/integ/test_integration.py tests/integ/test_integration_auth.py tests/integ/test_prioritization.py tests/integ/test_private_api.py tests/integ/test_probe_services.py tests/unit/test_prio.py tests/integ/test_params_validation.py tests/functional/test_probe_services.py
+TESTARGS ?= \
+	tests/functional/test_private_explorer.py \
+	tests/functional/test_probe_services.py \
+	tests/integ/test_aggregation.py \
+	tests/integ/test_citizenlab.py \
+	tests/integ/test_incidents.py \
+	tests/integ/test_integration.py \
+	tests/integ/test_integration_auth.py \
+	tests/integ/test_oonirun.py \
+	tests/integ/test_params_validation.py \
+	tests/integ/test_prioritization.py \
+	tests/integ/test_private_api.py \
+	tests/integ/test_probe_services.py \
+	tests/unit/test_prio.py
 
 #tests/integ/test_prioritization_nodb.py
 #tests/integ/test_probe_services_nodb.py
