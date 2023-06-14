@@ -1,3 +1,9 @@
+ooni-api (1.0.59) unstable; urgency=medium
+
+  * Add update time to URL priorities
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 14 Jun 2023 18:20:00 +0100
+
 ooni-api (1.0.58) unstable; urgency=medium
 
   * Add incident management CRUD
