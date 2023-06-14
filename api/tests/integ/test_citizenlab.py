@@ -360,9 +360,13 @@ def test_url_priorities_crud(adminsession, url_prio_tblready):
         assert r.status_code == 200, r.json
         for x in r.json["rules"]:
             for k, v in x.items():
-                assert v != '', f"Empty value in {x}"
-        match = [x for x in r.json["rules"] if x == exp]
-        return len(match)
+                assert v != "", f"Empty value in {x}"
+        for ru in r.json["rules"]:
+            ru.pop("update_time")
+            if ru == exp:
+                return True  # found
+
+        return False
 
     assert match("INTEG-TEST") == 0
     assert match("INTEG-TEST2") == 0
@@ -376,7 +380,7 @@ def test_url_priorities_crud(adminsession, url_prio_tblready):
     assert r.status_code == 400, r.json
 
     # Create
-    xxx = dict(category_code="NEWS", priority=100, cc='', url="INTEG-TEST")
+    xxx = dict(category_code="NEWS", priority=100, cc="", url="INTEG-TEST")
     d = dict(new_entry=xxx)
     r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json
