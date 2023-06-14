@@ -33,6 +33,7 @@ URL prioritization: uses the url_priorities table.
 It contains rules on category_code, cc, domain and url to assign priorities.
 Values can be wildcards "*". A citizenlab entry can match multiple rules.
 """
+# The tables creation is in tests/integ/clickhouse_1_schema.sql
 
 log = logging.getLogger()  # overridden by current_app.logger
 
@@ -703,7 +704,7 @@ def list_url_priorities() -> Response:
     global log
     log = current_app.logger
     log.debug("listing URL prio rules")
-    query = """SELECT category_code, cc, domain, url, priority
+    query = """SELECT category_code, cc, domain, url, priority, update_time
     FROM url_priorities FINAL
     ORDER BY category_code, cc, domain, url, priority
     """

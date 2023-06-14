@@ -59,7 +59,8 @@ CREATE TABLE default.url_priorities (
     `cc` String,
     `domain` String,
     `url` String,
-    `priority` Int32
+    `priority` Int32,
+    `update_time` DateTime DEFAULT now()
 )
 ENGINE = CollapsingMergeTree(sign)
 ORDER BY (category_code, cc, domain, url, priority)
