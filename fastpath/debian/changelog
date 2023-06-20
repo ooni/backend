@@ -1,3 +1,9 @@
+fastpath (0.76) unstable; urgency=medium
+
+  * Extract test helpers metadata
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 20 Jun 2023 18:46:54 +0100
+
 fastpath (0.75) unstable; urgency=medium
 
   * Mark certain Signal msmts as failed #679

@@ -1649,6 +1649,8 @@ def process_measurement(msm_tup) -> None:
         sw_version = measurement.get("software_version", "unknown")
         test_version = g_or(measurement, "test_version", "")
         test_runtime = g_or(measurement, "test_runtime", 0.0)
+        test_helper_address = g(measurement, "test_helpers", "backend", "address", default="")
+        test_helper_type = g(measurement, "test_helpers", "backend", "type", default="")
 
         annot = measurement.get("annotations")
         if not isinstance(annot, dict):
@@ -1675,6 +1677,8 @@ def process_measurement(msm_tup) -> None:
             architecture,
             engine_name,
             engine_version,
+            test_helper_address,
+            test_helper_type,
         )
 
         tn = measurement.get("test_name")
