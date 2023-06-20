@@ -77,7 +77,9 @@ def _click_create_table_fastpath() -> None:
         `test_runtime` Float32,
         `architecture` String,
         `engine_name` String,
-        `engine_version` String
+        `engine_version` String,
+        `test_helper_address` String,
+        `test_helper_type` String
     )
     ENGINE = ReplacingMergeTree
     ORDER BY (measurement_start_time, report_id, input)
@@ -156,6 +158,8 @@ def clickhouse_upsert_summary(
     architecture: str,
     engine_name: str,
     engine_version: str,
+    test_helper_address: str,
+    test_helper_type: str,
 ) -> None:
     """Insert a row in the fastpath table. Overwrite an existing one."""
     sql_insert = dedent(
@@ -182,7 +186,9 @@ def clickhouse_upsert_summary(
     test_runtime,
     architecture,
     engine_name,
-    engine_version
+    engine_version,
+    test_helper_address,
+    test_helper_type
     ) VALUES
         """
     )
@@ -227,6 +233,8 @@ def clickhouse_upsert_summary(
         architecture=architecture,
         engine_name=engine_name,
         engine_version=engine_version,
+        test_helper_address=test_helper_address,
+        test_helper_type=test_helper_type,
     )
 
     settings = {"priority": 5}
