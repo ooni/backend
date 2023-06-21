@@ -209,11 +209,12 @@ def rebuild_feeds(events: pd.DataFrame) -> int:
     # change is not too heavy
     cnt = 0
     sql = """SELECT test_name, probe_cc, probe_asn, input, time, status
-        FROM blocking_events
-        WHERE test_name = %(test_name)s AND input = %(inp)s
-        AND probe_cc = %(cc)s AND probe_asn = %(asn)s
-        ORDER BY time
+    FROM blocking_events
+    WHERE test_name = %(test_name)s AND input = %(inp)s
+    AND probe_cc = %(cc)s AND probe_asn = %(asn)s
+    ORDER BY time
     """
+    events = events.reset_index()
     unique_tcais = events[TCAI].drop_duplicates()
     update_time = datetime.utcnow()
     for x in unique_tcais.itertuples():
@@ -224,6 +225,7 @@ def rebuild_feeds(events: pd.DataFrame) -> int:
             write_feed(feed_data, path)
             cnt += len(history)
 
+    log.info(f"[re]created {cnt} feeds")
     return cnt
 
 
@@ -259,8 +261,8 @@ def load_country_name_map(devel: bool) -> dict:
 def create_tables() -> None:
     # Requires admin privileges
     sql = """
-CREATE TABLE IF NOT EXISTS blocking_status
-(
+    CREATE TABLE IF NOT EXISTS blocking_status
+    (
     `test_name` String,
     `input` String,
     `probe_cc` String,
@@ -274,15 +276,15 @@ CREATE TABLE IF NOT EXISTS blocking_status
     `change` Float32,
     `stability` Float32,
     `update_time` DateTime64(0) MATERIALIZED now64()
-)
-ENGINE = ReplacingMergeTree
-ORDER BY (test_name, input, probe_cc, probe_asn)
-SETTINGS index_granularity = 4
-"""
+    )
+    ENGINE = ReplacingMergeTree
+    ORDER BY (test_name, input, probe_cc, probe_asn)
+    SETTINGS index_granularity = 4
+    """
     query(sql)
     sql = """
-CREATE TABLE IF NOT EXISTS blocking_events
-(
+    CREATE TABLE IF NOT EXISTS blocking_events
+    (
     `test_name` String,
     `input` String,
     `probe_cc` String,
@@ -290,11 +292,11 @@ CREATE TABLE IF NOT EXISTS blocking_events
     `status` String,
     `time` DateTime64(3),
     `detection_time` DateTime64(0) MATERIALIZED now64()
-)
-ENGINE = ReplacingMergeTree
-ORDER BY (test_name, input, probe_cc, probe_asn, time)
-SETTINGS index_granularity = 4
-"""
+    )
+    ENGINE = ReplacingMergeTree
+    ORDER BY (test_name, input, probe_cc, probe_asn, time)
+    SETTINGS index_granularity = 4
+    """
     query(sql)
     sql = "CREATE USER IF NOT EXISTS detector IDENTIFIED WITH plaintext_password BY 'detector'"
     query(sql)
@@ -342,15 +344,15 @@ def reprocess_inner(
         status, events = process_data(status, new)
         if events is not None and len(events):
             events_tmp.append(events)
-        if collect_hist:
-            status_history_tmp.append(status)
+            if collect_hist:
+                status_history_tmp.append(status)
 
     if events_tmp:
         events = pd.concat(events_tmp)
     else:
         events = None
-    status_history = pd.concat(status_history_tmp) if collect_hist else None
-    return events, status, status_history
+        status_history = pd.concat(status_history_tmp) if collect_hist else None
+        return events, status, status_history
 
 
 @metrics.timer("process_historical_data")
@@ -402,6 +404,7 @@ def process_fresh_data(
     urls = sorted(set(u for urls in services.values() for u in urls))
 
     status = load_blocking_status()
+    metrics.gauge("blocking_status_tblsize", len(status))
 
     gen = gen_input(click, start_date, end_date, interval, urls)
     new = None
@@ -443,8 +446,20 @@ def process_fresh_data(
 
     if events is not None and len(events):
         log.debug(f"Appending {len(events)} events to blocking_events table")
-        sql = "INSERT INTO blocking_events VALUES"
-        click.insert_dataframe(sql, events.reset_index(drop=True))
+        ev = events.reset_index()
+        ev = ev.drop(columns=["old_status"])
+        ev["time"] = end_date  # event detection time
+        log.info(ev)
+        assert ev.columns.values.tolist() == [
+            "test_name",
+            "probe_cc",
+            "probe_asn",
+            "input",
+            "status",
+            "time",
+        ]
+        sql = "INSERT INTO blocking_events (test_name, probe_cc, probe_asn, input, status, time) VALUES"
+        click.insert_dataframe(sql, ev)
 
     log.info("Done")
     return events, status
@@ -673,6 +688,26 @@ def reprocess_data_from_df(idf, debug=False):
     return events, status, status_history
 
 
+def process(start, end, interval, services) -> None:
+    events, status = process_fresh_data(start, end, interval, services)
+    log.info(f"Events: {len(events)}")
+    if events is not None and len(events):
+        log.info("Rebuilding feeds")
+        rebuild_feeds(events)
+        # TODO: create an index of available RSS feeds
+
+
+def reprocess(conf, services) -> None:
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
+    click.execute("TRUNCATE TABLE blocking_events SYNC")
+
+    t = conf.start_date
+    while t < conf.end_date:
+        te = t + conf.interval
+        process(t, te, conf.interval, services)
+        t += conf.interval
+
+
 def main():
     global click
     setup()
@@ -692,13 +727,16 @@ def main():
         "Instagram": ["https://www.instagram.com/"],
     }
     if conf.reprocess:
+        # Destructing reprocess
         assert conf.start_date and conf.end_date, "Dates not set"
-        events, status, _ = process_historical_data(
-            conf.start_date, conf.end_date, conf.interval, services
-        )
-        s = status.reset_index()
-        # log.info((s.accessible_perc, s.cnt, s.status))
+        reprocess(conf, services)
         return
+        # assert conf.start_date and conf.end_date, "Dates not set"
+        # events, status, _ = process_historical_data(
+        #    conf.start_date, conf.end_date, conf.interval, services
+        # )
+        # s = status.reset_index()
+        # log.info((s.accessible_perc, s.cnt, s.status))
 
     else:
         # Process fresh data
@@ -706,17 +744,7 @@ def main():
             # Beginning of current UTC hour
             conf.end_date = datetime(*datetime.utcnow().timetuple()[:4])
             conf.start_date = conf.end_date - conf.interval
-        events, status = process_fresh_data(
-            conf.start_date, conf.end_date, conf.interval, services
-        )
-        log.info(f"Events: {len(events)}")
-        # s = status.reset_index()
-        # log.info((s.accessible_perc, s.cnt, s.status))
-
-    if events is not None and len(events):
-        log.info("Rebuilding feeds")
-        rebuild_feeds(events)
-        # TODO: create an index of available RSS feeds
+        process(conf.start_date, conf.end_date, conf.interval, services)
 
     gen_stats()
     log.info("Done")
