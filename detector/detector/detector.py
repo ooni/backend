@@ -422,7 +422,6 @@ def process_fresh_data(
     assert len(status)
 
     log.debug("Updating blocking_status table")
-    # click.execute("TRUNCATE TABLE blocking_status SYNC")
 
     wanted_cols = [
         "test_name",
@@ -442,6 +441,7 @@ def process_fresh_data(
     status.old_status.fillna("UNKNOWN", inplace=True)
     status.change.fillna(0, inplace=True)
     tmp_s = status.reset_index()[wanted_cols].convert_dtypes()
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
     click.insert_dataframe("INSERT INTO blocking_status VALUES", tmp_s)
 
     if events is not None and len(events):
