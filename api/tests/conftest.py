@@ -129,7 +129,7 @@ def run_fastpath(log, repo_dir: Path, clickhouse_url: str) -> None:
     """Run fastpath from S3"""
     fpdir = repo_dir / "fastpath"
     conffile = fpdir / "etc/ooni/fastpath.conf"
-    conffile.parent.mkdir(parents=True)
+    conffile.parent.mkdir(parents=True, exist_ok=True)
     conf = f"""
         [DEFAULT]
         collectors = localhost
