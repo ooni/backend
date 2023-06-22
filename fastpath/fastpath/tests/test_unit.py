@@ -55,6 +55,10 @@ def test_extract_input_domain_meek():
 def test_g():
     g = fp.g
     assert g({}, "x", default="v") == "v"
+    assert g(dict(x=dict()), "x", "y", default="v") == "v"
+    assert g(dict(x=dict(y=None)), "x", "y", default="v") == "v"
+    assert g(dict(x=dict(y="22")), "x", "y", default="v") == "22"
+    #assert g(dict(x="str"), "x", "y", default="v") == "v"
 
 
 def test_gn():
