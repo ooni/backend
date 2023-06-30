@@ -423,6 +423,12 @@ def ssh_restart_netdata(host: str) -> None:
     ssh_restart_service(host, "netdata")
 
 
+@metrics.timer("ssh_restart_vector")
+@retry
+def ssh_restart_vector(host: str) -> None:
+    ssh_restart_service(host, "vector.service")
+
+
 @metrics.timer("ssh_wait_droplet_warmup")
 def ssh_wait_droplet_warmup(ipaddr: str) -> None:
     cmd = ssh_cmd_base + [
@@ -519,6 +525,19 @@ def setup_nginx(host: str, zone: str) -> None:
     scp_file(nginx_conf, host, "/etc/nginx/sites-enabled/default")
     ssh_restart_nginx(host)
     ssh_restart_netdata(host)
+
+
+@metrics.timer("setup_vector")
+def setup_vector(host: str) -> None:
+    """Deploy TLS certificates, configure Vector and [re]start it."""
+    fns = [
+        "/etc/vector/oonicacert.pem",
+        "/etc/vector/node-cert.pem",
+        "/etc/vector/node.key",
+    ]
+    for fn in fns:
+        scp_file(fn, host, fn)
+    ssh_restart_vector(host)
 
 
 def assign_rdn(click, dns_zone: str, wanted_droplet_num: int) -> str:
@@ -635,6 +654,7 @@ def main() -> None:
 
     create_le_do_ssl_cert(dns_zone)
     setup_nginx(f"root@{new_droplet.ip_address}", dns_zone)
+    setup_vector(f"root@{new_droplet.ip_address}")
     end_to_end_test(new_droplet.ip_address, f"{rdn}.{dns_zone}")
 
     # Update DNS A/AAAA records only when a new droplet is deployed
