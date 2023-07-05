@@ -1,3 +1,9 @@
+ooni-api (1.0.59) unstable; urgency=medium
+
+  * Serve webconn 0.5 to PK
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 05 Jul 2023 11:17:23 +0100
+
 ooni-api (1.0.58) unstable; urgency=medium
 
   * Add incident management CRUD

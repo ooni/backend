@@ -270,6 +270,10 @@ def check_in() -> Response:
     if octect in (34, 239):
         conf["features"]["webconnectivity_0.5"] = True
 
+    if probe_cc == "PK":
+        log.info("Serving webconnectivity_0.5 to PK")
+        conf["features"]["webconnectivity_0.5"] = True
+
     conf["test_helpers"] = generate_test_helpers_conf()
 
     resp["tests"] = {
