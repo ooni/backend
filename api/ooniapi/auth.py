@@ -242,12 +242,18 @@ def validate_redirect_url(rt_url: str) -> Tuple[str, str]:
     """Validates the redirect_to URL used in registration, rebuilds it
     and return the FQDN"""
     u = urlp.urlparse(rt_url)
-    if not (u.scheme == "https" and u.netloc.endswith(".ooni.org")):
+    if u.scheme != "https":
         raise ValueError("Invalid URL")
-    dn = u.netloc[:-9]  # without .ooni.org
-    valid_dnames = ("explorer", "explorer.test", "test-lists", "test-lists.test")
-    if dn not in valid_dnames:
-        raise ValueError("Invalid URL", dn)
+    valid_dnames = (
+        "explorer.ooni.org",
+        "explorer.test.ooni.org",
+        "run.ooni.io",
+        "run.test.ooni.org",
+        "test-lists.ooni.org",
+        "test-lists.test.ooni.org",
+    )
+    if u.netloc not in valid_dnames:
+        raise ValueError("Invalid URL", u.netloc)
 
     return u.geturl(), u.netloc
 
