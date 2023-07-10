@@ -1,3 +1,9 @@
+ooni-api (1.0.61) unstable; urgency=medium
+
+  * Allow more domains in login redirect
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 10 Jul 2023 12:06:43 +0100
+
 ooni-api (1.0.60) unstable; urgency=medium
 
   * Bump version with no changes
