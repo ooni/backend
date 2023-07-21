@@ -55,6 +55,11 @@ class InvalidCountryCode(BaseOONIException):
     description = "Country code is invalid"
 
 
+class EmptyTranslation(BaseOONIException):
+    err_str = "err_empty_translation_field"
+    description = "Empty translation field"
+
+
 class DuplicateURLError(BaseOONIException):
     err_str = "err_duplicate_url"
     description = "Duplicate URL"
