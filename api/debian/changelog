@@ -1,3 +1,9 @@
+ooni-api (1.0.62) unstable; urgency=medium
+
+  * Add translation support for OONI Run v2
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 10 Jul 2023 14:46:07 +0100
+
 ooni-api (1.0.61) unstable; urgency=medium
 
   * Allow more domains in login redirect

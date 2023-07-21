@@ -13,11 +13,6 @@ from clickhouse_driver import Client as Clickhouse
 
 import logging
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(relativeCreated)6d %(levelname).1s %(filename)s:%(lineno)s %(message)s",
-)
-
 from ooniapi.app import create_app
 
 
@@ -26,6 +21,10 @@ def app():
     app = create_app(testmode=True)
     app.debug = True
     assert app.logger.handlers == []
+    #logging.basicConfig(
+    #    level=logging.DEBUG,
+    #    format="%(relativeCreated)6d %(levelname).1s %(filename)s:%(lineno)s %(message)s",
+    #)
     return app
 
 
@@ -180,6 +179,17 @@ def connect_to_clickhouse(app):
 def inject_msmts(app):
     if not pytest.inject_msmts:
         return
+
+
+# # Logging # #
+
+
+def testlog(self, msg, *args, **kws):
+    msg = f"---------  {msg}  ---------"
+    self._log(logging.INFO, msg, args, **kws)
+
+
+logging.Logger.say = testlog
 
 
 # # Fixtures used by test files # #

@@ -5,6 +5,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 """
 
 from datetime import datetime
+from typing import Dict, Any
 import json
 import logging
 
@@ -19,13 +20,49 @@ from ooniapi.auth import (
 from ooniapi.config import metrics
 from ooniapi.database import query_click, optimize_table, insert_click, raw_query
 from ooniapi.errors import jerror
+from ooniapi.urlparams import commasplit
 from ooniapi.utils import nocachejson, cachedjson, generate_random_intuid
+
+from ooniapi.errors import InvalidRequest, EmptyTranslation
 
 log: logging.Logger
 
 # The table creation for CI purposes is in tests/integ/clickhouse_1_schema.sql
 
 oonirun_blueprint = Blueprint("oonirun_api", "oonirun")
+
+
+def from_timestamp(ts: str) -> datetime:
+    return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def to_timestamp(t: datetime) -> str:
+    ts = t.strftime("%Y-%m-%dT%H:%M:%S.%f")
+    return ts[:-3] + "Z"
+
+
+def to_db_date(t: datetime) -> str:
+    return t.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
+def validate_translations_not_empty(descriptor: dict) -> None:
+    for f in ("description_intl", "short_description_intl", "name_intl"):
+        d = descriptor.get(f, {}) or {}
+        for lang, txn in d.items():
+            if txn == "":
+                raise EmptyTranslation()
+
+
+def compare_descriptors(previous_descriptor: dict, descriptor: dict) -> bool:
+    """Return True if anything other than the localized fields changed"""
+    if previous_descriptor["nettests"] != descriptor["nettests"]:
+        return True
+    if previous_descriptor["author"] != descriptor["author"]:
+        return True
+    if previous_descriptor["icon"] != descriptor["icon"]:
+        return True
+
+    return False
 
 
 @oonirun_blueprint.route("/api/_/ooni_run/create", methods=["POST"])
@@ -39,11 +76,11 @@ def create_oonirun() -> Response:
         description: OONIRun descriptor content
         schema:
           type: object
-      - name: id or null
-        description: used to create a new version of an existing OONIRun
-        in: query
-        type: string
-        required: false
+      #- id: oonirun id or null
+      #  description: used to create a new version of an existing OONIRun
+      #  in: query
+      #  type: string
+      #  required: false
     responses:
       '200':
         schema:
@@ -62,44 +99,70 @@ def create_oonirun() -> Response:
     descriptor = request.json
     assert descriptor
     oonirun_id_raw = request.args.get("id")
-    for i in ("name", "description", "author"):
-        val = descriptor.get(i, "") or ""
-        # Must be present and non empty
-        if not val:
-            return jerror(f"Field {i} required")
 
-    sql_ins = (
-        "INSERT INTO oonirun (id, descriptor, creator_account_id, "
-        "name, author, description) VALUES"
-    )
+    if descriptor.get("name", "") == "":
+        log.info("'name' field empty")
+        return jerror("'name' field must not be empty")
+
+    validate_translations_not_empty(descriptor)
+
+    desc_s = json.dumps(descriptor)
+
+    now = datetime.utcnow()
+    now_ts = to_timestamp(now)
+
     if oonirun_id_raw is None:
-        # new ID
+        # Generate new ID
         oonirun_id = generate_random_intuid(current_app)
+        increase_descriptor_creation_time = True
+
     else:
         # We need a previous oonirun belonging to the same user
         oonirun_id = int(oonirun_id_raw)
-        query = """SELECT 1
+        query = """SELECT descriptor, descriptor_creation_time
         FROM oonirun
-        WHERE id = %(oonirun_id)s
-        AND creator_account_id = %(account_id)s
+        WHERE id = %(oonirun_id)s AND creator_account_id = %(account_id)s
+        ORDER BY descriptor_creation_time DESC
         LIMIT 1
         """
         query_params = dict(account_id=account_id, oonirun_id=oonirun_id)
         q = query_click(query, query_params)
         if not len(q):
-            return jerror(f"OONIRun descriptor not found")
+            return jerror("OONIRun descriptor not found")
 
-    desc_s = json.dumps(descriptor)
+        # A descriptor is already in the database and belongs to account_id
+        # Check if we need to update the descriptor timestamp or only txn
+        previous_descriptor = json.loads(q[0]["descriptor"])
+        increase_descriptor_creation_time = compare_descriptors(
+            previous_descriptor, descriptor
+        )
+        del previous_descriptor
+
+        previous_descriptor_creation_time = q[0]["descriptor_creation_time"]
+
+    if increase_descriptor_creation_time:
+        descriptor_creation_time = now
+    else:
+        descriptor_creation_time = previous_descriptor_creation_time
+
     row = dict(
-        id=oonirun_id,
-        descriptor=desc_s,
-        creator_account_id=account_id,
-        name=descriptor["name"],
         author=descriptor["author"],
-        description=descriptor["description"],
+        creator_account_id=account_id,
+        descriptor=desc_s,
+        descriptor_creation_time=descriptor_creation_time,
+        id=oonirun_id,
+        name=descriptor["name"],
+        short_description=descriptor.get("short_description", ""),
+        translation_creation_time=now,
     )
-    log.info(f"Creating oonirun {oonirun_id} {row}")
+    log.info(
+        f"Inserting oonirun {oonirun_id} {increase_descriptor_creation_time} {row}"
+    )
+    sql_ins = """INSERT INTO oonirun (id, descriptor, creator_account_id,
+        author, descriptor_creation_time, translation_creation_time, name,
+        short_description) VALUES"""
     insert_click(sql_ins, [row])
+
     optimize_table("oonirun")
     return nocachejson(v=1, id=oonirun_id)
 
@@ -152,7 +215,7 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
       - name: creation_time or null
         in: query
         type: string
-        example: "2023-06-02T12:33:43Z"
+        example: "2023-06-02T12:33:43.123Z"
         required: false
     responses:
       '200':
@@ -169,24 +232,28 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
             descriptor:
               type: object
               description: descriptor data
+            translation_creation_time:
+              type: string
     """
+    # Return the latest version of the translations
     global log
     log = current_app.logger
     log.debug("fetching oonirun")
-    creation_time = request.args.get("creation_time")
-    if creation_time is None:
+    descriptor_creation_time = request.args.get("creation_time")
+    if descriptor_creation_time is None:
         # Fetch latest version
         query_params = dict(oonirun_id=oonirun_id)
         creation_time_filter = ""
     else:
-        ct = datetime.strptime(creation_time, "%Y-%m-%dT%H:%M:%SZ")
-        query_params = dict(oonirun_id=oonirun_id, creation_time=ct)
-        creation_time_filter = "AND creation_time = %(creation_time)s"
+        ct = from_timestamp(descriptor_creation_time)
+        query_params = dict(oonirun_id=oonirun_id, dct=to_db_date(ct))
+        creation_time_filter = "AND descriptor_creation_time = %(dct)s"
 
-    query = f"""SELECT creation_time, descriptor
+    query = f"""SELECT
+        descriptor_creation_time, translation_creation_time, descriptor
         FROM oonirun
         WHERE id = %(oonirun_id)s {creation_time_filter}
-        ORDER BY creation_time DESC
+        ORDER BY descriptor_creation_time DESC
         LIMIT 1
     """
     q = query_click(query, query_params)
@@ -194,8 +261,15 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
         return jerror("oonirun descriptor not found")
 
     r = q[0]
-    desc = json.loads(r["descriptor"])
-    return cachedjson("1h", descriptor=desc, creation_time=r["creation_time"], v=1)
+    descriptor = json.loads(r["descriptor"])
+
+    kw = dict(
+        descriptor=descriptor,
+        descriptor_creation_time=r["descriptor_creation_time"],
+        translation_creation_time=r["translation_creation_time"],
+        v=1,
+    )
+    return cachedjson("1h", **kw)
 
 
 @oonirun_blueprint.route("/api/_/ooni_run/list", methods=["GET"])
@@ -220,40 +294,74 @@ def list_oonirun_descriptors() -> Response:
                   id:
                     type: string
                     description: descriptor ID
+                  archived:
+                    type: boolean
+                  author:
+                    type: string
                   creation_time:
                     type: string
                     description: descriptor creation time
-                  archived:
-                    type: boolean
-                  name:
-                    type: string
-                  description:
-                    type: string
-                  author:
-                    type: string
                   mine:
                     type: boolean
                     description: the descriptor belongs to the logged-in user. Optional.
+                  name:
+                    type: string
+                  short_description:
+                    type: string
     """
     global log
     log = current_app.logger
     log.debug("list oonirun")
     account_id = get_account_id_or_none()
-    cols = [
-        "id",
-        "creation_time",
-        "archived",
-        "name",
-        "description",
-        "author",
-    ]
-    if account_id is not None:
-        cols.append("creator_account_id = %(account_id)s AS mine")
 
-    query = f"""SELECT {", ".join(cols)}
+    query_params: Dict[str, Any] = dict(account_id=account_id)
+    try:
+        filters = []
+        only_latest = bool(request.args.get("only_latest"))
+        if only_latest:
+            filters.append("""
+            (id, translation_creation_time) IN (
+                SELECT id,
+                MAX(translation_creation_time) AS translation_creation_time
+                FROM oonirun
+                GROUP BY id
+            )""")
+
+        only_mine = bool(request.args.get("only_mine"))
+        if only_mine:
+            filters.append("creator_account_id = %(account_id)s")
+
+        ids_s = request.args.get("ids")
+        if ids_s:
+            ids = commasplit(ids_s)
+            filters.append("id IN %(ids)s")
+            query_params["ids"] = ids
+
+        # name_match = request.args.get("name_match", "").strip()
+        # if name_match:
+        #     filters.append("id IN %(ids)s")
+        #     query_params["ids"] = ids
+
+    except Exception as e:
+        log.debug(f"list_oonirun_descriptors: invalid parameter. {e}")
+        return jerror("Incorrect parameter used")
+
+    if account_id is None:
+        mine_col = "0"
+    else:
+        mine_col = "creator_account_id = %(account_id)s"
+
+    if filters:
+        fil = " WHERE " + " AND ".join(filters)
+    else:
+        fil = ""
+
+    query = f"""SELECT archived, author, id, descriptor_creation_time,
+    translation_creation_time, {mine_col} AS mine, name, short_description
     FROM oonirun
-    ORDER BY id, creation_time
+    {fil}
     """
-    query_params = dict(account_id=account_id)
-    q = query_click(query, query_params)
-    return nocachejson(v=1, descriptors=q)
+    descriptors = list(query_click(query, query_params))
+    log.debug(f"Returning {len(descriptors)} descriptor[s]")
+
+    return nocachejson(v=1, descriptors=descriptors)
