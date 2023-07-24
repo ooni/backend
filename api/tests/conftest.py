@@ -100,7 +100,7 @@ def runcmd(cmd: List[str], wd: Path) -> None:
     try:
         p = subprocess.run(cmd, cwd=wd)
     except Exception as e:
-        pytest.exit(e, returncode=1)
+        pytest.exit(str(e), returncode=1)
     if p.returncode != 0:
         print("=" * 60)
         print(p.stderr)
@@ -189,7 +189,7 @@ def testlog(self, msg, *args, **kws):
     self._log(logging.INFO, msg, args, **kws)
 
 
-logging.Logger.say = testlog
+logging.Logger.say = testlog  # type: ignore
 
 
 # # Fixtures used by test files # #
