@@ -14,6 +14,7 @@ TESTARGS ?= \
 	tests/integ/test_prioritization.py \
 	tests/integ/test_private_api.py \
 	tests/integ/test_probe_services.py \
+	tests/unit/test_oonirun.py \
 	tests/unit/test_prio.py
 
 #tests/integ/test_prioritization_nodb.py
