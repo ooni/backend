@@ -93,9 +93,8 @@ class NoProposedChanges(BaseOONIException):
 
 class OwnershipPermissionError(BaseOONIException):
     err_str = "err_ownership"
-    description = (
-        "Attempted to create, update or delete an item beloging to another user"
-    )
+    description = """Attempted to create, update or delete an item \
+beloging to another user"""
 
 
 class InvalidRequest(BaseOONIException):
