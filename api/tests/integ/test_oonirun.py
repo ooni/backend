@@ -36,7 +36,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         "short_description_intl": {
             "it": "integ-test descrizione breve in italiano",
         },
-        "icon": "",
+        "icon": "myicon",
         "author": "integ-test author",
         "nettests": [
             {
@@ -90,7 +90,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         "short_description_intl": {
             "it": "integ-test descrizione breve in italiano",
         },
-        "icon": "",
+        "icon": "myicon",
         "author": "integ-test author",
         "nettests": [
             {
@@ -129,6 +129,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         "archived",
         "author",
         "descriptor_creation_time",
+        "icon",
         "id",
         "mine",
         "name",
@@ -171,6 +172,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         "archived": 0,
         "author": "integ-test author",
         "descriptor_creation_time": creation_time,
+        "icon": "myicon",
         "id": oonirun_id,
         "mine": 0,
         "name": "integ-test name in English",

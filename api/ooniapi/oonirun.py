@@ -154,13 +154,14 @@ def create_oonirun() -> Response:
         name=descriptor["name"],
         short_description=descriptor.get("short_description", ""),
         translation_creation_time=now,
+        icon=descriptor.get("icon", ""),
     )
     log.info(
         f"Inserting oonirun {oonirun_id} {increase_descriptor_creation_time} {row}"
     )
     sql_ins = """INSERT INTO oonirun (id, descriptor, creator_account_id,
         author, descriptor_creation_time, translation_creation_time, name,
-        short_description) VALUES"""
+        short_description, icon) VALUES"""
     insert_click(sql_ins, [row])
 
     optimize_table("oonirun")
@@ -308,6 +309,8 @@ def list_oonirun_descriptors() -> Response:
                     type: string
                   short_description:
                     type: string
+                  icon:
+                    type: string
     """
     global log
     log = current_app.logger
@@ -356,12 +359,11 @@ def list_oonirun_descriptors() -> Response:
     else:
         fil = ""
 
-    query = f"""SELECT archived, author, id, descriptor_creation_time,
+    query = f"""SELECT archived, author, id, icon, descriptor_creation_time,
     translation_creation_time, {mine_col} AS mine, name, short_description
     FROM oonirun
     {fil}
     """
     descriptors = list(query_click(query, query_params))
     log.debug(f"Returning {len(descriptors)} descriptor[s]")
-
     return nocachejson(v=1, descriptors=descriptors)
