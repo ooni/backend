@@ -247,7 +247,8 @@ CREATE TABLE IF NOT EXISTS default.oonirun
     `descriptor` String,
     `author` String,
     `name` String,
-    `short_description` String
+    `short_description` String,
+    `icon` String
 )
 ENGINE = ReplacingMergeTree(translation_creation_time)
 ORDER BY (id, descriptor_creation_time)
