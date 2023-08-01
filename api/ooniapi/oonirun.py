@@ -330,6 +330,12 @@ def list_oonirun_descriptors() -> Response:
                 GROUP BY id
             )""")
 
+        include_archived = bool(request.args.get("include_archived"))
+        if not include_archived:
+            filters.append("""
+            archived = 0
+            """)
+
         only_mine = bool(request.args.get("only_mine"))
         if only_mine:
             filters.append("creator_account_id = %(account_id)s")
@@ -363,6 +369,7 @@ def list_oonirun_descriptors() -> Response:
     translation_creation_time, {mine_col} AS mine, name, short_description
     FROM oonirun
     {fil}
+    ORDER BY descriptor_creation_time, translation_creation_time
     """
     descriptors = list(query_click(query, query_params))
     log.debug(f"Returning {len(descriptors)} descriptor[s]")
