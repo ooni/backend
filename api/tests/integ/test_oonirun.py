@@ -12,6 +12,7 @@ from .test_integration_auth import reset_smtp_mock, setup_test_session
 from .test_integration_auth import adminsession, usersession
 
 import ooniapi
+
 # todo test with _nodb
 
 
@@ -54,7 +55,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert r.status_code == 400, r.json
 
     say("Empty name_intl->it")
-    z["name"]  = "integ-test name in English"
+    z["name"] = "integ-test name in English"
     r = usersession.post("/api/_/ooni_run/create", json=z)
     assert r.status_code == 400, r.json
 
@@ -65,7 +66,6 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert r.json["v"] == 1, r.json
     assert str(r.json["id"]).endswith("00")
     oonirun_id = int(r.json["id"])
-
 
     say("fetch latest")
     r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
@@ -193,16 +193,10 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
     say("descriptor_creation_time has changed")
-    print("OLD")
-    print(creation_time)
-    print(r.json["descriptor_creation_time"])
     assert creation_time < r.json["descriptor_creation_time"]
-    print(creation_time)
     assert translation_creation_time < r.json["translation_creation_time"]
 
     creation_time = r.json["descriptor_creation_time"]
-    print("NEW")
-    print(creation_time)
     translation_creation_time = r.json["translation_creation_time"]
 
     say("List descriptors as admin and find we have 2 versions now")
@@ -250,6 +244,18 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     r = usersession.post(f"/api/_/ooni_run/archive/{oonirun_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
+
+    say("List descriptors")
+    r = usersession.get(f"/api/_/ooni_run/list?ids={oonirun_id}&include_archived=True")
+    assert r.status_code == 200, r.json
+    descs = r.json["descriptors"]
+    assert len(descs) == 2, r.json
+
+    say("List descriptors")
+    r = usersession.get(f"/api/_/ooni_run/list?ids={oonirun_id}")
+    assert r.status_code == 200, r.json
+    descs = r.json["descriptors"]
+    assert len(descs) == 0, r.json
 
 
 def test_fetch_not_found(cleanup, usersession):
