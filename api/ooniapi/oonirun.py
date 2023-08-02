@@ -224,34 +224,43 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
         schema:
           type: object
           properties:
-            v:
-              type: integer
-              description: response format version
-            creation_time:
-              type: string
-              description: descriptor creation time
+            archived:
+              type: boolean
+              description: the descriptor is archived
             descriptor:
               type: object
               description: descriptor data
+            descriptor_creation_time:
+              type: string
+              description: descriptor creation time
+            mine:
+              type: boolean
+              description: the descriptor belongs to the logged-in user. Optional.
             translation_creation_time:
               type: string
+              description: translation creation time
+            v:
+              type: integer
+              description: response format version
     """
     # Return the latest version of the translations
     global log
     log = current_app.logger
     log.debug("fetching oonirun")
     descriptor_creation_time = request.args.get("creation_time")
+    account_id = get_account_id_or_none()
+    query_params = dict(oonirun_id=oonirun_id, account_id=account_id)
     if descriptor_creation_time is None:
         # Fetch latest version
-        query_params = dict(oonirun_id=oonirun_id)
         creation_time_filter = ""
     else:
         ct = from_timestamp(descriptor_creation_time)
-        query_params = dict(oonirun_id=oonirun_id, dct=to_db_date(ct))
+        query_params["dct"] = to_db_date(ct)
         creation_time_filter = "AND descriptor_creation_time = %(dct)s"
 
     query = f"""SELECT
-        descriptor_creation_time, translation_creation_time, descriptor
+        descriptor_creation_time, translation_creation_time, descriptor,
+        archived, creator_account_id = %(account_id)s AS mine
         FROM oonirun
         WHERE id = %(oonirun_id)s {creation_time_filter}
         ORDER BY descriptor_creation_time DESC
@@ -265,8 +274,10 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
     descriptor = json.loads(r["descriptor"])
 
     kw = dict(
+        archived=r["archived"],
         descriptor=descriptor,
         descriptor_creation_time=r["descriptor_creation_time"],
+        mine=r["mine"],
         translation_creation_time=r["translation_creation_time"],
         v=1,
     )
@@ -322,19 +333,23 @@ def list_oonirun_descriptors() -> Response:
         filters = []
         only_latest = bool(request.args.get("only_latest"))
         if only_latest:
-            filters.append("""
+            filters.append(
+                """
             (id, translation_creation_time) IN (
                 SELECT id,
                 MAX(translation_creation_time) AS translation_creation_time
                 FROM oonirun
                 GROUP BY id
-            )""")
+            )"""
+            )
 
         include_archived = bool(request.args.get("include_archived"))
         if not include_archived:
-            filters.append("""
+            filters.append(
+                """
             archived = 0
-            """)
+            """
+            )
 
         only_mine = bool(request.args.get("only_mine"))
         if only_mine:

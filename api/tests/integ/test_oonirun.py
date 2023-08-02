@@ -71,12 +71,15 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
-    assert sorted(r.json) == [
+    exp_fetch_fields = [
+        "archived",
         "descriptor",
         "descriptor_creation_time",
+        "mine",
         "translation_creation_time",
         "v",
     ]
+    assert sorted(r.json) == exp_fetch_fields
     exp = {
         "name": "integ-test name in English",
         "name_intl": {
@@ -114,12 +117,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     )
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
-    assert sorted(r.json) == [
-        "descriptor",
-        "descriptor_creation_time",
-        "translation_creation_time",
-        "v",
-    ]
+    assert sorted(r.json) == exp_fetch_fields
     assert r.json["descriptor"] == exp
     assert creation_time == r.json["descriptor_creation_time"]
     assert translation_creation_time == r.json["translation_creation_time"]
@@ -192,6 +190,8 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
+    assert r.json["mine"] == 1, r.json
+    assert r.json["archived"] == 0, r.json
     say("descriptor_creation_time has changed")
     assert creation_time < r.json["descriptor_creation_time"]
     assert translation_creation_time < r.json["translation_creation_time"]
@@ -228,17 +228,14 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
-    assert sorted(r.json) == [
-        "descriptor",
-        "descriptor_creation_time",
-        "translation_creation_time",
-        "v",
-    ]
+    assert sorted(r.json) == exp_fetch_fields
     say("Only the translation_creation_time increased")
     assert creation_time == r.json["descriptor_creation_time"]
     assert translation_creation_time < r.json["translation_creation_time"]
     exp["description_intl"]["it"] = "integ-test *nuova* descrizione in italiano"
     assert r.json["descriptor"] == exp
+    assert r.json["mine"] == 1, r.json
+    assert r.json["archived"] == 0, r.json
 
     say("Archive it")
     r = usersession.post(f"/api/_/ooni_run/archive/{oonirun_id}")
@@ -256,6 +253,11 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert r.status_code == 200, r.json
     descs = r.json["descriptors"]
     assert len(descs) == 0, r.json
+
+    say("Fetch latest and find that it's archived")
+    r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
+    assert r.status_code == 200, r.json
+    assert r.json["archived"] == 1, r.json
 
 
 def test_fetch_not_found(cleanup, usersession):
