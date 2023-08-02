@@ -86,11 +86,11 @@ def create_oonirun() -> Response:
         schema:
           type: object
           properties:
+            id:
+              type: integer
             v:
               type: integer
               description: response format version
-            id:
-              type: integer
     """
     global log
     log = current_app.logger
