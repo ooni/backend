@@ -231,7 +231,8 @@ CREATE TABLE IF NOT EXISTS default.incidents
     `ASNs` Array(UInt32),
     `domains` Array(String),
     `tags` Array(String),
-    `links` Array(String)
+    `links` Array(String),
+    `test_names` Array(String)
 )
 ENGINE = ReplacingMergeTree(update_time)
 ORDER BY (id)
