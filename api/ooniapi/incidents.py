@@ -84,7 +84,7 @@ def search_list_incidents() -> Response:
             query_params["account_id"] = account_id
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
-        title, event_type, published, CCs, ASNs, domains, tags,
+        title, event_type, published, CCs, ASNs, domains, tags, test_names,
         links, creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
@@ -126,7 +126,7 @@ def show_incident(incident_id: str) -> Response:
             query_params = {"id": incident_id, "account_id": account_id}
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
-        title, text, event_type, published, CCs, ASNs, domains, tags,
+        title, text, event_type, published, CCs, ASNs, domains, tags, test_names,
         links, creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
@@ -158,6 +158,7 @@ def prepare_incident_dict(d: dict):
         "reported_by",
         "start_time",
         "tags",
+        "test_names",
         "text",
         "title",
     ]
@@ -232,6 +233,10 @@ def post_update_incident(action: str) -> Response:
               type: array
               items:
                 type: string
+            test_names:
+              type: array
+              items:
+                type: string
             domains:
               type: array
               items:
@@ -292,7 +297,8 @@ def post_update_incident(action: str) -> Response:
 
         ins_sql = """INSERT INTO incidents
         (id, start_time, end_time, creator_account_id, reported_by, title,
-        text, event_type, published, CCs, ASNs, domains, tags, links)
+        text, event_type, published, CCs, ASNs, domains, tags, links,
+        test_names)
         VALUES
         """
         prepare_incident_dict(req)

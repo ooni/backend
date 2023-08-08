@@ -47,6 +47,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
         ASNs=[1, 2],
         domains=[],
         tags=["integ-test"],
+        test_names=["web_connectivity", "signal"],
         links=[
             "https://explorer.ooni.org/chart/mat?test_name=web_connectivity&axis_x=measurement_start_day&since=2023-04-16&until=2023-05-16&time_grain=day"
         ],
@@ -79,6 +80,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
         "start_time": "2020-01-01T00:00:00Z",
         "tags": ["integ-test"],
         "title": "integ-test-1",
+        "test_names": ["web_connectivity", "signal"],
         "event_type": "incident",
         "mine": 1,
     }
@@ -163,6 +165,7 @@ def test_crud_user_create(cleanup, client, adminsession, usersession):
         event_type="incident",
         published=True,
         CCs=["UK", "FR"],
+        test_names=["web_connectivity"],
         ASNs=[1, 2],
         domains=[],
         tags=["integ-test"],
@@ -196,6 +199,7 @@ def test_crud_user_create(cleanup, client, adminsession, usersession):
         "start_time": "2020-01-01T00:00:00Z",
         "tags": ["integ-test"],
         "title": title,
+        "test_names": ["web_connectivity"],
         "mine": 1,
         "event_type": "incident",
     }
