@@ -1,3 +1,9 @@
+ooni-api (1.0.63) unstable; urgency=medium
+
+  * Add "mine" to incident API
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 08 Aug 2023 12:28:29 +0200
+
 ooni-api (1.0.62) unstable; urgency=medium
 
   * Add translation support for OONI Run v2

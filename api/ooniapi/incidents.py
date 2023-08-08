@@ -75,15 +75,17 @@ def search_list_incidents() -> Response:
             if account_id is None:
                 return nocachejson(incidents=[])
             where += "\nAND creator_account_id = %(account_id)s"
-            query_params["account_id"] = account_id
 
         if account_id is None:
             # non-published incidents are not exposed to anon users
             where += "\nAND published = 1"
+            query_params["account_id"] = "never-match"
+        else:
+            query_params["account_id"] = account_id
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, event_type, published, CCs, ASNs, domains, tags,
-        links
+        links, creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
         ORDER BY title
@@ -115,15 +117,17 @@ def show_incident(incident_id: str) -> Response:
     log.debug("showing incident")
     try:
         where = "WHERE id = %(id)s AND deleted != 1"
-        query_params = {"id": incident_id}
         account_id = get_account_id_or_none()
         if account_id is None:
             # non-published incidents are not exposed to anon users
             where += "\nAND published = 1"
+            query_params = {"id": incident_id, "account_id": "never-match"}
+        else:
+            query_params = {"id": incident_id, "account_id": account_id}
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, text, event_type, published, CCs, ASNs, domains, tags,
-        links
+        links, creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
         LIMIT 1

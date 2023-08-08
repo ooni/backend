@@ -80,6 +80,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
         "tags": ["integ-test"],
         "title": "integ-test-1",
         "event_type": "incident",
+        "mine": 1,
     }
     assert i == expected
 
@@ -132,6 +133,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     i.pop("update_time")
     expected["start_time"] = "2020-01-02T00:00:00Z"
     expected["published"] = True
+    expected["mine"] = 0
     assert i == expected
 
     # Delete as admin
@@ -194,6 +196,7 @@ def test_crud_user_create(cleanup, client, adminsession, usersession):
         "start_time": "2020-01-01T00:00:00Z",
         "tags": ["integ-test"],
         "title": title,
+        "mine": 1,
         "event_type": "incident",
     }
     assert i == expected
