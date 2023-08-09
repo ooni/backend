@@ -1,3 +1,9 @@
+ooni-api (1.0.64) unstable; urgency=medium
+
+  * Set "mine" and "archived" as bools
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 09 Aug 2023 18:29:42 +0200
+
 ooni-api (1.0.63) unstable; urgency=medium
 
   * Add "mine" to incident API

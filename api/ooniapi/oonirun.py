@@ -274,10 +274,10 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
     descriptor = json.loads(r["descriptor"])
 
     kw = dict(
-        archived=r["archived"],
+        archived=bool(r["archived"]),
         descriptor=descriptor,
         descriptor_creation_time=r["descriptor_creation_time"],
-        mine=r["mine"],
+        mine=bool(r["mine"]),
         translation_creation_time=r["translation_creation_time"],
         v=1,
     )
@@ -387,5 +387,8 @@ def list_oonirun_descriptors() -> Response:
     ORDER BY descriptor_creation_time, translation_creation_time
     """
     descriptors = list(query_click(query, query_params))
+    for d in descriptors:
+        d["mine"] = bool(d["mine"])
+        d["archived"] = bool(d["archived"])
     log.debug(f"Returning {len(descriptors)} descriptor[s]")
     return nocachejson(v=1, descriptors=descriptors)
