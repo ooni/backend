@@ -583,77 +583,66 @@ def list_measurements() -> Response:
       - name: report_id
         in: query
         type: string
-        description: The report_id to search measurements for
+        description: Report_id to search measurements for
       - name: input
         in: query
         type: string
         minLength: 3 # `input` is handled by pg_trgm
-        description: The input (for example a URL or IP address) to search measurements for
+        description: Input (for example a URL or IP address) to search measurements for
       - name: domain
         in: query
         type: string
         minLength: 3
-        description: The domain to search measurements for
+        description: Domain to search measurements for
       - name: probe_cc
         in: query
         type: string
-        description: The two letter country code
+        description: Two letter country code
       - name: probe_asn
         in: query
         type: string
-        description: the Autonomous system number in the format "ASXXX"
+        description: Autonomous system number in the format "ASXXX"
       - name: test_name
         in: query
         type: string
-        description: The name of the test
+        description: Name of the test
       - name: category_code
         in: query
         type: string
-        description: The category code from the citizenlab list
+        description: Category code from the citizenlab list
       - name: since
         in: query
         type: string
         description: >-
-          The start date of when measurements were run (ex.
+          Start date of when measurements were run (ex.
           "2016-10-20T10:30:00")
       - name: until
         in: query
         type: string
         description: >-
-          The end date of when measurement were run (ex.
+          End date of when measurement were run (ex.
           "2016-10-20T10:30:00")
-      - name: since_index
-        in: query
-        type: string
-        description: Return results only strictly greater than the provided index
 
       - name: confirmed
         in: query
         type: string
-        collectionFormat: csv
-        items:
-          type: string
         description: |
-          Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).
+          Set "true" for confirmed network anomalies (we found a blockpage, a middlebox, etc.).
+          Default: both true and false
 
       - name: anomaly
         in: query
         type: string
-        collectionFormat: csv
-        items:
-          type: string
         description: |
-          Measurements that require special attention (it's likely to be a case of blocking), however it has not necessarily been confirmed
+          Set "true" for measurements that require special attention (likely to be a case of blocking)
+          Default: both true and false
 
       - name: failure
         in: query
         type: string
-        collectionFormat: csv
-        items:
-          type: string
         description: |
-          There was an error in the measurement (the control request failed, there was a bug, etc.).
-          Default is to consider it both true or false (`failure=true,false`)
+          Set "true" for failed measurements (the control request failed, there was a bug, etc.).
+          Default: both true and false
 
       - name: order_by
         in: query
