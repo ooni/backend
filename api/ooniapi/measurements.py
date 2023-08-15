@@ -35,6 +35,7 @@ from ooniapi.database import query_click, query_click_one_row
 from ooniapi.urlparams import (
     param_asn,
     param_bool,
+    param_commasplit,
     param_date,
     param_input_or_none,
     param_report_id,
@@ -644,6 +645,21 @@ def list_measurements() -> Response:
           Set "true" for failed measurements (the control request failed, there was a bug, etc.).
           Default: both true and false
 
+      - name: software_version
+        in: query
+        type: string
+        description: Filter measurements by software version. Comma-separated.
+
+      - name: test_version
+        in: query
+        type: string
+        description: Filter measurements by test version. Comma-separated.
+
+      - name: engine_version
+        in: query
+        type: string
+        description: Filter measurements by engine version. Comma-separated.
+
       - name: order_by
         in: query
         type: string
@@ -698,6 +714,9 @@ def list_measurements() -> Response:
     anomaly = param_bool("anomaly")
     confirmed = param_bool("confirmed")
     category_code = param("category_code")
+    software_versions = param_commasplit("software_version")
+    test_versions = param_commasplit("test_version")
+    engine_versions = param_commasplit("engine_version")
 
     # Workaround for https://github.com/ooni/probe/issues/1034
     user_agent = request.headers.get("User-Agent", "")
@@ -787,6 +806,18 @@ def list_measurements() -> Response:
     if test_name is not None:
         query_params["test_name"] = test_name
         fpwhere.append(sql.text("test_name = :test_name"))
+
+    if software_versions is not None:
+        query_params["software_versions"] = software_versions
+        fpwhere.append(sql.text("software_version IN :software_versions"))
+
+    if test_versions is not None:
+        query_params["test_versions"] = test_versions
+        fpwhere.append(sql.text("test_version IN :test_versions"))
+
+    if engine_versions is not None:
+        query_params["engine_versions"] = engine_versions
+        fpwhere.append(sql.text("engine_version IN :engine_versions"))
 
     # Filter on anomaly, confirmed and failure:
     # The database stores anomaly and confirmed as boolean + NULL and stores

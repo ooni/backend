@@ -773,6 +773,34 @@ def test_list_measurements_ZZ(client):
     assert resp.status_code == 403
 
 
+def test_list_measurements_filter_software_version_nomatch(client):
+    # https://github.com/ooni/backend/issues/15
+    url = "measurements?since=2021-07-09&until=2021-07-10&software_version=9.9.9"
+    resp = api(client, url)
+    assert len(resp["results"]) == 0
+
+
+def test_list_measurements_filter_software_version(client):
+    # https://github.com/ooni/backend/issues/15
+    url = "measurements?since=2021-07-09&until=2021-07-10&software_version=3.9.2"
+    resp = api(client, url)
+    assert len(resp["results"]) == 100
+
+
+def test_list_measurements_filter_test_version(client):
+    # https://github.com/ooni/backend/issues/15
+    url = "measurements?since=2021-07-09&until=2021-07-10&test_version=0.4.0"
+    resp = api(client, url)
+    assert len(resp["results"]) == 100
+
+
+def test_list_measurements_filter_engine_version(client):
+    # https://github.com/ooni/backend/issues/15
+    url = "measurements?since=2021-07-09&until=2021-07-10&engine_version=3.9.2"
+    resp = api(client, url)
+    assert len(resp["results"]) == 100
+
+
 ## get_measurement ##
 
 
