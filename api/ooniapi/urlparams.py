@@ -114,6 +114,13 @@ def commasplit(p: str) -> List[str]:
     return sorted(out)
 
 
+def param_commasplit(name) -> Optional[List[str]]:
+    p = request.args.get(name)
+    if not p:
+        return None
+    return commasplit(p)
+
+
 def param_domain_m(name="domain") -> List[str]:
     p = request.args.get(name)
     if not p:
