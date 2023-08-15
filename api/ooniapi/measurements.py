@@ -690,7 +690,6 @@ def list_measurements() -> Response:
     test_name = param("test_name")
     since = param_date("since")
     until = param_date("until")
-    since_index = param("since_index")  # unused
     order_by = param("order_by")
     order = param("order", "desc")
     offset = int(param("offset", 0))
