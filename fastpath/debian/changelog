@@ -1,3 +1,9 @@
+fastpath (0.77) unstable; urgency=medium
+
+  * Flag torsf measurements from Android probe 3.8.3 as failed
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 17 Aug 2023 10:54:38 +0200
+
 fastpath (0.76) unstable; urgency=medium
 
   * Extract test helpers metadata

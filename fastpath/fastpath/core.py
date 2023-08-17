@@ -1422,6 +1422,12 @@ def score_torsf(msm: dict) -> dict:
     scores["extra"] = dict(
         bootstrap_time=tk.get("bootstrap_time"), test_runtime=msm.get("test_runtime")
     )
+
+    sw_name = msm.get("software_name", "unknown")
+    sw_version = msm.get("software_version", "unknown")
+    if sw_version == "3.8.3" and sw_name.startswith("ooniprobe-android"):
+        scores["accuracy"] = 0.0
+
     return scores
 
 
