@@ -921,7 +921,7 @@ def score_vanilla_tor(msm: dict) -> dict:
             scores["msg"] = "Client bug"
             return scores
 
-    tor_logs = tk.get("tor_logs")
+    tor_logs = tk.get("tor_logs") or tk.get("tor_log")
     if tor_logs is None:
         # unknown bug
         scores["accuracy"] = 0.0
