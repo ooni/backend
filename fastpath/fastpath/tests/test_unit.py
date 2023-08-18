@@ -303,6 +303,34 @@ def test_score_whatsapp_failure():
     }
 
 
+# # test_name: vanilla_tor
+
+
+def test_score_vanilla_tor():
+    # https://github.com/ooni/backend/issues/608
+    msm = loadj("vanilla_tor")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.98,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+
+def test_score_vanilla_tor_ok():
+    # https://github.com/ooni/backend/issues/608
+    msm = loadj("vanilla_tor_ok")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
 # # test_name: web_connectivity
 
 
