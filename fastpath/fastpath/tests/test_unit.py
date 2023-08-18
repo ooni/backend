@@ -58,7 +58,7 @@ def test_g():
     assert g(dict(x=dict()), "x", "y", default="v") == "v"
     assert g(dict(x=dict(y=None)), "x", "y", default="v") == "v"
     assert g(dict(x=dict(y="22")), "x", "y", default="v") == "22"
-    #assert g(dict(x="str"), "x", "y", default="v") == "v"
+    # assert g(dict(x="str"), "x", "y", default="v") == "v"
 
 
 def test_gn():
@@ -639,6 +639,19 @@ def test_score_torsf2():
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
         "extra": {"bootstrap_time": 78.980935917, "test_runtime": 79.196301917},
+    }
+
+
+def test_score_torsf383():
+    msm = loadj("torsf_383")
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "accuracy": 0.0,
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
     }
 
 
