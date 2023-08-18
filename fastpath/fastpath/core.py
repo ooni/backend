@@ -1352,7 +1352,6 @@ def score_signal(msm: dict) -> dict:
     if tk.get("failed_operation", True) or tk.get("failure", True):
         scores["accuracy"] = 0.0
 
-
     try:
         # https://github.com/ooni/probe/issues/2344
         tv = g_or(msm, "test_version", "0.0.0")
@@ -1414,6 +1413,13 @@ def score_torsf(msm: dict) -> dict:
     # https://github.com/ooni/ooni.org/issues/772
     scores = init_scores()
     tk = g_or(msm, "test_keys", {})
+
+    sw_name = msm.get("software_name", "unknown")
+    sw_version = msm.get("software_version", "unknown")
+    if sw_version == "3.8.3" and sw_name.startswith("ooniprobe-android"):
+        scores["accuracy"] = 0.0
+        return scores
+
     failure = tk.get("failure")
     if failure:
         scores["blocking_general"] = 1.0
@@ -1422,12 +1428,6 @@ def score_torsf(msm: dict) -> dict:
     scores["extra"] = dict(
         bootstrap_time=tk.get("bootstrap_time"), test_runtime=msm.get("test_runtime")
     )
-
-    sw_name = msm.get("software_name", "unknown")
-    sw_version = msm.get("software_version", "unknown")
-    if sw_version == "3.8.3" and sw_name.startswith("ooniprobe-android"):
-        scores["accuracy"] = 0.0
-
     return scores
 
 
@@ -1485,7 +1485,6 @@ def score_browser_web(msm: dict) -> dict:
     scores["extra"] = dict(browser_name=bn, load_time_ms=lt)
 
     return scores
-
 
 
 @metrics.timer("score_measurement")
@@ -1656,8 +1655,12 @@ def process_measurement(msm_tup) -> None:
         test_version = g_or(measurement, "test_version", "")
         test_runtime = g_or(measurement, "test_runtime", 0.0)
         try:
-            test_helper_address = g(measurement, "test_helpers", "backend", "address", default="")
-            test_helper_type = g(measurement, "test_helpers", "backend", "type", default="")
+            test_helper_address = g(
+                measurement, "test_helpers", "backend", "address", default=""
+            )
+            test_helper_type = g(
+                measurement, "test_helpers", "backend", "type", default=""
+            )
         except AttributeError:
             test_helper_address = ""
             test_helper_type = ""
