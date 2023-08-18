@@ -914,27 +914,24 @@ def score_vanilla_tor(msm: dict) -> dict:
     tk = g_or(msm, "test_keys", {})
     scores = init_scores()
 
-    nks = ("error", "success", "tor_log", "tor_progress_summary", "tor_progress_tag")
+    nks = ("error", "success", "tor_logs", "tor_progress_summary", "tor_progress_tag")
     if msm["software_name"] == "ooniprobe" and all_keys_none(tk, nks):
         if tk["tor_progress"] == 0:
             # client bug?
             scores["msg"] = "Client bug"
             return scores
 
-    tor_log = tk.get("tor_log")
-    if tor_log is None:
+    tor_logs = tk.get("tor_logs")
+    if tor_logs is None:
         # unknown bug
-        return scores
-
-    if (
-        "Bootstrapped 100%: Done" in tor_log
-        or "Bootstrapped 100% (done): Done" in tor_log
-    ):
-        # Success
+        scores["accuracy"] = 0.0
         return scores
 
     progress = float(tk.get("tor_progress", 0))
     progress = min(100, max(0, progress))
+    if progress == 100:
+        return scores
+
     # If the Tor bootstrap reaches, for example, 80% maybe it's being heavily
     # throttled or it's just a very slow network: blocking score is set to 0.68
     scores["blocking_general"] = 1.0 - progress * 0.004
