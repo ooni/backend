@@ -914,7 +914,7 @@ def score_vanilla_tor(msm: dict) -> dict:
     tk = g_or(msm, "test_keys", {})
     scores = init_scores()
 
-    nks = ("error", "success", "tor_logs", "tor_progress_summary", "tor_progress_tag")
+    nks = ("error", "success", "tor_progress_summary", "tor_progress_tag")
     if msm["software_name"] == "ooniprobe" and all_keys_none(tk, nks):
         if tk["tor_progress"] == 0:
             # client bug?
@@ -925,6 +925,11 @@ def score_vanilla_tor(msm: dict) -> dict:
     if tor_logs is None:
         # unknown bug
         scores["accuracy"] = 0.0
+        return scores
+
+    # Handle old bug in ooniprobe
+    search = ["Bootstrapped 100%: Done", "Bootstrapped 100% (done): Done"]
+    if search[0] in tor_logs or search[1] in tor_logs:
         return scores
 
     progress = float(tk.get("tor_progress", 0))
