@@ -232,7 +232,8 @@ CREATE TABLE IF NOT EXISTS default.incidents
     `domains` Array(String),
     `tags` Array(String),
     `links` Array(String),
-    `test_names` Array(String)
+    `test_names` Array(String),
+    `short_description` String,
 )
 ENGINE = ReplacingMergeTree(update_time)
 ORDER BY (id)
