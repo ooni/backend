@@ -169,6 +169,10 @@ def prepare_incident_dict(d: dict):
     d["start_time"] = datetime.strptime(d["start_time"], "%Y-%m-%dT%H:%M:%SZ")
     if d["end_time"] is not None:
         d["end_time"] = datetime.strptime(d["end_time"], "%Y-%m-%dT%H:%M:%SZ")
+        delta = d["end_time"] - d["start_time"]
+        if delta.total_seconds() < 0:
+            raise InvalidRequest()
+
     if not d["title"] or not d["text"]:
         log.debug("Invalid incident update request: empty title or desc")
         raise InvalidRequest()
