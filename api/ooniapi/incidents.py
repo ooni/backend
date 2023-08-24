@@ -173,6 +173,12 @@ def prepare_incident_dict(d: dict):
         log.debug("Invalid incident update request: empty title or desc")
         raise InvalidRequest()
 
+    try:
+        for asn in d["ASNs"]:
+            int(asn)
+    except Exception:
+        raise InvalidRequest()
+
 
 def user_cannot_update(incident_id: str) -> bool:
     # Check if there is already an incident and belogs to a different user
