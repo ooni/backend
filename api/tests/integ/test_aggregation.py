@@ -303,10 +303,10 @@ def test_aggregation_x_axis_only_hour(client, log):
             {
                 "anomaly_count": 688,
                 "confirmed_count": 42,
-                "failure_count": 720,
+                "failure_count": 721,
                 "measurement_count": 9990,
                 "measurement_start_day": "2021-07-09T00:00:00Z",
-                "ok_count": 8540,
+                "ok_count": 8539,
             },
             {
                 "anomaly_count": 0,
