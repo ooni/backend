@@ -1,3 +1,9 @@
+ooni-api (1.0.65) unstable; urgency=medium
+
+  * https://github.com/ooni/backend/issues/707
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 24 Aug 2023 16:06:21 +0200
+
 ooni-api (1.0.64) unstable; urgency=medium
 
   * Set "mine" and "archived" as bools

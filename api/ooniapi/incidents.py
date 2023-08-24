@@ -27,10 +27,10 @@ from ooniapi.auth import (
 )
 from ooniapi.config import metrics
 from ooniapi.database import query_click, optimize_table, insert_click, raw_query
-from ooniapi.errors import BaseOONIException, jerror, NoProposedChanges
+from ooniapi.errors import BaseOONIException, jerror
 from ooniapi.errors import OwnershipPermissionError, InvalidRequest
 from ooniapi.urlparams import param_bool
-from ooniapi.utils import nocachejson, cachedjson, generate_random_intuid
+from ooniapi.utils import nocachejson, generate_random_intuid
 
 log: logging.Logger
 
@@ -166,7 +166,6 @@ def prepare_incident_dict(d: dict):
         log.debug(f"Invalid incident update request. Keys: {sorted(d)}")
         raise InvalidRequest()
 
-    d["published"] = int(d.get("published", 0))
     d["start_time"] = datetime.strptime(d["start_time"], "%Y-%m-%dT%H:%M:%SZ")
     if d["end_time"] is not None:
         d["end_time"] = datetime.strptime(d["end_time"], "%Y-%m-%dT%H:%M:%SZ")
@@ -265,6 +264,8 @@ def post_update_incident(action: str) -> Response:
         if req is None:
             raise InvalidRequest()
 
+        req["published"] = int(req.get("published", 0))
+
         if action in ("update", "delete"):
             incident_id = req.get("id")
             if incident_id is None:
@@ -274,16 +275,19 @@ def post_update_incident(action: str) -> Response:
         if action == "create":
             incident_id = str(generate_random_intuid(current_app))
             req["id"] = incident_id
-            if get_client_role() != "admin":
-                req["published"] = 0  # users cannot publish
+            if get_client_role() != "admin" and req["published"] == 1:
+                raise InvalidRequest
+
             log.info(f"Creating incident {incident_id}")
 
         elif action == "update":
             if get_client_role() != "admin":
                 if user_cannot_update(incident_id):
                     raise OwnershipPermissionError
-                req["published"] = 0  # users cannot publish
-                log.info(f"Updating incident {incident_id}")
+                if req["published"] == 1:
+                    raise InvalidRequest
+
+            log.info(f"Updating incident {incident_id}")
 
         elif action == "delete":
             if get_client_role() != "admin":
