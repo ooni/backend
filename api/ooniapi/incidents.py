@@ -85,7 +85,7 @@ def search_list_incidents() -> Response:
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, creator_account_id = %(account_id)s AS mine
+        links, short_description, creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
         ORDER BY title
@@ -127,7 +127,7 @@ def show_incident(incident_id: str) -> Response:
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, text, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, creator_account_id = %(account_id)s AS mine
+        links, short_description, creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
         LIMIT 1
@@ -156,11 +156,12 @@ def prepare_incident_dict(d: dict):
         "links",
         "published",
         "reported_by",
+        "short_description",
         "start_time",
         "tags",
         "test_names",
         "text",
-        "title",
+        "title"
     ]
     if sorted(d) != exp:
         log.debug(f"Invalid incident update request. Keys: {sorted(d)}")
@@ -218,11 +219,11 @@ def post_update_incident(action: str) -> Response:
               type: string
             title:
               type: string
+            short_description:
+              type: string
             start_time:
               type: string
             reported_by:
-              type: string
-            title:
               type: string
             text:
               type: string
@@ -312,7 +313,7 @@ def post_update_incident(action: str) -> Response:
         ins_sql = """INSERT INTO incidents
         (id, start_time, end_time, creator_account_id, reported_by, title,
         text, event_type, published, CCs, ASNs, domains, tags, links,
-        test_names)
+        test_names, short_description)
         VALUES
         """
         prepare_incident_dict(req)
