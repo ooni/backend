@@ -1,3 +1,9 @@
+ooni-api (1.0.70) unstable; urgency=medium
+
+  * Lightweight ipaddr detection API
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 22 Sep 2023 12:49:04 +0200
+
 ooni-api (1.0.67) unstable; urgency=medium
 
   * Support zstd compression for measurement uploads
