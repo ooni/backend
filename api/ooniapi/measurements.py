@@ -629,21 +629,21 @@ def list_measurements() -> Response:
         type: string
         description: |
           Set "true" for confirmed network anomalies (we found a blockpage, a middlebox, etc.).
-          Default: both true and false
+          Default: no filtering (show both true and false)
 
       - name: anomaly
         in: query
         type: string
         description: |
           Set "true" for measurements that require special attention (likely to be a case of blocking)
-          Default: both true and false
+          Default: no filtering (show both true and false)
 
       - name: failure
         in: query
         type: string
         description: |
           Set "true" for failed measurements (the control request failed, there was a bug, etc.).
-          Default: both true and false
+          Default: no filtering (show both true and false)
 
       - name: software_version
         in: query
