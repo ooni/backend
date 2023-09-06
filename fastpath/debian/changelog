@@ -1,3 +1,9 @@
+fastpath (0.80) unstable; urgency=medium
+
+  * Buffer writes to DB
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 06 Sep 2023 18:08:36 +0200
+
 fastpath (0.77) unstable; urgency=medium
 
   * Flag torsf measurements from Android probe 3.8.3 as failed
