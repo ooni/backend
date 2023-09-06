@@ -10,7 +10,7 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 from datetime import datetime
 from textwrap import dedent
 from urllib.parse import urlparse
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import logging
 
 try:
@@ -27,6 +27,7 @@ log = logging.getLogger("fastpath.db")
 metrics = setup_metrics(name="fastpath.db")
 
 click_client: Clickhouse
+fastpath_row_buffer = []
 
 
 def extract_input_domain(msm: dict, test_name: str) -> Tuple[str, str]:
@@ -141,27 +142,8 @@ def setup_clickhouse(conf) -> None:
     # FIXME _click_create_table_fastpath()
 
 
-@metrics.timer("clickhouse_upsert_summary")
-def clickhouse_upsert_summary(
-    msm,
-    scores,
-    anomaly: bool,
-    confirmed: bool,
-    msm_failure: bool,
-    blocking_type: str,
-    measurement_uid: str,
-    software_name: str,
-    software_version: str,
-    platform: str,
-    test_version: str,
-    test_runtime: float,
-    architecture: str,
-    engine_name: str,
-    engine_version: str,
-    test_helper_address: str,
-    test_helper_type: str,
-) -> None:
-    """Insert a row in the fastpath table. Overwrite an existing one."""
+def _write_rows_to_fastpath(rows: List[Dict]):
+    global click_client
     sql_insert = dedent(
         """\
     INSERT INTO fastpath (
@@ -192,6 +174,43 @@ def clickhouse_upsert_summary(
     ) VALUES
         """
     )
+    settings = {"priority": 5}
+    try:
+        click_client.execute(sql_insert, rows, settings=settings)
+    except Exception:
+        log.error("Failed Clickhouse insert", exc_info=True)
+
+
+def flush_fastpath_buffer():
+    global fastpath_row_buffer
+    log.info("Flushing fastpath buffer")
+    _write_rows_to_fastpath(fastpath_row_buffer)
+    fastpath_row_buffer = []
+
+
+@metrics.timer("clickhouse_upsert_summary")
+def clickhouse_upsert_summary(
+    msm,
+    scores,
+    anomaly: bool,
+    confirmed: bool,
+    msm_failure: bool,
+    blocking_type: str,
+    measurement_uid: str,
+    software_name: str,
+    software_version: str,
+    platform: str,
+    test_version: str,
+    test_runtime: float,
+    architecture: str,
+    engine_name: str,
+    engine_version: str,
+    test_helper_address: str,
+    test_helper_type: str,
+    buffer_writes=False,
+) -> None:
+    """Insert a row in the fastpath table. Overwrite an existing one."""
+    global fastpath_row_buffer
 
     def nn(features: dict, k: str) -> str:
         """Get string value and never return None"""
@@ -237,11 +256,20 @@ def clickhouse_upsert_summary(
         test_helper_type=test_helper_type,
     )
 
-    settings = {"priority": 5}
-    try:
-        click_client.execute(sql_insert, [row], settings=settings)
-    except Exception:
-        log.error("Failed Clickhouse insert", exc_info=True)
+    if buffer_writes:
+        # Enabled only when multithreading is not in use
+        fastpath_row_buffer.append(row)
+        if len(fastpath_row_buffer) < 500:
+            return
+        log.info("Writing to fastpath")
+        rows = fastpath_row_buffer
+    else:
+        rows = [row]
+
+    _write_rows_to_fastpath(rows)
+
+    if buffer_writes:
+        fastpath_row_buffer = []
 
     # Future feature extraction:
     # def getint(features: dict, k: str, default: int) -> int:

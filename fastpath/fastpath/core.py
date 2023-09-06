@@ -301,7 +301,9 @@ def process_measurements_from_s3() -> None:
         if conf.stop_after:
             msmt_cnt += 1
             if msmt_cnt >= conf.stop_after:
-                return
+                break
+
+    db.flush_fastpath_buffer()
 
 
 def minifp(fp: Fingerprint) -> Dict[str, Any]:
@@ -1669,6 +1671,7 @@ def process_measurement(msm_tup) -> None:
         engine_version = g_or(annot, "engine_version", "")
         blocking_type = g(scores, "analysis", "blocking_type", default="")
 
+        buffer_writes = not conf.noapi
         db.clickhouse_upsert_summary(
             measurement,
             scores,
@@ -1687,6 +1690,7 @@ def process_measurement(msm_tup) -> None:
             engine_version,
             test_helper_address,
             test_helper_type,
+            buffer_writes=buffer_writes,
         )
 
         tn = measurement.get("test_name")
