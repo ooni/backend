@@ -17,6 +17,7 @@ from flask import Blueprint, current_app, request, Response
 
 import jwt.exceptions  # debdeps: python3-jwt
 import geoip2.errors  # debdeps: python3-geoip2
+import zstd  # debedps: python3-zstd
 
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
@@ -884,6 +885,19 @@ def receive_measurement(report_id) -> Response:
         metrics.incr("receive_measurement_discard_cc_zz")
         return nocachejson()
 
+    content_encoding = request.headers.get("Content-Encoding")
+    if content_encoding == "zstd":
+        try:
+            data = zstd.decompress(request.data)
+            ratio = len(request.data) / len(data)
+            log.debug(f"Zstd compression ratio {ratio}")
+        except Exception as e:
+            log.info("Failed zstd decompression")
+            return jerror("Incorrect format")
+
+    else:
+        data = request.data
+
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.utcnow()
@@ -893,7 +907,6 @@ def receive_measurement(report_id) -> Response:
     msmtdir = spooldir / "incoming" / dirname
     msmtdir.mkdir(parents=True, exist_ok=True)
 
-    data = request.data
     h = sha512(data).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
     # msmt_uid is a unique id based on upload time, cc, testname and hash
