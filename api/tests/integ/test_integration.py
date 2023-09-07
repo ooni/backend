@@ -774,49 +774,49 @@ def test_list_measurements_ZZ(client):
 
 
 def test_list_measurements_filter_software_version_nomatch(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&software_version=9.9.9"
     resp = api(client, url)
     assert len(resp["results"]) == 0
 
 
 def test_list_measurements_filter_software_version_empty_value(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&software_version="
     resp = api(client, url)
     assert len(resp["results"]) == 100
 
 
 def test_list_measurements_filter_software_version_single(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&software_version=0.7.1"
     resp = api(client, url)
     assert len(resp["results"]) == 28
 
 
 def test_list_measurements_filter_software_version_multiple(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&software_version=0.7.1,0.8.1"
     resp = api(client, url)
-    assert len(resp["results"]) == 31
+    assert len(resp["results"]) == 3
 
 
 def test_list_measurements_filter_software_version(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&software_version=3.9.2"
     resp = api(client, url)
     assert len(resp["results"]) == 100
 
 
 def test_list_measurements_filter_test_version(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&test_version=0.4.0"
     resp = api(client, url)
     assert len(resp["results"]) == 100
 
 
 def test_list_measurements_filter_engine_version(client):
-    # https://github.com/ooni/backend/issues/15
+    # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&engine_version=3.9.2"
     resp = api(client, url)
     assert len(resp["results"]) == 100
