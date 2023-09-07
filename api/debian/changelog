@@ -1,3 +1,9 @@
+ooni-api (1.0.67) unstable; urgency=medium
+
+  * Support zstd compression for measurement uploads
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 07 Sep 2023 16:35:39 +0200
+
 ooni-api (1.0.66) unstable; urgency=medium
 
   * Add short description to incidents
