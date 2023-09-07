@@ -259,7 +259,7 @@ def clickhouse_upsert_summary(
     if buffer_writes:
         # Enabled only when multithreading is not in use
         fastpath_row_buffer.append(row)
-        if len(fastpath_row_buffer) < 500:
+        if len(fastpath_row_buffer) < 10000:
             return
         log.info("Writing to fastpath")
         rows = fastpath_row_buffer
