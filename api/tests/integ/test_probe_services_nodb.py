@@ -16,6 +16,7 @@ import json
 
 from mock import MagicMock
 import pytest
+import zstd
 
 import ooniapi.probe_services
 
@@ -98,7 +99,7 @@ def getjsonh(client, url, headers=None):
     return response.json
 
 
-def post(client, url, data):
+def post(client, url, data, headers=None):
     response = client.post(url, data=data)
     assert response.status_code == 200
     assert response.is_json
@@ -477,6 +478,15 @@ def test_collector_upload_msmt_valid(client, mocks):
     assert c == {}
 
     c = postj(client, f"/report/{rid}/close")
+    assert c == {}
+
+
+def test_collector_upload_msmt_valid_zstd(client, mocks):
+    rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
+    msmt = json.dumps(dict(test_keys={})).encode()
+    zmsmt = zstd.compress(msmt)
+    headers = [("Content-Encoding", "zstd")]
+    c = post(client, f"/report/{rid}", zmsmt, headers=headers)
     assert c == {}
 
 
