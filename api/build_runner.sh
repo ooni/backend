@@ -53,7 +53,8 @@ apt-get install --no-install-recommends -qy \
   python3-sqlalchemy-utils \
   python3-statsd \
   python3-systemd \
-  python3-ujson
+  python3-ujson \
+  python3-zstd
 apt-get autoremove -y
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
