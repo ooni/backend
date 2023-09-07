@@ -297,7 +297,7 @@ def process_measurements_from_s3() -> None:
         msm_jstr, msm, msm_uid = measurement_tup
         assert msm_jstr is None or isinstance(msm_jstr, (str, bytes)), type(msm_jstr)
         assert msm is None or isinstance(msm, dict)
-        process_measurement(measurement_tup)
+        process_measurement(measurement_tup, buffer_writes=True)
         if conf.stop_after:
             msmt_cnt += 1
             if msmt_cnt >= conf.stop_after:
@@ -1597,7 +1597,7 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
 
 
 @metrics.timer("full_run")
-def process_measurement(msm_tup) -> None:
+def process_measurement(msm_tup, buffer_writes=False) -> None:
     """Process a measurement:
     - Parse JSON if needed
     - Unwrap "content" key if needed
@@ -1671,7 +1671,6 @@ def process_measurement(msm_tup) -> None:
         engine_version = g_or(annot, "engine_version", "")
         blocking_type = g(scores, "analysis", "blocking_type", default="")
 
-        buffer_writes = not conf.noapi
         db.clickhouse_upsert_summary(
             measurement,
             scores,
