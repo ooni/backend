@@ -798,7 +798,7 @@ def test_list_measurements_filter_software_version_multiple(client):
     # https://github.com/ooni/backend/issues/615
     url = "measurements?since=2021-07-09&until=2021-07-10&software_version=0.7.1,0.8.1"
     resp = api(client, url)
-    assert len(resp["results"]) == 3
+    assert len(resp["results"]) == 31
 
 
 def test_list_measurements_filter_software_version(client):
