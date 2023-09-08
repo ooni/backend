@@ -836,16 +836,6 @@ def receive_measurement(report_id) -> Response:
         type: string
         minLength: 10
         required: true
-      - in: body
-        name: body
-        required: true
-        schema:
-          properties:
-            content:
-              type: object
-            format:
-              type: string
-          type: object
     responses:
       200:
         description: Acknowledge
@@ -886,17 +876,15 @@ def receive_measurement(report_id) -> Response:
         return nocachejson()
 
     content_encoding = request.headers.get("Content-Encoding")
+    data = request.data
     if content_encoding == "zstd":
         try:
-            data = zstd.decompress(request.data)
-            ratio = len(request.data) / len(data)
+            data = zstd.decompress(data)
+            ratio = len(data) / len(data)
             log.debug(f"Zstd compression ratio {ratio}")
         except Exception as e:
             log.info("Failed zstd decompression")
             return jerror("Incorrect format")
-
-    else:
-        data = request.data
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
