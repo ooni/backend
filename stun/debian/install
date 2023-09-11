@@ -1,0 +1,2 @@
+debian/ooni-stun.service /lib/systemd/system/
+ooni-stun.py /usr/bin/
