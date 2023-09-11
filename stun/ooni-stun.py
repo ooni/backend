@@ -11,8 +11,9 @@ import logging
 import socket
 import time
 
-import statsd  # debdeps: python3-statsd
 from setproctitle import setproctitle  # debdeps: python3-setproctitle
+from systemd.journal import JournalHandler  # debdeps: python3-systemd
+import statsd  # debdeps: python3-statsd
 
 
 # IP address and UDP port to use for incoming requests
@@ -26,6 +27,8 @@ RESPONSE_CHANGED_PORT = -1  # If negative return no attribute CHANGED-ADDRESS
 
 
 log = logging.getLogger("ooni-stun")
+log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="ooni-stun"))
+log.setLevel(logging.DEBUG)
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="ooni-stun")
 
 rtt_lookup = {}
@@ -38,11 +41,11 @@ def uint16_to_bytes(number):
 class Attribute:
     """STUN response attribute"""
 
-    def __init__(self, attributeType):
+    def __init__(self, attributeType: int) -> None:
         self.__attributeType = attributeType
 
     def gen_bytes(self):
-        attributeValue = self.getAttributeValue()
+        attributeValue = self.serialize()
         return (
             uint16_to_bytes(self.__attributeType)
             + uint16_to_bytes(len(attributeValue))
@@ -57,12 +60,12 @@ class IPv4Attr(Attribute):
     SOURCE_ADDR = 4
     CHANGED_ADDR = 5
 
-    def __init__(self, attributeType, ipaddr, port):
+    def __init__(self, attributeType: int, ipaddr, port: int) -> None:
         super().__init__(attributeType)
         self.__ipaddr = ipaddr
         self.__port = port
 
-    def getAttributeValue(self):
+    def serialize(self):
         protocolIPv4 = uint16_to_bytes(1)
         port = uint16_to_bytes(self.__port)
         ipaddr = self.__ipaddr
@@ -76,7 +79,7 @@ class TextAttribute(Attribute):
         super().__init__(attributeType)
         self.__text = text
 
-    def getAttributeValue(self):
+    def serialize(self):
         return self.__text.encode("utf-8") + b"\x00"
 
 
@@ -92,7 +95,7 @@ class ResponseMessage:
         self.__messageTransactionID = transaction_id
         self.__attributes = []
 
-    def add_attribute(self, attribute):
+    def add_attribute(self, attribute: Attribute):
         self.__attributes.append(attribute)
 
     def gen_bytes(self):
@@ -111,19 +114,6 @@ def pack_ipaddr(ipaddr: str) -> bytes:
     return ipaddress.IPv4Address(ipaddr).packed
 
 
-def pick(ipaddr: str, port: int, default_ipaddr, defaultPort: int):
-    bothConfigured = True
-    if ipaddr:
-        p_ipaddr = ipaddress.IPv4Address(ipaddr).packed
-    else:
-        p_ipaddr = default_ipaddr
-        bothConfigured = False
-    if port < 0:
-        port = defaultPort
-        bothConfigured = False
-    return (p_ipaddr, port, bothConfigured)
-
-
 def log_rtt(transaction_id, sock_addr) -> None:
     # Maintains the rtt_lookup dict
     if transaction_id not in rtt_lookup:
@@ -135,46 +125,40 @@ def log_rtt(transaction_id, sock_addr) -> None:
 
 
 @metrics.timer("handle_request")
-def reply(data, addr, sock) -> None:
+def reply(req: bytes, req_ipaddr, req_port: int, sock) -> None:
     log.debug("Received request")
-    if data[0:2] != uint16_to_bytes(1):
+    if len(req) < 21 or req[0:2] != uint16_to_bytes(1):
         log.debug("Unsupported request")
         return
 
-    transaction_id = data[4:20]
-    sock_addr = ipaddress.IPv4Address(addr[0])
+    transaction_id = req[4:20]
+    sock_addr_ipa = ipaddress.IPv4Address(req_ipaddr)
 
-    # log_rtt(transaction_id, sock_addr)
+    # log_rtt(transaction_id, sock_addr_ipa)
 
     resp = ResponseMessage(ResponseMessage.BINDING_RESPONSE, transaction_id)
 
     # MAPPED-ADDRESS attribute
-    mappedIp, mappedPort, _ = pick("", -1, sock_addr.packed, addr[1])
-    resp.add_attribute(IPv4Attr(IPv4Attr.MAPPED_ADDR, mappedIp, mappedPort))
+    # (client or NAT ip address)
+    mapped_ipaddr = sock_addr_ipa.packed
+    resp.add_attribute(IPv4Attr(IPv4Attr.MAPPED_ADDR, mapped_ipaddr, req_port))
 
     # SOURCE-ADDRESS attribute
-    lipa = ipaddress.IPv4Address(LISTEN_IPADDR).packed
-    src_ipaddr, src_port, _ = pick("", -1, lipa, LISTEN_PORT)
-    resp.add_attribute(IPv4Attr(IPv4Attr.SOURCE_ADDR, src_ipaddr, src_port))
+    src_ipaddr = ipaddress.IPv4Address(LISTEN_IPADDR).packed
+    resp.add_attribute(IPv4Attr(IPv4Attr.SOURCE_ADDR, src_ipaddr, LISTEN_PORT))
 
     # custom SOURCE-ADDRESS attribute
-    # src_ipaddr, src_port, _ = pick("1.2.3.4", -1, lipa, LISTEN_PORT)
     # resp.add_attribute(IPv4Attr(IPv4Attr.SOURCE_ADDR, src_ipaddr, src_port))
 
     # CHANGED-ADDRESS attribute
-    changed_ipaddr, changed_port, changed = pick(
-        RESPONSE_CHANGED_IPADDR, RESPONSE_CHANGED_PORT, None, 0
-    )
-    if changed:
-        resp.add_attribute(
-            IPv4Attr(IPv4Attr.CHANGED_ADDR, changed_ipaddr, changed_port)
-        )
+    # resp.add_attribute(IPv4Attr(IPv4Attr.CHANGED_ADDR, changed_ipaddr,
+    # changed_port))
 
     # SERVER attribute
-    # fixed len?
     # resp.add_attribute(TextAttribute(TextAttribute.TYPE_SERVER, "replaceme"))
 
-    sock.sendto(resp.gen_bytes(), addr)
+    payload = resp.gen_bytes()
+    sock.sendto(payload, (req_ipaddr, req_port))
 
 
 def run():
@@ -184,8 +168,9 @@ def run():
     sock.bind((LISTEN_IPADDR, LISTEN_PORT))
     log.info("Started")
     while True:
-        req, req_addr = sock.recvfrom(1024)
-        reply(req, req_addr, sock)
+        req, tup = sock.recvfrom(1024)
+        req_ipaddr, req_port = tup
+        reply(req, req_ipaddr, req_port, sock)
 
 
 if __name__ == "__main__":
