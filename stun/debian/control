@@ -15,6 +15,7 @@ Package: ooni-stun
 Architecture: all
 Depends: ${misc:Depends},
  ${python3:Depends},
+ nftables,
  python3-setuptools,
  python3-statsd,
  python3-systemd,
