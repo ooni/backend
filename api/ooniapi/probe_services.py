@@ -117,6 +117,47 @@ def probe_geoip(probe_cc: str, asn: str) -> Tuple[Dict, str, int]:
     return resp, probe_cc, asn_int
 
 
+@probe_services_blueprint.route("/api/_/discover_probe_ipaddr", methods=["GET"])
+def discover_probe_ipaddr() -> Response:
+    """Probe Services: discover probe ipaddr
+    ---
+    responses:
+      '200':
+        description: Give a URL test list to a probe running web_connectivity
+          tests; additional data for other tests;
+        schema:
+          type: object
+          properties:
+            v:
+              type: integer
+              description: response format version
+            cc:
+              type: string
+              description: probe CC inferred from GeoIP or ZZ
+            asn:
+              type: string
+              description: probe ASN inferred from GeoIP or AS0
+            network_name:
+              type: string
+              description: probe network name inferred from GeoIP or None
+    """
+    ipaddr = extract_probe_ipaddr()
+    cc = "ZZ"
+    asn = "AS0"
+    network_name = ""
+    try:
+        cc = lookup_probe_cc(ipaddr)
+        asn, network_name = lookup_probe_network(ipaddr)
+        metrics.incr("geoip_ipaddr_found")
+    except geoip2.errors.AddressNotFoundError:
+        metrics.incr("geoip_ipaddr_not_found")
+    except Exception as e:
+        log = current_app.logger
+        log.error(str(e), exc_info=True)
+
+    return nocachejson(v=1, ipaddr=ipaddr, cc=cc, asn=asn, network_name=network_name)
+
+
 @probe_services_blueprint.route("/api/v1/check-in", methods=["POST"])
 def check_in() -> Response:
     """Probe Services: check-in. Probes ask for tests to be run
