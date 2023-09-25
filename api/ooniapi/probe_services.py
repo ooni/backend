@@ -2,15 +2,15 @@
 OONI Probe Services API
 """
 
-import ipaddress
 from base64 import b64encode
 from datetime import datetime, timedelta, date
-from os import urandom
-from typing import Dict, Any, Tuple, List, Optional
-
-from pathlib import Path
 from hashlib import sha512
+from os import urandom
+from pathlib import Path
+from typing import Dict, Any, Tuple, List, Optional
 from urllib.request import urlopen
+import ipaddress
+import time
 
 import ujson
 from flask import Blueprint, current_app, request, Response
@@ -351,12 +351,6 @@ Workflow:
 """
 
 
-def beginning_next_month() -> int:
-    d = date.today().replace(day=1) + timedelta(days=32)
-    ts = d.replace(day=1).strftime("%s")
-    return int(ts)
-
-
 @probe_services_blueprint.route("/api/v1/register", methods=["POST"])
 def probe_register() -> Response:
     """Probe Services: Register
@@ -409,7 +403,7 @@ def probe_register() -> Response:
 
     # client_id is a JWT token with "issued at" claim and
     # "audience" claim. The "issued at" claim is rounded up.
-    issued_at = beginning_next_month()
+    issued_at = int(time.time())
     payload = {"iat": issued_at, "aud": "probe_login"}
     client_id = create_jwt(payload)
     log.info("register successful")

@@ -1,3 +1,9 @@
+ooni-api (1.0.72) unstable; urgency=medium
+
+  * Fix probe registration iat
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 25 Sep 2023 19:03:09 +0200
+
 ooni-api (1.0.71) unstable; urgency=medium
 
   * Version bump
