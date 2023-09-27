@@ -1,3 +1,9 @@
+ooni-api (1.0.78) unstable; urgency=medium
+
+  * Return email address on login
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 27 Sep 2023 18:35:33 +0200
+
 ooni-api (1.0.77) unstable; urgency=medium
 
   * Add torsf feature flag

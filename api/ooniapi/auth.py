@@ -304,6 +304,7 @@ def user_register() -> Response:
         "exp": expiration,
         "aud": "register",
         "account_id": account_id,
+        "email_address": email_address,
         "redirect_to": redirect_to,
     }
     registration_token = create_jwt(payload)
@@ -373,9 +374,10 @@ def user_login() -> Response:
     # Store account role in token to prevent frequent DB lookups
     role = _get_account_role(dec["account_id"]) or "user"
     redirect_to = dec.get("redirect_to", "")
+    email = dec["email_address"]
 
     token = _create_session_token(dec["account_id"], role)
-    return nocachejson(redirect_to=redirect_to, bearer=token)
+    return nocachejson(redirect_to=redirect_to, bearer=token, email_address=email)
 
 
 @metrics.timer("user_refresh_token")
