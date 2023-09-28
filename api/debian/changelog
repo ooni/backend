@@ -1,3 +1,9 @@
+ooni-api (1.0.72.1) unstable; urgency=medium
+
+  * Build on bullseye
+
+ -- Federico Ceratto <federico@debian.org>  Thu, 28 Sep 2023 11:31:24 +0200
+
 ooni-api (1.0.72) unstable; urgency=medium
 
   * Fix probe registration iat

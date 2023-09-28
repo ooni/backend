@@ -1,4 +1,4 @@
-FROM debian:bullseye
+FROM debian:bookworm
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONPATH /app/
 ENV DEBIAN_FRONTEND noninteractive
