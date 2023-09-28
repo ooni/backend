@@ -167,7 +167,7 @@ def _register_and_login(client, email_address):
     assert url, msg
     u = urlparse(url)
     token = u.query.split("=")[1]
-    assert len(token) == 271
+    assert len(token) in (323, 335)
 
     r = client.get(f"/api/v1/user_login?k={token}")
     assert r.status_code == 200, r.json
