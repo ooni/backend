@@ -20,10 +20,11 @@ import logging
 from flask import Blueprint, current_app, request, Response
 
 from ooniapi.auth import (
-    role_required,
-    get_client_role,
     get_account_id_or_none,
     get_account_id_or_raise,
+    get_client_role,
+    hash_email_address,
+    role_required,
 )
 from ooniapi.config import metrics
 from ooniapi.database import query_click, optimize_table, insert_click, raw_query
@@ -150,6 +151,7 @@ def prepare_incident_dict(d: dict):
         "CCs",
         "creator_account_id",
         "domains",
+        "email_address",
         "end_time",
         "event_type",
         "id",
@@ -161,7 +163,7 @@ def prepare_incident_dict(d: dict):
         "tags",
         "test_names",
         "text",
-        "title"
+        "title",
     ]
     if sorted(d) != exp:
         log.debug(f"Invalid incident update request. Keys: {sorted(d)}")
@@ -183,6 +185,12 @@ def prepare_incident_dict(d: dict):
             int(asn)
     except Exception:
         raise InvalidRequest()
+
+
+def mismatched_email_addr(req: dict) -> bool:
+    account_id = get_account_id_or_raise()
+    hashed = hash_email_address(req["email_address"])
+    return account_id == hashed
 
 
 def user_cannot_update(incident_id: str) -> bool:
@@ -224,6 +232,8 @@ def post_update_incident(action: str) -> Response:
             start_time:
               type: string
             reported_by:
+              type: string
+            email_address:
               type: string
             text:
               type: string
@@ -286,6 +296,8 @@ def post_update_incident(action: str) -> Response:
         if action == "create":
             incident_id = str(generate_random_intuid(current_app))
             req["id"] = incident_id
+            if get_client_role() != "admin" and mismatched_email_addr(req):
+                raise InvalidRequest
             if get_client_role() != "admin" and req["published"] == 1:
                 raise InvalidRequest
 
@@ -295,6 +307,8 @@ def post_update_incident(action: str) -> Response:
             if get_client_role() != "admin":
                 if user_cannot_update(incident_id):
                     raise OwnershipPermissionError
+                if mismatched_email_addr(req):
+                    raise InvalidRequest
                 if req["published"] == 1:
                     raise InvalidRequest
 
@@ -304,6 +318,7 @@ def post_update_incident(action: str) -> Response:
             if get_client_role() != "admin":
                 if user_cannot_update(incident_id):
                     raise OwnershipPermissionError
+                # (no email check on deletion)
             # TODO: switch to faster deletion with new db version
             q = "ALTER TABLE incidents DELETE WHERE id = %(iid)s"
             raw_query(q, {"iid": incident_id})
@@ -313,7 +328,7 @@ def post_update_incident(action: str) -> Response:
         ins_sql = """INSERT INTO incidents
         (id, start_time, end_time, creator_account_id, reported_by, title,
         text, event_type, published, CCs, ASNs, domains, tags, links,
-        test_names, short_description)
+        test_names, short_description, email_address)
         VALUES
         """
         prepare_incident_dict(req)
