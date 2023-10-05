@@ -221,6 +221,7 @@ CREATE TABLE IF NOT EXISTS default.incidents
     `end_time` Nullable(DateTime),
     `creator_account_id` FixedString(32),
     `reported_by` String,
+    `email_address` String,
     `id` String,
     `title` String,
     `text` String,
