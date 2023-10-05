@@ -86,7 +86,8 @@ def search_list_incidents() -> Response:
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, short_description, creator_account_id = %(account_id)s AS mine
+        links, short_description, email_address,
+        creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
         ORDER BY title
@@ -128,7 +129,8 @@ def show_incident(incident_id: str) -> Response:
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, text, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, short_description, creator_account_id = %(account_id)s AS mine
+        links, short_description, email_address,
+        creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
         LIMIT 1
