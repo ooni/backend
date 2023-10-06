@@ -201,6 +201,7 @@ def test_crud_user_create(cleanup, client, adminsession, usersession):
         ],
         "published": False,
         "reported_by": "ooni",
+        "email_address": "nick@localhost.local",
         "start_time": "2020-01-01T00:00:00Z",
         "tags": ["integ-test"],
         "title": title,
@@ -219,6 +220,7 @@ def test_crud_user_create_cannot_publish(cleanup, client, adminsession, usersess
         start_time=datetime(2020, 1, 1),
         end_time=None,
         reported_by="ooni",
+        email_address="nick@localhost.local",
         title=title,
         text="foo bar\nbaz\n",
         event_type="incident",
@@ -243,6 +245,7 @@ def test_crud_user_create_invalid_asns(cleanup, client, adminsession, usersessio
         start_time=datetime(2020, 1, 1),
         end_time=None,
         reported_by="ooni",
+        email_address="nick@localhost.local",
         title=title,
         text="foo bar\nbaz\n",
         event_type="incident",
@@ -267,7 +270,34 @@ def test_crud_user_create_invalid_dates(cleanup, client, adminsession, usersessi
         start_time=datetime(2020, 1, 1),
         end_time=datetime(2019, 1, 1),
         reported_by="ooni",
+        email_address="nick@localhost.local",
         title=title,
+        text="foo bar\nbaz\n",
+        event_type="incident",
+        published=False,
+        CCs=["UK", "FR"],
+        test_names=["web_connectivity"],
+        ASNs=[1, 2],
+        domains=[],
+        tags=["integ-test"],
+        links=[
+            "https://explorer.ooni.org/chart/mat?test_name=web_connectivity&axis_x=measurement_start_day&since=2023-04-16&until=2023-05-16&time_grain=day"
+        ],
+    )
+    d = dict(**new)
+    r = usersession.post("/api/v1/incidents/create", json=d)
+    assert r.status_code == 400, r.json
+
+
+def test_crud_user_create_mismatched_email(cleanup, client, adminsession, usersession):
+    title = "integ-test-6"
+    new = dict(
+        start_time=datetime(2020, 1, 1),
+        end_time=None,
+        reported_by="ooni",
+        email_address="WRONG_ADDRESS@localhost.local",
+        title=title,
+        short_description="integ test",
         text="foo bar\nbaz\n",
         event_type="incident",
         published=False,
@@ -291,6 +321,7 @@ def test_crud_invalid_fields(client, adminsession, usersession):
         start_time=datetime(2020, 1, 1),
         end_time=None,
         reported_by="ooni",
+        email_address="nick@localhost.local",
         title="",  # empty
         short_description="integ test",
         text="foo bar\nbaz\n",
@@ -316,6 +347,7 @@ def test_crud_extra_field(client, adminsession, usersession):
         start_time=datetime(2020, 1, 1),
         end_time=None,
         reported_by="ooni",
+        email_address="nick@localhost.local",
         title="",
         short_description="integ test",
         text="foo bar\nbaz\n",
