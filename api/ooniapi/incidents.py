@@ -96,6 +96,8 @@ def search_list_incidents() -> Response:
         rows = list(q)
         for r in rows:
             r["published"] = bool(r["published"])
+            if account_id is None or get_client_role() != "admin":
+                r["email_address"] = None  # hide email
         return nocachejson(incidents=rows, v=1)
     except BaseOONIException as e:
         return jerror(e)
@@ -140,6 +142,8 @@ def show_incident(incident_id: str) -> Response:
             return jerror("Not found")
         inc = q[0]
         inc["published"] = bool(inc["published"])
+        if account_id is None or get_client_role() != "admin":
+            inc["email_address"] = None  # hide email
         # TODO: cache if possible
         return nocachejson(incident=inc, v=1)
     except BaseOONIException as e:
