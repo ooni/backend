@@ -140,6 +140,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     expected["start_time"] = "2020-01-02T00:00:00Z"
     expected["published"] = True
     expected["mine"] = 0
+    expected["email_address"] = None  # anon cannot see the email
     assert i == expected
 
     # Delete as admin
@@ -201,7 +202,7 @@ def test_crud_user_create(cleanup, client, adminsession, usersession):
         ],
         "published": False,
         "reported_by": "ooni",
-        "email_address": "nick@localhost.local",
+        "email_address": None,
         "start_time": "2020-01-01T00:00:00Z",
         "tags": ["integ-test"],
         "title": title,
