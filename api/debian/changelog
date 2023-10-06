@@ -1,3 +1,9 @@
+ooni-api (1.0.74) unstable; urgency=medium
+
+  * Filter measurements by OONIRun ID
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 06 Oct 2023 18:52:49 +0200
+
 ooni-api (1.0.72) unstable; urgency=medium
 
   * Fix probe registration iat
