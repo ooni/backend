@@ -36,11 +36,11 @@ jobs:
 
       - name: Notify success
         if: ${{ success() }}
-        run: curl -s -d "CI: API OK 😄" https://ntfy.sh/ooni-7aGhaS
+        run: curl -s -d "CI API OK 😄" https://ntfy.sh/ooni-7aGhaS
 
       - name: Notify failure
         if: ${{ failure() }}
-        run: curl -d "CI: API FAIL 😞" https://ntfy.sh/ooni-7aGhaS
+        run: curl -d "CI API FAIL 😞" https://ntfy.sh/ooni-7aGhaS
 
       #- name: debug docker
       #  if: always()
