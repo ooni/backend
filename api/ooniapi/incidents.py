@@ -192,7 +192,11 @@ def prepare_incident_dict(d: dict):
 def mismatched_email_addr(req: dict) -> bool:
     account_id = get_account_id_or_raise()
     hashed = hash_email_address(req["email_address"])
-    return account_id == hashed
+    if account_id == hashed:
+        return False
+
+    log.info(f"Email mismatch {hashed} {account_id}")
+    return True
 
 
 def user_cannot_update(incident_id: str) -> bool:
