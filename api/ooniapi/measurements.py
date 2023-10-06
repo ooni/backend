@@ -397,8 +397,6 @@ def get_raw_measurement() -> Response:
     return resp
 
 
-
-
 def format_msmt_meta(msmt_meta: dict) -> dict:
     keys = (
         "input",
@@ -660,6 +658,11 @@ def list_measurements() -> Response:
         type: string
         description: Filter measurements by engine version. Comma-separated.
 
+      - name: oonirun_id
+        in: query
+        type: string
+        description: Filter measurements by OONIRun ID.
+
       - name: order_by
         in: query
         type: string
@@ -717,6 +720,7 @@ def list_measurements() -> Response:
     software_versions = param_commasplit("software_version")
     test_versions = param_commasplit("test_version")
     engine_versions = param_commasplit("engine_version")
+    oonirun_id = param("oonirun_id")
 
     # Workaround for https://github.com/ooni/probe/issues/1034
     user_agent = request.headers.get("User-Agent", "")
@@ -818,6 +822,10 @@ def list_measurements() -> Response:
     if engine_versions is not None:
         query_params["engine_versions"] = engine_versions
         fpwhere.append(sql.text("engine_version IN :engine_versions"))
+
+    if oonirun_id is not None:
+        query_params["oonirun_id"] = oonirun_id
+        fpwhere.append(sql.text("oonirun_id = :oonirun_id"))
 
     # Filter on anomaly, confirmed and failure:
     # The database stores anomaly and confirmed as boolean + NULL and stores
