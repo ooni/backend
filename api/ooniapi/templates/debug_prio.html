@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OONI API</title>
+
+  {% block head_meta %}
+    <meta charset="UTF-8">
+  {% endblock %}
+
+  {% block head_css %}
+    <link href="/static/css/master.css" rel="stylesheet" />
+  {% endblock %}
+
+  {% block head %}
+  {% endblock %}
+
+  {% block head_js %}
+  {% endblock %}
+
+  <script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>
+
+</head>
+<body>
+{% block body %}
+
+  {% block navbar %}
+  {% endblock %}
+
+  {% block uncontained %}
+  {% endblock %}
+
+  <div class="container">
+
+    {% block content_fluid %}
+    {% endblock %}
+
+<form>
+  <label>CC</label> <input type="text" name="probe_cc"> <br>
+    <input type="submit" value="Submit">
+</form>
+
+    <table class="sortable">
+      <tr>
+        <th>url</th>
+        <th>category_code</th>
+        <th>msmt_cnt</th>
+        <th>priority</th>
+        <th>weight</th>
+      </tr>
+
+      {% for i in test_items %}
+      <tr class="item">
+        <td>{{ i["url"] }}</td>
+        <td>{{ i["category_code"] }}</td>
+        <td>{{ i["msmt_cnt"] }}</td>
+        <td>{{ i["priority"] }}</td>
+        <td>{{ i["weight"] }}</td>
+      </tr>
+      {% endfor %}
+
+  </table>
+
+  </div>
+
+  {% block footer %}
+    {% include 'footer.html' %}
+  {% endblock %}
+
+  {% block tail_js %}
+  {% endblock %}
+
+{% endblock %}
+</body>
+</html>
+

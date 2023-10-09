@@ -1,3 +1,9 @@
+ooni-api (1.0.75) unstable; urgency=medium
+
+  * Debug test list using HTML table
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 09 Oct 2023 11:32:34 +0200
+
 ooni-api (1.0.74) unstable; urgency=medium
 
   * Filter measurements by OONIRun ID

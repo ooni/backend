@@ -26,7 +26,14 @@ from collections import namedtuple
 from typing import List, Dict, Tuple
 import random
 
-from flask import Blueprint, current_app, request, Response, make_response
+from flask import (
+    Blueprint,
+    current_app,
+    request,
+    Response,
+    make_response,
+    render_template,
+)
 from sqlalchemy import sql as sa
 
 from ooniapi.config import metrics
@@ -146,7 +153,9 @@ ON (citiz.url = cnt.input)
         q = q.replace("--asn-filter--", "AND probe_asn = :asn")
 
     # support uppercase or lowercase match
-    r = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=1)
+    r = query_click(
+        sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=1
+    )
     return tuple(r)
 
 
@@ -321,6 +330,9 @@ def debug_prioritization() -> Response:
         in: query
         type: string
         description: Probe ASN
+      - name: format
+        in: query
+        description: JSON or HTML
       - name: limit
         in: query
         type: integer
@@ -336,10 +348,22 @@ def debug_prioritization() -> Response:
     category_codes = param_category_codes()
     asn = param_asn("probe_asn") or 0
     limit = int(param("limit") or -1)
+    fmt = (param("format") or "HTML").upper()
     test_items, entries, prio_rules = generate_test_list(
         country_code, category_codes, asn, limit, True
     )
-    return cachedjson("0s", test_items=test_items, entries=entries, prio_rules=prio_rules)
+    if fmt == "JSON":
+        out = cachedjson(
+            "0s", test_items=test_items, entries=entries, prio_rules=prio_rules
+        )
+    else:
+        out = render_template(
+            "debug_prio.html",
+            test_items=test_items,
+            entries=entries,
+            prio_rules=prio_rules,
+        )
+    return out
 
 
 @prio_bp.route("/api/_/show_countries_prioritization")
