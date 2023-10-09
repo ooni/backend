@@ -332,7 +332,12 @@ def debug_prioritization() -> Response:
         description: Probe ASN
       - name: format
         in: query
-        description: JSON or HTML
+        type: string
+        description: |
+          Output format, HTML (default) or JSON
+        enum:
+          - JSON
+          - HTML
       - name: limit
         in: query
         type: integer

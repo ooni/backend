@@ -34,10 +34,18 @@
     {% block content_fluid %}
     {% endblock %}
 
-<form>
-  <label>CC</label> <input type="text" name="probe_cc"> <br>
-    <input type="submit" value="Submit">
-</form>
+    <br>
+    <h3>URL prioritization</h3>
+
+    <form>
+      <label>CC</label> <input type="text" name="probe_cc"> <br>
+      <label>category codes</label> <input type="text" name="category_codes"> <br>
+      <label>probe_asn</label> <input type="text" name="probe_asn"> <br>
+      <label>format</label> <input type="text" name="format" value="HTML"> <br>
+      <br>
+      <input type="submit" value="Submit">
+    </form>
+    <br>
 
     <table class="sortable">
       <tr>
@@ -57,8 +65,7 @@
         <td>{{ i["weight"] }}</td>
       </tr>
       {% endfor %}
-
-  </table>
+    </table>
 
   </div>
 
