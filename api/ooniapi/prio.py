@@ -352,7 +352,7 @@ def debug_prioritization() -> Response:
     country_code = (param("probe_cc") or "ZZ").upper()
     category_codes = param_category_codes()
     asn = param_asn("probe_asn") or 0
-    limit = int(param("limit") or -1)
+    limit = int(param("limit") or 9999)
     fmt = (param("format") or "HTML").upper()
     test_items, entries, prio_rules = generate_test_list(
         country_code, category_codes, asn, limit, True
