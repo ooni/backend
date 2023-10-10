@@ -357,17 +357,13 @@ def debug_prioritization() -> Response:
     test_items, entries, prio_rules = generate_test_list(
         country_code, category_codes, asn, limit, True
     )
+    d = dict(test_items=test_items, entries=entries, prio_rules=prio_rules)
     if fmt == "JSON":
-        out = cachedjson(
-            "0s", test_items=test_items, entries=entries, prio_rules=prio_rules
-        )
+        out = cachedjson("0s", **d)
     else:
-        out = render_template(
-            "debug_prio.html",
-            test_items=test_items,
-            entries=entries,
-            prio_rules=prio_rules,
-        )
+        html = render_template("debug_prio.html", **d)
+        out = make_response(html)
+
     return out
 
 
