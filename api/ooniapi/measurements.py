@@ -658,7 +658,7 @@ def list_measurements() -> Response:
         type: string
         description: Filter measurements by engine version. Comma-separated.
 
-      - name: oonirun_id
+      - name: ooni_run_link_id
         in: query
         type: string
         description: Filter measurements by OONIRun ID.
@@ -720,7 +720,7 @@ def list_measurements() -> Response:
     software_versions = param_commasplit("software_version")
     test_versions = param_commasplit("test_version")
     engine_versions = param_commasplit("engine_version")
-    oonirun_id = param("oonirun_id")
+    oonirun_id = param("ooni_run_link_id")
 
     # Workaround for https://github.com/ooni/probe/issues/1034
     user_agent = request.headers.get("User-Agent", "")
