@@ -4,6 +4,7 @@ Requires=ooni-update-citizenlab.service
 
 [Timer]
 Unit=ooni-update-citizenlab.service
+# Every 30 min starting at :00
 OnCalendar=*-*-* *:00/30
 
 [Install]

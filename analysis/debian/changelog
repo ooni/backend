@@ -1,3 +1,9 @@
+analysis (1.11) unstable; urgency=medium
+
+  * Update timers
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 11 Oct 2023 15:46:46 +0200
+
 analysis (1.10) unstable; urgency=medium
 
   * Install certs for Vecton in the TH rotation script

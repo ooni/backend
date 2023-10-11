@@ -4,7 +4,8 @@ Requires=ooni-update-fingerprints.service
 
 [Timer]
 Unit=ooni-update-fingerprints.service
-OnCalendar=hourly
+# Every 30 min starting at :15
+OnCalendar=*-*-* *:00/30
 
 [Install]
 WantedBy=timers.target

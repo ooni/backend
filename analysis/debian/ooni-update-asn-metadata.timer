@@ -4,7 +4,8 @@ Requires=ooni-update-asn-metadata.service
 
 [Timer]
 Unit=ooni-update-asn-metadata.service
-OnCalendar=weekly
+OnCalendar=Wed *-*-* 15:00:00
+Persistent=true
 
 [Install]
 WantedBy=timers.target

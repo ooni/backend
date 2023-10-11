@@ -4,7 +4,7 @@ Requires=ooni-db-backup.service
 
 [Timer]
 Unit=ooni-db-backup.service
-OnCalendar=weekly
+OnCalendar=Tue *-*-* 15:00:00
 Persistent=true
 
 [Install]

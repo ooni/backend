@@ -6,7 +6,7 @@ Requires=ooni-download-geoip.service
 Unit=ooni-download-geoip.service
 OnActiveSec=0
 # run every week on Sunday
-OnCalendar=Sun *-*-* 00:00:00
+OnCalendar=Thu *-*-* 15:00:00
 
 [Install]
 WantedBy=timers.target
