@@ -1,3 +1,10 @@
+ooni-api (1.0.76) unstable; urgency=medium
+
+  * Add torsf feature flag
+    https://github.com/ooni/backend/issues/742
+
+ -- Federico Ceratto <federico@debian.org>  Wed, 11 Oct 2023 13:49:36 +0200
+
 ooni-api (1.0.75) unstable; urgency=medium
 
   * Debug test list using HTML table
