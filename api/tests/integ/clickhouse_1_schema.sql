@@ -242,7 +242,7 @@ SETTINGS index_granularity = 1;
 
 CREATE TABLE IF NOT EXISTS default.oonirun
 (
-    `id` UInt64,
+    `ooni_run_link_id` UInt64,
     `descriptor_creation_time` DateTime64(3),
     `translation_creation_time` DateTime64(3),
     `creator_account_id` FixedString(32),
@@ -254,5 +254,5 @@ CREATE TABLE IF NOT EXISTS default.oonirun
     `icon` String
 )
 ENGINE = ReplacingMergeTree(translation_creation_time)
-ORDER BY (id, descriptor_creation_time)
+ORDER BY (ooni_run_link_id, descriptor_creation_time)
 SETTINGS index_granularity = 1;
