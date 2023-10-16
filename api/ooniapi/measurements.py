@@ -720,7 +720,7 @@ def list_measurements() -> Response:
     software_versions = param_commasplit("software_version")
     test_versions = param_commasplit("test_version")
     engine_versions = param_commasplit("engine_version")
-    oonirun_id = param("ooni_run_link_id")
+    ooni_run_link_id = param("ooni_run_link_id")
 
     # Workaround for https://github.com/ooni/probe/issues/1034
     user_agent = request.headers.get("User-Agent", "")
@@ -823,9 +823,9 @@ def list_measurements() -> Response:
         query_params["engine_versions"] = engine_versions
         fpwhere.append(sql.text("engine_version IN :engine_versions"))
 
-    if oonirun_id is not None:
-        query_params["oonirun_id"] = oonirun_id
-        fpwhere.append(sql.text("oonirun_id = :oonirun_id"))
+    if ooni_run_link_id is not None:
+        query_params["ooni_run_link_id"] = ooni_run_link_id
+        fpwhere.append(sql.text("ooni_run_link_id = :ooni_run_link_id"))
 
     # Filter on anomaly, confirmed and failure:
     # The database stores anomaly and confirmed as boolean + NULL and stores
