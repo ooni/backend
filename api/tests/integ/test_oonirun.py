@@ -64,11 +64,11 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     r = usersession.post("/api/_/ooni_run/create", json=z)
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
-    assert str(r.json["id"]).endswith("00")
-    oonirun_id = int(r.json["id"])
+    assert str(r.json["ooni_run_link_id"]).endswith("00")
+    ooni_run_link_id = int(r.json["ooni_run_link_id"])
 
     say("fetch latest")
-    r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
+    r = usersession.get(f"/api/_/ooni_run/fetch/{ooni_run_link_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
     exp_fetch_fields = [
@@ -113,7 +113,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
 
     say("fetch by creation_time")
     r = usersession.get(
-        f"/api/_/ooni_run/fetch/{oonirun_id}?creation_time={creation_time}"
+        f"/api/_/ooni_run/fetch/{ooni_run_link_id}?creation_time={creation_time}"
     )
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
@@ -128,9 +128,9 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         "author",
         "descriptor_creation_time",
         "icon",
-        "id",
         "mine",
         "name",
+        "ooni_run_link_id",
         "short_description",
         "translation_creation_time",
     ]
@@ -140,7 +140,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert sorted(r.json) == ["descriptors", "v"]
     assert len(r.json["descriptors"]) > 0
     assert sorted(r.json["descriptors"][0]) == exp_list_fields
-    found = [d for d in r.json["descriptors"] if d["id"] == oonirun_id]
+    found = [d for d in r.json["descriptors"] if d["ooni_run_link_id"] == ooni_run_link_id]
     assert len(found) == 1
 
     say("list all items as admin")
@@ -150,7 +150,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert sorted(r.json) == ["descriptors", "v"]
     assert len(r.json["descriptors"]) > 0
     assert sorted(r.json["descriptors"][0]) == exp_list_fields
-    found = [d for d in r.json["descriptors"] if d["id"] == oonirun_id]
+    found = [d for d in r.json["descriptors"] if d["ooni_run_link_id"] == ooni_run_link_id]
     assert len(found) == 1
 
     ##  find the item created by usersession above
@@ -165,13 +165,13 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert len(r.json["descriptors"]) > 0
     assert sorted(r.json["descriptors"][0]) == exp_list_fields
     say("find the item created by usersession above")
-    desc = [d for d in r.json["descriptors"] if d["id"] == oonirun_id][0]
+    desc = [d for d in r.json["descriptors"] if d["ooni_run_link_id"] == ooni_run_link_id][0]
     assert desc == {
         "archived": False,
         "author": "integ-test author",
         "descriptor_creation_time": creation_time,
         "icon": "myicon",
-        "id": oonirun_id,
+        "ooni_run_link_id": ooni_run_link_id,
         "mine": False,
         "name": "integ-test name in English",
         "short_description": "integ-test short description in English",
@@ -181,13 +181,13 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     ### "update" the oonirun by creating a new version, changing the inputs
     z["nettests"][0]["inputs"].append("https://foo.net/")
     exp["nettests"][0]["inputs"].append("https://foo.net/")
-    r = usersession.post(f"/api/_/ooni_run/create?id={oonirun_id}", json=z)
+    r = usersession.post(f"/api/_/ooni_run/create?id={ooni_run_link_id}", json=z)
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
-    assert r.json["id"] == oonirun_id
+    assert r.json["ooni_run_link_id"] == ooni_run_link_id
 
     say("Fetch it back")
-    r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
+    r = usersession.get(f"/api/_/ooni_run/fetch/{ooni_run_link_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
     assert r.json["mine"] is True, r.json
@@ -200,13 +200,13 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     translation_creation_time = r.json["translation_creation_time"]
 
     say("List descriptors as admin and find we have 2 versions now")
-    r = adminsession.get(f"/api/_/ooni_run/list?ids={oonirun_id}")
+    r = adminsession.get(f"/api/_/ooni_run/list?ids={ooni_run_link_id}")
     assert r.status_code == 200, r.json
     descs = r.json["descriptors"]
     assert len(descs) == 2, r.json
 
     say("List descriptors using more params")
-    r = usersession.get(f"/api/_/ooni_run/list?ids={oonirun_id}&only_mine=True")
+    r = usersession.get(f"/api/_/ooni_run/list?ids={ooni_run_link_id}&only_mine=True")
     assert r.status_code == 200, r.json
     descs = r.json["descriptors"]
     assert len(descs) == 2, r.json
@@ -215,20 +215,20 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         assert d["archived"] is False
 
     say("Fail to update the oonirun using the wrong account")
-    r = adminsession.post(f"/api/_/ooni_run/create?id={oonirun_id}", json=z)
+    r = adminsession.post(f"/api/_/ooni_run/create?id={ooni_run_link_id}", json=z)
     assert r.status_code == 400, r.json
     assert r.json == {"error": "OONIRun descriptor not found"}
 
     say("# Update translations without changing descriptor_creation_time")
     z["description_intl"]["it"] = "integ-test *nuova* descrizione in italiano"
-    r = usersession.post(f"/api/_/ooni_run/create?id={oonirun_id}", json=z)
+    r = usersession.post(f"/api/_/ooni_run/create?id={ooni_run_link_id}", json=z)
     assert r.status_code == 200, r.json
     say("previous id and descriptor_creation_time, not changed")
-    assert r.json["id"] == oonirun_id
+    assert r.json["ooni_run_link_id"] == ooni_run_link_id
     # assert creation_time == r.json["descriptor_creation_time"]
 
     say("Fetch latest and find descriptor_creation_time has not changed")
-    r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
+    r = usersession.get(f"/api/_/ooni_run/fetch/{ooni_run_link_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
     assert sorted(r.json) == exp_fetch_fields
@@ -241,24 +241,24 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     assert r.json["archived"] is False, r.json
 
     say("Archive it")
-    r = usersession.post(f"/api/_/ooni_run/archive/{oonirun_id}")
+    r = usersession.post(f"/api/_/ooni_run/archive/{ooni_run_link_id}")
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
 
     say("List descriptors")
-    r = usersession.get(f"/api/_/ooni_run/list?ids={oonirun_id}&include_archived=True")
+    r = usersession.get(f"/api/_/ooni_run/list?ids={ooni_run_link_id}&include_archived=True")
     assert r.status_code == 200, r.json
     descs = r.json["descriptors"]
     assert len(descs) == 2, r.json
 
     say("List descriptors")
-    r = usersession.get(f"/api/_/ooni_run/list?ids={oonirun_id}")
+    r = usersession.get(f"/api/_/ooni_run/list?ids={ooni_run_link_id}")
     assert r.status_code == 200, r.json
     descs = r.json["descriptors"]
     assert len(descs) == 0, r.json
 
     say("Fetch latest and find that it's archived")
-    r = usersession.get(f"/api/_/ooni_run/fetch/{oonirun_id}")
+    r = usersession.get(f"/api/_/ooni_run/fetch/{ooni_run_link_id}")
     assert r.status_code == 200, r.json
     assert r.json["archived"] == True, r.json
 

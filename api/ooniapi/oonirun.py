@@ -86,7 +86,7 @@ def create_oonirun() -> Response:
         schema:
           type: object
           properties:
-            id:
+            ooni_run_link_id:
               type: integer
             v:
               type: integer
@@ -98,7 +98,7 @@ def create_oonirun() -> Response:
     account_id = get_account_id_or_raise()
     descriptor = request.json
     assert descriptor
-    oonirun_id_raw = request.args.get("id")
+    ooni_run_link_id_raw = request.args.get("ooni_run_link_id")
 
     if descriptor.get("name", "") == "":
         log.info("'name' field empty")
@@ -111,21 +111,21 @@ def create_oonirun() -> Response:
     now = datetime.utcnow()
     now_ts = to_timestamp(now)
 
-    if oonirun_id_raw is None:
+    if ooni_run_link_id_raw is None:
         # Generate new ID
-        oonirun_id = generate_random_intuid(current_app)
+        ooni_run_link_id = generate_random_intuid(current_app)
         increase_descriptor_creation_time = True
 
     else:
         # We need a previous oonirun belonging to the same user
-        oonirun_id = int(oonirun_id_raw)
+        ooni_run_link_id = int(ooni_run_link_id_raw)
         query = """SELECT descriptor, descriptor_creation_time
         FROM oonirun
-        WHERE id = %(oonirun_id)s AND creator_account_id = %(account_id)s
+        WHERE ooni_run_link_id = %(ooni_run_link_id)s AND creator_account_id = %(account_id)s
         ORDER BY descriptor_creation_time DESC
         LIMIT 1
         """
-        query_params = dict(account_id=account_id, oonirun_id=oonirun_id)
+        query_params = dict(account_id=account_id, ooni_run_link_id=ooni_run_link_id)
         q = query_click(query, query_params)
         if not len(q):
             return jerror("OONIRun descriptor not found")
@@ -150,31 +150,33 @@ def create_oonirun() -> Response:
         creator_account_id=account_id,
         descriptor=desc_s,
         descriptor_creation_time=descriptor_creation_time,
-        id=oonirun_id,
+        ooni_run_link_id=ooni_run_link_id,
         name=descriptor["name"],
         short_description=descriptor.get("short_description", ""),
         translation_creation_time=now,
         icon=descriptor.get("icon", ""),
     )
     log.info(
-        f"Inserting oonirun {oonirun_id} {increase_descriptor_creation_time} {row}"
+        f"Inserting oonirun {ooni_run_link_id} {increase_descriptor_creation_time} {row}"
     )
-    sql_ins = """INSERT INTO oonirun (id, descriptor, creator_account_id,
+    sql_ins = """INSERT INTO oonirun (ooni_run_link_id, descriptor, creator_account_id,
         author, descriptor_creation_time, translation_creation_time, name,
         short_description, icon) VALUES"""
     insert_click(sql_ins, [row])
 
     optimize_table("oonirun")
-    return nocachejson(v=1, id=oonirun_id)
+    return nocachejson(v=1, ooni_run_link_id=ooni_run_link_id)
 
 
-@oonirun_blueprint.route("/api/_/ooni_run/archive/<int:oonirun_id>", methods=["POST"])
+@oonirun_blueprint.route(
+    "/api/_/ooni_run/archive/<int:ooni_run_link_id>", methods=["POST"]
+)
 @role_required(["admin", "user"])
-def archive_oonirun(oonirun_id) -> Response:
+def archive_oonirun(ooni_run_link_id) -> Response:
     """Archive an OONIRun descriptor and all its past versions.
     ---
     parameters:
-      - name: oonirun_id
+      - name: ooni_run_link_id
         in: path
         type: integer
         required: true
@@ -189,27 +191,29 @@ def archive_oonirun(oonirun_id) -> Response:
     """
     global log
     log = current_app.logger
-    log.debug(f"archive oonirun {oonirun_id}")
+    log.debug(f"archive oonirun {ooni_run_link_id}")
     account_id = get_account_id_or_raise()
 
     # Async mutation on all servers
-    query = "ALTER TABLE oonirun UPDATE archived = 1 WHERE id = %(oonirun_id)s"
+    query = "ALTER TABLE oonirun UPDATE archived = 1 WHERE ooni_run_link_id = %(ooni_run_link_id)s"
     if get_client_role() != "admin":
         query += " AND creator_account_id = %(account_id)s"
 
-    query_params = dict(oonirun_id=oonirun_id, account_id=account_id)
+    query_params = dict(ooni_run_link_id=ooni_run_link_id, account_id=account_id)
     raw_query(query, query_params)
     optimize_table("oonirun")
     return nocachejson(v=1)
 
 
 @metrics.timer("fetch_oonirun_descriptor")
-@oonirun_blueprint.route("/api/_/ooni_run/fetch/<int:oonirun_id>", methods=["GET"])
-def fetch_oonirun_descriptor(oonirun_id) -> Response:
+@oonirun_blueprint.route(
+    "/api/_/ooni_run/fetch/<int:ooni_run_link_id>", methods=["GET"]
+)
+def fetch_oonirun_descriptor(ooni_run_link_id) -> Response:
     """Fetch OONIRun descriptor by creation time or the newest one
     ---
     parameters:
-      - name: oonirun_id
+      - name: ooni_run_link_id
         in: path
         type: integer
         required: true
@@ -249,7 +253,7 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
     log.debug("fetching oonirun")
     descriptor_creation_time = request.args.get("creation_time")
     account_id = get_account_id_or_none()
-    query_params = dict(oonirun_id=oonirun_id, account_id=account_id)
+    query_params = dict(ooni_run_link_id=ooni_run_link_id, account_id=account_id)
     if descriptor_creation_time is None:
         # Fetch latest version
         creation_time_filter = ""
@@ -262,7 +266,7 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
         descriptor_creation_time, translation_creation_time, descriptor,
         archived, creator_account_id = %(account_id)s AS mine
         FROM oonirun
-        WHERE id = %(oonirun_id)s {creation_time_filter}
+        WHERE ooni_run_link_id = %(ooni_run_link_id)s {creation_time_filter}
         ORDER BY descriptor_creation_time DESC
         LIMIT 1
     """
@@ -288,6 +292,20 @@ def fetch_oonirun_descriptor(oonirun_id) -> Response:
 def list_oonirun_descriptors() -> Response:
     """List OONIRun descriptors
     ---
+    parameters:
+      - name: ooni_run_link_ids
+        in: query
+        type: string
+        description: OONIRun descriptors comma separated
+      - name: only_latest
+        in: query
+        type: boolean
+      - name: only_mine
+        in: query
+        type: boolean
+      - name: include_archived
+        in: query
+        type: boolean
     responses:
       '200':
         description: OONIRun metadata and descriptor
@@ -303,7 +321,7 @@ def list_oonirun_descriptors() -> Response:
               items:
                 type: object
                 properties:
-                  id:
+                  ooni_run_link_id:
                     type: string
                     description: descriptor ID
                   archived:
@@ -335,11 +353,11 @@ def list_oonirun_descriptors() -> Response:
         if only_latest:
             filters.append(
                 """
-            (id, translation_creation_time) IN (
-                SELECT id,
+            (ooni_run_link_id, translation_creation_time) IN (
+                SELECT ooni_run_link_id,
                 MAX(translation_creation_time) AS translation_creation_time
                 FROM oonirun
-                GROUP BY id
+                GROUP BY ooni_run_link_id
             )"""
             )
 
@@ -355,15 +373,15 @@ def list_oonirun_descriptors() -> Response:
         if only_mine:
             filters.append("creator_account_id = %(account_id)s")
 
-        ids_s = request.args.get("ids")
+        ids_s = request.args.get("ooni_run_link_ids")
         if ids_s:
             ids = commasplit(ids_s)
-            filters.append("id IN %(ids)s")
+            filters.append("ooni_run_link_id IN %(ids)s")
             query_params["ids"] = ids
 
         # name_match = request.args.get("name_match", "").strip()
         # if name_match:
-        #     filters.append("id IN %(ids)s")
+        #     filters.append("ooni_run_link_id IN %(ids)s")
         #     query_params["ids"] = ids
 
     except Exception as e:
@@ -380,7 +398,7 @@ def list_oonirun_descriptors() -> Response:
     else:
         fil = ""
 
-    query = f"""SELECT archived, author, id, icon, descriptor_creation_time,
+    query = f"""SELECT archived, author, ooni_run_link_id, icon, descriptor_creation_time,
     translation_creation_time, {mine_col} AS mine, name, short_description
     FROM oonirun
     {fil}
