@@ -181,7 +181,7 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
     ### "update" the oonirun by creating a new version, changing the inputs
     z["nettests"][0]["inputs"].append("https://foo.net/")
     exp["nettests"][0]["inputs"].append("https://foo.net/")
-    r = usersession.post(f"/api/_/ooni_run/create?id={ooni_run_link_id}", json=z)
+    r = usersession.post(f"/api/_/ooni_run/create?ooni_run_link_id={ooni_run_link_id}", json=z)
     assert r.status_code == 200, r.json
     assert r.json["v"] == 1, r.json
     assert r.json["ooni_run_link_id"] == ooni_run_link_id
@@ -215,13 +215,13 @@ def test_create_fetch_archive(cleanup, client, usersession, adminsession):
         assert d["archived"] is False
 
     say("Fail to update the oonirun using the wrong account")
-    r = adminsession.post(f"/api/_/ooni_run/create?id={ooni_run_link_id}", json=z)
+    r = adminsession.post(f"/api/_/ooni_run/create?ooni_run_link_id={ooni_run_link_id}", json=z)
     assert r.status_code == 400, r.json
     assert r.json == {"error": "OONIRun descriptor not found"}
 
     say("# Update translations without changing descriptor_creation_time")
     z["description_intl"]["it"] = "integ-test *nuova* descrizione in italiano"
-    r = usersession.post(f"/api/_/ooni_run/create?id={ooni_run_link_id}", json=z)
+    r = usersession.post(f"/api/_/ooni_run/create?ooni_run_link_id={ooni_run_link_id}", json=z)
     assert r.status_code == 200, r.json
     say("previous id and descriptor_creation_time, not changed")
     assert r.json["ooni_run_link_id"] == ooni_run_link_id
