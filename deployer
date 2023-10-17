@@ -3,6 +3,8 @@
 """
 Software deployer with staging pipeline
 
+Released under GPLv3 License, see /usr/share/common-licenses/GPL-3
+2020-2023 federico.ceratto@openobservatory.org
 """
 # TODO: implement promote
 # TODO: refresh badge on deploy
@@ -17,13 +19,9 @@ from tempfile import NamedTemporaryFile
 import subprocess
 import sys
 
-try:
-    from debian import debian_support
-    version_compare = debian_support.version_compare
-except ImportError:
-    import apt_pkg
-    apt_pkg.init_system()
-    version_compare = apt_pkg.version_compare
+import apt_pkg
+
+apt_pkg.init_system()
 
 
 def find_conf():
@@ -126,27 +124,27 @@ def print_status(conf):
 
     print()
     stage_names = conf["stages"].keys()
-    hdr = "{:^15}  " * (len(stage_names) + 1)
+    hdr = "{:^18}  " * (len(stage_names) + 1)
     print(hdr.format("Package", *stage_names))
     # ➛ ➜ ➔ ➝ ➞ ➟ ➠ ➧ ➨  ►  ➢ ➣ ➤   ⟿     ✅
     for pkg in conf["deb_packages"]:
-        tpl = "{:15}  "
+        tpl = "{:18}  "
         versions = []
         for stage in stage_names:
             for hn in status[stage]:
                 ver = status[stage][hn].get(pkg, "")
                 if versions == []:
-                    tpl += "   {:15}"
+                    tpl += "   {:18}"
                 else:
                     prev = versions[-1]
-                    compare = version_compare(prev or 0, ver or 0)
+                    compare = apt_pkg.version_compare(prev, ver)
                     if compare > 0:
-                        tpl += " \033[0;32m►►\033[0m  {:15}"
+                        tpl += " \033[0;32m►►\033[0m  {:18}"
                     elif compare == 0:
-                        tpl += "     {:15}"
+                        tpl += "     {:18}"
                     else:
-                        tpl += " \033[0;31m⚠\033[0m   {:15}"
-                        # tpl += " \033[0;31m✘\033[0m   {:15}"
+                        tpl += " \033[0;31m⚠\033[0m   {:18}"
+                        # tpl += " \033[0;31m✘\033[0m   {:18}"
 
                 versions.append(ver)
                 break
@@ -195,6 +193,8 @@ def deploy(conf, args, status):
         apt_update(hn)
 
     for hn in status[args.stage]:
+        # fixme if args.pkgname not in status[args.stage][hn][args.pkgname]:
+        # keyerror
         if args.pkgname not in status[args.stage][hn][args.pkgname]:
             apt_install(hn, args.pkgname, args.version)
         else:
