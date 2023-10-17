@@ -1432,23 +1432,9 @@ def score_riseupvpn(msm: dict) -> dict:
     """Calculate measurement scoring for RiseUp VPN
     Returns a scores dict
     """
-    # https://github.com/ooni/backend/issues/541
-    scores = init_scores()
-    tk = g_or(msm, "test_keys", {})
-    tstatus = tk.get("transport_status") or {}
-    obfs4 = tstatus.get("obfs4")
-    openvpn = tstatus.get("openvpn")
-    anomaly = (
-        tk.get("api_status") == "blocked"
-        or tk.get("ca_cert_status") is False
-        or obfs4 == "blocked"
-        or openvpn == "blocked"
-    )
-    if anomaly:
-        scores["blocking_general"] = 1.0
-
-    scores["extra"] = dict(test_runtime=msm.get("test_runtime"))
-    return scores
+    # originally, there was scoring: https://github.com/ooni/backend/issues/541
+    # on 2023-10-17, we disabled scoring: https://github.com/ooni/backend/issues/745
+    return {}
 
 
 def score_openvpn(msm: dict) -> dict:
