@@ -245,6 +245,24 @@ def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
     }, fjd(r)
 
 
+def test_aggregation_no_axis_filter_multi_oonirun(client):
+    # 0-dimensional data
+    url = "aggregation?ooni_run_link_ids=1234,2345&since=2021-07-09&until=2021-07-10"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r == {
+        "dimension_count": 0,
+        "result": {
+            "anomaly_count": 0,
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 0,
+            "ok_count": 0,
+        },
+        "v": 0,
+    }, fjd(r)
+
+
 def test_aggregation_x_axis_only(client, log):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"

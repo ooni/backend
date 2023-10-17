@@ -18,6 +18,7 @@ from ooniapi.config import metrics
 from ooniapi.database import query_click, query_click_one_row
 from ooniapi.utils import jerror, convert_to_csv
 from ooniapi.urlparams import (
+    commasplit,
     param_asn_m,
     param_date,
     param_domain_m,
@@ -141,6 +142,10 @@ def get_aggregated() -> Response:
         in: query
         type: string
         description: Name of the tests, comma separated
+      - name: ooni_run_link_ids
+        in: query
+        type: string
+        description: OONIRun descriptors comma separated
       - name: since
         in: query
         type: string
@@ -203,6 +208,7 @@ def get_aggregated() -> Response:
         inp = param_input_or_none() or ""
         probe_asn_s = param_asn_m()
         probe_cc_s = param_probe_cc_m()
+        ooni_run_link_ids_raw = param("ooni_run_link_ids")
         since = param_date("since")
         until = param_date("until")
         time_grain = param("time_grain", "auto").lower()
@@ -268,6 +274,11 @@ def get_aggregated() -> Response:
     if probe_asn_s:
         where.append(sql.text("probe_asn IN :probe_asn_s"))
         query_params["probe_asn_s"] = probe_asn_s
+
+    if ooni_run_link_ids_raw:
+        ooni_run_link_ids = commasplit(ooni_run_link_ids_raw)
+        where.append(sql.text("ooni_run_link_id IN :ooni_run_link_ids"))
+        query_params["ooni_run_link_ids"] = ooni_run_link_ids
 
     if since:
         where.append(sql.text("measurement_start_time >= :since"))
