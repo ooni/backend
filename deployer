@@ -3,6 +3,8 @@
 """
 Software deployer with staging pipeline
 
+Dependencies: python3-apt
+
 Released under GPLv3 License, see /usr/share/common-licenses/GPL-3
 2020-2023 federico.ceratto@openobservatory.org
 """
@@ -19,7 +21,7 @@ from tempfile import NamedTemporaryFile
 import subprocess
 import sys
 
-import apt_pkg
+import apt_pkg  # debdeps: python3-apt
 
 apt_pkg.init_system()
 
