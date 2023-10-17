@@ -37,7 +37,8 @@ CREATE TABLE default.fastpath
     `engine_version` String,
     `blocking_type` String,
     `test_helper_address` LowCardinality(String),
-    `test_helper_type` LowCardinality(String)
+    `test_helper_type` LowCardinality(String),
+    `ooni_run_link_id` UInt64
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_start_time, report_id, input)
