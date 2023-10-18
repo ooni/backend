@@ -1217,14 +1217,7 @@ def test_score_torsf():
 def test_score_riseupvpn():
     for can_fn, msm in minicans("riseupvpn", date(2021, 10, 15), date(2021, 10, 16), 1):
         scores = fp.score_measurement(msm)
-        assert scores == {
-            "blocking_general": 0.0,
-            "blocking_global": 0.0,
-            "blocking_country": 0.0,
-            "blocking_isp": 0.0,
-            "blocking_local": 0.0,
-            "extra": {"test_runtime": 3.8260852},
-        }
+        assert scores == {}
         assert msm["report_id"] == "20211015T005140Z_riseupvpn_AR_7303_n1_gc8so3BXiS9thxBJ"
         return
 

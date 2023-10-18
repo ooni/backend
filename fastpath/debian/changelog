@@ -1,3 +1,9 @@
+fastpath (0.81) unstable; urgency=medium
+
+  * Relax riseupvpn scoring (see https://github.com/ooni/backend/issues/745)
+
+ -- Simone Basso <simone@openobservatory.org>  Wed, 17 Oct 2023 16:10:00 +0200
+
 fastpath (0.80) unstable; urgency=medium
 
   * Buffer writes to DB

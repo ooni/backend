@@ -505,14 +505,7 @@ def test_score_tor_list():
 def test_score_riseupvpn():
     msm = loadj("riseupvpn")
     scores = fp.score_measurement(msm)
-    assert scores == {
-        "blocking_general": 1.0,
-        "blocking_global": 0.0,
-        "blocking_country": 0.0,
-        "blocking_isp": 0.0,
-        "blocking_local": 0.0,
-        "extra": {"test_runtime": 1.076507343},
-    }
+    assert scores == {}
 
 
 # # test_name: meek_fronted_requests_test
