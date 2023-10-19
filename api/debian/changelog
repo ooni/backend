@@ -1,3 +1,9 @@
+ooni-api (1.0.79) unstable; urgency=medium
+
+  * Mark vanilla_tor as disabled by default https://github.com/ooni/probe-cli/pull/1374
+
+ -- Simone Basso <simone@openobservatory.org>  Thu, 19 Oct 2023 12:35:00 +0200
+
 ooni-api (1.0.78) unstable; urgency=medium
 
   * Return email address on login
