@@ -1,3 +1,9 @@
+ooni-api (1.0.81) unstable; urgency=medium
+
+  * Bump version
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 20 Oct 2023 13:40:26 +0200
+
 ooni-api (1.0.79) unstable; urgency=medium
 
   * Mark vanilla_tor as disabled by default https://github.com/ooni/probe-cli/pull/1374
