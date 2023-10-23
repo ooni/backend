@@ -1,3 +1,9 @@
+ooni-api (1.0.83) unstable; urgency=medium
+
+  * Incident management: publish/unpublish
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 20 Oct 2023 17:05:36 +0200
+
 ooni-api (1.0.82) unstable; urgency=medium
 
   * Filter measurements by OONIRun ID

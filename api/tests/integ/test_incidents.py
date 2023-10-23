@@ -143,14 +143,60 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     expected["email_address"] = None  # anon cannot see the email
     assert i == expected
 
-    # Delete as admin
-    d = dict(**new)
-    r = adminsession.post("/api/v1/incidents/delete", json=d)
-    assert r.status_code == 200, r.json
+    # Cannot unpublish as user
+    d = dict(id=incident_id)
+    r = usersession.post("/api/v1/incidents/unpublish", json=d)
+    assert r.status_code == 400, r.json
+
+    # Unpublish as admin
+    d = dict(id=incident_id)
+    r = adminsession.post("/api/v1/incidents/unpublish", json=d)
+    assert r.status_code == 200, r
+    assert r.json["r"] == 1
 
     # Search as anon - finds nothing
     j = api(client, "incidents/search")
     assert j == {"incidents": [], "v": 1}
+
+    # Fetch as admin: is unpublished
+    r = adminsession.get(f"/api/v1/incidents/show/{incident_id}")
+    i = r.json["incident"]
+    i.pop("update_time")
+    i.pop("id")
+    assert i == {
+        "ASNs": [1, 2],
+        "CCs": ["UK", "FR"],
+        "domains": [],
+        "email_address": "nick@localhost.local",  # admin can see the email
+        "end_time": None,
+        "event_type": "incident",
+        "links": [
+            "https://explorer.ooni.org/chart/mat?test_name=web_connectivity&axis_x=measurement_start_day&since=2023-04-16&until=2023-05-16&time_grain=day"
+        ],
+        "mine": 1,
+        "published": False,
+        "reported_by": "ooni",
+        "short_description": "integ test",
+        "start_time": "2020-01-02T00:00:00Z",
+        "tags": ["integ-test"],
+        "test_names": ["web_connectivity", "signal"],
+        "text": "foo bar\n" "baz\n",
+        "title": "integ-test-1",
+    }
+
+    # Publish as admin
+    d = dict(id=incident_id)
+    r = adminsession.post("/api/v1/incidents/publish", json=d)
+    assert r.status_code == 200, r
+    assert r.json["r"] == 1
+
+    r = adminsession.get(f"/api/v1/incidents/show/{incident_id}")
+    assert r.json["incident"]["published"] is True
+
+    # Delete as admin
+    d = dict(**new)
+    r = adminsession.post("/api/v1/incidents/delete", json=d)
+    assert r.status_code == 200, r.json
 
     # Search as user - only_mine - finds nothing
     r = usersession.get("/api/v1/incidents/search?only_mine=True")
