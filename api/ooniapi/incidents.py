@@ -3,7 +3,7 @@ Incident reporting
 
 https://docs.google.com/document/d/1TdMBWD45j3bx7GRMIriMvey72viQeKrx7Ad6DyboLwg/
 
-Create / update / delete / list incidents
+Create / update / publish / unpublish / delete / list incidents
 Search/list incidents with:
     Filtering by domain/cc/asn/creator id/ and so on
     Sort by creation/edit date, event date, and so on
@@ -139,7 +139,7 @@ def show_incident(incident_id: str) -> Response:
         """
         q = query_click(query, query_params)
         if len(q) < 1:
-            return jerror("Not found")
+            return jerror("Incident not found")
         inc = q[0]
         inc["published"] = bool(inc["published"])
         if account_id is None or get_client_role() != "admin":
@@ -222,8 +222,8 @@ def user_cannot_update(incident_id: str) -> bool:
 @inc_blueprint.route("/api/v1/incidents/<string:action>", methods=["POST"])
 @role_required(["admin", "user"])
 def post_update_incident(action: str) -> Response:
-    """Create/update/delete an incident.
-    The `action` value can be "create", "update", "delete".
+    """Create/update/publish/unpublish/delete an incident.
+    The `action` value can be "create", "update", "delete", "publish", "unpublish".
     The `id` value is returned by the API when an incident is created.
     It should be set by the caller for incident update or deletion.
     ---
@@ -287,7 +287,7 @@ def post_update_incident(action: str) -> Response:
     # See comments on top of file
     global log
     log = current_app.logger
-    if action not in ("create", "update", "delete"):
+    if action not in ("create", "update", "delete", "publish", "unpublish"):
         return jerror("Invalid request")  # TODO
 
     try:
@@ -297,11 +297,21 @@ def post_update_incident(action: str) -> Response:
 
         req["published"] = int(req.get("published", 0))
 
-        if action in ("update", "delete"):
+        if action in ("update", "delete", "publish", "unpublish"):
+            # When incident already exists:
             incident_id = req.get("id")
             if incident_id is None:
                 raise InvalidRequest()
             incident_id = str(incident_id)
+
+            # Only admin or incident owner can make changes
+            if get_client_role() != "admin":
+                if user_cannot_update(incident_id):
+                    raise OwnershipPermissionError
+
+                # ...while using the right email addr
+                if mismatched_email_addr(req):
+                    raise InvalidRequest
 
         if action == "create":
             incident_id = str(generate_random_intuid(current_app))
@@ -311,29 +321,34 @@ def post_update_incident(action: str) -> Response:
             if get_client_role() != "admin" and req["published"] == 1:
                 raise InvalidRequest
 
+            prepare_incident_dict(req)
             log.info(f"Creating incident {incident_id}")
 
         elif action == "update":
             if get_client_role() != "admin":
-                if user_cannot_update(incident_id):
-                    raise OwnershipPermissionError
-                if mismatched_email_addr(req):
-                    raise InvalidRequest
+                # Only admin can publish
                 if req["published"] == 1:
                     raise InvalidRequest
 
+            prepare_incident_dict(req)
             log.info(f"Updating incident {incident_id}")
 
         elif action == "delete":
-            if get_client_role() != "admin":
-                if user_cannot_update(incident_id):
-                    raise OwnershipPermissionError
-                # (no email check on deletion)
             # TODO: switch to faster deletion with new db version
             q = "ALTER TABLE incidents DELETE WHERE id = %(iid)s"
             raw_query(q, {"iid": incident_id})
             optimize_table("incidents")
             return nocachejson()
+
+        elif action in ("publish", "unpublish"):
+            if get_client_role() != "admin":
+                raise InvalidRequest
+            sql = "SELECT * FROM incidents FINAL WHERE id = %(incident_id)s"
+            q = query_click(sql, dict(incident_id=incident_id))
+            if len(q) < 1:
+                return jerror("Incident not found")
+            req = q[0]
+            req["published"] = bool(action == "publish")
 
         ins_sql = """INSERT INTO incidents
         (id, start_time, end_time, creator_account_id, reported_by, title,
@@ -341,7 +356,6 @@ def post_update_incident(action: str) -> Response:
         test_names, short_description, email_address)
         VALUES
         """
-        prepare_incident_dict(req)
         r = insert_click(ins_sql, [req])
         log.debug(f"Result: {r}")
         optimize_table("incidents")
