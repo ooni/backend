@@ -218,6 +218,7 @@ ORDER BY (asn, changed);
 CREATE TABLE IF NOT EXISTS default.incidents
 (
     `update_time` DateTime DEFAULT now(),
+    `create_time` DateTime DEFAULT now(),
     `start_time` DateTime DEFAULT now(),
     `end_time` Nullable(DateTime),
     `creator_account_id` FixedString(32),

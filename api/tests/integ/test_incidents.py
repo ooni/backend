@@ -65,6 +65,8 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     r = adminsession.get(f"/api/v1/incidents/show/{incident_id}")
     assert r.status_code == 200, r.json
     i = r.json["incident"]
+    assert "create_time" in i
+    i.pop("create_time")
     i.pop("update_time")
     # contains text
     expected = {
@@ -98,6 +100,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     i = [i for i in r.json["incidents"] if i["title"] == "integ-test-1"]
     i = i[0]
     assert i
+    create_time = i.pop("create_time")
     i.pop("update_time")
     assert i == expected
 
@@ -124,6 +127,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
 
     # Update as admin (change start_time and publish)
     new["start_time"] = datetime(2020, 1, 2)
+    new["create_time"] = create_time
     new["published"] = True
     d = dict(**new)
     r = adminsession.post("/api/v1/incidents/update", json=d)
@@ -136,6 +140,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     i = [i for i in j["incidents"] if i["title"] == "integ-test-1"]
     i = i[0]
     assert i
+    i.pop("create_time")
     i.pop("update_time")
     expected["start_time"] = "2020-01-02T00:00:00Z"
     expected["published"] = True
@@ -161,6 +166,7 @@ def test_crud_general(cleanup, client, adminsession, usersession):
     # Fetch as admin: is unpublished
     r = adminsession.get(f"/api/v1/incidents/show/{incident_id}")
     i = r.json["incident"]
+    i.pop("create_time")
     i.pop("update_time")
     i.pop("id")
     assert i == {
@@ -236,6 +242,7 @@ def test_crud_user_create(cleanup, client, adminsession, usersession):
     r = usersession.get("/api/v1/incidents/search?only_mine=True")
     assert r.status_code == 200, r.json
     i = [i for i in r.json["incidents"] if i["title"] == title][0]
+    i.pop("create_time")
     i.pop("update_time")
     i.pop("id")
     expected = {

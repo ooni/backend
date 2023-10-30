@@ -86,7 +86,7 @@ def search_list_incidents() -> Response:
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, short_description, email_address,
+        links, short_description, email_address, create_time,
         creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
@@ -131,7 +131,7 @@ def show_incident(incident_id: str) -> Response:
 
         query = f"""SELECT id, update_time, start_time, end_time, reported_by,
         title, text, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, short_description, email_address,
+        links, short_description, email_address, create_time,
         creator_account_id = %(account_id)s AS mine
         FROM incidents FINAL
         {where}
@@ -155,6 +155,7 @@ def prepare_incident_dict(d: dict):
     exp = [
         "ASNs",
         "CCs",
+        "create_time",
         "creator_account_id",
         "domains",
         "email_address",
@@ -175,9 +176,11 @@ def prepare_incident_dict(d: dict):
         log.debug(f"Invalid incident update request. Keys: {sorted(d)}")
         raise InvalidRequest()
 
-    d["start_time"] = datetime.strptime(d["start_time"], "%Y-%m-%dT%H:%M:%SZ")
+    ts_fmt = "%Y-%m-%dT%H:%M:%SZ"
+    d["start_time"] = datetime.strptime(d["start_time"], ts_fmt)
+    d["create_time"] = datetime.strptime(d["create_time"], ts_fmt)
     if d["end_time"] is not None:
-        d["end_time"] = datetime.strptime(d["end_time"], "%Y-%m-%dT%H:%M:%SZ")
+        d["end_time"] = datetime.strptime(d["end_time"], ts_fmt)
         delta = d["end_time"] - d["start_time"]
         if delta.total_seconds() < 0:
             raise InvalidRequest()
@@ -241,6 +244,8 @@ def post_update_incident(action: str) -> Response:
               type: string
             start_time:
               type: string
+            create_time:
+              type: string
             reported_by:
               type: string
             email_address:
@@ -288,7 +293,7 @@ def post_update_incident(action: str) -> Response:
     global log
     log = current_app.logger
     if action not in ("create", "update", "delete", "publish", "unpublish"):
-        return jerror("Invalid request")  # TODO
+        return jerror("Invalid request")  # TODO: more specific error msg?
 
     try:
         req = request.json
@@ -316,6 +321,7 @@ def post_update_incident(action: str) -> Response:
         if action == "create":
             incident_id = str(generate_random_intuid(current_app))
             req["id"] = incident_id
+            req["create_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
             if get_client_role() != "admin" and mismatched_email_addr(req):
                 raise InvalidRequest
             if get_client_role() != "admin" and req["published"] == 1:
