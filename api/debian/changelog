@@ -1,3 +1,10 @@
+ooni-api (1.0.84) unstable; urgency=medium
+
+  * Add create_time
+    https://github.com/ooni/backend/issues/752
+
+ -- Federico Ceratto <federico@debian.org>  Mon, 30 Oct 2023 18:45:43 +0100
+
 ooni-api (1.0.83) unstable; urgency=medium
 
   * Incident management: publish/unpublish
