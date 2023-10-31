@@ -293,7 +293,7 @@ def list_oonirun_descriptors() -> Response:
     """List OONIRun descriptors
     ---
     parameters:
-      - name: ooni_run_link_ids
+      - name: ooni_run_link_id
         in: query
         type: string
         description: OONIRun descriptors comma separated
@@ -373,7 +373,7 @@ def list_oonirun_descriptors() -> Response:
         if only_mine:
             filters.append("creator_account_id = %(account_id)s")
 
-        ids_s = request.args.get("ooni_run_link_ids")
+        ids_s = request.args.get("ooni_run_link_id")
         if ids_s:
             ids = commasplit(ids_s)
             filters.append("ooni_run_link_id IN %(ids)s")

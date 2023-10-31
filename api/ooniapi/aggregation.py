@@ -142,7 +142,7 @@ def get_aggregated() -> Response:
         in: query
         type: string
         description: Name of the tests, comma separated
-      - name: ooni_run_link_ids
+      - name: ooni_run_link_id
         in: query
         type: string
         description: OONIRun descriptors comma separated
@@ -208,7 +208,7 @@ def get_aggregated() -> Response:
         inp = param_input_or_none() or ""
         probe_asn_s = param_asn_m()
         probe_cc_s = param_probe_cc_m()
-        ooni_run_link_ids_raw = param("ooni_run_link_ids")
+        ooni_run_link_ids_raw = param("ooni_run_link_id")
         since = param_date("since")
         until = param_date("until")
         time_grain = param("time_grain", "auto").lower()
