@@ -247,7 +247,7 @@ def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
 
 def test_aggregation_no_axis_filter_multi_oonirun(client):
     # 0-dimensional data
-    url = "aggregation?ooni_run_link_ids=1234,2345&since=2021-07-09&until=2021-07-10"
+    url = "aggregation?ooni_run_link_id=1234,2345&since=2021-07-09&until=2021-07-10"
     r = api(client, url)
     r.pop("db_stats", None)
     assert r == {
