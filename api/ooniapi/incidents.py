@@ -335,8 +335,8 @@ def post_update_incident(action: str) -> Response:
 
         elif action == "delete":
             # TODO: switch to faster deletion with new db version
-            q = "ALTER TABLE incidents DELETE WHERE id = %(iid)s"
-            raw_query(q, {"iid": incident_id})
+            sql = "ALTER TABLE incidents DELETE WHERE id = %(iid)s"
+            raw_query(sql, {"iid": incident_id})
             optimize_table("incidents")
             return nocachejson()
 
