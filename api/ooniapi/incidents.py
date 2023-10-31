@@ -359,7 +359,7 @@ def post_update_incident(action: str) -> Response:
         ins_sql = """INSERT INTO incidents
         (id, start_time, end_time, creator_account_id, reported_by, title,
         text, event_type, published, CCs, ASNs, domains, tags, links,
-        test_names, short_description, email_address)
+        test_names, short_description, email_address, create_time)
         VALUES
         """
         r = insert_click(ins_sql, [req])
