@@ -208,7 +208,7 @@ def get_aggregated() -> Response:
         inp = param_input_or_none() or ""
         probe_asn_s = param_asn_m()
         probe_cc_s = param_probe_cc_m()
-        ooni_run_link_ids_raw = param("ooni_run_link_id")
+        ooni_run_link_id_raw = param("ooni_run_link_id")
         since = param_date("since")
         until = param_date("until")
         time_grain = param("time_grain", "auto").lower()
@@ -275,10 +275,10 @@ def get_aggregated() -> Response:
         where.append(sql.text("probe_asn IN :probe_asn_s"))
         query_params["probe_asn_s"] = probe_asn_s
 
-    if ooni_run_link_ids_raw:
-        ooni_run_link_ids = commasplit(ooni_run_link_ids_raw)
-        where.append(sql.text("ooni_run_link_id IN :ooni_run_link_ids"))
-        query_params["ooni_run_link_ids"] = ooni_run_link_ids
+    if ooni_run_link_id_raw:
+        ooni_run_link_id_s = commasplit(ooni_run_link_id_raw)
+        where.append(sql.text("ooni_run_link_id IN :ooni_run_link_id_s"))
+        query_params["ooni_run_link_id_s"] = ooni_run_link_id_s
 
     if since:
         where.append(sql.text("measurement_start_time >= :since"))
