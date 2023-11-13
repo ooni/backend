@@ -65,6 +65,141 @@
                 "summary": "Look up organization name by ASN"
             }
         },
+        "/api/_/check-in": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "parameters": [
+                    {
+                        "description": "probe_asn and probe_cc are not provided if unknown",
+                        "in": "body",
+                        "name": "probe self-description",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "charging": {
+                                    "description": "set only on devices with battery; true when charging",
+                                    "type": "boolean"
+                                },
+                                "on_wifi": {
+                                    "type": "boolean"
+                                },
+                                "platform": {
+                                    "example": "android",
+                                    "type": "string"
+                                },
+                                "probe_asn": {
+                                    "description": "ASN, two uppercase letters followed by number",
+                                    "example": "AS1234",
+                                    "type": "string"
+                                },
+                                "probe_cc": {
+                                    "description": "Two letter, uppercase country code",
+                                    "example": "IT",
+                                    "type": "string"
+                                },
+                                "run_type": {
+                                    "description": "timed or manual",
+                                    "example": "timed",
+                                    "type": "string"
+                                },
+                                "software_name": {
+                                    "example": "ooniprobe",
+                                    "type": "string"
+                                },
+                                "software_version": {
+                                    "example": "0.0.1",
+                                    "type": "string"
+                                },
+                                "web_connectivity": {
+                                    "properties": {
+                                        "category_codes": {
+                                            "description": "List/array of URL categories, all uppercase",
+                                            "items": {
+                                                "example": "NEWS",
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Give a URL test list to a probe running web_connectivity tests; additional data for other tests;",
+                        "schema": {
+                            "properties": {
+                                "conf": {
+                                    "description": "auxiliary configuration parameters",
+                                    "features": {
+                                        "description": "feature flags",
+                                        "type": "object"
+                                    },
+                                    "type": "object"
+                                },
+                                "nettests": {
+                                    "items": {
+                                        "description": "test-specific configuration",
+                                        "properties": {
+                                            "report_id": "string",
+                                            "targets": {
+                                                "items": {
+                                                    "properties": {
+                                                        "attributes": {
+                                                            "type": "object"
+                                                        },
+                                                        "input": "string",
+                                                        "options": {
+                                                            "type": "object"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "type": "array"
+                                            },
+                                            "test_name": "string"
+                                        },
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                },
+                                "probe_asn": {
+                                    "description": "probe ASN inferred from GeoIP or AS0",
+                                    "type": "string"
+                                },
+                                "probe_cc": {
+                                    "description": "probe CC inferred from GeoIP or ZZ",
+                                    "type": "string"
+                                },
+                                "probe_network_name": {
+                                    "description": "probe network name inferred from GeoIP or None",
+                                    "type": "string"
+                                },
+                                "utc_time": {
+                                    "description": "current UTC time as YYYY-mm-ddTHH:MM:SSZ",
+                                    "type": "string"
+                                },
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Private, experimental check-in"
+            }
+        },
         "/api/_/check_report_id": {
             "get": {
                 "description": "Used by https://github.com/ooni/probe/issues/1034<br/>",
@@ -349,6 +484,195 @@
                 "summary": "List all networks that have measurements"
             }
         },
+        "/api/_/ooni_run/archive/{ooni_run_link_id}": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "ooni_run_link_id",
+                        "required": true,
+                        "type": "integer"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "schema": {
+                            "properties": {
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Archive an OONIRun descriptor and all its past versions."
+            }
+        },
+        "/api/_/ooni_run/create": {
+            "post": {
+                "parameters": [
+                    {
+                        "description": "OONIRun descriptor content",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "schema": {
+                            "properties": {
+                                "ooni_run_link_id": {
+                                    "type": "integer"
+                                },
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Create a new oonirun link or a new version for an existing one."
+            }
+        },
+        "/api/_/ooni_run/fetch/{ooni_run_link_id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "ooni_run_link_id",
+                        "required": true,
+                        "type": "integer"
+                    },
+                    {
+                        "example": "2023-06-02T12:33:43.123Z",
+                        "in": "query",
+                        "name": "creation_time or null",
+                        "required": false,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OONIRun metadata and descriptor",
+                        "schema": {
+                            "properties": {
+                                "archived": {
+                                    "description": "the descriptor is archived",
+                                    "type": "boolean"
+                                },
+                                "descriptor": {
+                                    "description": "descriptor data",
+                                    "type": "object"
+                                },
+                                "descriptor_creation_time": {
+                                    "description": "descriptor creation time",
+                                    "type": "string"
+                                },
+                                "mine": {
+                                    "description": "the descriptor belongs to the logged-in user. Optional.",
+                                    "type": "boolean"
+                                },
+                                "translation_creation_time": {
+                                    "description": "translation creation time",
+                                    "type": "string"
+                                },
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Fetch OONIRun descriptor by creation time or the newest one"
+            }
+        },
+        "/api/_/ooni_run/list": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "OONIRun descriptors comma separated",
+                        "in": "query",
+                        "name": "ooni_run_link_id",
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "only_latest",
+                        "type": "boolean"
+                    },
+                    {
+                        "in": "query",
+                        "name": "only_mine",
+                        "type": "boolean"
+                    },
+                    {
+                        "in": "query",
+                        "name": "include_archived",
+                        "type": "boolean"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OONIRun metadata and descriptor",
+                        "schema": {
+                            "properties": {
+                                "descriptors": {
+                                    "description": "OONIRun descriptors metadata",
+                                    "items": {
+                                        "properties": {
+                                            "archived": {
+                                                "type": "boolean"
+                                            },
+                                            "author": {
+                                                "type": "string"
+                                            },
+                                            "creation_time": {
+                                                "description": "descriptor creation time",
+                                                "type": "string"
+                                            },
+                                            "icon": {
+                                                "type": "string"
+                                            },
+                                            "mine": {
+                                                "description": "the descriptor belongs to the logged-in user. Optional.",
+                                                "type": "boolean"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "ooni_run_link_id": {
+                                                "description": "descriptor ID",
+                                                "type": "string"
+                                            },
+                                            "short_description": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                },
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "List OONIRun descriptors"
+            }
+        },
         "/api/_/show_countries_prioritization": {
             "get": {
                 "parameters": [
@@ -615,6 +939,12 @@
                         "type": "string"
                     },
                     {
+                        "description": "OONIRun descriptors comma separated",
+                        "in": "query",
+                        "name": "ooni_run_link_id",
+                        "type": "string"
+                    },
+                    {
                         "description": "The start date of when measurements were run (ex. \"2016-10-20T10:30:00\")",
                         "in": "query",
                         "name": "since",
@@ -827,6 +1157,47 @@
                 "summary": "Probe Services: list collectors"
             }
         },
+        "/api/v1/geolookup": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "IP addresses",
+                        "required": true,
+                        "schema": {
+                            "properties": {
+                                "addresses": {
+                                    "items": {
+                                        "description": "IP address",
+                                        "example": "1.2.3.4",
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "schema": {
+                            "properties": {
+                                "geolocation": {
+                                    "type": "object"
+                                },
+                                "v": {
+                                    "description": "response format version",
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Probe Services: geolookup for multiple IP addresses"
+            }
+        },
         "/api/v1/get_account_role/{email_address}": {
             "get": {
                 "description": "Only for admins.<br/>",
@@ -854,6 +1225,131 @@
                     }
                 },
                 "summary": "Get account role. Return an error message if the account is not found."
+            }
+        },
+        "/api/v1/incidents/search": {
+            "get": {
+                "parameters": [
+                    {
+                        "description": "Show only owned items",
+                        "in": "query",
+                        "name": "only_mine",
+                        "type": "boolean"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "summary": "Search and list incidents"
+            }
+        },
+        "/api/v1/incidents/show/{incident_id}": {
+            "get": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "id",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "type": "object"
+                    }
+                },
+                "summary": "Returns an incident"
+            }
+        },
+        "/api/v1/incidents/{action}": {
+            "post": {
+                "description": "The `action` value can be \"create\", \"update\", \"delete\", \"publish\", \"unpublish\".<br/>The `id` value is returned by the API when an incident is created.<br/>It should be set by the caller for incident update or deletion.<br/>",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "Incident data",
+                        "schema": {
+                            "properties": {
+                                "ASNs": {
+                                    "items": {
+                                        "type": "integer"
+                                    },
+                                    "type": "array"
+                                },
+                                "CCs": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "create_time": {
+                                    "type": "string"
+                                },
+                                "domains": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "email_address": {
+                                    "type": "string"
+                                },
+                                "event_type": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "links": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "published": {
+                                    "type": "boolean"
+                                },
+                                "reported_by": {
+                                    "type": "string"
+                                },
+                                "short_description": {
+                                    "type": "string"
+                                },
+                                "start_time": {
+                                    "type": "string"
+                                },
+                                "tags": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "test_names": {
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "type": "array"
+                                },
+                                "text": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "type": "object"
+                    }
+                },
+                "summary": "Create/update/publish/unpublish/delete an incident."
             }
         },
         "/api/v1/login": {
@@ -1028,95 +1524,101 @@
             "get": {
                 "parameters": [
                     {
-                        "description": "The report_id to search measurements for",
+                        "description": "Report_id to search measurements for",
                         "in": "query",
                         "name": "report_id",
                         "type": "string"
                     },
                     {
-                        "description": "The input (for example a URL or IP address) to search measurements for",
+                        "description": "Input (for example a URL or IP address) to search measurements for",
                         "in": "query",
                         "minLength": 3,
                         "name": "input",
                         "type": "string"
                     },
                     {
-                        "description": "The domain to search measurements for",
+                        "description": "Domain to search measurements for",
                         "in": "query",
                         "minLength": 3,
                         "name": "domain",
                         "type": "string"
                     },
                     {
-                        "description": "The two letter country code",
+                        "description": "Two letter country code",
                         "in": "query",
                         "name": "probe_cc",
                         "type": "string"
                     },
                     {
-                        "description": "the Autonomous system number in the format \"ASXXX\"",
+                        "description": "Autonomous system number in the format \"ASXXX\"",
                         "in": "query",
                         "name": "probe_asn",
                         "type": "string"
                     },
                     {
-                        "description": "The name of the test",
+                        "description": "Name of the test",
                         "in": "query",
                         "name": "test_name",
                         "type": "string"
                     },
                     {
-                        "description": "The category code from the citizenlab list",
+                        "description": "Category code from the citizenlab list",
                         "in": "query",
                         "name": "category_code",
                         "type": "string"
                     },
                     {
-                        "description": "The start date of when measurements were run (ex. \"2016-10-20T10:30:00\")",
+                        "description": "Start date of when measurements were run (ex. \"2016-10-20T10:30:00\")",
                         "in": "query",
                         "name": "since",
                         "type": "string"
                     },
                     {
-                        "description": "The end date of when measurement were run (ex. \"2016-10-20T10:30:00\")",
+                        "description": "End date of when measurement were run (ex. \"2016-10-20T10:30:00\")",
                         "in": "query",
                         "name": "until",
                         "type": "string"
                     },
                     {
-                        "description": "Return results only strictly greater than the provided index",
+                        "description": "Set \"true\" for confirmed network anomalies (we found a blockpage, a middlebox, etc.).\nDefault: no filtering (show both true and false)\n",
                         "in": "query",
-                        "name": "since_index",
-                        "type": "string"
-                    },
-                    {
-                        "collectionFormat": "csv",
-                        "description": "Will be true for confirmed network anomalies (we found a blockpage, a middlebox was found, the IM app is blocked, etc.).\n",
-                        "in": "query",
-                        "items": {
-                            "type": "string"
-                        },
                         "name": "confirmed",
                         "type": "string"
                     },
                     {
-                        "collectionFormat": "csv",
-                        "description": "Measurements that require special attention (it's likely to be a case of blocking), however it has not necessarily been confirmed\n",
+                        "description": "Set \"true\" for measurements that require special attention (likely to be a case of blocking)\nDefault: no filtering (show both true and false)\n",
                         "in": "query",
-                        "items": {
-                            "type": "string"
-                        },
                         "name": "anomaly",
                         "type": "string"
                     },
                     {
-                        "collectionFormat": "csv",
-                        "description": "There was an error in the measurement (the control request failed, there was a bug, etc.).\nDefault is to consider it both true or false (`failure=true,false`)\n",
+                        "description": "Set \"true\" for failed measurements (the control request failed, there was a bug, etc.).\nDefault: no filtering (show both true and false)\n",
                         "in": "query",
-                        "items": {
-                            "type": "string"
-                        },
                         "name": "failure",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Filter measurements by software version. Comma-separated.",
+                        "in": "query",
+                        "name": "software_version",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Filter measurements by test version. Comma-separated.",
+                        "in": "query",
+                        "name": "test_version",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Filter measurements by engine version. Comma-separated.",
+                        "in": "query",
+                        "name": "engine_version",
+                        "type": "string"
+                    },
+                    {
+                        "description": "Filter measurements by OONIRun ID.",
+                        "in": "query",
+                        "name": "ooni_run_link_id",
                         "type": "string"
                     },
                     {
@@ -1798,22 +2300,6 @@
                         "name": "report_id",
                         "required": true,
                         "type": "string"
-                    },
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "required": true,
-                        "schema": {
-                            "properties": {
-                                "content": {
-                                    "type": "object"
-                                },
-                                "format": {
-                                    "type": "string"
-                                }
-                            },
-                            "type": "object"
-                        }
                     }
                 ],
                 "produces": [
