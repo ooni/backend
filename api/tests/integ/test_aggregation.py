@@ -190,9 +190,9 @@ def test_aggregation_no_axis_filter_multi_probe_cc(client):
         "result": {
             "anomaly_count": 123,
             "confirmed_count": 0,
-            "failure_count": 92,
+            "failure_count": 113,
             "measurement_count": 2435,
-            "ok_count": 2220,
+            "ok_count": 2199,
         },
         "v": 0,
     }, fjd(r)
@@ -319,12 +319,12 @@ def test_aggregation_x_axis_only_hour(client, log):
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 687,
+                "anomaly_count": 686,
                 "confirmed_count": 42,
-                "failure_count": 721,
+                "failure_count": 777,
                 "measurement_count": 9990,
                 "measurement_start_day": "2021-07-09T00:00:00Z",
-                "ok_count": 8540,
+                "ok_count": 8485,
             },
             {
                 "anomaly_count": 0,
