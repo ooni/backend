@@ -1154,7 +1154,9 @@ def test_score_signal():
         assert scores
         rid = msm["report_id"]
         if rid == "20210427T000430Z_signal_AU_45671_n1_Zq1z77FuiG2IkqqC":
+            # Failed due to https://github.com/ooni/probe/issues/2627
             assert scores == {
+                "accuracy": 0.0,
                 "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
@@ -1169,10 +1171,10 @@ def test_score_signal_newer():
         scores = fp.score_measurement(msm)
         if msm["measurement_uid"] == "20221117002725.926127_AE_signal_718505fece16c5ea":
             # https://github.com/ooni/probe/issues/2344
+            # Failed due to https://github.com/ooni/probe/issues/2627
             assert scores == {
                 "accuracy": 0.0,
-                "analysis": {"signal_backend_failure": "ssl_unknown_authority"},
-                "blocking_general": 1.0,
+                "blocking_general": 0.0,
                 "blocking_global": 0.0,
                 "blocking_country": 0.0,
                 "blocking_isp": 0.0,
