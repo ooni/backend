@@ -331,6 +331,7 @@ def test_score_vanilla_tor_ok():
         "blocking_local": 0.0,
     }
 
+
 # # test_name: web_connectivity
 
 
@@ -570,11 +571,13 @@ def test_score_http_requests():
 # # test_name: signal
 
 
-def test_score_signal():
+def test_score_signal_2627():
     # https://explorer.ooni.org/measurement/20221118T104419Z_signal_IT_30722_n1_Q02UUAiiHlVU0VE6
+    # Failed due to https://github.com/ooni/probe/issues/2627
     msm = loadj("signal_022")
     scores = fp.score_measurement(msm)
     assert scores == {
+        "accuracy": 0.0,
         "blocking_country": 0.0,
         "blocking_general": 0.0,
         "blocking_global": 0.0,
@@ -586,13 +589,13 @@ def test_score_signal():
 def test_score_signal_679():
     # https://explorer.ooni.org/m/20230530180835.892478_US_signal_b091ac0f3794bbcd
     # https://github.com/ooni/backend/issues/679
+    # Later updated due to https://github.com/ooni/probe/issues/2627
     msm = loadj("signal_679")
     scores = fp.score_measurement(msm)
     assert scores == {
         "accuracy": 0.0,
-        "analysis": {"signal_backend_failure": "android_dns_cache_no_data"},
         "blocking_country": 0.0,
-        "blocking_general": 1.0,
+        "blocking_general": 0.0,
         "blocking_global": 0.0,
         "blocking_isp": 0.0,
         "blocking_local": 0.0,

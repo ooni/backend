@@ -1,3 +1,10 @@
+fastpath (0.82) unstable; urgency=medium
+
+  * Flag all Signal msmts as failed
+    https://github.com/ooni/probe/issues/2627
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 14 Nov 2023 18:35:34 +0100
+
 fastpath (0.81) unstable; urgency=medium
 
   * Relax riseupvpn scoring (see https://github.com/ooni/backend/issues/745)
