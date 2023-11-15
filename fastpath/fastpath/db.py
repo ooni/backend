@@ -10,7 +10,7 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 from datetime import datetime
 from textwrap import dedent
 from urllib.parse import urlparse
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 import logging
 
 try:
@@ -170,7 +170,8 @@ def _write_rows_to_fastpath(rows: List[Dict]):
     engine_name,
     engine_version,
     test_helper_address,
-    test_helper_type
+    test_helper_type,
+    ooni_run_link_id
     ) VALUES
         """
     )
@@ -207,6 +208,7 @@ def clickhouse_upsert_summary(
     engine_version: str,
     test_helper_address: str,
     test_helper_type: str,
+    ooni_run_link_id: Optional[int],
     buffer_writes=False,
 ) -> None:
     """Insert a row in the fastpath table. Overwrite an existing one."""
@@ -254,6 +256,7 @@ def clickhouse_upsert_summary(
         engine_version=engine_version,
         test_helper_address=test_helper_address,
         test_helper_type=test_helper_type,
+        ooni_run_link_id=ooni_run_link_id,
     )
 
     if buffer_writes:

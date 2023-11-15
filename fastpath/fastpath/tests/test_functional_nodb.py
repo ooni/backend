@@ -124,7 +124,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
         "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
-        "engine_version, test_helper_address, test_helper_type ) VALUES "
+        "engine_version, test_helper_address, test_helper_type, ooni_run_link_id ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -153,6 +153,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
             "engine_version": "3.15.2",
             "test_helper_address": "https://0.th.ooni.org",
             "test_helper_type": "https",
+            "ooni_run_link_id": "",
         }
     ]
 
@@ -170,7 +171,7 @@ def test_score_browser_web(fprints):
         "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
-        "engine_version, test_helper_address, test_helper_type ) VALUES "
+        "engine_version, test_helper_address, test_helper_type, ooni_run_link_id ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -186,6 +187,7 @@ def test_score_browser_web(fprints):
             "measurement_start_time": datetime.datetime(2023, 3, 20, 18, 27, 2),
             "measurement_uid": "bogus_uid",
             "msm_failure": "f",
+            "ooni_run_link_id": "",
             "platform": "unset",
             "probe_asn": 577,
             "probe_cc": "CA",
@@ -193,12 +195,12 @@ def test_score_browser_web(fprints):
             "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"extra":{"browser_name":"chrome","load_time_ms":357.40000000037253}}',
             "software_name": "ooniprobe-web",
             "software_version": "0.1.0",
+            "test_helper_address": "",
+            "test_helper_type": "",
             "test_name": "browser_web",
             "test_runtime": 0.35740000000037253,
             "test_start_time": datetime.datetime(2023, 3, 20, 18, 26, 35),
             "test_version": "0.1.0",
-            "test_helper_address": "",
-            "test_helper_type": "",
         },
     ]
 
@@ -220,7 +222,7 @@ def test_score_openvpn():
         "probe_cc, probe_asn, test_name, test_start_time, measurement_start_time, "
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
-        "engine_version, test_helper_address, test_helper_type ) VALUES "
+        "engine_version, test_helper_address, test_helper_type, ooni_run_link_id ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -249,6 +251,7 @@ def test_score_openvpn():
             "engine_version": "3.17.0-alpha",
             "test_helper_address": "",
             "test_helper_type": "",
+            "ooni_run_link_id": "",
         }
     ]
 

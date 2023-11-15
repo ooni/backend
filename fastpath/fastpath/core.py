@@ -1662,7 +1662,17 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         engine_name = g_or(annot, "engine_name", "")
         engine_version = g_or(annot, "engine_version", "")
         blocking_type = g(scores, "analysis", "blocking_type", default="")
+        ooni_run_link_id_str = g_or(annot, "ooni_run_link_id", "")
+        if ooni_run_link_id_str:
+            try:
+                ooni_run_link_id = int(ooni_run_link_id_str)
+            except ValueError:
+                ooni_run_link_id = None
+        else:
+            ooni_run_link_id = None
 
+        # TODO: build an object or typed dict here instead of passing args by
+        # position. Move the dict from db.py "new = dict(..."
         db.clickhouse_upsert_summary(
             measurement,
             scores,
@@ -1681,6 +1691,7 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             engine_version,
             test_helper_address,
             test_helper_type,
+            ooni_run_link_id,
             buffer_writes=buffer_writes,
         )
 
