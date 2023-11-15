@@ -153,7 +153,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
             "engine_version": "3.15.2",
             "test_helper_address": "https://0.th.ooni.org",
             "test_helper_type": "https",
-            "ooni_run_link_id": "",
+            "ooni_run_link_id": None,
         }
     ]
 
@@ -187,7 +187,7 @@ def test_score_browser_web(fprints):
             "measurement_start_time": datetime.datetime(2023, 3, 20, 18, 27, 2),
             "measurement_uid": "bogus_uid",
             "msm_failure": "f",
-            "ooni_run_link_id": "",
+            "ooni_run_link_id": None,
             "platform": "unset",
             "probe_asn": 577,
             "probe_cc": "CA",
@@ -251,7 +251,7 @@ def test_score_openvpn():
             "engine_version": "3.17.0-alpha",
             "test_helper_address": "",
             "test_helper_type": "",
-            "ooni_run_link_id": "",
+            "ooni_run_link_id": None,
         }
     ]
 
