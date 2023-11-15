@@ -1,3 +1,9 @@
+fastpath (0.84) unstable; urgency=medium
+
+  * Support ooni_run_link_id
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 03 Nov 2023 12:14:54 +0100
+
 fastpath (0.83) unstable; urgency=medium
 
   * Flag Signal msmts from 0.2.3 as failed as well
