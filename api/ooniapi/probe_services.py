@@ -273,6 +273,9 @@ def check_in() -> Response:
 
     conf["test_helpers"] = generate_test_helpers_conf()
 
+    # set riseupvpn feature flag for all probes
+    conf["features"]["riseupvpn_enabled"] = True
+
     resp["tests"] = {
         "web_connectivity": {"urls": test_items},
     }

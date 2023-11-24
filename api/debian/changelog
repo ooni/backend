@@ -1,3 +1,9 @@
+ooni-api (1.0.86) unstable; urgency=medium
+
+  * Set riseupvpn feature flag
+
+ -- Federico Ceratto <federico@debian.org>  Fri, 24 Nov 2023 17:33:42 +0100
+
 ooni-api (1.0.84) unstable; urgency=medium
 
   * Add create_time
