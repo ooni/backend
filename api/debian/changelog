@@ -1,3 +1,9 @@
+ooni-api (1.0.88) unstable; urgency=medium
+
+  * Add more logging
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 12 Dec 2023 19:27:18 +0100
+
 ooni-api (1.0.87) unstable; urgency=medium
 
   * Add logging debug ongoing issue
