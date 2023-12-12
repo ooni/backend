@@ -246,8 +246,6 @@ def check_in() -> Response:
     except Exception:
         log.error(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
 
-    log.debug(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
-
     if "web_connectivity" in data:
         catcodes = data["web_connectivity"].get("category_codes", [])
         if isinstance(catcodes, str):
@@ -317,6 +315,9 @@ def check_in() -> Response:
         rid = generate_report_id(tn, probe_cc, asn_i)
         resp["tests"].setdefault(tn, {})  # type: ignore
         resp["tests"][tn]["report_id"] = rid  # type: ignore
+
+    til = len(test_items)
+    log.debug(f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
 
     return nocachejson(**resp)
 
