@@ -227,6 +227,8 @@ def check_in() -> Response:
     charging = data.get("charging", True)
     probe_cc = data.get("probe_cc", "ZZ").upper()
     probe_asn = data.get("probe_asn", "AS0")
+    software_name = data.get("software_name", "")
+    software_version = data.get("software_version", "")
 
     resp, probe_cc, asn_i = probe_geoip(probe_cc, probe_asn)
 
@@ -238,6 +240,13 @@ def check_in() -> Response:
         url_limit = 100
     else:
         url_limit = 20
+
+    try:
+        charging = bool(charging)
+    except Exception:
+        log.error(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
+
+    log.debug(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
 
     if "web_connectivity" in data:
         catcodes = data["web_connectivity"].get("category_codes", [])
@@ -264,7 +273,9 @@ def check_in() -> Response:
         test_items = []
 
     metrics.gauge("check-in-test-list-count", len(test_items))
-    conf: Dict[str, Any] = dict(features={"torsf_enabled": True, "vanilla_tor_enabled": True})
+    conf: Dict[str, Any] = dict(
+        features={"torsf_enabled": True, "vanilla_tor_enabled": True}
+    )
 
     # set webconnectivity_0.5 feature flag for some probes
     octect = extract_probe_ipaddr_octect(1, 0)
