@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     log_level: str = "info"
     s3_bucket_name: str = "oonidata-eufra"
     other_collectors: List[str] = []
-    statsd_host = "localhost"
-    statsd_port = 8125
-    statsd_prefix = "ooniapi"
+    statsd_host: str = "localhost"
+    statsd_port: int = 8125
+    statsd_prefix: str = "ooniapi"
 
 
 settings = Settings()

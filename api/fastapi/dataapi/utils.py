@@ -47,7 +47,8 @@ Query = Union[str, TextClause, Select]
 def _run_query(
     db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=3
 ):
-    settings = {"priority": query_prio, "max_execution_time": 28}
+    # settings = {"priority": query_prio, "max_execution_time": 28}
+    settings = {}
     if isinstance(query, (Select, TextClause)):
         query = str(query.compile(dialect=postgresql.dialect()))
     try:

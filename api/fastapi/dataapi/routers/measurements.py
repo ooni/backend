@@ -480,7 +480,10 @@ async def get_measurement_meta(
     report_id: Annotated[
         Optional[str],
         Query(
-            description="The report_id to search measurements for example: 20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a",
+            description=(
+                "The report_id to search measurements for example: "
+                "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a"
+            ),
             min_length=3,
         ),
     ] = None,
@@ -546,7 +549,7 @@ class MeasurementMeta2(BaseModel):
     confirmed: Optional[bool] = None
     failure: Optional[bool] = None
     input: Optional[str] = None
-    measurement_start_time: Optional[str] = None
+    measurement_start_time: Optional[datetime] = None
     measurement_uid: Optional[str] = None
     probe_asn: Optional[str] = None
     probe_cc: Optional[str] = None
@@ -579,72 +582,83 @@ async def list_measurements(
     report_id: Annotated[
         Optional[str],
         Query(description="Report_id to search measurements for", min_length=3),
-    ],
+    ] = None,
     input: Annotated[
         Optional[str],
         Query(
             description="Input (for example a URL or IP address) to search measurements for",
             min_length=3,
         ),
-    ],
+    ] = None,
     domain: Annotated[
         Optional[str],
         Query(description="Domain to search measurements for", min_length=3),
-    ],
-    probe_cc: Annotated[Optional[str], Query(description="Two letter country code")],
+    ] = None,
+    probe_cc: Annotated[
+        Optional[str], Query(description="Two letter country code")
+    ] = None,
     probe_asn: Annotated[
         Union[str, int, None],
         Query(description='Autonomous system number in the format "ASXXX"'),
-    ],
-    test_name: Annotated[Optional[str], Query(description="Name of the test")],
+    ] = None,
+    test_name: Annotated[Optional[str], Query(description="Name of the test")] = None,
     category_code: Annotated[
         Optional[str], Query(description="Category code from the citizenlab list")
-    ],
+    ] = None,
     since: Annotated[
         Optional[datetime],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
-    ],
+    ] = None,
     until: Annotated[
         Optional[datetime],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
-    ],
+    ] = None,
     confirmed: Annotated[
         Optional[bool],
         Query(
-            description='Set "true" for confirmed network anomalies (we found a blockpage, a middlebox, etc.). Default: no filtering (show both true and false)'
+            description=(
+                'Set "true" for confirmed network anomalies (we found a blockpage, a middlebox, etc.). '
+                "Default: no filtering (show both true and false)"
+            )
         ),
-    ],
+    ] = None,
     anomaly: Annotated[
         Optional[bool],
         Query(
-            description='Set "true" for measurements that require special attention (likely to be a case of blocking) Default: no filtering (show both true and false)'
+            description=(
+                'Set "true" for measurements that require special attention (likely to be a case of blocking).'
+                "Default: no filtering (show both true and false)"
+            )
         ),
-    ],
+    ] = None,
     failure: Annotated[
         Optional[bool],
         Query(
-            description='Set "true" for failed measurements (the control request failed, there was a bug, etc.). Default: no filtering (show both true and false)'
+            description=(
+                'Set "true" for failed measurements (the control request failed, there was a bug, etc.). '
+                "Default: no filtering (show both true and false)"
+            )
         ),
-    ],
+    ] = None,
     software_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by software version. Comma-separated."),
-    ],
+    ] = None,
     test_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by test version. Comma-separated."),
-    ],
+    ] = None,
     engine_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by engine version. Comma-separated."),
-    ],
+    ] = None,
     ooni_run_link_id: Annotated[
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
-    ],
+    ] = None,
     order_by: Annotated[
         Optional[str],
         Query(
@@ -658,7 +672,7 @@ async def list_measurements(
                 "test_name",
             ],
         ),
-    ],
+    ] = None,
     order: Annotated[
         str,
         Query(
@@ -897,8 +911,8 @@ async def list_measurements(
 
     # Replace the special value INULL for "input" with None
     for i, r in enumerate(results):
-        if r["input"] == INULL:
-            results[i]["input"] = None
+        if r.input == INULL:
+            results[i].input = None
 
     pages = -1
     count = -1
