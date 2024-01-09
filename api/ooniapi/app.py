@@ -5,9 +5,10 @@ import logging
 import os
 import re
 import sys
+import json
 from collections import deque
 
-from flask import Flask, json
+from flask import Flask
 
 from flask_cors import CORS  # debdeps: python3-flask-cors
 
@@ -198,6 +199,7 @@ def create_app(*args, testmode=False, **kw):
     unmetered_pages = ["/", "/health", "/report*"]
     app.limiter = FlaskLimiter(
         limits=limits,
+        lmdb_dir=app.config["LMDB_DIR"],
         app=app,
         whitelisted_ipaddrs=whitelist,
         unmetered_pages=unmetered_pages,

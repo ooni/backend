@@ -20,6 +20,7 @@ APP_ENV = os.environ.get("APP_ENV", "development")
 REPORT_INDEX_OFFSET = int(os.environ.get("REPORT_INDEX_OFFSET", "635830"))
 
 REQID_HDR = "X-Request-ID"
+LMDB_DIR = "/var/lib/ooniapi/lmdb"
 
 metrics = statsd.StatsClient("localhost", 8125, prefix="ooni-api")
 

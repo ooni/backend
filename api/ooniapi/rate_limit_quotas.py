@@ -39,11 +39,14 @@ StrBytes = Union[bytes, str]
 def lm_ipa_to_b(ipaddr: IpAddress) -> bytes:
     return ipaddr.packed
 
+
 def lm_sec_to_b(v: Union[float, int]) -> bytes:
     return struct.pack("I", int(v * 1000))
 
+
 def lm_b_to_sec(raw: bytes) -> float:
     return struct.unpack("I", raw)[0] / 1000.0
+
 
 def lm_b_to_str_ipa(raw_ipa: bytes) -> str:
     if len(raw_ipa) == 4:
@@ -52,8 +55,8 @@ def lm_b_to_str_ipa(raw_ipa: bytes) -> str:
 
 
 class LMDB:
-    def __init__(self, dbnames: tuple):
-        self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
+    def __init__(self, dbnames: tuple, lmdb_dir: str):
+        self._env = lmdb.open(lmdb_dir, metasync=False, max_dbs=10)
         dbnames2 = list(dbnames)
         dbnames2.append("meta")
         self._dbnames = dbnames2
@@ -94,6 +97,7 @@ class Limiter:
     def __init__(
         self,
         limits: dict,
+        lmdb_dir: str,
         token_check_callback=None,
         ipaddr_methods=["X-Real-Ip", "socket"],
         whitelisted_ipaddrs=Optional[List[str]],
@@ -105,7 +109,7 @@ class Limiter:
         self._labels = labels
         self._ipaddr_limits = [limits.get(x, None) for x in labels]
         self._token_limits = [limits.get(x, None) for x in labels]
-        self._lmdb = LMDB(dbnames=labels)
+        self._lmdb = LMDB(dbnames=labels, lmdb_dir=lmdb_dir)
         self._token_buckets = ({}, {}, {})  # type: TokenBuckets
         self._token_check_callback = token_check_callback
         self._ipaddr_extraction_methods = ipaddr_methods
@@ -267,8 +271,7 @@ class FlaskLimiter:
             return "429 error", 429
 
     def _after_request_callback(self, response):
-        """Consumes quota and injects HTTP headers when responding to a request
-        """
+        """Consumes quota and injects HTTP headers when responding to a request"""
         if self._disabled:  # used in integration tests
             return response
 
@@ -301,6 +304,7 @@ class FlaskLimiter:
         self,
         app,
         limits: dict,
+        lmdb_dir: str,
         token_check_callback=None,
         ipaddr_methods=["X-Real-Ip", "socket"],
         whitelisted_ipaddrs=None,
@@ -309,6 +313,7 @@ class FlaskLimiter:
         """"""
         self._limiter = Limiter(
             limits,
+            lmdb_dir=lmdb_dir,
             token_check_callback=token_check_callback,
             ipaddr_methods=ipaddr_methods,
             whitelisted_ipaddrs=whitelisted_ipaddrs,
