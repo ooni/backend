@@ -17,7 +17,11 @@ pydantic-settings = "^2.1.0"
 statsd = "^4.0.1"
 uvicorn = "^0.25.0"
 psycopg2 = "^2.9.9"
+httpx = "^0.26.0"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
 
 [build-system]
 requires = ["poetry-core"]
