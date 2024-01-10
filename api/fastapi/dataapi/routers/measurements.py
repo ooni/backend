@@ -18,11 +18,12 @@ import urllib3  # debdeps: python3-urllib3
 from fastapi import APIRouter, Depends, Query, HTTPException, Header, Request
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
-from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 # debdeps: python3-sqlalchemy
-from sqlalchemy import and_, text, select, sql, column
+from sqlalchemy.sql.expression import and_, text, select, column
+from sqlalchemy.sql.expression import text as sql_text
+from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError  # debdeps: python3-psycopg2
 
@@ -58,6 +59,7 @@ class MsmtNotFound(Exception):
 
 
 """
+TODO(art): do we care to have this redirect in place?
 @api_msm_blueprint.route("/")
 def show_apidocs():
     Route to https://api.ooni.io/api/ to /apidocs/
@@ -79,7 +81,7 @@ def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str
         )
         LIMIT 1"""
     query_params = dict(uid=measurement_uid)
-    lookup = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    lookup = query_click_one_row(db, sql_text(query), query_params, query_prio=3)
     if lookup is None:
         raise HTTPException(status_code=500, detail="Measurement not found")
 
@@ -145,7 +147,7 @@ def report_id_input_to_s3path_linenum(db: ClickhouseClient, report_id: str, inpu
         PREWHERE report_id = :report_id AND input = :inp
         LIMIT 1"""
     query_params = dict(inp=input, report_id=report_id)
-    lookup = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    lookup = query_click_one_row(db, sql_text(query), query_params, query_prio=3)
 
     if lookup is None:
         m = f"Missing row in jsonl table: {report_id} {input}"
@@ -420,7 +422,7 @@ def _get_measurement_meta_clickhouse(
         """
     query_params = dict(input=input_, report_id=report_id)
     query += "LIMIT 1"
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    msmt_meta = query_click_one_row(db, sql_text(query), query_params, query_prio=3)
     if not msmt_meta:
         return {}  # measurement not found
     if msmt_meta["probe_asn"] == 0:
@@ -439,7 +441,7 @@ def _get_measurement_meta_by_uid(db: ClickhouseClient, measurement_uid: str) -> 
         LIMIT 1
     """
     query_params = dict(uid=measurement_uid)
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    msmt_meta = query_click_one_row(db, sql_text(query), query_params, query_prio=3)
     if not msmt_meta:
         return {}  # measurement not found
     if msmt_meta["probe_asn"] == 0:
@@ -759,15 +761,15 @@ async def list_measurements(
 
     if since is not None:
         query_params["since"] = since
-        fpwhere.append(sql.text("measurement_start_time > :since"))
+        fpwhere.append(sql_text("measurement_start_time > :since"))
 
     if until is not None:
         query_params["until"] = until
-        fpwhere.append(sql.text("measurement_start_time <= :until"))
+        fpwhere.append(sql_text("measurement_start_time <= :until"))
 
     if report_id:
         query_params["report_id"] = report_id
-        fpwhere.append(sql.text("report_id = :report_id"))
+        fpwhere.append(sql_text("report_id = :report_id"))
 
     if probe_cc:
         if probe_cc == "ZZ":
@@ -777,9 +779,9 @@ async def list_measurements(
                 detail="Refusing list_measurements with probe_cc set to ZZ",
             )
         query_params["probe_cc"] = probe_cc
-        fpwhere.append(sql.text("probe_cc = :probe_cc"))
+        fpwhere.append(sql_text("probe_cc = :probe_cc"))
     else:
-        fpwhere.append(sql.text("probe_cc != 'ZZ'"))
+        fpwhere.append(sql_text("probe_cc != 'ZZ'"))
 
     if probe_asn is not None:
         if probe_asn == 0:
@@ -789,31 +791,31 @@ async def list_measurements(
                 detail="Refusing list_measurements with probe_asn set to 0",
             )
         query_params["probe_asn"] = probe_asn
-        fpwhere.append(sql.text("probe_asn = :probe_asn"))
+        fpwhere.append(sql_text("probe_asn = :probe_asn"))
     else:
         # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
         # https://github.com/ooni/explorer/issues/495
-        fpwhere.append(sql.text("probe_asn != 0"))
+        fpwhere.append(sql_text("probe_asn != 0"))
 
     if test_name is not None:
         query_params["test_name"] = test_name
-        fpwhere.append(sql.text("test_name = :test_name"))
+        fpwhere.append(sql_text("test_name = :test_name"))
 
     if software_versions is not None:
         query_params["software_versions"] = software_versions
-        fpwhere.append(sql.text("software_version IN :software_versions"))
+        fpwhere.append(sql_text("software_version IN :software_versions"))
 
     if test_versions is not None:
         query_params["test_versions"] = test_versions
-        fpwhere.append(sql.text("test_version IN :test_versions"))
+        fpwhere.append(sql_text("test_version IN :test_versions"))
 
     if engine_versions is not None:
         query_params["engine_versions"] = engine_versions
-        fpwhere.append(sql.text("engine_version IN :engine_versions"))
+        fpwhere.append(sql_text("engine_version IN :engine_versions"))
 
     if ooni_run_link_id is not None:
         query_params["ooni_run_link_id"] = ooni_run_link_id
-        fpwhere.append(sql.text("ooni_run_link_id = :ooni_run_link_id"))
+        fpwhere.append(sql_text("ooni_run_link_id = :ooni_run_link_id"))
 
     # Filter on anomaly, confirmed and failure:
     # The database stores anomaly and confirmed as boolean + NULL and stores
@@ -823,43 +825,43 @@ async def list_measurements(
     # See test_list_measurements_filter_flags_fastpath
 
     if anomaly is True:
-        fpwhere.append(sql.text("fastpath.anomaly = 't'"))
+        fpwhere.append(sql_text("fastpath.anomaly = 't'"))
 
     elif anomaly is False:
-        fpwhere.append(sql.text("fastpath.anomaly = 'f'"))
+        fpwhere.append(sql_text("fastpath.anomaly = 'f'"))
 
     if confirmed is True:
-        fpwhere.append(sql.text("fastpath.confirmed = 't'"))
+        fpwhere.append(sql_text("fastpath.confirmed = 't'"))
 
     elif confirmed is False:
-        fpwhere.append(sql.text("fastpath.confirmed = 'f'"))
+        fpwhere.append(sql_text("fastpath.confirmed = 'f'"))
 
     if failure is True:
-        fpwhere.append(sql.text("fastpath.msm_failure = 't'"))
+        fpwhere.append(sql_text("fastpath.msm_failure = 't'"))
 
     elif failure is False:
-        fpwhere.append(sql.text("fastpath.msm_failure = 'f'"))
+        fpwhere.append(sql_text("fastpath.msm_failure = 'f'"))
 
-    fpq_table = sql.table("fastpath")
+    fpq_table = sql_table("fastpath")
 
     if input:
         # input_ overrides domain and category_code
         query_params["input"] = input
-        fpwhere.append(sql.text("input = :input"))
+        fpwhere.append(sql_text("input = :input"))
 
     elif domain or category_code:
         # both domain and category_code can be set at the same time
         if domain:
             query_params["domain"] = domain
-            fpwhere.append(sql.text("domain = :domain"))
+            fpwhere.append(sql_text("domain = :domain"))
 
         if category_code:
             query_params["category_code"] = category_code
             fpq_table = fpq_table.join(
-                sql.table("citizenlab"),
-                sql.text("citizenlab.url = fastpath.input"),
+                sql_table("citizenlab"),
+                sql_text("citizenlab.url = fastpath.input"),
             )
-            fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
+            fpwhere.append(sql_text("citizenlab.category_code = :category_code"))
 
     fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
 
@@ -980,26 +982,26 @@ async def get_torsf_stats(
     cacheable = False
 
     cols = [
-        sql.text("toDate(measurement_start_time) AS measurement_start_day"),
+        sql_text("toDate(measurement_start_time) AS measurement_start_day"),
         column("probe_cc"),
-        sql.text("countIf(anomaly = 't') AS anomaly_count"),
-        sql.text("countIf(confirmed = 't') AS confirmed_count"),
-        sql.text("countIf(msm_failure = 't') AS failure_count"),
+        sql_text("countIf(anomaly = 't') AS anomaly_count"),
+        sql_text("countIf(confirmed = 't') AS confirmed_count"),
+        sql_text("countIf(msm_failure = 't') AS failure_count"),
     ]
-    table = sql.table("fastpath")
-    where = [sql.text("test_name = 'torsf'")]
+    table = sql_table("fastpath")
+    where = [sql_text("test_name = 'torsf'")]
     query_params: Dict[str, Any] = {}
 
     if probe_cc:
-        where.append(sql.text("probe_cc = :probe_cc"))
+        where.append(sql_text("probe_cc = :probe_cc"))
         query_params["probe_cc"] = probe_cc
 
     if since:
-        where.append(sql.text("measurement_start_time > :since"))
+        where.append(sql_text("measurement_start_time > :since"))
         query_params["since"] = since
 
     if until:
-        where.append(sql.text("measurement_start_time <= :until"))
+        where.append(sql_text("measurement_start_time <= :until"))
         query_params["until"] = until
         cacheable = until < datetime.now() - timedelta(hours=72)
 

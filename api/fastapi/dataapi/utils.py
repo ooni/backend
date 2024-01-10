@@ -1,3 +1,5 @@
+from csv import DictWriter
+from io import StringIO
 import logging
 from typing import Dict, List, Optional, Union
 from fastapi.responses import JSONResponse
@@ -5,8 +7,10 @@ from fastapi.responses import JSONResponse
 import clickhouse_driver
 import clickhouse_driver.errors
 
-from sqlalchemy import Select, TextClause
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.elements import TextClause
+from sqlalchemy.sql.selectable import Select
+
 
 from .config import settings
 
@@ -31,7 +35,7 @@ def nocachejson(*a, **kw) -> JSONResponse:
 
 def jerror(msg, code=400, **kw) -> JSONResponse:
     headers = {"Cache-Control": "no-cache"}
-    return JSONResponse(content=dict(**kw), status_code=code, headers=headers)
+    return JSONResponse(content=dict(msg=msg, **kw), status_code=code, headers=headers)
 
 
 def commasplit(p: str) -> List[str]:
@@ -39,6 +43,28 @@ def commasplit(p: str) -> List[str]:
     out = set(p.split(","))
     out.discard("")
     return sorted(out)
+
+
+def convert_to_csv(r) -> str:
+    """Convert aggregation result dict/list to CSV"""
+    csvf = StringIO()
+    if isinstance(r, dict):
+        # 0-dimensional data
+        fieldnames = sorted(r.keys())
+        writer = DictWriter(csvf, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(r)
+
+    else:
+        fieldnames = sorted(r[0].keys())
+        writer = DictWriter(csvf, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in r:
+            writer.writerow(row)
+
+    result = csvf.getvalue()
+    csvf.close()
+    return result
 
 
 Query = Union[str, TextClause, Select]
