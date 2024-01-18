@@ -30,13 +30,13 @@ jobs:
           DATE=$(date +'%Y%m%d')
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-4)
           TAG="v${DATE}-${SHORT_SHA}"
-          echo "::set-output name=tag::$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Docker Image
         run: |
           TAG_LATEST=$IMAGE_NAME:latest
           TAG_ENVIRONMENT=$IMAGE_NAME:production
-          TAG_VERSION=$IMAGE_NAME:${{ steps.prep.outputs.tag }}
+          TAG_VERSION=$IMAGE_NAME:${{ steps.version.outputs.tag }}
 
           # Build Docker image with multiple tags
           docker build -t $TAG_LATEST -t $TAG_VERSION -t $TAG_ENVIRONMENT $DOCKERFILE_PATH
