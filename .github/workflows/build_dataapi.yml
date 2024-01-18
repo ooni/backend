@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - 2024-refactor
-    paths:
-      - "api/fastapi/**"
+    #paths:
+    #  - "api/fastapi/**"
 
 env:
   IMAGE_NAME: ooni/dataapi
