@@ -14,6 +14,7 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python
 COPY . /app
 WORKDIR /app
 ENV PATH=/opt/poetry/bin:$PATH
+RUN echo "${TAG_VERSION:-docker}" > /app/dataapi/TAG_VERSION
 RUN poetry config virtualenvs.in-project true && poetry install --no-interaction --no-ansi
 
 ### Actual image running on the host
