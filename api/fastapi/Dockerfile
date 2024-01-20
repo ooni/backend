@@ -5,6 +5,7 @@
 # https://github.com/actions/setup-python/issues/721) or stop using debian to
 # have more recent base OS
 FROM python:3.11-bullseye as py-build
+ARG BUILD_LABEL=docker
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
      && apt-get -y install --no-install-recommends python3 python3-dev
@@ -14,7 +15,7 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python
 COPY . /app
 WORKDIR /app
 ENV PATH=/opt/poetry/bin:$PATH
-RUN echo "${TAG_VERSION:-docker}" > /app/dataapi/TAG_VERSION
+RUN echo "$BUILD_LABEL" > /app/dataapi/BUILD_LABEL
 RUN poetry config virtualenvs.in-project true && poetry install --no-interaction --no-ansi
 
 ### Actual image running on the host

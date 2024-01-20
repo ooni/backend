@@ -34,12 +34,13 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
+          BUILD_LABEL=${{ steps.version.outputs.tag }}
           TAG_LATEST=$IMAGE_NAME:latest
           TAG_ENVIRONMENT=$IMAGE_NAME:production
-          TAG_VERSION=$IMAGE_NAME:${{ steps.version.outputs.tag }}
+          TAG_VERSION=$IMAGE_NAME:$BUILD_LABEL
 
           # Build Docker image with multiple tags
-          docker build -t $TAG_LATEST -t $TAG_VERSION -t $TAG_ENVIRONMENT $DOCKERFILE_PATH
+          docker build --build-arg BUILD_LABEL=$BUILD_LABEL -t $TAG_LATEST -t $TAG_VERSION -t $TAG_ENVIRONMENT $DOCKERFILE_PATH
 
           # Push all tags
           docker push $TAG_LATEST
