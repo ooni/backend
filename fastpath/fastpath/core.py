@@ -999,7 +999,7 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
     # TODO: refactor to apply to all test types
 
     # anomaly
-    blocking_types = ("tcp_ip", "dns", "http-diff", "http-failure")
+    blocking_types = ("tcp_ip", "dns", "http-diff", "http-failure", "tls")
     probe_blocking = tk.get("blocking")
     if probe_blocking in blocking_types:
         scores["blocking_general"] = 1.0
