@@ -1,1 +1,0 @@
-../../contrib/Versioning/install.versioning.sql

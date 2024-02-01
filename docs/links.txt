@@ -1,2 +1,0 @@
-http://blog.treasuredata.com/blog/2015/02/25/managing-the-data-pipeline-with-git-luigi/
-

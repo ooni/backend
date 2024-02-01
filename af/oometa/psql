@@ -1,2 +1,0 @@
-#!/bin/sh
-exec psql -U oopguser -h $(docker inspect spbmeta | jq --raw-output '.[].NetworkSettings.Networks.bridge.IPAddress') "$@"
