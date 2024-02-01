@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+
+%:
+	dh $@ --buildsystem=pybuild
+
+override_dh_installsystemd:
+	dh_installsystemd --no-restart-on-upgrade --name detector
+	dh_installsystemd --no-restart-on-upgrade --name detector-webapp

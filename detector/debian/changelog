@@ -1,0 +1,11 @@
+detector (0.2) unstable; urgency=medium
+
+  * run webapp as a dedicated service
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 26 Nov 2019 18:58:45 +0000
+
+detector (0.1) unstable; urgency=medium
+
+  * event detector
+
+ -- Federico Ceratto <federico@debian.org>  Tue, 26 Nov 2019 18:58:23 +0000
