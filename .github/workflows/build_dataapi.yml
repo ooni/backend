@@ -1,0 +1,48 @@
+name: Build and Deploy Docker Image for dataapi
+
+on:
+  push:
+    branches:
+      - 2024-refactor
+    #paths:
+    #  - "api/fastapi/**"
+
+env:
+  IMAGE_NAME: ooni/dataapi
+  DOCKERFILE_PATH: ./api/fastapi/
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Format version number
+        id: version
+        run: |
+          DATE=$(date +'%Y%m%d')
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-4)
+          TAG="v${DATE}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push Docker Image
+        run: |
+          BUILD_LABEL=${{ steps.version.outputs.tag }}
+          TAG_LATEST=$IMAGE_NAME:latest
+          TAG_ENVIRONMENT=$IMAGE_NAME:production
+          TAG_VERSION=$IMAGE_NAME:$BUILD_LABEL
+
+          # Build Docker image with multiple tags
+          docker build --build-arg BUILD_LABEL=$BUILD_LABEL -t $TAG_LATEST -t $TAG_VERSION -t $TAG_ENVIRONMENT $DOCKERFILE_PATH
+
+          # Push all tags
+          docker push $TAG_LATEST
+          docker push $TAG_VERSION
+          docker push $TAG_ENVIRONMENT
