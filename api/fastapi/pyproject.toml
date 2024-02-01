@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "dataapi"
+version = "0.1.0"
+description = ""
+authors = ["OONI <contact@ooni.org>"]
+readme = "Readme.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.108.0"
+clickhouse-driver = "^0.2.6"
+sqlalchemy = "1.4.51"
+ujson = "^5.9.0"
+urllib3 = "^2.1.0"
+python-dateutil = "^2.8.2"
+pydantic-settings = "^2.1.0"
+statsd = "^4.0.1"
+uvicorn = "^0.25.0"
+psycopg2 = "^2.9.9"
+httpx = "^0.26.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
