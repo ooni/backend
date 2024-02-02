@@ -3,7 +3,7 @@ name: Build and Deploy Docker Image for dataapi
 on:
   push:
     branches:
-      - 2024-refactor
+      - backend-v2024.2.0
     #paths:
     #  - "api/fastapi/**"
 
