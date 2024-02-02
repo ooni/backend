@@ -2,7 +2,12 @@ import pytest
 
 from textwrap import dedent
 from urllib.parse import urlencode
-from ..utils import fjd
+import json
+
+
+def fjd(o):
+    # non-indented JSON dump
+    return json.dumps(o, sort_keys=True)
 
 
 def api(client, subpath, **kw):
