@@ -23,32 +23,6 @@ from ooniapi.probe_services import probe_services_blueprint
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 
-# def render_problem_exception(exception):
-#    response = exception.to_problem()
-#    return FlaskApi.get_response(response)
-
-
-# def render_generic_exception(exception):
-#    if not isinstance(exception, werkzeug.exceptions.HTTPException):
-#        exc_name = "{}.{}".format(type(exception).__module__, type(exception).__name__)
-#        exc_desc = str(exception)
-#        if hasattr(exception, "__traceback__"):
-#            current_app.logger.error(
-#                "".join(traceback.format_tb(exception.__traceback__))
-#            )
-#        current_app.logger.error(
-#            "Unhandled error occurred, {}: {}".format(exc_name, exc_desc)
-#        )
-#        exception = werkzeug.exceptions.InternalServerError(
-#            description="An unhandled application error occurred: {}".format(exc_name)
-#        )
-#
-#    response = problem(
-#        title=exception.name, detail=exception.description, status=exception.code
-#    )
-#    return FlaskApi.get_response(response)
-
-
 def render_generic_exception(exception):
     """Log a traceback and return code 500 with a simple JSON
     The CORS header is set as usual. Without this, an error could lead to browsers
