@@ -134,7 +134,7 @@ class MeasurementAggregation(BaseModel):
     v: int
     dimension_count: int
     db_stats: DBStats
-    result: List[AggregationResult]
+    result: Union[List[AggregationResult], AggregationResult]
 
 
 @router.get("/v1/aggregation")
@@ -239,7 +239,14 @@ async def get_measurements(
         domain_s = set(commasplit(domain))
     probe_asn_s = []
     if probe_asn:
-        probe_asn_s = commasplit(probe_asn)
+        try:
+            # Convert probe_asn to list of ints, stripping any leading "AS" prefix
+            probe_asn_s = [
+                int(i[2:]) if i.startswith("AS") else i for i in commasplit(probe_asn)
+            ]
+        except ValueError:
+            raise ValueError(f"Invalid ASN value in parameter probe_asn")
+
     probe_cc_s = []
     if probe_cc:
         probe_cc_s = commasplit(probe_cc)

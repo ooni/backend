@@ -7,13 +7,14 @@ import json
 
 from ...main import app
 
-from fastapi.testclient import TestClient
+def is_json(resp):
+    return resp.headers.get('content-type') == 'application/json'
 
 def fjd(o):
     # non-indented JSON dump
     return json.dumps(o, sort_keys=True)
 
- 
+
 def api(client, subpath, **kw):
     url = f"/api/v1/{subpath}"
     if kw:
@@ -30,9 +31,8 @@ def test_aggregation_no_axis_with_caching(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10"
     resp = client.get(f"/api/v1/{url}")
-    assert resp.status_code == 200
-    assert resp.is_json
-    r = resp.json
+    assert resp.status_code == 200, resp
+    r = resp.json()
     r.pop("db_stats", None)
     expected = {
         "dimension_count": 0,
@@ -55,7 +55,7 @@ def test_aggregation_no_axis_csv(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV"
     r = client.get(f"/api/v1/{url}")
-    assert not r.is_json
+    assert not is_json(r)
     expected = dedent(
         """\
         anomaly_count,confirmed_count,failure_count,measurement_count,ok_count
@@ -63,7 +63,7 @@ def test_aggregation_no_axis_csv(client):
     """
     )
     assert r.data.decode().replace("\r", "") == expected
-    assert r.content_type == "text/csv"
+    assert r.headers.get("content-type") == "text/csv"
     assert "Content-Disposition" not in r.headers  # not a download
 
 
@@ -71,8 +71,8 @@ def test_aggregation_no_axis_csv_dload(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV&download=true"
     r = client.get(f"/api/v1/{url}")
-    assert not r.is_json
-    assert r.content_type == "text/csv"
+    assert not is_json(r)
+    assert r.headers.get("content-type") == "text/csv"
     exp = "attachment; filename=ooni-aggregate-data.csv"
     assert r.headers["Content-Disposition"] == exp
 
@@ -307,7 +307,7 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_small(client):
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
     exp = "Choose time_grain between day, week, month, year, auto for the given time range"
-    assert r.json["error"] == exp
+    assert r.json()["error"] == exp
 
 
 def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
@@ -316,7 +316,7 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
     exp = "Choose time_grain between hour, day, auto for the given time range"
-    assert r.json["error"] == exp
+    assert r.json()["error"] == exp
 
 
 def test_aggregation_x_axis_only_hour(client):
@@ -496,7 +496,7 @@ def test_aggregation_x_axis_only_csv_2d(client):
     url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&time_grain=day&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 200
-    assert not r.is_json
+    assert not is_json(r)
     expected = dedent(
         """\
         anomaly_count,confirmed_count,failure_count,measurement_count,measurement_start_day,ok_count,probe_asn

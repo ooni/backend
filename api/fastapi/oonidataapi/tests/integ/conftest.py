@@ -31,10 +31,12 @@ def run_clickhouse_sql_scripts(clickhouse_url):
     for fn in ["1_schema", "2_fixtures"]:
         sql_f = THIS_DIR / f"clickhouse_{fn}.sql"
         print(f"[+] running {sql_f} on {clickhouse_url}")
-        queries = sql_f.read_text().split(";")
+        sql_no_comment = "\n".join(
+            filter(lambda x: not x.startswith("--"), sql_f.read_text().split("\n"))
+        )
+        queries = sql_no_comment.split(";")
         for q in queries:
             q = q.strip()
-            print(f"{q}")
             if not q:
                 continue
             click.execute(q)
@@ -78,7 +80,7 @@ def docker_clickhouse_url():
 
     # Cleanup after the test session is done
     container.stop()
-    # container.remove()
+    container.remove()
 
 
 @pytest.yield_fixture
