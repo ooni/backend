@@ -10,7 +10,6 @@ from flask import current_app, render_template
 from flask import make_response
 from flask.json import jsonify
 
-from ooniapi.aggregation import aggregation_blueprint
 from ooniapi.auth import auth_blueprint
 from ooniapi.citizenlab import cz_blueprint
 from ooniapi.incidents import inc_blueprint
@@ -73,7 +72,6 @@ def bad_request(e):
 
 
 def register(app):
-    app.register_blueprint(aggregation_blueprint, url_prefix="/api")
     app.register_blueprint(api_msm_blueprint, url_prefix="/api")
     app.register_blueprint(auth_blueprint, url_prefix="")
     app.register_blueprint(cz_blueprint, url_prefix="")
