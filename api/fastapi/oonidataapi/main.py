@@ -16,18 +16,20 @@ app.include_router(aggregation.router, prefix="/api")
 from importlib.metadata import version as importlib_version
 from importlib.resources import files as importlib_files
 
-pkg_name = "dataapi"
+pkg_name = "oonidataapi"
 
 pkg_version = importlib_version(pkg_name)
 try:
-    with importlib_files("dataapi").joinpath("BUILD_LABEL").open('r') as in_file:
+    with importlib_files(pkg_name).joinpath("BUILD_LABEL").open("r") as in_file:
         build_label = in_file.read().strip()
 except:
     build_label = None
 
+
 @app.get("/version")
 async def version():
     return {"version": pkg_version, "build_label": build_label}
+
 
 @app.get("/")
 async def root():
