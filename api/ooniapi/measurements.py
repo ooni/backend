@@ -22,7 +22,7 @@ from werkzeug.exceptions import HTTPException, BadRequest
 from flask import request, Response
 
 # debdeps: python3-sqlalchemy
-from sqlalchemy import sql
+from sqlalchemy import and_, text, select, sql, column
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError  # debdeps: python3-psycopg2
 
