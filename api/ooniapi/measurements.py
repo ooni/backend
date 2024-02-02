@@ -58,7 +58,6 @@ urllib_pool = urllib3.PoolManager()
 # type hints
 ostr = Optional[str]
 
-
 class QueryTimeoutError(HTTPException):
     code = 504
     description = "The database query timed out.\nTry changing the query parameters."
