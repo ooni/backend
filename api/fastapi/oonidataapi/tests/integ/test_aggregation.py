@@ -5,11 +5,15 @@ from urllib.parse import urlencode
 import json
 
 
+from ...main import app
+
+from fastapi.testclient import TestClient
+
 def fjd(o):
     # non-indented JSON dump
     return json.dumps(o, sort_keys=True)
 
-
+ 
 def api(client, subpath, **kw):
     url = f"/api/v1/{subpath}"
     if kw:
@@ -22,7 +26,7 @@ def api(client, subpath, **kw):
     return response.json
 
 
-def test_aggregation_no_axis_with_caching(client, log):
+def test_aggregation_no_axis_with_caching(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10"
     resp = client.get(f"/api/v1/{url}")
@@ -47,7 +51,7 @@ def test_aggregation_no_axis_with_caching(client, log):
     # assert h["Cache-Control"] == "max-age=86400"
 
 
-def test_aggregation_no_axis_csv(client, log):
+def test_aggregation_no_axis_csv(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV"
     r = client.get(f"/api/v1/{url}")
@@ -63,7 +67,7 @@ def test_aggregation_no_axis_csv(client, log):
     assert "Content-Disposition" not in r.headers  # not a download
 
 
-def test_aggregation_no_axis_csv_dload(client, log):
+def test_aggregation_no_axis_csv_dload(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV&download=true"
     r = client.get(f"/api/v1/{url}")
@@ -268,7 +272,7 @@ def test_aggregation_no_axis_filter_multi_oonirun(client):
     }, fjd(r)
 
 
-def test_aggregation_x_axis_only(client, log):
+def test_aggregation_x_axis_only(client):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
     r = api(client, url)
@@ -290,14 +294,14 @@ def test_aggregation_x_axis_only(client, log):
     assert r == expected, fjd(r)
 
 
-def test_aggregation_x_axis_only_invalid_range(client, log):
+def test_aggregation_x_axis_only_invalid_range(client):
     # 1 dimension: X
     url = "aggregation?since=2022-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
 
 
-def test_aggregation_x_axis_only_invalid_time_grain_too_small(client, log):
+def test_aggregation_x_axis_only_invalid_time_grain_too_small(client):
     # 1 dimension: X
     url = "aggregation?since=2020-07-09&until=2022-07-11&time_grain=hour&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
@@ -306,7 +310,7 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_small(client, log):
     assert r.json["error"] == exp
 
 
-def test_aggregation_x_axis_only_invalid_time_grain_too_large(client, log):
+def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
     # 1 dimension: X
     url = "aggregation?since=2022-07-09&until=2022-07-11&time_grain=year&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
@@ -315,7 +319,7 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_large(client, log):
     assert r.json["error"] == exp
 
 
-def test_aggregation_x_axis_only_hour(client, log):
+def test_aggregation_x_axis_only_hour(client):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
     r = api(client, url)
@@ -345,7 +349,7 @@ def test_aggregation_x_axis_only_hour(client, log):
     assert r == expected, fjd(r)
 
 
-def test_aggregation_x_axis_domain(client, log):
+def test_aggregation_x_axis_domain(client):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&axis_x=domain"
     r = api(client, url)
@@ -366,7 +370,7 @@ def test_aggregation_x_axis_domain(client, log):
     assert False, "Msmt not found"
 
 
-def test_aggregation_x_axis_without_since(client, log):
+def test_aggregation_x_axis_without_since(client):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&until=2021-07-10&axis_x=measurement_start_day"
     r = client.get(f"/api/v1/{url}")
@@ -374,7 +378,7 @@ def test_aggregation_x_axis_without_since(client, log):
 
 
 @pytest.mark.skip("To be fixed in future")
-def test_aggregation_y_axis_only_blocking_type(client, log):
+def test_aggregation_y_axis_only_blocking_type(client):
     # 1 dimension: Y: blocking_type
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_y=blocking_type"
     r = api(client, url)
@@ -389,7 +393,7 @@ def test_aggregation_y_axis_only_blocking_type(client, log):
     assert r == expected, fjd(r)
 
 
-def test_aggregation_x_axis_only_probe_cc(client, log):
+def test_aggregation_x_axis_only_probe_cc(client):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc"
     r = api(client, url)
@@ -426,7 +430,7 @@ def test_aggregation_x_axis_only_category_code(client):
 
 
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_aggregation_x_axis_only_csv(client, log):
+def test_aggregation_x_axis_only_csv(client):
     # 1-dimensional data
     url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2021-07-09&until=2021-07-10&format=CSV&axis_x=measurement_start_day"
     r = api(client, url)
@@ -449,7 +453,7 @@ def test_aggregation_x_axis_only_csv(client, log):
 
 
 @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
-def test_aggregation_x_axis_y_axis(client, log):
+def test_aggregation_x_axis_y_axis(client):
     # 2-dimensional data
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
     r = api(client, url)
@@ -459,7 +463,7 @@ def test_aggregation_x_axis_y_axis(client, log):
     assert len(r["result"]) == 2140
 
 
-def test_aggregation_x_axis_y_axis_are_the_same(client, log):
+def test_aggregation_x_axis_y_axis_are_the_same(client):
     # 2-dimensional data
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc&axis_y=probe_cc&test_name=web_connectivity"
     r = api(client, url)
@@ -486,7 +490,7 @@ def test_aggregation_foo(client):
     ]
 
 
-def test_aggregation_x_axis_only_csv_2d(client, log):
+def test_aggregation_x_axis_only_csv_2d(client):
     # 2-dimensional data: day vs ASN
     dom = "www.cabofrio.rj.gov.br"
     url = f"aggregation?probe_cc=BR&domain={dom}&since=2021-07-09&until=2021-07-10&time_grain=day&axis_x=measurement_start_day&axis_y=probe_asn&format=CSV"
@@ -545,7 +549,7 @@ aggreg_over_category_code_expected = [
 
 
 @pytest.mark.skip("FIXME citizenlab")
-def test_aggregation_x_axis_category_code(client, log):
+def test_aggregation_x_axis_category_code(client):
     # 1d data over a special column: category_code
     url = (
         "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_x=category_code"
@@ -558,7 +562,7 @@ def test_aggregation_x_axis_category_code(client, log):
 
 # @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 @pytest.mark.skip("FIXME citizenlab")
-def test_aggregation_y_axis_category_code(client, log):
+def test_aggregation_y_axis_category_code(client):
     # 1d data over a special column: category_code
     url = (
         "aggregation?probe_cc=DE&since=2021-07-09&until=2021-07-10&axis_y=category_code"
@@ -572,7 +576,7 @@ def test_aggregation_y_axis_category_code(client, log):
 
 
 @pytest.mark.skip("FIXME citizenlab")
-def test_aggregation_xy_axis_category_code(client, log):
+def test_aggregation_xy_axis_category_code(client):
     # 2d data over a special column: category_code
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=category_code&axis_y=category_code"
     r = api(client, url)

@@ -6,8 +6,8 @@ import pytest
 
 from fastapi.testclient import TestClient
 
-from ..main import app
 from ..dependencies import get_clickhouse_client
+from ..main import app
 
 THIS_DIR = os.path.dirname(__file__)
 
