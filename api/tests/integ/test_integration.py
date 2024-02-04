@@ -20,8 +20,7 @@ from dateutil.parser import parse as parse_date
 from tests.utils import *
 import pytest
 
-from ooniapi.measurements import FASTPATH_MSM_ID_PREFIX
-
+FASTPATH_MSM_ID_PREFIX = "temp-fid-"
 # The flask app is created in tests/conftest.py
 
 

@@ -19,6 +19,7 @@ import urllib3  # debdeps: python3-urllib3
 from flask import current_app, request, make_response, abort, redirect, Response
 from flask.json import jsonify
 from werkzeug.exceptions import HTTPException, BadRequest
+from flask import request, Response
 
 # debdeps: python3-sqlalchemy
 from sqlalchemy import and_, text, select, sql, column
@@ -46,10 +47,6 @@ from ooniapi.urlparams import (
 from flask import Blueprint
 
 api_msm_blueprint = Blueprint("msm_api", "measurements")
-
-FASTPATH_MSM_ID_PREFIX = "temp-fid-"
-FASTPATH_SERVER = "fastpath.ooni.nu"
-FASTPATH_PORT = 8000
 
 log = logging.getLogger()
 
