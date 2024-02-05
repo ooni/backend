@@ -1,0 +1,372 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>README.md</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.3.0/milligram.min.css">
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+
+html, body {
+margin: 0;
+font-family: "Fira Sans", sans-serif;
+font-weight: 400;
+}
+.header {
+padding: 2rem;
+background-color: #0588cb;
+color: #fff;
+margin-bottom: 2rem;
+}
+a {
+color: #0588cb;
+}
+pre {
+border-left: none !important;
+padding: 0.5rem 1rem;
+}
+a.headerlink {
+color: #868e96
+}
+a.headerlink:hover {
+color: #0588cb;
+}
+div#pagepath { padding-bottom: 1em }
+h1 { font-size: 48px; font-weight: 300; }
+h2 { font-size: 36px; font-weight: 600; }
+h3 { font-size: 28px; font-weight: 600; }
+h4 { font-size: 22px; font-weight: 600; }
+h5 { font-size: 20px; font-weight: 600; }
+h6 { font-size: 20px; font-weight: 600; }
+h7 { font-size: 20px; font-weight: 600; }
+div.toc {
+border: 1px solid #ccc;
+margin: 1em;
+padding: 1em;
+border-radius: 10px;
+font-size: 115%;
+}
+footer {
+background-color: rgb(0, 54, 91);
+padding: 2rem;
+color: #fff;
+font-size: 14px;
+font-family: "Fira Sans", sans-serif;
+margin-top: 2rem;
+}
+.pt-1 {
+padding-top: 0.25rem;
+}
+.pb-2 {
+padding-bottom: 0.5rem;
+}
+.pb-4 {
+padding-bottom: 1rem;
+}
+.footer-section-title {
+font-weight: bold;
+}
+footer a {
+color: #fff;
+opacity: 0.5;
+padding: 2px 0;
+margin: 2px 0;
+}
+footer a:hover {
+color: #fff;
+opacity: 1;
+}
+.button {
+color: #0588cb !important;
+border-color: #0588cb !important;
+}
+.button:hover,.button:focus {
+color: #343a40 !important;
+border-color: #343a40 !important;
+
+}
+.button-small {
+padding: 0 2rem;
+height: 3.5rem;
+line-height: 3.5rem;
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="row">
+    <div class="column">
+      <h2>Project documentation</h2>
+    </div>
+  </div>
+</div>
+<div class="container">
+<div id="pagepath"><a href='/index.html'></a> » <a href=''>README.md</a></div><div><svg viewBox="0 0 1408 360" xmlns="http://www.w3.org/2000/svg" xmlns:inkspace="http://www.inkscape.org/namespaces/inkscape" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs id="defs_block">
+    <filter height="1.504" id="filter_blur" inkspace:collect="always" width="1.1575" x="-0.07875" y="-0.252">
+      <feGaussianBlur id="feGaussianBlur3780" inkspace:collect="always" stdDeviation="4.2" />
+    </filter>
+  </defs>
+  <title>blockdiag</title>
+  <desc>blockdiag {
+
+ Probes [color = "#ffeeee"]; 
+ Explorer [color = "#eeeeff"]; 
+ "S3 jsonl" [shape = ellipse];
+ "S3 postcan" [shape = ellipse];
+ "DB jsonl tbl" [shape = ellipse];
+ "DB fastpath tbl" [shape = ellipse];
+ "disk queue" [shape = ellipse];
+
+ Probes -&gt; "API: Probe services" -&gt; "Fastpath" -&gt; "DB fastpath tbl" -&gt; "API: Measurements" -&gt; "Explorer";
+ "API: Probe services" -&gt; "disk queue" -&gt; "API: uploader" -&gt; "S3 jsonl" -&gt; "API: Measurements";
+ "API: uploader" -&gt; "S3 postcan";
+ "API: uploader" -&gt; "DB jsonl tbl";
+ "DB jsonl tbl" -&gt; "API: Measurements"
+}
+</desc>
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="67" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="1219" y="46" />
+  <ellipse cx="899" cy="66" fill="rgb(0,0,0)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" />
+  <ellipse cx="899" cy="146" fill="rgb(0,0,0)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" />
+  <ellipse cx="899" cy="226" fill="rgb(0,0,0)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" />
+  <ellipse cx="707" cy="306" fill="rgb(0,0,0)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" />
+  <ellipse cx="515" cy="66" fill="rgb(0,0,0)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="451" y="286" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="259" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="1027" y="46" />
+  <rect fill="rgb(0,0,0)" height="40" stroke="rgb(0,0,0)" style="filter:url(#filter_blur);opacity:0.7;fill-opacity:1" width="128" x="643" y="46" />
+  <rect fill="rgb(255,238,238)" height="40" stroke="rgb(0,0,0)" width="128" x="64" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="36" x="128.0" y="66">Probes</text>
+  <rect fill="rgb(238,238,255)" height="40" stroke="rgb(0,0,0)" width="128" x="1216" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="48" x="1280.0" y="66">Explorer</text>
+  <ellipse cx="896" cy="60" fill="rgb(255,255,255)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="48" x="896.0" y="66">S3 jsonl</text>
+  <ellipse cx="896" cy="140" fill="rgb(255,255,255)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="60" x="896.0" y="146">S3 postcan</text>
+  <ellipse cx="896" cy="220" fill="rgb(255,255,255)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="72" x="896.0" y="226">DB jsonl tbl</text>
+  <ellipse cx="704" cy="300" fill="rgb(255,255,255)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="90" x="704.0" y="306">DB fastpath tbl</text>
+  <ellipse cx="512" cy="60" fill="rgb(255,255,255)" rx="64.0" ry="20.0" stroke="rgb(0,0,0)" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="60" x="512.0" y="66">disk queue</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="448" y="280" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="48" x="512.0" y="306">Fastpath</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="256" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="114" x="320.0" y="66">API: Probe services</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="1024" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="102" x="1088.0" y="66">API: Measurements</text>
+  <rect fill="rgb(255,255,255)" height="40" stroke="rgb(0,0,0)" width="128" x="640" y="40" />
+  <text fill="rgb(0,0,0)" font-family="sans-serif" font-size="11" font-style="normal" font-weight="normal" text-anchor="middle" textLength="78" x="704.0" y="66">API: uploader</text>
+  <path d="M 192 60 L 248 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="255,60 248,56 248,64 255,60" stroke="rgb(0,0,0)" />
+  <path d="M 960 60 L 1016 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="1023,60 1016,56 1016,64 1023,60" stroke="rgb(0,0,0)" />
+  <path d="M 960 220 L 1008 220" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 1008 220 L 1008 60" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 1008 60 L 1016 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="1023,60 1016,56 1016,64 1023,60" stroke="rgb(0,0,0)" />
+  <path d="M 768 300 L 1008 300" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 1008 300 L 1008 60" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 1008 60 L 1016 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="1023,60 1016,56 1016,64 1023,60" stroke="rgb(0,0,0)" />
+  <path d="M 576 60 L 632 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="639,60 632,56 632,64 639,60" stroke="rgb(0,0,0)" />
+  <path d="M 384 60 L 416 60" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 416 60 L 416 300" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 416 300 L 440 300" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="447,300 440,296 440,304 447,300" stroke="rgb(0,0,0)" />
+  <path d="M 384 60 L 440 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="447,60 440,56 440,64 447,60" stroke="rgb(0,0,0)" />
+  <path d="M 576 300 L 632 300" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="639,300 632,296 632,304 639,300" stroke="rgb(0,0,0)" />
+  <path d="M 1152 60 L 1208 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="1215,60 1208,56 1208,64 1215,60" stroke="rgb(0,0,0)" />
+  <path d="M 768 60 L 824 60" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="831,60 824,56 824,64 831,60" stroke="rgb(0,0,0)" />
+  <path d="M 768 60 L 800 60" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 800 60 L 800 140" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 800 140 L 824 140" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="831,140 824,136 824,144 831,140" stroke="rgb(0,0,0)" />
+  <path d="M 768 60 L 800 60" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 800 60 L 800 220" fill="none" stroke="rgb(0,0,0)" />
+  <path d="M 800 220 L 824 220" fill="none" stroke="rgb(0,0,0)" />
+  <polygon fill="rgb(0,0,0)" points="831,220 824,216 824,224 831,220" stroke="rgb(0,0,0)" />
+</svg>
+</div>
+
+<p>Each measurement is processed individually in real time.</p>
+<h4 id="components-api">Components: API<a class="headerlink" href="#components-api" title="Permanent link"> #</a></h4>
+<p>The API entry points are documented at <a href="https://api.ooni.io/apidocs/">apidocs</a></p>
+<h5 id="measurements">Measurements<a class="headerlink" href="#measurements" title="Permanent link"> #</a></h5>
+<p>Provide access to measurements to end users directly and through Explorer.</p>
+<p>Mounted under /api/v1/measurement/</p>
+<p>The API is versioned. Access is rate limited based on source IP address and access tokens
+due to the computational cost of running heavy queries on the database.</p>
+<p><a href="https://github.com/ooni/api/blob/master/newapi/ooniapi/probe_services.py">Sources</a></p>
+<h5 id="probe-services">Probe services<a class="headerlink" href="#probe-services" title="Permanent link"> #</a></h5>
+<p>Serves lists of collectors and test helpers to the probes and receive measurements from them.</p>
+<p>Mounted under /api/v1/</p>
+<p><a href="https://github.com/ooni/api/blob/master/newapi/ooniapi/probe_services.py">Sources</a></p>
+<h5 id="private-entry-points">Private entry points<a class="headerlink" href="#private-entry-points" title="Permanent link"> #</a></h5>
+<p>Not for public consumption. Mounted under <code>/api/_</code> and used exclusively by Explorer</p>
+<p><a href="https://github.com/ooni/api/blob/master/newapi/ooniapi/private.py">Sources</a></p>
+<h4 id="fastpath">Fastpath<a class="headerlink" href="#fastpath" title="Permanent link"> #</a></h4>
+<p><a href="af/fastpath/fastpath/core.html">Documentation</a></p>
+<h4 id="database">Database<a class="headerlink" href="#database" title="Permanent link"> #</a></h4>
+<h4 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link"> #</a></h4>
+<h5 id="build-deploy-rollback">Build, deploy, rollback<a class="headerlink" href="#build-deploy-rollback" title="Permanent link"> #</a></h5>
+<p>Host deployments are done with the <a href="https://github.com/ooni/sysadmin">sysadmin repo</a></p>
+<p>For component updates a deployment pipeline is used:</p>
+<p>Look at the <a href="https://github.com/ooni/backend/wiki/Backend">Status dashboard</a> - be aware of badge image caching</p>
+<p>Use the deploy tool:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Update all badges:</span>
+dep refresh_badges
+
+<span class="c1"># Show status</span>
+dep
+
+<span class="c1"># Deploy/rollback a given version on the &quot;test&quot; stage</span>
+deploy ooni-api <span class="nb">test</span> <span class="m">0</span>.6~pr194-147
+
+<span class="c1"># Deploy latest build on the first stage</span>
+deploy ooni-api
+
+<span class="c1"># Deploy latest build on a given stage</span>
+deploy ooni-api prod
+</code></pre></div>
+
+<h5 id="adding-new-tests">Adding new tests<a class="headerlink" href="#adding-new-tests" title="Permanent link"> #</a></h5>
+<p>Update <a href="https://github.com/ooni/pipeline/blob/master/af/fastpath/database_upgrade_schema.py">database_upgrade_schema</a></p>
+<div class="codehilite"><pre><span></span><code>ALTER TYPE ootest ADD VALUE &#39;&lt;test_name&gt;&#39;;
+</code></pre></div>
+
+<p>Update <a href="https://github.com/ooni/pipeline/blob/master/af/fastpath/fastpath/core.py">fastpath</a>
+by adding a new test to the <code>score_measurement</code> function and adding relevant
+integration tests.</p>
+<p>Create a <a href="https://github.com/ooni/pipeline/compare">Pull Request</a></p>
+<p>Run fastpath manually from S3 on the testing stage see: <a href="#rerun-fastpath-manually">rerun fastpath manually</a></p>
+<p>Update the <a href="https://github.com/ooni/api/blob/master/newapi/ooniapi/measurements.py#L491">api</a></p>
+<h5 id="adding-new-fingerprints">Adding new fingerprints<a class="headerlink" href="#adding-new-fingerprints" title="Permanent link"> #</a></h5>
+<p>TODO</p>
+<h5 id="api-runbook">API runbook<a class="headerlink" href="#api-runbook" title="Permanent link"> #</a></h5>
+<p>Monitor the <a href="https://mon.ooni.nu/grafana/d/CkdDBscGz/ams-pg-api?orgId=1">API</a> and 
+<a href="https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1">fastpath</a> dashboards.</p>
+<p>Follow Nginx or API logs with:</p>
+<div class="codehilite"><pre><span></span><code>sudo journalctl -f -u nginx --no-hostname
+<span class="c1"># The API logs contain SQL queries, exceptions etc</span>
+sudo journalctl -f --identifier gunicorn3 --no-hostname
+</code></pre></div>
+
+<h5 id="fastpath-runbook">Fastpath runbook<a class="headerlink" href="#fastpath-runbook" title="Permanent link"> #</a></h5>
+<h6 id="manual-deployment">Manual deployment<a class="headerlink" href="#manual-deployment" title="Permanent link"> #</a></h6>
+<div class="codehilite"><pre><span></span><code>ssh &lt;host&gt;
+sudo apt-get update
+apt-cache show fastpath <span class="p">|</span> grep Ver <span class="p">|</span> head -n5
+sudo apt-get install fastpath
+</code></pre></div>
+
+<h6 id="restart">Restart<a class="headerlink" href="#restart" title="Permanent link"> #</a></h6>
+<p><code>sudo systemctl restart fastpath</code></p>
+<h6 id="rerun-fastpath-manually">Rerun fastpath manually<a class="headerlink" href="#rerun-fastpath-manually" title="Permanent link"> #</a></h6>
+<p>Run as fastpath user:</p>
+<div class="codehilite"><pre><span></span><code>ssh &lt;host&gt;
+sudo sudo -u fastpath /bin/bash
+<span class="nb">cd</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code>fastpath --help
+<span class="c1"># rerun without overwriting files on disk nor writing to database:</span>
+fastpath --start-day <span class="m">2016</span>-05-13 --end-day <span class="m">2016</span>-05-14 --stdout --no-write-msmt --no-write-to-db
+<span class="c1"># rerun without overwriting files on disk:</span>
+fastpath --start-day <span class="m">2016</span>-05-13 --end-day <span class="m">2016</span>-05-14 --stdout --no-write-msmt
+<span class="c1"># rerun and overwrite:</span>
+fastpath --start-day <span class="m">2016</span>-05-13 --end-day <span class="m">2016</span>-05-14 --stdout --update
+</code></pre></div>
+
+<p>The fastpath will pull cans from S3.
+The daemon (doing real-time processing) can keep running in the meantime.</p>
+<p><a href="https://mon.ooni.nu/prometheus/new/graph?g0.expr=netdata_statsd_gauge_fastpath_s3feeder_s3_download_percentage_value_average%7Bdimension%3D%22gauge%22%7D&amp;g0.tab=0&amp;g0.stacked=1&amp;g0.range_input=2h&amp;g1.expr=netdata_statsd_gauge_fastpath_load_s3_reports_remaining_files_value_average%7Bdimension%3D%22gauge%22%7D&amp;g1.tab=0&amp;g1.stacked=1&amp;g1.range_input=1h">Progress chart</a></p>
+<h6 id="log-monitoring">Log monitoring<a class="headerlink" href="#log-monitoring" title="Permanent link"> #</a></h6>
+<div class="codehilite"><pre><span></span><code>sudo journalctl -f -u fastpath
+</code></pre></div>
+
+<h6 id="monitoring-dashboard">Monitoring dashboard<a class="headerlink" href="#monitoring-dashboard" title="Permanent link"> #</a></h6>
+<p><a href="https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&amp;refresh=5m&amp;from=now-7d&amp;to=now">https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&amp;refresh=5m&amp;from=now-7d&amp;to=now</a></p>
+<h5 id="analysis-runbook">Analysis runbook<a class="headerlink" href="#analysis-runbook" title="Permanent link"> #</a></h5>
+<p>The Analysis tool runs a number of systemd timers to monitor the slow query summary and more.
+See https://github.com/ooni/pipeline/blob/master/af/analysis/analysis/analysis.py</p>
+<h6 id="manual-deployment_1">Manual deployment<a class="headerlink" href="#manual-deployment_1" title="Permanent link"> #</a></h6>
+<div class="codehilite"><pre><span></span><code><span class="nv">ssh</span> <span class="o">&lt;</span><span class="nv">host</span><span class="o">&gt;</span>
+<span class="nv">sudo</span> <span class="nv">apt</span><span class="o">-</span><span class="nv">get</span> <span class="nv">update</span>
+<span class="nv">apt</span><span class="o">-</span><span class="nv">cache</span> <span class="k">show</span> <span class="nv">analysis</span> <span class="o">|</span> <span class="nv">grep</span> <span class="nv">Ver</span> <span class="o">|</span> <span class="nv">head</span> <span class="o">-</span><span class="nv">n5</span>
+<span class="nv">sudo</span> <span class="nv">apt</span><span class="o">-</span><span class="nv">get</span> <span class="nv">install</span> <span class="nv">analysis</span><span class="o">=&lt;</span><span class="nv">version</span><span class="o">&gt;</span>
+</code></pre></div>
+
+<h6 id="run-manually">Run manually<a class="headerlink" href="#run-manually" title="Permanent link"> #</a></h6>
+<div class="codehilite"><pre><span></span><code>sudo systemctl restart ooni-update-counters.service
+</code></pre></div>
+
+<h6 id="log-monitoring_1">Log monitoring<a class="headerlink" href="#log-monitoring_1" title="Permanent link"> #</a></h6>
+<div class="codehilite"><pre><span></span><code>sudo journalctl -f --identifier analysis
+</code></pre></div>
+
+<h6 id="monitoring-dashboard_1">Monitoring dashboard<a class="headerlink" href="#monitoring-dashboard_1" title="Permanent link"> #</a></h6>
+<p><a href="https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&amp;refresh=5m&amp;from=now-7d&amp;to=now">https://mon.ooni.nu/grafana/d/75nnWVpMz/fastpath-ams-pg?orgId=1&amp;refresh=5m&amp;from=now-7d&amp;to=now</a></p>
+<h5 id="deploy-new-host">Deploy new host<a class="headerlink" href="#deploy-new-host" title="Permanent link"> #</a></h5>
+<p>Deploy host from https://cloud.digitalocean.com/projects/</p>
+<p>Create DNS "A" record <code>&lt;name&gt;.ooni.org</code> at https://ap.www.namecheap.com/</p>
+<p>On the sysadmin repo, ansible directory, add the host to the inventory</p>
+<p>Run the deploy with the root SSH user</p>
+<div class="codehilite"><pre><span></span><code>./play deploy-&lt;foo&gt;.yml -l &lt;name&gt;.ooni.org --diff -u root
+</code></pre></div>
+
+<p>Update prometheus</p>
+<div class="codehilite"><pre><span></span><code>./play deploy-prometheus.yml -t prometheus-conf --diff
+</code></pre></div></div>
+<footer class="p-4">
+<div class="container">
+<div class="row">
+<div class="column column-50">
+<div class="pb-2"><img src="https://ooni.org/images/OONI-HorizontalMonochromeInverted.svg" height="32px" /></div>
+<div class="pb-4">Global community measuring internet censorship around the world.</div>
+<div>
+<div>© 2020 Open Observatory of Network Interference (OONI)</div>
+<div><a href="https://github.com/ooni/license">Content available under a Creative Commons license.</a></div>
+</div>
+</div>
+<div class="column column-50">
+<div class="row">
+<div class="column column-30">
+<div class="footer-section-title">About</div>
+<div class="pt-1"><a href="/about/">OONI</a></div>
+<div class="pt-1"><a href="/about/data-policy/">Data Policy</a></div>
+<div class="pt-1"><a href="https://github.com/ooni/license/tree/master/data">Data License</a></div>
+<div class="pt-1"><a href="/about/#contact">Contact</a></div>
+</div>
+<div class="column column-30">
+<div class="footer-section-title">OONI Probe</div>
+<div class="pt-1"><a href="https://ooni.org/install/">Install</a></div>
+<div class="pt-1"><a href="https://ooni.org/nettest/">Tests</a></div>
+<div class="pt-1"><a href="https://github.com/ooni">Source code</a></div>
+<div class="pt-1">
+<a href="https://api.ooni.io/">API</a>
+</div>
+</div>
+<div class="column column-30">
+<div class="footer-section-title">Updates</div>
+<div class="pt-1">
+<a href="/post/">Blog</a>
+</div>
+<div class="pt-1"><a href="https://lists.torproject.org/cgi-bin/mailman/listinfo/ooni-talk">Mailing list</a></div>
+<div class="pt-1"><a href="https://slack.ooni.org/">Slack</a></div>
+<ul class="pt-1 footer-links-social"></ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</footer></body></html>
