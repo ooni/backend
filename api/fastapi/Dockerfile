@@ -15,7 +15,7 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python
 COPY . /app
 WORKDIR /app
 ENV PATH=/opt/poetry/bin:$PATH
-RUN echo "$BUILD_LABEL" > /app/dataapi/BUILD_LABEL
+RUN echo "$BUILD_LABEL" > /app/oonidataapi/BUILD_LABEL
 RUN poetry config virtualenvs.in-project true && poetry install --no-interaction --no-ansi
 
 ### Actual image running on the host
@@ -26,5 +26,5 @@ ENV PYTHONUNBUFFERED 1
 
 COPY --from=py-build /app /app
 WORKDIR /app
-CMD ["/app/.venv/bin/uvicorn", "dataapi.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["/app/.venv/bin/uvicorn", "oonidataapi.main:app", "--host", "0.0.0.0", "--port", "80"]
 EXPOSE 80
