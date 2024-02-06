@@ -18,7 +18,7 @@ locale-gen en_US.UTF-8
 # Set up OONI archive
 echo 'deb http://deb-ci.ooni.org unstable main' \
   > /etc/apt/sources.list.d/ooni.list
-apt-key adv --keyserver hkp://keyserver.ubuntu.com \
+apt-key adv --keyserver hkps://keys.openpgp.org \
   --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
 
 apt-get update
