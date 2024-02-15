@@ -2,5 +2,5 @@ Running:
 
 ```
 poetry install
-poetry run uvicorn dataapi.main:app
+poetry run uvicorn oonidataapi.main:app
 ```
