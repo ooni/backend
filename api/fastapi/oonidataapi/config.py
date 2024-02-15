@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     statsd_host: str = "localhost"
     statsd_port: int = 8125
     statsd_prefix: str = "ooniapi"
+    jwt_encryption_key: str = "CHANGEME"
 
 
 settings = Settings()

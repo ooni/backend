@@ -1,6 +1,7 @@
 """
 Authentication API
 """
+
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from functools import wraps
