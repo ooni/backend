@@ -17,7 +17,7 @@ import urllib3  # debdeps: python3-urllib3
 
 from fastapi import APIRouter, Depends, Query, HTTPException, Header, Request
 from fastapi.responses import Response, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing_extensions import Annotated
 
 # debdeps: python3-sqlalchemy
@@ -115,9 +115,9 @@ def get_measurement(
 
     headers = {"Cache-Control": "max-age=3600"}
     if download:
-        headers[
-            "Content-Disposition"
-        ] = f"attachment; filename=ooni_measurement-{measurement_uid}.json"
+        headers["Content-Disposition"] = (
+            f"attachment; filename=ooni_measurement-{measurement_uid}.json"
+        )
 
     return Response(content=body, media_type="application/json", headers=headers)
 
@@ -608,13 +608,13 @@ async def list_measurements(
         Optional[str], Query(description="Category code from the citizenlab list")
     ] = None,
     since: Annotated[
-        Optional[datetime],
+        Optional[str],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
     ] = None,
     until: Annotated[
-        Optional[datetime],
+        Optional[str],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
@@ -729,19 +729,27 @@ async def list_measurements(
 
     # # Prepare query parameters
 
+    until_dt = None
+    if until is not None:
+        until_dt = datetime.strptime(until, "%Y-%m-%d")
+
     # Set reasonable since/until ranges if not specified.
     try:
         if until is None:
             if report_id is None:
                 t = datetime.utcnow() + timedelta(days=1)
-                until = datetime(t.year, t.month, t.day)
+                until_dt = datetime(t.year, t.month, t.day)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid until")
 
+    since_dt = None
+    if since is not None:
+        since_dt = datetime.strptime(since, "%Y-%m-%d")
+
     try:
-        if since is None:
-            if report_id is None and until is not None:
-                since = until - timedelta(days=30)
+        if since_dt is None:
+            if report_id is None and until_dt is not None:
+                since_dt = until_dt - timedelta(days=30)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid since")
 
@@ -760,11 +768,11 @@ async def list_measurements(
     # Populate WHERE clauses and query_params dict
 
     if since is not None:
-        query_params["since"] = since
+        query_params["since"] = since_dt
         fpwhere.append(sql_text("measurement_start_time > :since"))
 
     if until is not None:
-        query_params["until"] = until
+        query_params["until"] = until_dt
         fpwhere.append(sql_text("measurement_start_time <= :until"))
 
     if report_id:
@@ -981,13 +989,6 @@ async def get_torsf_stats(
     """
     cacheable = False
 
-    cols = [
-        sql_text("toDate(measurement_start_time) AS measurement_start_day"),
-        column("probe_cc"),
-        sql_text("countIf(anomaly = 't') AS anomaly_count"),
-        sql_text("countIf(confirmed = 't') AS confirmed_count"),
-        sql_text("countIf(msm_failure = 't') AS failure_count"),
-    ]
     table = sql_table("fastpath")
     where = [sql_text("test_name = 'torsf'")]
     query_params: Dict[str, Any] = {}
@@ -1007,7 +1008,17 @@ async def get_torsf_stats(
 
     # Assemble query
     where_expr = and_(*where)
-    query = select(cols).where(where_expr).select_from(table)  # type: ignore
+    query = (
+        select(
+            sql_text("toDate(measurement_start_time) AS measurement_start_day"),
+            column("probe_cc"),
+            sql_text("countIf(anomaly = 't') AS anomaly_count"),
+            sql_text("countIf(confirmed = 't') AS confirmed_count"),
+            sql_text("countIf(msm_failure = 't') AS failure_count"),
+        )
+        .where(where_expr)
+        .select_from(table)
+    )
 
     query = query.group_by(column("measurement_start_day"), column("probe_cc"))
     query = query.order_by(column("measurement_start_day"), column("probe_cc"))

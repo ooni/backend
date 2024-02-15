@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from .routers import measurements
 from .routers import aggregation
+from .routers import oonirun
 
 from .config import settings
 
@@ -12,6 +13,7 @@ logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
 app = FastAPI()
 app.include_router(measurements.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")
+app.include_router(oonirun.router, prefix="/api")
 
 from importlib.metadata import version as importlib_version
 from importlib.resources import files as importlib_files
