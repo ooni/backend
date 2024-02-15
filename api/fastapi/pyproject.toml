@@ -18,6 +18,7 @@ statsd = "^4.0.1"
 uvicorn = "^0.25.0"
 psycopg2 = "^2.9.9"
 httpx = "^0.26.0"
+pyjwt = "^2.8.0"
 
 
 [tool.poetry.group.dev.dependencies]
