@@ -127,18 +127,6 @@ def raw_query(
     return q
 
 
-def get_client_token() -> Optional[Dict]:
-    # Returns decoded JWT from client or raises ExpiredSignatureError
-    try:
-        bt = request.headers.get("Authorization", "")
-        if bt.startswith("Bearer "):
-            token = bt[7:]
-
-        return decode_jwt(token, audience="user_auth")
-    except Exception:
-        return None
-
-
 def decode_jwt(token: str, **kw) -> Dict[str, Any]:
     # raises ExpiredSignatureError on expiration
     key = settings.jwt_encryption_key
