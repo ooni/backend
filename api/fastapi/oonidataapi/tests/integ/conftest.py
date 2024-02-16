@@ -13,14 +13,6 @@ from ...main import app
 THIS_DIR = Path(__file__).parent
 
 
-def pytest_addoption(parser):
-    parser.addoption("--proddb", action="store_true", help="uses data from prod DB")
-
-
-def pytest_configure(config):
-    pytest.proddb = config.getoption("--proddb")
-
-
 def run_clickhouse_sql_scripts(clickhouse_url):
     click = Clickhouse.from_url(clickhouse_url)
     tables = click.execute("SHOW TABLES")

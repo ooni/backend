@@ -1,5 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, JSON
 
 from .postgresql import Base
 
@@ -7,13 +6,19 @@ from .postgresql import Base
 class OONIRunLink(Base):
     __tablename__ = "oonirun"
 
-    ooni_run_link_id = Column(Integer, primary_key=True)
-    descriptor_creation_time = Column(DateTime)
-    translation_creation_time = Column(DateTime)
+    oonirun_link_id = Column(Integer, primary_key=True)
+    revision = Column(Integer, default=1, primary_key=True)
+    date_updated = Column(DateTime)
+    date_created = Column(DateTime)
     creator_account_id = Column(String)
-    is_archived = Column(Boolean, default=False)
-    descriptor = Column(String)
-    author = Column(String)
+
     name = Column(String)
+    name_intl = Column(JSON, nullable=True)
     short_description = Column(String)
+    short_description_intl = Column(JSON, nullable=True)
+    description = Column(String)
+    description_intl = Column(JSON, nullable=True)
+    author = Column(String)
     icon = Column(String)
+    nettests = Column(JSON)
+    is_archived = Column(Boolean, default=False)

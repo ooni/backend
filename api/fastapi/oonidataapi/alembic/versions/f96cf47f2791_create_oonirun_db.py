@@ -22,15 +22,21 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         "oonirun",
-        sa.Column("ooni_run_link_id", sa.Integer, primary_key=True),
-        sa.Column("descriptor_creation_time", sa.DateTime(), nullable=False),
-        sa.Column("translation_creation_time", sa.DateTime(), nullable=False),
-        sa.Column("is_archived", sa.Boolean()),
-        sa.Column("descriptor", sa.String()),
-        sa.Column("author", sa.String()),
+        sa.Column("oonirun_link_id", sa.Integer, primary_key=True),
+        sa.Column("revision", sa.Integer(), nullable=False, primary_key=True),
+        sa.Column("date_created", sa.DateTime(), nullable=False),
+        sa.Column("date_updated", sa.DateTime(), nullable=False),
+        sa.Column("creator_account_id", sa.String(), nullable=False),
         sa.Column("name", sa.String()),
+        sa.Column("name_intl", sa.JSON()),
         sa.Column("short_description", sa.String()),
+        sa.Column("short_description_intl", sa.JSON()),
+        sa.Column("description", sa.String()),
+        sa.Column("description_intl", sa.JSON()),
+        sa.Column("author", sa.String()),
         sa.Column("icon", sa.String()),
+        sa.Column("nettests", sa.JSON(), nullable=False),
+        sa.Column("is_archived", sa.Boolean()),
     )
 
 

@@ -5,10 +5,9 @@ from urllib.parse import urlencode
 import json
 
 
-from ...main import app
-
 def is_json(resp):
-    return resp.headers.get('content-type') == 'application/json'
+    return resp.headers.get("content-type") == "application/json"
+
 
 def fjd(o):
     # non-indented JSON dump
@@ -401,7 +400,6 @@ def test_aggregation_x_axis_only_probe_cc(client):
     assert len(r["result"]) == 33
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_only_category_code(client):
     # 1-dimensional data
     url = "aggregation?probe_cc=IE&category_code=HACK&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day"
@@ -429,7 +427,6 @@ def test_aggregation_x_axis_only_category_code(client):
     assert r == expected, fjd(r)
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_only_csv(client):
     # 1-dimensional data
     url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2021-07-09&until=2021-07-10&format=CSV&axis_x=measurement_start_day"
@@ -452,7 +449,6 @@ def test_aggregation_x_axis_only_csv(client):
     assert r.replace("\r", "") == expected
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_x_axis_y_axis(client):
     # 2-dimensional data
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
@@ -470,7 +466,6 @@ def test_aggregation_x_axis_y_axis_are_the_same(client):
     assert r == {"error": "Axis X and Y cannot be the same", "v": 0}
 
 
-@pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 def test_aggregation_two_axis_too_big(client, log):
     url = "aggregation?since=2021-10-14&until=2021-10-15&test_name=web_connectivity&axis_x=measurement_start_day&axis_y=input"
     r = api(client, url)
@@ -560,7 +555,6 @@ def test_aggregation_x_axis_category_code(client):
     assert r["result"][:3] == aggreg_over_category_code_expected, fjd(r)
 
 
-# @pytest.mark.skipif(not pytest.proddb, reason="use --proddb to run")
 @pytest.mark.skip("FIXME citizenlab")
 def test_aggregation_y_axis_category_code(client):
     # 1d data over a special column: category_code

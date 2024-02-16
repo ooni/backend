@@ -9,7 +9,7 @@ readme = "Readme.md"
 python = "^3.11"
 fastapi = "^0.108.0"
 clickhouse-driver = "^0.2.6"
-sqlalchemy = "1.4.51"
+sqlalchemy = "^2.0.27"
 ujson = "^5.9.0"
 urllib3 = "^2.1.0"
 python-dateutil = "^2.8.2"
@@ -19,6 +19,7 @@ uvicorn = "^0.25.0"
 psycopg2 = "^2.9.9"
 httpx = "^0.26.0"
 pyjwt = "^2.8.0"
+alembic = "^1.13.1"
 
 
 [tool.poetry.group.dev.dependencies]
