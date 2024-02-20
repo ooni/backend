@@ -246,6 +246,56 @@ def test_check_in_geoip(client, mocks):
     assert c["probe_network_name"] is not None
 
 
+# See https://github.com/ooni/probe/issues/2555 for context. Delete when the A/B testing is done.
+def test_check_in_abtesting_2555(client, mocks):
+    testcases = [{
+        "name": "when the country is KH and the software name and version would match",
+        "inputs": {
+            "probe_cc": "KH",
+            "software_name": "ooniprobe-android-unattended",
+            "software_version": "3.8.6",
+        },
+        "expect": False,
+    }, {
+        "name": "when the country is BY and the software name and version would match",
+        "inputs": {
+            "probe_cc": "BY",
+            "software_name": "ooniprobe-android-unattended",
+            "software_version": "3.8.6",
+        },
+        "expect": False,
+    }, {
+        "name": "when the country is neither BY nor KH with unexpected software_name",
+        "inputs": {
+            "probe_cc": "IT",
+            "software_name": "ooniprobe-android",
+            "software_version": "3.8.6",
+        },
+        "expect": False,
+    }, {
+        "name": "when the country is neither BY nor KH with unexpected software_version",
+        "inputs": {
+            "probe_cc": "IT",
+            "software_name": "ooniprobe-android-unattended",
+            "software_version": "3.8.4",
+        },
+        "expect": False,
+    }, {
+        "name": "when the country is neither BY nor KH with correct software_version and software_version",
+        "inputs": {
+            "probe_cc": "IT",
+            "software_name": "ooniprobe-android-unattended",
+            "software_version": "3.8.6",
+        },
+        "expect": True,
+    }]
+    for tc in testcases:
+        print("running", tc["name"])
+        j = tc["inputs"]
+        c = client.post("/api/v1/check-in", json=j).json
+        assert c.get("conf", {}).get("features", {}).get("webconnectivity_0.5", False) == tc["expect"]
+
+
 # # Test /api/v1/collectors
 
 
