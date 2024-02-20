@@ -1,9 +1,0 @@
-#!/bin/bash -ex
-
-mkdir -p tsvdump.dir
-for fname in tsv/*.tsv; do
-    tbl=$(basename "$fname" .tsv)
-    if [ ! -f "tsvdump.dir/${tbl}.tsv" ]; then
-        ./psql -c "\\copy ${tbl} to 'tsvdump.dir/${tbl}.tsv'"
-    fi
-done

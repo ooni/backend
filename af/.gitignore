@@ -1,6 +1,0 @@
-# TMP
-airflow/dumb-init_1.2.0_amd64.deb
-shovel/*.flame
-shovel/*.svg
-shovel/bridge_db.json
-useless-test-dags/

@@ -1,7 +1,0 @@
-#!/bin/bash
-set -exu
-rm .tox/integ -rf
-tox -e integ -v --notest
-./.tox/integ/bin/pip3 freeze | sort > /tmp/freeze
-sort requirements/main.txt  | grep -v '^#.*$' | grep -v '^$' | sort > /tmp/main
-meld /tmp/freeze /tmp/main

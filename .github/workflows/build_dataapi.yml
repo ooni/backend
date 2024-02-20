@@ -1,0 +1,86 @@
+name: Build and Deploy Docker Image for dataapi
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "api/fastapi/**"
+      - ".github/workflows/build_dataapi.yml"
+
+env:
+  oonidataapi_dir: ./api/fastapi
+  IMAGE_NAME: ooni/dataapi
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Format version information
+        id: version
+        run: |
+          DATE=$(date +'%Y%m%d')
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
+          BUILD_LABEL="${DATE}-${SHORT_SHA}"
+          echo "build_label=$BUILD_LABEL" >> "$GITHUB_OUTPUT"
+          VERSION_NUMBER=$(cat ${{ env.oonidataapi_dir }}/pyproject.toml | grep 'version =' | awk -F '"' '{print $2}')
+          echo "version_number=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push Docker Image
+        env:
+          DOCKERFILE_PATH: ${{ env.oonidataapi_dir }}
+        run: |
+          TAG_LATEST=$IMAGE_NAME:latest
+          TAG_ENVIRONMENT=$IMAGE_NAME:production
+          TAG_BUILD_LABEL=$IMAGE_NAME:${{ steps.version.outputs.build_label }}
+          TAG_VERSION=$IMAGE_NAME:v${{ steps.version.outputs.version_number }}
+
+          # Build Docker image with multiple tags
+          docker build --build-arg BUILD_LABEL=${{ steps.version.outputs.build_label }} \
+                       -t $TAG_BUILD_LABEL \
+                       -t $TAG_ENVIRONMENT \
+                       -t $TAG_LATEST \
+                       -t $TAG_VERSION \
+                       $DOCKERFILE_PATH
+
+          # Push all tags
+          docker push $TAG_BUILD_LABEL
+          docker push $TAG_ENVIRONMENT
+          docker push $TAG_LATEST
+          docker push $TAG_VERSION
+
+      - name: Checkout ooni/devops
+        uses: actions/checkout@v2
+        with:
+          repository: "ooni/devops" # Replace with your repository's name
+          ssh-key: ${{ secrets.OONI_DEVOPS_DEPLOYKEY }}
+          path: "ooni-devops"
+          ref: "tf-actions"
+
+      - name: Bump version of dataapi
+        run: |
+          jq --arg value "v${{ steps.version.outputs.version_number }}" \
+              '(.ooni_service_config.dataapi_version) = $value' \
+              ${BASE_DIR}/terraform.tfvars.json > ${BASE_DIR}/terraform.tfvars.json.tmp \
+          && mv ${BASE_DIR}/terraform.tfvars.json.tmp ${BASE_DIR}/terraform.tfvars.json
+        env:
+          BASE_DIR: "ooni-devops/tf/environments/production"
+
+      - name: Commit changes
+        id: commit
+        run: |
+          cd ooni-devops
+          git config --global user.email "nothuman@ooni.org"
+          git config --global user.name "OONI Github Actions Bot"
+          git add .
+          git commit -m "auto: update oonidataapi package version to v${{ steps.version.outputs.version_number }}" || echo "No changes to commit"
+          git push origin
