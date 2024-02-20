@@ -276,9 +276,12 @@ def check_in() -> Response:
     )
 
     # set webconnectivity_0.5 feature flag for some probes
-    octect = extract_probe_ipaddr_octect(1, 0)
-    if octect in (34, 239):
-        conf["features"]["webconnectivity_0.5"] = True
+    # Temporarily disabled while we work towards deploying this in prod:
+    # https://github.com/ooni/probe/issues/2674
+    #
+    #octect = extract_probe_ipaddr_octect(1, 0)
+    #if octect in (34, 239):
+    #    conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
 
