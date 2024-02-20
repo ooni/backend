@@ -1,3 +1,9 @@
+ooni-api (1.0.89) unstable; urgency=medium
+
+  * Disable wc 0.5
+
+ -- Arturo <arturo@ooni.org>  Wed, 21 Feb 2024 16:25:18 +0100
+
 ooni-api (1.0.88) unstable; urgency=medium
 
   * Add more logging
