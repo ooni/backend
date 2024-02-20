@@ -11,6 +11,7 @@ from typing import Dict, Any, Tuple, List, Optional
 from urllib.request import urlopen
 import ipaddress
 import time
+import os
 
 import ujson
 from flask import Blueprint, current_app, request, Response
@@ -275,10 +276,15 @@ def check_in() -> Response:
         features={"torsf_enabled": True, "vanilla_tor_enabled": True}
     )
 
-    # WebConnectivity v0.4 vs v0.5 A/B testing.
+    # WebConnectivity v0.4 vs v0.5 A/B testing. Try to avoid using the new version of
+    # the experiment in Cambodia and Belarus where there are upcoming elections.
     #
     # See https://github.com/ooni/probe/issues/2555#issuecomment-1906097413.
-    if software_name == "ooniprobe-android-unattended" and software_version == "3.8.6":
+    if (
+        probe_cc not in ("BY", "KH") and
+        software_name == "ooniprobe-android-unattended" and
+        software_version == "3.8.6"
+      ):
         conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
