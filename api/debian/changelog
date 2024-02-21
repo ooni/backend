@@ -1,6 +1,6 @@
 ooni-api (1.0.89) unstable; urgency=medium
 
-  * Disable wc 0.5
+  * Disable web_connectivity 0.5 feature flag
 
  -- Arturo <arturo@ooni.org>  Wed, 21 Feb 2024 16:25:18 +0100
 
