@@ -67,21 +67,21 @@ jobs:
           path: "ooni-devops"
           ref: "tf-actions"
 
-      - name: Bump version of dataapi
-        run: |
-          jq --arg value "v${{ steps.version.outputs.version_number }}" \
-              '(.ooni_service_config.dataapi_version) = $value' \
-              ${BASE_DIR}/terraform.tfvars.json > ${BASE_DIR}/terraform.tfvars.json.tmp \
-          && mv ${BASE_DIR}/terraform.tfvars.json.tmp ${BASE_DIR}/terraform.tfvars.json
-        env:
-          BASE_DIR: "ooni-devops/tf/environments/production"
+      #- name: Bump version of dataapi
+      #  run: |
+      #    jq --arg value "v${{ steps.version.outputs.version_number }}" \
+      #        '(.ooni_service_config.dataapi_version) = $value' \
+      #        ${BASE_DIR}/terraform.tfvars.json > ${BASE_DIR}/terraform.tfvars.json.tmp \
+      #    && mv ${BASE_DIR}/terraform.tfvars.json.tmp ${BASE_DIR}/terraform.tfvars.json
+      #  env:
+      #    BASE_DIR: "ooni-devops/tf/environments/prod"
 
-      - name: Commit changes
-        id: commit
-        run: |
-          cd ooni-devops
-          git config --global user.email "nothuman@ooni.org"
-          git config --global user.name "OONI Github Actions Bot"
-          git add .
-          git commit -m "auto: update oonidataapi package version to v${{ steps.version.outputs.version_number }}" || echo "No changes to commit"
-          git push origin
+      #- name: Commit changes
+      #  id: commit
+      #  run: |
+      #    cd ooni-devops
+      #    git config --global user.email "nothuman@ooni.org"
+      #    git config --global user.name "OONI Github Actions Bot"
+      #    git add .
+      #    git commit -m "auto: update oonidataapi package version to v${{ steps.version.outputs.version_number }}" || echo "No changes to commit"
+      #    git push origin
