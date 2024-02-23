@@ -86,10 +86,10 @@ class OONIRunLinkBase(BaseModel):
         return v
 
     icon: Optional[str] = ""
-    is_archived: Optional[bool] = False
 
 
 class OONIRunLink(OONIRunLinkBase):
+    is_archived: Optional[bool] = False
     oonirun_link_id: int
     date_created: datetime
     date_updated: datetime
