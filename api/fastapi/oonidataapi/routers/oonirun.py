@@ -167,7 +167,7 @@ def create_oonirun_link(
 )
 def edit_oonirun_link(
     oonirun_link_id: int,
-    edit_request: OONIRunLinkCreate,
+    edit_request: OONIRunLinkEdit,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
 ):
