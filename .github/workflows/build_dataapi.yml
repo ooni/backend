@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - oonirunv2
     paths:
       - "api/fastapi/**"
       - ".github/workflows/build_dataapi.yml"
