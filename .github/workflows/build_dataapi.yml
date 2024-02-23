@@ -59,13 +59,12 @@ jobs:
           docker push $TAG_LATEST
           docker push $TAG_VERSION
 
-      - name: Checkout ooni/devops
-        uses: actions/checkout@v2
-        with:
-          repository: "ooni/devops" # Replace with your repository's name
-          ssh-key: ${{ secrets.OONI_DEVOPS_DEPLOYKEY }}
-          path: "ooni-devops"
-          ref: "tf-actions"
+      #- name: Checkout ooni/devops
+      #  uses: actions/checkout@v2
+      #  with:
+      #    repository: "ooni/devops" # Replace with your repository's name
+      #    ssh-key: ${{ secrets.OONI_DEVOPS_DEPLOYKEY }}
+      #    path: "ooni-devops"
 
       #- name: Bump version of dataapi
       #  run: |
@@ -82,6 +81,7 @@ jobs:
       #    cd ooni-devops
       #    git config --global user.email "nothuman@ooni.org"
       #    git config --global user.name "OONI Github Actions Bot"
+      #    git checkout -b bump-api
       #    git add .
       #    git commit -m "auto: update oonidataapi package version to v${{ steps.version.outputs.version_number }}" || echo "No changes to commit"
       #    git push origin
