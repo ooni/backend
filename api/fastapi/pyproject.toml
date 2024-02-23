@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "oonidataapi"
-version = "0.2.0.dev1"
+version = "0.3.0.dev1"
 description = ""
 authors = ["OONI <contact@ooni.org>"]
 readme = "Readme.md"
