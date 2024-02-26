@@ -362,7 +362,7 @@ async def get_measurements(
         )
 
     where_expr = and_(*where)
-    query = select(cols).where(where_expr).select_from(table)  # type: ignore
+    query = select(*cols).where(where_expr).select_from(table)
 
     # Add group-by
     for g in group_by:
@@ -386,17 +386,17 @@ async def get_measurements(
         if resp_format == "CSV":
             csv_data = convert_to_csv(r)
             if download:
-                headers[
-                    "Content-Disposition"
-                ] = f"attachment; filename=ooni-aggregate-data.csv"
+                headers["Content-Disposition"] = (
+                    f"attachment; filename=ooni-aggregate-data.csv"
+                )
 
             return Response(content=csv_data, media_type="text/csv", headers=headers)
 
         else:
             if download:
-                headers[
-                    "Content-Disposition"
-                ] = f"attachment; filename=ooni-aggregate-data.csv"
+                headers["Content-Disposition"] = (
+                    f"attachment; filename=ooni-aggregate-data.csv"
+                )
                 set_dload(response, "ooni-aggregate-data.json")
             return MeasurementAggregation(
                 v=0,

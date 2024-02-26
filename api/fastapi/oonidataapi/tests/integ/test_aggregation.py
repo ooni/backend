@@ -22,7 +22,7 @@ def api(client, subpath, **kw):
 
     response = client.get(url)
     assert response.status_code == 200, response.data
-    assert response.is_json
+    assert is_json(response)
     return response.json
 
 

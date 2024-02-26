@@ -115,9 +115,9 @@ def get_measurement(
 
     headers = {"Cache-Control": "max-age=3600"}
     if download:
-        headers[
-            "Content-Disposition"
-        ] = f"attachment; filename=ooni_measurement-{measurement_uid}.json"
+        headers["Content-Disposition"] = (
+            f"attachment; filename=ooni_measurement-{measurement_uid}.json"
+        )
 
     return Response(content=body, media_type="application/json", headers=headers)
 
@@ -981,13 +981,6 @@ async def get_torsf_stats(
     """
     cacheable = False
 
-    cols = [
-        sql_text("toDate(measurement_start_time) AS measurement_start_day"),
-        column("probe_cc"),
-        sql_text("countIf(anomaly = 't') AS anomaly_count"),
-        sql_text("countIf(confirmed = 't') AS confirmed_count"),
-        sql_text("countIf(msm_failure = 't') AS failure_count"),
-    ]
     table = sql_table("fastpath")
     where = [sql_text("test_name = 'torsf'")]
     query_params: Dict[str, Any] = {}
@@ -1007,7 +1000,17 @@ async def get_torsf_stats(
 
     # Assemble query
     where_expr = and_(*where)
-    query = select(cols).where(where_expr).select_from(table)  # type: ignore
+    query = (
+        select(
+            sql_text("toDate(measurement_start_time) AS measurement_start_day"),
+            column("probe_cc"),
+            sql_text("countIf(anomaly = 't') AS anomaly_count"),
+            sql_text("countIf(confirmed = 't') AS confirmed_count"),
+            sql_text("countIf(msm_failure = 't') AS failure_count"),
+        )
+        .where(where_expr)
+        .select_from(table)
+    )
 
     query = query.group_by(column("measurement_start_day"), column("probe_cc"))
     query = query.order_by(column("measurement_start_day"), column("probe_cc"))
