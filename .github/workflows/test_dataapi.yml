@@ -1,6 +1,11 @@
-name: Run tests for dataapi
-
-
+name: Tests
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
 jobs:
   run_tests:
     runs-on: ubuntu-latest
