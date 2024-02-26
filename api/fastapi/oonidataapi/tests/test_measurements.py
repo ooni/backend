@@ -47,7 +47,7 @@ def clickhouse_fixture():
     yield MockClick(conn)
     conn.close()
     os.close(fd)
-    # os.remove(path)
+    os.remove(path)
 
 
 @pytest.fixture(name="client")
@@ -63,13 +63,14 @@ def client_fixture(clickhouse):
 
 
 def test_list_measurements(client, clickhouse):
-    clickhouse.execute("SELECT * FROM fastpath")
-    response = client.get("/api/v1/measurements")
+    response = client.get("/api/v1/measurements?since=2024-01-01&until=2024-02-01")
     assert response.status_code == 200
     j = response.json()
     assert len(j["results"]) == 100
 
-    response = client.get("/api/v1/measurements?probe_cc=IT")
+    response = client.get(
+        "/api/v1/measurements?probe_cc=IT&since=2024-01-01&until=2024-02-01"
+    )
     assert response.status_code == 200
     j = response.json()
     for res in j["results"]:
