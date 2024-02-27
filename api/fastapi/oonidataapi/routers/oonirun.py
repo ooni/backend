@@ -60,7 +60,7 @@ class OONIRunLinkBase(BaseModel):
     )
     author: str = Field(
         default="",
-        title="public author name of ooni run link",
+        title="public email address of the author name of the ooni run link",
         min_length=2,
         max_length=100,
     )
@@ -106,11 +106,8 @@ class OONIRunLink(OONIRunLinkBase):
     oonirun_link_id: int
     date_created: datetime
     date_updated: datetime
-    creator_account_id: str
     revision: int
     is_mine: Optional[bool] = False
-
-    v: int = 1
 
     @computed_field
     @property
@@ -283,7 +280,6 @@ def fetch_oonirun_descriptor(
 
 class OONIRunDescriptorList(BaseModel):
     descriptors: List[OONIRunLink]
-    v: int = 1
 
     class Config:
         orm_mode = True
@@ -332,7 +328,9 @@ def list_oonirun_descriptors(
                 ).in_(subquery)
             )
         if not include_archived:
-            q = q.filter(models.OONIRunLink.expiration_date >= datetime.now())
+            q = q.filter(
+                models.OONIRunLink.expiration_date > datetime.now(timezone.utc)
+            )
         if only_mine:
             q = q.filter(models.OONIRunLink.creator_account_id == account_id)
 
@@ -349,7 +347,6 @@ def list_oonirun_descriptors(
     for row in q.all():
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
-            creator_account_id=row.creator_account_id,
             name=row.name,
             name_intl=row.name_intl,
             short_description=row.short_description,
@@ -367,4 +364,4 @@ def list_oonirun_descriptors(
         )
         descriptors.append(oonirun_link)
     log.debug(f"Returning {len(descriptors)} descriptor[s]")
-    return OONIRunDescriptorList(v=1, descriptors=descriptors)
+    return OONIRunDescriptorList(descriptors=descriptors)
