@@ -12,6 +12,8 @@ class OONIRunLink(Base):
     date_created = Column(DateTime)
     creator_account_id = Column(String)
 
+    expiration_date = Column(DateTime)
+
     name = Column(String)
     name_intl = Column(JSON, nullable=True)
     short_description = Column(String)
@@ -20,5 +22,5 @@ class OONIRunLink(Base):
     description_intl = Column(JSON, nullable=True)
     author = Column(String)
     icon = Column(String)
+    color = Column(String)
     nettests = Column(JSON)
-    is_archived = Column(Boolean, default=False)
