@@ -112,7 +112,10 @@ class OONIRunLink(OONIRunLinkBase):
     @computed_field
     @property
     def is_expired(self) -> bool:
-        return self.expiration_date < datetime.now(timezone.utc)
+        # See docstring of models.OONIRunLink.expiration_date_dt_native
+        return self.expiration_date.replace(tzinfo=timezone.utc) < datetime.now(
+            timezone.utc
+        )
 
     class Config:
         orm_mode = True
@@ -159,7 +162,7 @@ def create_oonirun_link(
         nettests=create_request.nettests,
         icon=create_request.icon,
         color=create_request.color,
-        is_archived=False,
+        expiration_date=create_request.expiration_date,
         date_created=now,
         date_updated=now,
     )
@@ -198,11 +201,23 @@ def edit_oonirun_link(
     if not oonirun_link:
         raise HTTPException(status_code=404, detail="OONI Run link not found")
 
-    if oonirun_link.expiration_date < now:
+    if oonirun_link.expiration_date_dt_native < now:
         raise HTTPException(
             status_code=403,
             detail="OONI Run link has expired and cannot be edited",
         )
+
+    if edit_request.expiration_date is not None:
+        q = db.query(models.OONIRunLink).filter(
+            models.OONIRunLink.oonirun_link_id == oonirun_link_id,
+            # Timezones in python are a mess...
+            models.OONIRunLink.expiration_date > now.replace(tzinfo=None),
+        )
+        if get_client_role(authorization) != "admin":
+            q = q.filter(models.OONIRunLink.creator_account_id == account_id)
+
+        q.update({"expiration_date": edit_request.expiration_date})
+        db.commit()
 
     current_nettests = oonirun_link.nettests
     if current_nettests != edit_request.nettests:
@@ -299,9 +314,9 @@ def list_oonirun_descriptors(
         Optional[bool],
         Query(description="List only the my descriptors"),
     ] = None,
-    include_archived: Annotated[
+    include_expired: Annotated[
         Optional[bool],
-        Query(description="List also archived descriptors"),
+        Query(description="List also expired descriptors"),
     ] = None,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
@@ -327,7 +342,7 @@ def list_oonirun_descriptors(
                     models.OONIRunLink.revision,
                 ).in_(subquery)
             )
-        if not include_archived:
+        if not include_expired:
             q = q.filter(
                 models.OONIRunLink.expiration_date > datetime.now(timezone.utc)
             )
