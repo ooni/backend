@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "oonidataapi"
-version = "0.3.0.dev1"
+version = "0.4.2.dev1"
 description = ""
 authors = ["OONI <contact@ooni.org>"]
 readme = "Readme.md"
@@ -26,6 +26,7 @@ alembic = "^1.13.1"
 pytest = "^7.4.4"
 docker = "^7.0.0"
 pytest-cov = "^4.1.0"
+click = "^8.1.7"
 
 [build-system]
 requires = ["poetry-core"]

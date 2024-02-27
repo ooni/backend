@@ -14,8 +14,28 @@ env:
   IMAGE_NAME: ooni/dataapi
 
 jobs:
+  test:
+    uses: ./.github/workflows/test_dataapi.yml
+
   build_and_push:
+    name: Build and push
+    needs: [test]
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: oonipg
+          POSTGRES_PASSWORD: oonipg
+          POSTGRES_DB: oonipg
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -37,6 +57,7 @@ jobs:
           echo "version_number=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Docker Image
+        id: dockerbuild
         env:
           DOCKERFILE_PATH: ${{ env.oonidataapi_dir }}
         run: |
@@ -45,6 +66,11 @@ jobs:
           TAG_BUILD_LABEL=$IMAGE_NAME:${{ steps.version.outputs.build_label }}
           TAG_VERSION=$IMAGE_NAME:v${{ steps.version.outputs.version_number }}
 
+          echo "tag_latest=$TAG_LATEST" >> $GITHUB_OUTPUT
+          echo "tag_environment=$TAG_ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "tag_build_label=$TAG_BUILD_LABEL" >> $GITHUB_OUTPUT
+          echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+
           # Build Docker image with multiple tags
           docker build --build-arg BUILD_LABEL=${{ steps.version.outputs.build_label }} \
                        -t $TAG_BUILD_LABEL \
@@ -52,12 +78,55 @@ jobs:
                        -t $TAG_LATEST \
                        -t $TAG_VERSION \
                        $DOCKERFILE_PATH
+      # Setup python
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
 
+      - name: Install poetry
+        run: |
+          curl -fsS https://install.python-poetry.org | python - --preview -y
+
+      - name: Add poetry to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Set up poetry cache
+        uses: actions/cache@v3
+        with:
+          path: "$HOME/.cache/pypoetry/virtualenvs"
+          key: venv-${{ runner.os }}-${{ hashFiles('**/api/fastapi/poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install
+        working-directory: ./api/fastapi/
+
+      # Configure database and docker
+      - name: Run alembic migrations
+        env:
+          OONI_PG_PASSWORD: oonipg
+          OONI_PG_HOST: localhost
+        run: poetry run alembic upgrade head
+        working-directory: ./api/fastapi/oonidataapi/
+
+      - name: Start Docker container with PostgreSQL
+        run: |
+          docker run -d --name oonidataapi -p 8000:80 \
+            -e POSTGRESQL_URL="postgresql://oonipg:oonipg@localhost/oonipg" \
+            ${{ steps.dockerbuild.outputs.tag_version }}
+
+      # Run smoke test
+      #- name: Run smoketest against the built docker image
+      #  run: poetry run python oonidataapi/tests/run_smoketest.py --backend-base-url=http://localhost:8000/
+      #  working-directory: ./api/fastapi/
+
+      - name: Push docker tags
+        run: |
           # Push all tags
-          docker push $TAG_BUILD_LABEL
-          docker push $TAG_ENVIRONMENT
-          docker push $TAG_LATEST
-          docker push $TAG_VERSION
+          docker push ${{ steps.dockerbuild.outputs.tag_latest }}
+          docker push ${{ steps.dockerbuild.outputs.tag_environment }}
+          docker push ${{ steps.dockerbuild.outputs.tag_build_label }}
+          docker push ${{ steps.dockerbuild.outputs.tag_version }}
 
       #- name: Checkout ooni/devops
       #  uses: actions/checkout@v2

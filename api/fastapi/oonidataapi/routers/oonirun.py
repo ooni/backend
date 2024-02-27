@@ -4,7 +4,7 @@ OONIRun link management
 https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from os import urandom
 from sys import byteorder
 from typing import Dict, Any, List, Optional
@@ -12,7 +12,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
-from pydantic import constr, Field, validator
+from pydantic import computed_field, constr, Field, validator
 from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
 
@@ -45,7 +45,9 @@ router = APIRouter()
 
 
 class OONIRunLinkBase(BaseModel):
-    name: str = Field(default="", title="name of the ooni run link", min_length=2)
+    name: str = Field(
+        default="", title="name of the ooni run link", min_length=2, max_length=50
+    )
     short_description: str = Field(
         default="",
         title="short description of the ooni run link",
@@ -58,7 +60,7 @@ class OONIRunLinkBase(BaseModel):
     )
     author: str = Field(
         default="",
-        title="public author name of ooni run link",
+        title="public email address of the author name of the ooni run link",
         min_length=2,
         max_length=100,
     )
@@ -80,35 +82,50 @@ class OONIRunLinkBase(BaseModel):
 
     @validator("name_intl", "short_description_intl", "description_intl")
     def validate_intl(cls, v):
+        # None is also a valid type
+        if v is None:
+            return v
         for value in v.values():
             if len(value) < 2:
                 raise ValueError("must be at least 2 characters")
         return v
 
-    icon: Optional[str] = ""
+    icon: Optional[str] = Field(
+        default=None,
+        description="icon to use for the ooni run link",
+    )
+    color: Optional[str] = Field(
+        default=None,
+        description="color to use for the ooni run link as a hex value prefixed with #",
+        pattern="^#(?:[0-9a-fA-F]{6})$",
+    )
+    expiration_date: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc) + timedelta(days=30 * 6),
+        description="future date after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
+    )
 
 
 class OONIRunLink(OONIRunLinkBase):
-    is_archived: Optional[bool] = False
     oonirun_link_id: int
     date_created: datetime
     date_updated: datetime
-    creator_account_id: str
     revision: int
     is_mine: Optional[bool] = False
 
-    v: int = 1
+    @computed_field
+    @property
+    def is_expired(self) -> bool:
+        # See docstring of models.OONIRunLink.expiration_date_dt_native
+        return self.expiration_date.replace(tzinfo=timezone.utc) < datetime.now(
+            timezone.utc
+        )
 
     class Config:
         orm_mode = True
 
 
-class OONIRunLinkCreate(OONIRunLinkBase):
+class OONIRunLinkCreateEdit(OONIRunLinkBase):
     pass
-
-
-class OONIRunLinkEdit(OONIRunLinkBase):
-    is_archived: Optional[bool] = False
 
 
 def generate_random_intuid() -> int:
@@ -119,12 +136,12 @@ def generate_random_intuid() -> int:
 
 @router.post(
     "/v2/oonirun",
-    tags=["oonirunv2"],
+    tags=["oonirun"],
     dependencies=[Depends(role_required(["admin", "user"]))],
     response_model=OONIRunLink,
 )
 def create_oonirun_link(
-    create_request: OONIRunLinkCreate,
+    create_request: OONIRunLinkCreateEdit,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
 ):
@@ -133,7 +150,7 @@ def create_oonirun_link(
     account_id = get_account_id_or_raise(authorization)
     assert create_request
 
-    now = datetime.utcnow().replace(microsecond=0)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
 
     oonirun_link = models.OONIRunLink(
         oonirun_link_id=generate_random_intuid(),
@@ -147,7 +164,8 @@ def create_oonirun_link(
         author=create_request.author,
         nettests=create_request.nettests,
         icon=create_request.icon,
-        is_archived=False,
+        color=create_request.color,
+        expiration_date=create_request.expiration_date,
         date_created=now,
         date_updated=now,
     )
@@ -166,8 +184,8 @@ def create_oonirun_link(
     response_model=OONIRunLink,
 )
 def edit_oonirun_link(
-    oonirun_link_id: int,
-    edit_request: OONIRunLinkEdit,
+    oonirun_link_id: str,
+    edit_request: OONIRunLinkCreateEdit,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
 ):
@@ -175,7 +193,7 @@ def edit_oonirun_link(
     log.debug(f"edit oonirun {oonirun_link_id}")
     account_id = get_account_id_or_raise(authorization)
 
-    now = datetime.utcnow().replace(microsecond=0)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
@@ -185,6 +203,24 @@ def edit_oonirun_link(
     oonirun_link = q.order_by(models.OONIRunLink.revision.desc()).first()
     if not oonirun_link:
         raise HTTPException(status_code=404, detail="OONI Run link not found")
+
+    if oonirun_link.expiration_date_dt_native < now:
+        raise HTTPException(
+            status_code=403,
+            detail="OONI Run link has expired and cannot be edited",
+        )
+
+    if edit_request.expiration_date is not None:
+        q = db.query(models.OONIRunLink).filter(
+            models.OONIRunLink.oonirun_link_id == oonirun_link_id,
+            # Timezones in python are a mess...
+            models.OONIRunLink.expiration_date > now.replace(tzinfo=None),
+        )
+        if get_client_role(authorization) != "admin":
+            q = q.filter(models.OONIRunLink.creator_account_id == account_id)
+
+        q.update({"expiration_date": edit_request.expiration_date})
+        db.commit()
 
     current_nettests = oonirun_link.nettests
     if current_nettests != edit_request.nettests:
@@ -200,7 +236,8 @@ def edit_oonirun_link(
             author=edit_request.author,
             nettests=edit_request.nettests,
             icon=edit_request.icon,
-            is_archived=edit_request.is_archived,
+            color=edit_request.color,
+            expiration_date=edit_request.expiration_date,
             revision=int(oonirun_link.revision + 1),
             date_created=now,
             date_updated=now,
@@ -218,18 +255,19 @@ def edit_oonirun_link(
     oonirun_link.author = edit_request.author
     oonirun_link.nettests = edit_request.nettests
     oonirun_link.icon = edit_request.icon
-    oonirun_link.is_archived = edit_request.is_archived
+    oonirun_link.color = edit_request.color
+    oonirun_link.expiration_date = edit_request.expiration_date
     oonirun_link.date_updated = now
     db.commit()
     return oonirun_link
 
 
-@metrics.timer("fetch_oonirun_descriptor")
+@metrics.timer("fetch_oonirun_link")
 @router.get(
     "/v2/oonirun/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
 )
-def fetch_oonirun_descriptor(
-    oonirun_link_id: int,
+def fetch_oonirun_link(
+    oonirun_link_id: str,
     revision: Annotated[
         Optional[int],
         Query(
@@ -258,17 +296,16 @@ def fetch_oonirun_descriptor(
     return oonirun_link
 
 
-class OONIRunDescriptorList(BaseModel):
-    descriptors: List[OONIRunLink]
-    v: int = 1
+class OONIRunLinkList(BaseModel):
+    links: List[OONIRunLink]
 
     class Config:
         orm_mode = True
 
 
-@router.get("/v2/oonirun/", tags=["oonirun"])
-def list_oonirun_descriptors(
-    ooni_run_link_id: Annotated[
+@router.get("/v2/oonirun_links", tags=["oonirun"])
+def list_oonirun_links(
+    oonirun_link_id: Annotated[
         Optional[str],
         Query(description="OONI Run descriptors comma separated"),
     ] = None,
@@ -280,53 +317,47 @@ def list_oonirun_descriptors(
         Optional[bool],
         Query(description="List only the my descriptors"),
     ] = None,
-    include_archived: Annotated[
+    include_expired: Annotated[
         Optional[bool],
-        Query(description="List also archived descriptors"),
+        Query(description="List also expired descriptors"),
     ] = None,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
-) -> OONIRunDescriptorList:
+) -> OONIRunLinkList:
     """List OONIRun descriptors"""
     log.debug("list oonirun")
     account_id = get_account_id_or_none(authorization)
 
     q = db.query(models.OONIRunLink)
-    try:
-        if only_latest:
-            subquery = (
-                db.query(
-                    models.OONIRunLink.oonirun_link_id,
-                    sqlalchemy.func.max(models.OONIRunLink.revision).label("revision"),
-                )
-                .group_by(models.OONIRunLink.oonirun_link_id)
-                .subquery("latest_link")
+    if only_latest:
+        subquery = (
+            db.query(
+                models.OONIRunLink.oonirun_link_id,
+                sqlalchemy.func.max(models.OONIRunLink.revision).label("revision"),
             )
-            q = q.filter(
-                sqlalchemy.tuple_(
-                    models.OONIRunLink.oonirun_link_id,
-                    models.OONIRunLink.revision,
-                ).in_(subquery)
-            )
-        if not include_archived:
-            q = q.filter(models.OONIRunLink.is_archived == False)
-        if only_mine:
-            q = q.filter(models.OONIRunLink.creator_account_id == account_id)
+            .group_by(models.OONIRunLink.oonirun_link_id)
+            .subquery("latest_link")
+        )
+        q = q.filter(
+            sqlalchemy.tuple_(
+                models.OONIRunLink.oonirun_link_id,
+                models.OONIRunLink.revision,
+            ).in_(subquery)
+        )
+    if not include_expired:
+        q = q.filter(models.OONIRunLink.expiration_date > datetime.now(timezone.utc))
+    if only_mine:
+        q = q.filter(models.OONIRunLink.creator_account_id == account_id)
 
-        if ooni_run_link_id:
-            q = q.filter(
-                models.OONIRunLink.oonirun_link_id.in_(commasplit(ooni_run_link_id))
-            )
+    if oonirun_link_id:
+        q = q.filter(
+            models.OONIRunLink.oonirun_link_id.in_(commasplit(oonirun_link_id))
+        )
 
-    except Exception as e:
-        log.debug(f"list_oonirun_descriptors: invalid parameter. {e}")
-        raise HTTPException(status_code=400, detail="Incorrect parameter used")
-
-    descriptors = []
+    links = []
     for row in q.all():
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
-            creator_account_id=row.creator_account_id,
             name=row.name,
             name_intl=row.name_intl,
             short_description=row.short_description,
@@ -336,12 +367,12 @@ def list_oonirun_descriptors(
             author=row.author,
             nettests=row.nettests,
             icon=row.icon,
-            is_archived=row.is_archived,
+            expiration_date=row.expiration_date,
             revision=row.revision,
             date_created=row.date_created,
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,
         )
-        descriptors.append(oonirun_link)
-    log.debug(f"Returning {len(descriptors)} descriptor[s]")
-    return OONIRunDescriptorList(v=1, descriptors=descriptors)
+        links.append(oonirun_link)
+    log.debug(f"Returning {len(links)} ooni run links")
+    return OONIRunLinkList(links=links)
