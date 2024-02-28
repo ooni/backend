@@ -15,7 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-def setup_db(db_url):
+def setup_db_alembic(db_url):
     from alembic import command
     from alembic.config import Config
 
@@ -24,11 +24,15 @@ def setup_db(db_url):
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_path))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-    print(migrations_path)
-    print(db_url)
 
     ret = command.upgrade(alembic_cfg, "head")
     print(ret)
+
+
+def setup_db(db_url):
+    engine = create_engine(db_url, connect_args={"check_same_thread": False})
+    metadata = models.OONIRunLink.metadata
+    metadata.create_all(engine)
 
 
 def override_pg(db_url):

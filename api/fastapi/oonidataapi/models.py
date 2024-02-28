@@ -7,7 +7,7 @@ from .postgresql import Base
 class OONIRunLink(Base):
     __tablename__ = "oonirun"
 
-    oonirun_link_id = Column(Integer, primary_key=True)
+    oonirun_link_id = Column(String, primary_key=True)
     revision = Column(Integer, default=1, primary_key=True)
     date_updated = Column(DateTime)
     date_created = Column(DateTime)
