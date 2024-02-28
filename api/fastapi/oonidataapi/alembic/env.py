@@ -1,3 +1,5 @@
+import os
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -20,6 +22,9 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 from oonidataapi import models
 target_metadata = models.Base.metadata
+
+section = config.config_ini_section
+config.set_section_option(section, "OONI_PG_PASSWORD", os.environ["OONI_PG_PASSWORD"])
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
