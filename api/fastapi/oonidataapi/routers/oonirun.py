@@ -82,6 +82,9 @@ class OONIRunLinkBase(BaseModel):
 
     @validator("name_intl", "short_description_intl", "description_intl")
     def validate_intl(cls, v):
+        # None is also a valid type
+        if v is None:
+            return v
         for value in v.values():
             if len(value) < 2:
                 raise ValueError("must be at least 2 characters")

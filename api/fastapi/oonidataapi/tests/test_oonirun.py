@@ -64,6 +64,15 @@ def test_oonirun_validation(client, client_with_user_role, client_with_admin_rol
     r = client_with_user_role.post("/api/v2/oonirun", json=z)
     assert r.status_code == 422, "empty name_intl should be rejected"
 
+    z = deepcopy(SAMPLE_OONIRUN)
+    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    assert r.status_code == 422, "empty name should be rejected"
+
+    z["name"] = "integ-test name in English"
+    z["name_intl"] = None
+    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    assert r.status_code == 200, "name_intl can be None"
+
 
 def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role):
     z = deepcopy(SAMPLE_OONIRUN)
@@ -91,6 +100,10 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
 
     r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
     assert r.status_code == 403, "expired link cannot be edited"
+
+    r = client_with_user_role.get("/api/_/ooni_run/fetch/999999999999999")
+    assert r.status_code == 404, r.json()
+    assert "not found" in r.json()["detail"].lower()
 
 
 def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_role):
@@ -327,12 +340,6 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     assert r.json()["is_expired"] == True, r.json()
-
-
-def test_fetch_not_found(client_with_user_role):
-    r = client_with_user_role.get("/api/_/ooni_run/fetch/999999999999999")
-    assert r.status_code == 404, r.json()
-    assert "not found" in r.json()["detail"].lower()
 
 
 def test_oonirun_expiration(client, client_with_user_role):
