@@ -326,37 +326,30 @@ def list_oonirun_descriptors(
     account_id = get_account_id_or_none(authorization)
 
     q = db.query(models.OONIRunLink)
-    try:
-        if only_latest:
-            subquery = (
-                db.query(
-                    models.OONIRunLink.oonirun_link_id,
-                    sqlalchemy.func.max(models.OONIRunLink.revision).label("revision"),
-                )
-                .group_by(models.OONIRunLink.oonirun_link_id)
-                .subquery("latest_link")
+    if only_latest:
+        subquery = (
+            db.query(
+                models.OONIRunLink.oonirun_link_id,
+                sqlalchemy.func.max(models.OONIRunLink.revision).label("revision"),
             )
-            q = q.filter(
-                sqlalchemy.tuple_(
-                    models.OONIRunLink.oonirun_link_id,
-                    models.OONIRunLink.revision,
-                ).in_(subquery)
-            )
-        if not include_expired:
-            q = q.filter(
-                models.OONIRunLink.expiration_date > datetime.now(timezone.utc)
-            )
-        if only_mine:
-            q = q.filter(models.OONIRunLink.creator_account_id == account_id)
+            .group_by(models.OONIRunLink.oonirun_link_id)
+            .subquery("latest_link")
+        )
+        q = q.filter(
+            sqlalchemy.tuple_(
+                models.OONIRunLink.oonirun_link_id,
+                models.OONIRunLink.revision,
+            ).in_(subquery)
+        )
+    if not include_expired:
+        q = q.filter(models.OONIRunLink.expiration_date > datetime.now(timezone.utc))
+    if only_mine:
+        q = q.filter(models.OONIRunLink.creator_account_id == account_id)
 
-        if oonirun_link_id:
-            q = q.filter(
-                models.OONIRunLink.oonirun_link_id.in_(commasplit(oonirun_link_id))
-            )
-
-    except Exception as e:
-        log.debug(f"list_oonirun_descriptors: invalid parameter. {e}")
-        raise HTTPException(status_code=400, detail="Incorrect parameter used")
+    if oonirun_link_id:
+        q = q.filter(
+            models.OONIRunLink.oonirun_link_id.in_(commasplit(oonirun_link_id))
+        )
 
     descriptors = []
     for row in q.all():
