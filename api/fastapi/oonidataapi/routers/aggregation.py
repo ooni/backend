@@ -155,13 +155,14 @@ async def get_measurements(
         Query(
             min_length=3,
             description="Domain to search measurements for, comma separated",
+            # TODO: add validation for domain name
         ),
     ] = None,
     category_code: Annotated[
         Optional[str],
         Query(
             description="The category code from the citizenlab list",
-            regex=r"^[A-Z]+$",
+            pattern="^[A-Z]+$",
         ),
     ] = None,
     probe_cc: Annotated[
@@ -178,7 +179,11 @@ async def get_measurements(
         ),
     ] = None,
     test_name: Annotated[
-        Optional[str], Query(description="Name of the tests, comma separated")
+        Optional[str],
+        Query(
+            description="Name of the tests, comma separated",
+            pattern="^[a-z0-9_,]+$",
+        ),
     ] = None,
     ooni_run_link_id: Annotated[
         Optional[str], Query(description="OONIRun descriptors comma separated")
@@ -206,14 +211,14 @@ async def get_measurements(
         Optional[str],
         Query(
             description="The dimension on the x axis e.g. measurement_start_day",
-            regex=r"^[a-z_]+$",
+            pattern="^[a-z_]+$",
         ),
     ] = None,
     axis_y: Annotated[
         Optional[str],
         Query(
             description="The dimension on the y axis e.g. probe_cc",
-            regex=r"^[a-z_]+$",
+            pattern="^[a-z_]+$",
         ),
     ] = None,
     format: Annotated[
@@ -236,7 +241,7 @@ async def get_measurements(
         test_name_s = commasplit(test_name)
     domain_s = []
     if domain:
-        domain_s = set(commasplit(domain))
+        domain_s = commasplit(domain)
     probe_asn_s = []
     if probe_asn:
         try:
