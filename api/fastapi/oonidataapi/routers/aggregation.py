@@ -137,7 +137,7 @@ class MeasurementAggregation(BaseModel):
     result: Union[List[AggregationResult], AggregationResult]
 
 
-@router.get("/v1/aggregation")
+@router.get("/v1/aggregation", response_model_exclude_none=True)
 @metrics.timer("get_aggregated")
 async def get_measurements(
     db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
@@ -408,7 +408,7 @@ async def get_measurements(
                     elapsed_seconds=pq.elapsed,
                 ),
                 result=r,
-            )
+            ).model_dump(exclude_none=True)
 
     except Exception as e:
         return jerror(str(e), v=0)
