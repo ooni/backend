@@ -1,5 +1,6 @@
 from pathlib import Path
 import time
+from typing import Iterable
 from fastapi.testclient import TestClient
 import pytest
 import docker
@@ -10,18 +11,23 @@ from clickhouse_driver import Client as Clickhouse
 from ...config import settings
 from ...main import app
 
-THIS_DIR = Path(__file__).parent
+THIS_DIR = Path(__file__).parent.parent.resolve()
 
 
 def run_clickhouse_sql_scripts(clickhouse_url):
     click = Clickhouse.from_url(clickhouse_url)
     tables = click.execute("SHOW TABLES")
+    assert isinstance(tables, Iterable)
     for row in tables:
         if row[0] == "fastpath":
             return
 
-    for fn in ["1_schema", "2_fixtures"]:
-        sql_f = THIS_DIR / f"clickhouse_{fn}.sql"
+    for fn in [
+        "clickhouse_1_schema.sql",
+        "clickhouse_2_fixtures.sql",
+        "2_fastpath_fixtures.sql",
+    ]:
+        sql_f = THIS_DIR / "fixtures" / fn
         print(f"[+] running {sql_f} on {clickhouse_url}")
         sql_no_comment = "\n".join(
             filter(lambda x: not x.startswith("--"), sql_f.read_text().split("\n"))
