@@ -65,7 +65,7 @@ jobs:
                        $DOCKERFILE_PATH
 
       - name: Start Docker container
-        run: docker run -d --name oonidataapi -p 8000:8000 ${{ steps.dockerbuild.ouputs.tag_version }}
+        run: docker run -d --name oonidataapi -p 8000:8000 ${{ steps.dockerbuild.outputs.tag_version }}
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
@@ -95,10 +95,10 @@ jobs:
       - name: Push docker tags
         run: |
           # Push all tags
-          docker push ${{ steps.dockerbuild.ouputs.tag_latest }}
-          docker push ${{ steps.dockerbuild.ouputs.tag_environment }}
-          docker push ${{ steps.dockerbuild.ouputs.tag_build_label }}
-          docker push ${{ steps.dockerbuild.ouputs.tag_version }}
+          docker push ${{ steps.dockerbuild.outputs.tag_latest }}
+          docker push ${{ steps.dockerbuild.outputs.tag_environment }}
+          docker push ${{ steps.dockerbuild.outputs.tag_build_label }}
+          docker push ${{ steps.dockerbuild.outputs.tag_version }}
 
       #- name: Checkout ooni/devops
       #  uses: actions/checkout@v2
