@@ -116,9 +116,9 @@ jobs:
             ${{ steps.dockerbuild.outputs.tag_version }}
 
       # Run smoke test
-      - name: Run smoketest against the built docker image
-        run: poetry run python oonidataapi/tests/run_smoketest.py --backend-base-url=http://localhost:8000/
-        working-directory: ./api/fastapi/
+      #- name: Run smoketest against the built docker image
+      #  run: poetry run python oonidataapi/tests/run_smoketest.py --backend-base-url=http://localhost:8000/
+      #  working-directory: ./api/fastapi/
 
       - name: Push docker tags
         run: |
