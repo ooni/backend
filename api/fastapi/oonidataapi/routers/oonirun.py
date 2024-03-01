@@ -262,11 +262,11 @@ def edit_oonirun_link(
     return oonirun_link
 
 
-@metrics.timer("fetch_oonirun_descriptor")
+@metrics.timer("fetch_oonirun_link")
 @router.get(
     "/v2/oonirun/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
 )
-def fetch_oonirun_descriptor(
+def fetch_oonirun_link(
     oonirun_link_id: str,
     revision: Annotated[
         Optional[int],
@@ -296,15 +296,15 @@ def fetch_oonirun_descriptor(
     return oonirun_link
 
 
-class OONIRunDescriptorList(BaseModel):
-    descriptors: List[OONIRunLink]
+class OONIRunLinkList(BaseModel):
+    links: List[OONIRunLink]
 
     class Config:
         orm_mode = True
 
 
-@router.get("/v2/oonirun", tags=["oonirun"])
-def list_oonirun_descriptors(
+@router.get("/v2/oonirun_links", tags=["oonirun"])
+def list_oonirun_links(
     oonirun_link_id: Annotated[
         Optional[str],
         Query(description="OONI Run descriptors comma separated"),
@@ -323,7 +323,7 @@ def list_oonirun_descriptors(
     ] = None,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
-) -> OONIRunDescriptorList:
+) -> OONIRunLinkList:
     """List OONIRun descriptors"""
     log.debug("list oonirun")
     account_id = get_account_id_or_none(authorization)
@@ -354,7 +354,7 @@ def list_oonirun_descriptors(
             models.OONIRunLink.oonirun_link_id.in_(commasplit(oonirun_link_id))
         )
 
-    descriptors = []
+    links = []
     for row in q.all():
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
@@ -373,6 +373,6 @@ def list_oonirun_descriptors(
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,
         )
-        descriptors.append(oonirun_link)
-    log.debug(f"Returning {len(descriptors)} descriptor[s]")
-    return OONIRunDescriptorList(descriptors=descriptors)
+        links.append(oonirun_link)
+    log.debug(f"Returning {len(links)} ooni run links")
+    return OONIRunLinkList(links=links)
