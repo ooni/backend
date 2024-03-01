@@ -99,10 +99,12 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
     assert r.status_code == 403, "expired link cannot be edited"
 
-    r = client_with_user_role.get(f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}")
+    r = client_with_user_role.get(
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}"
+    )
     j = r.json()
     assert r.status_code == 200, r.json()
-    assert j["descriptors"] == []
+    assert j["links"] == []
 
 
 def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_role):
@@ -171,28 +173,28 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["is_mine"] == True
     assert j["revision"] == 1
 
-    r = client_with_user_role.get("/api/v2/oonirun/")
+    r = client_with_user_role.get("/api/v2/oonirun_links")
     assert r.status_code == 200, r.json()
 
     j = r.json()
-    assert len(j["descriptors"]) > 0
+    assert len(j["links"]) > 0
 
     found = False
-    for d in j["descriptors"]:
+    for d in j["links"]:
         if d["oonirun_link_id"] == oonirun_link_id:
             found = True
         assert sorted(d.keys()) == sorted(EXPECTED_OONIRUN_LINK_PUBLIC_KEYS)
     assert found == True
 
     ## list all items as admin
-    r = client_with_admin_role.get("/api/v2/oonirun/")
+    r = client_with_admin_role.get("/api/v2/oonirun_links")
     assert r.status_code == 200, r.json()
 
     j = r.json()
-    assert len(j["descriptors"]) > 0
+    assert len(j["links"]) > 0
 
     found = False
-    for d in j["descriptors"]:
+    for d in j["links"]:
         if d["oonirun_link_id"] == oonirun_link_id:
             found = True
         assert sorted(d.keys()) == sorted(EXPECTED_OONIRUN_LINK_PUBLIC_KEYS)
@@ -203,14 +205,14 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     # assert desc[0]["name_intl"] == "integ-test"
 
     ## list all items as anonymous
-    r = client.get("/api/v2/oonirun/")
+    r = client.get("/api/v2/oonirun_links")
     assert r.status_code == 200, r.json()
 
     j = r.json()
-    assert len(j["descriptors"]) > 0
+    assert len(j["links"]) > 0
 
     found = False
-    for d in j["descriptors"]:
+    for d in j["links"]:
         if d["oonirun_link_id"] == oonirun_link_id:
             found = True
             assert d["is_mine"] == False
@@ -236,18 +238,18 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
 
     ## List descriptors as admin and find we have 2 versions now
     r = client_with_admin_role.get(
-        f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}"
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}"
     )
     assert r.status_code == 200, r.json()
-    descs = r.json()["descriptors"]
+    descs = r.json()["links"]
     assert len(descs) == 2, r.json()
 
     ## List descriptors using more params
     r = client_with_user_role.get(
-        f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}&only_mine=True"
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}&only_mine=True"
     )
     assert r.status_code == 200, r.json()
-    descs = r.json()["descriptors"]
+    descs = r.json()["links"]
     assert len(descs) == 2, r.json()
     for d in descs:
         assert d["is_mine"] is True
@@ -309,30 +311,32 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
 
     ## List descriptors after expiration filtering by ID
     r = client_with_user_role.get(
-        f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}&include_expired=True"
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}&include_expired=True"
     )
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 2, r.json()
 
     ## List descriptors after expiration NOT filtering by ID
-    r = client_with_user_role.get(f"/api/v2/oonirun/?&include_expired=True")
+    r = client_with_user_role.get(f"/api/v2/oonirun_links?include_expired=True")
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 3, r.json()
 
     ## List descriptors filtered by ID
-    r = client_with_user_role.get(f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}")
+    r = client_with_user_role.get(
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}"
+    )
     assert r.status_code == 200, r.json()
-    descs = r.json()["descriptors"]
+    descs = r.json()["links"]
     assert len(descs) == 0, r.json()
 
     ## List descriptors unfiltered by ID
-    r = client_with_user_role.get(f"/api/v2/oonirun/")
+    r = client_with_user_role.get(f"/api/v2/oonirun_links")
     assert r.status_code == 200, r.json()
-    descs = r.json()["descriptors"]
+    descs = r.json()["links"]
     assert len(descs) == 1, r.json()
 
     ## Fetch latest and find that it's archived
@@ -381,29 +385,31 @@ def test_oonirun_expiration(client, client_with_user_role):
     assert r.json()["is_expired"] == True, r.json()
 
     ## List descriptors after expiration
-    r = client_with_user_role.get(f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}")
+    r = client_with_user_role.get(
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}"
+    )
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 0, r.json()
 
     ## List descriptors after expiration
     r = client_with_user_role.get(
-        f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}&include_expired=True"
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}&include_expired=True"
     )
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 2, r.json()
     for d in descs:
         assert d["is_expired"] == True, "is_expired should be True"
 
     r = client_with_user_role.get(
-        f"/api/v2/oonirun/?oonirun_link_id={oonirun_link_id}&include_expired=True&only_latest=True"
+        f"/api/v2/oonirun_links?oonirun_link_id={oonirun_link_id}&include_expired=True&only_latest=True"
     )
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 1, r.json()
     for d in descs:
         assert d["is_expired"] == True, "is_expired should be True"
@@ -445,16 +451,16 @@ def test_oonirun_revisions(client, client_with_user_role):
     j = r.json()
     assert j["revision"] == 3, "revision is 3"
 
-    r = client_with_user_role.get(f"/api/v2/oonirun/")
+    r = client_with_user_role.get(f"/api/v2/oonirun_links")
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 5, r.json()
 
-    r = client_with_user_role.get(f"/api/v2/oonirun/?only_latest=True")
+    r = client_with_user_role.get(f"/api/v2/oonirun_links?only_latest=True")
     j = r.json()
     assert r.status_code == 200, r.json()
-    descs = j["descriptors"]
+    descs = j["links"]
     assert len(descs) == 2, r.json()
     for d in descs:
         if d["oonirun_link_id"] == oonirun_link_id_one:
