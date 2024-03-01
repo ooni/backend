@@ -8,9 +8,7 @@ import time
 
 SAMPLE_OONIRUN = {
     "name": "",
-    "name_intl": {
-        "it": "",
-    },
+    "name_intl": {},
     "description": "integ-test description in English",
     "description_intl": {
         "es": "integ-test descripción en español",
@@ -408,3 +406,57 @@ def test_oonirun_expiration(client, client_with_user_role):
     assert len(descs) == 1, r.json()
     for d in descs:
         assert d["is_expired"] == True, "is_expired should be True"
+
+
+def test_oonirun_revisions(client, client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    ### Create descriptor as user
+    z["name"] = "first descriptor"
+    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+    oonirun_link_id_one = int(j["oonirun_link_id"])
+
+    ## Create two new revisions
+    j["nettests"][0]["inputs"].append("https://foo.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id_one}", json=j)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+    j["nettests"][0]["inputs"].append("https://foo2.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id_one}", json=j)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    ### Create another descriptor as user
+    z["name"] = "second descriptor"
+    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+    oonirun_link_id_two = int(j["oonirun_link_id"])
+
+    ## Create new revision
+    j["nettests"][0]["inputs"].append("https://foo.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id_two}", json=j)
+    assert r.status_code == 200, r.json()
+
+    ## Fetch anonymously and check it's got the new revision
+    r = client.get(f"/api/v2/oonirun/{oonirun_link_id_one}")
+    j = r.json()
+    assert j["revision"] == 3, "revision is 3"
+
+    r = client_with_user_role.get(f"/api/v2/oonirun/")
+    j = r.json()
+    assert r.status_code == 200, r.json()
+    descs = j["descriptors"]
+    assert len(descs) == 5, r.json()
+
+    r = client_with_user_role.get(f"/api/v2/oonirun/?only_latest=True")
+    j = r.json()
+    assert r.status_code == 200, r.json()
+    descs = j["descriptors"]
+    assert len(descs) == 2, r.json()
+    for d in descs:
+        if d["oonirun_link_id"] == oonirun_link_id_one:
+            assert d["revision"] == 3, "revision is 3"
+        if d["oonirun_link_id"] == oonirun_link_id_two:
+            assert d["revision"] == 2, "revision is 2"
