@@ -136,7 +136,7 @@ def generate_random_intuid() -> int:
 
 @router.post(
     "/v2/oonirun",
-    tags=["oonirunv2"],
+    tags=["oonirun"],
     dependencies=[Depends(role_required(["admin", "user"]))],
     response_model=OONIRunLink,
 )
@@ -303,7 +303,7 @@ class OONIRunDescriptorList(BaseModel):
         orm_mode = True
 
 
-@router.get("/v2/oonirun/", tags=["oonirun"])
+@router.get("/v2/oonirun", tags=["oonirun"])
 def list_oonirun_descriptors(
     oonirun_link_id: Annotated[
         Optional[str],

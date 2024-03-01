@@ -99,9 +99,10 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
     assert r.status_code == 403, "expired link cannot be edited"
 
-    r = client_with_user_role.get("/api/_/ooni_run/fetch/999999999999999")
-    assert r.status_code == 404, r.json()
-    assert "not found" in r.json()["detail"].lower()
+    r = client_with_user_role.get(f"/api/v2/oonirun?ids={oonirun_link_id}")
+    j = r.json()
+    assert r.status_code == 200, r.json()
+    assert j["descriptors"] == []
 
 
 def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_role):
