@@ -28,6 +28,9 @@ section = config.config_ini_section
 config.set_section_option(
     section, "OONI_PG_PASSWORD", os.environ.get("OONI_PG_PASSWORD", "")
 )
+config.set_section_option(
+    section, "OONI_PG_HOST", os.environ.get("OONI_PG_HOST", "postgres.tier0.prod.ooni.nu")
+)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

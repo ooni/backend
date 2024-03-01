@@ -21,6 +21,18 @@ jobs:
     name: Build and push
     needs: [test]
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: oonipg
+          POSTGRES_PASSWORD: oonipg
+          POSTGRES_DB: oonipg
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -64,9 +76,20 @@ jobs:
                        -t $TAG_VERSION \
                        $DOCKERFILE_PATH
 
-      - name: Start Docker container
-        run: docker run -d --name oonidataapi -p 8000:80 ${{ steps.dockerbuild.outputs.tag_version }}
+      - name: Run alembic migrations
+        env:
+          OONI_PG_PASSWORD: oonipg
+          OONI_PG_HOST: postgres
+        run: poetry run alembic upgrade head
+        working-directory: ./api/fastapi/oonidataapi/
 
+      - name: Start Docker container with PostgreSQL
+        run: |
+          docker run -d --name oonidataapi -p 8000:80 \
+            -e POSTGRESQL_URL="postgresql://oonipg:oonipg@postgres/oonipg" \
+            ${{ steps.dockerbuild.outputs.tag_version }}
+
+      # Setup python
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
@@ -89,6 +112,7 @@ jobs:
         run: poetry install
         working-directory: ./api/fastapi/
 
+      # Run smoke test
       - name: Run smoketest against the built docker image
         run: poetry run python oonidataapi/tests/run_smoketest.py --backend-base-url=http://localhost:8000/
         working-directory: ./api/fastapi/
