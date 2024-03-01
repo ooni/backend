@@ -4,10 +4,10 @@ import random
 
 
 def test_oonirun(client):
-    r = client.get("/api/v2/oonirun/")
+    r = client.get("/api/v2/oonirun_links")
     r.raise_for_status()
     j = r.json()
-    desc = j["descriptors"]
+    desc = j["links"]
     assert isinstance(desc, list)
     if len(desc) > 0:
         for _ in range(5):
