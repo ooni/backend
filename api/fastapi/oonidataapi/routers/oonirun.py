@@ -184,7 +184,7 @@ def create_oonirun_link(
     response_model=OONIRunLink,
 )
 def edit_oonirun_link(
-    oonirun_link_id: int,
+    oonirun_link_id: str,
     edit_request: OONIRunLinkCreateEdit,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
@@ -267,7 +267,7 @@ def edit_oonirun_link(
     "/v2/oonirun/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
 )
 def fetch_oonirun_descriptor(
-    oonirun_link_id: int,
+    oonirun_link_id: str,
     revision: Annotated[
         Optional[int],
         Query(
