@@ -14,7 +14,12 @@ env:
   IMAGE_NAME: ooni/dataapi
 
 jobs:
+  test:
+    uses: ./.github/workflows/test_dataapi.yml
+
   build_and_push:
+    name: Build and push
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -37,6 +42,7 @@ jobs:
           echo "version_number=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Docker Image
+        id: dockerbuild
         env:
           DOCKERFILE_PATH: ${{ env.oonidataapi_dir }}
         run: |
@@ -44,6 +50,11 @@ jobs:
           TAG_ENVIRONMENT=$IMAGE_NAME:production
           TAG_BUILD_LABEL=$IMAGE_NAME:${{ steps.version.outputs.build_label }}
           TAG_VERSION=$IMAGE_NAME:v${{ steps.version.outputs.version_number }}
+
+          echo "tag_latest=$TAG_LATEST" >> $GITHUB_OUTPUT
+          echo "tag_environment=$TAG_ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "tag_build_label=$TAG_BUILD_LABEL" >> $GITHUB_OUTPUT
+          echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
 
           # Build Docker image with multiple tags
           docker build --build-arg BUILD_LABEL=${{ steps.version.outputs.build_label }} \
@@ -53,11 +64,41 @@ jobs:
                        -t $TAG_VERSION \
                        $DOCKERFILE_PATH
 
+      - name: Start Docker container
+        run: docker run -d --name oonidataapi -p 8000:8000 ${{ steps.dockerbuild.ouputs.tag_version }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install poetry
+        run: |
+          curl -fsS https://install.python-poetry.org | python - --preview -y
+
+      - name: Add poetry to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Set up poetry cache
+        uses: actions/cache@v3
+        with:
+          path: "$HOME/.cache/pypoetry/virtualenvs"
+          key: venv-${{ runner.os }}-${{ hashFiles('**/api/fastapi/poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install
+        working-directory: ./api/fastapi/
+
+      - name: Run smoketest against the built docker image
+        run: poetry run python oonidataapi/tests/run_smoketest.py --backend-base-url=http://localhost:8000/
+
+      - name: Push docker tags
+        run: |
           # Push all tags
-          docker push $TAG_BUILD_LABEL
-          docker push $TAG_ENVIRONMENT
-          docker push $TAG_LATEST
-          docker push $TAG_VERSION
+          docker push ${{ steps.dockerbuild.ouputs.tag_latest }}
+          docker push ${{ steps.dockerbuild.ouputs.tag_environment }}
+          docker push ${{ steps.dockerbuild.ouputs.tag_build_label }}
+          docker push ${{ steps.dockerbuild.ouputs.tag_version }}
 
       #- name: Checkout ooni/devops
       #  uses: actions/checkout@v2
