@@ -65,7 +65,7 @@ jobs:
                        $DOCKERFILE_PATH
 
       - name: Start Docker container
-        run: docker run -d --name oonidataapi -p 8000:8000 ${{ steps.dockerbuild.outputs.tag_version }}
+        run: docker run -d --name oonidataapi -p 8000:80 ${{ steps.dockerbuild.outputs.tag_version }}
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
