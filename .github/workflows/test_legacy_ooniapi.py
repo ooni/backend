@@ -1,4 +1,4 @@
-name: Test API
+name: Test Legacy API
 on:
   pull_request:
   workflow_dispatch:
@@ -9,6 +9,29 @@ on:
         default: false
 
 jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    container: debian:11
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - name: Setup APT
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y ca-certificates gnupg
+          echo "deb http://deb-ci.ooni.org unstable main" >> /etc/apt/sources.list
+          apt-key adv --verbose --keyserver hkp://keyserver.ubuntu.com --recv-keys "B5A08F01796E7F521861B449372D1FF271F2DD50"
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -qy mypy
+
+      - name: Run tests
+        # see the mypy.ini file
+        run: cd api && mypy **/*.py
+
   integration_test:
     runs-on: ubuntu-latest
     steps:
