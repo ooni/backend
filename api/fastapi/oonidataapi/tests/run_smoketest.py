@@ -6,8 +6,8 @@ import random
 
 def test_oonirun(client):
     r = client.get("/api/v2/oonirun_links")
-    r.raise_for_status()
     j = r.json()
+    assert r.status_code == 200, j
     desc = j["links"]
     assert isinstance(desc, list)
     if len(desc) > 0:
