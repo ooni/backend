@@ -127,18 +127,24 @@ def raw_query(
     return q
 
 
-def decode_jwt(token: str, **kw) -> Dict[str, Any]:
-    # raises ExpiredSignatureError on expiration
-    key = settings.jwt_encryption_key
+def decode_jwt(token: str, key: str, **kw) -> Dict[str, Any]:
     tok = jwt.decode(token, key, algorithms=["HS256"], **kw)
     return tok
+
+
+def create_jwt(payload: dict, key: str) -> str:
+    token = jwt.encode(payload, key, algorithm="HS256")
+    if isinstance(token, bytes):
+        return token.decode()
+    else:
+        return token
 
 
 def get_client_token(authorization: str):
     try:
         assert authorization.startswith("Bearer ")
         token = authorization[7:]
-        return decode_jwt(token, audience="user_auth")
+        return decode_jwt(token, audience="user_auth", key=settings.jwt_encryption_key)
     except:
         return None
 

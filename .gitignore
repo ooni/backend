@@ -17,3 +17,4 @@ af/oometa/tsvdump.dir/
 .tox/
 af/fastpath/var/
 af/fastpath/etc/
+.coverage
