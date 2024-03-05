@@ -11,7 +11,7 @@ phases:
     commands:
       - echo "Installing Poetry"
       - curl -fsS https://install.python-poetry.org | python - --preview -y
-      - echo "$HOME/.local/bin" >> $PATH
+      - export PATH="$HOME/.local/bin"
 
   pre_build:
     commands:
