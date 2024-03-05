@@ -2,7 +2,7 @@ version: 0.2
 env:
   variables:
     OONI_CODE_PATH: api/fastapi/
-    IMAGE_NAME: ooni/dataapi
+    IMAGE_NAME: 082866812839.dkr.ecr.eu-central-1.amazonaws.com/ooni/dataapi
 
 phases:
   install:
@@ -15,6 +15,7 @@ phases:
 
   pre_build:
     commands:
+      - aws --version
       - echo "Logging in to ECR"
       - aws ecr get-login-password --region eu-central-1
       - echo "Formatting version information..."
@@ -37,15 +38,20 @@ phases:
                      -t $IMAGE_NAME:production \
                      -t $IMAGE_NAME:latest \
                      -t $IMAGE_NAME:v$VERSION_NUMBER \
-                     ./Dockerfile
+                     .
 
   post_build:
     commands:
+      - echo "Build complete at $(date)"
       - echo "Pushing Docker images..."
       - docker push $IMAGE_NAME:$BUILD_LABEL
       - docker push $IMAGE_NAME:production
       - docker push $IMAGE_NAME:latest
       - docker push $IMAGE_NAME:v$VERSION_NUMBER
+      - printf '[{"name":"ooni_dataapi","imageUri":"%s"}]' $IMAGE_NAME:$BUILD_LABEL > imagedefinitions.json
+
+artifacts:
+  files: imagedefinitions.json
 
 cache:
   paths:
