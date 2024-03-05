@@ -26,6 +26,7 @@ phases:
 
   build:
     commands:
+      - PROJECT_ROOT=$(pwd)
       - cd $OONI_CODE_PATH
       - echo "Installing project dependencies with poetry..."
       - poetry install --no-root
@@ -48,7 +49,7 @@ phases:
       - docker push $IMAGE_NAME:production
       - docker push $IMAGE_NAME:latest
       - docker push $IMAGE_NAME:v$VERSION_NUMBER
-      - printf '[{"name":"ooni_dataapi","imageUri":"%s"}]' $IMAGE_NAME:$BUILD_LABEL > imagedefinitions.json
+      - printf '[{"name":"ooni_dataapi","imageUri":"%s"}]' $IMAGE_NAME:$BUILD_LABEL > ${PROJECT_ROOT}/imagedefinitions.json
 
 artifacts:
   files: imagedefinitions.json
