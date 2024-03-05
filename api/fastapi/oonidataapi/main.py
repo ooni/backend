@@ -34,7 +34,12 @@ from importlib.resources import files as importlib_files
 
 pkg_name = "oonidataapi"
 
-pkg_version = importlib_version(pkg_name)
+try:
+    pkg_version = importlib_version(pkg_name)
+except:
+    # This happens when we are not installed, for example in development
+    pkg_version = None
+
 try:
     with importlib_files(pkg_name).joinpath("BUILD_LABEL").open("r") as in_file:
         build_label = in_file.read().strip()

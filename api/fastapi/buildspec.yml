@@ -11,12 +11,12 @@ phases:
     commands:
       - echo "Installing Poetry"
       - curl -fsS https://install.python-poetry.org | python - --preview -y
-      - export PATH="$HOME/.local/bin"
+      - export PATH="$HOME/.local/bin:$PATH"
 
   pre_build:
     commands:
       - echo "Logging in to ECR"
-      - aws ecr get-login --no-include-email --region eu-central-1
+      - aws ecr get-login-password --region eu-central-1
       - echo "Formatting version information..."
       - DATE=$(date +'%Y%m%d')
       - SHORT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
