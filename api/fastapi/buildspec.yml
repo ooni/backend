@@ -17,7 +17,7 @@ phases:
     commands:
       - aws --version
       - echo "Logging in to ECR"
-      - aws ecr get-login-password --region eu-central-1
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 082866812839.dkr.ecr.us-west-2.amazonaws.com
       - echo "Formatting version information..."
       - DATE=$(date +'%Y%m%d')
       - SHORT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
@@ -52,7 +52,3 @@ phases:
 
 artifacts:
   files: imagedefinitions.json
-
-cache:
-  paths:
-    - "$HOME/.cache/pypoetry/**/*"
