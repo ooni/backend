@@ -101,18 +101,29 @@ class OONIRunLinkBase(BaseModel):
     )
     expiration_date: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc) + timedelta(days=30 * 6),
-        description="future date after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
+        description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
 
 
 class OONIRunLink(OONIRunLinkBase):
     oonirun_link_id: int
-    date_created: datetime
-    date_updated: datetime
-    revision: int
-    is_mine: Optional[bool] = False
+    date_created: datetime = Field(
+        description="time when the ooni run link was created"
+    )
+    date_updated: datetime = Field(
+        description="time when the ooni run link was created"
+    )
+    revision: int = Field(
+        description="incremental number indicating the revision number of the ooni run link (the first revision is 1)"
+    )
+    is_mine: Optional[bool] = Field(
+        description="flag indiciating indicating if the ooni run link was created by the current user",
+        default=False,
+    )
 
-    @computed_field
+    @computed_field(
+        description="flag indicating if the ooni run link is expired (see the expiration_date field for more information)"
+    )
     @property
     def is_expired(self) -> bool:
         # See docstring of models.OONIRunLink.expiration_date_dt_native

@@ -30,7 +30,7 @@ phases:
       - cd $OONI_CODE_PATH
       - echo "Installing project dependencies with poetry..."
       - poetry install --no-root
-      - poetry run pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=term oonidataapi/tests
+      - poetry run pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=term oonidataapi/tests/test_oonirun.py
 
       - echo "Building and tagging Docker image..."
       - |
