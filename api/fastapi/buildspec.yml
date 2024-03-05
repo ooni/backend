@@ -2,7 +2,7 @@ version: 0.2
 env:
   variables:
     OONI_CODE_PATH: api/fastapi/
-    IMAGE_NAME: 082866812839.dkr.ecr.eu-central-1.amazonaws.com/ooni/dataapi
+    IMAGE_NAME: ooni/dataapi
 
 phases:
   install:
@@ -17,7 +17,7 @@ phases:
     commands:
       - aws --version
       - echo "Logging in to ECR"
-      - aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 082866812839.dkr.ecr.eu-central-1.amazonaws.com
+      - aws secretsmanager get-secret-value --secret-id DOCKER_HUB_PASSWORD --query SecretString --output text | docker login --username ooni --password-stdin
       - echo "Formatting version information..."
       - DATE=$(date +'%Y%m%d')
       - SHORT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
