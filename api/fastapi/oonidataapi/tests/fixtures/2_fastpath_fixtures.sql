@@ -1,48 +1,4 @@
 
-CREATE TABLE fastpath (
-  measurement_uid TEXT,
-  report_id TEXT,
-  input TEXT,
-  probe_cc TEXT,
-  probe_asn INTEGER,
-  test_name TEXT,
-  test_start_time TEXT,
-  measurement_start_time TEXT,
-  filename TEXT,
-  scores TEXT,
-  platform TEXT,
-  anomaly TEXT,
-  confirmed TEXT,
-  msm_failure TEXT,
-  domain TEXT,
-  software_name TEXT,
-  software_version TEXT,
-  control_failure TEXT,
-  blocking_general REAL,
-  is_ssl_expected INTEGER,
-  page_len INTEGER,
-  page_len_ratio REAL,
-  server_cc TEXT,
-  server_asn INTEGER,
-  server_as_name TEXT,
-  update_time TEXT,
-  test_version TEXT,
-  architecture TEXT,
-  engine_name TEXT,
-  engine_version TEXT,
-  test_runtime REAL,
-  blocking_type TEXT,
-  test_helper_address TEXT,
-  test_helper_type TEXT,
-  ooni_run_link_id TEXT
-);
-
-CREATE TABLE citizenlab (
-    domain TEXT, 
-    url TEXT,
-    cc TEXT,
-    category_code TEXT
-);
 INSERT INTO fastpath (measurement_uid,report_id,input,probe_cc,probe_asn,test_name,test_start_time,measurement_start_time,filename,scores,platform,anomaly,confirmed,msm_failure,domain,software_name,software_version,control_failure,blocking_general,is_ssl_expected,page_len,page_len_ratio,server_cc,server_asn,server_as_name,test_version,architecture,engine_name,engine_version,test_runtime,blocking_type,test_helper_address,test_helper_type,ooni_run_link_id) VALUES ('20240101000002.422281_TW_webconnectivity_55232ce980f563d5','20231231T221448Z_webconnectivity_TW_18182_n1_zBswL4awQc3qUCnU','https://vesselthefilm.com/','TW','18182','web_connectivity','2023-12-31 22:14:47','2024-01-01 00:00:01','','{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"fingerprints":[{"name":"cp.fp_x_redirect_just","scope":"fp","location_found":"body","confidence_no_fp":5,"expected_countries":[]}]}','linux','f','f','f','vesselthefilm.com','ooniprobe-cli','3.20.0','','0','0','0','0','','0','','0.4.3','amd64','ooniprobe-engine','3.20.0','3.259042','','https://1.th.ooni.org','https','\N');
 INSERT INTO fastpath (measurement_uid,report_id,input,probe_cc,probe_asn,test_name,test_start_time,measurement_start_time,filename,scores,platform,anomaly,confirmed,msm_failure,domain,software_name,software_version,control_failure,blocking_general,is_ssl_expected,page_len,page_len_ratio,server_cc,server_asn,server_as_name,test_version,architecture,engine_name,engine_version,test_runtime,blocking_type,test_helper_address,test_helper_type,ooni_run_link_id) VALUES ('20240101000001.568391_SE_dnscheck_2c4c15529c6e2e15','20231231T232727Z_dnscheck_SE_44034_n1_YS3hnP0H0QoU4c7X','dot://dns.switch.ch/dns-query','SE','44034','dnscheck','2023-12-31 23:27:28','2024-01-01 00:00:01','','{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"accuracy":0.0}','android','f','f','t','dns.switch.ch','ooniprobe-android-unattended','3.8.5.1','','0','0','0','0','','0','','0.9.2','arm64','ooniprobe-engine','3.19.1','15.037774','','','','\N');
 INSERT INTO fastpath (measurement_uid,report_id,input,probe_cc,probe_asn,test_name,test_start_time,measurement_start_time,filename,scores,platform,anomaly,confirmed,msm_failure,domain,software_name,software_version,control_failure,blocking_general,is_ssl_expected,page_len,page_len_ratio,server_cc,server_asn,server_as_name,test_version,architecture,engine_name,engine_version,test_runtime,blocking_type,test_helper_address,test_helper_type,ooni_run_link_id) VALUES ('20240101000002.759261_US_torsf_cdcd0913c665a955','20231231T234808Z_torsf_US_20001_n1_pxzHhtg9PKsm9FsG','','US','20001','torsf','2023-12-31 23:48:09','2024-01-01 00:00:01','','{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}','android','t','f','f','','ooniprobe-android-unattended','3.8.5.1','','0','0','0','0','','0','','0.5.0','arm64','ooniprobe-engine','3.19.1','600.0654','','','','\N');

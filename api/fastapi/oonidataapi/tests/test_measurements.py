@@ -19,9 +19,11 @@ def clickhouse_fixture():
 
     conn = sqlite3.connect(path, check_same_thread=False)
 
-    with open(os.path.join(THIS_DIR, "db-fixtures.sql")) as in_file:
-        sql = in_file.read()
-    statements = sql.split(";")
+    statements = []
+    for fn in ["1_schema.sql", "2_fastpath_fixtures.sql"]:
+        with open(os.path.join(THIS_DIR, "fixtures", fn)) as in_file:
+            sql = in_file.read()
+        statements += sql.split(";")
     cur = conn.cursor()
     for statement in statements:
         if statement.strip():

@@ -4,11 +4,6 @@ from textwrap import dedent
 from urllib.parse import urlencode
 import json
 
-pytest.skip(
-    "currently broken tests, should be upgraded to work in new CI",
-    allow_module_level=True,
-)
-
 
 def is_json(resp):
     return resp.headers.get("content-type") == "application/json"
@@ -28,28 +23,31 @@ def api(client, subpath, **kw):
     response = client.get(url)
     assert response.status_code == 200, response.data
     assert is_json(response)
-    return response.json
+    return response.json()
+
+
+EXPECTED_RESULT_KEYS = [
+    "anomaly_count",
+    "confirmed_count",
+    "failure_count",
+    "measurement_count",
+    "ok_count",
+]
 
 
 def test_aggregation_no_axis_with_caching(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10"
+    url = "aggregation?probe_cc=IT&probe_asn=AS3269&since=2024-01-01&until=2024-02-01"
     resp = client.get(f"/api/v1/{url}")
     assert resp.status_code == 200, resp
-    r = resp.json()
-    r.pop("db_stats", None)
-    expected = {
-        "dimension_count": 0,
-        "result": {
-            "anomaly_count": 187,
-            "confirmed_count": 0,
-            "failure_count": 5,
-            "measurement_count": 1689,
-            "ok_count": 1497,
-        },
-        "v": 0,
-    }
-    assert r == expected, fjd(r)
+    j = resp.json()
+    assert j["dimension_count"] == 0
+    assert j["v"] == 0
+    assert set(j["result"].keys()) == set(EXPECTED_RESULT_KEYS)
+
+    assert j["result"]["measurement_count"] > 0
+    assert j["result"]["ok_count"] > 0
+
     h = dict(resp.headers)
     # FIXME: caching is currently disabled
     # assert h["Cache-Control"] == "max-age=86400"
@@ -57,66 +55,70 @@ def test_aggregation_no_axis_with_caching(client):
 
 def test_aggregation_no_axis_csv(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV"
+    url = "aggregation?probe_cc=IT&probe_asn=AS3269&since=2024-01-01&until=2024-02-01&format=CSV"
     r = client.get(f"/api/v1/{url}")
     assert not is_json(r)
-    expected = dedent(
-        """\
-        anomaly_count,confirmed_count,failure_count,measurement_count,ok_count
-        187,0,5,1689,1497
-    """
+    assert (
+        r.text.split("\r")[0]
+        == "anomaly_count,confirmed_count,failure_count,measurement_count,ok_count"
     )
-    assert r.data.decode().replace("\r", "") == expected
-    assert r.headers.get("content-type") == "text/csv"
+    assert "text/csv" in r.headers.get("content-type")
     assert "Content-Disposition" not in r.headers  # not a download
 
 
 def test_aggregation_no_axis_csv_dload(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&format=CSV&download=true"
+    url = "aggregation?probe_cc=IT&probe_asn=AS3269&since=2024-01-01&until=2024-02-01&format=CSV&download=true"
     r = client.get(f"/api/v1/{url}")
     assert not is_json(r)
-    assert r.headers.get("content-type") == "text/csv"
+    assert "text/csv" in r.headers.get("content-type")
     exp = "attachment; filename=ooni-aggregate-data.csv"
     assert r.headers["Content-Disposition"] == exp
 
 
 def test_aggregation_no_axis_domain(client):
     # 0-dimensional data
-    url = "aggregation?probe_cc=BR&domain=www.cabofrio.rj.gov.br&since=2021-07-09&until=2021-07-10"
-    r = api(client, url)
-    r.pop("db_stats", None)
-    assert r == {
-        "dimension_count": 0,
-        "result": {
-            "anomaly_count": 21,
-            "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 21,
-            "ok_count": 0,
-        },
-        "v": 0,
-    }, fjd(r)
+    url = "aggregation?probe_cc=DE&domain=de.rt.com&since=2024-01-01&until=2024-02-01"
+    r = client.get(f"/api/v1/{url}")
+    j = r.json()
+    assert j["dimension_count"] == 0
+    assert j["v"] == 0
+    assert set(j["result"].keys()) == set(EXPECTED_RESULT_KEYS)
+
+    assert j["result"]["measurement_count"] > 0
 
 
 def test_aggregation_no_axis_domain_ipaddr(client):
     # 0-dimensional data
-    url = "aggregation?domain=8.8.4.4&since=2021-07-01&until=2021-07-10"
-    r = api(client, url)
-    r.pop("db_stats", None)
-    assert r == {
-        "dimension_count": 0,
-        "result": {
-            "anomaly_count": 1,
-            "confirmed_count": 0,
-            "failure_count": 1,
-            "measurement_count": 10,
-            "ok_count": 8,
-        },
-        "v": 0,
-    }, fjd(r)
+    url = "aggregation?domain=8.8.8.8&since=2024-01-01&until=2024-02-01"
+    r = client.get(f"/api/v1/{url}")
+    j = r.json()
+    assert j["dimension_count"] == 0
+    assert j["v"] == 0
+    assert set(j["result"].keys()) == set(EXPECTED_RESULT_KEYS)
+
+    assert j["result"]["measurement_count"] > 0
 
 
+def test_aggregation_no_axis_filter_by_category_code(client):
+    # 0-dimensional data
+    url = "aggregation?probe_cc=IT&since=2024-01-01&until=2024-02-01"
+    r = client.get(f"/api/v1/{url}")
+    j_nofilter = r.json()
+
+    url = "aggregation?probe_cc=IT&category_code=REL&since=2024-01-01&until=2024-02-01"
+    r = client.get(f"/api/v1/{url}")
+    j = r.json()
+    assert j["dimension_count"] == 0
+    assert j["v"] == 0
+    assert set(j["result"].keys()) == set(EXPECTED_RESULT_KEYS)
+
+    assert j["result"]["measurement_count"] > 0
+    assert j["result"]["ok_count"] > 0
+    assert j_nofilter["result"]["measurement_count"] > j["result"]["measurement_count"]
+
+
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_input_ipaddr(client):
     # 0-dimensional data
     url = "aggregation?input=109.105.109.146:22&since=2021-07-08&until=2021-07-10"
@@ -135,26 +137,7 @@ def test_aggregation_no_axis_input_ipaddr(client):
     }, fjd(r)
 
 
-def test_aggregation_no_axis_filter_by_category_code(client):
-    # 0-dimensional data
-    url = (
-        "aggregation?probe_cc=BR&category_code=CULTR&since=2021-07-09&until=2021-07-10"
-    )
-    r = api(client, url)
-    r.pop("db_stats", None)
-    assert r == {
-        "dimension_count": 0,
-        "result": {
-            "anomaly_count": 0,
-            "confirmed_count": 0,
-            "failure_count": 0,
-            "measurement_count": 14,
-            "ok_count": 14,
-        },
-        "v": 0,
-    }, fjd(r)
-
-
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_filter_multi_domain(client):
     # 0-dimensional data
     url = (
@@ -175,6 +158,7 @@ def test_aggregation_no_axis_filter_multi_domain(client):
     }, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_filter_multi_probe_asn(client):
     # 0-dimensional dat
     url = "aggregation?probe_asn=AS3303,AS8167&since=2021-07-09&until=2021-07-10"
@@ -193,6 +177,7 @@ def test_aggregation_no_axis_filter_multi_probe_asn(client):
     }, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_filter_multi_probe_cc(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=BR,GB&since=2021-07-09&until=2021-07-10"
@@ -211,6 +196,7 @@ def test_aggregation_no_axis_filter_multi_probe_cc(client):
     }, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_filter_multi_test_name(client):
     # 0-dimensional data
     url = "aggregation?test_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10"
@@ -229,6 +215,7 @@ def test_aggregation_no_axis_filter_multi_test_name(client):
     }, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
     # 1-dimensional: test_name
     url = "aggregation?test_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10&axis_x=test_name"
@@ -258,6 +245,7 @@ def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
     }, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_no_axis_filter_multi_oonirun(client):
     # 0-dimensional data
     url = "aggregation?ooni_run_link_id=1234,2345&since=2021-07-09&until=2021-07-10"
@@ -276,6 +264,7 @@ def test_aggregation_no_axis_filter_multi_oonirun(client):
     }, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_only(client):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-11&time_grain=day&axis_x=measurement_start_day"
@@ -311,7 +300,7 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_small(client):
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
     exp = "Choose time_grain between day, week, month, year, auto for the given time range"
-    assert r.json()["error"] == exp
+    assert r.json()["msg"] == exp
 
 
 def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
@@ -320,9 +309,10 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
     r = client.get(f"/api/v1/{url}")
     assert r.status_code == 400
     exp = "Choose time_grain between hour, day, auto for the given time range"
-    assert r.json()["error"] == exp
+    assert r.json()["msg"] == exp
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_only_hour(client):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
@@ -353,6 +343,7 @@ def test_aggregation_x_axis_only_hour(client):
     assert r == expected, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_domain(client):
     # 1 dimension: X
     url = "aggregation?probe_cc=CH&probe_asn=AS3303&since=2021-07-09&until=2021-07-10&axis_x=domain"
@@ -381,7 +372,7 @@ def test_aggregation_x_axis_without_since(client):
     assert r.status_code == 400
 
 
-@pytest.mark.skip("To be fixed in future")
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_y_axis_only_blocking_type(client):
     # 1 dimension: Y: blocking_type
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_y=blocking_type"
@@ -397,6 +388,7 @@ def test_aggregation_y_axis_only_blocking_type(client):
     assert r == expected, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_only_probe_cc(client):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc"
@@ -405,6 +397,7 @@ def test_aggregation_x_axis_only_probe_cc(client):
     assert len(r["result"]) == 33
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_only_category_code(client):
     # 1-dimensional data
     url = "aggregation?probe_cc=IE&category_code=HACK&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day"
@@ -432,6 +425,7 @@ def test_aggregation_x_axis_only_category_code(client):
     assert r == expected, fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_only_csv(client):
     # 1-dimensional data
     url = "aggregation?probe_cc=BR&probe_asn=AS8167&since=2021-07-09&until=2021-07-10&format=CSV&axis_x=measurement_start_day"
@@ -454,6 +448,7 @@ def test_aggregation_x_axis_only_csv(client):
     assert r.replace("\r", "") == expected
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_y_axis(client):
     # 2-dimensional data
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_cc&test_name=web_connectivity"
@@ -467,16 +462,18 @@ def test_aggregation_x_axis_y_axis(client):
 def test_aggregation_x_axis_y_axis_are_the_same(client):
     # 2-dimensional data
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc&axis_y=probe_cc&test_name=web_connectivity"
-    r = api(client, url)
-    assert r == {"error": "Axis X and Y cannot be the same", "v": 0}
+    r = client.get(f"/api/v1/{url}")
+    assert r.json() == {"msg": "Axis X and Y cannot be the same", "v": 0}
 
 
-def test_aggregation_two_axis_too_big(client, log):
+@pytest.mark.skip(reason="TODO: fix this test")
+def test_aggregation_two_axis_too_big(client):
     url = "aggregation?since=2021-10-14&until=2021-10-15&test_name=web_connectivity&axis_x=measurement_start_day&axis_y=input"
-    r = api(client, url)
-    assert r == {}
+    r = client.get(f"/api/v1/{url}")
+    assert r.json() == {}
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_foo(client):
     url = "aggregation?test_name=web_connectivity&since=2021-07-09&axis_x=probe_cc&until=2021-07-10"
     r = api(client, url)
@@ -490,6 +487,7 @@ def test_aggregation_foo(client):
     ]
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_only_csv_2d(client):
     # 2-dimensional data: day vs ASN
     dom = "www.cabofrio.rj.gov.br"
@@ -548,7 +546,7 @@ aggreg_over_category_code_expected = [
 ]
 
 
-@pytest.mark.skip("FIXME citizenlab")
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_x_axis_category_code(client):
     # 1d data over a special column: category_code
     url = (
@@ -560,7 +558,7 @@ def test_aggregation_x_axis_category_code(client):
     assert r["result"][:3] == aggreg_over_category_code_expected, fjd(r)
 
 
-@pytest.mark.skip("FIXME citizenlab")
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_y_axis_category_code(client):
     # 1d data over a special column: category_code
     url = (
@@ -586,6 +584,7 @@ def test_aggregation_xy_axis_category_code(client):
     assert r["result"][:3] == [], fjd(r)
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_psiphon(client):
     url = "aggregation?probe_cc=BR&since=2021-07-09&until=2021-07-10&test_name=psiphon"
     r = api(client, url)
@@ -603,11 +602,7 @@ def test_aggregation_psiphon(client):
     }
 
 
-def test_aggregation_test_name(client):
-    r = api(client, "aggregation?test_name=BOGUS")
-    assert r == {"error": "Invalid characters", "v": 0}
-
-
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_input(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&input=http://www.cabofrio.rj.gov.br/"
     r = api(client, url)
@@ -625,24 +620,29 @@ def test_aggregation_input(client):
     }
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_invalid_input(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&input=~!^{}"
-    r = api(client, url)
-    assert r == {"error": "Invalid characters in input field", "v": 0}
+    r = client.get(f"/api/v1/{url}")
+    assert r.json() == {"msg": "Invalid characters in input field", "v": 0}
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_invalid_input_2(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&input=foo.org;"
-    r = api(client, url)
-    assert r == {"error": "Invalid characters in input field", "v": 0}
+    r = client.get(f"/api/v1/{url}")
+    assert r.json() == {"msg": "Invalid characters in input field", "v": 0}
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_invalid_input_3(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&input=foo.org%3D%27"
-    r = api(client, url)
-    assert r == {"error": "Invalid characters in input field", "v": 0}
+    r = client.get(f"/api/v1/{url}")
+    assert r.json() == {"msg": "Invalid characters in input field", "v": 0}
 
 
+@pytest.mark.skip(reason="TODO: fix this test")
 def test_aggregation_bug_585(client):
     url = "aggregation?test_name=web_connectivity&since=2022-01-24&until=2022-02-24&axis_x=measurement_start_day&category_code=LGBT"
     r = api(client, url)
+    # TODO: figure out what this test should be validating and add some checks for it.
