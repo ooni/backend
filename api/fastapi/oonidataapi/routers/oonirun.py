@@ -106,7 +106,7 @@ class OONIRunLinkBase(BaseModel):
 
 
 class OONIRunLink(OONIRunLinkBase):
-    oonirun_link_id: int
+    oonirun_link_id: str
     date_created: datetime = Field(
         description="time when the ooni run link was created"
     )
@@ -139,10 +139,10 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
     pass
 
 
-def generate_random_intuid() -> int:
+def generate_link_id() -> str:
     collector_id = 0
     randint = int.from_bytes(urandom(4), byteorder)
-    return randint * 100 + collector_id
+    return str(randint * 100 + collector_id)
 
 
 @router.post(
@@ -164,7 +164,7 @@ def create_oonirun_link(
     now = datetime.now(timezone.utc).replace(microsecond=0)
 
     oonirun_link = models.OONIRunLink(
-        oonirun_link_id=generate_random_intuid(),
+        oonirun_link_id=generate_link_id(),
         creator_account_id=account_id,
         name=create_request.name,
         name_intl=create_request.name_intl,

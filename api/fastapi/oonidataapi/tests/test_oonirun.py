@@ -81,7 +81,7 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     assert r.status_code == 200, r.json()
     j = r.json()
     assert str(j["oonirun_link_id"]).endswith("00")
-    oonirun_link_id = int(r.json()["oonirun_link_id"])
+    oonirun_link_id = r.json()["oonirun_link_id"]
 
     j["expiration_date"] = (
         datetime.now(timezone.utc) + timedelta(minutes=-1)
@@ -115,14 +115,14 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     r = client_with_user_role.post("/api/v2/oonirun", json=z)
     assert r.status_code == 200, r.json()
     assert str(r.json()["oonirun_link_id"]).endswith("00")
-    oonirun_link_id = int(r.json()["oonirun_link_id"])
+    oonirun_link_id = r.json()["oonirun_link_id"]
 
     z["name"] = "second descriptor in English"
     z["name_intl"]["it"] = "second integ-test nome in italiano"
     r = client_with_user_role.post("/api/v2/oonirun", json=z)
     assert r.status_code == 200, r.json()
     assert str(r.json()["oonirun_link_id"]).endswith("00")
-    oonirun_link_id = int(r.json()["oonirun_link_id"])
+    oonirun_link_id = r.json()["oonirun_link_id"]
 
     r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
@@ -353,7 +353,7 @@ def test_oonirun_expiration(client, client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun", json=z)
     assert r.status_code == 200, r.json()
     assert str(r.json()["oonirun_link_id"]).endswith("00")
-    oonirun_link_id = int(r.json()["oonirun_link_id"])
+    oonirun_link_id = r.json()["oonirun_link_id"]
 
     ## Fetch anonymously and check it's not expired
     r = client.get(f"/api/v2/oonirun/{oonirun_link_id}")
@@ -422,7 +422,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
-    oonirun_link_id_one = int(j["oonirun_link_id"])
+    oonirun_link_id_one = j["oonirun_link_id"]
 
     ## Create two new revisions
     j["nettests"][0]["inputs"].append("https://foo.net/")
@@ -439,7 +439,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
-    oonirun_link_id_two = int(j["oonirun_link_id"])
+    oonirun_link_id_two = j["oonirun_link_id"]
 
     ## Create new revision
     j["nettests"][0]["inputs"].append("https://foo.net/")
