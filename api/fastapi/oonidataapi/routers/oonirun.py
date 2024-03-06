@@ -106,7 +106,7 @@ class OONIRunLinkBase(BaseModel):
 
 
 class OONIRunLink(OONIRunLinkBase):
-    oonirun_link_id: int
+    oonirun_link_id: str
     date_created: datetime = Field(
         description="time when the ooni run link was created"
     )
