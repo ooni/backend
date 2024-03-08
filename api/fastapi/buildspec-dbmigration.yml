@@ -1,0 +1,26 @@
+version: 0.2
+env:
+  variables:
+    OONI_CODE_PATH: api/fastapi/
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "Installing Poetry"
+      - curl -fsS https://install.python-poetry.org | python - --preview -y
+      - export PATH="$HOME/.local/bin:$PATH"
+
+  pre_build:
+    commands:
+      - aws --version
+
+  build:
+    commands:
+      - PROJECT_ROOT=$(pwd)
+      - cd $OONI_CODE_PATH
+      - echo "Installing project dependencies with poetry..."
+      - poetry install --no-root
+      - export OONI_PG_URL=$(aws secretsmanager get-secret-value --secret-id OONI_PROD_POSTGRES_URL --query SecretString --output text)
+      - poetry run alembic upgrade head
