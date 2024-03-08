@@ -121,8 +121,7 @@ def test_oonirun_models(tmp_path_factory):
     db.commit()
 
     new_row = db.query(models.OONIRunLink).first()
-    if not new_row:
-        raise Exception("No row created")
+    assert new_row
     assert new_row.nettests[0].revision == 3
 
     db.close()
