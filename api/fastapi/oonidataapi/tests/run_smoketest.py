@@ -5,7 +5,7 @@ import random
 
 
 def test_oonirun(client):
-    r = client.get("/api/v2/oonirun_links")
+    r = client.get("/api/v2/oonirun-links")
     j = r.json()
     assert r.status_code == 200, j
     desc = j["links"]
@@ -34,6 +34,7 @@ def wait_for_backend(backend_base_url, timeout=10):
 
         time.sleep(1)
 
+
 @click.command()
 @click.option(
     "--backend-base-url",
@@ -46,6 +47,7 @@ def smoketest(backend_base_url):
 
     with httpx.Client(base_url=backend_base_url) as client:
         test_oonirun(client)
+
 
 if __name__ == "__main__":
     smoketest()

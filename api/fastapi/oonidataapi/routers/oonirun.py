@@ -314,7 +314,7 @@ class OONIRunLinkList(BaseModel):
         orm_mode = True
 
 
-@router.get("/v2/oonirun_links", tags=["oonirun"])
+@router.get("/v2/oonirun-links", tags=["oonirun"])
 def list_oonirun_links(
     oonirun_link_id: Annotated[
         Optional[str],
