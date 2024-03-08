@@ -11,12 +11,11 @@ from typing import Dict, Any, List, Optional
 import json
 import logging
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
-from pydantic import computed_field, constr, Field, validator
+from pydantic import computed_field, Field, validator
 from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
-
-import sqlalchemy
 
 from ..config import metrics
 from .. import models
@@ -44,6 +43,29 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class OONIRunLinkNettest(BaseModel):
+    test_name: str = Field(
+        default="", title="name of the ooni nettest", min_length=2, max_length=100
+    )
+    test_inputs: List[Dict] = Field(
+        default=[], title="list of input dictionaries for the nettest"
+    )
+    test_options: Dict = Field(default={}, title="options for the nettest")
+    backend_config: Dict = Field(default={}, title="options for the nettest")
+    is_background_run_enabled_default: bool = Field(
+        default=False,
+        title="if this test should be enabled by default for background runs",
+    )
+    is_manual_run_enabled_default: bool = Field(
+        default=False, title="if this test should be enabled by default for manual runs"
+    )
+
+
+class OONIRunLinkNettestDescriptor(BaseModel):
+    revision: int = Field(default=1, title="revision of the nettest")
+    nettests: List[OONIRunLinkNettest] = Field(default=[], title="list of nettests")
+
+
 class OONIRunLinkBase(BaseModel):
     name: str = Field(
         default="", title="name of the ooni run link", min_length=2, max_length=50
@@ -65,7 +87,7 @@ class OONIRunLinkBase(BaseModel):
         max_length=100,
     )
 
-    nettests: List[Dict]
+    nettests: List[OONIRunLinkNettest]
 
     name_intl: Optional[Dict[str, str]] = Field(
         default=None,
@@ -131,9 +153,6 @@ class OONIRunLink(OONIRunLinkBase):
             timezone.utc
         )
 
-    class Config:
-        orm_mode = True
-
 
 class OONIRunLinkCreateEdit(OONIRunLinkBase):
     pass
@@ -163,9 +182,8 @@ def create_oonirun_link(
 
     now = datetime.now(timezone.utc).replace(microsecond=0)
 
-    oonirun_link = models.OONIRunLink(
+    oonirun_link = OONIRunLink(
         oonirun_link_id=generate_link_id(),
-        creator_account_id=account_id,
         name=create_request.name,
         name_intl=create_request.name_intl,
         short_description=create_request.short_description,
@@ -173,17 +191,58 @@ def create_oonirun_link(
         description=create_request.description,
         description_intl=create_request.description_intl,
         author=create_request.author,
-        nettests=create_request.nettests,
         icon=create_request.icon,
         color=create_request.color,
         expiration_date=create_request.expiration_date,
         date_created=now,
         date_updated=now,
+        nettests=[],
+        revision=1,
     )
+    # XXX this is kind of sketchy.
+    # Maybe https://sqlmodel.tiangolo.com/ solves this better
+    db_keys = [
+        "oonirun_link_id",
+        "name",
+        "name_intl",
+        "short_description",
+        "short_description_intl",
+        "description",
+        "description_intl",
+        "author",
+        "icon",
+        "color",
+        "expiration_date",
+        "date_created",
+        "date_updated",
+    ]
+    db_oonirun_link = models.OONIRunLink(
+        creator_account_id=account_id, **{k: getattr(oonirun_link, k) for k in db_keys}
+    )
+    db_nettest_list = []
+    for nettest_index, nt in enumerate(create_request.nettests):
+        nettest = OONIRunLinkNettest(
+            test_name=nt.test_name,
+            test_inputs=nt.test_inputs,
+            test_options=nt.test_options,
+            backend_config=nt.backend_config,
+            is_background_run_enabled_default=nt.is_background_run_enabled_default,
+            is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
+        )
+        db_nettest_list.append(
+            models.OONIRunLinkNettest(
+                **nettest.dict(),
+                date_created=now,
+                nettest_index=nettest_index,
+                revision=1,
+                oonirun_link=db_oonirun_link,
+            )
+        )
+        oonirun_link.nettests.append(nettest)
 
-    db.add(oonirun_link)
+    db.add(db_oonirun_link)
+    db.add_all(db_nettest_list)
     db.commit()
-    db.refresh(oonirun_link)
 
     return oonirun_link
 
@@ -211,8 +270,10 @@ def edit_oonirun_link(
     )
     if get_client_role(authorization) != "admin":
         q = q.filter(models.OONIRunLink.creator_account_id == account_id)
-    oonirun_link = q.order_by(models.OONIRunLink.revision.desc()).first()
-    if not oonirun_link:
+
+    try:
+        oonirun_link = q.one()
+    except sa.exc.NoResultFound:
         raise HTTPException(status_code=404, detail="OONI Run link not found")
 
     if oonirun_link.expiration_date_dt_native < now:
@@ -233,29 +294,40 @@ def edit_oonirun_link(
         q.update({"expiration_date": edit_request.expiration_date})
         db.commit()
 
-    current_nettests = oonirun_link.nettests
-    if current_nettests != edit_request.nettests:
-        new_oonirun_link = models.OONIRunLink(
-            oonirun_link_id=oonirun_link.oonirun_link_id,
-            creator_account_id=account_id,
-            name=edit_request.name,
-            name_intl=edit_request.name_intl,
-            short_description=edit_request.short_description,
-            short_description_intl=edit_request.short_description_intl,
-            description=edit_request.description,
-            description_intl=edit_request.description_intl,
-            author=edit_request.author,
-            nettests=edit_request.nettests,
-            icon=edit_request.icon,
-            color=edit_request.color,
-            expiration_date=edit_request.expiration_date,
-            revision=int(oonirun_link.revision + 1),
-            date_created=now,
-            date_updated=now,
+    latest_revision = oonirun_link.nettests[0].revision
+    latest_nettests = []
+    for nettest_index, nt in enumerate(
+        filter(lambda nt: nt.revision == latest_revision, oonirun_link.nettests)
+    ):
+        assert nt.nettest_index == nettest_index, "inconsistent nettest index"
+        latest_nettests.append(
+            OONIRunLinkNettest(
+                test_name=nt.test_name,
+                test_inputs=nt.test_inputs,
+                test_options=nt.test_options,
+                backend_config=nt.backend_config,
+                is_background_run_enabled_default=nt.is_background_run_enabled_default,
+                is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
+            )
         )
-        db.add(new_oonirun_link)
-        db.commit()
-        return new_oonirun_link
+
+    if latest_nettests != edit_request.nettests:
+        latest_revision += 1
+        for nettest_index, nt in enumerate(edit_request.nettests):
+            new_nettest = models.OONIRunLinkNettest(
+                revision=latest_revision,
+                nettest_index=nettest_index,
+                date_created=now,
+                test_name=nt.test_name,
+                test_inputs=nt.test_inputs,
+                test_options=nt.test_options,
+                backend_config=nt.backend_config,
+                is_background_run_enabled_default=nt.is_background_run_enabled_default,
+                is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
+                oonirun_link=oonirun_link,
+            )
+            db.add(new_nettest)
+        latest_nettests = edit_request.nettests
 
     oonirun_link.name = edit_request.name
     oonirun_link.name_intl = edit_request.name_intl
@@ -264,13 +336,48 @@ def edit_oonirun_link(
     oonirun_link.description = edit_request.description
     oonirun_link.description_intl = edit_request.description_intl
     oonirun_link.author = edit_request.author
-    oonirun_link.nettests = edit_request.nettests
     oonirun_link.icon = edit_request.icon
     oonirun_link.color = edit_request.color
     oonirun_link.expiration_date = edit_request.expiration_date
     oonirun_link.date_updated = now
     db.commit()
-    return oonirun_link
+
+    return OONIRunLink(
+        nettests=latest_nettests,
+        name=oonirun_link.name,
+        short_description=oonirun_link.short_description,
+        description=oonirun_link.description,
+        author=oonirun_link.author,
+        name_intl=oonirun_link.name_intl,
+        short_description_intl=oonirun_link.short_description_intl,
+        description_intl=oonirun_link.description_intl,
+        icon=oonirun_link.icon,
+        color=oonirun_link.color,
+        expiration_date=oonirun_link.expiration_date,
+        oonirun_link_id=oonirun_link.oonirun_link_id,
+        date_created=oonirun_link.date_created,
+        date_updated=oonirun_link.date_updated,
+        revision=latest_revision,
+        is_mine=oonirun_link.creator_account_id == account_id,
+    )
+
+
+def get_nettests(oonirun_link: models.OONIRunLink, revision: Optional[int]):
+    nettests = []
+    for nt in oonirun_link.nettests:
+        if revision and nt.revision != revision:
+            continue
+        nettests.append(
+            OONIRunLinkNettest(
+                test_name=nt.test_name,
+                test_inputs=nt.test_inputs,
+                test_options=nt.test_options,
+                backend_config=nt.backend_config,
+                is_background_run_enabled_default=nt.is_background_run_enabled_default,
+                is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
+            )
+        )
+    return nettests
 
 
 @metrics.timer("fetch_oonirun_link")
@@ -296,19 +403,42 @@ def fetch_oonirun_link(
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
     )
-    if revision is not None:
-        q = q.filter(models.OONIRunLink.revision == revision)
-    oonirun_link = q.order_by(models.OONIRunLink.revision.desc()).first()
 
-    if oonirun_link is None:
+    try:
+        res = q.one()
+    except sa.exc.NoResultFound:
         raise HTTPException(status_code=404, detail=f"OONI Run link not found")
 
-    oonirun_link.is_mine = account_id == oonirun_link.creator_account_id
+    # nettests are sorted by revision
+    latest_revision = res.nettests[0].revision
+    if revision is None:
+        revision = latest_revision
+
+    assert isinstance(revision, int)
+    oonirun_link = OONIRunLink(
+        oonirun_link_id=res.oonirun_link_id,
+        name=res.name,
+        name_intl=res.name_intl,
+        short_description=res.short_description,
+        short_description_intl=res.short_description_intl,
+        description=res.description,
+        description_intl=res.description_intl,
+        icon=res.icon,
+        color=res.color,
+        is_mine=account_id == res.creator_account_id,
+        expiration_date=res.expiration_date_dt_native,
+        nettests=get_nettests(res, revision),
+        date_created=res.date_created,
+        date_updated=res.date_updated,
+        author=res.author,
+        revision=revision,
+    )
+
     return oonirun_link
 
 
 class OONIRunLinkList(BaseModel):
-    links: List[OONIRunLink]
+    oonirun_links: List[OONIRunLink]
 
     class Config:
         orm_mode = True
@@ -319,10 +449,6 @@ def list_oonirun_links(
     oonirun_link_id: Annotated[
         Optional[str],
         Query(description="OONI Run descriptors comma separated"),
-    ] = None,
-    only_latest: Annotated[
-        Optional[bool],
-        Query(description="List only the latest versions"),
     ] = None,
     only_mine: Annotated[
         Optional[bool],
@@ -340,21 +466,6 @@ def list_oonirun_links(
     account_id = get_account_id_or_none(authorization)
 
     q = db.query(models.OONIRunLink)
-    if only_latest:
-        subquery = (
-            db.query(
-                models.OONIRunLink.oonirun_link_id,
-                sqlalchemy.func.max(models.OONIRunLink.revision).label("revision"),
-            )
-            .group_by(models.OONIRunLink.oonirun_link_id)
-            .subquery("latest_link")
-        )
-        q = q.filter(
-            sqlalchemy.tuple_(
-                models.OONIRunLink.oonirun_link_id,
-                models.OONIRunLink.revision,
-            ).in_(subquery)
-        )
     if not include_expired:
         q = q.filter(models.OONIRunLink.expiration_date > datetime.now(timezone.utc))
     if only_mine:
@@ -367,6 +478,9 @@ def list_oonirun_links(
 
     links = []
     for row in q.all():
+        revision = 1
+        if row.nettests:
+            revision = row.nettests[0].revision
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
             name=row.name,
@@ -376,14 +490,14 @@ def list_oonirun_links(
             description=row.description,
             description_intl=row.description_intl,
             author=row.author,
-            nettests=row.nettests,
+            nettests=get_nettests(row, revision),
             icon=row.icon,
             expiration_date=row.expiration_date,
-            revision=row.revision,
+            revision=revision,
             date_created=row.date_created,
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,
         )
         links.append(oonirun_link)
     log.debug(f"Returning {len(links)} ooni run links")
-    return OONIRunLinkList(links=links)
+    return OONIRunLinkList(oonirun_links=links)
