@@ -7,7 +7,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 from datetime import datetime, timedelta, timezone, date
 from os import urandom
 from sys import byteorder
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import json
 import logging
 
@@ -34,11 +34,12 @@ from ..dependencies import get_postgresql_session
 ISO_FORMAT_DATETIME = "%Y-%m-%dT%H:%M:%S.%fZ"
 ISO_FORMAT_DATE = "%Y-%m-%d"
 
+
 class BaseModel(PydandicBaseModel):
     class Config:
         json_encoders = {
             datetime: lambda v: v.strftime(ISO_FORMAT_DATETIME),
-            date: lambda v: v.strftime(ISO_FORMAT_DATE)
+            date: lambda v: v.strftime(ISO_FORMAT_DATE),
         }
 
 
@@ -232,10 +233,10 @@ def create_oonirun_link(
         )
         db_oonirun_link.nettests.append(
             models.OONIRunLinkNettest(
-            **nettest.dict(),
-            date_created=now,
-            nettest_index=nettest_index,
-            revision=1,
+                **nettest.dict(),
+                date_created=now,
+                nettest_index=nettest_index,
+                revision=1,
             )
         )
         oonirun_link.nettests.append(nettest)
@@ -361,11 +362,15 @@ def edit_oonirun_link(
     )
 
 
-def get_nettests(oonirun_link: models.OONIRunLink, revision: Optional[int]):
+def get_nettests(
+    oonirun_link: models.OONIRunLink, revision: Optional[int]
+) -> Tuple[List[OONIRunLinkNettest], datetime]:
+    date_created = oonirun_link.nettests[0].date_created
     nettests = []
     for nt in oonirun_link.nettests:
         if revision and nt.revision != revision:
             continue
+        date_created = nt.date_created
         nettests.append(
             OONIRunLinkNettest(
                 test_name=nt.test_name,
@@ -376,10 +381,15 @@ def get_nettests(oonirun_link: models.OONIRunLink, revision: Optional[int]):
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
             )
         )
-    return nettests
+    return nettests, date_created
 
 
-def make_oonirun_link(db : Session, oonirun_link_id : str, account_id : Optional[str], revision : Optional[int] = None):
+def make_oonirun_link(
+    db: Session,
+    oonirun_link_id: str,
+    account_id: Optional[str],
+    revision: Optional[int] = None,
+):
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
     )
@@ -395,6 +405,8 @@ def make_oonirun_link(db : Session, oonirun_link_id : str, account_id : Optional
         revision = latest_revision
 
     assert isinstance(revision, int)
+
+    nettests, date_created = get_nettests(res, revision)
     return OONIRunLink(
         oonirun_link_id=res.oonirun_link_id,
         name=res.name,
@@ -406,13 +418,14 @@ def make_oonirun_link(db : Session, oonirun_link_id : str, account_id : Optional
         icon=res.icon,
         color=res.color,
         expiration_date=res.expiration_date_dt_native,
-        nettests=get_nettests(res, revision),
-        date_created=res.date_created,
+        nettests=nettests,
+        date_created=date_created,
         date_updated=res.date_updated,
         is_mine=account_id == res.creator_account_id,
         author=res.author,
         revision=revision,
     )
+
 
 @metrics.timer("get_latest_oonirun_link")
 @router.get(
@@ -428,13 +441,17 @@ def get_latest_oonirun_link(
     log.debug("fetching oonirun")
     account_id = get_account_id_or_none(authorization)
 
-    oonirun_link = make_oonirun_link(db=db, oonirun_link_id=oonirun_link_id, account_id=account_id)
+    oonirun_link = make_oonirun_link(
+        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id
+    )
     return oonirun_link
 
 
 @metrics.timer("get_latest_oonirun_link")
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}/revision/{revision_number}", tags=["oonirun"], response_model=OONIRunLink
+    "/v2/oonirun-links/{oonirun_link_id}/revision/{revision_number}",
+    tags=["oonirun"],
+    response_model=OONIRunLink,
 )
 def get_oonirun_link_revision(
     oonirun_link_id: str,
@@ -453,15 +470,15 @@ def get_oonirun_link_revision(
         try:
             revision = int(revision_number)
         except:
-            raise HTTPException(status_code=401, detail="invalid revision number specified")
+            raise HTTPException(
+                status_code=401, detail="invalid revision number specified"
+            )
 
     oonirun_link = make_oonirun_link(
-        db=db,
-        oonirun_link_id=oonirun_link_id,
-        account_id=account_id,
-        revision=revision
+        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id, revision=revision
     )
     return oonirun_link
+
 
 class OONIRunLinkList(BaseModel):
     oonirun_links: List[OONIRunLink]
@@ -498,6 +515,7 @@ def list_oonirun_links(
         revision = 1
         if row.nettests:
             revision = row.nettests[0].revision
+        nettests, _ = get_nettests(row, revision)
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
             name=row.name,
@@ -507,7 +525,7 @@ def list_oonirun_links(
             description=row.description,
             description_intl=row.description_intl,
             author=row.author,
-            nettests=get_nettests(row, revision),
+            nettests=nettests,
             icon=row.icon,
             expiration_date=row.expiration_date,
             revision=revision,
