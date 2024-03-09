@@ -13,7 +13,7 @@ import logging
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, Query, HTTPException, Header
+from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
 from pydantic import computed_field, Field, validator
 from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
@@ -448,6 +448,42 @@ def get_latest_oonirun_link(
     return oonirun_link
 
 
+class OONIRunLinkRevisions(BaseModel):
+    revisions: List[str]
+
+
+@metrics.timer("get_latest_oonirun_link")
+@router.get(
+    "/v2/oonirun-links/{oonirun_link_id}/revisions",
+    tags=["oonirun"],
+    response_model=OONIRunLinkRevisions,
+)
+def get_oonirun_link_revisions(
+    oonirun_link_id: str,
+    db=Depends(get_postgresql_session),
+):
+    """
+    Obtain the list of revisions for a certain OONI Run link
+    """
+    q = db.query(models.OONIRunLink).filter(
+        models.OONIRunLink.oonirun_link_id == oonirun_link_id
+    )
+
+    try:
+        res = q.one()
+    except sa.exc.NoResultFound:
+        raise HTTPException(status_code=404, detail=f"OONI Run link not found")
+
+    revision = set()
+    for nt in res.nettests:
+        revision.add(nt.revision)
+
+    revisions = []
+    for r in sorted(revision, reverse=True):
+        revisions.append(str(r))
+    return OONIRunLinkRevisions(revisions=revisions)
+
+
 @metrics.timer("get_latest_oonirun_link")
 @router.get(
     "/v2/oonirun-links/{oonirun_link_id}/revisions/{revision_number}",
@@ -456,24 +492,29 @@ def get_latest_oonirun_link(
 )
 def get_oonirun_link_revision(
     oonirun_link_id: str,
-    revision_number: str,
+    revision_number: Annotated[
+        str,
+        Path(
+            regex="^(latest|\\d+)$",
+            error_messages={
+                "regex": "invalid revision number specified, must be 'latest' or a number"
+            },
+        ),
+    ],
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
 ):
-    """Fetch OONIRun descriptor by creation time or the newest one"""
+    """Fetch an OONI Run link by specifying the revision number"""
     # Return the latest version of the translations
     log.debug("fetching oonirun")
     account_id = get_account_id_or_none(authorization)
 
-    if revision_number == "latest":
+    try:
+        revision = int(revision_number)
+    except:
+        # We can assert it, since we are doing validation
+        assert revision_number == "latest"
         revision = None
-    else:
-        try:
-            revision = int(revision_number)
-        except:
-            raise HTTPException(
-                status_code=401, detail="invalid revision number specified"
-            )
 
     oonirun_link = make_oonirun_link(
         db=db, oonirun_link_id=oonirun_link_id, account_id=account_id, revision=revision
@@ -483,9 +524,6 @@ def get_oonirun_link_revision(
 
 class OONIRunLinkList(BaseModel):
     oonirun_links: List[OONIRunLink]
-
-    class Config:
-        orm_mode = True
 
 
 @router.get("/v2/oonirun-links", tags=["oonirun"])

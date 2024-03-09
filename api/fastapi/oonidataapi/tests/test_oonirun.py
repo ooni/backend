@@ -537,6 +537,12 @@ def test_oonirun_revisions(client, client_with_user_role):
     j = r.json()
     assert j["revision"] == "2", "revision is 2"
 
+    ## Get revision list
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions")
+    j = r.json()
+    assert len(j["revisions"]) == 3, "there are 2 revisions"
+    assert j["revisions"][0] == "3", "the latest one is 3"
+
     ## Fetch invalid revision number
     r = client.get(
         f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/notarevision"
