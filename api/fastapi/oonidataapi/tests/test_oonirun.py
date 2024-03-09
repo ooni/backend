@@ -491,13 +491,13 @@ def test_oonirun_revisions(client, client_with_user_role):
     second_date_created = j["date_created"]
 
     ## Fetch first revision
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/1")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/1")
     j = r.json()
     assert r.status_code == 200, r.json()
     assert j["date_created"] == first_date_created
 
     ## Fetch second revision
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/2")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/2")
     j = r.json()
     assert r.status_code == 200, r.json()
     assert j["date_created"] == second_date_created
@@ -528,16 +528,18 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert len(descs) == 2, r.json()
 
     ## Fetch latest revision number
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/latest")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/latest")
     j = r.json()
     assert j["revision"] == "3", "revision is 3"
 
     ## Fetch specific revision number
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/2")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/2")
     j = r.json()
     assert j["revision"] == "2", "revision is 2"
 
     ## Fetch invalid revision number
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/notarevision")
+    r = client.get(
+        f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/notarevision"
+    )
     j = r.json()
     assert r.status_code != 200, r.json()

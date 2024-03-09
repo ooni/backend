@@ -450,7 +450,7 @@ def get_latest_oonirun_link(
 
 @metrics.timer("get_latest_oonirun_link")
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}/revision/{revision_number}",
+    "/v2/oonirun-links/{oonirun_link_id}/revisions/{revision_number}",
     tags=["oonirun"],
     response_model=OONIRunLink,
 )
