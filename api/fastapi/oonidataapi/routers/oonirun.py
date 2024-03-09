@@ -140,7 +140,7 @@ class OONIRunLink(OONIRunLinkBase):
     date_updated: datetime = Field(
         description="time when the ooni run link was created"
     )
-    revision: int = Field(
+    revision: str = Field(
         description="incremental number indicating the revision number of the ooni run link (the first revision is 1)"
     )
     is_mine: Optional[bool] = Field(
@@ -187,6 +187,7 @@ def create_oonirun_link(
 
     now = datetime.now(timezone.utc).replace(microsecond=0)
 
+    revision = 1
     oonirun_link = OONIRunLink(
         oonirun_link_id=generate_link_id(),
         name=create_request.name,
@@ -202,7 +203,7 @@ def create_oonirun_link(
         date_created=now,
         date_updated=now,
         nettests=[],
-        revision=1,
+        revision=str(revision),
     )
     # TODO(art): There is a fair amount of duplication moving around pydantic and SQLAlchmey objects.
     # Maybe https://sqlmodel.tiangolo.com/ could help.
@@ -236,7 +237,7 @@ def create_oonirun_link(
                 **nettest.dict(),
                 date_created=now,
                 nettest_index=nettest_index,
-                revision=1,
+                revision=revision,
             )
         )
         oonirun_link.nettests.append(nettest)
@@ -294,7 +295,7 @@ def edit_oonirun_link(
         q.update({"expiration_date": edit_request.expiration_date})
         db.commit()
 
-    latest_revision = oonirun_link.nettests[0].revision
+    latest_revision: int = oonirun_link.nettests[0].revision
     latest_nettests = []
     for nettest_index, nt in enumerate(
         filter(lambda nt: nt.revision == latest_revision, oonirun_link.nettests)
@@ -357,7 +358,7 @@ def edit_oonirun_link(
         oonirun_link_id=oonirun_link.oonirun_link_id,
         date_created=oonirun_link.date_created,
         date_updated=oonirun_link.date_updated,
-        revision=latest_revision,
+        revision=str(latest_revision),
         is_mine=oonirun_link.creator_account_id == account_id,
     )
 
@@ -423,7 +424,7 @@ def make_oonirun_link(
         date_updated=res.date_updated,
         is_mine=account_id == res.creator_account_id,
         author=res.author,
-        revision=revision,
+        revision=str(revision),
     )
 
 
@@ -528,7 +529,7 @@ def list_oonirun_links(
             nettests=nettests,
             icon=row.icon,
             expiration_date=row.expiration_date,
-            revision=revision,
+            revision=str(revision),
             date_created=row.date_created,
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,

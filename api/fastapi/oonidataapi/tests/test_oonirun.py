@@ -220,7 +220,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert date_updated > datetime.now(timezone.utc) + timedelta(hours=-1)
 
     assert j["is_mine"] == True
-    assert j["revision"] == 1
+    assert j["revision"] == "1"
 
     ## Fetch by revision
     r = client_with_user_role.get(f"/api/v2/oonirun-links/{oonirun_link_id}?revision=1")
@@ -246,7 +246,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert date_updated > datetime.now(timezone.utc) + timedelta(hours=-1)
 
     assert j["is_mine"] == True
-    assert j["revision"] == 1
+    assert j["revision"] == "1"
 
     r = client_with_user_role.get("/api/v2/oonirun-links")
     assert r.status_code == 200, r.json()
@@ -309,7 +309,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     j = r.json()
     assert j["is_mine"] is True, r.json()
     assert j["is_expired"] is False, r.json()
-    assert j["revision"] > 1, r.json()
+    assert int(j["revision"]) > 1, r.json()
 
     ## List descriptors as admin and find 2 of them
     r = client_with_admin_role.get(f"/api/v2/oonirun-links")
@@ -431,7 +431,7 @@ def test_oonirun_expiration(client, client_with_user_role):
     ## Fetch anonymously and check it's got the new revision
     r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     j = r.json()
-    assert j["revision"] == 2, "revision did not change"
+    assert j["revision"] == "2", "revision did not change"
 
     ## Update expiry time
     j["expiration_date"] = (
@@ -519,7 +519,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     ## Fetch anonymously and check it's got the new revision
     r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}")
     j = r.json()
-    assert j["revision"] == 3, "revision is 3"
+    assert j["revision"] == "3", "revision is 3"
 
     r = client_with_user_role.get(f"/api/v2/oonirun-links")
     j = r.json()
@@ -530,12 +530,12 @@ def test_oonirun_revisions(client, client_with_user_role):
     ## Fetch latest revision number
     r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/latest")
     j = r.json()
-    assert j["revision"] == 3, "revision is 3"
+    assert j["revision"] == "3", "revision is 3"
 
     ## Fetch specific revision number
     r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/2")
     j = r.json()
-    assert j["revision"] == 2, "revision is 2"
+    assert j["revision"] == "2", "revision is 2"
 
     ## Fetch invalid revision number
     r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/notarevision")
