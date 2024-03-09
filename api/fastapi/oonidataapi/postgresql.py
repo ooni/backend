@@ -12,6 +12,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 class Base(DeclarativeBase):
     type_annotation_map = {
         Dict[str, Any]: JSON,
-        List[Dict[str, Any]]: JSON,
+        List[str]: JSON,
         Dict[str, str]: JSON,
     }

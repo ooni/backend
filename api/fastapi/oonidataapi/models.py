@@ -60,7 +60,7 @@ class OONIRunLinkNettest(Base):
     date_created: Mapped[datetime] = mapped_column()
 
     test_name: Mapped[str] = mapped_column()
-    test_inputs: Mapped[List[Dict[str, Any]]] = mapped_column(nullable=True)
+    test_inputs: Mapped[List[str]] = mapped_column(nullable=True)
     test_options: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
     backend_config: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
 

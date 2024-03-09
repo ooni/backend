@@ -27,8 +27,8 @@ SAMPLE_OONIRUN = {
     "nettests": [
         {
             "test_inputs": [
-                {"url": "https://example.com/"},
-                {"url": "https://ooni.org/"},
+                "https://example.com/",
+                "https://ooni.org/",
             ],
             "test_options": {
                 "HTTP3Enabled": True,
@@ -129,21 +129,21 @@ def test_oonirun_models(tmp_path_factory):
 
 def test_oonirun_validation(client, client_with_user_role, client_with_admin_role):
     z = deepcopy(SAMPLE_OONIRUN)
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 422, "empty name should be rejected"
 
     z["name"] = "integ-test name in English"
     z["name_intl"] = {"it": ""}
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 422, "empty name_intl should be rejected"
 
     z = deepcopy(SAMPLE_OONIRUN)
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 422, "empty name should be rejected"
 
     z["name"] = "integ-test name in English"
     z["name_intl"] = None
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, "name_intl can be None"
 
 
@@ -152,7 +152,7 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     ### Create descriptor as user
     z["name"] = "integ-test name in English"
     z["name_intl"]["it"] = "integ-test nome in italiano"
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
     assert str(j["oonirun_link_id"]).endswith("00")
@@ -161,21 +161,21 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     j["expiration_date"] = (
         datetime.now(timezone.utc) + timedelta(minutes=-1)
     ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
 
     not_existing_link_id = "1234676871672836187"
-    r = client_with_user_role.put(f"/api/v2/oonirun/{not_existing_link_id}", json=j)
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{not_existing_link_id}", json=j)
     assert r.status_code == 404, r.json()
 
-    r = client.get(f"/api/v2/oonirun/{not_existing_link_id}")
+    r = client.get(f"/api/v2/oonirun-links/{not_existing_link_id}")
     assert r.status_code == 404, r.json()
 
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 403, "expired link cannot be edited"
 
     r = client_with_user_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}"
+        f"/api/v2/oonirun-links"
     )
     j = r.json()
     assert r.status_code == 200, r.json()
@@ -187,19 +187,19 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     ### Create 2 descriptors as user
     z["name"] = "integ-test name in English"
     z["name_intl"]["it"] = "integ-test nome in italiano"
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, r.json()
     assert str(r.json()["oonirun_link_id"]).endswith("00")
     oonirun_link_id = r.json()["oonirun_link_id"]
 
     z["name"] = "second descriptor in English"
     z["name_intl"]["it"] = "second integ-test nome in italiano"
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, r.json()
     assert str(r.json()["oonirun_link_id"]).endswith("00")
     oonirun_link_id = r.json()["oonirun_link_id"]
 
-    r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client_with_user_role.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
 
     j = r.json()
@@ -223,7 +223,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["revision"] == 1
 
     ## Fetch by revision
-    r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}?revision=1")
+    r = client_with_user_role.get(f"/api/v2/oonirun-links/{oonirun_link_id}?revision=1")
     assert r.status_code == 200, r.json()
 
     j = r.json()
@@ -297,13 +297,13 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert found == True
 
     ### "update" the oonirun by creating a new version, changing the inputs
-    z["nettests"][0]["test_inputs"].append({"url": "https://foo.net/"})
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=z)
+    z["nettests"][0]["test_inputs"].append("https://foo.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=z)
     assert r.status_code == 200, r.json()
     assert r.json()["oonirun_link_id"] == oonirun_link_id
 
     ## Fetch it back
-    r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client_with_user_role.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
 
     j = r.json()
@@ -311,21 +311,21 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["is_expired"] is False, r.json()
     assert j["revision"] > 1, r.json()
 
-    ## List descriptors as admin and find we have 2 versions now
+    ## List descriptors as admin and find 2 of them
     r = client_with_admin_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}"
+        f"/api/v2/oonirun-links"
     )
     assert r.status_code == 200, r.json()
     descs = r.json()["oonirun_links"]
-    assert len(descs) == 1, r.json()
+    assert len(descs) == 2, r.json()
 
     ## List descriptors using more params
     r = client_with_user_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}&only_mine=True"
+        f"/api/v2/oonirun-links?is_mine=True"
     )
     assert r.status_code == 200, r.json()
     descs = r.json()["oonirun_links"]
-    assert len(descs) == 1, r.json()
+    assert len(descs) == 2, r.json()
     for d in descs:
         assert d["is_mine"] is True
         assert d["is_expired"] is False
@@ -333,7 +333,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     # XXX this is wrong. Admin can do everything.
     # TODO(art): add test for trying to edit from a non-admin account
     # say("Fail to update the oonirun using the wrong account")
-    # r = client_with_admin_role.put(f"/api/v2/oonirun/{ooni_run_link_id}", json=z)
+    # r = client_with_admin_role.put(f"/api/v2/oonirun-links/{ooni_run_link_id}", json=z)
     # assert r.status_code == 400, r.json()
     # assert r.json() == {"error": "OONIRun descriptor not found"}
 
@@ -342,7 +342,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     # We need to pause 1 second for the update time to be different
     time.sleep(1)
     z["description_intl"]["it"] = "integ-test *nuova* descrizione in italiano"
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=z)
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=z)
     assert r.status_code == 200, r.json()
 
     ## previous id and descriptor_creation_time, not changed
@@ -350,7 +350,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     # assert creation_time == r.json()["descriptor_creation_time"]
 
     ## Fetch latest and find descriptor_creation_time has not changed
-    r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client_with_user_role.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
 
     j = r.json()
@@ -379,22 +379,15 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     edit_req["expiration_date"] = (
         datetime.now(timezone.utc) + timedelta(minutes=-1)
     ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=edit_req)
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=edit_req)
     j = r.json()
     assert r.status_code == 200, r.json()
     assert j["is_expired"] == True
 
-    ## List descriptors after expiration filtering by ID
+    ## List descriptors after expiration
     r = client_with_user_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}&include_expired=True"
+        f"/api/v2/oonirun-links?is_expired=True"
     )
-    j = r.json()
-    assert r.status_code == 200, r.json()
-    descs = j["oonirun_links"]
-    assert len(descs) == 1, r.json()
-
-    ## List descriptors after expiration NOT filtering by ID
-    r = client_with_user_role.get(f"/api/v2/oonirun-links?include_expired=True")
     j = r.json()
     assert r.status_code == 200, r.json()
     descs = j["oonirun_links"]
@@ -402,20 +395,20 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
 
     ## List descriptors filtered by ID
     r = client_with_user_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}"
+        f"/api/v2/oonirun-links/{oonirun_link_id}"
     )
     assert r.status_code == 200, r.json()
-    descs = r.json()["oonirun_links"]
-    assert len(descs) == 0, r.json()
+    descs = r.json()["nettests"]
+    assert len(descs) == 2, r.json()
 
-    ## List descriptors unfiltered by ID
+    ## List descriptors
     r = client_with_user_role.get(f"/api/v2/oonirun-links")
     assert r.status_code == 200, r.json()
     descs = r.json()["oonirun_links"]
     assert len(descs) == 1, r.json()
 
     ## Fetch latest and find that it's archived
-    r = client_with_user_role.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client_with_user_role.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     assert r.json()["is_expired"] == True, r.json()
 
@@ -425,24 +418,24 @@ def test_oonirun_expiration(client, client_with_user_role):
     ### Create descriptor as user
     z["name"] = "integ-test name in English"
     z["name_intl"]["it"] = "integ-test nome in italiano"
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, r.json()
     assert str(r.json()["oonirun_link_id"]).endswith("00")
     oonirun_link_id = r.json()["oonirun_link_id"]
 
     ## Fetch anonymously and check it's not expired
-    r = client.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     j = r.json()
     assert r.status_code == 200, r.json()
     assert j["is_expired"] == False, r.json()
 
     ## Create new revision
-    j["nettests"][0]["test_inputs"].append({"url": "https://foo.net/"})
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
+    j["nettests"][0]["test_inputs"].append("https://foo.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
 
     ## Fetch anonymously and check it's got the new revision
-    r = client.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     j = r.json()
     assert j["revision"] == 2, "revision did not change"
 
@@ -450,18 +443,18 @@ def test_oonirun_expiration(client, client_with_user_role):
     j["expiration_date"] = (
         datetime.now(timezone.utc) + timedelta(minutes=-1)
     ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id}", json=j)
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
     assert r.json()["is_expired"] == True, r.json()
 
     ## Fetch anonymously and check it's expired
-    r = client.get(f"/api/v2/oonirun/{oonirun_link_id}")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     assert r.json()["is_expired"] == True, r.json()
 
     ## List descriptors after expiration
     r = client_with_user_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}"
+        f"/api/v2/oonirun-links"
     )
     j = r.json()
     assert r.status_code == 200, r.json()
@@ -470,7 +463,7 @@ def test_oonirun_expiration(client, client_with_user_role):
 
     ## List descriptors after expiration
     r = client_with_user_role.get(
-        f"/api/v2/oonirun-links?oonirun_link_id={oonirun_link_id}&include_expired=True"
+        f"/api/v2/oonirun-links?is_expired=True"
     )
     j = r.json()
     assert r.status_code == 200, r.json()
@@ -484,35 +477,35 @@ def test_oonirun_revisions(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     ### Create descriptor as user
     z["name"] = "first descriptor"
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
     oonirun_link_id_one = j["oonirun_link_id"]
 
     ## Create two new revisions
-    j["nettests"][0]["test_inputs"].append({"url": "https://foo.net/"})
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id_one}", json=j)
+    j["nettests"][0]["test_inputs"].append("https://foo.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id_one}", json=j)
     assert r.status_code == 200, r.json()
     j = r.json()
-    j["nettests"][0]["test_inputs"].append({"url": "https://foo2.net/"})
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id_one}", json=j)
+    j["nettests"][0]["test_inputs"].append("https://foo2.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id_one}", json=j)
     assert r.status_code == 200, r.json()
     j = r.json()
 
     ### Create another descriptor as user
     z["name"] = "second descriptor"
-    r = client_with_user_role.post("/api/v2/oonirun", json=z)
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
     oonirun_link_id_two = j["oonirun_link_id"]
 
     ## Create new revision
-    j["nettests"][0]["test_inputs"].append({"url": "https://foo.net/"})
-    r = client_with_user_role.put(f"/api/v2/oonirun/{oonirun_link_id_two}", json=j)
+    j["nettests"][0]["test_inputs"].append("https://foo.net/")
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id_two}", json=j)
     assert r.status_code == 200, r.json()
 
     ## Fetch anonymously and check it's got the new revision
-    r = client.get(f"/api/v2/oonirun/{oonirun_link_id_one}")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}")
     j = r.json()
     assert j["revision"] == 3, "revision is 3"
 
@@ -521,3 +514,18 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 200, r.json()
     descs = j["oonirun_links"]
     assert len(descs) == 2, r.json()
+
+    ## Fetch latest revision number
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/latest")
+    j = r.json()
+    assert j["revision"] == 3, "revision is 3"
+
+    ## Fetch specific revision number
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/2")
+    j = r.json()
+    assert j["revision"] == 2, "revision is 2"
+
+    ## Fetch invalid revision number
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revision/notarevision")
+    j = r.json()
+    assert r.status_code != 200, r.json()
