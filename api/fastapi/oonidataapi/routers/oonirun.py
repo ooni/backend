@@ -66,9 +66,10 @@ class OONIRunLinkNettest(BaseModel):
     )
 
 
-class OONIRunLinkNettestDescriptor(BaseModel):
-    revision: int = Field(default=1, title="revision of the nettest")
+class OONIRunLinkEngineDescriptor(BaseModel):
+    revision: str = Field(title="revision of the nettest descriptor")
     nettests: List[OONIRunLinkNettest] = Field(default=[], title="list of nettests")
+    date_created: datetime = Field(title="date when the nettest list was created")
 
 
 class OONIRunLinkBase(BaseModel):
@@ -428,31 +429,11 @@ def make_oonirun_link(
     )
 
 
-@metrics.timer("get_latest_oonirun_link")
-@router.get(
-    "/v2/oonirun-links/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
-)
-def get_latest_oonirun_link(
-    oonirun_link_id: str,
-    authorization: str = Header("authorization"),
-    db=Depends(get_postgresql_session),
-):
-    """Fetch OONIRun descriptor by creation time or the newest one"""
-    # Return the latest version of the translations
-    log.debug("fetching oonirun")
-    account_id = get_account_id_or_none(authorization)
-
-    oonirun_link = make_oonirun_link(
-        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id
-    )
-    return oonirun_link
-
-
 class OONIRunLinkRevisions(BaseModel):
     revisions: List[str]
 
 
-@metrics.timer("get_latest_oonirun_link")
+@metrics.timer("get_revisions_oonirun_link")
 @router.get(
     "/v2/oonirun-links/{oonirun_link_id}/revisions",
     tags=["oonirun"],
@@ -484,9 +465,62 @@ def get_oonirun_link_revisions(
     return OONIRunLinkRevisions(revisions=revisions)
 
 
-@metrics.timer("get_latest_oonirun_link")
+@metrics.timer("get_full_descriptor_oonirun_link")
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}/revisions/{revision_number}",
+    "/v2/oonirun-links/{oonirun_link_id}/engine-descriptor/{revision_number}",
+    tags=["oonirun"],
+    response_model=OONIRunLinkEngineDescriptor,
+)
+def get_oonirun_link_engine_descriptor(
+    oonirun_link_id: str,
+    revision_number: Annotated[
+        str,
+        Path(
+            regex="^(latest|\\d+)$",
+            error_messages={
+                "regex": "invalid revision number specified, must be 'latest' or a number"
+            },
+        ),
+    ],
+    authorization: str = Header("authorization"),
+    db=Depends(get_postgresql_session),
+):
+    """Fetch an OONI Run link by specifying the revision number"""
+    # Return the latest version of the translations
+    account_id = get_account_id_or_none(authorization)
+
+    try:
+        revision = int(revision_number)
+    except:
+        # We can assert it, since we are doing validation
+        assert revision_number == "latest"
+        revision = None
+
+    q = db.query(models.OONIRunLink).filter(
+        models.OONIRunLink.oonirun_link_id == oonirun_link_id
+    )
+
+    try:
+        res = q.one()
+    except sa.exc.NoResultFound:
+        raise HTTPException(status_code=404, detail=f"OONI Run link not found")
+
+    latest_revision = res.nettests[0].revision
+    if revision is None:
+        revision = latest_revision
+
+    assert isinstance(revision, int)
+    nettests, date_created = get_nettests(res, revision)
+    return OONIRunLinkEngineDescriptor(
+        nettests=nettests,
+        date_created=date_created,
+        revision=str(revision),
+    )
+
+
+@metrics.timer("get_full_descriptor_oonirun_link")
+@router.get(
+    "/v2/oonirun-links/{oonirun_link_id}/full-descriptor/{revision_number}",
     tags=["oonirun"],
     response_model=OONIRunLink,
 )
@@ -518,6 +552,26 @@ def get_oonirun_link_revision(
 
     oonirun_link = make_oonirun_link(
         db=db, oonirun_link_id=oonirun_link_id, account_id=account_id, revision=revision
+    )
+    return oonirun_link
+
+
+@metrics.timer("get_latest_oonirun_link")
+@router.get(
+    "/v2/oonirun-links/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
+)
+def get_latest_oonirun_link(
+    oonirun_link_id: str,
+    authorization: str = Header("authorization"),
+    db=Depends(get_postgresql_session),
+):
+    """Fetch OONIRun descriptor by creation time or the newest one"""
+    # Return the latest version of the translations
+    log.debug("fetching oonirun")
+    account_id = get_account_id_or_none(authorization)
+
+    oonirun_link = make_oonirun_link(
+        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id
     )
     return oonirun_link
 

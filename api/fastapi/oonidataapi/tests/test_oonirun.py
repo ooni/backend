@@ -491,13 +491,13 @@ def test_oonirun_revisions(client, client_with_user_role):
     second_date_created = j["date_created"]
 
     ## Fetch first revision
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/1")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/full-descriptor/1")
     j = r.json()
     assert r.status_code == 200, r.json()
     assert j["date_created"] == first_date_created
 
     ## Fetch second revision
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/2")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/full-descriptor/2")
     j = r.json()
     assert r.status_code == 200, r.json()
     assert j["date_created"] == second_date_created
@@ -528,12 +528,16 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert len(descs) == 2, r.json()
 
     ## Fetch latest revision number
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/latest")
+    r = client.get(
+        f"/api/v2/oonirun-links/{oonirun_link_id_one}/full-descriptor/latest"
+    )
     j = r.json()
     assert j["revision"] == "3", "revision is 3"
+    lastest_nettests = j["nettests"]
+    latest_date_created = j["date_created"]
 
     ## Fetch specific revision number
-    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/2")
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/full-descriptor/2")
     j = r.json()
     assert j["revision"] == "2", "revision is 2"
 
@@ -543,9 +547,18 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert len(j["revisions"]) == 3, "there are 2 revisions"
     assert j["revisions"][0] == "3", "the latest one is 3"
 
+    ## Fetch nettests for latest
+    r = client.get(
+        f"/api/v2/oonirun-links/{oonirun_link_id_one}/engine-descriptor/latest"
+    )
+    j = r.json()
+    assert j["revision"] == "3", "revision is 3"
+    assert j["nettests"] == lastest_nettests, "nettests are the same"
+    assert j["date_created"] == latest_date_created, "date created matches"
+
     ## Fetch invalid revision number
     r = client.get(
-        f"/api/v2/oonirun-links/{oonirun_link_id_one}/revisions/notarevision"
+        f"/api/v2/oonirun-links/{oonirun_link_id_one}/full-descriptor/notarevision"
     )
     j = r.json()
     assert r.status_code != 200, r.json()
