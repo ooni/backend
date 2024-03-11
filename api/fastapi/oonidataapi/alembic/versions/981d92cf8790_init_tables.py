@@ -10,7 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.schema import Sequence, CreateSequence
 
 # revision identifiers, used by Alembic.
 revision: str = "981d92cf8790"
@@ -20,9 +20,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    op.execute(CreateSequence(Sequence("oonirun_link_id_seq", start=10_000)))
+
+    oonirun_link_id_seq = Sequence("oonirun_link_id_seq")
+
     op.create_table(
         "oonirun",
-        sa.Column("oonirun_link_id", sa.String(), nullable=False, primary_key=True),
+        sa.Column(
+            "oonirun_link_id",
+            sa.String(),
+            nullable=False,
+            server_default=oonirun_link_id_seq.next_value(),
+            primary_key=True,
+        ),
         sa.Column("date_created", sa.DateTime(), nullable=False),
         sa.Column("date_updated", sa.DateTime(), nullable=False),
         sa.Column("creator_account_id", sa.String(), nullable=False),

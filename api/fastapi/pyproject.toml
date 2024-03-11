@@ -28,6 +28,7 @@ docker = "^7.0.0"
 pytest-cov = "^4.1.0"
 click = "^8.1.7"
 black = "^24.2.0"
+pytest-postgresql = "^5.1.1"
 
 [build-system]
 requires = ["poetry-core"]

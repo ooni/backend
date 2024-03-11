@@ -189,8 +189,8 @@ def create_oonirun_link(
     now = datetime.now(timezone.utc).replace(microsecond=0)
 
     revision = 1
-    oonirun_link = OONIRunLink(
-        oonirun_link_id=generate_link_id(),
+    db_oonirun_link = models.OONIRunLink(
+        creator_account_id=account_id,
         name=create_request.name,
         name_intl=create_request.name_intl,
         short_description=create_request.short_description,
@@ -203,27 +203,8 @@ def create_oonirun_link(
         expiration_date=create_request.expiration_date,
         date_created=now,
         date_updated=now,
-        nettests=[],
-        revision=str(revision),
     )
-    # TODO(art): There is a fair amount of duplication moving around pydantic and SQLAlchmey objects.
-    # Maybe https://sqlmodel.tiangolo.com/ could help.
-    db_oonirun_link = models.OONIRunLink(
-        creator_account_id=account_id,
-        oonirun_link_id=oonirun_link.oonirun_link_id,
-        name=oonirun_link.name,
-        name_intl=oonirun_link.name_intl,
-        short_description=oonirun_link.short_description,
-        short_description_intl=oonirun_link.short_description_intl,
-        description=oonirun_link.description,
-        description_intl=oonirun_link.description_intl,
-        author=oonirun_link.author,
-        icon=oonirun_link.icon,
-        color=oonirun_link.color,
-        expiration_date=oonirun_link.expiration_date,
-        date_created=oonirun_link.date_created,
-        date_updated=oonirun_link.date_updated,
-    )
+    nettest_list = []
     for nettest_index, nt in enumerate(create_request.nettests):
         nettest = OONIRunLinkNettest(
             test_name=nt.test_name,
@@ -241,12 +222,28 @@ def create_oonirun_link(
                 revision=revision,
             )
         )
-        oonirun_link.nettests.append(nettest)
+        nettest_list.append(nettest)
 
     db.add(db_oonirun_link)
     db.commit()
 
-    return oonirun_link
+    return OONIRunLink(
+        oonirun_link_id=db_oonirun_link.oonirun_link_id,
+        name=db_oonirun_link.name,
+        name_intl=db_oonirun_link.name_intl,
+        short_description=db_oonirun_link.short_description,
+        short_description_intl=db_oonirun_link.short_description_intl,
+        description=db_oonirun_link.description,
+        description_intl=db_oonirun_link.description_intl,
+        author=db_oonirun_link.author,
+        icon=db_oonirun_link.icon,
+        color=db_oonirun_link.color,
+        expiration_date=db_oonirun_link.expiration_date,
+        date_created=db_oonirun_link.date_created,
+        date_updated=db_oonirun_link.date_updated,
+        nettests=nettest_list,
+        revision=str(revision),
+    )
 
 
 @router.put(

@@ -11,11 +11,12 @@ from ..main import app
 from ..dependencies import get_postgresql_session
 from .. import models
 
+import sqlalchemy as sa
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-def setup_db_alembic(db_url):
+def setup_db_with_alembic(db_url):
     from alembic import command
     from alembic.config import Config
 
@@ -29,15 +30,9 @@ def setup_db_alembic(db_url):
     print(ret)
 
 
-def setup_db(db_url):
-    engine = create_engine(db_url, connect_args={"check_same_thread": False})
-    metadata = models.OONIRunLink.metadata
-    metadata.create_all(engine)
-
-
 def override_pg(db_url):
     def f():
-        engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        engine = create_engine(db_url)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         db = SessionLocal()
         try:
@@ -49,17 +44,17 @@ def override_pg(db_url):
 
 
 @pytest.fixture
-def postgresql(tmp_path_factory):
-    db_path = tmp_path_factory.mktemp("oonidb") / "db.sqlite3"
-    db_url = f"sqlite:///{db_path}"
+def postgresql_app_override(postgresql):
+    db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
 
-    setup_db(db_url)
+    setup_db_with_alembic(db_url)
+
     app.dependency_overrides[get_postgresql_session] = override_pg(db_url)
     yield
 
 
 @pytest.fixture
-def client(postgresql):
+def client(postgresql_app_override):
     client = TestClient(app)
     return client
 

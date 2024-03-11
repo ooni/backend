@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import List, Dict, Any
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, Sequence, String
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
@@ -11,7 +11,12 @@ from .postgresql import Base
 class OONIRunLink(Base):
     __tablename__ = "oonirun"
 
-    oonirun_link_id: Mapped[str] = mapped_column(primary_key=True)
+    # First 10k OONI Run links are reserved for official OONI links
+    oonirun_link_id: Mapped[str] = mapped_column(
+        String,
+        Sequence("oonirun_link_id_seq", start=10_000),
+        primary_key=True,
+    )
     date_updated: Mapped[datetime] = mapped_column()
     date_created: Mapped[datetime] = mapped_column()
     creator_account_id: Mapped[str] = mapped_column()
