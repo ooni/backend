@@ -48,7 +48,7 @@ Source = "https://github.com/ooni/backend"
 [tool.hatch.build.targets.wheel]
 packages = ["src/oonirun"]
 
-[tool.hatch.envs.test]
+[tool.hatch.envs.default]
 dependencies = [
   "coverage[toml]",
   "pytest",
@@ -59,5 +59,34 @@ dependencies = [
 ]
 path = ".venv/"
 
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+  "- coverage combine",
+  "coverage report",
+]
+cov = [
+  "test-cov",
+  "cov-report",
+]
+
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = ["oonirun", "tests"]
+omit = [
+]
+
+[tool.coverage.paths]
+oonirun = ["src/oonirun"]
+tests = ["tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
