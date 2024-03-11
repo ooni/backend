@@ -33,10 +33,10 @@ def upgrade() -> None:
             server_default=oonirun_link_id_seq.next_value(),
             primary_key=True,
         ),
-        sa.Column("date_created", sa.DateTime(), nullable=False),
-        sa.Column("date_updated", sa.DateTime(), nullable=False),
+        sa.Column("date_created", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("date_updated", sa.DateTime(timezone=True), nullable=False),
         sa.Column("creator_account_id", sa.String(), nullable=False),
-        sa.Column("expiration_date", sa.DateTime(), nullable=False),
+        sa.Column("expiration_date", sa.DateTime(timezone=True), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("short_description", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=False),
@@ -57,7 +57,7 @@ def upgrade() -> None:
         sa.Column(
             "nettest_index", sa.Integer(), nullable=False, server_default=sa.text("0")
         ),
-        sa.Column("date_created", sa.DateTime(), nullable=True),
+        sa.Column("date_created", sa.DateTime(timezone=True), nullable=True),
         sa.Column("test_name", sa.String(), nullable=True),
         sa.Column("inputs", sa.JSON(), nullable=True),
         sa.Column("options", sa.JSON(), nullable=True),

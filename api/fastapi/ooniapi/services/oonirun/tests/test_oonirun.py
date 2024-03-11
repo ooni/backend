@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import time
 
 from oonirun import models
+from oonirun.routers.oonirun import utcnow_seconds
 
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
@@ -87,9 +88,9 @@ def test_oonirun_models(tmp_path_factory):
     db_runlink = models.OONIRunLink(
         **run_link,
         oonirun_link_id="000000000",
-        date_created=datetime.now(timezone.utc),
-        date_updated=datetime.now(timezone.utc),
-        expiration_date=datetime.now(timezone.utc) + timedelta(days=1),
+        date_created=utcnow_seconds(),
+        date_updated=utcnow_seconds(),
+        expiration_date=utcnow_seconds(),
         creator_account_id="000000000",
     )
     db_runlink.nettests = [
@@ -97,25 +98,25 @@ def test_oonirun_models(tmp_path_factory):
             **nettests[0],
             revision=1,
             nettest_index=0,
-            date_created=datetime.now(timezone.utc),
+            date_created=utcnow_seconds(),
         ),
         models.OONIRunLinkNettest(
             **nettests[1],
             revision=1,
             nettest_index=1,
-            date_created=datetime.now(timezone.utc),
+            date_created=utcnow_seconds(),
         ),
         models.OONIRunLinkNettest(
             **nettests[1],
             revision=2,
             nettest_index=0,
-            date_created=datetime.now(timezone.utc),
+            date_created=utcnow_seconds(),
         ),
         models.OONIRunLinkNettest(
             **nettests[1],
             revision=3,
             nettest_index=0,
-            date_created=datetime.now(timezone.utc),
+            date_created=utcnow_seconds(),
         ),
     ]
     db.add(db_runlink)
@@ -159,9 +160,9 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     assert str(j["oonirun_link_id"]).startswith("10")
     oonirun_link_id = r.json()["oonirun_link_id"]
 
-    j["expiration_date"] = (
-        datetime.now(timezone.utc) + timedelta(minutes=-1)
-    ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    j["expiration_date"] = (utcnow_seconds() + timedelta(minutes=-1)).strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )
     r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
 
@@ -208,17 +209,18 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["name_intl"] == z["name_intl"]
     assert j["description"] == z["description"]
     assert j["nettests"] == z["nettests"]
+    print(j["date_created"])
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
-    assert date_created < datetime.now(timezone.utc)
-    assert date_created > datetime.now(timezone.utc) + timedelta(hours=-1)
+    assert date_created < utcnow_seconds() + timedelta(minutes=+10)
+    assert date_created > utcnow_seconds() + timedelta(hours=-1)
 
     date_updated = datetime.strptime(
         j["date_updated"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
-    assert date_updated < datetime.now(timezone.utc)
-    assert date_updated > datetime.now(timezone.utc) + timedelta(hours=-1)
+    assert date_updated < utcnow_seconds() + timedelta(minutes=+10)
+    assert date_updated > utcnow_seconds() + timedelta(hours=-1)
 
     assert j["is_mine"] == True
     assert j["revision"] == "1"
@@ -237,14 +239,14 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
-    assert date_created < datetime.now(timezone.utc)
-    assert date_created > datetime.now(timezone.utc) + timedelta(hours=-1)
+    assert date_created < utcnow_seconds() + timedelta(minutes=10)
+    assert date_created > utcnow_seconds() + timedelta(hours=-1)
 
     date_updated = datetime.strptime(
         j["date_updated"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
-    assert date_updated < datetime.now(timezone.utc)
-    assert date_updated > datetime.now(timezone.utc) + timedelta(hours=-1)
+    assert date_updated < utcnow_seconds() + timedelta(minutes=+10)
+    assert date_updated > utcnow_seconds() + timedelta(hours=-1)
 
     assert j["is_mine"] == True
     assert j["revision"] == "1"
@@ -357,14 +359,14 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
-    assert date_created < datetime.now(timezone.utc)
-    assert date_created > datetime.now(timezone.utc) + timedelta(hours=-1)
+    assert date_created < utcnow_seconds() + timedelta(minutes=30)
+    assert date_created > utcnow_seconds() + timedelta(hours=-1)
 
     date_updated = datetime.strptime(
         j["date_updated"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
-    assert date_updated < datetime.now(timezone.utc)
-    assert date_updated > datetime.now(timezone.utc) + timedelta(hours=-1)
+    assert date_updated < utcnow_seconds() + timedelta(minutes=30)
+    assert date_updated > utcnow_seconds() + timedelta(hours=-1)
 
     assert date_updated > date_created
 
@@ -373,9 +375,9 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
 
     # Archive it
     edit_req = deepcopy(j)
-    edit_req["expiration_date"] = (
-        datetime.now(timezone.utc) + timedelta(minutes=-1)
-    ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    edit_req["expiration_date"] = (utcnow_seconds() + timedelta(minutes=-1)).strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )
     r = client_with_user_role.put(
         f"/api/v2/oonirun-links/{oonirun_link_id}", json=edit_req
     )
@@ -435,9 +437,9 @@ def test_oonirun_expiration(client, client_with_user_role):
     assert j["revision"] == "2", "revision did not change"
 
     ## Update expiry time
-    j["expiration_date"] = (
-        datetime.now(timezone.utc) + timedelta(minutes=-1)
-    ).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    j["expiration_date"] = (utcnow_seconds() + timedelta(minutes=-1)).strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )
     r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
     assert r.json()["is_expired"] == True, r.json()

@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone, date
 from os import urandom
 from sys import byteorder
 from typing import Dict, Any, List, Optional, Tuple
-import json
 import logging
 
 import sqlalchemy as sa
@@ -46,6 +45,10 @@ class BaseModel(PydandicBaseModel):
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def utcnow_seconds():
+    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 class OONIRunLinkNettest(BaseModel):
@@ -128,7 +131,7 @@ class OONIRunLinkBase(BaseModel):
         pattern="^#(?:[0-9a-fA-F]{6})$",
     )
     expiration_date: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc) + timedelta(days=30 * 6),
+        default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
 
@@ -154,10 +157,7 @@ class OONIRunLink(OONIRunLinkBase):
     )
     @property
     def is_expired(self) -> bool:
-        # See docstring of models.OONIRunLink.expiration_date_dt_native
-        return self.expiration_date.replace(tzinfo=timezone.utc) < datetime.now(
-            timezone.utc
-        )
+        return self.expiration_date < utcnow_seconds()
 
 
 class OONIRunLinkCreateEdit(OONIRunLinkBase):
@@ -186,7 +186,7 @@ def create_oonirun_link(
     account_id = get_account_id_or_raise(authorization)
     assert create_request
 
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = utcnow_seconds()
 
     revision = 1
     db_oonirun_link = models.OONIRunLink(
@@ -262,7 +262,7 @@ def edit_oonirun_link(
     log.debug(f"edit oonirun {oonirun_link_id}")
     account_id = get_account_id_or_raise(authorization)
 
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = utcnow_seconds()
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
@@ -275,7 +275,7 @@ def edit_oonirun_link(
     except sa.exc.NoResultFound:
         raise HTTPException(status_code=404, detail="OONI Run link not found")
 
-    if oonirun_link.expiration_date_dt_native < now:
+    if oonirun_link.expiration_date < now:
         raise HTTPException(
             status_code=403,
             detail="OONI Run link has expired and cannot be edited",
@@ -285,7 +285,7 @@ def edit_oonirun_link(
         q = db.query(models.OONIRunLink).filter(
             models.OONIRunLink.oonirun_link_id == oonirun_link_id,
             # Timezones in python are a mess...
-            models.OONIRunLink.expiration_date > now.replace(tzinfo=None),
+            models.OONIRunLink.expiration_date > now,
         )
         if get_client_role(authorization) != "admin":
             q = q.filter(models.OONIRunLink.creator_account_id == account_id)
@@ -416,7 +416,7 @@ def make_oonirun_link(
         description_intl=res.description_intl,
         icon=res.icon,
         color=res.color,
-        expiration_date=res.expiration_date_dt_native,
+        expiration_date=res.expiration_date,
         nettests=nettests,
         date_created=date_created,
         date_updated=res.date_updated,
@@ -596,7 +596,7 @@ def list_oonirun_links(
 
     q = db.query(models.OONIRunLink)
     if not is_expired:
-        q = q.filter(models.OONIRunLink.expiration_date > datetime.now(timezone.utc))
+        q = q.filter(models.OONIRunLink.expiration_date > utcnow_seconds())
     if is_mine == True:
         q = q.filter(models.OONIRunLink.creator_account_id == account_id)
 
