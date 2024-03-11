@@ -38,6 +38,9 @@ imagedefinitions.json:
 test:
 	hatch run test
 
+test-cov:
+	hatch run test-cov
+
 build:
 	hatch build
 
@@ -45,7 +48,7 @@ clean:
 	hatch clean
 	rm imagedefinitions.json
 	rm -rf build dist *eggs *.egg-info
-	rm -rf .hatch
+	rm -rf .venv
 
 run:
 	hatch run uvicorn oonirun.main:app

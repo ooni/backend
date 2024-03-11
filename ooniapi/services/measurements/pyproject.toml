@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ooniapi.measurements"
+name = "measurements"
 version = "0.5.0.dev1"
 description = ''
 
@@ -17,7 +17,6 @@ dependencies = [
   "pydantic-settings ~= 2.1.0",
   "statsd ~= 4.0.1",
   "uvicorn ~= 0.25.0",
-  "psycopg2 ~= 2.9.9",
   "httpx ~= 0.26.0",
   "pyjwt ~= 2.8.0",
   "alembic ~= 1.13.1",

@@ -49,27 +49,14 @@ Source = "https://github.com/ooni/backend"
 packages = ["src/oonirun"]
 
 [tool.hatch.envs.default]
-dependencies = [
-  "coverage[toml]",
-  "pytest",
-  "pytest-cov",
-  "click",
-  "black",
-  "pytest-postgresql",
-]
+dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql"]
 path = ".venv/"
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
-test-cov = "coverage run -m pytest {args:tests}"
-cov-report = [
-  "- coverage combine",
-  "coverage report",
-]
-cov = [
-  "test-cov",
-  "cov-report",
-]
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=term {args:tests}"
+cov-report = ["- coverage combine", "coverage report"]
+cov = ["test-cov", "cov-report"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
@@ -77,16 +64,11 @@ addopts = ["--import-mode=importlib"]
 [tool.coverage.run]
 branch = true
 source_pkgs = ["oonirun", "tests"]
-omit = [
-]
+omit = []
 
 [tool.coverage.paths]
 oonirun = ["src/oonirun"]
 tests = ["tests"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
