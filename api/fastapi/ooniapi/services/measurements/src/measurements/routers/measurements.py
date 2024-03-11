@@ -30,8 +30,8 @@ from psycopg2.extensions import QueryCanceledError  # debdeps: python3-psycopg2
 from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
-from ..config import settings, metrics
-from ..utils import (
+from ..common.config import settings, metrics
+from ..common.utils import (
     jerror,
     cachedjson,
     commasplit,

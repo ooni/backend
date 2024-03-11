@@ -18,10 +18,10 @@ from pydantic import computed_field, Field, validator
 from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
 
-from ..config import metrics
+from ..common.config import metrics
 from .. import models
 
-from ..utils import (
+from ..common.utils import (
     commasplit,
     role_required,
     get_client_role,

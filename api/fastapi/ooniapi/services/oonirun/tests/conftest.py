@@ -6,9 +6,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from ooniapi.common.config import settings
-from ooniapi.oonirun.main import app
-from ooniapi.oonirun.dependencies import get_postgresql_session
+from oonirun.common.config import settings
+from oonirun.main import app
+from oonirun.dependencies import get_postgresql_session
 
 import sqlalchemy as sa
 from sqlalchemy import create_engine
@@ -19,7 +19,9 @@ def setup_db_with_alembic(db_url):
     from alembic import command
     from alembic.config import Config
 
-    migrations_path = (Path(__file__).parent.parent / "alembic").resolve()
+    migrations_path = (
+        Path(__file__).parent.parent / "src" / "oonirun" / "alembic"
+    ).resolve()
 
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_path))

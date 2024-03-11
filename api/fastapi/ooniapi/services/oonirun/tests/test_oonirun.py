@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import time
 
-from ooniapi.oonirun import models
+from oonirun import models
 
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker

@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from oonidataapi import models
+from oonirun import models
 
 target_metadata = models.Base.metadata
 

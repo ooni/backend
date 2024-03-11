@@ -45,6 +45,9 @@ Documentation = "https://github.com/ooni/backend"
 Issues = "https://github.com/ooni/backend/issues"
 Source = "https://github.com/ooni/backend"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/oonirun"]
+
 [tool.hatch.envs.test]
 dependencies = [
   "coverage[toml]",
@@ -54,3 +57,7 @@ dependencies = [
   "black",
   "pytest-postgresql",
 ]
+path = ".venv/"
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
