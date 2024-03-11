@@ -37,9 +37,9 @@ oonirun_nettest_table = table(
     ),
     sa.Column("date_created", sa.DateTime(), nullable=True),
     sa.Column("test_name", sa.String(), nullable=True),
-    sa.Column("test_inputs", sa.JSON(), nullable=True),
-    sa.Column("test_options", sa.JSON(), nullable=True),
-    sa.Column("backend_config", sa.JSON(), nullable=True),
+    sa.Column("inputs", sa.JSON(), nullable=True),
+    sa.Column("options", sa.JSON(), nullable=True),
+    sa.Column("backend_options", sa.JSON(), nullable=True),
     sa.Column(
         "is_background_run_enabled_default",
         sa.Boolean(),
@@ -67,9 +67,9 @@ def upgrade() -> None:
         ),
         sa.Column("date_created", sa.DateTime(), nullable=True),
         sa.Column("test_name", sa.String(), nullable=True),
-        sa.Column("test_inputs", sa.JSON(), nullable=True),
-        sa.Column("test_options", sa.JSON(), nullable=True),
-        sa.Column("backend_config", sa.JSON(), nullable=True),
+        sa.Column("inputs", sa.JSON(), nullable=True),
+        sa.Column("options", sa.JSON(), nullable=True),
+        sa.Column("backend_options", sa.JSON(), nullable=True),
         sa.Column(
             "is_background_run_enabled_default",
             sa.Boolean(),
@@ -99,17 +99,15 @@ def upgrade() -> None:
     for record in oonirun_rows:
         nettests_data = record.nettests
         for index, nettest in enumerate(nettests_data):
-            inputs = nettest.get("inputs", [])
-            test_inputs = list(map(lambda x: {"url": x}, inputs))
             nettest = dict(
                 oonirun_link_id=record.oonirun_link_id,
                 revision=record.revision,
                 nettest_index=index,
                 date_created=record.date_created,
                 test_name=nettest["test_name"],
-                test_inputs=test_inputs,
-                test_options=nettest.get("options", {}),
-                backend_config=nettest.get("backend_options", {}),
+                inputs=nettest.get("inputs", []),
+                options=nettest.get("options", {}),
+                backend_options=nettest.get("backend_options", {}),
                 is_background_run_enabled_default=nettest.get(
                     "is_background_run_enabled", False
                 ),

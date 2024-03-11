@@ -60,9 +60,9 @@ class OONIRunLinkNettest(Base):
     date_created: Mapped[datetime] = mapped_column()
 
     test_name: Mapped[str] = mapped_column()
-    test_inputs: Mapped[List[str]] = mapped_column(nullable=True)
-    test_options: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
-    backend_config: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
+    inputs: Mapped[List[str]] = mapped_column(nullable=True)
+    options: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
+    backend_options: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
 
     is_background_run_enabled_default: Mapped[bool] = mapped_column(default=False)
     is_manual_run_enabled_default: Mapped[bool] = mapped_column(default=False)

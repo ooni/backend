@@ -52,11 +52,11 @@ class OONIRunLinkNettest(BaseModel):
     test_name: str = Field(
         default="", title="name of the ooni nettest", min_length=2, max_length=100
     )
-    test_inputs: List[str] = Field(
+    inputs: List[str] = Field(
         default=[], title="list of input dictionaries for the nettest"
     )
-    test_options: Dict = Field(default={}, title="options for the nettest")
-    backend_config: Dict = Field(default={}, title="options for the nettest")
+    options: Dict = Field(default={}, title="options for the nettest")
+    backend_options: Dict = Field(default={}, title="options to send to the backend")
     is_background_run_enabled_default: bool = Field(
         default=False,
         title="if this test should be enabled by default for background runs",
@@ -227,9 +227,9 @@ def create_oonirun_link(
     for nettest_index, nt in enumerate(create_request.nettests):
         nettest = OONIRunLinkNettest(
             test_name=nt.test_name,
-            test_inputs=nt.test_inputs,
-            test_options=nt.test_options,
-            backend_config=nt.backend_config,
+            inputs=nt.inputs,
+            options=nt.options,
+            backend_options=nt.backend_options,
             is_background_run_enabled_default=nt.is_background_run_enabled_default,
             is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
         )
@@ -305,9 +305,9 @@ def edit_oonirun_link(
         latest_nettests.append(
             OONIRunLinkNettest(
                 test_name=nt.test_name,
-                test_inputs=nt.test_inputs,
-                test_options=nt.test_options,
-                backend_config=nt.backend_config,
+                inputs=nt.inputs,
+                options=nt.options,
+                backend_options=nt.backend_options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
             )
@@ -321,9 +321,9 @@ def edit_oonirun_link(
                 nettest_index=nettest_index,
                 date_created=now,
                 test_name=nt.test_name,
-                test_inputs=nt.test_inputs,
-                test_options=nt.test_options,
-                backend_config=nt.backend_config,
+                inputs=nt.inputs,
+                options=nt.options,
+                backend_options=nt.backend_options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
                 oonirun_link=oonirun_link,
@@ -376,9 +376,9 @@ def get_nettests(
         nettests.append(
             OONIRunLinkNettest(
                 test_name=nt.test_name,
-                test_inputs=nt.test_inputs,
-                test_options=nt.test_options,
-                backend_config=nt.backend_config,
+                inputs=nt.inputs,
+                options=nt.options,
+                backend_options=nt.backend_options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
             )

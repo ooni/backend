@@ -26,22 +26,22 @@ SAMPLE_OONIRUN = {
     "author": "integ-test author",
     "nettests": [
         {
-            "test_inputs": [
+            "inputs": [
                 "https://example.com/",
                 "https://ooni.org/",
             ],
-            "test_options": {
+            "options": {
                 "HTTP3Enabled": True,
             },
-            "backend_config": {},
+            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
         },
         {
-            "test_inputs": [],
-            "test_options": {},
-            "backend_config": {},
+            "inputs": [],
+            "options": {},
+            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
@@ -297,7 +297,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert found == True
 
     ### "update" the oonirun by creating a new version, changing the inputs
-    z["nettests"][0]["test_inputs"].append("https://foo.net/")
+    z["nettests"][0]["inputs"].append("https://foo.net/")
     r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=z)
     assert r.status_code == 200, r.json()
     assert r.json()["oonirun_link_id"] == oonirun_link_id
@@ -424,7 +424,7 @@ def test_oonirun_expiration(client, client_with_user_role):
     assert j["is_expired"] == False, r.json()
 
     ## Create new revision
-    j["nettests"][0]["test_inputs"].append("https://foo.net/")
+    j["nettests"][0]["inputs"].append("https://foo.net/")
     r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
 
@@ -473,7 +473,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     oonirun_link_id_one = j["oonirun_link_id"]
 
     ## Create two new revisions
-    j["nettests"][0]["test_inputs"].append("https://foo.net/")
+    j["nettests"][0]["inputs"].append("https://foo.net/")
     r = client_with_user_role.put(
         f"/api/v2/oonirun-links/{oonirun_link_id_one}", json=j
     )
@@ -482,7 +482,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     first_date_created = j["date_created"]
 
     time.sleep(1)
-    j["nettests"][0]["test_inputs"].append("https://foo2.net/")
+    j["nettests"][0]["inputs"].append("https://foo2.net/")
     r = client_with_user_role.put(
         f"/api/v2/oonirun-links/{oonirun_link_id_one}", json=j
     )
@@ -510,7 +510,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     oonirun_link_id_two = j["oonirun_link_id"]
 
     ## Create new revision
-    j["nettests"][0]["test_inputs"].append("https://foo.net/")
+    j["nettests"][0]["inputs"].append("https://foo.net/")
     r = client_with_user_role.put(
         f"/api/v2/oonirun-links/{oonirun_link_id_two}", json=j
     )
