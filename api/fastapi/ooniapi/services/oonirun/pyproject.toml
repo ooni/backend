@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ooniapi.oonirun"
+name = "oonirun"
 version = "0.5.0.dev1"
 description = ''
 

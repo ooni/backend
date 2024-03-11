@@ -9,47 +9,29 @@ phases:
     runtime-versions:
       python: 3.11
     commands:
-      - echo "Installing Poetry"
-      - curl -fsS https://install.python-poetry.org | python - --preview -y
-      - export PATH="$HOME/.local/bin:$PATH"
+      - python -m pip install hatch
 
   pre_build:
     commands:
       - aws --version
       - echo "Logging in to ECR"
       - aws secretsmanager get-secret-value --secret-id DOCKER_HUB_PASSWORD --query SecretString --output text | docker login --username ooni --password-stdin
-      - echo "Formatting version information..."
-      - DATE=$(date +'%Y%m%d')
-      - SHORT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
-      - BUILD_LABEL="${DATE}-${SHORT_SHA}"
-      - VERSION_NUMBER=$(cat your_project_dir/pyproject.toml | grep 'version =' | awk -F '"' '{print $2}')
 
   build:
     commands:
       - PROJECT_ROOT=$(pwd)
       - cd $OONI_CODE_PATH
       - echo "Installing project dependencies with poetry..."
-      - poetry install --no-root
-      - poetry run pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=term oonidataapi/tests/test_oonirun.py
-
+      - make test
       - echo "Building and tagging Docker image..."
-      - |
-        docker build --build-arg BUILD_LABEL=${BUILD_LABEL} \
-                     -t $IMAGE_NAME:$BUILD_LABEL \
-                     -t $IMAGE_NAME:production \
-                     -t $IMAGE_NAME:latest \
-                     -t $IMAGE_NAME:v$VERSION_NUMBER \
-                     .
+      - make docker-build
 
   post_build:
     commands:
       - echo "Build complete at $(date)"
       - echo "Pushing Docker images..."
-      - docker push $IMAGE_NAME:$BUILD_LABEL
-      - docker push $IMAGE_NAME:production
-      - docker push $IMAGE_NAME:latest
-      - docker push $IMAGE_NAME:v$VERSION_NUMBER
-      - printf '[{"name":"ooni_dataapi","imageUri":"%s"}]' $IMAGE_NAME:$BUILD_LABEL > ${PROJECT_ROOT}/imagedefinitions.json
+      - make docker-push
+      - make imagedefinitions.json
 
 artifacts:
   files: imagedefinitions.json

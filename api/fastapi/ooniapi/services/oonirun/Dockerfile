@@ -1,30 +1,25 @@
 # Python builder
-# Produced a virtualenv with all the deps good to go
-
-# TODO(art): upgrade to bookworm (blocked by this
-# https://github.com/actions/setup-python/issues/721) or stop using debian to
-# have more recent base OS
-FROM python:3.11-bullseye as py-build
+FROM python:3.11-bookworm as builder
 ARG BUILD_LABEL=docker
 
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-     && apt-get -y install --no-install-recommends python3 python3-dev
+WORKDIR /build
 
-RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python3 -
+RUN python -m pip install hatch
 
-COPY . /app
-WORKDIR /app
-ENV PATH=/opt/poetry/bin:$PATH
-RUN echo "$BUILD_LABEL" > /app/oonidataapi/BUILD_LABEL
-RUN poetry config virtualenvs.in-project true && poetry install --no-interaction --no-ansi
+COPY . /build
+
+RUN echo "$BUILD_LABEL" > /build/src/oonirun/BUILD_LABEL
+
+RUN hatch build
 
 ### Actual image running on the host
-FROM python:3.11-bullseye
+FROM python:3.11-bookworm as runner
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-COPY --from=py-build /app /app
 WORKDIR /app
-CMD ["/app/.venv/bin/uvicorn", "oonidataapi.main:app", "--host", "0.0.0.0", "--port", "80"]
+
+COPY --from=builder /build /build/dist/*.whl /app/
+
+RUN pip install /app/*whl && rm /app/*whl
+
+CMD ["uvicorn", "oonirun.main:app", "--host", "0.0.0.0", "--port", "80"]
 EXPOSE 80
