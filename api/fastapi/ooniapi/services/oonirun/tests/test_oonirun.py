@@ -5,7 +5,8 @@ Integration test for OONIRn API
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import time
-from oonidataapi import models
+
+from ooniapi.oonirun import models
 
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker

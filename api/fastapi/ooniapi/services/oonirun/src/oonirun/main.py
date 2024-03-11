@@ -4,7 +4,7 @@ from .routers import measurements
 from .routers import aggregation
 from .routers import oonirun
 
-from .config import settings
+from ooniapi.common.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 
 import logging
@@ -13,9 +13,7 @@ logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
 
 app = FastAPI()
 # TODO: temporarily enable all
-origins = [
-    "*"
-]
+origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

@@ -17,7 +17,7 @@ from sqlalchemy.sql.expression import and_, select, column, table
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
 
-from ..config import settings, metrics
+from ooniapi.common.config import settings, metrics
 from ..utils import (
     jerror,
     convert_to_csv,
