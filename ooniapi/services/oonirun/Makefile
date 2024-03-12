@@ -1,5 +1,6 @@
 .PHONY: init test build clean docker print-labels
 
+ECS_CONTAINER_NAME ?= ooniapi-service-oonirun
 IMAGE_NAME ?= ooni/api-oonirun
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
@@ -35,7 +36,7 @@ docker-push:
 	docker push ${IMAGE_NAME}:${ENV_LABEL}
 
 imagedefinitions.json: docker-build docker-push
-	echo '[{"name":"${IMAGE_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
+	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
 test:
 	hatch run test
