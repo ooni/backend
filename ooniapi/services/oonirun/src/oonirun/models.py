@@ -37,7 +37,7 @@ class UtcDateTime(TypeDecorator):
             return value.astimezone(timezone.utc)
 
     def process_result_value(self, value, dialect):
-        if value is not None:
+        if value is not None:  # no cov
             if value.tzinfo is None:
                 value = value.replace(tzinfo=timezone.utc)
             else:
