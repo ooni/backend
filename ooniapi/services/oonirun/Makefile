@@ -1,4 +1,4 @@
-.PHONY: init test build clean docker
+.PHONY: init test build clean docker print-labels
 
 IMAGE_NAME ?= ooni/api-oonirun
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
@@ -25,7 +25,7 @@ docker-build:
 		--build-arg BUILD_LABEL=${BUILD_LABEL} \
 		-t ${IMAGE_NAME}:${BUILD_LABEL} \
 		-t ${IMAGE_NAME}:${VERSION_LABEL} \
-		-t ${IMAGE_NAME}:${ENV_LABEL}
+		-t ${IMAGE_NAME}:${ENV_LABEL} \
 		-
 
 docker-push:
@@ -34,7 +34,7 @@ docker-push:
 	docker push ${IMAGE_NAME}:${VERSION_LABEL}
 	docker push ${IMAGE_NAME}:${ENV_LABEL}
 
-imagedefinitions.json:
+imagedefinitions.json: docker-build docker-push
 	echo '[{"name":"${IMAGE_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
 test:
@@ -48,7 +48,7 @@ build:
 
 clean:
 	hatch clean
-	rm imagedefinitions.json
+	rm -f imagedefinitions.json
 	rm -rf build dist *eggs *.egg-info
 	rm -rf .venv
 

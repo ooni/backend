@@ -19,17 +19,9 @@ phases:
   build:
     commands:
       - cd $OONI_CODE_PATH
-      - echo "Installing project dependencies with poetry..."
       - make test
-      - echo "Building and tagging Docker image..."
-      - GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION} make docker-build
-
-  post_build:
-    commands:
-      - echo "Build complete at $(date)"
-      - echo "Pushing Docker images..."
-      - make docker-push
-      - make imagedefinitions.json
+      - make clean
+      - GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION} make imagedefinitions.json
 
 artifacts:
   files: imagedefinitions.json
