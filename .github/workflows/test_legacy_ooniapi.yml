@@ -1,10 +1,10 @@
-name: Test Legacy API
+name: test legacy/ooniapi
 on:
   push:
   workflow_dispatch:
     inputs:
       debug_enabled:
-        description: 'Run the build with tmate debugging enabled'
+        description: "Run the build with tmate debugging enabled"
         required: false
         default: false
 

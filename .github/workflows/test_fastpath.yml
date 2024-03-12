@@ -1,4 +1,4 @@
-name: Test Fastpath
+name: test fastpath
 on: push
 
 jobs:
