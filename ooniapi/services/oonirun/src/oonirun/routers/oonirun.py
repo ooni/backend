@@ -141,7 +141,7 @@ class OONIRunLink(OONIRunLinkBase):
         description="time when the ooni run link was created"
     )
     date_updated: datetime = Field(
-        description="time when the ooni run link was created"
+        description="time when the ooni run nettest was last updated"
     )
     revision: str = Field(
         description="incremental number indicating the revision number of the ooni run link (the first revision is 1)"
