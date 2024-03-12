@@ -1,8 +1,7 @@
 version: 0.2
 env:
   variables:
-    OONI_CODE_PATH: api/fastapi/
-    IMAGE_NAME: ooni/dataapi
+    OONI_CODE_PATH: ooniapi/services/oonirun
 
 phases:
   install:
@@ -19,12 +18,11 @@ phases:
 
   build:
     commands:
-      - PROJECT_ROOT=$(pwd)
       - cd $OONI_CODE_PATH
       - echo "Installing project dependencies with poetry..."
       - make test
       - echo "Building and tagging Docker image..."
-      - make docker-build
+      - GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION} make docker-build
 
   post_build:
     commands:

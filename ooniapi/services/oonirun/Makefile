@@ -8,11 +8,13 @@ PKG_VERSION := $(shell cat pyproject.toml | grep -e 'version\s*=' | cut -d '"' -
 
 BUILD_LABEL := $(DATE)-$(SHORT_SHA)
 VERSION_LABEL = v$(PKG_VERSION)
+ENV_LABEL ?= latest
 
-check:
-	echo "${GIT_FULL_SHA}"
-	echo "${BUILD_LABEL}"
-	echo "${PKG_VERSION}"
+print-labels:
+	echo "PKG_VERSION=${PKG_VERSION}"
+	echo "BUILD_LABEL=${BUILD_LABEL}"
+	echo "VERSION_LABEL=${VERSION_LABEL}"
+	echo "ENV_LABEL=${ENV_LABEL}"
 
 init:
 	hatch env create
@@ -23,14 +25,14 @@ docker-build:
 		--build-arg BUILD_LABEL=${BUILD_LABEL} \
 		-t ${IMAGE_NAME}:${BUILD_LABEL} \
 		-t ${IMAGE_NAME}:${VERSION_LABEL} \
-		-t ${IMAGE_NAME}:latest \
+		-t ${IMAGE_NAME}:${ENV_LABEL}
 		-
 
 docker-push:
 	# We need to use tar -czh to resolve the common dir symlink
 	docker push ${IMAGE_NAME}:${BUILD_LABEL}
 	docker push ${IMAGE_NAME}:${VERSION_LABEL}
-	docker push ${IMAGE_NAME}:latest
+	docker push ${IMAGE_NAME}:${ENV_LABEL}
 
 imagedefinitions.json:
 	echo '[{"name":"${IMAGE_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
