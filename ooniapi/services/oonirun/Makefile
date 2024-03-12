@@ -1,6 +1,6 @@
 .PHONY: init test build clean docker
 
-IMAGE_NAME ?= ooni/dataapi
+IMAGE_NAME ?= ooni/api-oonirun
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
 SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
