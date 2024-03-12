@@ -14,6 +14,7 @@ PORT=$((RANDOM % 10001 + 30000))
 
 cleanup() {
     echo "cleaning up"
+    docker logs $CONTAINER_NAME
     docker stop $CONTAINER_NAME >/dev/null 2>&1
     docker rm $CONTAINER_NAME >/dev/null 2>&1
 }
