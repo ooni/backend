@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ooniapi.common"
+version = "0.5.0.dev1"
+description = ''
+
+dependencies = [
+  "fastapi ~= 0.108.0",
+  "clickhouse-driver ~= 0.2.6",
+  "sqlalchemy ~= 2.0.27",
+  "ujson ~= 5.9.0",
+  "urllib3 ~= 2.1.0",
+  "python-dateutil ~= 2.8.2",
+  "pydantic-settings ~= 2.1.0",
+  "statsd ~= 4.0.1",
+  "uvicorn ~= 0.25.0",
+  "psycopg2 ~= 2.9.9",
+  "httpx ~= 0.26.0",
+  "pyjwt ~= 2.8.0",
+  "alembic ~= 1.13.1",
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [{ name = "OONI", email = "contact@ooni.org" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+Documentation = "https://github.com/ooni/backend"
+Issues = "https://github.com/ooni/backend/issues"
+Source = "https://github.com/ooni/backend"
+
+[tool.hatch.envs.test]
+dependencies = ["coverage[toml]", "pytest", "pytest-cov", "click", "black"]
