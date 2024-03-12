@@ -9,7 +9,7 @@ phases:
     runtime-versions:
       python: 3.11
     commands:
-      - python -m pip install hatch
+      - pip install hatch
 
   pre_build:
     commands:
@@ -20,9 +20,10 @@ phases:
   build:
     commands:
       - cd $OONI_CODE_PATH
+      - export GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION}
       - make test
       - make clean
-      - GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION} make imagedefinitions.json
+      - make imagedefinitions.json
 
 artifacts:
   files: imagedefinitions.json
