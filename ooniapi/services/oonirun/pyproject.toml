@@ -63,8 +63,11 @@ addopts = ["--import-mode=importlib"]
 
 [tool.coverage.run]
 branch = true
+parallel = true
 source_pkgs = ["oonirun", "tests"]
-omit = []
+omit = [
+    "src/oonirun/common/*"
+]
 
 [tool.coverage.paths]
 oonirun = ["src/oonirun"]
