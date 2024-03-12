@@ -21,4 +21,4 @@ jobs:
       - name: Upload coverage to codecov
         uses: codecov/codecov-action@v3
         with:
-        working-directory: ./ooniapi/services/oonirun/
+          working-directory: ./ooniapi/services/oonirun/

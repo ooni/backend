@@ -1,4 +1,4 @@
-name: Build deb packages
+name: build deb packages
 on: pull_request
 
 jobs:
