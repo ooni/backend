@@ -1,0 +1,27 @@
+version: 0.2
+env:
+  variables:
+    OONI_CODE_PATH: ooniapi/services/oonirun
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - python -m pip install hatch
+
+  pre_build:
+    commands:
+      - aws --version
+      - echo "Logging in to ECR"
+      - aws secretsmanager get-secret-value --secret-id DOCKER_HUB_PASSWORD --query SecretString --output text | docker login --username ooni --password-stdin
+
+  build:
+    commands:
+      - cd $OONI_CODE_PATH
+      - make test
+      - make clean
+      - GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION} make imagedefinitions.json
+
+artifacts:
+  files: imagedefinitions.json
