@@ -17,12 +17,11 @@ from pydantic import computed_field, Field, validator
 from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
 
-from ..common.config import metrics
+
 from .. import models
 
+from ..common.dependencies import get_settings, role_required
 from ..common.utils import (
-    commasplit,
-    role_required,
     get_client_role,
     get_account_id_or_raise,
     get_account_id_or_none,
@@ -164,12 +163,6 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
     pass
 
 
-def generate_link_id() -> str:
-    collector_id = 0
-    randint = int.from_bytes(urandom(4), byteorder)
-    return str(randint * 100 + collector_id)
-
-
 @router.post(
     "/v2/oonirun-links",
     tags=["oonirun"],
@@ -180,10 +173,13 @@ def create_oonirun_link(
     create_request: OONIRunLinkCreateEdit,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
+    settings=Depends(get_settings),
 ):
     """Create a new oonirun link or a new version for an existing one."""
     log.debug("creating oonirun")
-    account_id = get_account_id_or_raise(authorization)
+    account_id = get_account_id_or_raise(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
     assert create_request
 
     now = utcnow_seconds()
@@ -257,18 +253,25 @@ def edit_oonirun_link(
     edit_request: OONIRunLinkCreateEdit,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
+    settings=Depends(get_settings),
 ):
     """Edit an existing OONI Run link"""
     log.debug(f"edit oonirun {oonirun_link_id}")
-    account_id = get_account_id_or_raise(authorization)
+    account_id = get_account_id_or_raise(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
 
     now = utcnow_seconds()
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
     )
-    if get_client_role(authorization) != "admin":
+    client_role = get_client_role(authorization, settings.jwt_encryption_key)
+    if client_role == "user":
         q = q.filter(models.OONIRunLink.creator_account_id == account_id)
+    else:
+        # When you are an admin we can do everything and there are no other roles
+        assert client_role == "admin"
 
     try:
         oonirun_link = q.one()
@@ -418,7 +421,6 @@ class OONIRunLinkRevisions(BaseModel):
     revisions: List[str]
 
 
-@metrics.timer("get_revisions_oonirun_link")
 @router.get(
     "/v2/oonirun-links/{oonirun_link_id}/revisions",
     tags=["oonirun"],
@@ -450,7 +452,6 @@ def get_oonirun_link_revisions(
     return OONIRunLinkRevisions(revisions=revisions)
 
 
-@metrics.timer("get_full_descriptor_oonirun_link")
 @router.get(
     "/v2/oonirun-links/{oonirun_link_id}/engine-descriptor/{revision_number}",
     tags=["oonirun"],
@@ -467,13 +468,9 @@ def get_oonirun_link_engine_descriptor(
             },
         ),
     ],
-    authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
 ):
     """Fetch an OONI Run link by specifying the revision number"""
-    # Return the latest version of the translations
-    account_id = get_account_id_or_none(authorization)
-
     try:
         revision = int(revision_number)
     except:
@@ -503,7 +500,6 @@ def get_oonirun_link_engine_descriptor(
     )
 
 
-@metrics.timer("get_full_descriptor_oonirun_link")
 @router.get(
     "/v2/oonirun-links/{oonirun_link_id}/full-descriptor/{revision_number}",
     tags=["oonirun"],
@@ -522,11 +518,14 @@ def get_oonirun_link_revision(
     ],
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
+    settings=Depends(get_settings),
 ):
     """Fetch an OONI Run link by specifying the revision number"""
     # Return the latest version of the translations
     log.debug("fetching oonirun")
-    account_id = get_account_id_or_none(authorization)
+    account_id = get_account_id_or_none(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
 
     try:
         revision = int(revision_number)
@@ -541,7 +540,6 @@ def get_oonirun_link_revision(
     return oonirun_link
 
 
-@metrics.timer("get_latest_oonirun_link")
 @router.get(
     "/v2/oonirun-links/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
 )
@@ -549,11 +547,14 @@ def get_latest_oonirun_link(
     oonirun_link_id: str,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
+    settings=Depends(get_settings),
 ):
     """Fetch OONIRun descriptor by creation time or the newest one"""
     # Return the latest version of the translations
     log.debug("fetching oonirun")
-    account_id = get_account_id_or_none(authorization)
+    account_id = get_account_id_or_none(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
 
     oonirun_link = make_oonirun_link(
         db=db, oonirun_link_id=oonirun_link_id, account_id=account_id
@@ -577,10 +578,11 @@ def list_oonirun_links(
     ] = None,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
+    settings=Depends(get_settings),
 ) -> OONIRunLinkList:
     """List OONIRun descriptors"""
     log.debug("list oonirun")
-    account_id = get_account_id_or_none(authorization)
+    account_id = get_account_id_or_none(authorization, settings.jwt_encryption_key)
 
     q = db.query(models.OONIRunLink)
     if not is_expired:
@@ -590,9 +592,10 @@ def list_oonirun_links(
 
     links = []
     for row in q.all():
-        revision = 1
-        if row.nettests:
-            revision = row.nettests[0].revision
+        revision = row.nettests[0].revision
+        assert (
+            row.nettests[-1].revision <= revision
+        ), "nettests must be sorted by revision"
         nettests, _ = get_nettests(row, revision)
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,

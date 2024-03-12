@@ -6,13 +6,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from oonirun.common.config import settings
+from oonirun.common.config import Settings
+from oonirun.common.dependencies import get_settings
 from oonirun.main import app
-from oonirun.dependencies import get_postgresql_session
-
-import sqlalchemy as sa
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 
 def setup_db_with_alembic(db_url):
@@ -27,40 +23,31 @@ def setup_db_with_alembic(db_url):
     alembic_cfg.set_main_option("script_location", str(migrations_path))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
-    ret = command.upgrade(alembic_cfg, "head")
-    print(ret)
+    command.upgrade(alembic_cfg, "head")
 
 
-def override_pg(db_url):
-    def f():
-        engine = create_engine(db_url)
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        db = SessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+def make_override_get_settings(**kw):
+    def override_get_settings():
+        return Settings(**kw)
 
-    return f
+    return override_get_settings
 
 
 @pytest.fixture
-def postgresql_app_override(postgresql):
+def client(postgresql):
     db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
-
     setup_db_with_alembic(db_url)
 
-    app.dependency_overrides[get_postgresql_session] = override_pg(db_url)
-    yield
+    app.dependency_overrides[get_settings] = make_override_get_settings(
+        postgresql_url=db_url
+    )
 
-
-@pytest.fixture
-def client(postgresql_app_override):
     client = TestClient(app)
-    return client
+    yield client
 
 
 def create_jwt(payload: dict) -> str:
+    settings = Settings()
     key = settings.jwt_encryption_key
     token = jwt.encode(payload, key, algorithm="HS256")
     if isinstance(token, bytes):

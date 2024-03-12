@@ -17,9 +17,3 @@ class Settings(BaseSettings):
     statsd_port: int = 8125
     statsd_prefix: str = "ooniapi"
     jwt_encryption_key: str = "CHANGEME"
-
-
-settings = Settings()
-metrics = statsd.StatsClient(
-    settings.statsd_host, settings.statsd_port, prefix=settings.statsd_prefix
-)

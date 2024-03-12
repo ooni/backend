@@ -8,6 +8,7 @@ import time
 
 from oonirun import models
 from oonirun.routers.oonirun import utcnow_seconds
+import pytest
 
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
@@ -128,8 +129,48 @@ def test_oonirun_models(tmp_path_factory):
 
     db.close()
 
+    with pytest.raises(sa.exc.StatementError):
+        db_runlink = models.OONIRunLink(
+            **run_link,
+            oonirun_link_id="000000000",
+            date_created="NOT A DATE",
+            date_updated=utcnow_seconds(),
+            expiration_date=utcnow_seconds(),
+            creator_account_id="000000000",
+        )
+        db.add(db_runlink)
+        db.commit()
+    db.rollback()
 
-def test_oonirun_validation(client, client_with_user_role, client_with_admin_role):
+    with pytest.raises(sa.exc.StatementError):
+        naive_datetime = datetime.now()
+        db_runlink = models.OONIRunLink(
+            **run_link,
+            oonirun_link_id="000000000",
+            date_created=naive_datetime,
+            date_updated=utcnow_seconds(),
+            expiration_date=utcnow_seconds(),
+            creator_account_id="000000000",
+        )
+        db.add(db_runlink)
+        db.commit()
+    db.rollback()
+
+    with pytest.raises(sa.exc.StatementError):
+        db_runlink = models.OONIRunLink(
+            **run_link,
+            oonirun_link_id="000000000",
+            date_created=None,
+            date_updated=utcnow_seconds(),
+            expiration_date=utcnow_seconds(),
+            creator_account_id="000000000",
+        )
+        db.add(db_runlink)
+        db.commit()
+    db.rollback()
+
+
+def test_oonirun_validation(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
     assert r.status_code == 422, "empty name should be rejected"
@@ -149,7 +190,7 @@ def test_oonirun_validation(client, client_with_user_role, client_with_admin_rol
     assert r.status_code == 200, "name_intl can be None"
 
 
-def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role):
+def test_oonirun_not_found(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     ### Create descriptor as user
     z["name"] = "integ-test name in English"
@@ -184,6 +225,26 @@ def test_oonirun_not_found(client, client_with_user_role, client_with_admin_role
     assert j["oonirun_links"] == []
 
 
+def test_oonirun_admin(client_with_user_role, client_with_admin_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    ### Create link as user
+    z["name"] = "integ-test name in English"
+    z["name_intl"]["it"] = "integ-test nome in italiano"
+    r = client_with_user_role.post("/api/v2/oonirun-links", json=z)
+    assert r.status_code == 200, r.json()
+    assert str(r.json()["oonirun_link_id"]).startswith("10")
+    oonirun_link_id = r.json()["oonirun_link_id"]
+
+    r = client_with_user_role.put("/api/v2/oonirun-links", json=z)
+    z["name"] = "changed name by user"
+    r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=z)
+    assert r.status_code == 200, r.json()
+
+    z["name"] = "changed name by admin"
+    r = client_with_admin_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=z)
+    assert r.status_code == 200, r.json()
+
+
 def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_role):
     z = deepcopy(SAMPLE_OONIRUN)
     ### Create 2 descriptors as user
@@ -209,7 +270,6 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["name_intl"] == z["name_intl"]
     assert j["description"] == z["description"]
     assert j["nettests"] == z["nettests"]
-    print(j["date_created"])
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
     ).replace(tzinfo=timezone.utc)
@@ -430,11 +490,14 @@ def test_oonirun_expiration(client, client_with_user_role):
     j["nettests"][0]["inputs"].append("https://foo.net/")
     r = client_with_user_role.put(f"/api/v2/oonirun-links/{oonirun_link_id}", json=j)
     assert r.status_code == 200, r.json()
+    j = r.json()
+    expiration_date = j["expiration_date"]
 
     ## Fetch anonymously and check it's got the new revision
     r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id}")
     j = r.json()
     assert j["revision"] == "2", "revision did not change"
+    assert j["expiration_date"] == expiration_date
 
     ## Update expiry time
     j["expiration_date"] = (utcnow_seconds() + timedelta(minutes=-1)).strftime(
@@ -554,10 +617,14 @@ def test_oonirun_revisions(client, client_with_user_role):
     r = client.get(
         f"/api/v2/oonirun-links/{oonirun_link_id_one}/engine-descriptor/latest"
     )
-    j = r.json()
-    assert j["revision"] == "3", "revision is 3"
-    assert j["nettests"] == lastest_nettests, "nettests are the same"
-    assert j["date_created"] == latest_date_created, "date created matches"
+    j_latest = r.json()
+    assert j_latest["revision"] == "3", "revision is 3"
+    assert j_latest["nettests"] == lastest_nettests, "nettests are the same"
+    assert j_latest["date_created"] == latest_date_created, "date created matches"
+
+    ## Should match latest
+    r = client.get(f"/api/v2/oonirun-links/{oonirun_link_id_one}/engine-descriptor/3")
+    assert j_latest == r.json()
 
     ## Fetch invalid revision number
     r = client.get(
@@ -565,3 +632,13 @@ def test_oonirun_revisions(client, client_with_user_role):
     )
     j = r.json()
     assert r.status_code != 200, r.json()
+
+    ## Get not-existing revision
+    r = client.get(f"/api/v2/oonirun-links/404/revisions")
+    j = r.json()
+    assert r.status_code == 404, r.json()
+
+    ## Get not-existing engine descriptor
+    r = client.get(f"/api/v2/oonirun-links/404/engine-descriptor/latest")
+    j = r.json()
+    assert r.status_code == 404, r.json()

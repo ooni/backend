@@ -14,8 +14,6 @@ from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.sql.selectable import Select
 
 
-from .config import settings
-
 log = logging.getLogger(__name__)
 
 
@@ -140,78 +138,43 @@ def create_jwt(payload: dict, key: str) -> str:
         return token
 
 
-def get_client_token(authorization: str):
+def get_client_token(authorization: str, jwt_encryption_key: str):
     try:
         assert authorization.startswith("Bearer ")
         token = authorization[7:]
-        return decode_jwt(token, audience="user_auth", key=settings.jwt_encryption_key)
+        return decode_jwt(token, audience="user_auth", key=jwt_encryption_key)
     except:
         return None
 
 
-def role_required(roles):
-    """Wrapped function requiring user to be logged in and have the right role."""
-    # Also:
-    #  explicitely set no-cache headers
-    #  apply the cross_origin decorator to:
-    #    - set CORS header to a trusted URL
-    #    - enable credentials (cookies)
-    #
-    if isinstance(roles, str):
-        roles = [roles]
-
-    async def verify_jwt(authorization: str = Header("authorization")):
-        tok = get_client_token(authorization)
-        if tok is None:
-            raise HTTPException(detail="Authentication required", status_code=401)
-        if tok["role"] not in roles:
-            raise HTTPException(detail="Role not authorized", status_code=401)
-
-        # TODO(art): we don't check for the session_expunge table yet. It's empty so the impact is none
-        # query = """SELECT threshold
-        #    FROM session_expunge
-        #    WHERE account_id = :account_id """
-        # account_id = tok["account_id"]
-        # query_params = dict(account_id=account_id)
-        # row = query_click_one_row(sql.text(query), query_params)
-        # if row:
-        #    threshold = row["threshold"]
-        #    iat = datetime.utcfromtimestamp(tok["iat"])
-        #    if iat < threshold:
-        #        return jerror("Authentication token expired", 401)
-
-        # If needed we can add here a 2-tier expiration time: long for
-        # /api/v1/user_refresh_token and short for everything else
-
-    return verify_jwt
-
-
-def get_client_role(authorization: str) -> str:
+def get_client_role(authorization: str, jwt_encryption_key: str) -> str:
     """Raise exception for unlogged users"""
-    tok = get_client_token(authorization)
+    tok = get_client_token(authorization, jwt_encryption_key)
     assert tok
     return tok["role"]
 
 
-def get_account_id_or_none(authorization: str) -> Optional[str]:
+def get_account_id_or_none(
+    authorization: str, jwt_encryption_key: str
+) -> Optional[str]:
     """Returns None for unlogged users"""
-    tok = get_client_token(authorization)
+    tok = get_client_token(authorization, jwt_encryption_key)
     if tok:
         return tok["account_id"]
     return None
 
 
-def get_account_id_or_raise(authorization: str) -> str:
+def get_account_id_or_raise(authorization: str, jwt_encryption_key: str) -> str:
     """Raise exception for unlogged users"""
-    tok = get_client_token(authorization)
+    tok = get_client_token(authorization, jwt_encryption_key)
     if tok:
         return tok["account_id"]
     raise Exception
 
 
-def get_account_id(authorization: str):
+def get_account_id(authorization: str, jwt_encryption_key: str):
     # TODO: switch to get_account_id_or_none
-    tok = get_client_token(authorization)
+    tok = get_client_token(authorization, jwt_encryption_key)
     if not tok:
         return jerror("Authentication required", 401)
 
