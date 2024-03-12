@@ -170,6 +170,18 @@ def test_oonirun_models(tmp_path_factory):
     db.rollback()
 
 
+def test_get_version(client):
+    r = client.get("/version")
+    j = r.json()
+    assert "version" in j
+    assert "build_label" in j
+
+
+def test_get_root(client):
+    r = client.get("/")
+    assert r.status_code == 200
+
+
 def test_oonirun_validation(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     r = client_with_user_role.post("/api/v2/oonirun-links", json=z)

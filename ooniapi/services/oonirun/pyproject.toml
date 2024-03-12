@@ -54,8 +54,8 @@ path = ".venv/"
 
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
-test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=term {args:tests}"
-cov-report = ["- coverage combine", "coverage report", "coverage html -d coverage_html"]
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
+cov-report = ["coverage report"]
 cov = ["test-cov", "cov-report"]
 
 [tool.pytest.ini_options]
