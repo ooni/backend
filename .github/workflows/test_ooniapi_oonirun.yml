@@ -1,12 +1,5 @@
 name: test ooniapi/oonirun
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - "*"
-  workflow_call:
+on: push
 jobs:
   run_tests:
     runs-on: ubuntu-latest

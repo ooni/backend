@@ -1,6 +1,6 @@
 name: Test Legacy API
 on:
-  pull_request:
+  push:
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -56,14 +56,6 @@ jobs:
       - name: Run all tests
         run: cd api && T="--show-capture=no -s -vv" make tests
         #run: T="--show-capture=no -s -vv --junitxml=pytest.xml" make tests
-
-      - name: Notify success
-        if: ${{ success() }}
-        run: curl -s -d "CI API OK 😄" https://ntfy.sh/ooni-7aGhaS
-
-      - name: Notify failure
-        if: ${{ failure() }}
-        run: curl -d "CI API FAIL 😞" https://ntfy.sh/ooni-7aGhaS
 
       #- name: debug docker
       #  if: always()

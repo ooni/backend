@@ -1,10 +1,5 @@
 name: Test Fastpath
-on:
-  pull_request:
-    paths:
-        - 'fastpath/**'
-
-# Run only local tests
+on: push
 
 jobs:
   build:
