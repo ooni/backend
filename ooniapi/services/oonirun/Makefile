@@ -1,7 +1,7 @@
-.PHONY: init test build clean docker print-labels
+SERVICE_NAME ?= oonirun
 
-ECS_CONTAINER_NAME ?= ooniapi-service-oonirun
-IMAGE_NAME ?= ooni/api-oonirun
+ECS_CONTAINER_NAME ?= ooniapi-service-$(SERVICE_NAME)
+IMAGE_NAME ?= ooni/api-$(SERVICE_NAME)
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
 SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
@@ -12,6 +12,7 @@ VERSION_LABEL = v$(PKG_VERSION)
 ENV_LABEL ?= latest
 
 print-labels:
+	echo "ECS_CONTAINER_NAME=${ECS_CONTAINER_NAME}"
 	echo "PKG_VERSION=${PKG_VERSION}"
 	echo "BUILD_LABEL=${BUILD_LABEL}"
 	echo "VERSION_LABEL=${VERSION_LABEL}"
@@ -54,4 +55,6 @@ clean:
 	rm -rf .venv
 
 run:
-	hatch run uvicorn oonirun.main:app
+	hatch run uvicorn $(SERVICE_NAME).main:app
+
+.PHONY: init test build clean docker print-labels
