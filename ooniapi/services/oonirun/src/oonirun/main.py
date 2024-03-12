@@ -44,6 +44,11 @@ async def version():
     return {"version": pkg_version, "build_label": build_label}
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "version": pkg_version, "build_label": build_label}
+
+
 @app.get("/")
 async def root():
     return {"message": "Hello OONItarian!"}

@@ -36,7 +36,10 @@ docker-push:
 	docker push ${IMAGE_NAME}:${VERSION_LABEL}
 	docker push ${IMAGE_NAME}:${ENV_LABEL}
 
-imagedefinitions.json: docker-build docker-push
+docker-smoketest:
+	./scripts/docker-smoketest.sh ${IMAGE_NAME}:${BUILD_LABEL}
+
+imagedefinitions.json:
 	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
 test:

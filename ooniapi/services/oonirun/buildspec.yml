@@ -19,6 +19,9 @@ phases:
     commands:
       - export GIT_FULL_SHA=${CODEBUILD_RESOLVED_SOURCE_VERSION}
       - cd $OONI_CODE_PATH
+      - make docker-build
+      - make docker-smoketest
+      - make docker-push
       - make imagedefinitions.json
       - cat imagedefinitions.json | tee ${CODEBUILD_SRC_DIR}/imagedefinitions.json
 
