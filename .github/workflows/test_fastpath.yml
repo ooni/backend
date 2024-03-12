@@ -2,8 +2,7 @@ name: test fastpath
 on: push
 
 jobs:
-  build:
-    name: Test Fastpath
+  test:
     runs-on: ubuntu-latest
     container: debian:11
     steps:
