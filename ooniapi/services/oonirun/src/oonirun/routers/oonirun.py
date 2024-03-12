@@ -281,18 +281,6 @@ def edit_oonirun_link(
             detail="OONI Run link has expired and cannot be edited",
         )
 
-    if edit_request.expiration_date is not None:
-        q = db.query(models.OONIRunLink).filter(
-            models.OONIRunLink.oonirun_link_id == oonirun_link_id,
-            # Timezones in python are a mess...
-            models.OONIRunLink.expiration_date > now,
-        )
-        if get_client_role(authorization) != "admin":
-            q = q.filter(models.OONIRunLink.creator_account_id == account_id)
-
-        q.update({"expiration_date": edit_request.expiration_date})
-        db.commit()
-
     latest_revision: int = oonirun_link.nettests[0].revision
     latest_nettests = []
     for nettest_index, nt in enumerate(
