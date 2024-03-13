@@ -21,6 +21,8 @@ dependencies = [
   "httpx ~= 0.26.0",
   "pyjwt ~= 2.8.0",
   "alembic ~= 1.13.1",
+  "prometheus-fastapi-instrumentator ~= 6.1.0",
+  "prometheus-client",
 ]
 
 readme = "README.md"
@@ -56,7 +58,7 @@ packages = ["src/oonirun"]
 artifacts = ["BUILD_LABEL"]
 
 [tool.hatch.envs.default]
-dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql"]
+dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql", "pytest-asyncio"]
 path = ".venv/"
 
 [tool.hatch.envs.default.scripts]

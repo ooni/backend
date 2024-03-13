@@ -5,9 +5,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 """
 
 from datetime import datetime, timedelta, timezone, date
-from os import urandom
-from sys import byteorder
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import logging
 
 import sqlalchemy as sa
@@ -16,7 +14,6 @@ from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
 from pydantic import computed_field, Field, validator
 from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
-
 
 from .. import models
 
@@ -27,7 +24,6 @@ from ..common.utils import (
     get_account_id_or_none,
 )
 from ..dependencies import get_postgresql_session
-
 
 ISO_FORMAT_DATETIME = "%Y-%m-%dT%H:%M:%S.%fZ"
 ISO_FORMAT_DATE = "%Y-%m-%d"

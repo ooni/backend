@@ -17,3 +17,4 @@ class Settings(BaseSettings):
     statsd_port: int = 8125
     statsd_prefix: str = "ooniapi"
     jwt_encryption_key: str = "CHANGEME"
+    prometheus_metrics_password: str = "CHANGEME"

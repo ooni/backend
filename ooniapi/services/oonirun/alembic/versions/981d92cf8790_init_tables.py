@@ -83,5 +83,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("oonirun")
     op.drop_table("oonirun_nettest")
+    op.drop_table("oonirun")
