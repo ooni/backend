@@ -17,7 +17,9 @@ FROM python:3.11-bookworm as runner
 
 WORKDIR /app
 
-COPY --from=builder /build/alembic /build/alembic.ini /build/dist/*.whl /app/
+COPY --from=builder /build/alembic/ /app/alembic/
+COPY --from=builder /build/alembic.ini /app/
+COPY --from=builder /build/dist/*.whl /app/
 
 RUN pip install /app/*whl && rm /app/*whl
 
