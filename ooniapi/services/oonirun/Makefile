@@ -5,7 +5,7 @@ IMAGE_NAME ?= ooni/api-$(SERVICE_NAME)
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
 SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
-PKG_VERSION := $(shell cat pyproject.toml | grep -e 'version\s*=' | cut -d '"' -f2)
+PKG_VERSION := $(shell hatch version)
 
 BUILD_LABEL := $(DATE)-$(SHORT_SHA)
 VERSION_LABEL = v$(PKG_VERSION)
