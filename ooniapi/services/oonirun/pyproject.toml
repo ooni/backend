@@ -72,10 +72,7 @@ addopts = ["--import-mode=importlib"]
 branch = true
 parallel = true
 source_pkgs = ["oonirun", "tests"]
-omit = [
-  "src/oonirun/common/*",
-  "src/oonirun/__about__.py"
-]
+omit = ["src/oonirun/common/*", "src/oonirun/__about__.py"]
 
 [tool.coverage.paths]
 oonirun = ["src/oonirun"]
