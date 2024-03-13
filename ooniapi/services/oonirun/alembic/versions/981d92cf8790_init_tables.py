@@ -79,6 +79,6 @@ def upgrade() -> None:
     )
 
 
-def downgrade() -> None:  # no cov
+def downgrade() -> None:
     op.drop_table("oonirun_nettest")
     op.drop_table("oonirun")
