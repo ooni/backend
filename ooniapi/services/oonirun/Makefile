@@ -29,6 +29,7 @@ docker-build:
 		-t ${IMAGE_NAME}:${VERSION_LABEL} \
 		-t ${IMAGE_NAME}:${ENV_LABEL} \
 		-
+	echo "built image: ${IMAGE_NAME}:${BUILD_LABEL} (${IMAGE_NAME}:${VERSION_LABEL} ${IMAGE_NAME}:${ENV_LABEL})"
 
 docker-push:
 	# We need to use tar -czh to resolve the common dir symlink
