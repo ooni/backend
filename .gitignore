@@ -19,3 +19,4 @@ af/fastpath/var/
 af/fastpath/etc/
 .coverage
 coverage.xml
+/dist/
