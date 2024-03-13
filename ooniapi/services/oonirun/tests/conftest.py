@@ -36,9 +36,21 @@ def alembic_migration(postgresql):
 
 
 @pytest.fixture
+def client_with_bad_settings():
+    app.dependency_overrides[get_settings] = make_override_get_settings(
+        postgresql_url="postgresql://bad:bad@localhost/bad"
+    )
+
+    client = TestClient(app)
+    yield client
+
+
+@pytest.fixture
 def client(alembic_migration):
     app.dependency_overrides[get_settings] = make_override_get_settings(
-        postgresql_url=alembic_migration
+        postgresql_url=alembic_migration,
+        jwt_encryption_key="super_secure",
+        prometheus_metrics_password="super_secure",
     )
 
     client = TestClient(app)
@@ -46,9 +58,7 @@ def client(alembic_migration):
 
 
 def create_jwt(payload: dict) -> str:
-    settings = Settings()
-    key = settings.jwt_encryption_key
-    return jwt.encode(payload, key, algorithm="HS256")
+    return jwt.encode(payload, "super_secure", algorithm="HS256")
 
 
 def create_session_token(account_id: str, role: str) -> str:

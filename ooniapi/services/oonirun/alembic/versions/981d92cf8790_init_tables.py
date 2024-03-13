@@ -75,13 +75,10 @@ def upgrade() -> None:
             server_default=sa.text("false"),
         ),
         sa.PrimaryKeyConstraint("oonirun_link_id", "revision", "nettest_index"),
-        sa.ForeignKeyConstraint(
-            ["oonirun_link_id"],
-            ["oonirun.oonirun_link_id"],
-        ),
+        sa.ForeignKeyConstraint(["oonirun_link_id"], ["oonirun.oonirun_link_id"]),
     )
 
 
-def downgrade() -> None:
-    op.drop_table("oonirun")
+def downgrade() -> None:  # no cov
     op.drop_table("oonirun_nettest")
+    op.drop_table("oonirun")

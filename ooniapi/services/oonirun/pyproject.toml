@@ -58,7 +58,7 @@ packages = ["src/oonirun"]
 artifacts = ["BUILD_LABEL"]
 
 [tool.hatch.envs.default]
-dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql"]
+dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql", "pytest-asyncio"]
 path = ".venv/"
 
 [tool.hatch.envs.default.scripts]
