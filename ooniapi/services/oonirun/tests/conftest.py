@@ -25,9 +25,7 @@ def alembic_migration(postgresql):
 
     db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
 
-    migrations_path = (
-        pathlib.Path(__file__).parent.parent / "src" / "oonirun" / "alembic"
-    ).resolve()
+    migrations_path = (pathlib.Path(__file__).parent.parent / "alembic").resolve()
 
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_path))

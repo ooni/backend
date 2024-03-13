@@ -5,7 +5,7 @@ IMAGE_NAME ?= ooni/api-$(SERVICE_NAME)
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
 SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
-PKG_VERSION := $(shell cat pyproject.toml | grep -e 'version\s*=' | cut -d '"' -f2)
+PKG_VERSION := $(shell hatch version)
 
 BUILD_LABEL := $(DATE)-$(SHORT_SHA)
 VERSION_LABEL = v$(PKG_VERSION)
@@ -29,6 +29,7 @@ docker-build:
 		-t ${IMAGE_NAME}:${VERSION_LABEL} \
 		-t ${IMAGE_NAME}:${ENV_LABEL} \
 		-
+	echo "built image: ${IMAGE_NAME}:${BUILD_LABEL} (${IMAGE_NAME}:${VERSION_LABEL} ${IMAGE_NAME}:${ENV_LABEL})"
 
 docker-push:
 	# We need to use tar -czh to resolve the common dir symlink
