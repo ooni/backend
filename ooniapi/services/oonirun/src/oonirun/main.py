@@ -1,11 +1,13 @@
-from functools import lru_cache
 from fastapi import FastAPI
 
 from .routers import oonirun
 
 from .dependencies import get_settings
 from .common.version import get_build_label, get_pkg_version
+from .common.metrics import mount_metrics
 from fastapi.middleware.cors import CORSMiddleware
+
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from contextlib import asynccontextmanager
 
@@ -21,10 +23,15 @@ build_label = get_build_label(pkg_name)
 async def lifespan(app: FastAPI):
     settings = get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
+    mount_metrics(app, instrumentor.registry)
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+
+instrumentor = Instrumentator().instrument(
+    app, metric_namespace="ooniapi", metric_subsystem="oonirun"
+)
 
 # TODO: temporarily enable all
 origins = ["*"]
