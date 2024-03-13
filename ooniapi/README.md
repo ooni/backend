@@ -22,20 +22,28 @@ There is also a `common` folder for all shared logic common to every component.
 ## List of OONI API Services
 
 ### Tier0
-* `ooniprobe`, (aka `probe_services`), where probes send their measurements and
-  get metadata to run experiments.
-* `oonirun`, CRUD for editing OONI Run links, but also for probes to get the
-  descriptors and run tests (this fact is what makes it tier0)
+
+- `ooniprobe`, (aka `probe_services`), where probes send their measurements and
+  get metadata to run experiments;
+- `oonirun`, CRUD for editing OONI Run links, but also for probes to get the
+  descriptors and run tests (this fact is what makes it tier0);
+- `prioritization`, CRUD for editing the priorities of URLs and populating the
+  appropriate clickhouse tables so they can be used by probe;
+- `fastpath`, responsible for taking measurements blobs sent to `ooniprobe`
+  service and storing them in s3;
 
 ### Tier1
-* `data`, (aka OONI Data Kraken), where Explorer and other clients access the
-  observations data and experiment results.
-* `findings`, (aka `incidents`) backend for findings pages on explorer
-* `measurements`, backend for aggregation and list measurement endpoints (note
-  also probe uses this, so it's maybe on the high end of tier1)
+
+- `data`, (aka OONI Data Kraken), where Explorer and other clients access the
+  observations data and experiment results;
+- `findings`, (aka `incidents`) backend for findings pages on explorer;
+- `measurements`, backend for aggregation and list measurement endpoints (note
+  also probe uses this, so it's maybe on the high end of tier1);
+- ``
 
 ### Tier2
-* `testlists`, backend for test-lists.ooni.org
+
+- `testlists`, for proposing changes to the test-lists and submitting a github PR;
 
 ## Developer setup
 
@@ -44,6 +52,7 @@ hatch](https://hatch.pypa.io/1.9/install/), check the `Makefile` for service
 specific commands.
 
 Generally it should work something like:
+
 ```
 make test
 make run
