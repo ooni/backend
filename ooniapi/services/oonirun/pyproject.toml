@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "oonirun"
-version = "0.5.0.dev1"
 description = ''
+dynamic = ["version"]
 
 dependencies = [
   "fastapi ~= 0.108.0",
@@ -45,8 +45,15 @@ Documentation = "https://github.com/ooni/backend"
 Issues = "https://github.com/ooni/backend/issues"
 Source = "https://github.com/ooni/backend"
 
+[tool.hatch.version]
+path = "src/oonirun/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["BUILD_LABEL"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/oonirun"]
+artifacts = ["BUILD_LABEL"]
 
 [tool.hatch.envs.default]
 dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql"]
@@ -66,7 +73,8 @@ branch = true
 parallel = true
 source_pkgs = ["oonirun", "tests"]
 omit = [
-    "src/oonirun/common/*"
+  "src/oonirun/common/*",
+  "src/oonirun/__about__.py"
 ]
 
 [tool.coverage.paths]

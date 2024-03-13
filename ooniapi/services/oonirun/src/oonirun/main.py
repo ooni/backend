@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 import logging
 
-pkg_name = "ooniapi.oonirun"
+pkg_name = "oonirun"
 
 pkg_version = get_pkg_version(pkg_name)
 build_label = get_build_label(pkg_name)
