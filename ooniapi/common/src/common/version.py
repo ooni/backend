@@ -2,8 +2,6 @@ from importlib.metadata import version as importlib_version
 from importlib.resources import files as importlib_files
 from typing import Optional
 
-pkg_name = "oonidataapi"
-
 
 def get_pkg_version(pkg_name) -> Optional[str]:
     try:
