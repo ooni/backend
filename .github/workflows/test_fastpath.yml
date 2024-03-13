@@ -1,5 +1,8 @@
 name: test fastpath
-on: push
+on:
+  push:
+    branches:
+      - master
 
 jobs:
   test:
