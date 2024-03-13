@@ -75,7 +75,10 @@ def upgrade() -> None:
             server_default=sa.text("false"),
         ),
         sa.PrimaryKeyConstraint("oonirun_link_id", "revision", "nettest_index"),
-        sa.ForeignKeyConstraint(["oonirun_link_id"], ["oonirun.oonirun_link_id"]),
+        sa.ForeignKeyConstraint(
+            ["oonirun_link_id"],
+            ["oonirun.oonirun_link_id"],
+        ),
     )
 
 
