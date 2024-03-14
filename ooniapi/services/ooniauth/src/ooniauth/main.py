@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
@@ -10,10 +10,13 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from .routers import v1
 
+from .common.config import Settings
 from .common.dependencies import get_settings
 from .common.version import get_build_label, get_pkg_version
 from .common.metrics import mount_metrics
 
+
+log = logging.getLogger(__name__)
 
 pkg_name = "ooniauth"
 
@@ -50,7 +53,11 @@ app.include_router(v1.router, prefix="/api")
 
 @app.get("/version")
 async def version():
-    return {"version": pkg_version, "build_label": build_label}
+    return {
+        "version": pkg_version,
+        "build_label": build_label,
+        "package_name": pkg_name,
+    }
 
 
 class HealthStatus(BaseModel):
@@ -62,7 +69,7 @@ class HealthStatus(BaseModel):
 
 @app.get("/health")
 async def health(
-    settings=Depends(get_settings),
+    settings: Settings = Depends(get_settings),
 ):
     errors = []
 
@@ -72,13 +79,18 @@ async def health(
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
 
-    status = "ok"
+    if settings.aws_secret_access_key == "" or settings.aws_access_key_id == "":
+        errors.append("bad_aws_credentials")
+
+    if settings.account_id_hashing_key == "CHANGEME":
+        errors.append("bad_prometheus_password")
+
     if len(errors) > 0:
-        status = "fail"
+        log.error(f"Health check errors: {errors}")
+        raise HTTPException(status_code=542, detail=f"health check failed")
 
     return {
-        "status": status,
-        "errors": errors,
+        "status": "ok",
         "version": pkg_version,
         "build_label": build_label,
     }
