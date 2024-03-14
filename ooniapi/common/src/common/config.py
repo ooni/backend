@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     statsd_port: int = 8125
     statsd_prefix: str = "ooniapi"
     jwt_encryption_key: str = "CHANGEME"
+    account_id_hashing_key: str = "CHANGEME"
     prometheus_metrics_password: str = "CHANGEME"
     session_expiry_days: int = 10
     login_expiry_days: int = 10
+
+    aws_region: str = ""
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    email_source_address: str = "contact+dev@ooni.io"

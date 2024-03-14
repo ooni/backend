@@ -1,6 +1,11 @@
+import hashlib
 import time
-import sqlalchemy as sa
 from typing import Optional
+from textwrap import dedent
+
+import sqlalchemy as sa
+import boto3
+
 from .common.utils import create_jwt, query_click_one_row
 
 
@@ -36,3 +41,63 @@ def get_account_role(db, account_id: str) -> Optional[str]:
     query_params = dict(account_id=account_id)
     r = query_click_one_row(db, sa.text(query), query_params)
     return r["role"] if r else None
+
+
+def hash_email_address(email_address: str, key: str) -> str:
+    return hashlib.blake2b(
+        email_address.encode(), key=key.encode(), digest_size=16
+    ).hexdigest()
+
+
+def send_login_email(
+    destination_address: str, source_address: str, login_url: str, ses_client
+) -> str:
+    """Format and send a registration/login  email"""
+    body_text = dedent(
+        f"""
+        Welcome to OONI.
+        Please login by following {login_url}
+        The link can be used on multiple devices and will expire in 24 hours.
+        """
+    )
+
+    body_html = dedent(
+        f"""
+        <html>
+            <head></head>
+            <body>
+                <p>Welcome to OONI</p>
+                <p>
+                    <a href="{login_url}">Please login here</a>
+                </p>
+                <p>The link can be used on multiple devices and will expire in 24 hours.</p>
+            </body>
+        </html>
+        """
+    )
+
+    response = ses_client.send_email(
+        Destination={
+            "ToAddresses": [
+                destination_address,
+            ],
+        },
+        Message={
+            "Body": {
+                "Html": {
+                    "Charset": "UTF-8",
+                    "Data": body_html,
+                },
+                "Text": {
+                    "Charset": "UTF-8",
+                    "Data": body_text,
+                },
+            },
+            "Subject": {
+                "Charset": "UTF-8",
+                "Data": "OONI Account activation email",
+            },
+        },
+        Source=source_address,
+    )
+    return response["MessageId"]
