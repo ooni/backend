@@ -1,4 +1,4 @@
-name: test ooniapi/oonirun
+name: test ooniapi/ooniauth
 on: push
 jobs:
   run_tests:
