@@ -45,6 +45,12 @@ def test_user_register_non_valid_redirect(client):
     assert r.status_code == 422
 
 
+def test_user_register_missing_redirect(client):
+    d = dict(email_address="nick@a.org")
+    r = client.post("/api/v1/user_register", json=d)
+    assert r.status_code == 200
+
+
 def _register_and_login(client, email_address, mock_ses_client):
     d = dict(email_address=email_address, redirect_to="https://explorer.ooni.org")
     r = client.post("/api/v1/user_register", json=d)
@@ -69,6 +75,7 @@ def _register_and_login(client, email_address, mock_ses_client):
         == email_address
     )
     html_message = mock_send_email.call_args.kwargs["Message"]["Body"]["Html"]["Data"]
+    assert "source" in mock_send_email.call_args.kwargs["Source"]
     parser = AHrefParser()
     parser.feed(html_message)
     parser.close()

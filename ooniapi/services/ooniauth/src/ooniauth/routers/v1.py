@@ -49,7 +49,7 @@ class UserRegister(BaseModel):
         min_length=5,
         max_length=255,
     )
-    redirect_to: Optional[str] = Field(title="redirect to this URL")
+    redirect_to: Optional[str] = Field(title="redirect to this URL", default="")
 
     @validator("redirect_to")
     def validate_redirect_to(cls, v):
@@ -93,24 +93,7 @@ async def user_register(
     settings: Settings = Depends(get_settings),
     ses_client=Depends(get_ses_client),
 ):
-    """Auth Services: start email-based user registration
-    ---
-    parameters:
-      - in: body
-        name: register data
-        description: Registration data as HTML form or JSON
-        required: true
-        schema:
-          type: object
-          properties:
-            email_address:
-              type: string
-            redirect_to: ## Make this optional
-              type: string
-    responses:
-      200:
-        description: Confirmation
-    """
+    """Auth Services: start email-based user registration"""
     email_address = user_register.email_address.lower()
 
     account_id = hash_email_address(

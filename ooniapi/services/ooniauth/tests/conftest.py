@@ -41,6 +41,7 @@ def client(mock_ses_client):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
+        email_source_address="admin+sourceemail@ooni.org",
     )
     mock_clickhouse = MagicMock()
     mock_clickhouse.execute = MagicMock()
