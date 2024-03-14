@@ -20,7 +20,15 @@ cleanup() {
 }
 
 echo "[+] Running smoketest of ${IMAGE}"
-docker run -d --name $CONTAINER_NAME -p $PORT:80 ${IMAGE}
+docker run \
+    -e AWS_ACCESS_KEY_ID=ITSCHANGED \
+    -e AWS_ACCESS_KEY_ID=ITSCHANGED \
+    -e PROMETHEUS_METRICS_PASSWORD=ITSCHANGED \
+    -e JWT_ENCRYPTION_KEY=ITCHANGED \
+    -e ACCOUNT_ID_HASHING_KEY=ITSCHANGED \
+    -e AWS_ACCESS_KEY_ID=ITSCHANGED \
+    -e AWS_SECRET_ACCESS_KEY=ITSCHANGED \
+    -d --name $CONTAINER_NAME -p $PORT:80 ${IMAGE}
 
 trap cleanup INT TERM EXIT
 
