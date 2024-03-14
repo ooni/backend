@@ -230,6 +230,14 @@ that can be called by uvicorn:
 uvicorn ooniservicename.main:app --host 0.0.0.0 --port 80
 ```
 
+#### FastAPI code style
+
+Main boilerplate
+
+```
+
+```
+
 #### Makefile
 
 Each service must include a `Makefile` which defines some common tasks that can
@@ -264,7 +272,7 @@ Be sure to properly define the [.PHONY targets](https://web.mit.edu/gnu/doc/html
 
 Here is a sample template for your makefile:
 
-```
+```bash
 SERVICE_NAME ?= ooniservicename
 
 ECS_CONTAINER_NAME ?= ooniapi-service-$(SERVICE_NAME)
@@ -404,7 +412,7 @@ so that we can decide to move to another build pipeline if needed in the future.
 
 Here is a sample `buildspec.yml` file:
 
-```
+```yaml
 version: 0.2
 env:
   variables:
