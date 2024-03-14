@@ -1,7 +1,3 @@
----
-title: "OONI Services"
----
-
 OONI API components are broken up into smaller pieces that can be more easily
 deployed and managed without worrying too much about the blast radius caused by
 the deployment of a larger component.
