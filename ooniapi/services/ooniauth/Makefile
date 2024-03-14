@@ -53,7 +53,6 @@ build:
 	hatch build
 
 clean:
-	hatch clean
 	rm -f imagedefinitions.json
 	rm -rf build dist *eggs *.egg-info
 	rm -rf .venv
