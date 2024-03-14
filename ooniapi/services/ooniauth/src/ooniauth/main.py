@@ -8,17 +8,14 @@ from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from . import models
-from .routers import oonirun
+from .routers import ooniauth
 
-from .dependencies import get_postgresql_session
 from .common.dependencies import get_settings
-from .common.version import get_build_label, get_pkg_version
 from .common.version import get_build_label, get_pkg_version
 from .common.metrics import mount_metrics
 
 
-pkg_name = "oonirun"
+pkg_name = "ooniauth"
 
 pkg_version = get_pkg_version(pkg_name)
 build_label = get_build_label(pkg_name)
@@ -48,7 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(oonirun.router, prefix="/api")
+app.include_router(ooniauth.router, prefix="/api")
 
 
 @app.get("/version")
@@ -66,14 +63,8 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings=Depends(get_settings),
-    db=Depends(get_postgresql_session),
 ):
     errors = []
-    try:
-        db.query(models.OONIRunLink).limit(1).all()
-    except Exception as exc:
-        print(exc)
-        errors.append("db_error")
 
     if settings.jwt_encryption_key == "CHANGEME":
         errors.append("bad_jwt_secret")

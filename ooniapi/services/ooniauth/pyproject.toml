@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ooniauth"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "BSD-3-Clause"
+authors = [{ name = "OONI", email = "contact@ooni.org" }]
+keywords = []
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "fastapi ~= 0.108.0",
+  "clickhouse-driver ~= 0.2.6",
+  "sqlalchemy ~= 2.0.27",
+  "ujson ~= 5.9.0",
+  "urllib3 ~= 2.1.0",
+  "python-dateutil ~= 2.8.2",
+  "pydantic-settings ~= 2.1.0",
+  "uvicorn ~= 0.25.0",
+  "psycopg2 ~= 2.9.9",
+  "httpx ~= 0.26.0",
+  "pyjwt ~= 2.8.0",
+  "alembic ~= 1.13.1",
+  "prometheus-fastapi-instrumentator ~= 6.1.0",
+  "prometheus-client",
+]
+
+[project.urls]
+Documentation = "https://docs.ooni.org/"
+Issues = "https://github.com/ooni/backend/issues"
+Source = "https://github.com/ooni/backend"
+
+[tool.hatch.version]
+path = "src/ooniauth/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["BUILD_LABEL"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ooniauth"]
+artifacts = ["BUILD_LABEL"]
+
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "click",
+  "black",
+  "pytest-postgresql",
+  "pytest-asyncio",
+]
+path = ".venv/"
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
+cov-report = ["coverage report"]
+cov = ["test-cov", "cov-report"]
+
+[[tool.hatch.envs.all.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+[tool.hatch.envs.types]
+dependencies = ["mypy>=1.0.0"]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/ooniauth tests}"
+
+[tool.coverage.run]
+source_pkgs = ["ooniauth", "tests"]
+branch = true
+parallel = true
+omit = ["src/ooniauth/__about__.py"]
+
+[tool.coverage.paths]
+ooniauth = ["src/ooniauth", "*/ooniauth/src/ooniauth"]
+tests = ["tests", "*/ooniauth/tests"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
