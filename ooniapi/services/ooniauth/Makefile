@@ -21,7 +21,7 @@ print-labels:
 init:
 	hatch env create
 
-docker-build:
+docker-build: clean
 	# We need to use tar -czh to resolve the common dir symlink
 	tar -czh . | docker build \
 		--build-arg BUILD_LABEL=${BUILD_LABEL} \
