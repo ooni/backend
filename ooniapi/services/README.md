@@ -40,8 +40,9 @@ We follow the principles of a building a [12 factor app](https://12factor.net/):
   configuration, should be stateless.
 
 - **[VII. Port binding](https://12factor.net/port-binding)**, services expose a
-  HTTP service running with [uvicorn](https://www.uvicorn.org/). The port it
-  binds to can be overriden via an environment variable.
+  HTTP service running with [uvicorn](https://www.uvicorn.org/) bound to port
+  80 contained in a docker image. It's up to the container host to decide how to
+  map port 80 to a local port.
 
 - **[VIII. Concurrency](https://12factor.net/concurrency)**, it should be
   possible to run multiple instances of an OONI API Service to scale
@@ -119,10 +120,10 @@ project manager.
 You can get some help in bootstrapping the project by running:
 
 ```
-% hatch new ooni<servicename>
-<servicename>
+% hatch new ooniservicename
+ooniservicename
 ├── src
-│   └── <servicename>
+│   └── ooniservicename
 │       ├── __about__.py
 │       └── __init__.py
 ├── tests
@@ -133,6 +134,101 @@ You can get some help in bootstrapping the project by running:
 ```
 
 Notice how each service should always start with the `ooni` prefix.
+
+If you plan to use packages from the `ooniapi/common` directory tree you should
+setup a symlink for it:
+
+```
+cd ooniservicename/src/ooniservicename
+ln -s ../../../../common/src/common common
+```
+
+You should also make the following adjustments to the `pyproject.toml`:
+
+```
+authors = [
+  { name = "OONI", email = "contact@ooni.org" },
+]
+license = "BSD-3-Clause"
+```
+
+and then
+
+```
+Documentation = "https://docs.ooni.org/"
+Issues = "https://github.com/ooni/backend/issues"
+Source = "https://github.com/ooni/backend"
+```
+
+```
+[tool.hatch.build.targets.sdist]
+include = ["BUILD_LABEL"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ooniservicename"]
+artifacts = ["BUILD_LABEL"]
+```
+
+and then replace the `[tool.hatch.envs.default]` sections with:
+
+```
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "click",
+  "black",
+  "pytest-postgresql",
+  "pytest-asyncio",
+]
+path = ".venv/"
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
+cov-report = ["coverage report"]
+cov = ["test-cov", "cov-report"]
+```
+
+You should then update the LICENSE.txt file to this:
+
+```
+cat << EOF > LICENSE.txt
+Copyright 2022-present Open Observatory of Network Interference Foundation (OONI) ETS
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+EOF
+```
+
+You should then create a `src/ooniservicename/main.py` file that contains an app
+that can be called by uvicorn:
+
+```
+uvicorn ooniservicename.main:app --host 0.0.0.0 --port 80
+```
 
 #### Makefile
 
@@ -233,6 +329,69 @@ run:
 	hatch run uvicorn $(SERVICE_NAME).main:app
 
 .PHONY: init test build clean docker print-labels
+```
+
+#### Dockerfile
+
+The docker file should be as simple as it can be, yet understandable. Since
+third parties might be looking at the Dockerfile as well, try to ensure that
+it's understandable how the software is built and run without needing to lookup
+too many other files. For example try to avoid calling the `Makefile` or other
+auxilary scripts, since that creates unncessary indirection.
+
+Split the builder from the runner process and make sure the runner, so that the
+runner is clean from any dependenceis that are not needed at runtime.
+
+The builder should produce a binary distribution that can be installed on the
+runner.
+
+If there are auxilarity admin tools that are needed, they should be copied over
+to the runner and placed inside of the `WORKDIR`.
+
+The Dockerfile should take `BUILD_LABEL` as an argument. `BUILD_LABEL` can be
+injected into the built application to track the specific commit and timestamp
+of the build, like so:
+
+```
+docker build --build-arg BUILD_LABEL=${DATE_YYMMDD}-${GIT_SHORT_SHA}
+```
+
+Here is a sample `Dockerfile` for a python based service:
+
+```
+# Python builder
+FROM python:3.11-bookworm as builder
+ARG BUILD_LABEL=docker
+
+WORKDIR /build
+
+RUN python -m pip install hatch
+
+COPY . /build
+
+# When you build stuff on macOS you end up with ._ files
+# https://apple.stackexchange.com/questions/14980/why-are-dot-underscore-files-created-and-how-can-i-avoid-them
+RUN find /build -type f -name '._*' -delete
+
+RUN echo "$BUILD_LABEL" > /build/src/ooniservicename/BUILD_LABEL
+
+RUN hatch build
+
+### Actual image running on the host
+FROM python:3.11-bookworm as runner
+
+WORKDIR /app
+
+COPY --from=builder /build/README.md /app/
+COPY --from=builder /build/dist/*.whl /app/
+RUN pip install /app/*whl && rm /app/*whl
+
+COPY --from=builder /build/alembic/ /app/alembic/
+COPY --from=builder /build/alembic.ini /app/
+RUN rm -rf /app/alembic/__pycache__
+
+CMD ["uvicorn", "ooniservicename.main:app", "--host", "0.0.0.0", "--port", "80"]
+EXPOSE 80
 ```
 
 #### Build spec
