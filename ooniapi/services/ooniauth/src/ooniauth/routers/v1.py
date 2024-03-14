@@ -6,7 +6,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode, urlunsplit
 import logging
 
 import jwt
@@ -49,7 +49,6 @@ class UserRegister(BaseModel):
         min_length=5,
         max_length=255,
     )
-    password: str = Field(title="password of the user", min_length=8)
     redirect_to: Optional[str] = Field(title="redirect to this URL")
 
     @validator("redirect_to")
@@ -74,9 +73,14 @@ class UserRegister(BaseModel):
 
         return v
 
-    @property
-    def redirect_to_fqdm(self):
-        return urlparse(self.redirect_to).netloc
+
+def format_login_url(redirect_to: Optional[str], registration_token: str) -> str:
+    if redirect_to is None:
+        return ""
+
+    login_fqdm = urlparse(redirect_to).netloc
+    e = urlencode(dict(token=registration_token))
+    return urlunsplit(("https", login_fqdm, "/login", e, ""))
 
 
 class UserRegistrationResponse(BaseModel):
@@ -84,7 +88,7 @@ class UserRegistrationResponse(BaseModel):
 
 
 @router.post("/v1/user_register", response_model=UserRegistrationResponse)
-def user_register(
+async def user_register(
     user_register: UserRegister,
     settings: Settings = Depends(get_settings),
     ses_client=Depends(get_ses_client),
@@ -125,9 +129,8 @@ def user_register(
     }
     registration_token = create_jwt(payload=payload, key=settings.jwt_encryption_key)
 
-    e = urlparse.urlencode(dict(token=registration_token))
-    login_url = urlparse.urlunsplit(
-        ("https", user_register.redirect_to_fqdm, "/login", e, "")
+    login_url = format_login_url(
+        redirect_to=user_register.redirect_to, registration_token=registration_token
     )
 
     log.info("sending registration token")
@@ -153,7 +156,7 @@ class SessionTokenCreate(BaseModel):
 
 
 @router.get("/v1/user_login", response_model=SessionTokenCreate)
-def user_login(
+async def user_login(
     token: Annotated[
         str,
         Query(alias="k", description="JWT token with aud=register"),
@@ -205,7 +208,7 @@ class SessionTokenRefresh(BaseModel):
     dependencies=[Depends(role_required(["admin", "user"]))],
     response_model=SessionTokenRefresh,
 )
-def user_refresh_token(
+async def user_refresh_token(
     settings: Settings = Depends(get_settings),
     authorization: str = Header("authorization"),
 ):
@@ -241,7 +244,7 @@ class AccountMetadata(BaseModel):
 
 
 @router.get("/_/account_metadata")
-def get_account_metadata(
+async def get_account_metadata(
     settings: Settings = Depends(get_settings),
     authorization: str = Header("authorization"),
 ):
@@ -261,4 +264,4 @@ def get_account_metadata(
             raise HTTPException(401, "Invalid credentials")
         return AccountMetadata(logged_in=True, role=tok["role"])
     except Exception:
-        raise HTTPException(401, "Invalid credentials")
+        return AccountMetadata(logged_in=False, role="")

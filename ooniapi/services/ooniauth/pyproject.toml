@@ -63,6 +63,7 @@ dependencies = [
   "black",
   "pytest-postgresql",
   "pytest-asyncio",
+  "freezegun",
 ]
 path = ".venv/"
 
@@ -84,7 +85,7 @@ check = "mypy --install-types --non-interactive {args:src/ooniauth tests}"
 source_pkgs = ["ooniauth", "tests"]
 branch = true
 parallel = true
-omit = ["src/ooniauth/__about__.py"]
+omit = ["src/ooniauth/__about__.py", "src/ooniauth/common/*"]
 
 [tool.coverage.paths]
 ooniauth = ["src/ooniauth", "*/ooniauth/src/ooniauth"]
