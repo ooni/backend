@@ -35,6 +35,6 @@ def test_integration(server):
     with httpx.Client(base_url=f"http://127.0.0.1:{LISTEN_PORT}") as client:
         r = client.get("/version")
         assert r.status_code == 200
-        r = client.get("/api/v2/oonirun-links")
+        r = client.get("/api/v2/oonirun/links")
         j = r.json()
         assert isinstance(j["oonirun_links"], list)
