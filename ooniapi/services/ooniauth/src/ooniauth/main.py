@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from .routers import v1
+from .routers import v1, v2
 
 from .common.config import Settings
 from .common.dependencies import get_settings
@@ -49,6 +49,7 @@ app.add_middleware(
 )
 
 app.include_router(v1.router, prefix="/api")
+app.include_router(v2.router, prefix="/api")
 
 
 @app.get("/version")
@@ -81,9 +82,6 @@ async def health(
 
     if settings.aws_secret_access_key == "" or settings.aws_access_key_id == "":
         errors.append("bad_aws_credentials")
-
-    if settings.account_id_hashing_key == "CHANGEME":
-        errors.append("bad_prometheus_password")
 
     if len(errors) > 0:
         log.error(f"Health check errors: {errors}")

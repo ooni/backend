@@ -1,9 +1,3 @@
-"""
-OONIRun link management
-
-https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
-"""
-
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse, urlencode, urlunsplit
@@ -16,13 +10,14 @@ from pydantic import Field, validator
 from pydantic import EmailStr
 from typing_extensions import Annotated
 
-from ..dependencies import get_clickhouse_client, get_ses_client
+from ..dependencies import get_ses_client
 
 from ..utils import (
     create_session_token,
     get_account_role,
-    hash_email_address,
     send_login_email,
+    format_login_url,
+    VALID_REDIRECT_TO_FQDN,
 )
 from ..common.dependencies import get_settings, role_required
 from ..common.config import Settings
@@ -38,10 +33,6 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# @router.get("/api/v2/ooniauth/user-session")
-# @router.post("/api/v2/ooniauth/user-session", response_model=SessionTokenCreate)
-# redirect_to: ## Make this optional
-
 
 class UserRegister(BaseModel):
     email_address: EmailStr = Field(
@@ -56,24 +47,11 @@ class UserRegister(BaseModel):
         u = urlparse(v)
         if u.scheme != "https":
             raise ValueError("Invalid URL")
-        valid_dnames = (
-            "explorer.ooni.org",
-            "explorer.test.ooni.org",
-            "run.ooni.io",
-            "run.test.ooni.org",
-            "test-lists.ooni.org",
-            "test-lists.test.ooni.org",
-        )
-        if u.netloc not in valid_dnames:
+
+        if u.netloc not in VALID_REDIRECT_TO_FQDN:
             raise ValueError("Invalid URL", u.netloc)
 
         return v
-
-
-def format_login_url(redirect_to: str, registration_token: str) -> str:
-    login_fqdm = urlparse(redirect_to).netloc
-    e = urlencode(dict(token=registration_token))
-    return urlunsplit(("https", login_fqdm, "/login", e, ""))
 
 
 class UserRegistrationResponse(BaseModel):
@@ -89,9 +67,6 @@ async def user_register(
     """Auth Services: start email-based user registration"""
     email_address = user_register.email_address.lower()
 
-    account_id = hash_email_address(
-        email_address=email_address, key=settings.account_id_hashing_key
-    )
     now = datetime.now(timezone.utc)
     expiration = now + timedelta(days=1)
     # On the backend side the registration is stateless
@@ -99,7 +74,6 @@ async def user_register(
         "nbf": now,
         "exp": expiration,
         "aud": "register",
-        "account_id": account_id,
         "email_address": email_address,
         "redirect_to": user_register.redirect_to,
     }
@@ -138,7 +112,6 @@ async def user_login(
         Query(alias="k", description="JWT token with aud=register"),
     ],
     settings: Settings = Depends(get_settings),
-    db: Settings = Depends(get_clickhouse_client),
 ):
     """Auth Services: login using a registration/login link"""
     try:
@@ -157,13 +130,15 @@ async def user_login(
     log.info("user login successful")
 
     # Store account role in token to prevent frequent DB lookups
-    role = get_account_role(db=db, account_id=dec["account_id"]) or "user"
+    email_address = dec["email_address"]
+    role = get_account_role(
+        admin_emails=settings.admin_emails, email_address=email_address
+    )
     redirect_to = dec.get("redirect_to", "")
-    email = dec["email_address"]
 
     token = create_session_token(
         key=settings.jwt_encryption_key,
-        account_id=dec["account_id"],
+        email_address=email_address,
         role=role,
         session_expiry_days=settings.session_expiry_days,
         login_expiry_days=settings.login_expiry_days,
@@ -171,7 +146,7 @@ async def user_login(
     return SessionTokenCreate(
         bearer=token,
         redirect_to=redirect_to,
-        email_address=email,
+        email_address=email_address,
     )
 
 
@@ -198,7 +173,7 @@ async def user_refresh_token(
 
     newtoken = create_session_token(
         key=settings.jwt_encryption_key,
-        account_id=tok["account_id"],
+        email_address=tok["email_address"],
         role=tok["role"],
         session_expiry_days=settings.session_expiry_days,
         login_expiry_days=settings.login_expiry_days,
