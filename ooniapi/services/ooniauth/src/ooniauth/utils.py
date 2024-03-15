@@ -1,12 +1,12 @@
 import hashlib
 import time
-from typing import Optional
+from typing import List, Optional
 from textwrap import dedent
 from urllib.parse import urlencode, urlparse, urlunsplit
 
 import sqlalchemy as sa
 
-from .common.utils import create_jwt, query_click_one_row
+from .common.utils import create_jwt
 
 VALID_REDIRECT_TO_FQDN = (
     "explorer.ooni.org",
@@ -26,12 +26,11 @@ def format_login_url(redirect_to: str, registration_token: str) -> str:
 
 def create_session_token(
     key: str,
-    account_id: str,
+    email_address: str,
     role: str,
     session_expiry_days: int,
     login_expiry_days: int,
     login_time: Optional[int] = None,
-    email_address: Optional[str] = None,
 ) -> str:
     now = int(time.time())
     session_exp = now + session_expiry_days * 86400
@@ -44,7 +43,6 @@ def create_session_token(
         "iat": now,
         "exp": exp,
         "aud": "user_auth",
-        "account_id": account_id,
         "login_time": login_time,
         "role": role,
         "email_address": email_address,
@@ -52,12 +50,10 @@ def create_session_token(
     return create_jwt(payload=payload, key=key)
 
 
-def get_account_role(db, account_id: str) -> Optional[str]:
-    """Get account role from database, or None"""
-    query = "SELECT role FROM accounts WHERE account_id = :account_id"
-    query_params = dict(account_id=account_id)
-    r = query_click_one_row(db, sa.text(query), query_params)
-    return r["role"] if r else None
+def get_account_role(admin_emails: List[str], email_address: str) -> str:
+    if email_address in admin_emails:
+        return "admin"
+    return "user"
 
 
 def hash_email_address(email_address: str, key: str) -> str:

@@ -1,15 +1,3 @@
-"""
-Integration test for Auth API
-
-Warning: this test runs against a real database and SMTP
-
-Lint using:
-    black -t py37 -l 100 --fast ooniapi/tests/integ/test_probe_services.py
-
-Test using:
-    pytest-3 -s --show-capture=no ooniapi/tests/integ/test_integration_auth.py
-"""
-
 from urllib.parse import parse_qs, urlparse
 from ooniauth.common.utils import decode_jwt
 from ooniauth.main import app

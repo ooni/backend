@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     session_expiry_days: int = 10
     login_expiry_days: int = 10
 
+    admin_emails: List[str] = [
+        "admin@ooni.org",
+        "contact@ooni.org",
+    ]
+
     aws_region: str = ""
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""

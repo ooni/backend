@@ -1,11 +1,5 @@
-"""
-OONIRun link management
-
-https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
-"""
-
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import urlparse
 import logging
 
@@ -16,7 +10,7 @@ from pydantic import Field, validator
 from pydantic import EmailStr
 from typing_extensions import Annotated
 
-from ..dependencies import get_clickhouse_client, get_ses_client
+from ..dependencies import get_ses_client
 
 from ..utils import (
     create_session_token,
@@ -26,7 +20,7 @@ from ..utils import (
     format_login_url,
     VALID_REDIRECT_TO_FQDN,
 )
-from ..common.dependencies import get_settings, role_required
+from ..common.dependencies import get_settings
 from ..common.config import Settings
 from ..common.routers import BaseModel
 from ..common.utils import (
@@ -113,7 +107,6 @@ async def create_user_login(
 
 
 class UserSession(BaseModel):
-    account_id: str
     session_token: str
     redirect_to: str
     email_address: str
@@ -123,7 +116,7 @@ class UserSession(BaseModel):
 
 
 def maybe_get_user_session_from_header(
-    db, authorization_header: str, jwt_encryption_key: str
+    authorization_header: str, jwt_encryption_key: str, admin_emails: List[str]
 ) -> Optional[UserSession]:
     token = get_client_token(
         authorization=authorization_header, jwt_encryption_key=jwt_encryption_key
@@ -131,10 +124,9 @@ def maybe_get_user_session_from_header(
     if token is None:
         return None
 
-    account_id = token["account_id"]
-    role = get_account_role(account_id=account_id, db=db) or "user"
-    login_time = datetime.fromtimestamp(token["login_time"])
     email_address = token["email_address"]
+    role = get_account_role(admin_emails=admin_emails, email_address=email_address)
+    login_time = datetime.fromtimestamp(token["login_time"])
     redirect_to = ""
 
     return UserSession(
@@ -143,13 +135,12 @@ def maybe_get_user_session_from_header(
         email_address=email_address,
         role=role,
         login_time=login_time,
-        account_id=account_id,
         is_logged_in=True,
     )
 
 
 def get_user_session_from_login_token(
-    login_token: str, db, jwt_encryption_key: str
+    login_token: str, jwt_encryption_key: str, admin_emails: List[str]
 ) -> UserSession:
     try:
         d = decode_jwt(
@@ -157,15 +148,14 @@ def get_user_session_from_login_token(
             key=jwt_encryption_key,
             audience="register",
         )
-        account_id = d["account_id"]
-        role = get_account_role(db=db, account_id=account_id) or "user"
+        email_address = d["email_address"]
+        role = get_account_role(admin_emails=admin_emails, email_address=email_address)
         return UserSession(
             session_token="",
             redirect_to=d["redirect_to"],
             email_address=d["email_address"],
             role=role,
             login_time=datetime.now(timezone.utc),
-            account_id=account_id,
         )
     except (
         jwt.exceptions.MissingRequiredClaimError,
@@ -188,19 +178,18 @@ async def create_user_session(
     req: Optional[CreateUserSession] = None,
     authorization: str = Header("authorization"),
     settings: Settings = Depends(get_settings),
-    db: Settings = Depends(get_clickhouse_client),
 ):
     """Auth Services: login using a registration/login link"""
     if req and req.login_token:
         user_session = get_user_session_from_login_token(
             login_token=req.login_token,
-            db=db,
+            admin_emails=settings.admin_emails,
             jwt_encryption_key=settings.jwt_encryption_key,
         )
     else:
         user_session = maybe_get_user_session_from_header(
             authorization_header=authorization,
-            db=db,
+            admin_emails=settings.admin_emails,
             jwt_encryption_key=settings.jwt_encryption_key,
         )
 
@@ -210,7 +199,6 @@ async def create_user_session(
     assert user_session.login_time
     user_session.session_token = create_session_token(
         key=settings.jwt_encryption_key,
-        account_id=user_session.account_id,
         role=user_session.role,
         session_expiry_days=settings.session_expiry_days,
         login_expiry_days=settings.login_expiry_days,
@@ -225,11 +213,10 @@ async def create_user_session(
 async def get_user_session(
     authorization: str = Header("authorization"),
     settings: Settings = Depends(get_settings),
-    db: Settings = Depends(get_clickhouse_client),
 ):
     user_session = maybe_get_user_session_from_header(
         authorization_header=authorization,
-        db=db,
+        admin_emails=settings.admin_emails,
         jwt_encryption_key=settings.jwt_encryption_key,
     )
     if not user_session:
@@ -239,7 +226,6 @@ async def get_user_session(
             email_address="",
             role="",
             login_time=None,
-            account_id="",
             is_logged_in=False,
         )
     return user_session

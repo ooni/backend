@@ -1,14 +1,11 @@
 from unittest.mock import MagicMock
 import pytest
 
-import time
-import jwt
-
 from fastapi.testclient import TestClient
 
 from ooniauth.common.config import Settings
 from ooniauth.common.dependencies import get_settings
-from ooniauth.dependencies import get_ses_client, get_clickhouse_client
+from ooniauth.dependencies import get_ses_client
 from ooniauth.utils import hash_email_address
 from ooniauth.main import app
 
@@ -23,7 +20,7 @@ def make_override_get_settings(**kw):
 @pytest.fixture
 def client_with_bad_settings():
     app.dependency_overrides[get_settings] = make_override_get_settings(
-        postgresql_url="postgresql://bad:bad@localhost/bad"
+        postgresql_url="postgresql://bad:bad@localhost/bad",
     )
 
     client = TestClient(app)
@@ -32,12 +29,13 @@ def client_with_bad_settings():
 
 @pytest.fixture
 def user_email():
-    return "dev+useraccount@ooni.org"
+    # NSA shall never be an admin user, lol
+    return "root@nsa.gov"
 
 
 @pytest.fixture
 def admin_email():
-    return "dev+adminaccount@ooni.org"
+    return "admin@ooni.org"
 
 
 @pytest.fixture
@@ -95,6 +93,7 @@ def client(
         email_source_address=email_source_address,
         account_id_hashing_key=account_id_hashing_key,
         aws_access_key_id="ITSCHANGED",
+        admin_emails=[admin_email],
         aws_secret_access_key="ITSCHANGED",
     )
     mock_clickhouse = MagicMock()
@@ -111,9 +110,6 @@ def client(
             return [("admin",)], [("role", "String")]
 
         return [("user",)], [("role", "String")]
-
-    mock_clickhouse.execute = mock_execute
-    app.dependency_overrides[get_clickhouse_client] = lambda: mock_clickhouse
 
     client = TestClient(app)
     yield client

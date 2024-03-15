@@ -1,9 +1,3 @@
-"""
-OONIRun link management
-
-https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
-"""
-
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse, urlencode, urlunsplit
@@ -16,7 +10,7 @@ from pydantic import Field, validator
 from pydantic import EmailStr
 from typing_extensions import Annotated
 
-from ..dependencies import get_clickhouse_client, get_ses_client
+from ..dependencies import get_ses_client
 
 from ..utils import (
     create_session_token,
@@ -127,7 +121,6 @@ async def user_login(
         Query(alias="k", description="JWT token with aud=register"),
     ],
     settings: Settings = Depends(get_settings),
-    db: Settings = Depends(get_clickhouse_client),
 ):
     """Auth Services: login using a registration/login link"""
     try:
@@ -146,13 +139,15 @@ async def user_login(
     log.info("user login successful")
 
     # Store account role in token to prevent frequent DB lookups
-    role = get_account_role(db=db, account_id=dec["account_id"]) or "user"
+    email_address = dec["email_address"]
+    role = get_account_role(
+        admin_emails=settings.admin_emails, email_address=email_address
+    )
     redirect_to = dec.get("redirect_to", "")
-    email = dec["email_address"]
 
     token = create_session_token(
         key=settings.jwt_encryption_key,
-        account_id=dec["account_id"],
+        email_address=email_address,
         role=role,
         session_expiry_days=settings.session_expiry_days,
         login_expiry_days=settings.login_expiry_days,
@@ -160,7 +155,7 @@ async def user_login(
     return SessionTokenCreate(
         bearer=token,
         redirect_to=redirect_to,
-        email_address=email,
+        email_address=email_address,
     )
 
 
@@ -187,7 +182,7 @@ async def user_refresh_token(
 
     newtoken = create_session_token(
         key=settings.jwt_encryption_key,
-        account_id=tok["account_id"],
+        email_address=tok["email_address"],
         role=tok["role"],
         session_expiry_days=settings.session_expiry_days,
         login_expiry_days=settings.login_expiry_days,
