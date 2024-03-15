@@ -188,12 +188,7 @@ async def user_refresh_token(
     settings: Settings = Depends(get_settings),
     authorization: str = Header("authorization"),
 ):
-    """Auth services: refresh user token
-    ---
-    responses:
-      200:
-        description: JSON with "bearer" key
-    """
+    """Auth services: refresh user token"""
     tok = get_client_token(
         authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
@@ -223,14 +218,7 @@ async def get_account_metadata(
     settings: Settings = Depends(get_settings),
     authorization: str = Header("authorization"),
 ):
-    """Get account metadata for logged-in users
-    ---
-    responses:
-      200:
-        description: Username and role if logged in.
-        schema:
-          type: object
-    """
+    """Get account metadata for logged-in users"""
     tok = get_client_token(
         authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
