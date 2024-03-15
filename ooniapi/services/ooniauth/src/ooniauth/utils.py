@@ -2,11 +2,26 @@ import hashlib
 import time
 from typing import Optional
 from textwrap import dedent
+from urllib.parse import urlencode, urlparse, urlunsplit
 
 import sqlalchemy as sa
-import boto3
 
 from .common.utils import create_jwt, query_click_one_row
+
+VALID_REDIRECT_TO_FQDN = (
+    "explorer.ooni.org",
+    "explorer.test.ooni.org",
+    "run.ooni.io",
+    "run.test.ooni.org",
+    "test-lists.ooni.org",
+    "test-lists.test.ooni.org",
+)
+
+
+def format_login_url(redirect_to: str, registration_token: str) -> str:
+    login_fqdm = urlparse(redirect_to).netloc
+    e = urlencode(dict(token=registration_token))
+    return urlunsplit(("https", login_fqdm, "/login", e, ""))
 
 
 def create_session_token(
@@ -15,7 +30,8 @@ def create_session_token(
     role: str,
     session_expiry_days: int,
     login_expiry_days: int,
-    login_time=None,
+    login_time: Optional[int] = None,
+    email_address: Optional[str] = None,
 ) -> str:
     now = int(time.time())
     session_exp = now + session_expiry_days * 86400
@@ -31,6 +47,7 @@ def create_session_token(
         "account_id": account_id,
         "login_time": login_time,
         "role": role,
+        "email_address": email_address,
     }
     return create_jwt(payload=payload, key=key)
 

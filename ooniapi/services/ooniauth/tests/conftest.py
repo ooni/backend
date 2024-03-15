@@ -104,7 +104,6 @@ def client(
     # coldata = [("name", "type")]
     def mock_execute(query, query_params, with_column_types, settings):
         assert with_column_types == True
-        print(settings)
         assert query.startswith("SELECT role FROM")
         if query_params["account_id"] == hash_email_address(
             email_address=admin_email, key=account_id_hashing_key

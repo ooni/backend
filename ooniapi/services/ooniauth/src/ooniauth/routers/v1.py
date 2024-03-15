@@ -23,6 +23,8 @@ from ..utils import (
     get_account_role,
     hash_email_address,
     send_login_email,
+    format_login_url,
+    VALID_REDIRECT_TO_FQDN,
 )
 from ..common.dependencies import get_settings, role_required
 from ..common.config import Settings
@@ -56,24 +58,11 @@ class UserRegister(BaseModel):
         u = urlparse(v)
         if u.scheme != "https":
             raise ValueError("Invalid URL")
-        valid_dnames = (
-            "explorer.ooni.org",
-            "explorer.test.ooni.org",
-            "run.ooni.io",
-            "run.test.ooni.org",
-            "test-lists.ooni.org",
-            "test-lists.test.ooni.org",
-        )
-        if u.netloc not in valid_dnames:
+
+        if u.netloc not in VALID_REDIRECT_TO_FQDN:
             raise ValueError("Invalid URL", u.netloc)
 
         return v
-
-
-def format_login_url(redirect_to: str, registration_token: str) -> str:
-    login_fqdm = urlparse(redirect_to).netloc
-    e = urlencode(dict(token=registration_token))
-    return urlunsplit(("https", login_fqdm, "/login", e, ""))
 
 
 class UserRegistrationResponse(BaseModel):

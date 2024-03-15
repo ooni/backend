@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from .routers import v1
+from .routers import v1, v2
 
 from .common.config import Settings
 from .common.dependencies import get_settings
@@ -49,6 +49,7 @@ app.add_middleware(
 )
 
 app.include_router(v1.router, prefix="/api")
+app.include_router(v2.router, prefix="/api")
 
 
 @app.get("/version")
