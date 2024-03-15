@@ -33,10 +33,6 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# @router.get("/api/v2/ooniauth/user-session")
-# @router.post("/api/v2/ooniauth/user-session", response_model=SessionTokenCreate)
-# redirect_to: ## Make this optional
-
 
 class UserRegister(BaseModel):
     email_address: EmailStr = Field(

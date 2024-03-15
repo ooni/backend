@@ -4,23 +4,42 @@ from ooniauth.main import app
 from freezegun import freeze_time
 
 
+from html.parser import HTMLParser
+
+
+# TODO(art): deduplicate this in a utility lib
+class AHrefParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            for attr in attrs:
+                if attr[0] == "href":
+                    self.links.append(attr[1])
+
+
+def test_ahref_parser():
+    link = "https://example.com/somewhere"
+    html_message = f"""
+<html>
+<a href="{link}" extra_tag="ignored"></a>
+<html>
+"""
+    parser = AHrefParser()
+    parser.feed(html_message)
+    parser.close()
+
+    assert parser.links[0] == link
+
+
 def perform_login(client, email_address, mock_ses_client, valid_redirect_to_url):
     d = dict(email_address=email_address, redirect_to=valid_redirect_to_url)
     r = client.post("/api/v2/ooniauth/user-login", json=d)
     j = r.json()
     assert r.status_code == 200
     assert j["email_address"] == email_address
-
-    from html.parser import HTMLParser
-
-    class AHrefParser(HTMLParser):
-        links = []
-
-        def handle_starttag(self, tag, attrs):
-            if tag == "a":
-                for attr in attrs:
-                    if attr[0] == "href":
-                        self.links.append(attr[1])
 
     mock_send_email = mock_ses_client.send_email
     assert (
