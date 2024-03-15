@@ -49,11 +49,6 @@ def prometheus_password():
 
 
 @pytest.fixture
-def account_id_hashing_key():
-    return "super_secure"
-
-
-@pytest.fixture
 def email_source_address():
     return "admin+sourceemail@ooni.org"
 
@@ -83,7 +78,6 @@ def client(
     mock_ses_client,
     admin_email,
     jwt_encryption_key,
-    account_id_hashing_key,
     prometheus_password,
     email_source_address,
 ):
@@ -91,25 +85,10 @@ def client(
         jwt_encryption_key=jwt_encryption_key,
         prometheus_metrics_password=prometheus_password,
         email_source_address=email_source_address,
-        account_id_hashing_key=account_id_hashing_key,
         aws_access_key_id="ITSCHANGED",
         admin_emails=[admin_email],
         aws_secret_access_key="ITSCHANGED",
     )
-    mock_clickhouse = MagicMock()
-    mock_clickhouse.execute = MagicMock()
-
-    # rows, coldata = q
-    # coldata = [("name", "type")]
-    def mock_execute(query, query_params, with_column_types, settings):
-        assert with_column_types == True
-        assert query.startswith("SELECT role FROM")
-        if query_params["account_id"] == hash_email_address(
-            email_address=admin_email, key=account_id_hashing_key
-        ):
-            return [("admin",)], [("role", "String")]
-
-        return [("user",)], [("role", "String")]
 
     client = TestClient(app)
     yield client

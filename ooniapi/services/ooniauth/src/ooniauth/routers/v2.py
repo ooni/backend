@@ -15,7 +15,6 @@ from ..dependencies import get_ses_client
 from ..utils import (
     create_session_token,
     get_account_role,
-    hash_email_address,
     send_login_email,
     format_login_url,
     VALID_REDIRECT_TO_FQDN,
@@ -69,9 +68,6 @@ async def create_user_login(
     """Auth Services: login by receiving an email"""
     email_address = req.email_address.lower()
 
-    account_id = hash_email_address(
-        email_address=email_address, key=settings.account_id_hashing_key
-    )
     now = datetime.now(timezone.utc)
     login_token_expiration = now + timedelta(days=1)
     # On the backend side the registration is stateless
@@ -79,7 +75,6 @@ async def create_user_login(
         "nbf": now,
         "exp": login_token_expiration,
         "aud": "register",
-        "account_id": account_id,
         "email_address": email_address,
         "redirect_to": req.redirect_to,
     }

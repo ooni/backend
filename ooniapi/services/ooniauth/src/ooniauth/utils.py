@@ -1,4 +1,3 @@
-import hashlib
 import time
 from typing import List, Optional
 from textwrap import dedent
@@ -54,12 +53,6 @@ def get_account_role(admin_emails: List[str], email_address: str) -> str:
     if email_address in admin_emails:
         return "admin"
     return "user"
-
-
-def hash_email_address(email_address: str, key: str) -> str:
-    return hashlib.blake2b(
-        email_address.encode(), key=key.encode(), digest_size=16
-    ).hexdigest()
 
 
 def send_login_email(

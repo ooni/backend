@@ -83,9 +83,6 @@ async def health(
     if settings.aws_secret_access_key == "" or settings.aws_access_key_id == "":
         errors.append("bad_aws_credentials")
 
-    if settings.account_id_hashing_key == "CHANGEME":
-        errors.append("bad_prometheus_password")
-
     if len(errors) > 0:
         log.error(f"Health check errors: {errors}")
         raise HTTPException(status_code=542, detail=f"health check failed")
