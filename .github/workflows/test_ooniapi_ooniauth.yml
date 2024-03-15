@@ -1,4 +1,4 @@
-name: test ooniapi/oonirun
+name: test ooniapi/ooniauth
 on: push
 jobs:
   run_tests:
@@ -16,10 +16,10 @@ jobs:
 
       - name: Run all tests
         run: make test-cov
-        working-directory: ./ooniapi/services/oonirun/
+        working-directory: ./ooniapi/services/ooniauth/
 
       - name: Upload coverage to codecov
         uses: codecov/codecov-action@v3
         with:
-          flags: oonirun
-          working-directory: ./ooniapi/services/oonirun/
+          flags: ooniauth
+          working-directory: ./ooniapi/services/ooniauth/

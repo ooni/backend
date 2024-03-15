@@ -12,11 +12,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
 from pydantic import computed_field, Field, validator
-from pydantic import BaseModel as PydandicBaseModel
 from typing_extensions import Annotated
 
 from .. import models
 
+from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
 from ..common.utils import (
     get_client_role,
@@ -24,17 +24,6 @@ from ..common.utils import (
     get_account_id_or_none,
 )
 from ..dependencies import get_postgresql_session
-
-ISO_FORMAT_DATETIME = "%Y-%m-%dT%H:%M:%S.%fZ"
-ISO_FORMAT_DATE = "%Y-%m-%d"
-
-
-class BaseModel(PydandicBaseModel):
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.strftime(ISO_FORMAT_DATETIME),
-            date: lambda v: v.strftime(ISO_FORMAT_DATE),
-        }
 
 
 log = logging.getLogger(__name__)

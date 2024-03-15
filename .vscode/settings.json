@@ -1,5 +1,5 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}/ooniapi/services/oonirun/.venv",
+    "python.defaultInterpreterPath": "${workspaceFolder}/ooniapi/services/ooniauth/.venv",
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true
 }

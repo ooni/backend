@@ -1,7 +1,3 @@
----
-title: "OONI Services"
----
-
 OONI API components are broken up into smaller pieces that can be more easily
 deployed and managed without worrying too much about the blast radius caused by
 the deployment of a larger component.
@@ -400,6 +396,47 @@ RUN rm -rf /app/alembic/__pycache__
 
 CMD ["uvicorn", "ooniservicename.main:app", "--host", "0.0.0.0", "--port", "80"]
 EXPOSE 80
+```
+
+It's recommended you also implement a smoke test for the built docker image.
+
+Here is a sample:
+
+```bash
+#!/bin/bash
+
+set -ex
+
+if [ $# -eq 0 ]; then
+  echo "Error: No Docker image name provided."
+  echo "Usage: $0 [IMAGE_NAME]"
+  exit 1
+fi
+
+IMAGE=$1
+CONTAINER_NAME=ooniapi-smoketest-$RANDOM
+PORT=$((RANDOM % 10001 + 30000))
+
+cleanup() {
+    echo "cleaning up"
+    docker logs $CONTAINER_NAME
+    docker stop $CONTAINER_NAME >/dev/null 2>&1
+    docker rm $CONTAINER_NAME >/dev/null 2>&1
+}
+
+echo "[+] Running smoketest of ${IMAGE}"
+docker run -d --name $CONTAINER_NAME -p $PORT:80 ${IMAGE}
+
+trap cleanup INT TERM EXIT
+
+sleep 2
+response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT/health)
+if [ "${response}" -eq 200 ]; then
+  echo "Smoke test passed: Received 200 OK from /health endpoint."
+else
+  echo "Smoke test failed: Did not receive 200 OK from /health endpoint. Received: $response"
+  exit 1
+fi
 ```
 
 #### Build spec
