@@ -49,14 +49,10 @@ class UserRegister(BaseModel):
         min_length=5,
         max_length=255,
     )
-    redirect_to: Optional[str] = Field(title="redirect to this URL", default="")
+    redirect_to: str = Field(title="redirect to this URL")
 
     @validator("redirect_to")
     def validate_redirect_to(cls, v):
-        # None is also a valid type
-        if v is None:
-            return v
-
         u = urlparse(v)
         if u.scheme != "https":
             raise ValueError("Invalid URL")
@@ -74,10 +70,7 @@ class UserRegister(BaseModel):
         return v
 
 
-def format_login_url(redirect_to: Optional[str], registration_token: str) -> str:
-    if redirect_to is None:
-        return ""
-
+def format_login_url(redirect_to: str, registration_token: str) -> str:
     login_fqdm = urlparse(redirect_to).netloc
     e = urlencode(dict(token=registration_token))
     return urlunsplit(("https", login_fqdm, "/login", e, ""))
@@ -152,11 +145,11 @@ async def user_login(
         dec = decode_jwt(
             token=token, key=settings.jwt_encryption_key, audience="register"
         )
-    except jwt.exceptions.MissingRequiredClaimError:
-        raise HTTPException(401, "Invalid token")
-    except jwt.exceptions.InvalidSignatureError:
-        raise HTTPException(401, "Invalid credential signature")
-    except jwt.exceptions.DecodeError:
+    except (
+        jwt.exceptions.MissingRequiredClaimError,
+        jwt.exceptions.InvalidSignatureError,
+        jwt.exceptions.DecodeError,
+    ):
         raise HTTPException(401, "Invalid credentials")
     except jwt.exceptions.ExpiredSignatureError:
         raise HTTPException(401, "Expired token")
@@ -205,9 +198,8 @@ async def user_refresh_token(
         authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
 
-    # @role_required already checked for expunged tokens
-    if not tok:
-        raise HTTPException(401, "Invalid credentials")
+    # @role_required already checked for validity of token
+    assert tok is not None
 
     newtoken = create_session_token(
         key=settings.jwt_encryption_key,
@@ -239,12 +231,9 @@ async def get_account_metadata(
         schema:
           type: object
     """
-    try:
-        tok = get_client_token(
-            authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
-        )
-        if not tok:
-            raise HTTPException(401, "Invalid credentials")
-        return AccountMetadata(logged_in=True, role=tok["role"])
-    except Exception:
+    tok = get_client_token(
+        authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
+    if not tok:
         return AccountMetadata(logged_in=False, role="")
+    return AccountMetadata(logged_in=True, role=tok["role"])

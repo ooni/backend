@@ -85,7 +85,12 @@ check = "mypy --install-types --non-interactive {args:src/ooniauth tests}"
 source_pkgs = ["ooniauth", "tests"]
 branch = true
 parallel = true
-omit = ["src/ooniauth/__about__.py", "src/ooniauth/common/*"]
+omit = [
+  "src/ooniauth/__about__.py",
+  "src/ooniauth/common/*",
+  # Ignored because these should be run manually on deployed instance
+  "tests/run_*",
+]
 
 [tool.coverage.paths]
 ooniauth = ["src/ooniauth", "*/ooniauth/src/ooniauth"]
