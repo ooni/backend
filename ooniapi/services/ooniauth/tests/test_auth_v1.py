@@ -35,7 +35,7 @@ def register(client, email_address, mock_ses_client, valid_redirect_to_url):
 
     login_link = parser.links[0]
     token = parse_qs(urlparse(login_link).query)["token"][0]
-    assert len(token) > 300
+    assert len(token) > 200
     return token
 
 

@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from ooniauth.common.config import Settings
 from ooniauth.common.dependencies import get_settings
 from ooniauth.dependencies import get_ses_client
-from ooniauth.utils import hash_email_address
 from ooniauth.main import app
 
 
