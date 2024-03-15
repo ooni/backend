@@ -149,7 +149,7 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
 
 
 @router.post(
-    "/v2/oonirun-links",
+    "/v2/oonirun/links",
     tags=["oonirun"],
     dependencies=[Depends(role_required(["admin", "user"]))],
     response_model=OONIRunLink,
@@ -228,7 +228,7 @@ def create_oonirun_link(
 
 
 @router.put(
-    "/v2/oonirun-links/{oonirun_link_id}",
+    "/v2/oonirun/links/{oonirun_link_id}",
     dependencies=[Depends(role_required(["admin", "user"]))],
     tags=["oonirun"],
     response_model=OONIRunLink,
@@ -407,7 +407,7 @@ class OONIRunLinkRevisions(BaseModel):
 
 
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}/revisions",
+    "/v2/oonirun/links/{oonirun_link_id}/revisions",
     tags=["oonirun"],
     response_model=OONIRunLinkRevisions,
 )
@@ -438,7 +438,7 @@ def get_oonirun_link_revisions(
 
 
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}/engine-descriptor/{revision_number}",
+    "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
     tags=["oonirun"],
     response_model=OONIRunLinkEngineDescriptor,
 )
@@ -486,7 +486,7 @@ def get_oonirun_link_engine_descriptor(
 
 
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}/full-descriptor/{revision_number}",
+    "/v2/oonirun/links/{oonirun_link_id}/full-descriptor/{revision_number}",
     tags=["oonirun"],
     response_model=OONIRunLink,
 )
@@ -526,7 +526,7 @@ def get_oonirun_link_revision(
 
 
 @router.get(
-    "/v2/oonirun-links/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
+    "/v2/oonirun/links/{oonirun_link_id}", tags=["oonirun"], response_model=OONIRunLink
 )
 def get_latest_oonirun_link(
     oonirun_link_id: str,
@@ -551,7 +551,7 @@ class OONIRunLinkList(BaseModel):
     oonirun_links: List[OONIRunLink]
 
 
-@router.get("/v2/oonirun-links", tags=["oonirun"])
+@router.get("/v2/oonirun/links", tags=["oonirun"])
 def list_oonirun_links(
     is_mine: Annotated[
         Optional[bool],
