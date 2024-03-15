@@ -9,7 +9,8 @@ from .common.config import Settings
 
 
 def get_ses_client(settings: Annotated[Settings, Depends(get_settings)]):
-    return boto3.client(
+    # TODO(art): add support for running integration tests of boto
+    return boto3.client(  # no cov
         "ses",
         region_name=settings.aws_region,
         aws_access_key_id=settings.aws_access_key_id,
