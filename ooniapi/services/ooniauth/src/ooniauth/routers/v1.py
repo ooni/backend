@@ -138,6 +138,7 @@ async def user_login(
 
     token = create_session_token(
         key=settings.jwt_encryption_key,
+        hashing_key=settings.account_id_hashing_key,
         email_address=email_address,
         role=role,
         session_expiry_days=settings.session_expiry_days,
@@ -173,6 +174,7 @@ async def user_refresh_token(
 
     newtoken = create_session_token(
         key=settings.jwt_encryption_key,
+        hashing_key=settings.account_id_hashing_key,
         email_address=tok["email_address"],
         role=tok["role"],
         session_expiry_days=settings.session_expiry_days,

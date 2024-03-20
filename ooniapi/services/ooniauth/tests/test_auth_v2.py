@@ -187,6 +187,8 @@ def test_admin_register_and_get_metadata(
     j = client.get("/api/v2/ooniauth/user-session", headers=h).json()
     assert j["role"] == "admin"
     assert j["is_logged_in"] == True
+    assert j["email_address"] == admin_email
+    assert len(j["account_id"]) > 1
 
 
 def test_user_register_timetravel(

@@ -1,3 +1,4 @@
+import hashlib
 import time
 from typing import List, Optional
 from textwrap import dedent
@@ -17,6 +18,11 @@ VALID_REDIRECT_TO_FQDN = (
 )
 
 
+def hash_email_address(email_address: str, key: str) -> str:
+    em = email_address.encode()
+    return hashlib.blake2b(em, key=key.encode("utf-8"), digest_size=16).hexdigest()
+
+
 def format_login_url(redirect_to: str, registration_token: str) -> str:
     login_fqdm = urlparse(redirect_to).netloc
     e = urlencode(dict(token=registration_token))
@@ -25,6 +31,7 @@ def format_login_url(redirect_to: str, registration_token: str) -> str:
 
 def create_session_token(
     key: str,
+    hashing_key: str,
     email_address: str,
     role: str,
     session_expiry_days: int,
@@ -44,6 +51,7 @@ def create_session_token(
         "aud": "user_auth",
         "login_time": login_time,
         "role": role,
+        "account_id": hash_email_address(email_address, hashing_key),
         "email_address": email_address,
     }
     return create_jwt(payload=payload, key=key)
