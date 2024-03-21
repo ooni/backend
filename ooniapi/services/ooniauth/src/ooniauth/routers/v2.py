@@ -15,6 +15,7 @@ from ..dependencies import get_ses_client
 from ..utils import (
     create_session_token,
     get_account_role,
+    hash_email_address,
     send_login_email,
     format_login_url,
     VALID_REDIRECT_TO_FQDN,
@@ -105,6 +106,7 @@ class UserSession(BaseModel):
     session_token: str
     redirect_to: str
     email_address: str
+    account_id: str
     role: str
     login_time: Optional[datetime]
     is_logged_in: bool = False
@@ -120,6 +122,7 @@ def maybe_get_user_session_from_header(
         return None
 
     email_address = token["email_address"]
+    account_id = token["account_id"]
     role = get_account_role(admin_emails=admin_emails, email_address=email_address)
     login_time = datetime.fromtimestamp(token["login_time"])
     redirect_to = ""
@@ -128,6 +131,7 @@ def maybe_get_user_session_from_header(
         session_token="",
         redirect_to=redirect_to,
         email_address=email_address,
+        account_id=account_id,
         role=role,
         login_time=login_time,
         is_logged_in=True,
@@ -135,7 +139,7 @@ def maybe_get_user_session_from_header(
 
 
 def get_user_session_from_login_token(
-    login_token: str, jwt_encryption_key: str, admin_emails: List[str]
+    login_token: str, jwt_encryption_key: str, hashing_key: str, admin_emails: List[str]
 ) -> UserSession:
     try:
         d = decode_jwt(
@@ -144,9 +148,13 @@ def get_user_session_from_login_token(
             audience="register",
         )
         email_address = d["email_address"]
+        account_id = hash_email_address(
+            email_address=d["email_address"], key=hashing_key
+        )
         role = get_account_role(admin_emails=admin_emails, email_address=email_address)
         return UserSession(
             session_token="",
+            account_id=account_id,
             redirect_to=d["redirect_to"],
             email_address=d["email_address"],
             role=role,
@@ -180,6 +188,7 @@ async def create_user_session(
             login_token=req.login_token,
             admin_emails=settings.admin_emails,
             jwt_encryption_key=settings.jwt_encryption_key,
+            hashing_key=settings.account_id_hashing_key,
         )
     else:
         user_session = maybe_get_user_session_from_header(
@@ -194,6 +203,7 @@ async def create_user_session(
     assert user_session.login_time
     user_session.session_token = create_session_token(
         key=settings.jwt_encryption_key,
+        hashing_key=settings.account_id_hashing_key,
         role=user_session.role,
         session_expiry_days=settings.session_expiry_days,
         login_expiry_days=settings.login_expiry_days,
@@ -219,6 +229,7 @@ async def get_user_session(
             session_token="",
             redirect_to="",
             email_address="",
+            account_id="",
             role="",
             login_time=None,
             is_logged_in=False,
