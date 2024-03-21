@@ -1,7 +1,6 @@
 """
 OONI Probe Services API
 """
-
 from base64 import b64encode
 from datetime import datetime, timedelta, date
 from hashlib import sha512
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, List, Optional
 from urllib.request import urlopen
 import ipaddress
+import random
 import time
 
 import ujson
@@ -21,6 +21,7 @@ import zstd  # debedps: python3-zstd
 
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
+from ooniapi.vpn_services import query_vpn_credentials
 
 from ooniapi.auth import create_jwt, decode_jwt
 from ooniapi.prio import generate_test_list
@@ -305,6 +306,7 @@ def check_in() -> Response:
         "multi_protocol_traceroute",
         "ndt",
         "psiphon",
+        "openvpn",
         "riseupvpn",
         "tcp_connect",
         "telegram",
@@ -659,6 +661,29 @@ def serve_tor_targets() -> Response:
         return err
     torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
     return nocachejson(torconf)
+
+
+@probe_services_blueprint.route("/api/v1/openvpn-config")
+def serve_openvpn_config() -> Response:
+    """Probe Services: OpenVPN Config
+    ---
+    responses:
+      200:
+        description: Per-provider minimal subset of OpenVPN configuration, including credentials.
+    """
+    log = current_app.logger
+    openvpnconf = {}
+
+    try:
+        creds = random.choice(query_vpn_credentials(active=True))
+
+    except Exception as e:
+        log.info(str(e), exc_info=True)
+        return jerror(str(e))
+
+    # return a dict keyed by the provider label. Single provider for MVP.
+    openvpnconf[creds.provider] = creds.config
+    return nocachejson(openvpnconf)
 
 
 # Unneded: we use an external test helper

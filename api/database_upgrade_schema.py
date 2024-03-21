@@ -132,6 +132,21 @@ ENGINE = EmbeddedRocksDB
 PRIMARY KEY account_id"""
     )
 
+    # VPN credentials
+    run(
+        """
+-- VPN services
+
+CREATE TABLE IF NOT EXISTS default.vpn_services
+(
+    `provider` String,
+    `config` String,
+    `fetched_date` DateTime,
+)
+ENGINE = ReplacingMergeTree
+ORDER BY (provider, fetched_date)"""
+    )
+
     # Materialized views
     run(
         """
