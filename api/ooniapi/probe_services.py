@@ -1,6 +1,7 @@
 """
 OONI Probe Services API
 """
+
 from base64 import b64encode
 from datetime import datetime, timedelta, date
 from hashlib import sha512
@@ -21,7 +22,6 @@ import zstd  # debedps: python3-zstd
 
 from ooniapi.config import metrics
 from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
-from ooniapi.vpn_services import query_vpn_credentials
 
 from ooniapi.auth import create_jwt, decode_jwt
 from ooniapi.prio import generate_test_list
@@ -245,7 +245,9 @@ def check_in() -> Response:
     try:
         charging = bool(charging)
     except Exception:
-        log.error(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
+        log.error(
+            f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
+        )
 
     if "web_connectivity" in data:
         catcodes = data["web_connectivity"].get("category_codes", [])
@@ -280,8 +282,8 @@ def check_in() -> Response:
     # Temporarily disabled while we work towards deploying this in prod:
     # https://github.com/ooni/probe/issues/2674
     #
-    #octect = extract_probe_ipaddr_octect(1, 0)
-    #if octect in (34, 239):
+    # octect = extract_probe_ipaddr_octect(1, 0)
+    # if octect in (34, 239):
     #    conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
@@ -322,7 +324,9 @@ def check_in() -> Response:
         resp["tests"][tn]["report_id"] = rid  # type: ignore
 
     til = len(test_items)
-    log.debug(f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
+    log.debug(
+        f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
+    )
 
     return nocachejson(**resp)
 
@@ -661,33 +665,6 @@ def serve_tor_targets() -> Response:
         return err
     torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
     return nocachejson(torconf)
-
-
-@probe_services_blueprint.route("/api/v1/openvpn-config")
-def serve_openvpn_config() -> Response:
-    """Probe Services: OpenVPN Config
-    ---
-    responses:
-      200:
-        description: Per-provider minimal subset of OpenVPN configuration, including credentials.
-    """
-    log = current_app.logger
-    openvpnconf = {}
-
-    try:
-        creds = random.choice(query_vpn_credentials(active=True))
-
-    except Exception as e:
-        log.info(str(e), exc_info=True)
-        return jerror(str(e))
-
-    # return a dict keyed by the provider label. Single provider for MVP.
-    openvpnconf[creds.provider] = creds.config
-    return nocachejson(openvpnconf)
-
-
-# Unneded: we use an external test helper
-# @probe_services_blueprint.route("/api/private/v1/wcth")
 
 
 @probe_services_blueprint.route("/invalidpath")
