@@ -1355,16 +1355,16 @@ def score_signal(msm: dict) -> dict:
         tv = g_or(msm, "test_version", "0.0.0")
 
         if parse_version(tv) <= parse_version("0.2.4"):
-            # TODO(bassosimone,DecFox,hellais): doesn't this pattern of checking
-            # the version without the date break reprocessing of signal?
+            # Caveat: this breaks reprocessing but it's also fine because
+            # we do not want to reprocess measurements
             # See https://github.com/ooni/probe/issues/2636
             # See https://github.com/ooni/probe-cli/pull/1421
             scores["accuracy"] = 0.0
             return scores
 
         if parse_version(tv) <= parse_version("0.2.3"):
-            # TODO(bassosimone,DecFox,hellais): doesn't this pattern of checking
-            # the version without the date break reprocessing of signal?
+            # Caveat: this breaks reprocessing but it's also fine because
+            # we do not want to reprocess measurements
             # https://github.com/ooni/probe/issues/2627
             scores["accuracy"] = 0.0
             return scores
