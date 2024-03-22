@@ -1368,7 +1368,7 @@ def score_signal(msm: dict) -> dict:
             # https://github.com/ooni/probe/issues/2627
             scores["accuracy"] = 0.0
             return scores
-        
+
         if parse_version(tv) < parse_version("0.2.2"):
             start_time = msm.get("measurement_start_time")
             if start_time is None:
