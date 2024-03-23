@@ -18,8 +18,6 @@ class OONIProbeVPNConfig(Base):
     date_updated: Mapped[datetime] = mapped_column(UtcDateTime())
     date_created: Mapped[datetime] = mapped_column(UtcDateTime())
 
-    expiration_date: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
-
     provider: Mapped[str] = mapped_column()
 
     protocol: Mapped[str] = mapped_column()

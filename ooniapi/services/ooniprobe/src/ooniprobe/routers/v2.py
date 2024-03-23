@@ -48,7 +48,6 @@ def update_vpn_config(db: Session, provider_name: str):
     except sa.orm.exc.NoResultFound:
         vpn_config = models.OONIProbeVPNConfig(
             provider=provider_name,
-            cert=vpn_cert,
             date_updated=datetime.now(timezone.utc),
             date_created=datetime.now(timezone.utc),
             protocol="openvpn",
@@ -86,7 +85,7 @@ def list_vpn_configs(
     """List OONIRun descriptors"""
     log.debug("list oonirun")
 
-    if provider_name != "riseup":
+    if provider_name != "riseupvpn":
         raise HTTPException(status_code=404, detail="provider not found")
 
     vpn_config = get_or_update_riseup_vpn_config(db, provider_name)
