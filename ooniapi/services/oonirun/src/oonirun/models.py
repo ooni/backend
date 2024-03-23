@@ -6,8 +6,8 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 
-from .postgresql import Base
 from .common.models import UtcDateTime
+from .common.postgresql import Base
 
 
 class OONIRunLink(Base):
