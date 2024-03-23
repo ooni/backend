@@ -244,9 +244,7 @@ def check_in() -> Response:
     try:
         charging = bool(charging)
     except Exception:
-        log.error(
-            f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
-        )
+        log.error(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
 
     if "web_connectivity" in data:
         catcodes = data["web_connectivity"].get("category_codes", [])
@@ -281,8 +279,8 @@ def check_in() -> Response:
     # Temporarily disabled while we work towards deploying this in prod:
     # https://github.com/ooni/probe/issues/2674
     #
-    # octect = extract_probe_ipaddr_octect(1, 0)
-    # if octect in (34, 239):
+    #octect = extract_probe_ipaddr_octect(1, 0)
+    #if octect in (34, 239):
     #    conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
@@ -322,9 +320,7 @@ def check_in() -> Response:
         resp["tests"][tn]["report_id"] = rid  # type: ignore
 
     til = len(test_items)
-    log.debug(
-        f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
-    )
+    log.debug(f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
 
     return nocachejson(**resp)
 
@@ -663,6 +659,10 @@ def serve_tor_targets() -> Response:
         return err
     torconf = _load_json(current_app.config["TOR_TARGETS_CONFFILE"])
     return nocachejson(torconf)
+
+
+# Unneded: we use an external test helper
+# @probe_services_blueprint.route("/api/private/v1/wcth")
 
 
 @probe_services_blueprint.route("/invalidpath")
