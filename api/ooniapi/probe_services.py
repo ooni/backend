@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, List, Optional
 from urllib.request import urlopen
 import ipaddress
-import random
 import time
 
 import ujson
@@ -308,7 +307,6 @@ def check_in() -> Response:
         "multi_protocol_traceroute",
         "ndt",
         "psiphon",
-        "openvpn",
         "riseupvpn",
         "tcp_connect",
         "telegram",
