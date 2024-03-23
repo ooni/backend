@@ -66,6 +66,7 @@ dependencies = [
   "black",
   "pytest-postgresql",
   "pytest-asyncio",
+  "freezegun",
 ]
 path = ".venv/"
 

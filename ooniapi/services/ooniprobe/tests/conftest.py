@@ -5,6 +5,8 @@ import time
 import jwt
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
@@ -19,11 +21,26 @@ def make_override_get_settings(**kw):
 
 
 @pytest.fixture
-def alembic_migration(postgresql):
+def pg_url(postgresql):
+    return f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
+
+
+@pytest.fixture
+def db(pg_url):
+    engine = create_engine(pg_url)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture
+def alembic_migration(pg_url):
     from alembic import command
     from alembic.config import Config
-
-    db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
 
     migrations_path = (
         pathlib.Path(__file__).parent.parent
@@ -35,10 +52,10 @@ def alembic_migration(postgresql):
 
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_path))
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+    alembic_cfg.set_main_option("sqlalchemy.url", pg_url)
 
     command.upgrade(alembic_cfg, "head")
-    yield db_url
+    yield pg_url
 
 
 @pytest.fixture

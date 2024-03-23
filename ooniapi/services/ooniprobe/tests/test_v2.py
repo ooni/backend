@@ -4,14 +4,12 @@ Integration test for OONIRn API
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-import time
+from freezegun import freeze_time
 
-from ooniprobe import models
 import pytest
 
-import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from ooniprobe.utils import OpenVPNConfig
+from ooniprobe import models
 
 
 def test_get_version(client):
@@ -41,3 +39,50 @@ def test_get_config(client):
     assert r.status_code == 200
     j = r.json()
     assert j["date_updated"] == date_updated
+
+
+def test_invalid_provider_name(client, db):
+    # we probably aren't going to add NSA VPN to our provider list anytime soon :D
+    r = client.get("/api/v2/ooniprobe/vpn-config/nsavpn")
+    assert r.status_code != 200
+
+
+def test_config_updated(client, db):
+    vpn_cert = OpenVPNConfig(
+        ca="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
+        cert="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
+        key="-----BEGIN RSA PRIVATE KEY-----\nSAMPLE KEY\n-----END RSA PRIVATE KEY-----\n",
+    )
+
+    with freeze_time("1984-01-01"):
+        vpn_config = models.OONIProbeVPNConfig(
+            provider="riseupvpn",
+            date_updated=datetime.now(timezone.utc),
+            date_created=datetime.now(timezone.utc),
+            protocol="openvpn",
+            openvpn_ca=vpn_cert["ca"],
+            openvpn_cert=vpn_cert["cert"],
+            openvpn_key=vpn_cert["key"],
+        )
+        db.add(vpn_config)
+        db.commit()
+
+        r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
+        assert r.status_code == 200
+        j = r.json()
+        assert j["provider"] == "riseupvpn"
+        assert j["protocol"] == "openvpn"
+        assert j["config"]["cert"] == vpn_cert["cert"]
+        assert j["config"]["ca"] == vpn_cert["ca"]
+        assert j["config"]["key"] == vpn_cert["key"]
+
+    # Check to see if the cert got updated
+    with freeze_time("1984-04-01"):
+        r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
+        assert r.status_code == 200
+        j = r.json()
+        assert j["provider"] == "riseupvpn"
+        assert j["protocol"] == "openvpn"
+        assert j["config"]["cert"] != vpn_cert["cert"]
+        assert j["config"]["ca"] != vpn_cert["ca"]
+        assert j["config"]["key"] != vpn_cert["key"]
