@@ -1,9 +1,3 @@
-"""
-OONIRun link management
-
-https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
-"""
-
 from datetime import datetime, timedelta, timezone, date
 from typing import Dict, List, Optional, Tuple
 import logging
@@ -16,6 +10,7 @@ from typing_extensions import Annotated
 
 from .. import models
 
+from ..utils import fetch_openvpn_config
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings
 from ..dependencies import get_postgresql_session
@@ -27,25 +22,81 @@ router = APIRouter()
 
 
 class VPNConfig(BaseModel):
-    pass
+    provider: str
+    protocol: str
+    config: Dict[str, str]
+    date_updated: str
 
 
-class ListVPNConfig(BaseModel):
-    vpn_configs: List[VPNConfig]
+def update_vpn_config(db: Session, provider_name: str):
+    vpn_cert = fetch_openvpn_config()
+
+    try:
+        vpn_config = (
+            db.query(models.OONIProbeVPNConfig)
+            .filter(
+                models.OONIProbeVPNConfig.provider == provider_name,
+            )
+            .one()
+        )
+        vpn_config.protocol = "openvpn"
+        vpn_config.openvpn_ca = vpn_cert["ca"]
+        vpn_config.openvpn_cert = vpn_cert["cert"]
+        vpn_config.openvpn_key = vpn_cert["key"]
+        db.commit()
+
+    except sa.orm.exc.NoResultFound:
+        vpn_config = models.OONIProbeVPNConfig(
+            provider=provider_name,
+            cert=vpn_cert,
+            date_updated=datetime.now(timezone.utc),
+            date_created=datetime.now(timezone.utc),
+            protocol="openvpn",
+            openvpn_ca=vpn_cert["ca"],
+            openvpn_cert=vpn_cert["cert"],
+            openvpn_key=vpn_cert["key"],
+        )
+        db.add(vpn_config)
+        db.commit()
+
+    return vpn_config
 
 
-@router.get("/v2/ooniprobe/vpn-config", tags=["ooniprobe"])
+def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
+    vpn_config = (
+        db.query(models.OONIProbeVPNConfig)
+        .filter(
+            models.OONIProbeVPNConfig.provider == provider_name,
+            models.OONIProbeVPNConfig.date_updated
+            > datetime.now(timezone.utc) - timedelta(days=7),
+        )
+        .first()
+    )
+    if vpn_config is None:
+        return update_vpn_config(db, provider_name)
+    return vpn_config
+
+
+@router.get("/v2/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
 def list_vpn_configs(
+    provider_name: str,
     db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
-) -> ListVPNConfig:
+) -> VPNConfig:
     """List OONIRun descriptors"""
     log.debug("list oonirun")
 
-    q = db.query(models.OONIProbeVPNConfig)
+    if provider_name != "riseup":
+        raise HTTPException(status_code=404, detail="provider not found")
 
-    vpn_configs = []
-    for row in q.all():
-        vpn_config = VPNConfig()
-        vpn_configs.append(vpn_config)
-    return ListVPNConfig(vpn_configs=vpn_configs)
+    vpn_config = get_or_update_riseup_vpn_config(db, provider_name)
+    return VPNConfig(
+        provider=provider_name,
+        protocol="openvpn",
+        config={
+            "cert": vpn_config.openvpn_cert,
+            "ca": vpn_config.openvpn_ca,
+            "key": vpn_config.openvpn_key,
+        },
+        date_updated=vpn_config.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    )
