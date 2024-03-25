@@ -95,7 +95,7 @@ def get_vpn_config(
     """GET VPN config parameters for a given provider, including authentication"""
     log.debug(f"GET vpn config for {provider_name}")
 
-    if provider_name != "riseupvpn":
+    if provider_name != "riseup":
         raise HTTPException(status_code=404, detail="provider not found")
 
     try:
