@@ -1360,9 +1360,7 @@ def score_signal(msm: dict) -> dict:
             return scores
         start_time = datetime.strptime(msmt_start_time, "%Y-%m-%d %H:%M:%S")
 
-        if parse_version(tv) <= parse_version("0.2.4") and parse_version(
-            tv
-        ) > parse_version("0.2.3"):
+        if tv == "0.2.4":
             # the breakage here is affecting just v0.2.4 of the test
             # See https://github.com/ooni/probe/issues/2636
             # See https://github.com/ooni/probe-cli/pull/1421

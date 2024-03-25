@@ -1,4 +1,4 @@
-fastpath (0.85) unstable; urgency=medium
+fastpath (0.86) unstable; urgency=medium
 
   * Mark signal measurements as failed
   * Disable torsf test via check-in
