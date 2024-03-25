@@ -20,6 +20,10 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Do not bother using credentials older than these, in days
+# This also means that we need to ensure we're inserting new credentials at a shorter period.
+CREDENTIAL_FRESHNESS_INTERVAL_DAYS = 7
+
 
 class VPNConfig(BaseModel):
     provider: str
@@ -73,7 +77,7 @@ def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
         .filter(
             models.OONIProbeVPNConfig.provider == provider_name,
             models.OONIProbeVPNConfig.date_updated
-            > datetime.now(timezone.utc) - timedelta(days=7),
+            > datetime.now(timezone.utc) - timedelta(days=CREDENTIAL_FRESHNESS_INTERVAL_DAYS),
         )
         .first()
     )
@@ -88,13 +92,18 @@ def get_vpn_config(
     db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
 ) -> VPNConfig:
-    """List VPN config parameters for a given provider, including authentication"""
+    """GET VPN config parameters for a given provider, including authentication"""
     log.debug(f"GET vpn config for {provider_name}")
 
     if provider_name != "riseupvpn":
         raise HTTPException(status_code=404, detail="provider not found")
 
-    vpn_config = get_or_update_riseup_vpn_config(db, provider_name)
+    try:
+        vpn_config = get_or_update_riseup_vpn_config(db, provider_name)
+    except Exception as exc:
+        log.error("Error while fetching credentials for riseup", exc)
+        raise HTTPException(status_code=500, detail="could not fetch credentials")
+
     return VPNConfig(
         provider=provider_name,
         protocol="openvpn",

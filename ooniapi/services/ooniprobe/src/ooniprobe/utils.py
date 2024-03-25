@@ -1,12 +1,11 @@
 """
 VPN Services
 
-Insert credentials into database.
+Insert VPN credentials into database.
 """
 
 import logging
 from typing import Dict, Mapping, TypedDict
-
 
 import pem
 import httpx
@@ -14,9 +13,6 @@ import httpx
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"
 
-# Do not bother using credentials older than these, in days
-# This also means that we need to ensure we're inserting new credentials at a shorter period.
-CREDENTIAL_FRESHNESS_INTERVAL_DAYS = 7
 
 log = logging.getLogger(__name__)
 
