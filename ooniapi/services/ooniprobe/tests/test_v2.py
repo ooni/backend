@@ -1,9 +1,10 @@
 """
-Integration test for OONIRn API
+Integration test for OONIProbe API
 """
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+
 from freezegun import freeze_time
 
 import pytest
@@ -86,3 +87,4 @@ def test_config_updated(client, db):
         assert j["config"]["cert"] != vpn_cert["cert"]
         assert j["config"]["ca"] != vpn_cert["ca"]
         assert j["config"]["key"] != vpn_cert["key"]
+        assert j["date_updated"].startswith("1984-04-01")
