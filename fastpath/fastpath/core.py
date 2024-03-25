@@ -1360,11 +1360,10 @@ def score_signal(msm: dict) -> dict:
             return scores
         start_time = datetime.strptime(msmt_start_time, "%Y-%m-%d %H:%M:%S")
 
-        if (
-            parse_version(tv) <= parse_version("0.2.4")
-            and parse_version(tv) > parse_version("0.2.3")
-            and start_time >= datetime(2023, 11, 7)
-        ):
+        if parse_version(tv) <= parse_version("0.2.4") and parse_version(
+            tv
+        ) > parse_version("0.2.3"):
+            # the breakage here is affecting just v0.2.4 of the test
             # See https://github.com/ooni/probe/issues/2636
             # See https://github.com/ooni/probe-cli/pull/1421
             scores["accuracy"] = 0.0
@@ -1381,6 +1380,7 @@ def score_signal(msm: dict) -> dict:
             2022, 10, 19
         ):
             scores["accuracy"] = 0.0
+            return scores
 
         # https://github.com/ooni/backend/issues/679
         # engine_version < 3.17.2 and measurement_start_time > 2023-05-02
@@ -1390,9 +1390,11 @@ def score_signal(msm: dict) -> dict:
             2023, 5, 2
         ):
             scores["accuracy"] = 0.0
+            return scores
 
     except Exception:
         scores["accuracy"] = 0.0
+        return scores
 
     st = tk.get("signal_backend_status")
     if st == "ok":
