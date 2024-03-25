@@ -1,3 +1,9 @@
+fastpath (0.85) unstable; urgency=medium
+
+  * Recognize Web Connectivity v0.5 "tls" blocking type
+
+ -- Simone Basso <simone@ooni.org>  Tue, 25 Jan 2024 11:47:55 +0100
+
 fastpath (0.84) unstable; urgency=medium
 
   * Support ooni_run_link_id
