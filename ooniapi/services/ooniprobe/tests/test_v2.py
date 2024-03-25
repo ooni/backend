@@ -4,13 +4,15 @@ Integration test for OONIProbe API
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
+from httpx import HTTPError
 from freezegun import freeze_time
-
 import pytest
 
 from ooniprobe.utils import OpenVPNConfig
 from ooniprobe import models
+from ooniprobe.routers import v2
 
 
 def test_get_version(client):
@@ -88,3 +90,11 @@ def test_config_updated(client, db):
         assert j["config"]["ca"] != vpn_cert["ca"]
         assert j["config"]["key"] != vpn_cert["key"]
         assert j["date_updated"].startswith("1984-04-01")
+
+
+@pytest.mark.parametrize('error', [HTTPError, Exception])
+def test_get_config_fails_if_exception_while_fetching_credentials(client, db, error):
+    # no previous credential; when forcing any exception on the fetch code the http client should get a 500
+    with patch.object(v2, 'get_or_update_riseup_vpn_config', side_effect=error('err')):
+        r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
+        assert r.status_code == 500

@@ -101,7 +101,7 @@ def get_vpn_config(
     try:
         vpn_config = get_or_update_riseup_vpn_config(db, provider_name)
     except Exception as exc:
-        log.error("Error while fetching credentials for riseup", exc)
+        log.error("Error while fetching credentials for riseup: %s", exc)
         raise HTTPException(status_code=500, detail="could not fetch credentials")
 
     return VPNConfig(
