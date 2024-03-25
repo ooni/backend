@@ -29,6 +29,10 @@ class VPNConfig(BaseModel):
 
 
 def update_vpn_config(db: Session, provider_name: str):
+    """Fetch a fresh config for a given provider and update the database entry"""
+
+    # we are only handling a single provider for the time being (riseup).
+    # TODO: manage an inventory of known providers.
     vpn_cert = fetch_openvpn_config()
 
     try:
@@ -43,6 +47,7 @@ def update_vpn_config(db: Session, provider_name: str):
         vpn_config.openvpn_ca = vpn_cert["ca"]
         vpn_config.openvpn_cert = vpn_cert["cert"]
         vpn_config.openvpn_key = vpn_cert["key"]
+        vpn_config.date_updated = datetime.now(timezone.utc)
         db.commit()
 
     except sa.orm.exc.NoResultFound:
@@ -62,6 +67,7 @@ def update_vpn_config(db: Session, provider_name: str):
 
 
 def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
+    """Get a configuration entry for the given provider, or fetch a fresh one if None found"""
     vpn_config = (
         db.query(models.OONIProbeVPNConfig)
         .filter(
@@ -77,13 +83,13 @@ def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
 
 
 @router.get("/v2/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
-def list_vpn_configs(
+def get_vpn_config(
     provider_name: str,
     db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
 ) -> VPNConfig:
-    """List OONIRun descriptors"""
-    log.debug("list oonirun")
+    """List VPN config parameters for a given provider, including authentication"""
+    log.debug(f"GET vpn config for {provider_name}")
 
     if provider_name != "riseupvpn":
         raise HTTPException(status_code=404, detail="provider not found")
@@ -93,8 +99,8 @@ def list_vpn_configs(
         provider=provider_name,
         protocol="openvpn",
         config={
-            "cert": vpn_config.openvpn_cert,
             "ca": vpn_config.openvpn_ca,
+            "cert": vpn_config.openvpn_cert,
             "key": vpn_config.openvpn_key,
         },
         date_updated=vpn_config.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
