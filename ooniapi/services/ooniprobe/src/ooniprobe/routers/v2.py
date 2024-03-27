@@ -30,9 +30,9 @@ class VPNConfig(BaseModel):
     provider: str
     protocol: str
     config: Dict[str, str]
-    # date_uddated when the credentials or other config has been updated;
-    # inputs have a different lifecycle.
-    date_updated_config: str
+    # date_uddated is when the credentials or other config has been updated;
+    # inputs will follow a different lifecycle.
+    date_updated: str
     inputs: List[str]
 
 
