@@ -16,13 +16,8 @@ config = context.config
 if config.config_file_name is not None:  # no cov
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-from oonirun import models
-
-target_metadata = models.Base.metadata
+# we have no interest in 'autogenerate' support
+target_metadata = None
 
 section = config.config_ini_section
 config.set_section_option(
