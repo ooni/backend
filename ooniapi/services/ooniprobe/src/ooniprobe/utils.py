@@ -3,7 +3,7 @@ VPN Services
 
 Insert VPN credentials into database.
 """
-
+import base64
 import logging
 from typing import Dict, Mapping, TypedDict
 
@@ -40,3 +40,8 @@ def fetch_openvpn_config() -> OpenVPNConfig:
     pem_cert = fetch_riseup_cert()
     key, cert = pem.parse(pem_cert)
     return OpenVPNConfig(ca=ca, cert=cert.as_text(), key=key.as_text())
+
+def as_base64(s: str) -> str:
+    """Encode the passed str as base64, and prepend the 'base64:' prefix"""
+    encoded = base64.b64encode(s).decode('utf-8')
+    return f"base64:{encoded}"

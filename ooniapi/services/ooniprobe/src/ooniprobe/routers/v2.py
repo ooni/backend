@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
 from pydantic import computed_field, Field, validator
 from typing_extensions import Annotated
 
+
 from .. import models
 
-from ..utils import fetch_openvpn_config
+from ..utils import as_base64, fetch_openvpn_config
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings
 from ..dependencies import get_postgresql_session
@@ -30,6 +31,7 @@ class VPNConfig(BaseModel):
     protocol: str
     config: Dict[str, str]
     date_updated: str
+    inputs: List[str]
 
 
 def update_vpn_config(db: Session, provider_name: str):
@@ -85,6 +87,10 @@ def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
         return update_vpn_config(db, provider_name)
     return vpn_config
 
+defaultRiseupTargets = [
+    "openvpn://riseup.corp/?address=51.15.187.53:1194&transport=tcp",
+    "openvpn://riseup.corp/?address=51.15.187.53:1194&transport=udp",
+]
 
 @router.get("/v2/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
 def get_vpn_config(
@@ -108,9 +114,10 @@ def get_vpn_config(
         provider=provider_name,
         protocol="openvpn",
         config={
-            "ca": vpn_config.openvpn_ca,
-            "cert": vpn_config.openvpn_cert,
-            "key": vpn_config.openvpn_key,
+            "ca": as_base64(vpn_config.openvpn_ca.encode('utf-8')),
+            "cert": as_base64(vpn_config.openvpn_cert.encode('utf-8')),
+            "key": as_base64(vpn_config.openvpn_key.encode('utf-8')),
         },
+        inputs=defaultRiseupTargets,
         date_updated=vpn_config.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
     )
