@@ -11,7 +11,7 @@ from typing_extensions import Annotated
 
 from .. import models
 
-from ..utils import as_base64, fetch_openvpn_config
+from ..utils import fetch_openvpn_config
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings
 from ..dependencies import get_postgresql_session
@@ -122,9 +122,9 @@ def get_vpn_config(
         provider=provider_name,
         protocol="openvpn",
         config={
-            "ca": as_base64(vpn_config.openvpn_ca.encode('utf-8')),
-            "cert": as_base64(vpn_config.openvpn_cert.encode('utf-8')),
-            "key": as_base64(vpn_config.openvpn_key.encode('utf-8')),
+            "ca": vpn_config.openvpn_ca,
+            "cert": vpn_config.openvpn_cert,
+            "key": vpn_config.openvpn_key,
         },
         inputs=defaultRiseupTargets,
         date_updated=vpn_config.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),

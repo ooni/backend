@@ -10,7 +10,7 @@ from httpx import HTTPError
 from freezegun import freeze_time
 import pytest
 
-from ooniprobe.utils import OpenVPNConfig, as_base64
+from ooniprobe.utils import OpenVPNConfig
 from ooniprobe import models
 from ooniprobe.routers import v2
 
@@ -33,20 +33,9 @@ def test_get_config(client):
     j = r.json()
     assert j["provider"] == "riseup"
     assert j["protocol"] == "openvpn"
-
-    decoded = lambda s: base64.b64decode(s.strip("base64:")).decode('utf-8')
-
-    cert = j["config"]["cert"]
-    assert cert.startswith("base64:")
-    assert decoded(cert).startswith("-----BEGIN CERTIFICATE")
-
-    ca = j["config"]["ca"]
-    assert ca.startswith("base64:")
-    assert decoded(ca).startswith("-----BEGIN CERTIFICATE")
-
-    key = j["config"]["key"]
-    assert key.startswith("base64:")
-    assert decoded(key).startswith("-----BEGIN RSA PRIVATE KEY")
+    assert j["config"]["cert"].startswith("-----BEGIN CERTIFICATE")
+    assert j["config"]["ca"].startswith("-----BEGIN CERTIFICATE")
+    assert j["config"]["key"].startswith("-----BEGIN RSA PRIVATE KEY")
     date_updated = j["date_updated"]
 
     r = client.get("/api/v2/ooniprobe/vpn-config/riseup")
@@ -86,9 +75,9 @@ def test_config_updated(client, db):
         j = r.json()
         assert j["provider"] == "riseup"
         assert j["protocol"] == "openvpn"
-        assert j["config"]["cert"] == as_base64(vpn_cert["cert"].encode("utf-8"))
-        assert j["config"]["ca"] == as_base64(vpn_cert["ca"].encode("utf-8"))
-        assert j["config"]["key"] == as_base64(vpn_cert["key"].encode("utf-8"))
+        assert j["config"]["cert"] == vpn_cert["cert"]
+        assert j["config"]["ca"] == vpn_cert["ca"]
+        assert j["config"]["key"] == vpn_cert["key"]
 
     # Check to see if the cert got updated
     with freeze_time("1984-04-01"):
