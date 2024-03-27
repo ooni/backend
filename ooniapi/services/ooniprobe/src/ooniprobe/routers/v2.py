@@ -30,7 +30,9 @@ class VPNConfig(BaseModel):
     provider: str
     protocol: str
     config: Dict[str, str]
-    date_updated: str
+    # date_uddated when the credentials or other config has been updated;
+    # inputs have a different lifecycle.
+    date_updated_config: str
     inputs: List[str]
 
 
@@ -87,6 +89,12 @@ def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
         return update_vpn_config(db, provider_name)
     return vpn_config
 
+# TODO: As a first step, I'm hardcoding a single endpoint. Endpoint discovery
+# can be done at the same time than credentials renewal, but we probably want
+# to rotate endpoints more often, design experiments etc, with a different lifecycle
+# than credentials. A simple implementation can be more or less straightforward,
+# but we want to dedicate some thought to the data model for the endpoint, since
+# there might be some extra metadata that we want to expose.
 defaultRiseupTargets = [
     "openvpn://riseup.corp/?address=51.15.187.53:1194&transport=tcp",
     "openvpn://riseup.corp/?address=51.15.187.53:1194&transport=udp",
