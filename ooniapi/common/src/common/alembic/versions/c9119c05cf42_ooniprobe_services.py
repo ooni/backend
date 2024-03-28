@@ -65,5 +65,5 @@ def upgrade() -> None:
     )
 
 def downgrade() -> None:
-    op.drop_table("ooniprobe_vpn_provider")
     op.drop_table("ooniprobe_vpn_provider_endpoint")
+    op.drop_table("ooniprobe_vpn_provider")
