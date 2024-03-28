@@ -20,28 +20,50 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute(CreateSequence(Sequence("vpn_config_id_seq", start=1)))
-
-    vpn_config_id_seq = Sequence("vpn_config_id_seq")
+    ooniprobe_vpn_provider_id_seq = Sequence("ooniprobe_vpn_provider_id_seq", start=1)
+    op.execute(CreateSequence(ooniprobe_vpn_provider_id_seq))
 
     op.create_table(
-        "ooniprobe_vpn_config",
+        "ooniprobe_vpn_provider",
         sa.Column(
             "id",
             sa.String(),
             nullable=False,
-            server_default=vpn_config_id_seq.next_value(),
+            server_default=ooniprobe_vpn_provider_id_seq.next_value(),
             primary_key=True,
         ),
         sa.Column("date_created", sa.DateTime(timezone=True), nullable=False),
         sa.Column("date_updated", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("provider", sa.String(), nullable=False),
-        sa.Column("protocol", sa.String(), nullable=False),
+        sa.Column("provider_name", sa.String(), nullable=False),
         sa.Column("openvpn_cert", sa.String(), nullable=True),
         sa.Column("openvpn_ca", sa.String(), nullable=False),
         sa.Column("openvpn_key", sa.String(), nullable=False),
     )
 
+    ooniprobe_vpn_provider_endpoint_id_seq = Sequence("ooniprobe_vpn_provider_endpoint_id_seq", start=1)
+    op.execute(CreateSequence(ooniprobe_vpn_provider_endpoint_id_seq))
+
+    op.create_table(
+        "ooniprobe_vpn_provider_endpoint",
+        sa.Column(
+            "id",
+            sa.String(),
+            nullable=False,
+            server_default=ooniprobe_vpn_provider_endpoint_id_seq.next_value(),
+            primary_key=True,
+        ),
+        sa.Column("date_created", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("date_updated", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("address", sa.String(), nullable=False),
+        sa.Column("protocol", sa.String(), nullable=True),
+        sa.Column("transport", sa.String(), nullable=True),
+        sa.Column("provider_id", sa.String(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["provider_id"],
+            ["ooniprobe_vpn_provider.id"],
+        ),
+    )
 
 def downgrade() -> None:
-    op.drop_table("ooniprobe_vpn_config")
+    op.drop_table("ooniprobe_vpn_provider")
+    op.drop_table("ooniprobe_vpn_provider_endpoint")

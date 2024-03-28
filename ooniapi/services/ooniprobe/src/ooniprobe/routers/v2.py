@@ -1,17 +1,14 @@
 from datetime import datetime, timedelta, timezone, date
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 import logging
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
-from pydantic import computed_field, Field, validator
-from typing_extensions import Annotated
-
+from fastapi import APIRouter, Depends, HTTPException
 
 from .. import models
 
-from ..utils import fetch_openvpn_config
+from ..utils import fetch_openvpn_config, fetch_openvpn_endpoints, format_endpoint, upsert_endpoints
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings
 from ..dependencies import get_postgresql_session
@@ -30,75 +27,66 @@ class VPNConfig(BaseModel):
     provider: str
     protocol: str
     config: Dict[str, str]
-    # date_uddated is when the credentials or other config has been updated;
+    # date_updated is when the credentials or other config has been updated;
     # inputs will follow a different lifecycle.
     date_updated: str
-    inputs: List[str]
+    endpoints: List[str]
 
 
-def update_vpn_config(db: Session, provider_name: str):
+def update_vpn_provider(db: Session, provider_name: str) -> models.OONIProbeVPNProvider:
     """Fetch a fresh config for a given provider and update the database entry"""
-
     # we are only handling a single provider for the time being (riseup).
     # TODO: manage an inventory of known providers.
     vpn_cert = fetch_openvpn_config()
+    vpn_endpoints = fetch_openvpn_endpoints()
 
     try:
-        vpn_config = (
-            db.query(models.OONIProbeVPNConfig)
+        provider = (
+            db.query(models.OONIProbeVPNProvider)
             .filter(
-                models.OONIProbeVPNConfig.provider == provider_name,
+                models.OONIProbeVPNProvider.provider_name == provider_name,
             )
             .one()
         )
-        vpn_config.protocol = "openvpn"
-        vpn_config.openvpn_ca = vpn_cert["ca"]
-        vpn_config.openvpn_cert = vpn_cert["cert"]
-        vpn_config.openvpn_key = vpn_cert["key"]
-        vpn_config.date_updated = datetime.now(timezone.utc)
+        provider.openvpn_ca = vpn_cert["ca"]
+        provider.openvpn_cert = vpn_cert["cert"]
+        provider.openvpn_key = vpn_cert["key"]
+        provider.date_updated = datetime.now(timezone.utc)
+        upsert_endpoints(db, vpn_endpoints, provider)
         db.commit()
 
     except sa.orm.exc.NoResultFound:
-        vpn_config = models.OONIProbeVPNConfig(
-            provider=provider_name,
+        provider = models.OONIProbeVPNProvider(
+            provider_name=provider_name,
             date_updated=datetime.now(timezone.utc),
             date_created=datetime.now(timezone.utc),
-            protocol="openvpn",
             openvpn_ca=vpn_cert["ca"],
             openvpn_cert=vpn_cert["cert"],
             openvpn_key=vpn_cert["key"],
         )
-        db.add(vpn_config)
+        db.add(provider)
+        upsert_endpoints(db, vpn_endpoints, provider)
         db.commit()
 
-    return vpn_config
+    return provider
 
 
-def get_or_update_riseup_vpn_config(db: Session, provider_name: str):
+def get_or_update_riseupvpn(db: Session, provider_name: str) -> models.OONIProbeVPNProvider:
     """Get a configuration entry for the given provider, or fetch a fresh one if None found"""
-    vpn_config = (
-        db.query(models.OONIProbeVPNConfig)
+    provider = (
+        db.query(models.OONIProbeVPNProvider)
         .filter(
-            models.OONIProbeVPNConfig.provider == provider_name,
-            models.OONIProbeVPNConfig.date_updated
-            > datetime.now(timezone.utc) - timedelta(days=CREDENTIAL_FRESHNESS_INTERVAL_DAYS),
+            models.OONIProbeVPNProvider.provider_name == provider_name,
+            models.OONIProbeVPNProvider.date_updated
+            > datetime.now(timezone.utc)
+            - timedelta(days=CREDENTIAL_FRESHNESS_INTERVAL_DAYS),
         )
         .first()
     )
-    if vpn_config is None:
-        return update_vpn_config(db, provider_name)
-    return vpn_config
+    if provider is None:
+        return update_vpn_provider(db, provider_name)
+    return provider
 
-# TODO: As a first step, I'm hardcoding a single endpoint. Endpoint discovery
-# can be done at the same time than credentials renewal, but we probably want
-# to rotate endpoints more often, design experiments etc, with a different lifecycle
-# than credentials. A simple implementation can be more or less straightforward,
-# but we want to dedicate some thought to the data model for the endpoint, since
-# there might be some extra metadata that we want to expose.
-defaultRiseupTargets = [
-    "openvpn://riseup.corp/?address=51.15.187.53:1194&transport=tcp",
-    "openvpn://riseup.corp/?address=51.15.187.53:1194&transport=udp",
-]
 
 @router.get("/v2/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
 def get_vpn_config(
@@ -109,23 +97,23 @@ def get_vpn_config(
     """GET VPN config parameters for a given provider, including authentication"""
     log.debug(f"GET vpn config for {provider_name}")
 
-    if provider_name != "riseup":
+    if provider_name != "riseupvpn":
         raise HTTPException(status_code=404, detail="provider not found")
 
     try:
-        vpn_config = get_or_update_riseup_vpn_config(db, provider_name)
+        provider = get_or_update_riseupvpn(db, provider_name)
     except Exception as exc:
         log.error("Error while fetching credentials for riseup: %s", exc)
         raise HTTPException(status_code=500, detail="could not fetch credentials")
 
     return VPNConfig(
-        provider=provider_name,
+        provider=provider.provider_name,
         protocol="openvpn",
         config={
-            "ca": vpn_config.openvpn_ca,
-            "cert": vpn_config.openvpn_cert,
-            "key": vpn_config.openvpn_key,
+            "ca": provider.openvpn_ca,
+            "cert": provider.openvpn_cert,
+            "key": provider.openvpn_key,
         },
-        inputs=defaultRiseupTargets,
-        date_updated=vpn_config.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        endpoints=[format_endpoint(provider.provider_name, ep) for ep in provider.endpoints],
+        date_updated=provider.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
     )

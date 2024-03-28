@@ -69,7 +69,7 @@ async def health(
 ):
     errors = []
     try:
-        db.query(models.OONIProbeVPNConfig).limit(1).all()
+        db.query(models.OONIProbeVPNProvider).limit(1).all()
     except Exception as exc:
         print(exc)
         errors.append("db_error")
