@@ -43,6 +43,9 @@ class OONIProbeVPNProviderEndpoint(Base):
     protocol: Mapped[str] = mapped_column()
     address: Mapped[str] = mapped_column()
     transport: Mapped[str] = mapped_column()
+    # TODO: maybe we want this in the future to store location and other
+    # metadata about an endpoint
+    # metadata: Mapped[Dict[str, str]] = mapped_column(nullable=True)
 
     provider_id = mapped_column(ForeignKey("ooniprobe_vpn_provider.id"))
     provider = relationship("OONIProbeVPNProvider", back_populates="endpoints")

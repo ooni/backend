@@ -5,6 +5,7 @@ Insert VPN credentials into database.
 """
 import base64
 from datetime import datetime, timezone
+import itertools
 import logging
 from typing import Dict, List, Mapping, TypedDict
 
@@ -16,7 +17,7 @@ from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"
-
+RISEUP_ENDPOINT_URL = "https://api.black.riseup.net/3/config/eip-service.json"
 
 log = logging.getLogger(__name__)
 
@@ -50,24 +51,26 @@ def fetch_openvpn_config() -> OpenVPNConfig:
     return OpenVPNConfig(ca=ca, cert=cert.as_text(), key=key.as_text())
 
 def fetch_openvpn_endpoints() -> List[OpenVPNEndpoint]:
-    # TODO(ain): As a first step, I'm hardcoding a single endpoint. Endpoint discovery
-    # can be done at the same time than credentials renewal, but we probably want
-    # to rotate endpoints more often, design experiments etc, with a different lifecycle
-    # than credentials. A simple implementation can be more or less straightforward,
-    # but we want to dedicate some thought to the data model for the endpoint, since
-    # there might be some extra metadata that we want to expose.
-    return [
-        OpenVPNEndpoint(
-            address="51.15.187.53:1194",
-            transport="udp",
-            protocol="openvpn"
-        ),
-        OpenVPNEndpoint(
-            address="51.15.187.53:1194",
-            transport="tcp",
-            protocol="openvpn"
-        )
-    ]
+    endpoints = []
+
+    r = httpx.get(RISEUP_ENDPOINT_URL)
+    r.raise_for_status()
+    j = r.json()
+    for ep in j["gateways"]:
+        ip = ep["ip_address"]
+        # TODO(art): do we want to store this metadata somewhere?
+        #location = ep["location"]
+        #hostname = ep["host"]
+        for t in ep["capabilities"]["transport"]:
+            if t["type"] != "openvpn":
+                continue
+            for transport, port in itertools.product(t["protocols"], t["ports"]):
+                endpoints.append(OpenVPNEndpoint(
+                    address=f"{ip}:{port}",
+                    protocol="openvpn",
+                    transport=transport
+                ))
+    return endpoints
 
 def format_endpoint(provider_name: str, ep: OONIProbeVPNProviderEndpoint) -> str:
     return f"{ep.protocol}://{provider_name}.corp/?address={ep.address}&transport={ep.transport}"

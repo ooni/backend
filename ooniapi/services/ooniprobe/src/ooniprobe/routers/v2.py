@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone, date
+import random
 from typing import Dict, List
 import logging
 
@@ -38,7 +39,6 @@ def update_vpn_provider(db: Session, provider_name: str) -> models.OONIProbeVPNP
     # we are only handling a single provider for the time being (riseup).
     # TODO: manage an inventory of known providers.
     vpn_cert = fetch_openvpn_config()
-    vpn_endpoints = fetch_openvpn_endpoints()
 
     try:
         provider = (
@@ -52,7 +52,13 @@ def update_vpn_provider(db: Session, provider_name: str) -> models.OONIProbeVPNP
         provider.openvpn_cert = vpn_cert["cert"]
         provider.openvpn_key = vpn_cert["key"]
         provider.date_updated = datetime.now(timezone.utc)
-        upsert_endpoints(db, vpn_endpoints, provider)
+
+        try:
+            vpn_endpoints = fetch_openvpn_endpoints()
+            upsert_endpoints(db, vpn_endpoints, provider)
+        except:
+            log.error("Could not fetch endpoints for %s", provider_name)
+
         db.commit()
 
     except sa.orm.exc.NoResultFound:
@@ -65,6 +71,7 @@ def update_vpn_provider(db: Session, provider_name: str) -> models.OONIProbeVPNP
             openvpn_key=vpn_cert["key"],
         )
         db.add(provider)
+        vpn_endpoints = fetch_openvpn_endpoints()
         upsert_endpoints(db, vpn_endpoints, provider)
         db.commit()
 
@@ -106,6 +113,7 @@ def get_vpn_config(
         log.error("Error while fetching credentials for riseup: %s", exc)
         raise HTTPException(status_code=500, detail="could not fetch credentials")
 
+    endpoints = [format_endpoint(provider.provider_name, ep) for ep in provider.endpoints]
     return VPNConfig(
         provider=provider.provider_name,
         protocol="openvpn",
@@ -114,6 +122,7 @@ def get_vpn_config(
             "cert": provider.openvpn_cert,
             "key": provider.openvpn_key,
         },
-        endpoints=[format_endpoint(provider.provider_name, ep) for ep in provider.endpoints],
+        # Pick 4 random endpoints to serve to the client
+        endpoints=random.sample(endpoints, min(len(endpoints), 4)),
         date_updated=provider.date_updated.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
     )
