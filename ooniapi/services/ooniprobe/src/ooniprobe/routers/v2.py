@@ -9,7 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import models
 
-from ..utils import fetch_openvpn_config, fetch_openvpn_endpoints, format_endpoint, upsert_endpoints
+from ..utils import (
+    fetch_openvpn_config,
+    fetch_openvpn_endpoints,
+    format_endpoint,
+    upsert_endpoints,
+)
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings
 from ..dependencies import get_postgresql_session
@@ -18,10 +23,6 @@ from ..dependencies import get_postgresql_session
 log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Do not bother using credentials older than these, in days
-# This also means that we need to ensure we're inserting new credentials at a shorter period.
-CREDENTIAL_FRESHNESS_INTERVAL_DAYS = 7
 
 
 class VPNConfig(BaseModel):
@@ -78,7 +79,9 @@ def update_vpn_provider(db: Session, provider_name: str) -> models.OONIProbeVPNP
     return provider
 
 
-def get_or_update_riseupvpn(db: Session, provider_name: str) -> models.OONIProbeVPNProvider:
+def get_or_update_riseupvpn(
+    db: Session, provider_name: str, vpn_credential_refresh_hours: int
+) -> models.OONIProbeVPNProvider:
     """Get a configuration entry for the given provider, or fetch a fresh one if None found"""
     provider = (
         db.query(models.OONIProbeVPNProvider)
@@ -86,7 +89,7 @@ def get_or_update_riseupvpn(db: Session, provider_name: str) -> models.OONIProbe
             models.OONIProbeVPNProvider.provider_name == provider_name,
             models.OONIProbeVPNProvider.date_updated
             > datetime.now(timezone.utc)
-            - timedelta(days=CREDENTIAL_FRESHNESS_INTERVAL_DAYS),
+            - timedelta(hours=vpn_credential_refresh_hours),
         )
         .first()
     )
@@ -108,12 +111,18 @@ def get_vpn_config(
         raise HTTPException(status_code=404, detail="provider not found")
 
     try:
-        provider = get_or_update_riseupvpn(db, provider_name)
+        provider = get_or_update_riseupvpn(
+            db=db,
+            provider_name=provider_name,
+            vpn_credential_refresh_hours=settings.vpn_credential_refresh_hours,
+        )
     except Exception as exc:
         log.error("Error while fetching credentials for riseup: %s", exc)
         raise HTTPException(status_code=500, detail="could not fetch credentials")
 
-    endpoints = [format_endpoint(provider.provider_name, ep) for ep in provider.endpoints]
+    endpoints = [
+        format_endpoint(provider.provider_name, ep) for ep in provider.endpoints
+    ]
     return VPNConfig(
         provider=provider.provider_name,
         protocol="openvpn",
