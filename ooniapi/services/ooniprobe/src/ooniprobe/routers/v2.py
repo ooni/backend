@@ -49,17 +49,13 @@ def update_vpn_provider(db: Session, provider_name: str) -> models.OONIProbeVPNP
             )
             .one()
         )
+        vpn_endpoints = fetch_openvpn_endpoints()
+
         provider.openvpn_ca = vpn_cert["ca"]
         provider.openvpn_cert = vpn_cert["cert"]
         provider.openvpn_key = vpn_cert["key"]
         provider.date_updated = datetime.now(timezone.utc)
-
-        try:
-            vpn_endpoints = fetch_openvpn_endpoints()
-            upsert_endpoints(db, vpn_endpoints, provider)
-        except:
-            log.error("Could not fetch endpoints for %s", provider_name)
-
+        upsert_endpoints(db, vpn_endpoints, provider)
         db.commit()
 
     except sa.orm.exc.NoResultFound:
@@ -93,9 +89,28 @@ def get_or_update_riseupvpn(
         )
         .first()
     )
-    if provider is None:
-        return update_vpn_provider(db, provider_name)
-    return provider
+    if provider:
+        return provider
+
+    try:
+        provider = update_vpn_provider(db, provider_name)
+        return provider
+    except:
+        log.error(f"failed to update vpn provider {provider_name}")
+
+    try:
+        # In this case we at least serve a stale version of the provider instead
+        # of just failing.
+        provider = (
+            db.query(models.OONIProbeVPNProvider)
+            .filter(
+                models.OONIProbeVPNProvider.provider_name == provider_name,
+            )
+            .one()
+        )
+        return provider
+    except sa.orm.exc.NoResultFound:
+        raise HTTPException(status_code=500, detail="error updating provider")
 
 
 @router.get("/v2/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
