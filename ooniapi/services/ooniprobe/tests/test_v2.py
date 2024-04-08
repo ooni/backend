@@ -1,6 +1,7 @@
 """
 Integration test for OONIProbe API
 """
+
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -11,6 +12,12 @@ import pytest
 from ooniprobe.utils import OpenVPNConfig
 from ooniprobe import models
 from ooniprobe.routers import v2
+
+DUMMY_VPN_CERT = OpenVPNConfig(
+    ca="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
+    cert="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
+    key="-----BEGIN RSA PRIVATE KEY-----\nSAMPLE KEY\n-----END RSA PRIVATE KEY-----\n",
+)
 
 
 def test_get_version(client):
@@ -49,20 +56,14 @@ def test_invalid_provider_name(client, db):
 
 
 def test_config_updated(client, db):
-    vpn_cert = OpenVPNConfig(
-        ca="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
-        cert="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
-        key="-----BEGIN RSA PRIVATE KEY-----\nSAMPLE KEY\n-----END RSA PRIVATE KEY-----\n",
-    )
-
     with freeze_time("1984-01-01"):
         provider = models.OONIProbeVPNProvider(
             provider_name="riseupvpn",
             date_updated=datetime.now(timezone.utc),
             date_created=datetime.now(timezone.utc),
-            openvpn_ca=vpn_cert["ca"],
-            openvpn_cert=vpn_cert["cert"],
-            openvpn_key=vpn_cert["key"],
+            openvpn_ca=DUMMY_VPN_CERT["ca"],
+            openvpn_cert=DUMMY_VPN_CERT["cert"],
+            openvpn_key=DUMMY_VPN_CERT["key"],
         )
         db.add(provider)
         db.commit()
@@ -72,9 +73,9 @@ def test_config_updated(client, db):
         j = r.json()
         assert j["provider"] == "riseupvpn"
         assert j["protocol"] == "openvpn"
-        assert j["config"]["cert"] == vpn_cert["cert"]
-        assert j["config"]["ca"] == vpn_cert["ca"]
-        assert j["config"]["key"] == vpn_cert["key"]
+        assert j["config"]["cert"] == DUMMY_VPN_CERT["cert"]
+        assert j["config"]["ca"] == DUMMY_VPN_CERT["ca"]
+        assert j["config"]["key"] == DUMMY_VPN_CERT["key"]
 
     # Check to see if the cert got updated
     with freeze_time("1984-04-01"):
@@ -83,15 +84,35 @@ def test_config_updated(client, db):
         j = r.json()
         assert j["provider"] == "riseupvpn"
         assert j["protocol"] == "openvpn"
-        assert j["config"]["cert"] != vpn_cert["cert"]
-        assert j["config"]["ca"] != vpn_cert["ca"]
-        assert j["config"]["key"] != vpn_cert["key"]
+        assert j["config"]["cert"] != DUMMY_VPN_CERT["cert"]
+        assert j["config"]["ca"] != DUMMY_VPN_CERT["ca"]
+        assert j["config"]["key"] != DUMMY_VPN_CERT["key"]
         assert j["date_updated"].startswith("1984-04-01")
 
 
-@pytest.mark.parametrize('error', [HTTPError, Exception])
+@pytest.mark.parametrize("error", [HTTPError, Exception])
 def test_get_config_fails_if_exception_while_fetching_credentials(client, db, error):
     # no previous credential; when forcing any exception on the fetch code the http client should get a 500
-    with patch.object(v2, 'get_or_update_riseupvpn', side_effect=error('err')):
+    with patch.object(v2, "get_or_update_riseupvpn", side_effect=error("err")):
         r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
         assert r.status_code == 500
+
+    with patch.object(v2, "update_vpn_provider", side_effect=error("err")):
+        r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
+        assert r.status_code == 500
+
+    # Check that we get stale data if we have it and it's failing to fetch the data
+    provider = models.OONIProbeVPNProvider(
+        provider_name="riseupvpn",
+        date_updated=datetime.now(timezone.utc) - timedelta(days=20),
+        date_created=datetime.now(timezone.utc) - timedelta(days=20),
+        openvpn_ca=DUMMY_VPN_CERT["ca"],
+        openvpn_cert=DUMMY_VPN_CERT["cert"],
+        openvpn_key=DUMMY_VPN_CERT["key"],
+    )
+    db.add(provider)
+    db.commit()
+
+    with patch.object(v2, "update_vpn_provider", side_effect=error("err")):
+        r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
+        assert r.status_code == 200
