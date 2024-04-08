@@ -61,4 +61,10 @@ clean:
 run:
 	hatch run uvicorn $(SERVICE_NAME).main:app
 
+db-migration: docker-build
+	docker run \
+		-e OONI_PG_URL=$(shell aws secretsmanager get-secret-value --secret-id oonidevops/ooni-tier0-postgres/postgresql_url | jq .SecretString) \
+		${IMAGE_NAME}:${BUILD_LABEL} \
+		alembic upgrade head
+
 .PHONY: init test build clean docker print-labels
