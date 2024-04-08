@@ -14,6 +14,7 @@ RUN find /build -type f -name '._*' -delete
 
 RUN echo "$BUILD_LABEL" > /build/src/oonirun/BUILD_LABEL
 
+RUN make clean
 RUN hatch build
 
 ### Actual image running on the host
