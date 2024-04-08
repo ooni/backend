@@ -28,3 +28,5 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     email_source_address: str = "contact+dev@ooni.io"
+
+    vpn_credential_refresh_hours: int = 24
