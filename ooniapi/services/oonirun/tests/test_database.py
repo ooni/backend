@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime
 import pathlib
-from oonirun.routers.oonirun import utcnow_seconds
+from oonirun.routers.v2 import utcnow_seconds
 import pytest
 
 import sqlalchemy as sa
