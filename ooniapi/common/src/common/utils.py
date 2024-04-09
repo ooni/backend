@@ -73,7 +73,7 @@ def create_jwt(payload: dict, key: str) -> str:
         return token
 
 
-def get_client_token(authorization: str, jwt_encryption_key: str):
+def get_client_token(authorization: str, jwt_encryption_key: str) -> Dict[str, Any]:
     assert authorization.startswith("Bearer ")
     token = authorization[7:]
     return decode_jwt(token, audience="user_auth", key=jwt_encryption_key)
