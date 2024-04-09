@@ -115,10 +115,11 @@ class UserSession(BaseModel):
 def maybe_get_user_session_from_header(
     authorization_header: str, jwt_encryption_key: str, admin_emails: List[str]
 ) -> Optional[UserSession]:
-    token = get_client_token(
-        authorization=authorization_header, jwt_encryption_key=jwt_encryption_key
-    )
-    if token is None:
+    try:
+        token = get_client_token(
+            authorization=authorization_header, jwt_encryption_key=jwt_encryption_key
+        )
+    except:
         return None
 
     email_address = token["email_address"]

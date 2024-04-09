@@ -19,8 +19,6 @@ from .. import models
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
 from ..common.utils import (
-    get_client_role,
-    get_account_id_or_raise,
     get_account_id_or_none,
 )
 from ..dependencies import get_postgresql_session
@@ -60,21 +58,17 @@ class OONIRunLinkEngineDescriptor(BaseModel):
 
 
 class OONIRunLinkBase(BaseModel):
-    name: str = Field(
-        default="", title="name of the ooni run link", min_length=2, max_length=50
-    )
+    name: str = Field(title="name of the ooni run link", min_length=2, max_length=50)
     short_description: str = Field(
-        default="",
         title="short description of the ooni run link",
         min_length=2,
         max_length=200,
     )
 
     description: str = Field(
-        default="", title="full description of the ooni run link", min_length=2
+        title="full description of the ooni run link", min_length=2
     )
     author: str = Field(
-        default="",
         title="public email address of the author name of the ooni run link",
         min_length=2,
         max_length=100,
@@ -151,21 +145,23 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
 @router.post(
     "/v2/oonirun/links",
     tags=["oonirun"],
-    dependencies=[Depends(role_required(["admin", "user"]))],
     response_model=OONIRunLink,
 )
 def create_oonirun_link(
     create_request: OONIRunLinkCreateEdit,
-    authorization: str = Header("authorization"),
+    token=Depends(role_required(["admin", "user"])),
     db=Depends(get_postgresql_session),
-    settings=Depends(get_settings),
 ):
     """Create a new oonirun link or a new version for an existing one."""
     log.debug("creating oonirun")
-    account_id = get_account_id_or_raise(
-        authorization, jwt_encryption_key=settings.jwt_encryption_key
-    )
+    account_id = token["account_id"]
     assert create_request
+
+    if create_request.author != token["email_address"]:
+        raise HTTPException(
+            status_code=400,
+            detail="email_address must match the email address of the user who created the oonirun link",
+        )
 
     now = utcnow_seconds()
 
@@ -229,34 +225,34 @@ def create_oonirun_link(
 
 @router.put(
     "/v2/oonirun/links/{oonirun_link_id}",
-    dependencies=[Depends(role_required(["admin", "user"]))],
     tags=["oonirun"],
     response_model=OONIRunLink,
 )
 def edit_oonirun_link(
     oonirun_link_id: str,
     edit_request: OONIRunLinkCreateEdit,
-    authorization: str = Header("authorization"),
+    token=Depends(role_required(["admin", "user"])),
     db=Depends(get_postgresql_session),
-    settings=Depends(get_settings),
 ):
     """Edit an existing OONI Run link"""
     log.debug(f"edit oonirun {oonirun_link_id}")
-    account_id = get_account_id_or_raise(
-        authorization, jwt_encryption_key=settings.jwt_encryption_key
-    )
+    account_id = token["account_id"]
 
     now = utcnow_seconds()
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
     )
-    client_role = get_client_role(authorization, settings.jwt_encryption_key)
-    if client_role == "user":
+    if token["role"] == "user":
         q = q.filter(models.OONIRunLink.creator_account_id == account_id)
+        if token["email_address"] != edit_request.author:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not allowed to set the email_address to something other than your email address",
+            )
     else:
         # When you are an admin we can do everything and there are no other roles
-        assert client_role == "admin"
+        assert token["role"] == "admin"
 
     try:
         oonirun_link = q.one()

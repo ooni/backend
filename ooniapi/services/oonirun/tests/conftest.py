@@ -71,6 +71,7 @@ def create_session_token(account_id: str, role: str) -> str:
         "exp": now + 10 * 86400,
         "aud": "user_auth",
         "account_id": account_id,
+        "email_address": "oonitarian@example.com",
         "login_time": None,
         "role": role,
     }

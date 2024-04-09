@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import models
-from .routers import oonirun
+from .routers import v2
 
 from .dependencies import get_postgresql_session
 from .common.dependencies import get_settings
@@ -48,7 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(oonirun.router, prefix="/api")
+app.include_router(v2.router, prefix="/api")
 
 
 @app.get("/version")

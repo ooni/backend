@@ -196,9 +196,10 @@ async def get_account_metadata(
     authorization: str = Header("authorization"),
 ):
     """Get account metadata for logged-in users"""
-    tok = get_client_token(
-        authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
-    )
-    if not tok:
+    try:
+        tok = get_client_token(
+            authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
+        )
+        return AccountMetadata(logged_in=True, role=tok["role"])
+    except:
         return AccountMetadata(logged_in=False, role="")
-    return AccountMetadata(logged_in=True, role=tok["role"])
