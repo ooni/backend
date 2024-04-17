@@ -1,5 +1,11 @@
 analysis (1.10) unstable; urgency=medium
 
+  * Drop th rotation script
+
+ -- Arturo <arturo@ooni.org>  Wed, 17 Apr 2024 16:16:16 +0100
+
+analysis (1.10) unstable; urgency=medium
+
   * Install certs for Vecton in the TH rotation script
 
  -- Federico Ceratto <federico@debian.org>  Fri, 30 Jun 2023 13:26:16 +0100
