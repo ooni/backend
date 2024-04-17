@@ -515,8 +515,8 @@ def round_robin_web_test_helpers() -> List[Dict]:
         shift = q % 3 + 1
 
     out = []
-    for n in range(4):
-        n = (n + shift) % 4
+    for n in range(5):
+        n = (n + shift) % 5
         out.append({"address": f"https://{n}.th.ooni.org", "type": "https"})
 
     return out
