@@ -94,4 +94,8 @@ async def health(
 
 @app.get("/")
 async def root():
-    return RedirectResponse("/docs")
+    # TODO(art): fix this redirect by pointing health monitoring to /health
+    #return RedirectResponse("/docs")
+    return {
+        "msg": "hello from ooniprobe"
+    }
