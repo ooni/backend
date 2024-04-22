@@ -512,7 +512,7 @@ def round_robin_web_test_helpers() -> List[Dict]:
     if q < 10:
         shift = 0
     else:
-        shift = q % 3 + 1
+        shift = q % 4 + 1
 
     out = []
     for n in range(5):
