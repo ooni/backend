@@ -1,8 +1,8 @@
-analysis (1.11) unstable; urgency=medium
+analysis (1.12) unstable; urgency=medium
 
   * Drop th rotation script
 
- -- Arturo <arturo@ooni.org>  Wed, 17 Apr 2024 16:16:16 +0100
+ -- Arturo <arturo@ooni.org>  Mon, 22 Apr 2024 10:10:16 +0100
 
 analysis (1.10) unstable; urgency=medium
 
