@@ -1,3 +1,9 @@
+ooni-api (1.0.92) unstable; urgency=medium
+
+  * return only 0,3,4 test helpers
+
+ -- Arturo <arturo@ooni.org>  Tue, 23 Apr 2024 10:45:18 +0100
+
 ooni-api (1.0.91) unstable; urgency=medium
 
   * Remove 0.th from returned addresses
