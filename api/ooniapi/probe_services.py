@@ -578,7 +578,6 @@ def generate_test_helpers_conf() -> Dict:
     }
     conf["web-connectivity"] = random_web_test_helpers(
         [
-            "https://0.th.ooni.org",
             "https://1.th.ooni.org",
             "https://2.th.ooni.org",
             "https://3.th.ooni.org",
