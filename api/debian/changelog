@@ -1,3 +1,10 @@
+ooni-api (1.0.91) unstable; urgency=medium
+
+  * Remove 0.th from returned addresses
+  * Replace round_robin function with random sort
+
+ -- Arturo <arturo@ooni.org>  Tue, 23 Apr 2024 09:15:18 +0100
+
 ooni-api (1.0.90) unstable; urgency=medium
 
   * Add 4.th to round robin

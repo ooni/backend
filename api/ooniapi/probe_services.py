@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, date
 from hashlib import sha512
 from os import urandom
 from pathlib import Path
+import random
 from typing import Dict, Any, Tuple, List, Optional
 from urllib.request import urlopen
 import ipaddress
@@ -244,7 +245,9 @@ def check_in() -> Response:
     try:
         charging = bool(charging)
     except Exception:
-        log.error(f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
+        log.error(
+            f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
+        )
 
     if "web_connectivity" in data:
         catcodes = data["web_connectivity"].get("category_codes", [])
@@ -284,8 +287,8 @@ def check_in() -> Response:
     # Temporarily disabled while we work towards deploying this in prod:
     # https://github.com/ooni/probe/issues/2674
     #
-    #octect = extract_probe_ipaddr_octect(1, 0)
-    #if octect in (34, 239):
+    # octect = extract_probe_ipaddr_octect(1, 0)
+    # if octect in (34, 239):
     #    conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
@@ -325,7 +328,9 @@ def check_in() -> Response:
         resp["tests"][tn]["report_id"] = rid  # type: ignore
 
     til = len(test_items)
-    log.debug(f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'")
+    log.debug(
+        f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
+    )
 
     return nocachejson(**resp)
 
@@ -497,6 +502,15 @@ def probe_login_post() -> Response:
     return nocachejson(token=token, expire=expire)
 
 
+def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
+    """Randomly sort test helpers"""
+    random.shuffle(th_list)
+    out = []
+    for th_addr in th_list:
+        out.append({"address": th_addr, "type": "https"})
+    return out
+
+
 def round_robin_web_test_helpers() -> List[Dict]:
     """Round robin test helpers based on the probe ipaddr.
     0.th is special and gets only 10% of the traffic.
@@ -562,7 +576,14 @@ def generate_test_helpers_conf() -> Dict:
             },
         ],
     }
-    conf["web-connectivity"] = round_robin_web_test_helpers()
+    conf["web-connectivity"] = random_web_test_helpers(
+        [
+            "https://1.th.ooni.org",
+            "https://2.th.ooni.org",
+            "https://3.th.ooni.org",
+            "https://4.th.ooni.org",
+        ]
+    )
     conf["web-connectivity"].append(
         {
             "address": "https://d33d1gs9kpq1c5.cloudfront.net",
