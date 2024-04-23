@@ -1,11 +1,12 @@
-from unittest.mock import MagicMock, Mock
+from unittest.mock import patch
 
 import ooniapi.probe_services
 from ooniapi.probe_services import random_web_test_helpers, round_robin_web_test_helpers
 
 
-def test_web_test_helpers():
-    ooniapi.probe_services.extract_probe_ipaddr = Mock(return_value="1.2.3.4")
+@patch("ooniapi.probe_services.extract_probe_ipaddr")
+def test_web_test_helpers(mock):
+    mock.return_value = "1.2.3.4"
     r1 = random_web_test_helpers(
         [
             "https://0.th.ooni.org",
