@@ -574,10 +574,20 @@ def test_score_http_requests():
 def test_score_signal_2627():
     # https://explorer.ooni.org/measurement/20221118T104419Z_signal_IT_30722_n1_Q02UUAiiHlVU0VE6
     # Failed due to https://github.com/ooni/probe/issues/2627
-    msm = loadj("signal_022")
+    msm = loadj("signal_2627")
     scores = fp.score_measurement(msm)
     assert scores == {
         "accuracy": 0.0,
+        "blocking_country": 0.0,
+        "blocking_general": 0.0,
+        "blocking_global": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+    }
+
+    msm = loadj("signal_022")
+    scores = fp.score_measurement(msm)
+    assert scores == {
         "blocking_country": 0.0,
         "blocking_general": 0.0,
         "blocking_global": 0.0,

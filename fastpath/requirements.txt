@@ -7,3 +7,4 @@ boto3
 gunicorn
 psycopg2-binary
 # systemd <- This is an optional requirement on linux
+clickhouse-driver

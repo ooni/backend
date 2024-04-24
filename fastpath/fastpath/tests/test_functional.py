@@ -1148,12 +1148,12 @@ def test_score_http_invalid_request_line():
 
 
 def test_score_signal():
-    for can_fn, msm in minicans("signal", date(2021, 4, 27), date(2021, 4, 27), 1):
+    for can_fn, msm in minicans("signal", date(2022, 10, 27), date(2022, 10, 27), 1):
         assert msm["test_name"] == "signal"
         scores = fp.score_measurement(msm)
         assert scores
         rid = msm["report_id"]
-        if rid == "20210427T000430Z_signal_AU_45671_n1_Zq1z77FuiG2IkqqC":
+        if rid == "20221027T000314Z_signal_AM_44395_n1_2Tjx8RckKKKGB5Fv":
             # Failed due to https://github.com/ooni/probe/issues/2627
             assert scores == {
                 "accuracy": 0.0,
