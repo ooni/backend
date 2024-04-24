@@ -493,7 +493,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     j = r.json()
     first_date_created = j["date_created"]
 
-    time.sleep(1)
+    time.sleep(1.2)
     j["nettests"][0]["inputs"].append("https://foo2.net/")
     r = client_with_user_role.put(
         f"/api/v2/oonirun/links/{oonirun_link_id_one}", json=j
