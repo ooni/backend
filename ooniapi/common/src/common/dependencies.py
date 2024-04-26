@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi import HTTPException, Header
-from .utils import get_client_token
+from .auth import get_client_token
 from .config import Settings
 
 
