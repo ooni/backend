@@ -34,7 +34,9 @@ def utcnow_seconds():
 
 
 class OONIFindingBase(BaseModel):
-    incident_id: str 
+    incident_id: str = Field(
+        alias="id"
+    ) 
     title: str = Field(
         default="", title="title of the ooni finding"
     )
@@ -337,7 +339,7 @@ def user_cannot_update(
     return q[0]["cnt"] > 0
 
 
-class OONIFindingsUpdate(BaseModel):
+class OONIFindingsUpdateResponse(BaseModel):
     r: int = Field(
         default=0, title="result of the update operation"
     )
@@ -350,7 +352,7 @@ class OONIFindingsUpdate(BaseModel):
     "/v2/incidents/{action}",
     dependencies=[Depends(role_required(["admin", "user"]))],
     tags=["oonifindings"],
-    response_model=OONIFindingsUpdate
+    response_model=OONIFindingsUpdateResponse
 )
 def post_update_incident(
     action: str,
@@ -421,7 +423,7 @@ def post_update_incident(
             optimize_table("incidents")
             setnocacheresponse(response)
             # TODO: replace with response_model
-            return OONIFindingsUpdate(r=r, incident_id=incident_id)
+            return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
 
         if action == "update":
             # Only admin can publish
@@ -455,5 +457,5 @@ def post_update_incident(
     optimize_table(db, tblname="incidents")
     
     setnocacheresponse(response)
-    return OONIFindingsUpdate(r=r, incident_id=incident_id)
+    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
         

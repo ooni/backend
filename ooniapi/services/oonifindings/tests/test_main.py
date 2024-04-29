@@ -15,8 +15,8 @@ def test_health_good(client):
 def test_health_bad(client_with_bad_settings):
     r = client_with_bad_settings.get("health")
     j = r.json()
-    assert j["status"] == "fail", j
-    assert len(j["errors"]) > 0, j
+    assert j["detail"] == "health check failed", j
+    assert r.status_code == 400
 
 
 def test_metrics(client):

@@ -65,7 +65,7 @@ dependencies = [
   "click",
   "black",
   "pytest-asyncio",
-  "pytest-clickhouse @ {root:parent:parent:parent:uri}/pytest-clickhouse/dist/pytest_clickhouse-0.0.1-py3-none-any.whl"
+  "pytest-docker",
 ]
 path = ".venv/"
 

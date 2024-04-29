@@ -13,8 +13,8 @@ LISTEN_PORT = random.randint(30_000, 42_000)
 
 
 @pytest.fixture
-def server(clickhouse_migration):
-    os.environ["CLICKHOUSE_URL"] = clickhouse_migration
+def server(clickhouse_server):
+    os.environ["CLICKHOUSE_URL"] = clickhouse_server
     proc = Process(
         target=uvicorn.run,
         args=("oonifindings.main:app"),
@@ -33,10 +33,9 @@ def server(clickhouse_migration):
 
 
 def test_integration(server):
-    with httpx.Client(base_url=f"https://120.0.0.1:{LISTEN_PORT}") as client:
+    with httpx.Client(base_url=f"http://127.0.0.1:{LISTEN_PORT}") as client:
         r = client.get("/version")
         assert r.status_code == 200
         r = client.get("/api/v2/incidents/search")
         j = r.json()
         assert isinstance(j["incidents"], list)
-

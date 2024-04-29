@@ -12,4 +12,4 @@ def get_clickhouse_session(settings: Annotated[Settings, Depends(get_settings)])
     try:
         yield db
     finally: 
-        db.disconnect_connection()
+        db.disconnect()

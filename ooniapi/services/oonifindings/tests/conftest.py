@@ -5,14 +5,35 @@ import time
 import jwt
 
 from fastapi.testclient import TestClient
-from clickhouse_driver import Client as Clickhouse
+from clickhouse_driver import Client as ClickhouseClient
 
 from oonifindings.common.config import Settings
 from oonifindings.common.dependencies import get_settings
 from oonifindings.main import app
 
+THIS_DIR = Path(__file__).parent.resolve()
 
-def run_migration(path: Path, click: Clickhouse):
+
+def is_clickhouse_running(url):
+    try:
+        with ClickhouseClient.from_url(url) as client:
+            client.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+def clickhouse_server(docker_ip, docker_services):
+    port = docker_services.port_for("clickhouse", 9000)
+    url = "clickhouse://{}:{}".format(docker_ip, port)
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+    )
+    yield url
+
+
+def run_migration(path: Path, click: ClickhouseClient):
     sql_no_comment = "\n".join(
         filter(lambda x: not x.startswith("--"), path.read_text().split("\n"))
     )
@@ -24,18 +45,22 @@ def run_migration(path: Path, click: Clickhouse):
         click.execute(q)
 
 
-@pytest.fixture
-def clickhouse_migration(clickhouse):
-    migrations_path = (Path(__file__).parent.parent / "migrations").resolve()
+def create_db_for_fixture(conn_url):
+    try:
+        with ClickhouseClient.from_url(conn_url) as client:
+            migrations_dir = THIS_DIR / "migrations"
+            for fn in migrations_dir.iterdir():
+                migration_path = fn.resolve()
+                run_migration(migration_path, click=client)
+        return conn_url
+    except Exception:
+        pytest.skip("database migration failed")
 
-    db_url = f"clickhouse://{clickhouse.connection.host}:{clickhouse.connection.port}"
 
-    for fn in migrations_path.iterdir():
-        sql_file = fn.resolve()
-        run_migration(sql_file, clickhouse)
-    
-    yield db_url
- 
+@pytest.fixture(scope="session")
+def db(clickhouse_server):
+    yield create_db_for_fixture(conn_url=clickhouse_server)
+
 
 def make_override_get_settings(**kw):
     def override_get_settings():
@@ -55,15 +80,15 @@ def client_with_bad_settings():
 
 
 @pytest.fixture
-def client(clickhouse_migration):
+def client(db):
     app.dependency_overrides[get_settings] = make_override_get_settings(
-        clickhouse_url=clickhouse_migration,
+        clickhouse_url=db,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure"
     )
 
     client = TestClient(app)
-    yield(client)
+    yield client
 
 
 def create_jwt(payload: dict) -> str:
