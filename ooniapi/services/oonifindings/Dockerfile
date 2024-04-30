@@ -25,9 +25,5 @@ COPY --from=builder /build/README.md /app/
 COPY --from=builder /build/dist/*.whl /app/
 RUN pip install /app/*whl && rm /app/*whl
 
-COPY --from=builder /build/alembic/ /app/alembic/
-COPY --from=builder /build/alembic.ini /app/
-RUN rm -rf /app/alembic/__pycache__
-
 CMD ["uvicorn", "oonifindings.main:app", "--host", "0.0.0.0", "--port", "80"]
 EXPOSE 80
