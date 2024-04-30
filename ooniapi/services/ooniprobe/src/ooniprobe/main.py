@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from pydantic import BaseModel
 
@@ -13,14 +14,12 @@ from .routers import v2
 
 from .dependencies import get_postgresql_session
 from .common.dependencies import get_settings
-from .common.version import get_build_label, get_pkg_version
-from .common.version import get_build_label, get_pkg_version
+from .common.version import get_build_label
 from .common.metrics import mount_metrics
+from .__about__ import VERSION
 
+pkg_name = "ooniprobe"
 
-pkg_name = "oonirun"
-
-pkg_version = get_pkg_version(pkg_name)
 build_label = get_build_label(pkg_name)
 
 
@@ -35,7 +34,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 instrumentor = Instrumentator().instrument(
-    app, metric_namespace="ooniapi", metric_subsystem="oonirun"
+    app, metric_namespace="ooniapi", metric_subsystem="ooniprobe"
 )
 
 # TODO: temporarily enable all
@@ -53,7 +52,7 @@ app.include_router(v2.router, prefix="/api")
 
 @app.get("/version")
 async def version():
-    return {"version": pkg_version, "build_label": build_label}
+    return {"version": VERSION, "build_label": build_label}
 
 
 class HealthStatus(BaseModel):
@@ -70,7 +69,7 @@ async def health(
 ):
     errors = []
     try:
-        db.query(models.OONIRunLink).limit(1).all()
+        db.query(models.OONIProbeVPNProvider).limit(1).all()
     except Exception as exc:
         print(exc)
         errors.append("db_error")
@@ -88,11 +87,15 @@ async def health(
     return {
         "status": status,
         "errors": errors,
-        "version": pkg_version,
+        "version": VERSION,
         "build_label": build_label,
     }
 
 
 @app.get("/")
 async def root():
-    return {"message": "Hello OONItarian!"}
+    # TODO(art): fix this redirect by pointing health monitoring to /health
+    #return RedirectResponse("/docs")
+    return {
+        "msg": "hello from ooniprobe"
+    }

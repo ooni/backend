@@ -1,8 +1,10 @@
 name: test legacy/ooniapi
 on:
   push:
-    branches:
-      - master
+    paths:
+      - "api/**"
+      - "analysis/**"
+
   workflow_dispatch:
     inputs:
       debug_enabled:

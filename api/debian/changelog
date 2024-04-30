@@ -1,3 +1,22 @@
+ooni-api (1.0.92) unstable; urgency=medium
+
+  * return only 0,3,4 test helpers
+
+ -- Arturo <arturo@ooni.org>  Tue, 23 Apr 2024 10:45:18 +0100
+
+ooni-api (1.0.91) unstable; urgency=medium
+
+  * Remove 0.th from returned addresses
+  * Replace round_robin function with random sort
+
+ -- Arturo <arturo@ooni.org>  Tue, 23 Apr 2024 09:15:18 +0100
+
+ooni-api (1.0.90) unstable; urgency=medium
+
+  * Add 4.th to round robin
+
+ -- Arturo <arturo@ooni.org>  Mon, 22 Apr 2024 10:25:18 +0100
+
 ooni-api (1.0.89) unstable; urgency=medium
 
   * Disable web_connectivity 0.5 feature flag

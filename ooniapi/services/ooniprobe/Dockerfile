@@ -12,9 +12,8 @@ COPY . /build
 # https://apple.stackexchange.com/questions/14980/why-are-dot-underscore-files-created-and-how-can-i-avoid-them
 RUN find /build -type f -name '._*' -delete
 
-RUN echo "$BUILD_LABEL" > /build/src/oonirun/BUILD_LABEL
+RUN echo "$BUILD_LABEL" > /build/src/ooniprobe/BUILD_LABEL
 
-RUN make clean
 RUN hatch build
 
 ### Actual image running on the host
@@ -26,9 +25,9 @@ COPY --from=builder /build/README.md /app/
 COPY --from=builder /build/dist/*.whl /app/
 RUN pip install /app/*whl && rm /app/*whl
 
-COPY --from=builder /build/src/oonirun/common/alembic/ /app/alembic/
-COPY --from=builder /build/src/oonirun/common/alembic.ini /app/
+COPY --from=builder /build/src/ooniprobe/common/alembic/ /app/alembic/
+COPY --from=builder /build/src/ooniprobe/common/alembic.ini /app/
 RUN rm -rf /app/alembic/__pycache__
 
-CMD ["uvicorn", "oonirun.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "ooniprobe.main:app", "--host", "0.0.0.0", "--port", "80"]
 EXPOSE 80

@@ -8,13 +8,12 @@ NAME = "analysis"
 setup(
     name=NAME,
     python_requires=">=3.7.0",
-    py_modules=["rotation", "ooni_db_backup"],
+    py_modules=["ooni_db_backup"],
     packages=["analysis"],
     entry_points={
         "console_scripts": [
             "analysis=analysis.analysis:main",
             "ooni-db-backup=ooni_db_backup:main",
-            "rotation=rotation:main",
         ]
     },
     scripts=["analysis/clickhouse_feeder.py"],

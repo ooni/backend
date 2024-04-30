@@ -25,12 +25,14 @@ def role_required(roles: list[str]):
         settings: Annotated[Settings, Depends(get_settings)],
         authorization: str = Header("authorization"),
     ):
-        tok = get_client_token(authorization, settings.jwt_encryption_key)
-        if tok is None:
+        try:
+            tok = get_client_token(authorization, settings.jwt_encryption_key)
+        except:
             raise HTTPException(detail="Authentication required", status_code=401)
         if tok["role"] not in roles:
             raise HTTPException(detail="Role not authorized", status_code=401)
 
+        return tok
         # TODO(art): we don't check for the session_expunge table yet. It's empty so the impact is none
         # query = """SELECT threshold
         #    FROM session_expunge

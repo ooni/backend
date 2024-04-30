@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime
 import pathlib
-from oonirun.routers.oonirun import utcnow_seconds
+from oonirun.routers.v2 import utcnow_seconds
 import pytest
 
 import sqlalchemy as sa
@@ -52,7 +52,9 @@ SAMPLE_OONIRUN = {
 def config_alembic(db_url):
     from alembic.config import Config
 
-    migrations_path = (pathlib.Path(__file__).parent.parent / "alembic").resolve()
+    migrations_path = (
+        pathlib.Path(__file__).parent.parent / "src" / "oonirun" / "common" / "alembic"
+    ).resolve()
 
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_path))

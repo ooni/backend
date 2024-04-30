@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import time
 
 from oonirun import models
-from oonirun.routers.oonirun import utcnow_seconds
+from oonirun.routers.v2 import utcnow_seconds
 import pytest
 
 import sqlalchemy as sa
@@ -26,7 +26,7 @@ SAMPLE_OONIRUN = {
         "it": "integ-test descrizione breve in italiano",
     },
     "icon": "myicon",
-    "author": "integ-test author",
+    "author": "oonitarian@example.com",
     "nettests": [
         {
             "inputs": [
@@ -85,7 +85,31 @@ def test_get_root(client):
     assert r.status_code == 200
 
 
+def test_oonirun_author_validation(client, client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "integ-test name in English"
+    del z["author"]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, "empty author should be rejected"
+
+    z["author"] = "not an author"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code != 200, "invalid author is rejected"
+
+    z["author"] = "nome@example.com"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code != 200, "invalid author is rejected"
+
+    z["author"] = "oonitarian@example.com"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, "valid author is OK"
+
+
 def test_oonirun_validation(client, client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    r = client.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code != 200, "unauthenticated requests are rejected"
+
     z = deepcopy(SAMPLE_OONIRUN)
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, "empty name should be rejected"
@@ -116,6 +140,13 @@ def test_oonirun_not_found(client, client_with_user_role):
     assert str(j["oonirun_link_id"]).startswith("10")
     oonirun_link_id = r.json()["oonirun_link_id"]
 
+    # try to change the email to a different value
+    j["author"] = "notme@example.com"
+    r = client_with_user_role.put(f"/api/v2/oonirun/links/{oonirun_link_id}", json=j)
+    assert r.status_code != 200, r.json()
+
+    # Expire the link
+    j["author"] = "oonitarian@example.com"
     j["expiration_date"] = (utcnow_seconds() + timedelta(minutes=-1)).strftime(
         "%Y-%m-%dT%H:%M:%S.%fZ"
     )

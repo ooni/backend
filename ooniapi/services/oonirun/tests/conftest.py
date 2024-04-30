@@ -25,7 +25,9 @@ def alembic_migration(postgresql):
 
     db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
 
-    migrations_path = (pathlib.Path(__file__).parent.parent / "alembic").resolve()
+    migrations_path = (
+        pathlib.Path(__file__).parent.parent / "src" / "oonirun" / "common" / "alembic"
+    ).resolve()
 
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_path))
@@ -69,6 +71,7 @@ def create_session_token(account_id: str, role: str) -> str:
         "exp": now + 10 * 86400,
         "aud": "user_auth",
         "account_id": account_id,
+        "email_address": "oonitarian@example.com",
         "login_time": None,
         "role": role,
     }
