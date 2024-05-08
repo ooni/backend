@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from .routers import oonifindings
+from .routers import v1
 
 from .dependencies import get_settings, get_clickhouse_session
 from .common.version import get_build_label, get_pkg_version
@@ -48,7 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(oonifindings.router, prefix="/api")
+app.include_router(v1.router, prefix="/api")
 
 
 @app.get("/version")

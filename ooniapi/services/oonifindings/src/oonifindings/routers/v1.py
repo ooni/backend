@@ -2,24 +2,25 @@
 OONIFindings incidents management
 """
 
-from datetime import datetime, date, timezone
-from typing import List, Dict
+from datetime import datetime, timezone
+from typing import List, Dict, Optional
 import logging
 
 from clickhouse_driver import Client as Clickhouse
 from fastapi import APIRouter, Depends, Header, Response, HTTPException
 
 from pydantic import Field
+from pydantic.functional_validators import field_validator
 
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
-    hash_email_address,
+    check_email_address,
     get_account_id_or_raise,
     get_account_id_or_none, 
     get_client_role
 )
-from ..common.exceptions import InvalidRequest, OwnershipPermissionError, BaseOONIException
+from ..common.exceptions import InvalidRequest, OwnershipPermissionError
 from ..common.utils import setnocacheresponse, generate_random_intuid
 from ..common.clickhouse_utils import query_click, raw_query, insert_click, optimize_table
 from ..dependencies import get_clickhouse_session
@@ -33,64 +34,79 @@ def utcnow_seconds():
     return datetime.now(timezone.utc).replace(microsecond=0)
 
 
-class OONIFindingBase(BaseModel):
-    incident_id: str = Field(
-        alias="id"
-    ) 
+class OONIFindingId(BaseModel):
+    incident_id: str
+
+
+class OONIFindingWithMail(OONIFindingId):
+    email_address: str = Field(
+        default="", title="email address of user"
+    )
+
+
+class OONIFindingBase(OONIFindingWithMail):
     title: str = Field(
         default="", title="title of the ooni finding"
     )
+    text: str = Field(
+        title="content of the oonifinding report"
+    )
+
+    @field_validator("title", "text")
+    @classmethod
+    def check_empty(cls, v: str):
+        if not v:
+            raise ValueError("field cannot be empty")
+        return v
+    
     short_description: str = Field(
-        default="", title="short description of the ooni finding"
+        default="", title="short description of the oonifinding report"
     )
     start_time: datetime = Field(
-        description="time when the ooni finding started"
+        title="date when the oonifinding incident started"
     )
-    create_time: datetime = Field(
-        description="time when the ooni finding report was created"
+    create_time: Optional[datetime] = Field(
+        title="date when the oonifinding report was created"
+    )
+    update_time: Optional[datetime] = Field(
+        title="time when the oonifinding report was last updated"
+    )
+    end_time: Optional[datetime] = Field(
+        title="time when the oonifinding incident ended"
     )
     reported_by: str = Field(
-        default="", title="name of the ooni finding reporter"
+        default="", title="name of the oonifinding reporter"
     )
-    email_address: str = Field(
-        default="", title="email address of ooni finding reporter"
-    )
-    text: str = Field(
-        default="", title="content of the ooni finding report"
+    creator_account_id: Optional[str] = Field(
+        title="account id of the oonifinding report creator"
     )
     published: bool = Field(
         default=False, title="binary check if event is published" 
     )
     event_type: str = Field(
-        default="", title="type of ooni finding event"
+        default="", title="type of oonifinding event"
     )
     ASNs: List[int] = Field(
-        default=[], description="list of ASNs associate with the ooni finding"
+        default=[], description="list of ASNs associate with the oonifinding"
     )
     CCs: List[str] = Field(
-        default=[], description="list of country codes associated with the ooni finding"
+        default=[], description="list of country codes associated with the oonifinding"
     )
     tags: List[str] = Field(
-        default=[], description="tags associated with the ooni finding"
+        default=[], description="tags associated with the oonifinding"
     )
     test_names: List[str] = Field(
-        default=[], description="ooni tests associated with the ooni finding"
+        default=[], description="ooni tests associated with the oonifinding"
     )
     domains: List[str] = Field(
-        default=[], description="list of domains associated with the ooni finding"
+        default=[], description="list of domains associated with the oonifinding"
     )
     links: List[str] = Field(
-        default=[], description="links associated with the ooni finding"
+        default=[], description="links associated with the oonifinding"
     )
 
 
 class OONIFinding(OONIFindingBase):
-    update_time: datetime = Field(
-        description="time when the ooni findings incident was last updated"
-    )
-    end_time: datetime = Field(
-        description="time when the ooni findings incident ended"
-    )
     mine: bool = Field(
         default=False, title="check to see if the client account ID matches the creator account ID"
     )
@@ -100,20 +116,16 @@ class OONIFindingIncident(BaseModel):
     incident: OONIFinding
 
 
-class OONIFindings(BaseModel):
+class OONIFindingIncidents(BaseModel):
     incidents: List[OONIFinding]
 
 
-class OONIFindingUpdate(OONIFindingBase):
-    pass
-
-
 @router.get(
-    "/v2/incidents/search",
+    "/v1/incidents/search",
     tags=["oonifindings"],
-    response_model = OONIFindings
+    response_model = OONIFindingIncidents
 )
-def search_list_incidents(
+def list_oonifindings(
     only_mine: bool,
     response: Response,
     authorization: str = Header("authorization"),
@@ -188,11 +200,11 @@ def search_list_incidents(
 
 
 @router.get(
-    "/v2/incidents/show/{incident_id}",
+    "/v1/incidents/show/{incident_id}",
     tags=["oonifindings"],
-    response_model=OONIFinding
+    response_model=OONIFindingIncident
 )
-def show_incident(
+def get_oonifinding_by_id(
     incident_id: str,
     response: Response,
     authorization: str = Header("authorization"),
@@ -258,37 +270,12 @@ def show_incident(
     return OONIFindingIncident(incident=incident_model)
 
 
-def prepare_incident_dict(
-    authorization: str,
-    jwt_encryption_key: str,
-    update_incident: OONIFindingUpdate
-) -> Dict:
-    d = update_incident.dict()
-    d["creator_account_id"] = get_account_id_or_raise(authorization, jwt_encryption_key=jwt_encryption_key)
-    exp = [
-        "ASNs",
-        "CCs",
-        "create_time",
-        "creator_account_id",
-        "domains",
-        "email_address",
-        "end_time",
-        "event_type",
-        "id",
-        "links",
-        "published",
-        "reported_by",
-        "short_description",
-        "start_time",
-        "tags",
-        "test_names",
-        "text",
-        "title",
-    ]
-    if sorted(d) != exp:
-        log.debug(f"Invalid incident update request. Keys: {sorted(d)}")
-        raise InvalidRequest()
+class OONIFindingCreateUpdate(OONIFindingBase):
+    pass
 
+
+def prepare_incident_dict(incident: OONIFindingCreateUpdate) -> Dict:
+    d = incident.model_dump()
     ts_fmt = "%Y-%m-%dT%H:%M:%SZ"
     d["start_time"] = datetime.strptime(d["start_time"], ts_fmt)
     d["create_time"] = datetime.strptime(d["create_time"], ts_fmt)
@@ -297,27 +284,7 @@ def prepare_incident_dict(
         delta = d["end_time"] - d["start_time"]
         if delta.total_seconds() < 0:
             raise InvalidRequest()
-
-    if not d["title"] or not d["text"]:
-        log.debug("Invalid incident update request: empty title or desc")
-        raise InvalidRequest()
-
     return d
-
-
-def mismatched_email_addr(
-    authorization: str,
-    jwt_encryption_key: str,
-    email_address: str,
-    hashing_key: str
-) -> bool:
-    account_id = get_account_id_or_raise(authorization, jwt_encryption_key=jwt_encryption_key)
-    hashed = hash_email_address(email_address, hashing_key=hashing_key)
-    if account_id == hashed:
-        return False
-
-    log.info(f"Email mismatch {hashed} {account_id}")
-    return True
 
 
 def user_cannot_update(
@@ -339,6 +306,29 @@ def user_cannot_update(
     return q[0]["cnt"] > 0
 
 
+def verify_user(
+    db: Clickhouse,
+    authorization: str,
+    jwt_encryption_key: str,
+    incident_id: str,
+    email_address: str,
+    key: str
+):
+    if user_cannot_update(
+        db, authorization, jwt_encryption_key=jwt_encryption_key, incident_id=incident_id
+    ):
+        raise HTTPException(status_code=400, detail="Attempted to create, update or delete an item belonging to another user")
+        
+    if not check_email_address(
+        authorization=authorization,
+        jwt_encryption_key=jwt_encryption_key,
+        email_address=email_address,
+        key=key
+    ):
+        raise HTTPException(status_code=400, detail="Invalid email address for owner account")
+
+
+
 class OONIFindingsUpdateResponse(BaseModel):
     r: int = Field(
         default=0, title="result of the update operation"
@@ -349,102 +339,174 @@ class OONIFindingsUpdateResponse(BaseModel):
 
 
 @router.post(
-    "/v2/incidents/{action}",
-    dependencies=[Depends(role_required(["admin", "user"]))],
+    "/v1/incidents/create",
+    dependencies=[Depends(role_required(["admin"]))],
     tags=["oonifindings"],
     response_model=OONIFindingsUpdateResponse
 )
-def post_update_incident(
-    action: str,
-    update_incident: OONIFindingUpdate,
+def create_oonifinding(
+    create_request: OONIFindingCreateUpdate,
     response: Response,
     authorization: str = Header("authorization"),
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings)
 ):
     """
-    Create/update/publish/unpublish/delete an incident.
-    The `action` value can be "create", "update", "delete", "publish", "unpublish".
-    The `id` value is returned by the API when an incident is created.
-    It should be set by the caller for incident update or deletion.
+    Create an incident
     """
-    if action not in ("create", "update", "delete", "publish", "unpublish"):
-        raise HTTPException(status_code=400, details="Invalid action encountered") 
-    assert update_incident
-
-    client_role = get_client_role(authorization, jwt_encryption_key=settings.jwt_encryption_key)
-
-    incident_dict = dict()
-    if action == "create":
-        incident_id = str(generate_random_intuid(collector_id=settings.collector_id))
-        if client_role != "admin" and mismatched_email_addr(
-            authorization,
-            jwt_encryption_key=settings.jwt_encryption_key,
-            email_address=update_incident.email_address,
-            hashing_key=settings.account_id_hashing_key
-        ):
-            raise InvalidRequest()
-        
-        if client_role != "admin" and update_incident.published:
-            raise InvalidRequest()
-
-        update_incident.incident_id = incident_id 
-        update_incident.create_time = utcnow_seconds() 
-        incident_dict = prepare_incident_dict(
-            authorization, jwt_encryption_key=settings.jwt_encryption_key, update_incident=update_incident
-        )
-        log.info(f"Creating incident {incident_id}")
-
-    else: 
-        incident_id = update_incident.incident_id
-        # When incident already exists:
-        assert incident_id
-
-        # Only admin or incident owner can make changes
-        if client_role != "admin":
-            if user_cannot_update(
-                db, authorization, jwt_encryption_key=settings.jwt_encryption_key, incident_id=incident_id
-            ):
-                raise OwnershipPermissionError()
-
-            # ...while using the right email addr
-            if mismatched_email_addr(
-                authorization, 
-                jwt_encryption_key=settings.jwt_encyption_key, 
-                email_address=update_incident.email_address,
-                hashing_key=settings.account_id_hashing_key
-            ):
-                raise InvalidRequest()
+    if not check_email_address(
+        authorization=authorization,
+        jwt_encryption_key=settings.jwt_encryption_key,
+        email_address=create_request.email_address,
+        key=settings.account_id_hashing_key
+    ):
+        raise HTTPException(status_code=400, detail="Invalid email address for creator account")
     
-        if action == "delete":
-            # TODO: switch to faster deletion with new db version
-            query = "ALTER TABLE incidents DELETE WHERE id = %(incident_id)s"
-            r = raw_query(db, query, {"incident_id": incident_id})
-            optimize_table("incidents")
-            setnocacheresponse(response)
-            # TODO: replace with response_model
-            return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+    assert create_request
+    if create_request.published:
+        raise HTTPException(status_code=400, detail="Invalid publish parameter on create request")
 
-        if action == "update":
-            # Only admin can publish
-            if client_role != "admin" and update_incident.published:
-                raise InvalidRequest()
+    incident_id = str(generate_random_intuid(collector_id=settings.collector_id))    
+    create_request.incident_id = incident_id 
+    create_request.create_time = utcnow_seconds()
+    create_request.creator_account_id = get_account_id_or_raise(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    ) 
+    incident_dict = prepare_incident_dict(incident=create_request)
 
-            incident_dict = prepare_incident_dict(
-                authorization, jwt_encryption_key=settings.jwt_encryption_key, update_incident=update_incident
+    log.info(f"Creating incident {incident_id}")
+
+    query = """INSERT INTO incidents
+    (id, start_time, end_time, creator_account_id, reported_by, title,
+    text, event_type, published, CCs, ASNs, domains, tags, links,
+    test_names, short_description, email_address, create_time)
+    VALUES
+    """
+    r = insert_click(db, query, [incident_dict])
+    optimize_table(db, tblname="incidents")
+    
+    setnocacheresponse(response)
+    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+
+
+@router.post(
+    "/v1/incidents/update",
+    dependencies=[Depends(role_required(["admin", "user"]))],
+    tags=["oonifindings"],
+    response_model=OONIFindingsUpdateResponse    
+)
+def update_oonifinding(
+    update_request: OONIFindingCreateUpdate,
+    response: Response,
+    authorization: str = Header("authorization"),
+    db=Depends(get_clickhouse_session),
+    token=Depends(role_required(["admin", "user"])),
+    settings=Depends(get_settings)
+):
+    """
+    Update an incident
+    """ 
+    incident_id = update_request.incident_id 
+    if token["role"] != "admin":
+        try:
+            verify_user(
+                db,
+                authorization=authorization,
+                jwt_encryption_key=settings.jwt_encryption_key,
+                incident_id=incident_id,
+                email_address=update_request.email_address,
+                key=settings.account_id_hashing_key,
             )
-            log.info(f"Updating incident {incident_id}")
+        except:
+            raise
 
-        elif action in ("publish", "unpublish"):
-            if client_role != "admin":
-                raise InvalidRequest()
-            
-            query = "SELECT * FROM incidents FINAL WHERE id = %(incident_id)s"
-            q = query_click(db, query, {"incident_id": incident_id})
-            if len(q) < 1:
-                return HTTPException(status_code=404, detail="Incident not found")
-            incident_dict = q[0]
-            incident_dict["published"] = bool(action == "publish")
+        if update_request.published:
+            raise HTTPException(status_code=400, details="Not enough permissions to publish")
+        
+    incident_dict = prepare_incident_dict(update_request)
+
+    log.info(f"Updating incident {incident_id}")
+
+    insert_query = """INSERT INTO incidents
+    (id, start_time, end_time, creator_account_id, reported_by, title,
+    text, event_type, published, CCs, ASNs, domains, tags, links,
+    test_names, short_description, email_address, create_time)
+    VALUES
+    """
+    r = insert_click(db, insert_query, [incident_dict])
+    log.debug(f"Result: {r}")
+    optimize_table(db, tblname="incidents")
+    
+    setnocacheresponse(response)
+    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+
+
+@router.post(
+      "/v1/incidents/delete",
+      tags=["oonifindings"],
+      response_model=OONIFindingsUpdateResponse  
+)
+def delete_oonifinding(
+    delete_request: OONIFindingWithMail,
+    response: Response,
+    authorization: str = Header("authorization"),
+    token=Depends(role_required(["admin", "user"])),
+    db=Depends(get_clickhouse_session),
+    settings=Depends(get_settings)
+):
+    """
+    Delete an incident
+    """
+    assert delete_request
+    incident_id = delete_request.incident_id 
+    if token["role"] != "admin":
+        try:
+            verify_user(
+                db,
+                authorization=authorization,
+                jwt_encryption_key=settings.jwt_encryption_key,
+                incident_id=incident_id,
+                email_address=delete_request.email_address,
+                key=settings.account_id_hashing_key,
+            )
+        except:
+            raise 
+        
+    query = "ALTER TABLE incidents DELETE WHERE id = %(incident_id)s"
+    r = raw_query(db, query, {"incident_id": incident_id})
+    optimize_table("incidents")
+    setnocacheresponse(response)
+    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+
+
+
+@router.post(
+    "/v1/incidents/{action}",
+    tags=["oonifindings"],
+    dependencies=[Depends(role_required(["admin"]))],
+    response_model=OONIFindingsUpdateResponse
+)
+def update_oonifinding_publish_status(
+    action: str,
+    publish_request: OONIFindingId,
+    response: Response,
+    db=Depends(get_clickhouse_session),
+):
+    """
+    Publish/Unpublish an incident.
+    """
+    if action not in ("publish", "unpublish"):
+        raise HTTPException(status_code=400, detail="Invalid query action")
+
+    assert publish_request
+    incident_id = publish_request.incident_id
+    
+    query = "SELECT * FROM incidents FINAL WHERE id = %(incident_id)s"
+    q = query_click(db, query, {"incident_id": incident_id})
+    if len(q) < 1:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    incident_dict = q[0]
+    incident_dict["published"] = bool(action == "publish")
 
     insert_query = """INSERT INTO incidents
     (id, start_time, end_time, creator_account_id, reported_by, title,

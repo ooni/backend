@@ -2,9 +2,23 @@ import hashlib
 from typing import Optional, Dict, Any 
 import jwt
 
+
 def hash_email_address(email_address: str, key: str) -> str:
     em = email_address.encode()
     return hashlib.blake2b(em, key=key.encode("utf-8"), digest_size=16).hexdigest()
+
+
+def check_email_address(
+    authorization: str,
+    jwt_encryption_key: str,
+    email_address: str,
+    key: str
+) -> bool:
+    account_id = get_account_id_or_raise(authorization, jwt_encryption_key=jwt_encryption_key)
+    hashed = hash_email_address(email_address, key=key)
+    if account_id == hashed:
+        return True
+    return False
 
 
 def decode_jwt(token: str, key: str, **kw) -> Dict[str, Any]:
