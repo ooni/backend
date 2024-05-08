@@ -1,6 +1,4 @@
 from urllib.parse import parse_qs, urlparse
-from ooniauth.common.utils import decode_jwt
-from ooniauth.main import app
 from freezegun import freeze_time
 
 from html.parser import HTMLParser
