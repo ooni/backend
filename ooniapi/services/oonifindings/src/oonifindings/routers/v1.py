@@ -520,4 +520,3 @@ def update_oonifinding_publish_status(
     
     setnocacheresponse(response)
     return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
-        
