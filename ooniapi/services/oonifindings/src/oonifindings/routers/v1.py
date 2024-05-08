@@ -144,7 +144,7 @@ def list_oonifindings(
     )
     if only_mine:
         if account_id is None:
-            return OONIFindings(incidents=[])
+            return OONIFindingIncidents(incidents=[])
         where += "\nAND creator_account_id = %(account_id)s"
 
     if account_id is None:
@@ -196,7 +196,7 @@ def list_oonifindings(
             mine=account_id == incident.creator_account_id,
         )
         incident_models.append(incident_model)
-    return OONIFindings(incidents=incident_models)
+    return OONIFindingIncidents(incidents=incident_models)
 
 
 @router.get(
