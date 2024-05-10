@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from clickhouse_driver import Client as ClickhouseClient
 
 from oonifindings.common.config import Settings
+from oonifindings.common.auth import hash_email_address
 from oonifindings.common.dependencies import get_settings
 from oonifindings.main import app
 
@@ -84,7 +85,8 @@ def client(db):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         clickhouse_url=db,
         jwt_encryption_key="super_secure",
-        prometheus_metrics_password="super_secure"
+        prometheus_metrics_password="super_secure",
+        account_id_hashing_key="super_secure"
     )
 
     client = TestClient(app)
@@ -123,3 +125,16 @@ def client_with_admin_role(client):
     jwt_token = create_session_token("0" * 16, "admin")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
+
+
+@pytest.fixture
+def client_with_hashed_email(client):
+    
+    def _hashed_email(email: str, role: str):
+        client = TestClient(app)
+        account_id = hash_email_address(email, "super_secure")
+        jwt_token = create_session_token(account_id, role)
+        client.headers = {"Authorization": f"Bearer {jwt_token}"}
+        return client
+
+    return _hashed_email

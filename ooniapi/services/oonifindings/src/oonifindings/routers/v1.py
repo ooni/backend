@@ -3,7 +3,7 @@ OONIFindings incidents management
 """
 
 from datetime import datetime, timezone
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union, Tuple, Any
 import logging
 
 from clickhouse_driver import Client as Clickhouse
@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, Response, HTTPException
 from pydantic import Field
 from pydantic.functional_validators import field_validator
 
-from ..common.routers import BaseModel
+from ..common.routers import BaseModel, ISO_FORMAT_DATE
 from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     check_email_address,
@@ -35,8 +35,9 @@ def utcnow_seconds():
 
 
 class OONIFindingId(BaseModel):
-    incident_id: str
-
+    incident_id: str = Field(
+        alias="id"
+    ) 
 
 class OONIFindingWithMail(OONIFindingId):
     email_address: str = Field(
@@ -44,21 +45,10 @@ class OONIFindingWithMail(OONIFindingId):
     )
 
 
-class OONIFindingBase(OONIFindingWithMail):
+class OONIFinding(OONIFindingWithMail):
     title: str = Field(
-        default="", title="title of the ooni finding"
+        title="title of the ooni finding"
     )
-    text: str = Field(
-        title="content of the oonifinding report"
-    )
-
-    @field_validator("title", "text")
-    @classmethod
-    def check_empty(cls, v: str):
-        if not v:
-            raise ValueError("field cannot be empty")
-        return v
-    
     short_description: str = Field(
         default="", title="short description of the oonifinding report"
     )
@@ -66,19 +56,19 @@ class OONIFindingBase(OONIFindingWithMail):
         title="date when the oonifinding incident started"
     )
     create_time: Optional[datetime] = Field(
-        title="date when the oonifinding report was created"
+        default=None, title="date when the oonifinding report was created"
     )
     update_time: Optional[datetime] = Field(
-        title="time when the oonifinding report was last updated"
+        default=None, title="time when the oonifinding report was last updated"
     )
     end_time: Optional[datetime] = Field(
-        title="time when the oonifinding incident ended"
+        default=None, title="time when the oonifinding incident ended"
     )
     reported_by: str = Field(
         default="", title="name of the oonifinding reporter"
     )
     creator_account_id: Optional[str] = Field(
-        title="account id of the oonifinding report creator"
+        default="", title="account id of the oonifinding report creator"
     )
     published: bool = Field(
         default=False, title="binary check if event is published" 
@@ -104,11 +94,8 @@ class OONIFindingBase(OONIFindingWithMail):
     links: List[str] = Field(
         default=[], description="links associated with the oonifinding"
     )
-
-
-class OONIFinding(OONIFindingBase):
-    mine: bool = Field(
-        default=False, title="check to see if the client account ID matches the creator account ID"
+    mine: Optional[bool] = Field(
+        default=False, title="check if creator account id matches user"
     )
 
 
@@ -174,27 +161,7 @@ def list_oonifindings(
     incident_models = []
     # TODO(decfox): try using OONIFindings.validate_model to populate model
     for incident in incidents:
-        incident_model = OONIFinding(
-            incident_id=incident.id,
-            update_time=incident.update_time,
-            start_time=incident.start_time,
-            end_time=incident.end_time,
-            reported_by=incident.reported_by,
-            title=incident.title,
-            text=incident.text,
-            event_type=incident.event_type,
-            published=incident.published,
-            CCs=incident.CCs,
-            ASNs=incident.ASNs,
-            domains=incident.domains,
-            tags=incident.tags,
-            test_names=incident.test_names,
-            links=incident.links,
-            short_description=incident.short_description,
-            email_address=incident.email_address,
-            create_time=incident.create_time,
-            mine=account_id == incident.creator_account_id,
-        )
+        incident_model = OONIFinding.model_validate(incident)
         incident_models.append(incident_model)
     return OONIFindingIncidents(incidents=incident_models)
 
@@ -245,46 +212,20 @@ def get_oonifinding_by_id(
     
     # TODO: cache if possible
     setnocacheresponse(response)
-    # TODO(decfox): try using OONIFinding.validate_model to populate model
-    incident_model = OONIFinding(
-        incident_id=incident.id,
-        update_time=incident.update_time,
-        start_time=incident.start_time,
-        end_time=incident.end_time,
-        reported_by=incident.reported_by,
-        title=incident.title,
-        text=incident.text,
-        event_type=incident.event_type,
-        published=incident.published,
-        CCs=incident.CCs,
-        ASNs=incident.ASNs,
-        domains=incident.domains,
-        tags=incident.tags,
-        test_names=incident.test_names,
-        links=incident.links,
-        short_description=incident.short_description,
-        email_address=incident.email_address,
-        create_time=incident.create_time,
-        mine=account_id == incident.creator_account_id,
-    )
+    incident_model = OONIFinding.model_validate(incident)
     return OONIFindingIncident(incident=incident_model)
 
 
-class OONIFindingCreateUpdate(OONIFindingBase):
-    pass
 
-
-def prepare_incident_dict(incident: OONIFindingCreateUpdate) -> Dict:
-    d = incident.model_dump()
-    ts_fmt = "%Y-%m-%dT%H:%M:%SZ"
-    d["start_time"] = datetime.strptime(d["start_time"], ts_fmt)
-    d["create_time"] = datetime.strptime(d["create_time"], ts_fmt)
-    if d["end_time"] is not None:
-        d["end_time"] = datetime.strptime(d["end_time"], ts_fmt)
-        delta = d["end_time"] - d["start_time"]
+def prepare_incident_dict(incident: OONIFinding) -> Dict:
+    incident.start_time = incident.start_time.replace(microsecond=0)
+    if incident.end_time is not None:
+        incident.end_time = incident.end_time.replace(microsecond=0)
+        delta = incident.end_time - incident.start_time
         if delta.total_seconds() < 0:
-            raise InvalidRequest()
-    return d
+            raise InvalidRequest() 
+    incident_dict = incident.model_dump(by_alias=True)
+    return incident_dict
 
 
 def user_cannot_update(
@@ -328,13 +269,22 @@ def verify_user(
         raise HTTPException(status_code=400, detail="Invalid email address for owner account")
 
 
-
-class OONIFindingsUpdateResponse(BaseModel):
-    r: int = Field(
-        default=0, title="result of the update operation"
+class OONIFindingCreateUpdate(OONIFinding):
+    text: str = Field(
+        title="content of the oonifinding report"
     )
-    incident_id: str = Field(
-        default="", title="incident id of the updated ooni finding"
+
+    @field_validator("title", "text")
+    @classmethod
+    def check_empty(cls, v: str):
+        if not v:
+            raise ValueError("field cannot be empty")
+        return v 
+
+
+class OONIFindingsUpdateResponse(OONIFindingId):
+    r: Union[int, Tuple[List[Any]]] = Field(
+        default=0, title="result of the update operation"
     )
 
 
@@ -362,9 +312,10 @@ def create_oonifinding(
     ):
         raise HTTPException(status_code=400, detail="Invalid email address for creator account")
     
-    assert create_request
+    # assert create_request
     if create_request.published:
         raise HTTPException(status_code=400, detail="Invalid publish parameter on create request")
+
 
     incident_id = str(generate_random_intuid(collector_id=settings.collector_id))    
     create_request.incident_id = incident_id 
@@ -386,7 +337,7 @@ def create_oonifinding(
     optimize_table(db, tblname="incidents")
     
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+    return OONIFindingsUpdateResponse(r=r, id=incident_id)
 
 
 @router.post(
@@ -438,13 +389,12 @@ def update_oonifinding(
     optimize_table(db, tblname="incidents")
     
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+    return OONIFindingsUpdateResponse(r=r, id=incident_id)
 
 
 @router.post(
       "/v1/incidents/delete",
       tags=["oonifindings"],
-      response_model=OONIFindingsUpdateResponse  
 )
 def delete_oonifinding(
     delete_request: OONIFindingWithMail,
@@ -474,9 +424,9 @@ def delete_oonifinding(
         
     query = "ALTER TABLE incidents DELETE WHERE id = %(incident_id)s"
     r = raw_query(db, query, {"incident_id": incident_id})
-    optimize_table("incidents")
+    optimize_table(db, "incidents")
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+    return {}
 
 
 
@@ -519,4 +469,4 @@ def update_oonifinding_publish_status(
     optimize_table(db, tblname="incidents")
     
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=r, incident_id=incident_id)
+    return OONIFindingsUpdateResponse(r=r, id=incident_id)
