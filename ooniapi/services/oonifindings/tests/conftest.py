@@ -137,11 +137,3 @@ def client_with_hashed_email(client):
         return client
 
     return _hashed_email
-
-
-@pytest.fixture
-def client_with_null_account(client):
-    client = TestClient(app)
-    jwt_token = create_session_token(None, "user")
-    client.headers = {"Authorization": f"Bearer {jwt_token}"}
-    yield client

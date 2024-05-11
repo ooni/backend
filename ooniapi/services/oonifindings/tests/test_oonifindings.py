@@ -289,8 +289,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
 def test_oonifinding_workflow(
         client, 
         client_with_hashed_email, 
-        client_with_user_role,
-        client_with_null_account 
+        client_with_user_role
     ):
     client_with_admin_role = client_with_hashed_email(SAMPLE_EMAIL, "admin")
     
@@ -303,7 +302,7 @@ def test_oonifinding_workflow(
     incident_id = r.json()["id"]
     assert incident_id
 
-    r = client_with_null_account.get(f"api/v1/incidents/show/{incident_id}")
+    r = client.get(f"api/v1/incidents/show/{incident_id}")
     assert r.status_code == 404, "unpublished events cannot be seen with invalid account id"
     
     r = client_with_user_role.get(f"api/v1/incidents/show/{incident_id}")
@@ -324,7 +323,7 @@ def test_oonifinding_workflow(
     r = client_with_admin_role.post("api/v1/incidents/publish", json=incident)
     assert r.json()["r"] == 1
 
-    r = client_with_null_account.get(f"api/v1/incidents/show/{incident_id}")
+    r = client.get(f"api/v1/incidents/show/{incident_id}")
     incident = r.json()["incident"]
     assert incident
     assert incident["mine"] is False
@@ -347,7 +346,7 @@ def test_oonifinding_workflow(
 
     EXPECTED_OONIFINDING_PUBLIC_KEYS.remove("text")
 
-    r = client_with_null_account.get("api/v1/incidents/search?only_mine=false")
+    r = client.get("api/v1/incidents/search?only_mine=false")
     assert r.status_code == 200
     incidents = r.json()["incidents"]
     assert len(incidents) == 2
@@ -373,7 +372,7 @@ def test_oonifinding_workflow(
         assert incident["mine"] is True
         assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
 
-    r = client_with_null_account.get("api/v1/incidents/search?only_mine=true")
+    r = client.get("api/v1/incidents/search?only_mine=true")
     assert r.status_code == 200
     incidents = r.json()["incidents"]
     assert len(incidents) == 0

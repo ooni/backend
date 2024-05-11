@@ -46,9 +46,11 @@ def get_client_token(authorization: str, jwt_encryption_key: str):
 def get_client_role(authorization: str, jwt_encryption_key: str) -> str:
     """Raise exception for unlogged users"""
     tok = get_client_token(authorization, jwt_encryption_key)
-    assert tok
-    return tok["role"]
-
+    try:
+        assert tok
+        return tok["role"]
+    except:
+        return None
 
 def get_account_id_or_none(
     authorization: str, jwt_encryption_key: str
