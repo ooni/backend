@@ -2,6 +2,7 @@
 Integration test for OONIFindings API
 """
 
+from typing import Dict, List
 from copy import deepcopy
 from datetime import timedelta
 
@@ -45,10 +46,11 @@ EXPECTED_OONIFINDING_PUBLIC_KEYS = [
     "end_time",
     "create_time",
     "update_time",
-    "mine",
+    "creator_account_id",
     "reported_by",
     "email_address",
     "text",
+    "mine",
     "published",
     "event_type",
     "ASNs",
@@ -120,25 +122,39 @@ def test_oonifinding_publish(client, client_with_hashed_email):
     incident_id = r.json()["id"]
     assert incident_id
 
-    r = client_with_admin_role.post("api/v1/incidents/random", json=z)
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident_payload = r.json()["incident"]
+    
+    r = client_with_admin_role.post("api/v1/incidents/random", json=incident_payload)
     assert r.status_code == 400, "only publish and unpublish are valid supported actions"
 
-    r = client_with_user_role.post("api/v1/incidents/publish", json=z)
+    r = client_with_user_role.post("api/v1/incidents/publish", json=incident_payload)
     assert r.status_code == 401, "only admins can publish incidents"
 
-    r = client_with_admin_role.post("api/v1/incidents/publish", json=z)
+    incident_payload["id"] = "sample id"
+    r = client_with_admin_role.post("api/v1/incidents/publish", json=incident_payload)
     assert r.status_code == 404, "valid incident id should be passed"
 
-    z["id"] = incident_id
-    r = client_with_admin_role.post("api/v1/incidents/publish", json=z)
+    incident_payload["id"] = incident_id
+    r = client_with_admin_role.post("api/v1/incidents/publish", json=incident_payload)
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
 
-    r = client_with_admin_role.post("api/v1/incidents/unpublish", json=z)
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["published"] is True
+
+    r = client_with_admin_role.post("api/v1/incidents/unpublish", json=incident_payload)
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["published"] is False
 
 
 def test_oonifinding_delete(client, client_with_hashed_email):
@@ -178,6 +194,9 @@ def test_oonifinding_delete(client, client_with_hashed_email):
     r = client_with_user_role.post("api/v1/incidents/delete", json=z)
     assert r.status_code == 200
 
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    assert r.status_code == 404
+
 
 def test_oonifinding_update(client, client_with_hashed_email):
     client_with_admin_role = client_with_hashed_email(SAMPLE_EMAIL, "admin")
@@ -195,21 +214,191 @@ def test_oonifinding_update(client, client_with_hashed_email):
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident_payload = r.json()["incident"]
 
-    incident_payload["text"] = "sample replacement text for update"
+    sample_replacement_text = "sample replacement text for update"
+    incident_payload["text"] = sample_replacement_text
     r = client_with_admin_role.post("api/v1/incidents/update", json=incident_payload)
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident_payload = r.json()["incident"]
+    assert incident_payload
+    assert incident_payload["text"] == sample_replacement_text
 
-    incident_payload["short_description"] = "sample replacement discription for update"
+    incident_payload["text"] = ""
+    r = client_with_admin_role.post("api/v1/incidents/update", json=incident_payload)
+    assert r.status_code == 422, "cannot update with empty text"
+
+    incident_payload["text"] = sample_replacement_text
+    incident_payload["title"] = ""
+    r = client_with_admin_role.post("api/v1/incidents/update", json=incident_payload)
+    assert r.status_code == 422, "cannot update with empty title"
+
+    incident_payload["title"] = z["title"]
+    sample_replacement_description = "sample replacement discription for update"
+    incident_payload["short_description"] = sample_replacement_description
 
     incident_payload["email_address"] = ""
     r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
-    assert r.status_code == 400
+    assert r.status_code == 400, "cannot update with invalid email"
 
     incident_payload["email_address"] = SAMPLE_EMAIL
     mismatched_client = client_with_hashed_email("user@ooni.org", "user")
-    r = mismatched_client.post("api/v1/incidents/delete", json=incident_payload)
-    assert r.status_code == 400
+    r = mismatched_client.post("api/v1/incidents/update", json=incident_payload)
+    assert r.status_code == 400, "email should match account id"
 
     r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
-    assert r.status_code == 200 
+    assert r.status_code == 200
+    assert r.json()["r"] == 1
+    assert r.json()["id"] == incident_id
+
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident_payload = r.json()["incident"]
+    assert incident_payload
+    assert incident_payload["short_description"] == sample_replacement_description
+
+    sample_tag = "sample_tag"
+    incident_payload["tags"].append(sample_tag)
+    r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
+    assert r.status_code == 200
+    assert r.json()["r"] == 1
+    assert r.json()["id"] == incident_id
+
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident_payload = r.json()["incident"]
+    assert incident_payload
+    assert len(incident_payload["tags"]) == 1
+    assert incident_payload["tags"][0] == sample_tag
+
+    incident_payload["published"] = True
+    r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
+    assert r.status_code == 400, "user role cannot publish incident" 
+
+    r = client_with_admin_role.post("api/v1/incidents/update", json=incident_payload)
+    assert r.status_code == 200
+    assert r.json()["r"] == 1
+    assert r.json()["id"] == incident_id
+
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident_payload = r.json()["incident"]
+    assert incident_payload
+    assert incident_payload["published"] == True
+
+
+# TODO(decfox): add checks for fetched incident fields
+def test_oonifinding_workflow(
+        client, 
+        client_with_hashed_email, 
+        client_with_user_role,
+        client_with_null_account 
+    ):
+    client_with_admin_role = client_with_hashed_email(SAMPLE_EMAIL, "admin")
+    
+    z = deepcopy(SAMPLE_OONIFINDING)
+
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
+    assert r.status_code == 200
+    assert r.json()["r"] == 1
+
+    incident_id = r.json()["id"]
+    assert incident_id
+
+    r = client_with_null_account.get(f"api/v1/incidents/show/{incident_id}")
+    assert r.status_code == 404, "unpublished events cannot be seen with invalid account id"
+    
+    r = client_with_user_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["mine"] is False
+    assert incident["email_address"] == ""
+    assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["mine"] is True
+    assert incident["email_address"] == z["email_address"]
+    assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+    
+    # publish incident and test
+    r = client_with_admin_role.post("api/v1/incidents/publish", json=incident)
+    assert r.json()["r"] == 1
+
+    r = client_with_null_account.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["mine"] is False
+    assert incident["email_address"] == ""
+    assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    r = client_with_user_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["mine"] is False
+    assert incident["email_address"] == ""
+    assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
+    incident = r.json()["incident"]
+    assert incident
+    assert incident["mine"] is True
+    assert incident["email_address"] == z["email_address"]
+    assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    EXPECTED_OONIFINDING_PUBLIC_KEYS.remove("text")
+
+    r = client_with_null_account.get("api/v1/incidents/search?only_mine=false")
+    assert r.status_code == 200
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 2
+    for incident in incidents:
+        assert incident["email_address"] == ""
+        assert incident["mine"] is False
+        assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    
+    r = client_with_user_role.get("api/v1/incidents/search?only_mine=false")
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 4
+    for incident in incidents:
+        assert incident["email_address"] == ""
+        assert incident["mine"] is False
+        assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    r = client_with_admin_role.get("api/v1/incidents/search?only_mine=false")
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 4
+    for incident in incidents: 
+        assert incident["email_address"] == SAMPLE_EMAIL
+        assert incident["mine"] is True
+        assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    r = client_with_null_account.get("api/v1/incidents/search?only_mine=true")
+    assert r.status_code == 200
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 0
+
+    r = client_with_user_role.get("api/v1/incidents/search?only_mine=true")
+    assert r.status_code == 200
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 0
+
+    client_account_with_user_role = client_with_hashed_email(SAMPLE_EMAIL, "user")
+
+    r = client_account_with_user_role.get("api/v1/incidents/search?only_mine=true")
+    assert r.status_code == 200
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 4
+    for incident in incidents:
+        assert incident["email_address"] == ""
+        assert incident["mine"] is True
+        assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+    r = client_with_admin_role.get("api/v1/incidents/search?only_mine=true")
+    assert r.status_code == 200
+    incidents = r.json()["incidents"]
+    assert len(incidents) == 4
+    for incident in incidents:
+        assert incident["email_address"] == SAMPLE_EMAIL
+        assert incident["mine"] is True
+        assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)

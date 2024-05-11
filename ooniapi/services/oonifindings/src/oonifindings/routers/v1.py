@@ -99,8 +99,21 @@ class OONIFinding(OONIFindingWithMail):
     )
 
 
+class OONIFindingWithText(OONIFinding):
+    text: str = Field(
+        title="content of the oonifinding report"
+    )
+
+    @field_validator("title", "text")
+    @classmethod
+    def check_empty(cls, v: str):
+        if not v:
+            raise ValueError("field cannot be empty")
+        return v 
+
+
 class OONIFindingIncident(BaseModel):
-    incident: OONIFinding
+    incident: OONIFindingWithText
 
 
 class OONIFindingIncidents(BaseModel):
@@ -143,7 +156,8 @@ def list_oonifindings(
 
     query = f"""SELECT id, update_time, start_time, end_time, reported_by,
     title, event_type, published, CCs, ASNs, domains, tags, test_names,
-    links, short_description, email_address, create_time, creator_account_id 
+    links, short_description, email_address, create_time, 
+    creator_account_id = %(account_id)s as mine
     FROM incidents FINAL
     {where}
     ORDER BY title
@@ -159,8 +173,8 @@ def list_oonifindings(
     
     setnocacheresponse(response)
     incident_models = []
-    # TODO(decfox): try using OONIFindings.validate_model to populate model
-    for incident in incidents:
+    for i in range(len(incidents)):
+        incident = incidents[i]
         incident_model = OONIFinding.model_validate(incident)
         incident_models.append(incident_model)
     return OONIFindingIncidents(incidents=incident_models)
@@ -195,7 +209,8 @@ def get_oonifinding_by_id(
 
     query = f"""SELECT id, update_time, start_time, end_time, reported_by,
     title, text, event_type, published, CCs, ASNs, domains, tags, test_names,
-    links, short_description, email_address, create_time, creator_account_id
+    links, short_description, email_address, create_time, 
+    creator_account_id = %(account_id)s AS mine
     FROM incidents FINAL
     {where}
     LIMIT 1
@@ -212,7 +227,7 @@ def get_oonifinding_by_id(
     
     # TODO: cache if possible
     setnocacheresponse(response)
-    incident_model = OONIFinding.model_validate(incident)
+    incident_model = OONIFindingWithText.model_validate(incident)
     return OONIFindingIncident(incident=incident_model)
 
 
@@ -269,17 +284,8 @@ def verify_user(
         raise HTTPException(status_code=400, detail="Invalid email address for owner account")
 
 
-class OONIFindingCreateUpdate(OONIFinding):
-    text: str = Field(
-        title="content of the oonifinding report"
-    )
-
-    @field_validator("title", "text")
-    @classmethod
-    def check_empty(cls, v: str):
-        if not v:
-            raise ValueError("field cannot be empty")
-        return v 
+class OONIFindingCreateUpdate(OONIFindingWithText):
+    pass
 
 
 class OONIFindingsUpdateResponse(OONIFindingId):
@@ -370,10 +376,13 @@ def update_oonifinding(
             )
         except:
             raise
-
-        if update_request.published:
-            raise HTTPException(status_code=400, details="Not enough permissions to publish")
         
+        if update_request.published is True:
+            raise HTTPException(status_code=400, detail="Not enough permissions to publish")
+
+    update_request.creator_account_id = get_account_id_or_raise(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    ) 
     incident_dict = prepare_incident_dict(update_request)
 
     log.info(f"Updating incident {incident_id}")
@@ -438,7 +447,7 @@ def delete_oonifinding(
 )
 def update_oonifinding_publish_status(
     action: str,
-    publish_request: OONIFindingId,
+    publish_request: OONIFindingCreateUpdate,
     response: Response,
     db=Depends(get_clickhouse_session),
 ):
