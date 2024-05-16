@@ -1,84 +1,110 @@
+from pathlib import Path
 import pytest
 
 import time
 import jwt
-from pathlib import Path
 
 from fastapi.testclient import TestClient
+from clickhouse_driver import Client as ClickhouseClient
 
-from ..config import settings
-from ..main import app
-from ..dependencies import get_postgresql_session
-from .. import models
+from oonimeasurements.common.config import Settings
+from oonimeasurements.dependencies import get_settings
+from oonimeasurements.main import app
 
-import sqlalchemy as sa
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+THIS_DIR = Path(__file__).parent.resolve()
 
 
-def setup_db_with_alembic(db_url):
-    from alembic import command
-    from alembic.config import Config
-
-    migrations_path = (Path(__file__).parent.parent / "alembic").resolve()
-
-    alembic_cfg = Config()
-    alembic_cfg.set_main_option("script_location", str(migrations_path))
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-
-    ret = command.upgrade(alembic_cfg, "head")
-    print(ret)
+def is_clickhouse_running(url):
+    try:
+        with ClickhouseClient.from_url(url) as client:
+            client.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
 
 
-def override_pg(db_url):
-    def f():
-        engine = create_engine(db_url)
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        db = SessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+@pytest.fixture(scope="session")
+def clickhouse_server(docker_ip, docker_services):
+    port = docker_services.port_for("clickhouse", 9000)
+    url = "clickhouse://{}:{}".format(docker_ip, port)
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+    )
+    yield url
 
-    return f
+
+def run_migration(path: Path, click: ClickhouseClient):
+    sql_no_comment = "\n".join(
+        filter(lambda x: not x.startswith("--"), path.read_text().split("\n"))
+    )
+    queries = sql_no_comment.split(";")
+    for q in queries:
+        q = q.strip()
+        if not q:
+            continue
+        click.execute(q)
+
+
+def create_db_for_fixture(conn_url):
+    try:
+        with ClickhouseClient.from_url(conn_url) as client:
+            migrations_dir = THIS_DIR / "migrations"
+            for fn in sorted(migrations_dir.iterdir()):
+                migration_path = fn.resolve()
+                run_migration(migration_path, click=client)
+        return conn_url
+    except Exception as e:
+        pytest.skip("database migration failed")
+
+
+@pytest.fixture(scope="session")
+def db(clickhouse_server):
+    yield create_db_for_fixture(conn_url=clickhouse_server)
+
+
+def make_override_get_settings(**kw):
+    def override_get_settings():
+        return Settings(**kw)
+
+    return override_get_settings
 
 
 @pytest.fixture
-def postgresql_app_override(postgresql):
-    db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
+def client_with_bad_settings():
+    app.dependency_overrides[get_settings] = make_override_get_settings(
+        clickhouse_url = "clickhouse://badhost:9000"
+    )
 
-    setup_db_with_alembic(db_url)
-
-    app.dependency_overrides[get_postgresql_session] = override_pg(db_url)
-    yield
-
-
-@pytest.fixture
-def client(postgresql_app_override):
     client = TestClient(app)
-    return client
+    yield client
+
+
+@pytest.fixture
+def client(db):
+    app.dependency_overrides[get_settings] = make_override_get_settings(
+        clickhouse_url=db,
+        jwt_encryption_key="super_secure",
+        prometheus_metrics_password="super_secure",
+        account_id_hashing_key="super_secure"
+    )
+    
+    client = TestClient(app)
+    yield client
 
 
 def create_jwt(payload: dict) -> str:
-    key = settings.jwt_encryption_key
-    token = jwt.encode(payload, key, algorithm="HS256")
-    if isinstance(token, bytes):
-        return token.decode()
-    else:
-        return token
+    return jwt.encode(payload, "super_secure", algorithm="HS256")
 
 
-def create_session_token(account_id: str, role: str, login_time=None) -> str:
+def create_session_token(account_id: str, role: str) -> str:
     now = int(time.time())
-    if login_time is None:
-        login_time = now
     payload = {
         "nbf": now,
         "iat": now,
         "exp": now + 10 * 86400,
         "aud": "user_auth",
         "account_id": account_id,
-        "login_time": login_time,
+        "login_time": None,
         "role": role,
     }
     return create_jwt(payload)

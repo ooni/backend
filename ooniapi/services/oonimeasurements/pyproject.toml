@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "oonimeasurements"
-version = "0.5.0.dev1"
+dynamic = ["version"]
 description = ''
 
 dependencies = [
@@ -24,11 +24,14 @@ dependencies = [
   "prometheus-fastapi-instrumentator ~= 6.1.0",
   "prometheus-client",
 ]
+
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
 keywords = []
-authors = [{ name = "OONI", email = "contact@ooni.org" }]
+authors = [
+  { name = "OONI", email = "contact@ooni.org" },
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -42,7 +45,7 @@ classifiers = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/ooni/backend"
+Documentation = "https://docs.ooni.org"
 Issues = "https://github.com/ooni/backend/issues"
 Source = "https://github.com/ooni/backend"
 
@@ -56,8 +59,18 @@ include = ["BUILD_LABEL"]
 packages = ["src/oonimeasurements"]
 artifacts = ["BUILD_LABEL"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.envs.default]
-dependencies = ["pytest", "pytest-cov", "click", "black", "pytest-postgresql", "pytest-asyncio"]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "click",
+  "black",
+  "pytest-asyncio",
+  "pytest-docker",
+]
 path = ".venv/"
 
 [tool.hatch.envs.default.scripts]
@@ -66,18 +79,32 @@ test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --s
 cov-report = ["coverage report"]
 cov = ["test-cov", "cov-report"]
 
-[tool.pytest.ini_options]
-addopts = ["--import-mode=importlib"]
+[[tool.hatch.envs.all.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+[tool.hatch.envs.types]
+dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/oonimeasurements tests}"
 
 [tool.coverage.run]
+source_pkgs = ["oonimeasurements", "tests"]
 branch = true
 parallel = true
-source_pkgs = ["oonimeasurements", "tests"]
-omit = ["src/oonimeasurements/common/*", "src/oonimeasurements/__about__.py"]
+omit = [
+  "src/oonimeasurements/common/*",
+  "src/oonimeasurements/__about__.py"
+]
 
 [tool.coverage.paths]
-oonimeasurements = ["src/oonimeasurements"]
-tests = ["tests"]
+oonimeasurements = ["src/oonimeasurements", "*/oonimeasurements/src/oonimeasurements"]
+tests = ["tests", "*/oonimeasurements/tests"]
 
 [tool.coverage.report]
-exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
