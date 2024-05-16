@@ -61,7 +61,7 @@ def optimize_table(db: clickhouse_driver.Client, tblname: str) -> None:
 
 def raw_query(
     db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=1
-):
+) -> int:
     settings = {"priority": query_prio, "max_execution_time": 300}
     q = db.execute(query, query_params, with_column_types=True, settings=settings)
     return q

@@ -1,10 +1,11 @@
 from csv import DictWriter
 from io import StringIO
+from sys import byteorder
+from os import urandom
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import List
+from fastapi import Response
 from fastapi.responses import JSONResponse
-
-import jwt
 
 
 log = logging.getLogger(__name__)
@@ -29,6 +30,15 @@ def nocachejson(*a, **kw) -> JSONResponse:
 def jerror(msg, code=400, **kw) -> JSONResponse:
     headers = {"Cache-Control": "no-cache"}
     return JSONResponse(content=dict(msg=msg, **kw), status_code=code, headers=headers)
+
+
+def setcacheresponse(interval: str, response: Response):
+    max_age = int(interval[:-1]) * INTERVAL_UNITS[interval[-1]]
+    response.headers["Cache-Control"] = f"max-age={max_age}"
+
+
+def setnocacheresponse(response: Response):
+    response.headers["Cache-Control"] = "no-cache"
 
 
 def commasplit(p: str) -> List[str]:
@@ -60,44 +70,10 @@ def convert_to_csv(r) -> str:
     return result
 
 
-def decode_jwt(token: str, key: str, **kw) -> Dict[str, Any]:
-    tok = jwt.decode(token, key, algorithms=["HS256"], **kw)
-    return tok
-
-
-def create_jwt(payload: dict, key: str) -> str:
-    token = jwt.encode(payload, key, algorithm="HS256")
-    if isinstance(token, bytes):
-        return token.decode()
-    else:
-        return token
-
-
-def get_client_token(authorization: str, jwt_encryption_key: str) -> Dict[str, Any]:
-    assert authorization.startswith("Bearer ")
-    token = authorization[7:]
-    return decode_jwt(token, audience="user_auth", key=jwt_encryption_key)
-
-
-def get_client_role(authorization: str, jwt_encryption_key: str) -> str:
-    """Raise exception for unlogged users"""
-    tok = get_client_token(authorization, jwt_encryption_key)
-    assert tok
-    return tok["role"]
-
-
-def get_account_id_or_none(
-    authorization: str, jwt_encryption_key: str
-) -> Optional[str]:
-    """Returns None for unlogged users"""
+def generate_random_intuid(collector_id: str) -> int:
     try:
-        tok = get_client_token(authorization, jwt_encryption_key)
-        return tok["account_id"]
-    except:
-        return None
-
-
-def get_account_id_or_raise(authorization: str, jwt_encryption_key: str) -> str:
-    """Raise exception for unlogged users"""
-    tok = get_client_token(authorization, jwt_encryption_key)
-    return tok["account_id"]
+        collector_id = int(collector_id)
+    except ValueError:
+        collector_id = 0
+    randint = int.from_bytes(urandom(4), byteorder)
+    return randint * 100 + collector_id
