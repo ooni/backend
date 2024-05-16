@@ -12,14 +12,16 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
-# debdeps: python3-sqlalchemy
+from clickhouse_driver import Client as ClickhouseClient
+
 from sqlalchemy.sql.expression import and_, select, column
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
 
 from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
 from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
-from ..dependencies import ClickhouseClient, get_clickhouse_client
+from ..dependencies import get_clickhouse_session
+
 
 router = APIRouter()
 
@@ -136,7 +138,6 @@ class MeasurementAggregation(BaseModel):
     response_model_exclude_none=True
 )
 async def get_measurements(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
     response: Response,
     input: Annotated[
         Optional[str],
@@ -226,6 +227,7 @@ async def get_measurements(
     download: Annotated[
         Optional[bool], Query(description="If we should be triggering a file download")
     ] = False,
+    db=Depends(get_clickhouse_session),
 ):  # TODO(art): figure out how to define either CSV or JSON data format in the response
     """Aggregate counters data"""
     # TODO:

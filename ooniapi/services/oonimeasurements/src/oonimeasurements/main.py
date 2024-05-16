@@ -73,16 +73,14 @@ async def health(
 ):
     errors = []
 
-    # try:
-        # query = f"""SELECT id, update_time, start_time, end_time, reported_by,
-        # title, event_type, published, CCs, ASNs, domains, tags, test_names,
-        # links, short_description, email_address, create_time, creator_account_id 
-        # FROM incidents FINAL
-        # """
-        # query_click(db=db, query=query, query_params={})
-    # except Exception as exc:
-        # log.error(exc)
-        # errors.append("db_error")
+    try:
+        query = f"""SELECT *
+        FROM fastpath FINAL
+        """
+        query_click(db=db, query=query, query_params={})
+    except Exception as exc:
+        log.error(exc)
+        errors.append("db_error")
 
     if settings.jwt_encryption_key == "CHANGEME":
         err = "bad_jwt_secret"

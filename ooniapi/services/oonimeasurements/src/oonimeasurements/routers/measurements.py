@@ -39,7 +39,7 @@ from urllib.parse import urljoin, urlencode
 
 from ..common.config import Settings
 from ..common.dependencies import get_settings
-from ..common.models import BaseModel
+from ..common.routers import BaseModel
 from ..common.utils import setcacheresponse, commasplit, setnocacheresponse
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..dependencies import get_clickhouse_session
@@ -979,7 +979,7 @@ async def get_torsf_stats(
     ],
     response: Response,
     db=Depends(get_clickhouse_session),
-) -> Response:
+):
     """
     Tor Pluggable Transports statistics
     Average / percentiles / total_count grouped by day
