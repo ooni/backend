@@ -3,11 +3,11 @@ OONIFindings incidents management
 """
 
 from datetime import datetime, timezone
-from typing import List, Dict, Optional, Union, Tuple, Any
+from typing import List, Dict, Optional, Union, Tuple, Any, Annotated
 import logging
 
 from clickhouse_driver import Client as Clickhouse
-from fastapi import APIRouter, Depends, Header, Response, HTTPException
+from fastapi import APIRouter, Depends, Header, Response, HTTPException, Query
 
 from pydantic import Field
 from pydantic.functional_validators import field_validator
@@ -20,7 +20,6 @@ from ..common.auth import (
     get_account_id_or_none, 
     get_client_role
 )
-from ..common.exceptions import InvalidRequest, OwnershipPermissionError
 from ..common.utils import setnocacheresponse, generate_random_intuid
 from ..common.clickhouse_utils import query_click, raw_query, insert_click, optimize_table
 from ..dependencies import get_clickhouse_session
@@ -126,7 +125,10 @@ class OONIFindingIncidents(BaseModel):
     response_model = OONIFindingIncidents
 )
 def list_oonifindings(
-    only_mine: bool,
+    only_mine: Annotated[
+        bool,
+        Query(description="show only owned items")
+    ],
     response: Response,
     authorization: str = Header("authorization"),
     db=Depends(get_clickhouse_session),
@@ -231,14 +233,13 @@ def get_oonifinding_by_id(
     return OONIFindingIncident(incident=incident_model)
 
 
-
 def prepare_incident_dict(incident: OONIFinding) -> Dict:
     incident.start_time = incident.start_time.replace(microsecond=0)
     if incident.end_time is not None:
         incident.end_time = incident.end_time.replace(microsecond=0)
         delta = incident.end_time - incident.start_time
         if delta.total_seconds() < 0:
-            raise InvalidRequest() 
+            raise HTTPException(status_code=400, detail="invalid query paramters") 
     incident_dict = incident.model_dump(by_alias=True)
     return incident_dict
 
@@ -365,17 +366,14 @@ def update_oonifinding(
     """ 
     incident_id = update_request.incident_id 
     if token["role"] != "admin":
-        try:
-            verify_user(
-                db,
-                authorization=authorization,
-                jwt_encryption_key=settings.jwt_encryption_key,
-                incident_id=incident_id,
-                email_address=update_request.email_address,
-                key=settings.account_id_hashing_key,
-            )
-        except:
-            raise
+        verify_user(
+            db,
+            authorization=authorization,
+            jwt_encryption_key=settings.jwt_encryption_key,
+            incident_id=incident_id,
+            email_address=update_request.email_address,
+            key=settings.account_id_hashing_key,
+        )
         
         if update_request.published is True:
             raise HTTPException(status_code=400, detail="Not enough permissions to publish")

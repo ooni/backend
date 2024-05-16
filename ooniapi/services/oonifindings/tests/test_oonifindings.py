@@ -2,9 +2,8 @@
 Integration test for OONIFindings API
 """
 
-from typing import Dict, List
 from copy import deepcopy
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from oonifindings.routers.v1 import utcnow_seconds
 
@@ -81,27 +80,37 @@ def test_oonifinding_validation(client, client_with_user_role):
 
 
 def test_oonifinding_creator_validation(client, client_with_hashed_email):
-    http_client = client_with_hashed_email(SAMPLE_EMAIL, "admin")
+    client_with_admin_role = client_with_hashed_email(SAMPLE_EMAIL, "admin")
     
     z = deepcopy(SAMPLE_OONIFINDING)
     
     z["email_address"] = ""
-    r = http_client.post("api/v1/incidents/create", json=z)
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 400, "email hash does not match with account id"
     
     z["email_address"] = SAMPLE_EMAIL 
     z["title"] = ""
-    r = http_client.post("api/v1/incidents/create", json=z)
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 422, "empty title should be rejected"
     
     z["title"] = "sample oonifinding"
     z["text"] = ""
-    r = http_client.post("api/v1/incidents/create", json=z)
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 422, "empty text should be rejected"
 
     z["text"] = "sample text for oonifinding incident"
-    r = http_client.post("api/v1/incidents/create", json=z)
-    assert r.status_code == 200, "email hash does not match with account id"
+    start_time = datetime.strptime(sample_start_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+    sample_end_time = start_time + timedelta(minutes=-1)
+    z["end_time"] = sample_end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
+    assert r.status_code == 400, "invalid end_time should be rejected"
+
+    sample_end_time = start_time + timedelta(minutes=1)
+    z["end_time"] = sample_end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
+    assert r.status_code == 200
+    assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
 
 def test_oonifinding_publish(client, client_with_hashed_email):
@@ -118,6 +127,7 @@ def test_oonifinding_publish(client, client_with_hashed_email):
     r = client_with_admin_role.post("/api/v1/incidents/create", json=z)
     assert r.status_code == 200
     assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     incident_id = r.json()["id"]
     assert incident_id
@@ -140,6 +150,7 @@ def test_oonifinding_publish(client, client_with_hashed_email):
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident = r.json()["incident"]
@@ -150,6 +161,7 @@ def test_oonifinding_publish(client, client_with_hashed_email):
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident = r.json()["incident"]
@@ -166,6 +178,7 @@ def test_oonifinding_delete(client, client_with_hashed_email):
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 200
     assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     incident_id = r.json()["id"]
     assert incident_id
@@ -173,10 +186,12 @@ def test_oonifinding_delete(client, client_with_hashed_email):
     z["id"] = incident_id
     r = client_with_admin_role.post("api/v1/incidents/delete", json=z)
     assert r.status_code == 200
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 200
     assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     incident_id = r.json()["id"]
     assert incident_id
@@ -193,6 +208,7 @@ def test_oonifinding_delete(client, client_with_hashed_email):
 
     r = client_with_user_role.post("api/v1/incidents/delete", json=z)
     assert r.status_code == 200
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     assert r.status_code == 404
@@ -207,6 +223,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 200
     assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     incident_id = r.json()["id"]
     assert incident_id
@@ -219,6 +236,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
     r = client_with_admin_role.post("api/v1/incidents/update", json=incident_payload)
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    assert r.headers["Cache-Control"] == "no-cache" 
     
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident_payload = r.json()["incident"]
@@ -251,6 +269,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident_payload = r.json()["incident"]
@@ -263,6 +282,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident_payload = r.json()["incident"]
@@ -278,6 +298,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident_payload = r.json()["incident"]
@@ -298,6 +319,7 @@ def test_oonifinding_workflow(
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 200
     assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     incident_id = r.json()["id"]
     assert incident_id
