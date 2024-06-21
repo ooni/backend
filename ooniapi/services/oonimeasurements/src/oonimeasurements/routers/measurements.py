@@ -3,7 +3,7 @@ Measurements API
 The routes are mounted under /api
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional, Any, Dict, Union
 import gzip
@@ -12,33 +12,40 @@ import logging
 import math
 import time
 
-import ujson  # debdeps: python3-ujson
-import urllib3  # debdeps: python3-urllib3
+import ujson  
+import urllib3  
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Header, Request
-from fastapi.responses import Response, JSONResponse
-from pydantic import BaseModel, validator
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    Query, 
+    HTTPException, 
+    Header, 
+    Response, 
+    Request
+)
 from typing_extensions import Annotated
 
-# debdeps: python3-sqlalchemy
 from sqlalchemy.sql.expression import and_, text, select, column
 from sqlalchemy.sql.expression import text as sql_text
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.exc import OperationalError
-from psycopg2.extensions import QueryCanceledError  # debdeps: python3-psycopg2
+from psycopg2.extensions import QueryCanceledError
+
+from clickhouse_driver import Client as ClickhouseClient
 
 from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
-from ..common.config import settings, metrics
-from ..common.utils import (
-    jerror,
-    cachedjson,
-    commasplit,
-    query_click,
-    query_click_one_row,
-)
-from ..dependencies import ClickhouseClient, get_clickhouse_client
+from ..common.config import Settings
+from ..common.dependencies import get_settings
+from ..common.routers import BaseModel
+from ..common.utils import setcacheresponse, commasplit, setnocacheresponse
+from ..common.clickhouse_utils import query_click, query_click_one_row
+from ..dependencies import get_clickhouse_session
+
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,31 +53,10 @@ FASTPATH_MSM_ID_PREFIX = "temp-fid-"
 FASTPATH_SERVER = "fastpath.ooni.nu"
 FASTPATH_PORT = 8000
 
-log = logging.getLogger(__name__)
 
 urllib_pool = urllib3.PoolManager()
 
-# type hints
-ostr = Optional[str]
-
-
-class MsmtNotFound(Exception):
-    pass
-
-
-"""
-TODO(art): do we care to have this redirect in place?
-@api_msm_blueprint.route("/")
-def show_apidocs():
-    Route to https://api.ooni.io/api/ to /apidocs/
-    return redirect("/apidocs")
-"""
-
-
-@router.get("/v1/files", tags=["files"])
-def list_files() -> JSONResponse:
-    """List files - unsupported"""
-    return cachedjson("1d", msg="not implemented")
+MsmtNotFound = HTTPException(status_code=500, detail="Measurement not found")
 
 
 def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str):
@@ -83,56 +69,20 @@ def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str
     query_params = dict(uid=measurement_uid)
     lookup = query_click_one_row(db, sql_text(query), query_params, query_prio=3)
     if lookup is None:
-        raise HTTPException(status_code=500, detail="Measurement not found")
+        raise MsmtNotFound
 
     s3path = lookup["s3path"]
     linenum = lookup["linenum"]
     return s3path, linenum
 
 
-@metrics.timer("get_measurement")
-@router.get("/v1/measurement/{measurement_uid}")
-def get_measurement(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
-    measurement_uid: str,
-    download: bool = False,
-) -> Response:
-    """Get one measurement by measurement_id,
-    Returns only the measurement without extra data from the database
-    """
-    assert measurement_uid
-    try:
-        s3path, linenum = measurement_uid_to_s3path_linenum(db, measurement_uid)
-    except MsmtNotFound:
-        return jerror("Incorrect or inexistent measurement_uid")
-
-    log.debug(f"Fetching file {s3path} from S3")
-    try:
-        body = _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
-    except Exception:  # pragma: no cover
-        log.error(f"Failed to fetch file {s3path} from S3")
-        return jerror("Incorrect or inexistent measurement_uid")
-
-    headers = {"Cache-Control": "max-age=3600"}
-    if download:
-        headers["Content-Disposition"] = (
-            f"attachment; filename=ooni_measurement-{measurement_uid}.json"
-        )
-
-    return Response(content=body, media_type="application/json", headers=headers)
-
-
-# # Fetching measurement bodies
-
-
-@metrics.timer("_fetch_jsonl_measurement_body_from_s3")
 def _fetch_jsonl_measurement_body_from_s3(
     s3path: str,
     linenum: int,
 ) -> bytes:
     baseurl = f"https://{settings.s3_bucket_name}.s3.amazonaws.com/"
     url = urljoin(baseurl, s3path)
-    log.info(f"Fetching {url}")
+    log.info(f"Fetching {url}") 
     r = urlopen(url)
     f = gzip.GzipFile(fileobj=r, mode="r")
     for n, line in enumerate(f):
@@ -141,6 +91,59 @@ def _fetch_jsonl_measurement_body_from_s3(
 
     raise MsmtNotFound
 
+
+class NotImplemented(BaseModel):
+    msg: str
+
+
+@router.get(
+    "/v1/files", 
+    tags=["files"],
+    response_model=NotImplemented,
+)
+def list_files(
+    response: Response,
+):
+    """List files - unsupported"""
+    setcacheresponse("1d", response)
+    return NotImplemented(msg="not implemented")
+
+
+@router.get(
+    "/v1/measurement/{measurement_uid}",
+    tags=["oonimeasurements"],
+)
+def get_measurement(
+    measurement_uid: str,
+    download: bool,
+    response: Response,
+    db=Depends(get_clickhouse_session)
+):
+    """
+    Get one measurement by measurement_id,
+    Returns only the measurement without extra data from the database
+    """
+    assert measurement_uid
+    try:
+        s3path, linenum = measurement_uid_to_s3path_linenum(db, measurement_uid)
+    except:
+        raise
+
+    log.debug(f"Fetching file {s3path} from S3")
+    body = _fetch_jsonl_measurement_body_from_s3(s3path, linenum)
+
+    if download:
+        response.headers["Content-Disposition"] = (
+            f"attachment; filename=ooni_measurement-{measurement_uid}.json"
+        )
+
+    setcacheresponse("1h", response)
+    response.content = body
+    response.media_type = "application/json"
+    return response
+
+
+### Fetching measurement bodies
 
 def report_id_input_to_s3path_linenum(db: ClickhouseClient, report_id: str, input: str):
     query = """SELECT s3path, linenum FROM jsonl
@@ -152,15 +155,13 @@ def report_id_input_to_s3path_linenum(db: ClickhouseClient, report_id: str, inpu
     if lookup is None:
         m = f"Missing row in jsonl table: {report_id} {input}"
         log.error(m)
-        metrics.incr("msmt_not_found_in_jsonl")
-        raise MsmtNotFound
+        raise HTTPException
 
     s3path = lookup["s3path"]
     linenum = lookup["linenum"]
     return s3path, linenum
 
 
-@metrics.timer("_fetch_jsonl_measurement_body_clickhouse")
 def _fetch_jsonl_measurement_body_clickhouse(
     db: ClickhouseClient,
     report_id: str,
@@ -202,9 +203,9 @@ def _unwrap_post(post: dict) -> dict:
     raise Exception("Unexpected format")
 
 
-@metrics.timer("_fetch_measurement_body_on_disk_by_msmt_uid")
 def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes]:
-    """Fetch raw POST from disk, extract msmt
+    """
+    Fetch raw POST from disk, extract msmt
     This is used only for msmts that have been processed by the fastpath
     but are not uploaded to S3 yet.
     YAML msmts not supported: requires implementing normalization here
@@ -225,22 +226,9 @@ def _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid: str) -> Optional[bytes
     return ujson.dumps(body).encode()
 
 
-def _fetch_measurement_body_by_uid(db: ClickhouseClient, msmt_uid: str) -> bytes:
-    """Fetch measurement body from either disk or jsonl on S3"""
-    log.debug(f"Fetching body for UID {msmt_uid}")
-    body = _fetch_measurement_body_on_disk_by_msmt_uid(msmt_uid)
-    if body is not None:
-        # TODO(arturo): remove ignore once https://github.com/jsocol/pystatsd/pull/184 lands
-        return body  # type: ignore
-
-    log.debug(f"Fetching body for UID {msmt_uid} from jsonl on S3")
-    s3path, linenum = measurement_uid_to_s3path_linenum(db, msmt_uid)
-    return _fetch_jsonl_measurement_body_from_s3(s3path, linenum)  # type: ignore
-
-
-@metrics.timer("_fetch_measurement_body_from_hosts")
-def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
-    """Fetch raw POST from another API host, extract msmt
+def _fetch_measurement_body_from_hosts(other_collectors: List[str], msmt_uid: str) -> Optional[bytes]:
+    """
+    Fetch raw POST from another API host, extract msmt
     This is used only for msmts that have been processed by the fastpath
     but are not uploaded to S3 yet.
     """
@@ -254,7 +242,7 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
         log.info("Error", exc_info=True)
         return None
 
-    for hostname in settings.other_collectors:
+    for hostname in other_collectors:
         url = urljoin(f"https://{hostname}/measurement_spool/", path)
         log.debug(f"Attempt to load {url}")
         try:
@@ -276,14 +264,18 @@ def _fetch_measurement_body_from_hosts(msmt_uid: str) -> Optional[bytes]:
     return None
 
 
-@metrics.timer("fetch_measurement_body")
 def _fetch_measurement_body(
-    db: ClickhouseClient, report_id: str, input: Optional[str], measurement_uid: str
+    db: ClickhouseClient, 
+    settings: Settings,
+    report_id: str, 
+    input: Optional[str], 
+    measurement_uid: str
 ) -> bytes:
-    """Fetch measurement body from either:
-    - local measurement spool dir (.post files)
-    - JSONL files on S3
-    - remote measurement spool dir (another API/collector host)
+    """
+    Fetch measurement body from either:
+        - local measurement spool dir (.post files)
+        - JSONL files on S3
+        - remote measurement spool dir (another API/collector host)
     """
     # TODO: uid_cleanup
     log.debug(f"Fetching body for {report_id} {input}")
@@ -294,14 +286,15 @@ def _fetch_measurement_body(
 
     fresh = False
     if new_format:
-        ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y%m%d%H%M")
+        ts = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y%m%d%H%M")
         fresh = measurement_uid > ts
 
+    other_collectors = settings.other_collectors
     # Do the fetching in different orders based on the likelyhood of success
     if new_format and fresh:
         body = (
             _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
-            or _fetch_measurement_body_from_hosts(measurement_uid)
+            or _fetch_measurement_body_from_hosts(other_collectors, measurement_uid)
             or _fetch_jsonl_measurement_body_clickhouse(
                 db, report_id, input, measurement_uid
             )
@@ -313,7 +306,7 @@ def _fetch_measurement_body(
                 db, report_id, input, measurement_uid
             )
             or _fetch_measurement_body_on_disk_by_msmt_uid(measurement_uid)
-            or _fetch_measurement_body_from_hosts(measurement_uid)
+            or _fetch_measurement_body_from_hosts(other_collectors, measurement_uid)
         )
 
     else:
@@ -322,66 +315,10 @@ def _fetch_measurement_body(
         )
 
     if body:
-        metrics.incr("msmt_body_found")
-        # TODO(arturo): remove ignore once https://github.com/jsocol/pystatsd/pull/184 lands
         return body  # type: ignore
 
-    metrics.incr("msmt_body_not_found")
     raise MsmtNotFound
 
-
-def genurl(path: str, **kw) -> str:
-    """Generate absolute URL for the API"""
-    base = settings.base_url
-    return urljoin(base, path) + "?" + urlencode(kw)
-
-
-@router.get("/v1/raw_measurement")
-@metrics.timer("get_raw_measurement")
-async def get_raw_measurement(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
-    report_id: Annotated[
-        Optional[str],
-        Query(description="The report_id to search measurements for", min_length=3),
-    ] = None,
-    input: Annotated[
-        Optional[str],
-        Query(
-            description="The input (for example a URL or IP address) to search measurements for",
-            min_length=3,
-        ),
-    ] = None,
-    measurement_uid: Annotated[
-        Optional[str],
-        Query(
-            description="The measurement_uid to search measurements for", min_length=3
-        ),
-    ] = None,
-) -> Response:
-    """Get raw measurement body by report_id + input
-    responses:
-      '200':
-        description: raw measurement body, served as JSON file to be dowloaded
-    """
-    # This is used by Explorer to let users download msmts
-    if measurement_uid:
-        # TODO: uid_cleanup
-        msmt_meta = _get_measurement_meta_by_uid(db, measurement_uid)
-    elif report_id:
-        # _fetch_measurement_body needs the UID
-        msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
-    else:
-        raise Exception("Either report_id or measurement_uid must be provided")
-
-    body = "{}"
-    if msmt_meta:
-        # TODO(arturo): remove ignore once https://github.com/jsocol/pystatsd/pull/184 lands
-        body = _fetch_measurement_body(
-            db, msmt_meta["report_id"], msmt_meta["input"], msmt_meta["measurement_uid"]  # type: ignore
-        )
-
-    headers = {"Cache-Control": f"max-age={24*3600}"}
-    return Response(content=body, media_type="application/json", headers=headers)
 
 
 def format_msmt_meta(msmt_meta: dict) -> dict:
@@ -404,7 +341,6 @@ def format_msmt_meta(msmt_meta: dict) -> dict:
     return out
 
 
-@metrics.timer("get_measurement_meta_clickhouse")
 def _get_measurement_meta_clickhouse(
     db: ClickhouseClient, report_id: str, input_: Optional[str]
 ) -> dict:
@@ -433,7 +369,6 @@ def _get_measurement_meta_clickhouse(
     return format_msmt_meta(msmt_meta)
 
 
-@metrics.timer("get_measurement_meta_by_uid")
 def _get_measurement_meta_by_uid(db: ClickhouseClient, measurement_uid: str) -> dict:
     query = """SELECT * FROM fastpath
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
@@ -452,6 +387,55 @@ def _get_measurement_meta_by_uid(db: ClickhouseClient, measurement_uid: str) -> 
     return format_msmt_meta(msmt_meta)
 
 
+@router.get("/v1/raw_measurement")
+async def get_raw_measurement(
+    report_id: Annotated[
+        Optional[str],
+        Query(description="The report_id to search measurements for", min_length=3),
+    ],
+    input: Annotated[
+        Optional[str],
+        Query(
+            description="The input (for example a URL or IP address) to search measurements for",
+            min_length=3,
+        ),
+    ],
+    measurement_uid: Annotated[
+        Optional[str],
+        Query(
+            description="The measurement_uid to search measurements for", min_length=3
+        ),
+    ],
+    response: Response,
+    db=Depends(get_clickhouse_session),
+    settings=Depends(get_settings),
+) -> Response:
+    """
+    Get raw measurement body by report_id + input
+    """
+    # This is used by Explorer to let users download msmts
+    if measurement_uid:
+        # TODO: uid_cleanup
+        msmt_meta = _get_measurement_meta_by_uid(db, measurement_uid)
+    elif report_id:
+        # _fetch_measurement_body needs the UID
+        msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
+    else:
+        HTTPException(status_code=400, detail="Either report_id or measurement_uid must be provided")
+
+    body = "{}"
+    if msmt_meta:
+        # TODO(arturo): remove ignore once https://github.com/jsocol/pystatsd/pull/184 lands
+        body = _fetch_measurement_body(
+            db, settings, msmt_meta["report_id"], msmt_meta["input"], msmt_meta["measurement_uid"]  # type: ignore
+        )
+
+    setcacheresponse("1d", response)
+    response.content = body
+    response.media_type = "application/json"
+    return response
+
+
 class MeasurementMeta(BaseModel):
     anomaly: bool
     confirmed: bool
@@ -468,9 +452,7 @@ class MeasurementMeta(BaseModel):
 
 
 @router.get("/v1/measurement_meta")
-@metrics.timer("get_measurement_meta")
 async def get_measurement_meta(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
     response: Response,
     measurement_uid: Annotated[
         Optional[str],
@@ -496,9 +478,15 @@ async def get_measurement_meta(
             min_length=3,
         ),
     ] = None,
-    full: Annotated[bool, Query(description="Include JSON measurement data")] = False,
+    full: Annotated[
+        bool, 
+        Query(description="Include JSON measurement data")
+    ] = False,
+    db=Depends(get_clickhouse_session),
 ) -> MeasurementMeta:
-    """Get metadata on one measurement by measurement_uid or report_id + input"""
+    """
+    Get metadata on one measurement by measurement_uid or report_id + input
+    """
 
     # TODO: input can be '' or NULL in the fastpath table - fix it
     # TODO: see integ tests for TODO items
@@ -509,15 +497,15 @@ async def get_measurement_meta(
         log.info(f"get_measurement_meta {report_id} {input}")
         msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
     else:
-        raise Exception("Either report_id or measurement_uid must be provided")
+        raise HTTPException(status_code=400, detail="Either report_id or measurement_uid must be provided")
 
     assert isinstance(msmt_meta, dict)
+    
+    setcacheresponse("1m", response)
     if not full:
-        response.headers["Cache-Control"] = f"max-age=60"
         return MeasurementMeta(**msmt_meta)
 
     if msmt_meta == {}:  # measurement not found
-        response.headers["Cache-Control"] = f"max-age=60"
         return MeasurementMeta(
             raw_measurement="",
             **msmt_meta,
@@ -534,15 +522,13 @@ async def get_measurement_meta(
         log.error(e, exc_info=True)
         body = ""
 
-    response.headers["Cache-Control"] = f"max-age=60"
     return MeasurementMeta(
         raw_measurement=body,
         **msmt_meta,
     )
 
 
-# # Listing measurements
-
+### Listing measurements
 
 # TODO(art): Isn't this the same as the above MeasurementMeta? Check it
 class MeasurementMeta2(BaseModel):
@@ -575,50 +561,57 @@ class MeasurementList(BaseModel):
     results: List[MeasurementMeta2]
 
 
+def genurl(base_url: str, path: str, **kw) -> str:
+    """Generate absolute URL for the API"""
+    return urljoin(base_url, path) + "?" + urlencode(kw)
+
+
 @router.get("/v1/measurements")
-@metrics.timer("list_measurements")
 async def list_measurements(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
-    response: Response,
     request: Request,
+    response: Response,
     report_id: Annotated[
         Optional[str],
         Query(description="Report_id to search measurements for", min_length=3),
-    ] = None,
+    ],
     input: Annotated[
         Optional[str],
         Query(
             description="Input (for example a URL or IP address) to search measurements for",
             min_length=3,
         ),
-    ] = None,
+    ],
     domain: Annotated[
         Optional[str],
         Query(description="Domain to search measurements for", min_length=3),
-    ] = None,
+    ],
     probe_cc: Annotated[
         Optional[str], Query(description="Two letter country code")
-    ] = None,
+    ],
     probe_asn: Annotated[
         Union[str, int, None],
         Query(description='Autonomous system number in the format "ASXXX"'),
-    ] = None,
-    test_name: Annotated[Optional[str], Query(description="Name of the test")] = None,
+    ],
+    test_name: Annotated[
+        Optional[str], 
+        Query(description="Name of the test"),
+    ],
     category_code: Annotated[
-        Optional[str], Query(description="Category code from the citizenlab list")
-    ] = None,
+        Optional[str], 
+        Query(description="Category code from the citizenlab list"),
+    ],
     since: Annotated[
         Optional[str],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
-    ] = None,
+    ],
     until: Annotated[
         Optional[str],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
-    ] = None,
+    ],
     confirmed: Annotated[
         Optional[bool],
         Query(
@@ -627,7 +620,7 @@ async def list_measurements(
                 "Default: no filtering (show both true and false)"
             )
         ),
-    ] = None,
+    ],
     anomaly: Annotated[
         Optional[bool],
         Query(
@@ -636,7 +629,7 @@ async def list_measurements(
                 "Default: no filtering (show both true and false)"
             )
         ),
-    ] = None,
+    ],
     failure: Annotated[
         Optional[bool],
         Query(
@@ -645,22 +638,22 @@ async def list_measurements(
                 "Default: no filtering (show both true and false)"
             )
         ),
-    ] = None,
+    ],
     software_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by software version. Comma-separated."),
-    ] = None,
+    ],
     test_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by test version. Comma-separated."),
-    ] = None,
+    ],
     engine_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by engine version. Comma-separated."),
-    ] = None,
+    ],
     ooni_run_link_id: Annotated[
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
-    ] = None,
+    ],
     order_by: Annotated[
         Optional[str],
         Query(
@@ -674,7 +667,7 @@ async def list_measurements(
                 "test_name",
             ],
         ),
-    ] = None,
+    ],
     order: Annotated[
         str,
         Query(
@@ -689,8 +682,12 @@ async def list_measurements(
         int, Query(description="Number of records to return (default: 100)")
     ] = 100,
     user_agent: Annotated[str | None, Header()] = None,
+    db=Depends(get_clickhouse_session),
+    settings=Depends(get_settings),
 ) -> MeasurementList:
-    """Search for measurements using only the database. Provide pagination."""
+    """
+    Search for measurements using only the database. Provide pagination.
+    """
     # x-code-samples:
     # - lang: 'curl'
     #    source: |
@@ -727,7 +724,7 @@ async def list_measurements(
             results=[MeasurementMeta2(measurement_url="")],
         )
 
-    # # Prepare query parameters
+    ### Prepare query parameters
 
     until_dt = None
     if until is not None:
@@ -737,10 +734,10 @@ async def list_measurements(
     try:
         if until is None:
             if report_id is None:
-                t = datetime.utcnow() + timedelta(days=1)
+                t = datetime.now(timezone.utc) + timedelta(days=1)
                 until_dt = datetime(t.year, t.month, t.day)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid until")
+        raise HTTPException(status_code=400, detail="Invalid until parameter")
 
     since_dt = None
     if since is not None:
@@ -751,12 +748,12 @@ async def list_measurements(
             if report_id is None and until_dt is not None:
                 since_dt = until_dt - timedelta(days=30)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid since")
+        raise HTTPException(status_code=400, detail="Invalid since parameter")
 
     if order.lower() not in ("asc", "desc"):
-        raise HTTPException(status_code=400, detail="Invalid order")
+        raise HTTPException(status_code=400, detail="Invalid order parameter")
 
-    # # Perform query
+    ### Perform query
 
     INULL = ""  # Special value for input = NULL to merge rows with FULL OUTER JOIN
 
@@ -892,7 +889,7 @@ async def list_measurements(
         results = []
         for row in rows:
             msmt_uid = row["measurement_uid"]
-            url = genurl("/api/v1/raw_measurement", measurement_uid=msmt_uid)
+            url = genurl(settings.base_url, "/api/v1/raw_measurement", measurement_uid=msmt_uid)
             results.append(
                 MeasurementMeta2(
                     measurement_uid=msmt_uid,
@@ -944,7 +941,7 @@ async def list_measurements(
         next_args = dict(request.query_params)
         next_args["offset"] = str(offset + limit)
         next_args["limit"] = str(limit)
-        next_url = genurl("/api/v1/measurements", **next_args)
+        next_url = genurl(settings.base_url, "/api/v1/measurements", **next_args)
 
     query_time = time.time() - iter_start_time
     metadata = ResultsMetadata(
@@ -956,15 +953,17 @@ async def list_measurements(
         next_url=next_url,
         query_time=query_time,
     )
-    response.headers["Cache-Control"] = "max-age=60"
+    setcacheresponse("1m", response)
     return MeasurementList(metadata=metadata, results=results[:limit])
 
 
+class ErrorResponse(BaseModel):
+    v: int
+    msg: str
+
+
 @router.get("/v1/torsf_stats")
-@metrics.timer("get_torsf_stats")
 async def get_torsf_stats(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
-    response: Response,
     probe_cc: Annotated[Optional[str], Query(description="Two letter country code")],
     since: Annotated[
         Optional[datetime],
@@ -978,14 +977,14 @@ async def get_torsf_stats(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
     ],
-) -> Response:
-    """Tor Pluggable Transports statistics
-     Average / percentiles / total_count grouped by day
-     Either group-by or filter by probe_cc
-     Returns a format similar to get_aggregated
-    responses:
-       '200':
-         description: Returns aggregated counters
+    response: Response,
+    db=Depends(get_clickhouse_session),
+):
+    """
+    Tor Pluggable Transports statistics
+    Average / percentiles / total_count grouped by day
+    Either group-by or filter by probe_cc
+    Returns a format similar to get_aggregated
     """
     cacheable = False
 
@@ -1031,8 +1030,9 @@ async def get_torsf_stats(
             row["anomaly_rate"] = row["anomaly_count"] / row["measurement_count"]
             result.append(row)
         if cacheable:
-            response.headers["Cache-Control"] = f"max_age={3600 * 24}"
+            setcacheresponse("1d", response)
         return Response({"v": 0, "result": result})
 
     except Exception as e:
-        return jerror(str(e), v=0)
+        setnocacheresponse(response)
+        return ErrorResponse(msg=str(e), v=0)
