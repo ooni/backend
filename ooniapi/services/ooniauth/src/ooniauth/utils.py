@@ -6,7 +6,7 @@ from urllib.parse import urlencode, urlparse, urlunsplit
 
 import sqlalchemy as sa
 
-from .common.utils import create_jwt
+from .common.auth import create_jwt
 
 VALID_REDIRECT_TO_FQDN = (
     "explorer.ooni.org",

@@ -4,22 +4,23 @@ OONIRun link management
 https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 """
 
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 import logging
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
-from pydantic import computed_field, Field, validator
+from pydantic import computed_field, Field
+from pydantic.functional_validators import field_validator
 from typing_extensions import Annotated
 
 from .. import models
 
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
-from ..common.utils import (
-    get_account_id_or_none,
+from ..common.auth import (
+    get_account_id_or_none, 
 )
 from ..dependencies import get_postgresql_session
 
@@ -89,8 +90,9 @@ class OONIRunLinkBase(BaseModel):
         description="full description of the ooni run link in different languages",
     )
 
-    @validator("name_intl", "short_description_intl", "description_intl")
-    def validate_intl(cls, v):
+    @field_validator("name_intl", "short_description_intl", "description_intl")
+    @classmethod
+    def validate_intl(cls, v: Dict[str, str]):
         # None is also a valid type
         if v is None:
             return v
@@ -193,7 +195,7 @@ def create_oonirun_link(
         )
         db_oonirun_link.nettests.append(
             models.OONIRunLinkNettest(
-                **nettest.dict(),
+                **nettest.model_dump(),
                 date_created=now,
                 nettest_index=nettest_index,
                 revision=revision,
@@ -443,7 +445,7 @@ def get_oonirun_link_engine_descriptor(
     revision_number: Annotated[
         str,
         Path(
-            regex="^(latest|\\d+)$",
+            pattern="^(latest|\\d+)$",
             error_messages={
                 "regex": "invalid revision number specified, must be 'latest' or a number"
             },
@@ -491,7 +493,7 @@ def get_oonirun_link_revision(
     revision_number: Annotated[
         str,
         Path(
-            regex="^(latest|\\d+)$",
+            pattern="^(latest|\\d+)$",
             error_messages={
                 "regex": "invalid revision number specified, must be 'latest' or a number"
             },

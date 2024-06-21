@@ -6,7 +6,8 @@ import logging
 import jwt
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import Field, validator
+from pydantic import Field
+from pydantic.functional_validators import field_validator
 from pydantic import EmailStr
 from typing_extensions import Annotated
 
@@ -23,7 +24,7 @@ from ..utils import (
 from ..common.dependencies import get_settings
 from ..common.config import Settings
 from ..common.routers import BaseModel
-from ..common.utils import (
+from ..common.auth import (
     create_jwt,
     decode_jwt,
     get_client_token,
@@ -43,7 +44,7 @@ class CreateUserLogin(BaseModel):
     )
     redirect_to: str = Field(title="redirect to this URL")
 
-    @validator("redirect_to")
+    @field_validator("redirect_to")
     def validate_redirect_to(cls, v):
         u = urlparse(v)
         if u.scheme != "https":
