@@ -1,0 +1,25 @@
+name: test ooniapi/oonimeasurements
+on: push
+jobs:
+  run_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install hatch
+        run: pip install hatch
+
+      - name: Run all tests
+        run: make test-cov
+        working-directory: ./ooniapi/services/oonimeasurements/
+
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@v3
+        with:
+          flags: oonimeasurements
+          working-directory: ./ooniapi/services/oonimeasurements/
