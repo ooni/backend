@@ -120,24 +120,23 @@ def maybe_get_user_session_from_header(
         token = get_client_token(
             authorization=authorization_header, jwt_encryption_key=jwt_encryption_key
         )
+        email_address = token["email_address"]
+        account_id = token["account_id"]
+        role = get_account_role(admin_emails=admin_emails, email_address=email_address)
+        login_time = datetime.fromtimestamp(token["login_time"])
+        redirect_to = ""
+
+        return UserSession(
+            session_token="",
+            redirect_to=redirect_to,
+            email_address=email_address,
+            account_id=account_id,
+            role=role,
+            login_time=login_time,
+            is_logged_in=True,
+        )
     except:
         return None
-
-    email_address = token["email_address"]
-    account_id = token["account_id"]
-    role = get_account_role(admin_emails=admin_emails, email_address=email_address)
-    login_time = datetime.fromtimestamp(token["login_time"])
-    redirect_to = ""
-
-    return UserSession(
-        session_token="",
-        redirect_to=redirect_to,
-        email_address=email_address,
-        account_id=account_id,
-        role=role,
-        login_time=login_time,
-        is_logged_in=True,
-    )
 
 
 def get_user_session_from_login_token(
