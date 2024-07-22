@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     jwt_encryption_key: str = "CHANGEME"
     prometheus_metrics_password: str = "CHANGEME"
     account_id_hashing_key: str = "CHANGEME"
+    collector_id: str = "CHANGEME"
     session_expiry_days: int = 10
     login_expiry_days: int = 10
 

@@ -1,0 +1,106 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "oonifindings"
+dynamic = ["version"]
+description = ''
+
+dependencies = [
+  "fastapi ~= 0.108.0",
+  "clickhouse-driver ~= 0.2.6",
+  "sqlalchemy ~= 2.0.27",
+  "pydantic-settings ~= 2.1.0", 
+  "uvicorn ~= 0.25.0",
+  "statsd ~= 4.0.1",
+  "uvicorn ~= 0.25.0",
+  "httpx ~= 0.26.0",
+  "pyjwt ~= 2.8.0",
+  "prometheus-fastapi-instrumentator ~= 6.1.0",
+  "prometheus-client",
+]
+
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+keywords = []
+authors = [
+  { name = "OONI", email = "contact@ooni.org" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+Documentation = "https://docs.ooni.org"
+Issues = "https://github.com/ooni/backend/issues"
+Source = "https://github.com/ooni/backend"
+
+[tool.hatch.version]
+path = "src/oonifindings/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["BUILD_LABEL"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/oonifindings"]
+artifacts = ["BUILD_LABEL"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "click",
+  "black",
+  "pytest-asyncio",
+  "pytest-docker",
+]
+path = ".venv/"
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
+cov-report = ["coverage report"]
+cov = ["test-cov", "cov-report"]
+
+[[tool.hatch.envs.all.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+[tool.hatch.envs.types]
+dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/oonifindings tests}"
+
+[tool.coverage.run]
+source_pkgs = ["oonifindings", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/oonifindings/common/*",
+  "src/oonifindings/__about__.py"
+]
+
+[tool.coverage.paths]
+oonifindings = ["src/oonifindings", "*/oonifindings/src/oonifindings"]
+tests = ["tests", "*/oonifindings/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]

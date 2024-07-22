@@ -6,7 +6,8 @@ import logging
 import jwt
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from pydantic import Field, validator
+from pydantic import Field
+from pydantic.functional_validators import field_validator
 from pydantic import EmailStr
 from typing_extensions import Annotated
 
@@ -23,7 +24,7 @@ from ..utils import (
 from ..common.dependencies import get_settings
 from ..common.config import Settings
 from ..common.routers import BaseModel
-from ..common.utils import (
+from ..common.auth import (
     create_jwt,
     decode_jwt,
     get_client_token,
@@ -43,7 +44,7 @@ class CreateUserLogin(BaseModel):
     )
     redirect_to: str = Field(title="redirect to this URL")
 
-    @validator("redirect_to")
+    @field_validator("redirect_to")
     def validate_redirect_to(cls, v):
         u = urlparse(v)
         if u.scheme != "https":
@@ -119,24 +120,23 @@ def maybe_get_user_session_from_header(
         token = get_client_token(
             authorization=authorization_header, jwt_encryption_key=jwt_encryption_key
         )
+        email_address = token["email_address"]
+        account_id = token["account_id"]
+        role = get_account_role(admin_emails=admin_emails, email_address=email_address)
+        login_time = datetime.fromtimestamp(token["login_time"])
+        redirect_to = ""
+
+        return UserSession(
+            session_token="",
+            redirect_to=redirect_to,
+            email_address=email_address,
+            account_id=account_id,
+            role=role,
+            login_time=login_time,
+            is_logged_in=True,
+        )
     except:
         return None
-
-    email_address = token["email_address"]
-    account_id = token["account_id"]
-    role = get_account_role(admin_emails=admin_emails, email_address=email_address)
-    login_time = datetime.fromtimestamp(token["login_time"])
-    redirect_to = ""
-
-    return UserSession(
-        session_token="",
-        redirect_to=redirect_to,
-        email_address=email_address,
-        account_id=account_id,
-        role=role,
-        login_time=login_time,
-        is_logged_in=True,
-    )
 
 
 def get_user_session_from_login_token(
