@@ -698,7 +698,7 @@ async def list_measurements(
     if (
         probe_asn is not None
         and isinstance(probe_asn, str)
-        and probe_asn.startswith("AS")
+        and probe_asn.lower().startswith("as")
     ):
         probe_asn = int(probe_asn[2:])
     software_versions = None
