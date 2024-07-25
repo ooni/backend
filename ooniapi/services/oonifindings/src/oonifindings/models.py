@@ -11,8 +11,10 @@ from .common.postgresql import Base
 class OONIFinding(Base):
     __tablename__ = "oonifinding"
 
-    # TODO(decfox): add primary key finding id
     finding_id: Mapped[str] = mapped_column(String, primary_key=True)
+    # TODO(decfox): this is nullable for now. We should
+    # make this a non-nullable field eventually and have an endpoint
+    # where we can query findings using the finding_slug.
     finding_slug: Mapped[str] = mapped_column(String, nullable=True)
 
     create_time: Mapped[datetime] = mapped_column(UtcDateTime())
