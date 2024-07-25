@@ -178,8 +178,8 @@ def list_oonifindings(
             title=row.title,
             event_type=row.event_type,
             published=bool(row.published),
-            CCs=row.CCs,
-            ASNs=row.ASNs,
+            CCs=row.country_codes,
+            ASNs=row.asns,
             domains=row.domains,
             tags=row.tags,
             test_names=row.test_names,
@@ -244,8 +244,8 @@ def get_oonifinding_by_id(
         text=finding.text,
         event_type=finding.event_type,
         published=bool(finding.published),
-        CCs=finding.CCs,
-        ASNs=finding.ASNs,
+        CCs=finding.country_codes,
+        ASNs=finding.asns,
         domains=finding.domains,
         tags=finding.tags,
         test_names=finding.test_names,
@@ -333,8 +333,8 @@ def create_oonifinding(
         email_address=create_request.email_address,
         event_type=create_request.event_type,
         published=int(create_request.published),
-        CCs=create_request.CCs,
-        ASNs=create_request.ASNs,
+        country_codes=create_request.CCs,
+        asns=create_request.ASNs,
         domains=create_request.domains,
         tags=create_request.tags,
         links=create_request.links,
@@ -393,8 +393,8 @@ def update_oonifinding(
     oonifinding.text = update_request.text
     oonifinding.event_type = update_request.event_type
     oonifinding.published = int(update_request.published)
-    oonifinding.CCs = update_request.CCs
-    oonifinding.ASNs = update_request.ASNs
+    oonifinding.country_codes = update_request.CCs
+    oonifinding.asns = update_request.ASNs
     oonifinding.domains = update_request.domains
     oonifinding.tags = update_request.tags
     oonifinding.links = update_request.links

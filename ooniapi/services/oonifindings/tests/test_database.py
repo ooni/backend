@@ -23,8 +23,8 @@ SAMPLE_OONIFINDING = {
     "published": 0,
     "event_type": "incident",
     "start_time": sample_start_time,
-    "ASNs": [],
-    "CCs": [
+    "asns": [],
+    "country_codes": [
         "IN", "TZ",
     ],
     "tags": [],

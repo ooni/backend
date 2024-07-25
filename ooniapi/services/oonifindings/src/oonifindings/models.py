@@ -29,8 +29,8 @@ class OONIFinding(Base):
     published: Mapped[int] = mapped_column()
     deleted: Mapped[int] = mapped_column(default=0)
 
-    CCs: Mapped[List[str]] = mapped_column(nullable=True)
-    ASNs: Mapped[List[str]] = mapped_column(nullable=True)
+    country_codes: Mapped[List[str]] = mapped_column(nullable=True)
+    asns: Mapped[List[str]] = mapped_column(nullable=True)
     domains: Mapped[List[str]] = mapped_column(nullable=True)
     tags: Mapped[List[str]] = mapped_column(nullable=True)
     links: Mapped[List[str]] = mapped_column(nullable=True)
