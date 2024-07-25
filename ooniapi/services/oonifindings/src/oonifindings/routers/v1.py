@@ -150,17 +150,16 @@ def list_oonifindings(
     Search and list incidents
     """
     log.debug("listing incidents")
-    q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.deleted != 1
-    )
 
     client_role = get_client_role(authorization, jwt_encryption_key=settings.jwt_encryption_key)
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
 
-    if only_mine:
-        q = q.filter(models.OONIFinding.creator_account_id == account_id)
+    q = db.query(models.OONIFinding).filter(
+        models.OONIFinding.deleted != 1,
+        sa.or_(not only_mine, models.OONIFinding.creator_account_id == account_id)
+    )
 
     if account_id is None:
         # non-published incidents are not exposed to anon users
@@ -215,17 +214,19 @@ def get_oonifinding_by_id(
     Returns an incident
     """
     log.debug("showing incident")
-    q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.finding_id == finding_id
-    )
-    q = q.filter(models.OONIFinding.deleted != 1)
 
     client_role = get_client_role(authorization, jwt_encryption_key=settings.jwt_encryption_key)
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
+
+    q = db.query(models.OONIFinding).filter(
+        models.OONIFinding.finding_id == finding_id,
+        models.OONIFinding.deleted != 1,
+    )
+
+    # non-published incidents are not exposed to anon users
     if account_id is None:
-        # non-published incidents are not exposed to anon users
         q = q.filter(models.OONIFinding.published == 1)
         account_id = "never-match"
 
@@ -365,11 +366,7 @@ def update_oonifinding(
     finding_id = update_request.incident_id
     account_id = token["account_id"]
 
-    q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.finding_id == finding_id
-    )
     if token["role"] == "user":
-        q = q.filter(models.OONIFinding.creator_account_id == account_id)
         if update_request.email_address != token["email_address"]:
             raise HTTPException(status_code=403, detail="You are not allowed to set the email address to something other than your email address")
         if update_request.published:
@@ -377,6 +374,10 @@ def update_oonifinding(
     else:
         assert token["role"] == "admin"
 
+    q = db.query(models.OONIFinding).filter(
+        models.OONIFinding.finding_id == finding_id,
+        sa.or_(token["role"] != "user", models.OONIFinding.creator_account_id == account_id)
+    )
     try:
         oonifinding = q.one()
     except sa.exc.NoResultFound:
@@ -424,21 +425,21 @@ def delete_oonifinding(
     account_id = token["account_id"]
     finding_id = delete_request.incident_id
 
-    q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.finding_id == finding_id
-    )
     if token["role"] == "user":
-        q = q.filter(models.OONIFinding.creator_account_id == account_id)
         if delete_request.email_address != token["email_address"]:
             raise HTTPException(status_code=403, detail="You are not allowed to delete the incident")
     else:
         assert token["role"] == "admin"
 
+    q = db.query(models.OONIFinding).filter(
+        models.OONIFinding.finding_id == finding_id,
+        sa.or_(token["role"] != "user", models.OONIFinding.creator_account_id == account_id)
+    )
     try:
         q.one()
     except sa.exc.NoResultFound:
         raise HTTPException(status_code=404, detail="OONI Finding not found")
-    
+
     q.delete()
     db.commit()
 
