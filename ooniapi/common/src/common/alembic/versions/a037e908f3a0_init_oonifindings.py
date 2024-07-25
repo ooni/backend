@@ -22,7 +22,7 @@ def upgrade() -> None:
     op.create_table(
         "oonifinding",
         sa.Column(
-            "incident_id",
+            "finding_id",
             sa.String(),
             nullable=False,
             primary_key=True,

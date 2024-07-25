@@ -83,7 +83,7 @@ def test_upgrade_to_head(postgresql):
 
     db_finding = models.OONIFinding(
         **finding,
-        incident_id="000000000",
+        finding_id="000000000",
         create_time=utcnow_seconds(),
         update_time=utcnow_seconds(),
         creator_account_id="000000000",
@@ -99,7 +99,7 @@ def test_upgrade_to_head(postgresql):
     with pytest.raises(sa.exc.StatementError):
         db_finding = models.OONIFinding(
             **finding,
-            incident_id="000000000",
+            finding_id="000000000",
             create_time="NOT A DATE",
             update_time=utcnow_seconds(),
             creator_account_id="000000000",
@@ -112,7 +112,7 @@ def test_upgrade_to_head(postgresql):
         naive_datetime = datetime.now()
         db_finding = models.OONIFinding(
             **finding,
-            incident_id="000000000",
+            finding_id="000000000",
             create_time=naive_datetime,
             update_time=utcnow_seconds(),
             creator_account_id="000000000",
@@ -124,7 +124,7 @@ def test_upgrade_to_head(postgresql):
     with pytest.raises(sa.exc.StatementError):
         db_finding = models.OONIFinding(
             **finding,
-            incident_id="000000000",
+            finding_id="000000000",
             create_time=None,
             update_time=utcnow_seconds(),
             creator_account_id="000000000",

@@ -170,7 +170,7 @@ def list_oonifindings(
     findings = []
     for row in q.all():
         oonifinding = OONIFinding(
-            id=row.incident_id,
+            id=row.finding_id,
             update_time=row.update_time,
             start_time=row.start_time,
             end_time=row.end_time,
@@ -200,12 +200,12 @@ def list_oonifindings(
 
 
 @router.get(
-    "/v1/incidents/show/{incident_id}",
+    "/v1/incidents/show/{finding_id}",
     tags=["oonifindings"],
     response_model=OONIFindingIncident
 )
 def get_oonifinding_by_id(
-    incident_id: str,
+    finding_id: str,
     response: Response,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
@@ -216,7 +216,7 @@ def get_oonifinding_by_id(
     """
     log.debug("showing incident")
     q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.incident_id == incident_id
+        models.OONIFinding.finding_id == finding_id
     )
     q = q.filter(models.OONIFinding.deleted != 1)
 
@@ -235,7 +235,7 @@ def get_oonifinding_by_id(
         raise HTTPException(status_code=404, detail="OONI Finding not found")
 
     oonifinding = OONIFindingWithText(
-        id=finding.incident_id,
+        id=finding.finding_id,
         update_time=finding.update_time,
         start_time=finding.start_time,
         end_time=finding.end_time,
@@ -315,12 +315,12 @@ def create_oonifinding(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
     now = utcnow_seconds()
-    incident_id = str(generate_random_intuid(collector_id=settings.collector_id))
+    finding_id = str(generate_random_intuid(collector_id=settings.collector_id))
 
-    log.info(f"Creating incident {incident_id}")
+    log.info(f"Creating incident {finding_id}")
 
     db_oonifinding = models.OONIFinding(
-        incident_id=incident_id,
+        finding_id=finding_id,
         create_time=now,
         update_time=now,
         start_time=create_request.start_time,
@@ -345,7 +345,7 @@ def create_oonifinding(
     db.commit()
 
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=1, id=incident_id)
+    return OONIFindingsUpdateResponse(r=1, id=finding_id)
 
 
 @router.post(
@@ -362,11 +362,11 @@ def update_oonifinding(
     """
     Update an incident
     """
-    incident_id = update_request.incident_id
+    finding_id = update_request.incident_id
     account_id = token["account_id"]
 
     q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.incident_id == incident_id
+        models.OONIFinding.finding_id == finding_id
     )
     if token["role"] == "user":
         q = q.filter(models.OONIFinding.creator_account_id == account_id)
@@ -382,7 +382,7 @@ def update_oonifinding(
     except sa.exc.NoResultFound:
         raise HTTPException(status_code=404, detail="OONI Finding not found")
 
-    log.info(f"Updating incident {incident_id}")
+    log.info(f"Updating incident {finding_id}")
 
     now = utcnow_seconds()
     oonifinding.update_time = now
@@ -404,7 +404,7 @@ def update_oonifinding(
     db.commit()
 
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=1, id=incident_id)
+    return OONIFindingsUpdateResponse(r=1, id=finding_id)
 
 
 @router.post(
@@ -422,10 +422,10 @@ def delete_oonifinding(
     """
     assert delete_request
     account_id = token["account_id"]
-    incident_id = delete_request.incident_id
+    finding_id = delete_request.incident_id
 
     q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.incident_id == incident_id
+        models.OONIFinding.finding_id == finding_id
     )
     if token["role"] == "user":
         q = q.filter(models.OONIFinding.creator_account_id == account_id)
@@ -465,10 +465,10 @@ def update_oonifinding_publish_status(
         raise HTTPException(status_code=400, detail="Invalid query action")
 
     assert publish_request
-    incident_id = publish_request.incident_id
+    finding_id = publish_request.incident_id
 
     q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.incident_id == publish_request.incident_id
+        models.OONIFinding.finding_id == finding_id
     )
 
     try:
@@ -480,4 +480,4 @@ def update_oonifinding_publish_status(
     db.commit()
 
     setnocacheresponse(response)
-    return OONIFindingsUpdateResponse(r=1, id=incident_id)
+    return OONIFindingsUpdateResponse(r=1, id=finding_id)
