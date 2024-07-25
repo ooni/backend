@@ -103,7 +103,7 @@ def test_oonifinding_creator_validation(client, client_with_hashed_email):
     sample_end_time = start_time + timedelta(minutes=-1)
     z["end_time"] = sample_end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
-    assert r.status_code == 400, "invalid end_time should be rejected"
+    assert r.status_code == 422, "invalid end_time should be rejected"
 
     sample_end_time = start_time + timedelta(minutes=1)
     z["end_time"] = sample_end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -199,12 +199,12 @@ def test_oonifinding_delete(client, client_with_hashed_email):
     z["id"] = incident_id
     z["email_address"] = ""
     r = client_with_user_role.post("api/v1/incidents/delete", json=z)
-    assert r.status_code == 400
+    assert r.status_code == 403
 
     z["email_address"] = SAMPLE_EMAIL
     mismatched_client = client_with_hashed_email("user@ooni.org", "user")
     r = mismatched_client.post("api/v1/incidents/delete", json=z)
-    assert r.status_code == 400
+    assert r.status_code == 403
 
     r = client_with_user_role.post("api/v1/incidents/delete", json=z)
     assert r.status_code == 200
@@ -258,12 +258,12 @@ def test_oonifinding_update(client, client_with_hashed_email):
 
     incident_payload["email_address"] = ""
     r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
-    assert r.status_code == 400, "cannot update with invalid email"
+    assert r.status_code == 403, "cannot update with invalid email"
 
     incident_payload["email_address"] = SAMPLE_EMAIL
     mismatched_client = client_with_hashed_email("user@ooni.org", "user")
     r = mismatched_client.post("api/v1/incidents/update", json=incident_payload)
-    assert r.status_code == 400, "email should match account id"
+    assert r.status_code == 403, "email should match account id"
 
     r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
     assert r.status_code == 200
@@ -292,7 +292,7 @@ def test_oonifinding_update(client, client_with_hashed_email):
 
     incident_payload["published"] = True
     r = client_with_user_role.post("api/v1/incidents/update", json=incident_payload)
-    assert r.status_code == 400, "user role cannot publish incident" 
+    assert r.status_code == 403, "user role cannot publish incident" 
 
     r = client_with_admin_role.post("api/v1/incidents/update", json=incident_payload)
     assert r.status_code == 200
@@ -315,6 +315,11 @@ def test_oonifinding_workflow(
     client_with_admin_role = client_with_hashed_email(SAMPLE_EMAIL, "admin")
     
     z = deepcopy(SAMPLE_OONIFINDING)
+
+    r = client_with_admin_role.post("api/v1/incidents/create", json=z)
+    assert r.status_code == 200
+    assert r.json()["r"] == 1
+    assert r.headers["Cache-Control"] == "no-cache" 
 
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 200
@@ -371,7 +376,7 @@ def test_oonifinding_workflow(
     r = client.get("api/v1/incidents/search?only_mine=false")
     assert r.status_code == 200
     incidents = r.json()["incidents"]
-    assert len(incidents) == 2
+    assert len(incidents) == 1
     for incident in incidents:
         assert incident["email_address"] == ""
         assert incident["mine"] is False
@@ -380,7 +385,7 @@ def test_oonifinding_workflow(
     
     r = client_with_user_role.get("api/v1/incidents/search?only_mine=false")
     incidents = r.json()["incidents"]
-    assert len(incidents) == 4
+    assert len(incidents) == 2
     for incident in incidents:
         assert incident["email_address"] == ""
         assert incident["mine"] is False
@@ -388,7 +393,7 @@ def test_oonifinding_workflow(
 
     r = client_with_admin_role.get("api/v1/incidents/search?only_mine=false")
     incidents = r.json()["incidents"]
-    assert len(incidents) == 4
+    assert len(incidents) == 2
     for incident in incidents: 
         assert incident["email_address"] == SAMPLE_EMAIL
         assert incident["mine"] is True
@@ -409,7 +414,7 @@ def test_oonifinding_workflow(
     r = client_account_with_user_role.get("api/v1/incidents/search?only_mine=true")
     assert r.status_code == 200
     incidents = r.json()["incidents"]
-    assert len(incidents) == 4
+    assert len(incidents) == 2
     for incident in incidents:
         assert incident["email_address"] == ""
         assert incident["mine"] is True
@@ -418,7 +423,7 @@ def test_oonifinding_workflow(
     r = client_with_admin_role.get("api/v1/incidents/search?only_mine=true")
     assert r.status_code == 200
     incidents = r.json()["incidents"]
-    assert len(incidents) == 4
+    assert len(incidents) == 2
     for incident in incidents:
         assert incident["email_address"] == SAMPLE_EMAIL
         assert incident["mine"] is True

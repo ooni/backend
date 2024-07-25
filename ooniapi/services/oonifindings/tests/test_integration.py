@@ -13,22 +13,21 @@ LISTEN_PORT = random.randint(30_000, 42_000)
 
 
 @pytest.fixture
-def server(clickhouse_server):
-    os.environ["CLICKHOUSE_URL"] = clickhouse_server
+def server(alembic_migration):
+    os.environ["POSTGRESQL_URL"] = alembic_migration
     proc = Process(
         target=uvicorn.run,
-        args=("oonifindings.main:app"),
-        kwargs={"host": "127.0.0.1", "port": LISTEN_PORT, "log_level": "info"},
+        args=("oonirun.main:app",),
+        kwargs={"host": "127.0.0.1", "port": LISTEN_PORT, "log_level": "debug"},
         daemon=True,
     )
-
     proc.start()
     # Give it as second to start
     time.sleep(1)
     yield
     proc.kill()
     # Note: coverage is not being calculated properly
-    # TODO(art): https://pytest-cov.readthedocs.io/en/latest/subprocess-support.html
+    # TODO(decfox): https://pytest-cov.readthedocs.io/en/latest/subprocess-support.html
     proc.join()
 
 
