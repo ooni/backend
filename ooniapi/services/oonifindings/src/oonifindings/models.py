@@ -13,6 +13,7 @@ class OONIFinding(Base):
 
     # TODO(decfox): add primary key finding id
     finding_id: Mapped[str] = mapped_column(String, primary_key=True)
+    finding_slug: Mapped[str] = mapped_column(String, nullable=True)
 
     create_time: Mapped[datetime] = mapped_column(UtcDateTime())
     update_time: Mapped[datetime] = mapped_column(UtcDateTime())

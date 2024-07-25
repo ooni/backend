@@ -27,6 +27,7 @@ def upgrade() -> None:
             nullable=False,
             primary_key=True,
         ),
+        sa.Column("finding_slug", sa.String(), nullable=True),
         sa.Column("create_time", sa.DateTime(timezone=True), nullable=False),
         sa.Column("update_time", sa.DateTime(timezone=True), nullable=False),
         sa.Column("start_time", sa.DateTime(timezone=True), nullable=True),

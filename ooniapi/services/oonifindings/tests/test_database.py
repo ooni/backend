@@ -12,7 +12,7 @@ from oonifindings.routers.v1 import utcnow_seconds
 
 sample_start_time = (utcnow_seconds() + timedelta(minutes=-1))
 
-SAMPLE_EMAIL = "sample@ooni.org"
+SAMPLE_EMAIL = "sample@i.org"
 
 SAMPLE_OONIFINDING = {
     "title": "sample oonifinding",
@@ -84,6 +84,7 @@ def test_upgrade_to_head(postgresql):
     db_finding = models.OONIFinding(
         **finding,
         finding_id="000000000",
+        finding_slug="2024-07-sample-finding",
         create_time=utcnow_seconds(),
         update_time=utcnow_seconds(),
         creator_account_id="000000000",
@@ -100,6 +101,7 @@ def test_upgrade_to_head(postgresql):
         db_finding = models.OONIFinding(
             **finding,
             finding_id="000000000",
+            finding_slug="2024-07-sample-finding",
             create_time="NOT A DATE",
             update_time=utcnow_seconds(),
             creator_account_id="000000000",
@@ -113,6 +115,7 @@ def test_upgrade_to_head(postgresql):
         db_finding = models.OONIFinding(
             **finding,
             finding_id="000000000",
+            finding_slug="2024-07-sample-finding",
             create_time=naive_datetime,
             update_time=utcnow_seconds(),
             creator_account_id="000000000",
@@ -125,6 +128,7 @@ def test_upgrade_to_head(postgresql):
         db_finding = models.OONIFinding(
             **finding,
             finding_id="000000000",
+            finding_slug="2024-07-sample-finding",
             create_time=None,
             update_time=utcnow_seconds(),
             creator_account_id="000000000",
