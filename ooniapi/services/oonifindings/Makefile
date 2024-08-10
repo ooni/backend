@@ -38,7 +38,6 @@ docker-push:
 	docker push ${IMAGE_NAME}:${ENV_LABEL}
 
 docker-smoketest:
-	chmod +x ./scripts/docker-smoketest.sh
 	./scripts/docker-smoketest.sh ${IMAGE_NAME}:${BUILD_LABEL}
 
 imagedefinitions.json:
