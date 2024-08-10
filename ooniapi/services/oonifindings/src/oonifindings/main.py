@@ -71,25 +71,24 @@ async def health(
     errors = []
 
     try:
-       db.query(models.OONIFinding).limit(1).all()
+        db.query(models.OONIFinding).limit(1).all()
     except Exception as exc:
-       log.error(exc)
-       errors.append("db_error")
+        log.error(exc)
+        errors.append("db_error")
 
     if settings.jwt_encryption_key == "CHANGEME":
-       err = "bad_jwt_secret"
-       log.error(err)
-       errors.append(err)
+        err = "bad_jwt_secret"
+        log.error(err)
+        errors.append(err)
 
     if settings.prometheus_metrics_password == "CHANGEME":
-       err = "bad_prometheus_password"
-       log.error(err)
-       errors.append(err)
-
-    if len(errors) > 0:
-       raise HTTPException(status_code=400, detail="health check failed")
+        err = "bad_prometheus_password"
+        log.error(err)
+        errors.append(err)
 
     status = "ok"
+    if len(errors) > 0:
+        status = "fail"
 
     return {
         "status": status,
