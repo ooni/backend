@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+*.pyc
+*.swp
+*.env
+.coverage
+coverage.xml
+dist/
+.venv/
+__pycache__/

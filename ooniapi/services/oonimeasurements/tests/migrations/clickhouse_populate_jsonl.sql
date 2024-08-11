@@ -1,0 +1,1 @@
+INSERT INTO jsonl (report_id, input, s3path, linenum) VALUES ('20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3', 'https://www.backtrack-linux.org/', 'raw/20210709/00/MY/webconnectivity/2021070900_MY_webconnectivity.n0.2.jsonl.gz', 35)

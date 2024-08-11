@@ -7,25 +7,21 @@ from datetime import datetime, timedelta, date
 from typing import List, Any, Dict, Optional, Union
 import logging
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
-# debdeps: python3-sqlalchemy
-from sqlalchemy.sql.expression import and_, select, column, table
+from clickhouse_driver import Client as ClickhouseClient
+
+from sqlalchemy.sql.expression import and_, select, column
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
 
-from ooniapi.common.config import settings, metrics
-from ..utils import (
-    jerror,
-    convert_to_csv,
-    commasplit,
-    query_click,
-    query_click_one_row,
-)
-from ..dependencies import ClickhouseClient, get_clickhouse_client
+from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
+from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
+from ..dependencies import get_clickhouse_session
+
 
 router = APIRouter()
 
@@ -137,12 +133,12 @@ class MeasurementAggregation(BaseModel):
     result: Union[List[AggregationResult], AggregationResult]
 
 
-@router.get("/v1/aggregation", response_model_exclude_none=True)
-@metrics.timer("get_aggregated")
+@router.get(
+    "/v1/aggregation", 
+    response_model_exclude_none=True
+)
 async def get_measurements(
-    db: Annotated[ClickhouseClient, Depends(get_clickhouse_client)],
     response: Response,
-    request: Request,
     input: Annotated[
         Optional[str],
         Query(
@@ -231,6 +227,7 @@ async def get_measurements(
     download: Annotated[
         Optional[bool], Query(description="If we should be triggering a file download")
     ] = False,
+    db=Depends(get_clickhouse_session),
 ):  # TODO(art): figure out how to define either CSV or JSON data format in the response
     """Aggregate counters data"""
     # TODO:
@@ -250,7 +247,7 @@ async def get_measurements(
                 int(i[2:]) if i.startswith("AS") else i for i in commasplit(probe_asn)
             ]
         except ValueError:
-            raise ValueError(f"Invalid ASN value in parameter probe_asn")
+            raise HTTPException(status_code=400, detail="Invalid ASN value in parameter probe_asn")
 
     probe_cc_s = []
     if probe_cc:
@@ -416,4 +413,4 @@ async def get_measurements(
             ).model_dump(exclude_none=True)
 
     except Exception as e:
-        return jerror(str(e), v=0)
+        raise HTTPException(status_code=400, detail=str(e))
