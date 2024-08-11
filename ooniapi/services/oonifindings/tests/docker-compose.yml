@@ -1,6 +1,0 @@
-version: '2'
-services:
-  clickhouse:
-    image: "clickhouse/clickhouse-server"
-    ports:
-      - "9000:9000"

@@ -12,15 +12,16 @@ def test_health_good(client):
     assert len(j["errors"]) == 0, j
 
 
+# TODO(decfox): have a stronger health check test
 def test_health_bad(client_with_bad_settings):
     r = client_with_bad_settings.get("health")
     j = r.json()
-    assert j["detail"] == "health check failed", j
-    assert r.status_code == 400
+    assert r.status_code == 200
+    assert j["status"] == "fail", j
 
 
 def test_metrics(client):
-    r = client.get("/metrics") 
+    client.get("/metrics")
 
 
 @pytest.mark.asyncio

@@ -8,13 +8,12 @@ from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from . import models
 from .routers import v1
 
-from .dependencies import get_settings, get_clickhouse_session
+from .dependencies import get_settings, get_postgresql_session
 from .common.version import get_build_label, get_pkg_version
-from .common.clickhouse_utils import query_click
 from .common.metrics import mount_metrics
-
 
 pkg_name = "oonifindings"
 
@@ -67,17 +66,12 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings=Depends(get_settings),
-    db=Depends(get_clickhouse_session),
+    db=Depends(get_postgresql_session),
 ):
     errors = []
 
     try:
-        query = f"""SELECT id, update_time, start_time, end_time, reported_by,
-        title, event_type, published, CCs, ASNs, domains, tags, test_names,
-        links, short_description, email_address, create_time, creator_account_id 
-        FROM incidents FINAL
-        """
-        query_click(db=db, query=query, query_params={})
+        db.query(models.OONIFinding).limit(1).all()
     except Exception as exc:
         log.error(exc)
         errors.append("db_error")
@@ -86,17 +80,16 @@ async def health(
         err = "bad_jwt_secret"
         log.error(err)
         errors.append(err)
-    
+
     if settings.prometheus_metrics_password == "CHANGEME":
         err = "bad_prometheus_password"
         log.error(err)
         errors.append(err)
 
-    if len(errors) > 0:
-        raise HTTPException(status_code=400, detail="health check failed")
-    
     status = "ok"
-    
+    if len(errors) > 0:
+        status = "fail"
+
     return {
         "status": status,
         "errors": errors,
