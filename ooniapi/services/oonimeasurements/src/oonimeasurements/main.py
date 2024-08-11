@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
@@ -74,7 +74,7 @@ async def health(
     errors = []
 
     try:
-        query = f"""SELECT *
+        query = """SELECT *
         FROM fastpath FINAL
         """
         query_click(db=db, query=query, query_params={})
@@ -86,17 +86,16 @@ async def health(
         err = "bad_jwt_secret"
         log.error(err)
         errors.append(err)
-    
+
     if settings.prometheus_metrics_password == "CHANGEME":
         err = "bad_prometheus_password"
         log.error(err)
         errors.append(err)
 
-    if len(errors) > 0:
-        raise HTTPException(status_code=400, detail="health check failed")
-    
     status = "ok"
-    
+    if len(errors) > 0:
+        status = "fail"
+
     return {
         "status": status,
         "errors": errors,
