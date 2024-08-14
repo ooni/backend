@@ -1,21 +1,23 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from . import models
-from .routers import v1
+from .routers import aggregation, measurements
 
-from .dependencies import get_settings, get_postgresql_session
+from .dependencies import get_clickhouse_session
+from .common.dependencies import get_settings
 from .common.version import get_build_label, get_pkg_version
+from .common.clickhouse_utils import query_click
 from .common.metrics import mount_metrics
 
-pkg_name = "oonifindings"
+
+pkg_name = "oonimeasurements"
 
 pkg_version = get_pkg_version(pkg_name)
 build_label = get_build_label(pkg_name)
@@ -34,7 +36,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 instrumentor = Instrumentator().instrument(
-    app, metric_namespace="ooniapi", metric_subsystem="oonifindings"
+    app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"
 )
 
 # TODO: temporarily enable all
@@ -47,7 +49,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(v1.router, prefix="/api")
+app.include_router(measurements.router, prefix="/api")
+app.include_router(aggregation.router, prefix="/api")
 
 
 @app.get("/version")
@@ -66,12 +69,15 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings=Depends(get_settings),
-    db=Depends(get_postgresql_session),
+    db=Depends(get_clickhouse_session),
 ):
     errors = []
 
     try:
-        db.query(models.OONIFinding).limit(1).all()
+        query = """SELECT *
+        FROM fastpath FINAL
+        """
+        query_click(db=db, query=query, query_params={})
     except Exception as exc:
         log.error(exc)
         errors.append("db_error")
