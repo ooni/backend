@@ -137,11 +137,11 @@ class OONIFindingIncidents(BaseModel):
     response_model=OONIFindingIncidents
 )
 def list_oonifindings(
+    response: Response,
     only_mine: Annotated[
         bool,
         Query(description="show only owned items")
-    ],
-    response: Response,
+    ] = False,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
