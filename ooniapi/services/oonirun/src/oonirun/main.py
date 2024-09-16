@@ -38,11 +38,9 @@ instrumentor = Instrumentator().instrument(
     app, metric_namespace="ooniapi", metric_subsystem="oonirun"
 )
 
-# TODO: temporarily enable all
-origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
