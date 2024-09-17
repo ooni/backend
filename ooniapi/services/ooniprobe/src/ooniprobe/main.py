@@ -40,7 +40,6 @@ instrumentor = Instrumentator().instrument(
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
-    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
