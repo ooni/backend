@@ -12,6 +12,7 @@ VALID_REDIRECT_TO_FQDN = (
     "explorer.ooni.org",
     "explorer.test.ooni.org",
     "run.ooni.io",
+    "run.ooni.org",
     "run.test.ooni.org",
     "run-v2.ooni.org",
     "test-lists.ooni.org",

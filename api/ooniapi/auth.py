@@ -249,6 +249,7 @@ def validate_redirect_url(rt_url: str) -> Tuple[str, str]:
         "explorer.ooni.org",
         "explorer.test.ooni.org",
         "run.ooni.io",
+        "run.ooni.org",
         "run.test.ooni.org",
         "run-v2.ooni.org",
         "test-lists.ooni.org",
