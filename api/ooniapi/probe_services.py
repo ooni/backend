@@ -580,7 +580,7 @@ def generate_test_helpers_conf() -> Dict:
         [
             "https://0.th.ooni.org",
             "https://6.th.ooni.org",
-            "https://4.th.ooni.org",
+            "https://5.th.ooni.org",
         ]
     )
     conf["web-connectivity"].append(
