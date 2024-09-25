@@ -1,3 +1,9 @@
+ooni-api (1.0.95) unstable; urgency=medium
+
+  * return only 6,5 test helpers
+
+ -- Arturo <arturo@ooni.org>  Wed, 25 Sep 2024 17:04:18 +0300
+
 ooni-api (1.0.94) unstable; urgency=medium
 
   * return only 0,6,5 test helpers
