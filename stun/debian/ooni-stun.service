@@ -1,0 +1,32 @@
+[Unit]
+Description=ooni-stun
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ooni-stun.py
+Restart=on-abort
+Type=simple
+RestartSec=2s
+
+User=oonistun
+Group=oonistun
+ReadOnlyDirectories=/
+ReadWriteDirectories=/proc/self
+
+PermissionsStartOnly=true
+LimitNOFILE=65536
+
+# Sandboxing
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+SystemCallFilter=~@clock @debug @cpu-emulation @keyring @module @mount @obsolete @raw-io @reboot @swap
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+
+[Install]
+WantedBy=multi-user.target
