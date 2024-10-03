@@ -1,6 +1,5 @@
 """
 Aggregation API
-The routes are mounted under /api
 """
 
 from datetime import datetime, timedelta, date
@@ -20,7 +19,7 @@ from sqlalchemy.sql.expression import text as sql_text
 
 from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
 from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
-from ..dependencies import get_clickhouse_session
+from ...dependencies import get_clickhouse_session
 
 
 router = APIRouter()
