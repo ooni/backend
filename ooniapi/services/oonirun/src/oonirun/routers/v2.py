@@ -20,7 +20,7 @@ from .. import models
 from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
-    get_account_id_or_none, 
+    get_account_id_or_none,
 )
 from ..dependencies import get_postgresql_session
 

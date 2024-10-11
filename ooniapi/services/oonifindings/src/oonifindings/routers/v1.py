@@ -3,6 +3,7 @@ OONIFindings incidents management
 """
 
 from datetime import datetime, timezone
+import re
 from typing import List, Optional, Union, Tuple, Any, Annotated
 import logging
 
@@ -19,7 +20,7 @@ from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_raise,
     get_account_id_or_none,
-    get_client_role
+    get_client_role,
 )
 from ..common.utils import setnocacheresponse, generate_random_intuid
 from ..dependencies import get_postgresql_session
@@ -34,27 +35,22 @@ def utcnow_seconds():
 
 
 class OONIFindingId(BaseModel):
-    incident_id: str = Field(
-        alias="id"
-    )
+    incident_id: str = Field(alias="id")
 
 
 class OONIFindingWithMail(OONIFindingId):
-    email_address: str = Field(
-        default="", title="email address of user"
-    )
+    email_address: str = Field(default="", title="email address of user")
 
 
 class OONIFinding(OONIFindingWithMail):
-    title: str = Field(
-        title="title of the ooni finding"
-    )
+    title: str = Field(title="title of the ooni finding")
     short_description: str = Field(
         default="", title="short description of the oonifinding report"
     )
-    start_time: datetime = Field(
-        title="date when the oonifinding incident started"
+    slug: Optional[str] = Field(
+        title="slug used to access the OONI Finding", default=None
     )
+    start_time: datetime = Field(title="date when the oonifinding incident started")
     create_time: Optional[datetime] = Field(
         default=None, title="date when the oonifinding report was created"
     )
@@ -64,23 +60,20 @@ class OONIFinding(OONIFindingWithMail):
     end_time: Optional[datetime] = Field(
         default=None, title="time when the oonifinding incident ended"
     )
-    reported_by: str = Field(
-        default="", title="name of the oonifinding reporter"
-    )
+    reported_by: str = Field(default="", title="name of the oonifinding reporter")
     creator_account_id: Optional[str] = Field(
         default="", title="account id of the oonifinding report creator"
     )
-    published: bool = Field(
-        default=False, title="binary check if event is published"
-    )
-    event_type: str = Field(
-        default="", title="type of oonifinding event"
-    )
+    published: bool = Field(default=False, title="binary check if event is published")
+    event_type: str = Field(default="", title="type of oonifinding event")
     ASNs: List[int] = Field(
         default=[], description="list of ASNs associate with the oonifinding"
     )
     CCs: List[str] = Field(
         default=[], description="list of country codes associated with the oonifinding"
+    )
+    themes: List[str] = Field(
+        default=[], description="list of themes related to this oonifinding"
     )
     tags: List[str] = Field(
         default=[], description="tags associated with the oonifinding"
@@ -101,26 +94,25 @@ class OONIFinding(OONIFindingWithMail):
     @field_validator("end_time")
     @classmethod
     def check_time_difference(cls, end_time: datetime, info: ValidationInfo):
-        start_time = info.data.get('start_time')
+        start_time = info.data.get("start_time")
         if end_time and start_time:
             start_time = start_time.replace(microsecond=0)
             end_time = end_time.replace(microsecond=0)
             delta = end_time - start_time
             if delta.total_seconds() < 0:
                 raise ValueError("invalid start and end time")
+        return end_time
 
 
 class OONIFindingWithText(OONIFinding):
-    text: str = Field(
-        title="content of the oonifinding report"
-    )
+    text: str = Field(title="content of the oonifinding report")
 
     @field_validator("title", "text")
     @classmethod
     def check_empty(cls, v: str):
         if not v:
             raise ValueError("field cannot be empty")
-        return v 
+        return v
 
 
 class OONIFindingIncident(BaseModel):
@@ -132,16 +124,27 @@ class OONIFindingIncidents(BaseModel):
 
 
 @router.get(
-    "/v1/incidents/search",
-    tags=["oonifindings"],
-    response_model=OONIFindingIncidents
+    "/v1/incidents/search", tags=["oonifindings"], response_model=OONIFindingIncidents
 )
 def list_oonifindings(
     response: Response,
-    only_mine: Annotated[
-        bool,
-        Query(description="show only owned items")
-    ] = False,
+    only_mine: Annotated[bool, Query(description="show only owned items")] = False,
+    theme: Annotated[
+        list[str] | None,
+        Query(description="The theme key to filter by"),
+    ] = None,
+    country_code: Annotated[
+        list[str] | None,
+        Query(description="The country code to filter by"),
+    ] = None,
+    asn: Annotated[
+        list[str] | None,
+        Query(description="The asn to filter by"),
+    ] = None,
+    domain: Annotated[
+        list[str] | None,
+        Query(description="The domain to filter by"),
+    ] = None,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
@@ -151,15 +154,30 @@ def list_oonifindings(
     """
     log.debug("listing incidents")
 
-    client_role = get_client_role(authorization, jwt_encryption_key=settings.jwt_encryption_key)
+    client_role = get_client_role(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
 
     q = db.query(models.OONIFinding).filter(
         models.OONIFinding.deleted != 1,
-        sa.or_(not only_mine, models.OONIFinding.creator_account_id == account_id)
     )
+    if only_mine:
+        q = q.filter(models.OONIFinding.creator_account_id == account_id)
+    if theme:
+        q = q.filter(sa.or_(*[models.OONIFinding.themes.any_() == t for t in theme]))
+    if country_code:
+        q = q.filter(
+            sa.or_(
+                *[models.OONIFinding.country_codes.any_() == c for c in country_code]
+            )
+        )
+    if asn:
+        q = q.filter(sa.or_(*[models.OONIFinding.asns.any_() == c for c in asn]))
+    if domain:
+        q = q.filter(sa.or_(*[models.OONIFinding.domains.any_() == d for d in domain]))
 
     if account_id is None:
         # non-published incidents are not exposed to anon users
@@ -167,9 +185,11 @@ def list_oonifindings(
         account_id = "never-match"
 
     findings = []
+    row: models.OONIFinding
     for row in q.all():
         oonifinding = OONIFinding(
             id=row.finding_id,
+            slug=row.finding_slug,
             update_time=row.update_time,
             start_time=row.start_time,
             end_time=row.end_time,
@@ -178,7 +198,8 @@ def list_oonifindings(
             event_type=row.event_type,
             published=bool(row.published),
             CCs=row.country_codes,
-            ASNs=row.asns,
+            ASNs=[int(a) for a in row.asns],
+            themes=row.themes if row.themes else [],
             domains=row.domains,
             tags=row.tags,
             test_names=row.test_names,
@@ -186,7 +207,7 @@ def list_oonifindings(
             short_description=row.short_description,
             email_address=row.email_address,
             create_time=row.create_time,
-            mine=(row.creator_account_id == account_id)
+            mine=(row.creator_account_id == account_id),
         )
 
         if account_id is None or client_role != "admin":
@@ -201,29 +222,36 @@ def list_oonifindings(
 @router.get(
     "/v1/incidents/show/{finding_id}",
     tags=["oonifindings"],
-    response_model=OONIFindingIncident
+    response_model=OONIFindingIncident,
 )
 def get_oonifinding_by_id(
     finding_id: str,
     response: Response,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
-    settings=Depends(get_settings)
+    settings=Depends(get_settings),
 ):
     """
     Returns an incident
     """
     log.debug("showing incident")
 
-    client_role = get_client_role(authorization, jwt_encryption_key=settings.jwt_encryption_key)
+    client_role = get_client_role(
+        authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
 
     q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.finding_id == finding_id,
         models.OONIFinding.deleted != 1,
     )
+    try:
+        # If it's an int we assume it's not a slug
+        int(finding_id)
+        q = q.filter(models.OONIFinding.finding_id == finding_id)
+    except ValueError:
+        q = q.filter(models.OONIFinding.finding_slug == finding_id)
 
     # non-published incidents are not exposed to anon users
     if account_id is None:
@@ -231,12 +259,13 @@ def get_oonifinding_by_id(
         account_id = "never-match"
 
     try:
-        finding = q.one()
+        finding: models.OONIFinding = q.one()
     except sa.exc.NoResultFound:
         raise HTTPException(status_code=404, detail="OONI Finding not found")
 
     oonifinding = OONIFindingWithText(
         id=finding.finding_id,
+        slug=finding.finding_slug,
         update_time=finding.update_time,
         start_time=finding.start_time,
         end_time=finding.end_time,
@@ -246,15 +275,16 @@ def get_oonifinding_by_id(
         event_type=finding.event_type,
         published=bool(finding.published),
         CCs=finding.country_codes,
-        ASNs=finding.asns,
+        ASNs=[int(a) for a in finding.asns],
         domains=finding.domains,
+        themes=finding.themes,
         tags=finding.tags,
         test_names=finding.test_names,
         links=finding.links,
         short_description=finding.short_description,
         email_address=finding.email_address,
         create_time=finding.create_time,
-        mine=(finding.creator_account_id == account_id)
+        mine=(finding.creator_account_id == account_id),
     )
 
     if account_id is None or client_role != "admin":
@@ -278,20 +308,17 @@ class OONIFindingsUpdateResponse(OONIFindingId):
     )
 
 
-def validate_time(incident: OONIFinding) -> bool:
-    incident.start_time = incident.start_time.replace(microsecond=0)
-    if incident.end_time is not None:
-        incident.end_time = incident.end_time.replace(microsecond=0)
-        delta = incident.end_time - incident.start_time
-        if delta.total_seconds() < 0:
-            raise HTTPException(status_code=400, detail="invalid query paramters") 
-    return True
+def generate_finding_slug(create_time: datetime, title: str):
+    ts = create_time.strftime("%Y")
+    text_slug = re.sub("[^0-9a-zA-Z-]+", "", title.lower().replace(" ", "-"))
+    finding_slug = f"{ts}-{text_slug}"[:64]
+    return finding_slug
 
 
 @router.post(
     "/v1/incidents/create",
     tags=["oonifindings"],
-    response_model=OONIFindingsUpdateResponse
+    response_model=OONIFindingsUpdateResponse,
 )
 def create_oonifinding(
     create_request: OONIFindingCreateUpdate,
@@ -299,17 +326,15 @@ def create_oonifinding(
     authorization: str = Header("authorization"),
     token=Depends(role_required(["admin"])),
     db=Depends(get_postgresql_session),
-    settings=Depends(get_settings)
+    settings=Depends(get_settings),
 ):
     """
     Create an incident
     """
     if create_request.email_address != token["email_address"]:
-        raise HTTPException(status_code=400, detail="Invalid email address for creator account")
-
-    # assert create_request
-    if create_request.published:
-        raise HTTPException(status_code=400, detail="Invalid publish parameter on create request")
+        raise HTTPException(
+            status_code=400, detail="Invalid email address for creator account"
+        )
 
     # TODO(decfox): evaluate if we can replace this with a simple getter
     account_id = get_account_id_or_raise(
@@ -317,11 +342,16 @@ def create_oonifinding(
     )
     now = utcnow_seconds()
     finding_id = str(generate_random_intuid(collector_id=settings.collector_id))
+    finding_slug = generate_finding_slug(create_time=now, title=create_request.title)
+    if create_request.slug is not None:
+        finding_slug = create_request.slug
 
     log.info(f"Creating incident {finding_id}")
+    log.info(create_request)
 
     db_oonifinding = models.OONIFinding(
         finding_id=finding_id,
+        finding_slug=finding_slug,
         create_time=now,
         update_time=now,
         start_time=create_request.start_time,
@@ -338,6 +368,7 @@ def create_oonifinding(
         asns=create_request.ASNs,
         domains=create_request.domains,
         tags=create_request.tags,
+        themes=create_request.themes,
         links=create_request.links,
         test_names=create_request.test_names,
     )
@@ -352,7 +383,7 @@ def create_oonifinding(
 @router.post(
     "/v1/incidents/update",
     tags=["oonifindings"],
-    response_model=OONIFindingsUpdateResponse
+    response_model=OONIFindingsUpdateResponse,
 )
 def update_oonifinding(
     update_request: OONIFindingCreateUpdate,
@@ -368,15 +399,22 @@ def update_oonifinding(
 
     if token["role"] == "user":
         if update_request.email_address != token["email_address"]:
-            raise HTTPException(status_code=403, detail="You are not allowed to set the email address to something other than your email address")
+            raise HTTPException(
+                status_code=403,
+                detail="You are not allowed to set the email address to something other than your email address",
+            )
         if update_request.published:
-            raise HTTPException(status_code=403, detail="You are not allowed to publish")
+            raise HTTPException(
+                status_code=403, detail="You are not allowed to publish"
+            )
     else:
         assert token["role"] == "admin"
 
     q = db.query(models.OONIFinding).filter(
         models.OONIFinding.finding_id == finding_id,
-        sa.or_(token["role"] != "user", models.OONIFinding.creator_account_id == account_id)
+        sa.or_(
+            token["role"] != "user", models.OONIFinding.creator_account_id == account_id
+        ),
     )
     try:
         oonifinding = q.one()
@@ -386,6 +424,9 @@ def update_oonifinding(
     log.info(f"Updating incident {finding_id}")
 
     now = utcnow_seconds()
+    # TODO: we eventually want to disable editing this since these will be used as ways to access findings.
+    oonifinding.slug = update_request.slug
+
     oonifinding.update_time = now
     oonifinding.start_time = update_request.start_time
     oonifinding.end_time = update_request.end_time
@@ -398,6 +439,7 @@ def update_oonifinding(
     oonifinding.asns = update_request.ASNs
     oonifinding.domains = update_request.domains
     oonifinding.tags = update_request.tags
+    oonifinding.themes = update_request.themes
     oonifinding.links = update_request.links
     oonifinding.test_names = update_request.test_names
     oonifinding.short_description = update_request.short_description
@@ -409,8 +451,8 @@ def update_oonifinding(
 
 
 @router.post(
-      "/v1/incidents/delete",
-      tags=["oonifindings"],
+    "/v1/incidents/delete",
+    tags=["oonifindings"],
 )
 def delete_oonifinding(
     delete_request: OONIFindingWithMail,
@@ -427,13 +469,17 @@ def delete_oonifinding(
 
     if token["role"] == "user":
         if delete_request.email_address != token["email_address"]:
-            raise HTTPException(status_code=403, detail="You are not allowed to delete the incident")
+            raise HTTPException(
+                status_code=403, detail="You are not allowed to delete the incident"
+            )
     else:
         assert token["role"] == "admin"
 
     q = db.query(models.OONIFinding).filter(
         models.OONIFinding.finding_id == finding_id,
-        sa.or_(token["role"] != "user", models.OONIFinding.creator_account_id == account_id)
+        sa.or_(
+            token["role"] != "user", models.OONIFinding.creator_account_id == account_id
+        ),
     )
     try:
         q.one()
@@ -451,7 +497,7 @@ def delete_oonifinding(
     "/v1/incidents/{action}",
     tags=["oonifindings"],
     dependencies=[Depends(role_required(["admin"]))],
-    response_model=OONIFindingsUpdateResponse
+    response_model=OONIFindingsUpdateResponse,
 )
 def update_oonifinding_publish_status(
     action: str,
@@ -468,9 +514,7 @@ def update_oonifinding_publish_status(
     assert publish_request
     finding_id = publish_request.incident_id
 
-    q = db.query(models.OONIFinding).filter(
-        models.OONIFinding.finding_id == finding_id
-    )
+    q = db.query(models.OONIFinding).filter(models.OONIFinding.finding_id == finding_id)
 
     try:
         oonifinding = q.one()
