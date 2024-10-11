@@ -101,6 +101,7 @@ class OONIFinding(OONIFindingWithMail):
             delta = end_time - start_time
             if delta.total_seconds() < 0:
                 raise ValueError("invalid start and end time")
+        return end_time
 
 
 class OONIFindingWithText(OONIFinding):

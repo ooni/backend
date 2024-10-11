@@ -467,7 +467,6 @@ def test_oonifinding_create(client, client_with_hashed_email, client_with_user_r
     r = client.get(f"api/v1/incidents/show/{incident_id}")
     assert r.status_code == 200
     j = r.json()
-    print(j)
     assert j["incident"]["themes"] == ["social_media"]
     assert j["incident"]["start_time"] == sample_start_time
     assert j["incident"]["end_time"] == sample_end_time
