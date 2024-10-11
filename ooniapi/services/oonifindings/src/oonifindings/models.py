@@ -15,7 +15,7 @@ class OONIFinding(Base):
     # TODO(decfox): this is nullable for now. We should
     # make this a non-nullable field eventually and have an endpoint
     # where we can query findings using the finding_slug.
-    finding_slug: Mapped[str] = mapped_column(String, nullable=True)
+    finding_slug: Mapped[str] = mapped_column(String, nullable=False, unique=True)
 
     create_time: Mapped[datetime] = mapped_column(UtcDateTime())
     update_time: Mapped[datetime] = mapped_column(UtcDateTime())
@@ -35,6 +35,7 @@ class OONIFinding(Base):
     country_codes: Mapped[List[str]] = mapped_column(nullable=True)
     asns: Mapped[List[str]] = mapped_column(nullable=True)
     domains: Mapped[List[str]] = mapped_column(nullable=True)
+    themes: Mapped[List[str]] = mapped_column(nullable=True)
     tags: Mapped[List[str]] = mapped_column(nullable=True)
     links: Mapped[List[str]] = mapped_column(nullable=True)
     test_names: Mapped[List[str]] = mapped_column(nullable=True)
