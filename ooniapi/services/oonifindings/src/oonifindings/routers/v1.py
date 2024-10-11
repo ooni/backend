@@ -319,8 +319,8 @@ def validate_time(incident: OONIFinding) -> bool:
 
 def generate_finding_slug(create_time: datetime, title: str):
     ts = create_time.strftime("%Y")
-    text_slug = re.sub("[^0-9a-zA-Z\-]+", "", title.lower().replace(" ", "-"))
-    finding_slug = f"{ts}-{text_slug}"
+    text_slug = re.sub("[^0-9a-zA-Z-]+", "", title.lower().replace(" ", "-"))
+    finding_slug = f"{ts}-{text_slug}"[:64]
     return finding_slug
 
 
@@ -345,12 +345,6 @@ def create_oonifinding(
             status_code=400, detail="Invalid email address for creator account"
         )
 
-    # assert create_request
-    if create_request.published:
-        raise HTTPException(
-            status_code=400, detail="Invalid publish parameter on create request"
-        )
-
     # TODO(decfox): evaluate if we can replace this with a simple getter
     account_id = get_account_id_or_raise(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
@@ -362,10 +356,11 @@ def create_oonifinding(
         finding_slug = create_request.slug
 
     log.info(f"Creating incident {finding_id}")
+    log.info(create_request)
 
     db_oonifinding = models.OONIFinding(
         finding_id=finding_id,
-        slug=finding_slug,
+        finding_slug=finding_slug,
         create_time=now,
         update_time=now,
         start_time=create_request.start_time,
@@ -382,6 +377,7 @@ def create_oonifinding(
         asns=create_request.ASNs,
         domains=create_request.domains,
         tags=create_request.tags,
+        themes=create_request.themes,
         links=create_request.links,
         test_names=create_request.test_names,
     )
@@ -452,6 +448,7 @@ def update_oonifinding(
     oonifinding.asns = update_request.ASNs
     oonifinding.domains = update_request.domains
     oonifinding.tags = update_request.tags
+    oonifinding.themes = update_request.themes
     oonifinding.links = update_request.links
     oonifinding.test_names = update_request.test_names
     oonifinding.short_description = update_request.short_description

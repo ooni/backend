@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List
+import sqlalchemy as sa
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -32,10 +33,12 @@ class OONIFinding(Base):
     published: Mapped[int] = mapped_column()
     deleted: Mapped[int] = mapped_column(default=0)
 
-    country_codes: Mapped[List[str]] = mapped_column(nullable=True)
-    asns: Mapped[List[str]] = mapped_column(nullable=True)
-    domains: Mapped[List[str]] = mapped_column(nullable=True)
-    themes: Mapped[List[str]] = mapped_column(nullable=True)
-    tags: Mapped[List[str]] = mapped_column(nullable=True)
-    links: Mapped[List[str]] = mapped_column(nullable=True)
-    test_names: Mapped[List[str]] = mapped_column(nullable=True)
+    country_codes: Mapped[List[str]] = mapped_column(
+        sa.ARRAY(sa.String()), nullable=True
+    )
+    asns: Mapped[List[str]] = mapped_column(sa.ARRAY(sa.INT), nullable=True)
+    domains: Mapped[List[str]] = mapped_column(sa.ARRAY(sa.String()), nullable=True)
+    themes: Mapped[List[str]] = mapped_column(sa.ARRAY(sa.String()), nullable=True)
+    tags: Mapped[List[str]] = mapped_column(sa.ARRAY(sa.String()), nullable=True)
+    links: Mapped[List[str]] = mapped_column(sa.ARRAY(sa.String()), nullable=True)
+    test_names: Mapped[List[str]] = mapped_column(sa.ARRAY(sa.String()), nullable=True)
