@@ -35,7 +35,7 @@ def utcnow_seconds():
 
 
 class OONIFindingId(BaseModel):
-    incident_id: str = Field(alias="id")
+    incident_id: Optional[str] = Field(alias="id", default=None)
 
 
 class OONIFindingWithMail(OONIFindingId):
@@ -493,10 +493,6 @@ def delete_oonifinding(
     return {}
 
 
-class OONIFindingsPublish(BaseModel):
-    id: str = Field(title="ID of the finding")
-
-
 @router.post(
     "/v1/incidents/{action}",
     tags=["oonifindings"],
@@ -505,7 +501,7 @@ class OONIFindingsPublish(BaseModel):
 )
 def update_oonifinding_publish_status(
     action: str,
-    publish_request: OONIFindingsPublish,
+    publish_request: OONIFindingId,
     response: Response,
     db=Depends(get_postgresql_session),
 ):
@@ -516,7 +512,7 @@ def update_oonifinding_publish_status(
         raise HTTPException(status_code=400, detail="Invalid query action")
 
     assert publish_request
-    finding_id = publish_request.id
+    finding_id = publish_request.incident_id
 
     q = db.query(models.OONIFinding).filter(models.OONIFinding.finding_id == finding_id)
 

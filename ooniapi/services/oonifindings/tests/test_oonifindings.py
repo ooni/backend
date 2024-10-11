@@ -18,7 +18,6 @@ sample_end_time = (utcnow_seconds() + timedelta(days=30)).strftime(
 SAMPLE_EMAIL = "sample@ooni.org"
 
 SAMPLE_OONIFINDING = {
-    "id": "",
     "title": "sample oonifinding",
     "short_description": "sample oonifinding description",
     "reported_by": "sample user",
