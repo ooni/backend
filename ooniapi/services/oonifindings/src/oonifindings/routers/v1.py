@@ -140,6 +140,10 @@ def list_oonifindings(
         list[str] | None,
         Query(description="The asn to filter by"),
     ] = None,
+    domain: Annotated[
+        list[str] | None,
+        Query(description="The domain to filter by"),
+    ] = None,
     authorization: str = Header("authorization"),
     db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
@@ -171,6 +175,8 @@ def list_oonifindings(
         )
     if asn:
         q = q.filter(sa.or_(*[models.OONIFinding.asns.any_() == c for c in asn]))
+    if domain:
+        q = q.filter(sa.or_(*[models.OONIFinding.domains.any_() == d for d in domain]))
 
     if account_id is None:
         # non-published incidents are not exposed to anon users
