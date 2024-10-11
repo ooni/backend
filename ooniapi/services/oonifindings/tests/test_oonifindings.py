@@ -18,7 +18,6 @@ sample_end_time = (utcnow_seconds() + timedelta(days=30)).strftime(
 SAMPLE_EMAIL = "sample@ooni.org"
 
 SAMPLE_OONIFINDING = {
-    "id": "",
     "title": "sample oonifinding",
     "short_description": "sample oonifinding description",
     "reported_by": "sample user",
@@ -148,12 +147,12 @@ def test_oonifinding_publish(client, client_with_hashed_email):
     r = client_with_user_role.post("api/v1/incidents/publish", json=incident_payload)
     assert r.status_code == 401, "only admins can publish incidents"
 
-    incident_payload["id"] = "sample id"
-    r = client_with_admin_role.post("api/v1/incidents/publish", json=incident_payload)
+    r = client_with_admin_role.post("api/v1/incidents/publish", json={"id": "12341512"})
     assert r.status_code == 404, "valid incident id should be passed"
 
-    incident_payload["id"] = incident_id
-    r = client_with_admin_role.post("api/v1/incidents/publish", json=incident_payload)
+    r = client_with_admin_role.post(
+        "api/v1/incidents/publish", json={"id": incident_id}
+    )
     assert r.status_code == 200
     assert r.json()["r"] == 1
     assert r.json()["id"] == incident_id

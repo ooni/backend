@@ -35,7 +35,7 @@ def utcnow_seconds():
 
 
 class OONIFindingId(BaseModel):
-    incident_id: str = Field(alias="id")
+    incident_id: Optional[str] = Field(alias="id", default=None)
 
 
 class OONIFindingWithMail(OONIFindingId):
@@ -501,7 +501,7 @@ def delete_oonifinding(
 )
 def update_oonifinding_publish_status(
     action: str,
-    publish_request: OONIFindingCreateUpdate,
+    publish_request: OONIFindingId,
     response: Response,
     db=Depends(get_postgresql_session),
 ):
