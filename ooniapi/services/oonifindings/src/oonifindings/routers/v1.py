@@ -307,16 +307,6 @@ class OONIFindingsUpdateResponse(OONIFindingId):
     )
 
 
-def validate_time(incident: OONIFinding) -> bool:
-    incident.start_time = incident.start_time.replace(microsecond=0)
-    if incident.end_time is not None:
-        incident.end_time = incident.end_time.replace(microsecond=0)
-        delta = incident.end_time - incident.start_time
-        if delta.total_seconds() < 0:
-            raise HTTPException(status_code=400, detail="invalid query paramters")
-    return True
-
-
 def generate_finding_slug(create_time: datetime, title: str):
     ts = create_time.strftime("%Y")
     text_slug = re.sub("[^0-9a-zA-Z-]+", "", title.lower().replace(" ", "-"))

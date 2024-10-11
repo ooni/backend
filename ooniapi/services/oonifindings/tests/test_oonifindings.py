@@ -186,6 +186,10 @@ def test_oonifinding_delete(client, client_with_hashed_email):
     incident_id = r.json()["id"]
     assert incident_id
 
+    z["id"] = "not-exist"
+    r = client_with_admin_role.post("api/v1/incidents/delete", json=z)
+    assert r.status_code == 404
+
     z["id"] = incident_id
     r = client_with_admin_role.post("api/v1/incidents/delete", json=z)
     assert r.status_code == 200
@@ -233,6 +237,11 @@ def test_oonifinding_update(client, client_with_hashed_email):
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident_payload = r.json()["incident"]
+
+    not_exist = deepcopy(incident_payload)
+    not_exist["id"] = "does-not-exist"
+    r = client_with_admin_role.post("api/v1/incidents/update", json=not_exist)
+    assert r.status_code == 404
 
     sample_replacement_text = "sample replacement text for update"
     incident_payload["text"] = sample_replacement_text
@@ -438,6 +447,7 @@ def test_oonifinding_create(client, client_with_hashed_email, client_with_user_r
     z["CCs"] = ["IT", "GR"]
     z["domains"] = ["www.facebook.com"]
     z["slug"] = "this-is-my-slug"
+    z["ASNs"] = [1234]
     z["published"] = True
 
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
@@ -484,3 +494,10 @@ def test_oonifinding_create(client, client_with_hashed_email, client_with_user_r
     assert r.status_code == 200
     j = r.json()
     assert len(j["incidents"]) == 0
+
+    r = client.get(f"api/v1/incidents/search?asn=1234")
+    assert r.status_code == 200
+    j = r.json()
+    assert len(j["incidents"]) == 1
+
+    assert j["incidents"][0]["themes"] == ["social_media"]
