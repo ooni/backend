@@ -32,7 +32,7 @@ def convert_json_to_array(column_name: str):
 
 
 def convert_array_to_json(column_name: str):
-    op.add_column("oonifinding", sa.Column(f"{column_name}_tmp", sa.JSONB))
+    op.add_column("oonifinding", sa.Column(f"{column_name}_tmp", sa.JSON()))
     op.execute(
         f"""
         UPDATE oonifinding
