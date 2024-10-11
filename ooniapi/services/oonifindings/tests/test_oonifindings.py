@@ -11,6 +11,10 @@ sample_start_time = (utcnow_seconds() + timedelta(minutes=-1)).strftime(
     "%Y-%m-%dT%H:%M:%S.%fZ"
 )
 
+sample_end_time = (utcnow_seconds() + timedelta(days=30)).strftime(
+    "%Y-%m-%dT%H:%M:%S.%fZ"
+)
+
 SAMPLE_EMAIL = "sample@ooni.org"
 
 SAMPLE_OONIFINDING = {
@@ -449,6 +453,8 @@ def test_oonifinding_create(client, client_with_hashed_email, client_with_user_r
     z["slug"] = "this-is-my-slug"
     z["ASNs"] = [1234]
     z["published"] = True
+    z["start_time"] = sample_start_time
+    z["end_time"] = sample_end_time
 
     r = client_with_admin_role.post("api/v1/incidents/create", json=z)
     assert r.status_code == 200
@@ -463,6 +469,8 @@ def test_oonifinding_create(client, client_with_hashed_email, client_with_user_r
     j = r.json()
     print(j)
     assert j["incident"]["themes"] == ["social_media"]
+    assert j["incident"]["start_time"] == sample_start_time
+    assert j["incident"]["end_time"] == sample_end_time
 
     r = client.get(f"api/v1/incidents/show/this-is-my-slug")
     assert r.status_code == 200
