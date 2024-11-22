@@ -247,7 +247,6 @@ async def list_observations(
         q += " AND ".join(and_clauses)
     q += f" ORDER BY {order_by} {order} LIMIT {limit} OFFSET {offset}"
 
-    print(q, q_args)
     t = time.perf_counter()
     rows = db.execute(q, q_args)
 
