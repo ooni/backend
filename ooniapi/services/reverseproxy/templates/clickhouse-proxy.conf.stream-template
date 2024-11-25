@@ -1,8 +1,0 @@
-upstream clickhouse_backend {
-    server ${CLICKHOUSE_STREAM_TARGET};
-}
-
-server {
-    listen 9000;
-    proxy_pass clickhouse_backend; 
-}
