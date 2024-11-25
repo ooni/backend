@@ -110,10 +110,10 @@ async def get_aggregation_analysis(
         q_args["test_name"] = test_name
         and_clauses.append("test_name = %(test_name)s")
         extra_cols["test_name"] = "test_name"
-    # if category_code is not None:
-    #     q_args["category_code"] = category_code
-    #     and_clauses.append("%(category_code)s")
-    #     extra_cols["category_code"] = "category_code"
+    if ooni_run_link_id is not None:
+        q_args["ooni_run_link_id"] = ooni_run_link_id
+        and_clauses.append("%(ooni_run_link_id)s")
+        extra_cols["ooni_run_link_id"] = "ooni_run_link_id"
     if domain is not None:
         q_args["domain"] = domain
         and_clauses.append("domain = %(domain)s")
