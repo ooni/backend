@@ -11,6 +11,7 @@ dependencies = [
   "fastapi ~= 0.108.0",
   "psycopg2 ~= 2.9.5",
   "clickhouse-driver ~= 0.2.6",
+  "clickhouse-sqlalchemy",
   "sqlalchemy ~= 2.0.27",
   "ujson ~= 5.9.0",
   "urllib3 ~= 2.1.0",
