@@ -36,7 +36,7 @@ class AggregationEntry(BaseModel):
 
 
 class AggregationResponse(BaseModel):
-    aggregation: List[AggregationEntry]
+    results: List[AggregationEntry]
 
 
 AggregationKeys = Literal[
@@ -174,4 +174,4 @@ AND measurement_start_time < %(until)s
     for row in db.execute_iter(query, params_filter):
         d = dict(zip(column_keys, row))
         entries.append(AggregationEntry(**d))
-    return AggregationResponse(aggregation=entries)
+    return AggregationResponse(results=entries)

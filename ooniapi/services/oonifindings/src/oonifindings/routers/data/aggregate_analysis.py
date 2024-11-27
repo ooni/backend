@@ -1,5 +1,5 @@
+import time
 from datetime import date, datetime, timedelta, timezone
-from time import time
 from typing import List, Literal, Optional, Union, Dict
 from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
@@ -60,7 +60,7 @@ class AggregationResponse(BaseModel):
     # TODO(arturo): these keys are inconsistent with the other APIs
     db_stats: DBStats
     dimension_count: int
-    result: List[AggregationEntry]
+    results: List[AggregationEntry]
 
 
 @router.get("/v1/aggregation/analysis", tags=["aggregation", "analysis"])
@@ -243,7 +243,7 @@ async def get_aggregation_analysis(
             ) as tls_nok_outcomes,
             sum(tls_ok_max) as tls_ok_sum
 
-        FROM ooni.analysis_web_measurement
+        FROM analysis_web_measurement
         {where}
         GROUP BY {", ".join(extra_cols.keys())}
         ORDER BY {", ".join(extra_cols.keys())}
@@ -301,5 +301,5 @@ async def get_aggregation_analysis(
             total_row_count=len(results),
         ),
         dimension_count=dimension_count,
-        result=results,
+        results=results,
     )
