@@ -65,7 +65,7 @@ dependencies = [
   "click",
   "black",
   "pytest-asyncio",
-  "pytest-postgresql",
+  "pytest-postgresql"
 ]
 path = ".venv/"
 
