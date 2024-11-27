@@ -221,27 +221,27 @@ async def get_aggregation_analysis(
 
             sumMap(
                 map(
-                    CONCAT(IF(is_isp_resolver, 'dns_isp.blocked.', 'dns_other.blocked.'), dns_failure), dns_blocked_max,
-                    CONCAT(IF(is_isp_resolver, 'dns_isp.down.', 'dns_other.down.'), dns_failure), dns_down_max
+                    CONCAT(IF(is_isp_resolver, 'dns_isp.blocked.', 'dns_other.blocked.'), dns_failure), dns_blocked,
+                    CONCAT(IF(is_isp_resolver, 'dns_isp.down.', 'dns_other.down.'), dns_failure), dns_down
                 )
             ) as dns_nok_outcomes,
-            sum(dns_ok_max) as dns_ok_sum,
+            sum(dns_ok) as dns_ok_sum,
 
             sumMap(
                 map(
-                    CONCAT('tcp.blocked.', coalesce(top_tcp_failure, '')), tcp_blocked_max,
-                    CONCAT('tcp.down.', coalesce(top_tcp_failure, '')), tcp_down_max
+                    CONCAT('tcp.blocked.', coalesce(top_tcp_failure, '')), tcp_blocked,
+                    CONCAT('tcp.down.', coalesce(top_tcp_failure, '')), tcp_down
                 )
             )  as tcp_nok_outcomes,
-            sum(tcp_ok_max) as tcp_ok_sum,
+            sum(tcp_ok) as tcp_ok_sum,
 
             sumMap(
                 map(
-                    CONCAT('tls.blocked.', coalesce(top_tls_failure, '')), tls_blocked_max,
-                    CONCAT('tls.down.', coalesce(top_tls_failure, '')), tls_down_max
+                    CONCAT('tls.blocked.', coalesce(top_tls_failure, '')), tls_blocked,
+                    CONCAT('tls.down.', coalesce(top_tls_failure, '')), tls_down
                 )
             ) as tls_nok_outcomes,
-            sum(tls_ok_max) as tls_ok_sum
+            sum(tls_ok) as tls_ok_sum
 
         FROM analysis_web_measurement
         {where}

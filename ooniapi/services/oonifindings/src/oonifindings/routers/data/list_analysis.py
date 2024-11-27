@@ -45,15 +45,15 @@ class AnalysisEntry(BaseModel):
     top_dns_failure: Optional[str]
     top_tcp_failure: Optional[str]
     top_tls_failure: Optional[str]
-    dns_blocked_max: float
-    dns_down_max: float
-    dns_ok_max: float
-    tcp_blocked_max: float
-    tcp_down_max: float
-    tcp_ok_max: float
-    tls_blocked_max: float
-    tls_down_max: float
-    tls_ok_max: float
+    dns_blocked: float
+    dns_down: float
+    dns_ok: float
+    tcp_blocked: float
+    tcp_down: float
+    tcp_ok: float
+    tls_blocked: float
+    tls_down: float
+    tls_ok: float
 
 
 class ListAnalysisResponse(BaseModel):

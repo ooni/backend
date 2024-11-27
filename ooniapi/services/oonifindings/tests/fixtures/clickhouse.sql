@@ -16,15 +16,15 @@ CREATE TABLE
         `top_dns_failure` Nullable (String),
         `top_tcp_failure` Nullable (String),
         `top_tls_failure` Nullable (String),
-        `dns_blocked_max` Float32,
-        `dns_down_max` Float32,
-        `dns_ok_max` Float32,
-        `tcp_blocked_max` Float32,
-        `tcp_down_max` Float32,
-        `tcp_ok_max` Float32,
-        `tls_blocked_max` Float32,
-        `tls_down_max` Float32,
-        `tls_ok_max` Float32
+        `dns_blocked` Float32,
+        `dns_down` Float32,
+        `dns_ok` Float32,
+        `tcp_blocked` Float32,
+        `tcp_down` Float32,
+        `tcp_ok` Float32,
+        `tls_blocked` Float32,
+        `tls_down` Float32,
+        `tls_ok` Float32
     ) ENGINE = ReplacingMergeTree PRIMARY KEY measurement_uid
 ORDER BY
     (
