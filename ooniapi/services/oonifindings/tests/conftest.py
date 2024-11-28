@@ -1,7 +1,8 @@
 from pathlib import Path
-import pytest
-
 import time
+
+import pytest
+import requests
 import jwt
 
 from clickhouse_driver import Client as ClickhouseClient
@@ -16,8 +17,25 @@ from oonifindings.main import app
 THIS_DIR = Path(__file__).parent.resolve()
 
 
-def read_file(file_path: str):
-    return (Path(__file__).parent / file_path).read_text()
+def get_file_path(file_path: str):
+    return Path(__file__).parent / file_path
+
+
+@pytest.fixture(scope="session")
+def maybe_download_fixtures():
+    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/"
+    filenames = [
+        "analysis_web_measurement-sample.sql.gz",
+        "obs_web-sample.sql.gz",
+    ]
+    for fn in filenames:
+        dst_path = get_file_path(f"fixtures/{fn}")
+        if dst_path.exists():
+            continue
+        url = base_url + fn
+        print(f"Downloading {url} to {dst_path}")
+        r = requests.get(url)
+        dst_path.write_bytes(r.content)
 
 
 def is_clickhouse_running(url):
@@ -30,20 +48,13 @@ def is_clickhouse_running(url):
 
 
 @pytest.fixture(scope="session")
-def clickhouse_server(docker_ip, docker_services):
+def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     """Ensure that HTTP service is up and responsive."""
     port = docker_services.port_for("clickhouse", 9000)
     url = "clickhouse://{}:{}/default".format(docker_ip, port)
     docker_services.wait_until_responsive(
         timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
     )
-    with ClickhouseClient.from_url(url) as click:
-        queries = filter(
-            lambda x: x != "",
-            map(lambda x: x.strip(), read_file("fixtures/clickhouse.sql").split(";")),
-        )
-        for q in queries:
-            click.execute(q)
     yield url
 
 
