@@ -13,6 +13,8 @@ server {
 server {
     listen 80;
 
+    server_name _;
+
     location / {
         if ($request_method !~ ^(GET|POST|HEAD|OPTIONS|PUT|DELETE)$) {
             return 405;
@@ -27,4 +29,21 @@ server {
         proxy_set_header X-Real-IP $http_x_forwarded_for;
         proxy_cache_bypass $http_upgrade;
     }
+}
+
+upstream wcths {
+  server 157.230.124.6;
+  server 64.226.86.179;
+  server 104.248.46.122;
+}
+
+server {
+  server_name *.th.ooni.org;
+  listen 80;
+
+  location / {
+    proxy_pass http://wcths;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+  }
 }
