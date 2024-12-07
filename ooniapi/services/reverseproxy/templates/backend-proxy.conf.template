@@ -38,7 +38,7 @@ upstream wcths {
 }
 
 server {
-  server_name *.th.ooni.org;
+  server_name *.th.ooni.org d33d1gs9kpq1c5.cloudfront.net;
   listen 80;
 
   location / {
