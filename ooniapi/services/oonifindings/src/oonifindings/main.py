@@ -10,6 +10,12 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import models
 from .routers import v1
+from .routers.data import (
+    list_analysis,
+    list_observations,
+    aggregate_observations,
+    aggregate_analysis,
+)
 
 from .dependencies import get_settings, get_postgresql_session
 from .common.version import get_build_label, get_pkg_version
@@ -46,6 +52,10 @@ app.add_middleware(
 )
 
 app.include_router(v1.router, prefix="/api")
+app.include_router(list_analysis.router, prefix="/api")
+app.include_router(list_observations.router, prefix="/api")
+app.include_router(aggregate_observations.router, prefix="/api")
+app.include_router(aggregate_analysis.router, prefix="/api")
 
 
 @app.get("/version")
