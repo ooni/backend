@@ -18,3 +18,6 @@ class BaseModel(PydandicBaseModel):
             date: lambda v: v.strftime(ISO_FORMAT_DATE),
         }
     )
+
+class NotSupportedResponse(BaseModel):
+    mssg: str
