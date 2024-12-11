@@ -3,6 +3,7 @@ gzip_proxied any;
 gzip_types text/plain application/json;
 gzip_min_length 1000;
 
+
 server {
     listen 8080;
     location /stub_status {
@@ -11,6 +12,8 @@ server {
 }
 
 server {
+    real_ip_header X-Forwarded-For;
+
     listen 80;
 
     server_name _;
@@ -26,7 +29,7 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Real-IP $http_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
         proxy_cache_bypass $http_upgrade;
     }
 }
