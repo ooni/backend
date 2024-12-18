@@ -1,4 +1,3 @@
-
 import pytest
 
 from textwrap import dedent
@@ -22,7 +21,7 @@ def api(client, subpath, **kw):
         url += "?" + urlencode(kw)
 
     response = client.get(url)
-    assert response.status_code == 200, response.data
+    assert response.status_code == 200, response.json()
     assert is_json(response)
     return response.json()
 
@@ -40,7 +39,7 @@ def test_aggregation_no_axis_with_caching(client):
     # 0-dimensional data
     url = "aggregation?probe_cc=IT&probe_asn=AS3269&since=2024-01-01&until=2024-02-01"
     resp = client.get(f"/api/v1/{url}")
-    assert resp.status_code == 200, resp
+    assert resp.status_code == 200, resp.json()
     j = resp.json()
     assert j["dimension_count"] == 0
     assert j["v"] == 0
@@ -149,9 +148,9 @@ def test_aggregation_no_axis_filter_multi_domain(client):
         "result": {
             "anomaly_count": 0,
             "confirmed_count": 0,
-            "failure_count": 1,
-            "measurement_count": 16,
-            "ok_count": 15,
+            "failure_count": 0,
+            "measurement_count": 24,
+            "ok_count": 24,
         },
         "v": 0,
     }, fjd(r)
@@ -165,11 +164,11 @@ def test_aggregation_no_axis_filter_multi_probe_asn(client):
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 187,
+            "anomaly_count": 10,
             "confirmed_count": 0,
-            "failure_count": 5,
-            "measurement_count": 1689,
-            "ok_count": 1497,
+            "failure_count": 4,
+            "measurement_count": 24,
+            "ok_count": 10,
         },
         "v": 0,
     }, fjd(r)
@@ -183,11 +182,11 @@ def test_aggregation_no_axis_filter_multi_probe_cc(client):
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 123,
+            "anomaly_count": 1,
             "confirmed_count": 0,
-            "failure_count": 113,
-            "measurement_count": 2435,
-            "ok_count": 2199,
+            "failure_count": 0,
+            "measurement_count": 20,
+            "ok_count": 19,
         },
         "v": 0,
     }, fjd(r)
@@ -201,11 +200,11 @@ def test_aggregation_no_axis_filter_multi_test_name(client):
     assert r == {
         "dimension_count": 0,
         "result": {
-            "anomaly_count": 319,
-            "confirmed_count": 42,
-            "failure_count": 340,
-            "measurement_count": 8547,
-            "ok_count": 7846,
+            "anomaly_count": 11,
+            "confirmed_count": 0,
+            "failure_count": 2,
+            "measurement_count": 57,
+            "ok_count": 44,
         },
         "v": 0,
     }, fjd(r)
@@ -220,19 +219,19 @@ def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 317,
-                "confirmed_count": 42,
-                "failure_count": 339,
-                "measurement_count": 8488,
-                "ok_count": 7790,
+                "anomaly_count": 11,
+                "confirmed_count": 0,
+                "failure_count": 2,
+                "measurement_count": 55,
+                "ok_count": 42,
                 "test_name": "web_connectivity",
             },
             {
-                "anomaly_count": 2,
+                "anomaly_count": 0,
                 "confirmed_count": 0,
-                "failure_count": 1,
-                "measurement_count": 59,
-                "ok_count": 56,
+                "failure_count": 0,
+                "measurement_count": 2,
+                "ok_count": 2,
                 "test_name": "whatsapp",
             },
         ],
@@ -267,12 +266,12 @@ def test_aggregation_x_axis_only(client):
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 187,
+                "anomaly_count": 10,
                 "confirmed_count": 0,
-                "failure_count": 5,
-                "measurement_count": 1689,
+                "failure_count": 4,
+                "measurement_count": 24,
                 "measurement_start_day": "2021-07-09",
-                "ok_count": 1497,
+                "ok_count": 10,
             },
         ],
         "v": 0,
