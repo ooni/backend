@@ -199,7 +199,7 @@ def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str
 
 def _fetch_jsonl_measurement_body_clickhouse(
     db: ClickhouseClient,
-    measurement_uid: str,
+    measurement_uid: Optional[str],
     s3_bucket_name: str,
 ) -> Optional[bytes]:
     """
@@ -222,7 +222,10 @@ def _fetch_jsonl_measurement_body_clickhouse(
 
 
 def _fetch_measurement_body(
-    db: ClickhouseClient, settings: Settings, report_id: str, measurement_uid: str
+    db: ClickhouseClient,
+    settings: Settings,
+    report_id: str,
+    measurement_uid: Optional[str],
 ) -> str:
     """
     Fetch measurement body from either:
@@ -242,6 +245,7 @@ def _fetch_measurement_body(
             db, measurement_uid, settings.s3_bucket_name
         )
     else:
+        assert measurement_uid
         ts = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y%m%d%H%M")
         fresh = measurement_uid > ts
 
@@ -391,9 +395,7 @@ async def get_raw_measurement(
             detail="Either report_id or measurement_uid must be provided",
         )
 
-    if msmt_meta.report_id or msmt_meta.measurement_uid:
-        # TODO: fix the types in here. The fetch measurement_body function
-        # actually works with either report_id or measurement_uid being set.
+    if msmt_meta.report_id:
         body = _fetch_measurement_body(
             db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
         )
