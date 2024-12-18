@@ -61,4 +61,7 @@ clean:
 run:
 	hatch run uvicorn $(SERVICE_NAME).main:app
 
+apidocs:
+	hatch run python -m oonifindings.mkapidocs apidocs.json
+
 .PHONY: init test build clean docker print-labels
