@@ -1,15 +1,13 @@
 """
 Aggregation API
-The routes are mounted under /api
 """
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import List, Any, Dict, Optional, Union
 import logging
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel
 from typing_extensions import Annotated
 
 from clickhouse_driver import Client as ClickhouseClient
@@ -20,8 +18,8 @@ from sqlalchemy.sql.expression import text as sql_text
 
 from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
 from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
-from ..dependencies import get_clickhouse_session
-
+from ...dependencies import get_clickhouse_session
+from ...common.routers import BaseModel
 
 router = APIRouter()
 
@@ -116,7 +114,7 @@ class AggregationResult(BaseModel):
     failure_count: int
     ok_count: int
     measurement_count: int
-    measurement_start_day: Optional[date] = None
+    measurement_start_day: Optional[str] = None
     blocking_type: Optional[str] = None
     category_code: Optional[str] = None
     domain: Optional[str] = None
@@ -134,8 +132,9 @@ class MeasurementAggregation(BaseModel):
 
 
 @router.get(
-    "/v1/aggregation", 
-    response_model_exclude_none=True
+    "/v1/aggregation",
+    response_model_exclude_none=True,
+    response_model=MeasurementAggregation,
 )
 async def get_measurements(
     response: Response,
@@ -247,7 +246,9 @@ async def get_measurements(
                 int(i[2:]) if i.startswith("AS") else i for i in commasplit(probe_asn)
             ]
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid ASN value in parameter probe_asn")
+            raise HTTPException(
+                status_code=400, detail="Invalid ASN value in parameter probe_asn"
+            )
 
     probe_cc_s = []
     if probe_cc:
@@ -342,12 +343,16 @@ async def get_measurements(
     group_by: List = []
     try:
         if axis_x == "measurement_start_day":
-            group_by_date(since, until, time_grain, cols, colnames, group_by)
+            time_grain = group_by_date(
+                since, until, time_grain, cols, colnames, group_by
+            )
         elif axis_x:
             add_axis(axis_x, cols, colnames, group_by)
 
         if axis_y == "measurement_start_day":
-            group_by_date(since, until, time_grain, cols, colnames, group_by)
+            time_grain = group_by_date(
+                since, until, time_grain, cols, colnames, group_by
+            )
         elif axis_y:
             add_axis(axis_y, cols, colnames, group_by)
 
@@ -372,7 +377,17 @@ async def get_measurements(
 
     try:
         if dimension_cnt > 0:
-            r: Any = list(query_click(db, query, query_params, query_prio=4))
+            str_format = "%Y-%m-%d"
+            if time_grain == "hour":
+                str_format = "%Y-%m-%dT%H:%M:%SZ"
+            r: Any = []
+            for row in query_click(db, query, query_params, query_prio=4):
+                ## Handle the difference in formatting between hourly and daily measurement_start_day
+                if "measurement_start_day" in row:
+                    row["measurement_start_day"] = row[
+                        "measurement_start_day"
+                    ].strftime(str_format)
+                r.append(row)
         else:
             r = query_click_one_row(db, query, query_params, query_prio=4)
 
@@ -410,7 +425,8 @@ async def get_measurements(
                     elapsed_seconds=pq.elapsed,
                 ),
                 result=r,
-            ).model_dump(exclude_none=True)
+            )
 
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=400, detail=str(e))

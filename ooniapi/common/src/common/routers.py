@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Union
 from pydantic import BaseModel as PydandicBaseModel
 from pydantic import ConfigDict
 

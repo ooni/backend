@@ -42,7 +42,11 @@ def run_migration(path: Path, click: ClickhouseClient):
         q = q.strip()
         if not q:
             continue
-        click.execute(q)
+        try:
+            click.execute(q)
+        except Exception as e:
+            print(f"Error running migration {path}: {e}")
+            raise
 
 
 def create_db_for_fixture(conn_url):
@@ -72,7 +76,7 @@ def make_override_get_settings(**kw):
 @pytest.fixture
 def client_with_bad_settings():
     app.dependency_overrides[get_settings] = make_override_get_settings(
-        clickhouse_url = "clickhouse://badhost:9000"
+        clickhouse_url="clickhouse://badhost:9000"
     )
 
     client = TestClient(app)
@@ -85,9 +89,9 @@ def client(db):
         clickhouse_url=db,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
-        account_id_hashing_key="super_secure"
+        account_id_hashing_key="super_secure",
     )
-    
+
     client = TestClient(app)
     yield client
 
