@@ -1,0 +1,2 @@
+# Deployed as /etc/ooni/nftables/udp_3478.nft by the ooni-stun deb package
+add rule inet filter input udp dport 3478 counter accept comment "Incoming STUN"
