@@ -2,17 +2,15 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from sqlalchemy import create_engine
-from clickhouse_sqlalchemy import make_session
+from clickhouse_driver import Client as Clickhouse
 
 from .common.config import Settings
 from .common.dependencies import get_settings
 
+
 def get_clickhouse_session(settings: Annotated[Settings, Depends(get_settings)]):
-    engine = create_engine(settings.clickhouse_url)
-    session = make_session(engine)
- 
+    db = Clickhouse.from_url(settings.clickhouse_url)
     try:
-        yield session
-    finally: 
-        session.close()
+        yield db
+    finally:
+        db.disconnect()

@@ -132,10 +132,7 @@ class MeasurementAggregation(BaseModel):
     result: Union[List[AggregationResult], AggregationResult]
 
 
-@router.get(
-    "/v1/aggregation", 
-    response_model_exclude_none=True
-)
+@router.get("/v1/aggregation", response_model_exclude_none=True)
 async def get_measurements(
     response: Response,
     input: Annotated[
@@ -246,7 +243,9 @@ async def get_measurements(
                 int(i[2:]) if i.startswith("AS") else i for i in commasplit(probe_asn)
             ]
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid ASN value in parameter probe_asn")
+            raise HTTPException(
+                status_code=400, detail="Invalid ASN value in parameter probe_asn"
+            )
 
     probe_cc_s = []
     if probe_cc:
