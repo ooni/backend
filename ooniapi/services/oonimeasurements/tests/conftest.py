@@ -42,7 +42,11 @@ def run_migration(path: Path, click: ClickhouseClient):
         q = q.strip()
         if not q:
             continue
-        click.execute(q)
+        try:
+            click.execute(q)
+        except Exception as e:
+            print(f"Error running migration {path}: {e}")
+            raise
 
 
 def create_db_for_fixture(conn_url):
