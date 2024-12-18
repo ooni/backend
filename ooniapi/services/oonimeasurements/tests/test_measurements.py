@@ -313,19 +313,123 @@ def test_aggregation_x_axis_only_hour(client):
         "dimension_count": 1,
         "result": [
             {
-                "anomaly_count": 686,
-                "confirmed_count": 42,
-                "failure_count": 777,
-                "measurement_count": 9990,
+                "anomaly_count": 9,
+                "confirmed_count": 0,
+                "failure_count": 2,
+                "measurement_count": 20,
                 "measurement_start_day": "2021-07-09T00:00:00Z",
-                "ok_count": 8485,
+                "ok_count": 9,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 4,
+                "measurement_start_day": "2021-07-09T02:00:00Z",
+                "ok_count": 4,
             },
             {
                 "anomaly_count": 0,
                 "confirmed_count": 0,
                 "failure_count": 0,
                 "measurement_count": 1,
-                "measurement_start_day": "2021-07-09T01:00:00Z",
+                "measurement_start_day": "2021-07-09T03:00:00Z",
+                "ok_count": 1,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09T04:00:00Z",
+                "ok_count": 1,
+            },
+            {
+                "anomaly_count": 1,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 20,
+                "measurement_start_day": "2021-07-09T05:00:00Z",
+                "ok_count": 19,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09T07:00:00Z",
+                "ok_count": 1,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09T08:00:00Z",
+                "ok_count": 1,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 5,
+                "measurement_start_day": "2021-07-09T09:00:00Z",
+                "ok_count": 5,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09T10:00:00Z",
+                "ok_count": 1,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 2,
+                "measurement_start_day": "2021-07-09T12:00:00Z",
+                "ok_count": 2,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 3,
+                "measurement_start_day": "2021-07-09T14:00:00Z",
+                "ok_count": 3,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 2,
+                "measurement_start_day": "2021-07-09T15:00:00Z",
+                "ok_count": 2,
+            },
+            {
+                "anomaly_count": 2,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 2,
+                "measurement_start_day": "2021-07-09T16:00:00Z",
+                "ok_count": 0,
+            },
+            {
+                "anomaly_count": 1,
+                "confirmed_count": 0,
+                "failure_count": 2,
+                "measurement_count": 6,
+                "measurement_start_day": "2021-07-09T17:00:00Z",
+                "ok_count": 3,
+            },
+            {
+                "anomaly_count": 0,
+                "confirmed_count": 0,
+                "failure_count": 0,
+                "measurement_count": 1,
+                "measurement_start_day": "2021-07-09T19:00:00Z",
                 "ok_count": 1,
             },
         ],
@@ -341,14 +445,14 @@ def test_aggregation_x_axis_domain(client):
     r.pop("db_stats", None)
     assert r["dimension_count"] == 1
     for x in r["result"]:
-        if x["domain"] == "www.theregister.co.uk":
+        if x["domain"] == "anonym.to":
             assert x == {
-                "anomaly_count": 0,
+                "anomaly_count": 1,
                 "confirmed_count": 0,
-                "domain": "www.theregister.co.uk",
+                "domain": "anonym.to",
                 "failure_count": 0,
                 "measurement_count": 1,
-                "ok_count": 1,
+                "ok_count": 0,
             }
             return
 
@@ -383,34 +487,25 @@ def test_aggregation_x_axis_only_probe_cc(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=probe_cc"
     r = api(client, url)
     assert r["dimension_count"] == 1
-    assert len(r["result"]) == 33
+    assert len(r["result"]) == 4
 
 
 def test_aggregation_x_axis_only_category_code(client):
     # 1-dimensional data
-    url = "aggregation?probe_cc=IE&category_code=HACK&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day"
+    url = "aggregation?probe_cc=CH&category_code=GAME&since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day"
     r = api(client, url)
-    expected = {
-        "dimension_count": 1,
-        "result": [
-            {
-                "anomaly_count": 32,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1302,
-                "measurement_start_day": "2021-07-10",
-            },
-            {
-                "anomaly_count": 13,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1236,
-                "measurement_start_day": "2021-07-10",
-            },
-        ],
-        "v": 0,
-    }
-    assert r == expected, fjd(r)
+    assert r["result"] == [
+        {
+            "anomaly_count": 0,
+            "confirmed_count": 0,
+            "failure_count": 0,
+            "measurement_count": 1,
+            "ok_count": 1,
+            "measurement_start_day": "2021-07-09T00:00:00Z",
+        },
+    ]
+    assert r["dimension_count"] == 1
+    assert r["v"] == 0
 
 
 def test_aggregation_x_axis_only_csv(client):
