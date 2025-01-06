@@ -47,6 +47,6 @@ generate_doc 6 "backend/systemd-timers" "docs/SystemdTimers.md" "06-backend-syst
 generate_doc 7 "backend/analysis" "docs/BackendAnalysis.md" "07-backend-analysis.md" "Backend Analysis" "Backend Analysis documentation"
 generate_doc 8 "backend/database" "docs/Database.md" "08-backend-database.md" "Database" "OONI Database schemas, guidelines and more"
 generate_doc 9 "backend/other-components" "docs/OtherComponents.md" "09-backend-other-components.md" "Other components" "Other components, nginx, jupyter notebooks, etc. "
-generate_doc 10 "web-uis" "docs/WebUIs.md" "Web UIs" "Web UIs"
+generate_doc 10 "web-uis" "docs/WebUIs.md" "10-web-uis.md" "Web UIs" "Web UIs"
 generate_doc 11 "backend/ci-cd" "docs/CI-CD.md" "11-ci-cd.md" "CD/CI" "Continous Integration, Continous Delivery workflows"
 generate_doc 12 "backend/bridges" "docs/Bridges.md" "12-bridges.md" "OONI Bridges" "OONI Bridges"
