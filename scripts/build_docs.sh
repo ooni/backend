@@ -14,11 +14,12 @@ strip_title() {
 }
 
 generate_doc() {
-    local output_file="$1"
-    local title="$2"
-    local description="$3"
-    local slug="$4"
-    local input_file="$5"
+    local slug="$1"
+    local order="$2"
+    local input_file="$3"
+    local output_file="$4"
+    local title="$5"
+    local description="$6"
 
     cat <<EOF>"$DOCS_ROOT/$output_file"
 ---
@@ -27,6 +28,8 @@ generate_doc() {
 title: $title
 description: $description
 slug: $slug
+sidebar:
+    order: $order
 ---
 EOF
     echo "[edit file](https://github.com/$REPO_NAME/edit/$MAIN_BRANCH/$input_file)" >> "$DOCS_ROOT/$output_file"
@@ -34,16 +37,16 @@ EOF
 }
 
 # Generate documentation files
-generate_doc "00-index.md" "OONI Backend" "OONI Backend documentation" "backend" "README.md"
-generate_doc "01-ooniapi-guidelines.md" "OONI API Guidelines" "OONI API development guidelines" "backend/ooniapi" "ooniapi/README.md"
-generate_doc "02-ooniapi-services.md" "OONI API Services" "OONI API Services documentation" "backend/ooniapi/services" "docs/API.md"
-generate_doc "03-test-helpers.md" "OONI Test Helpers" "OONI Test helpers documentation" "backend/test-helpers" "docs/TestHelpers.md"
-generate_doc "04-backend-fastpath.md" "OONI Fastpath" "OONI Fastpath documentation" "backend/fastpath" "docs/Fastpath.md"
-generate_doc "05-backend-measurement-uploader.md" "OONI Measurement Uploader" "OONI measurement uploader documentation" "backend/measurement-uploader" "docs/MeasurementUploader.md"
-generate_doc "06-backend-systemd-timers.md" "Systemd Timers" "Systemd timers documentation" "backend/systemd-timers" "docs/SystemdTimers.md"
-generate_doc "07-backend-analysis.md" "Backend Analysis" "Backend Analysis documentation" "backend/analysis" "docs/BackendAnalysis.md"
-generate_doc "08-backend-database.md" "Database" "OONI Database schemas, guidelines and more" "backend/database" "docs/Database.md"
-generate_doc "09-backend-other-components.md" "Other components" "Other components, nginx, jupyter notebooks, etc. " "backend/other-components" "docs/OtherComponents.md"
-generate_doc "10-web-uis.md" "Web UIs" "Web UIs" "web-uis" "docs/WebUIs.md"
-generate_doc "11-ci-cd.md" "CD/CI" "Continous Integration, Continous Delivery workflows" "backend/ci-cd" "docs/CI-CD.md"
-generate_doc "12-bridges.md" "OONI Bridges" "OONI Bridges" "backend/bridges" "docs/Bridges.md"
+generate_doc 0 "backend" "README.md" "00-index.md" "OONI Backend" "OONI Backend documentation"
+generate_doc 1 "backend/ooniapi" "ooniapi/README.md" "01-ooniapi-guidelines.md" "OONI API Guidelines" "OONI API development guidelines"
+generate_doc 2 "backend/ooniapi/services" "docs/API.md" "02-ooniapi-services.md" "OONI API Services" "OONI API Services documentation"
+generate_doc 3 "backend/test-helpers" "docs/TestHelpers.md" "03-test-helpers.md" "OONI Test Helpers" "OONI Test helpers documentation"
+generate_doc 4 "backend/fastpath" "docs/Fastpath.md" "04-backend-fastpath.md" "OONI Fastpath" "OONI Fastpath documentation"
+generate_doc 5 "backend/measurement-uploader" "docs/MeasurementUploader.md" "05-backend-measurement-uploader.md" "OONI Measurement Uploader" "OONI measurement uploader documentation"
+generate_doc 6 "backend/systemd-timers" "docs/SystemdTimers.md" "06-backend-systemd-timers.md" "Systemd Timers" "Systemd timers documentation"
+generate_doc 7 "backend/analysis" "docs/BackendAnalysis.md" "07-backend-analysis.md" "Backend Analysis" "Backend Analysis documentation"
+generate_doc 8 "backend/database" "docs/Database.md" "08-backend-database.md" "Database" "OONI Database schemas, guidelines and more"
+generate_doc 9 "backend/other-components" "docs/OtherComponents.md" "09-backend-other-components.md" "Other components" "Other components, nginx, jupyter notebooks, etc. "
+generate_doc 10 "web-uis" "docs/WebUIs.md" "10-web-uis.md" "Web UIs" "Web UIs"
+generate_doc 11 "backend/ci-cd" "11-ci-cd.md" "docs/CI-CD.md" "11-ci-cd.md" "CD/CI" "Continous Integration, Continous Delivery workflows"
+generate_doc 12 "backend/bridges" "docs/Bridges.md" "12-bridges.md" "OONI Bridges" "OONI Bridges"
