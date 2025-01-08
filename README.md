@@ -1,5 +1,7 @@
 # OONI Backend
 
+**NOTE** this repository contains both the monolith API backend code (inside of `api/`) and the new port to some updated patterns based on fastapi (see: `ooniapi/`) 
+
 The backend infrastructure performs multiple functions:
 
 - Provide APIs for data consumers
