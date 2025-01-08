@@ -2,10 +2,7 @@ from pathlib import Path
 import time
 
 import pytest
-import requests
 import jwt
-
-from clickhouse_driver import Client as ClickhouseClient
 
 from fastapi.testclient import TestClient
 
@@ -15,47 +12,6 @@ from oonifindings.common.dependencies import get_settings
 from oonifindings.main import app
 
 THIS_DIR = Path(__file__).parent.resolve()
-
-
-def get_file_path(file_path: str):
-    return Path(__file__).parent / file_path
-
-
-@pytest.fixture(scope="session")
-def maybe_download_fixtures():
-    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/"
-    filenames = [
-        "analysis_web_measurement-sample.sql.gz",
-        "obs_web-sample.sql.gz",
-    ]
-    for fn in filenames:
-        dst_path = get_file_path(f"fixtures/{fn}")
-        if dst_path.exists():
-            continue
-        url = base_url + fn
-        print(f"Downloading {url} to {dst_path}")
-        r = requests.get(url)
-        dst_path.write_bytes(r.content)
-
-
-def is_clickhouse_running(url):
-    try:
-        with ClickhouseClient.from_url(url) as client:
-            client.execute("SELECT 1")
-        return True
-    except Exception:
-        return False
-
-
-@pytest.fixture(scope="session")
-def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
-    """Ensure that HTTP service is up and responsive."""
-    port = docker_services.port_for("clickhouse", 9000)
-    url = "clickhouse://{}:{}/default".format(docker_ip, port)
-    docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
-    )
-    yield url
 
 
 def make_override_get_settings(**kw):
@@ -95,10 +51,9 @@ def client_with_bad_settings():
 
 
 @pytest.fixture
-def client(alembic_migration, clickhouse_server):
+def client(alembic_migration):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         postgresql_url=alembic_migration,
-        clickhouse_url=clickhouse_server,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
         account_id_hashing_key="super_secure",

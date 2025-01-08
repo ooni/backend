@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 
+import requests
 import time
 import jwt
 
@@ -14,6 +15,27 @@ from oonimeasurements.main import app
 THIS_DIR = Path(__file__).parent.resolve()
 
 
+def get_file_path(file_path: str):
+    return Path(__file__).parent / file_path
+
+
+@pytest.fixture(scope="session")
+def maybe_download_fixtures():
+    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/"
+    filenames = [
+        "analysis_web_measurement-sample.sql.gz",
+        "obs_web-sample.sql.gz",
+    ]
+    for fn in filenames:
+        dst_path = get_file_path(f"fixtures/{fn}")
+        if dst_path.exists():
+            continue
+        url = base_url + fn
+        print(f"Downloading {url} to {dst_path}")
+        r = requests.get(url)
+        dst_path.write_bytes(r.content)
+
+
 def is_clickhouse_running(url):
     try:
         with ClickhouseClient.from_url(url) as client:
@@ -24,7 +46,7 @@ def is_clickhouse_running(url):
 
 
 @pytest.fixture(scope="session")
-def clickhouse_server(docker_ip, docker_services):
+def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     port = docker_services.port_for("clickhouse", 9000)
     url = "clickhouse://{}:{}".format(docker_ip, port)
     docker_services.wait_until_responsive(

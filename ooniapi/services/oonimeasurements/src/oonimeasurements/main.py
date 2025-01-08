@@ -10,6 +10,12 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from .routers.v1 import aggregation
 from .routers.v1 import measurements
+from .routers.data import (
+    list_analysis,
+    list_observations,
+    aggregate_observations,
+    aggregate_analysis,
+)
 
 from .dependencies import get_clickhouse_session
 from .common.dependencies import get_settings
@@ -50,6 +56,10 @@ app.add_middleware(
 
 app.include_router(measurements.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")
+app.include_router(list_analysis.router, prefix="/api")
+app.include_router(list_observations.router, prefix="/api")
+app.include_router(aggregate_observations.router, prefix="/api")
+app.include_router(aggregate_analysis.router, prefix="/api")
 
 
 @app.get("/version")

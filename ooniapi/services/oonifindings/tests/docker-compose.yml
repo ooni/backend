@@ -1,9 +1,0 @@
-version: '2'
-services:
-  clickhouse:
-    image: "clickhouse/clickhouse-server"
-    ports:
-      - "9000"
-    volumes:
-        - ./fixtures:/fixtures
-        - ./fixtures/initdb:/docker-entrypoint-initdb.d/
