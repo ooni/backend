@@ -8,7 +8,8 @@ from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from .routers import aggregation, measurements
+from .routers.v1 import aggregation
+from .routers.v1 import measurements
 
 from .dependencies import get_clickhouse_session
 from .common.dependencies import get_settings

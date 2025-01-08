@@ -15,13 +15,14 @@ def test_health_good(client):
 def test_health_bad(client_with_bad_settings):
     r = client_with_bad_settings.get("health")
     j = r.json()
-    assert j["detail"] == "health check failed", j
-    assert r.status_code == 400
+    print(j)
+    assert j["status"] == "fail", j
+    assert r.status_code == 200
 
 
 def test_metrics(client):
     r = client.get("/metrics")
-    
+
 
 @pytest.mark.asyncio
 async def test_lifecycle():

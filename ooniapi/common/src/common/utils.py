@@ -51,6 +51,8 @@ def commasplit(p: str) -> List[str]:
 def convert_to_csv(r) -> str:
     """Convert aggregation result dict/list to CSV"""
     csvf = StringIO()
+    if len(r) == 0:
+        return ""
     if isinstance(r, dict):
         # 0-dimensional data
         fieldnames = sorted(r.keys())
