@@ -66,5 +66,7 @@ db-migration: docker-build
 		-e OONI_PG_URL=$(shell aws secretsmanager get-secret-value --secret-id oonidevops/ooni-tier0-postgres/postgresql_url | jq .SecretString) \
 		${IMAGE_NAME}:${BUILD_LABEL} \
 		alembic upgrade head
+apidocs:
+	hatch run python -m oonirun.mkapidocs apidocs.json
 
 .PHONY: init test build clean docker print-labels
