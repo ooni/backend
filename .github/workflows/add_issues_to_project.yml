@@ -10,13 +10,13 @@ jobs:
     name: Add issue to project
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/add-to-project@RELEASE_VERSION
+      - uses: actions/add-to-project@v1.0.2
         if: github.event.action == 'opened'
         with:
           project-url: https://github.com/orgs/ooni/projects/31
           github-token: ${{ secrets.ADD_TO_PROJECT_GH_TOKEN }}
 
-      - uses: actions/add-to-project@RELEASE_VERSION
+      - uses: actions/add-to-project@v1.0.2
         if: github.event.action == 'labeled' && startsWith(github.event.label.name, 'funder/')
         with:
           project-url: https://github.com/orgs/ooni/projects/33
