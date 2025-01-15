@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone, timedelta
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -22,7 +23,7 @@ class ProbeLoginResponse(BaseModel):
     token : str
     expire : str
 
-@router.get("/ooniprobe/login/", tags=["ooniprobe"], response_model=ProbeLoginResponse)
+@router.post("/ooniprobe/login/", tags=["ooniprobe"], response_model=ProbeLoginResponse)
 def probe_login_post(
     probe_login : ProbeLogin, 
     response : Response,
@@ -61,3 +62,43 @@ def probe_login_post(
 
     return login_response
 
+class ProbeRegister(BaseModel):
+    # None of this values is actually used, but I add them
+    # to keep it compliant with the old api
+    password : str
+    platform : str
+    probe_asn : str
+    probe_cc : str
+    software_name : str 
+    software_version : str
+    supported_tests : str
+
+class ProbeRegisterResponse(BaseModel):
+    client_id: str 
+
+@router.post("/ooniprobe/register/", tags=["ooniprobe"], response_model=ProbeRegisterResponse)
+def probe_register_post(
+    probe_register : ProbeRegister, 
+    response : Response,
+    settings : Settings = Depends(get_settings),
+) -> ProbeRegisterResponse:
+    """Probe Services: Register
+    Probes send a random string called password and receive a client_id
+    The client_id/password tuple is saved by the probe and long-lived
+
+    Note that most of the request body arguments are not actually 
+    used but are kept here to use the same API as the old version
+    """
+    global log
+
+    # client_id is a JWT token with "issued at" claim and
+    # "audience" claim. The "issued at" claim is rounded up.
+    issued_at = int(time.time())
+    payload = {"iat": issued_at, "aud": "probe_login"}
+    client_id = create_jwt(payload, key=settings.jwt_encryption_key)
+    log.info("register successful")
+
+    register_response = ProbeRegisterResponse(client_id=client_id)
+    setnocacheresponse(response)
+
+    return register_response
