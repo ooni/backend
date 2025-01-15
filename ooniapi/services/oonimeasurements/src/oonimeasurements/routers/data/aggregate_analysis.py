@@ -38,7 +38,7 @@ class DBStats(BaseModel):
 
 
 class Loni(BaseModel):
-    cnt: int
+    count: int
     dns_isp_blocked: float
     dns_isp_down: float
     dns_isp_ok: float
@@ -183,7 +183,7 @@ async def get_aggregation_analysis(
         for row in rows:
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
             loni = Loni(
-                cnt=d.get("cnt", 0),
+                count=d.get("count", 0),
                 dns_isp_blocked=d.get("dns_isp_blocked", 0.0),
                 dns_isp_down=d.get("dns_isp_down", 0.0),
                 dns_isp_ok=d.get("dns_isp_ok", 0.0),

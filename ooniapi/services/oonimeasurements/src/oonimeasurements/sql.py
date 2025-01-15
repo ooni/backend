@@ -131,7 +131,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     SELECT 
     {",".join(extra_cols.keys())},
     probe_analysis,
-    cnt,
+    count,
 
     if(dns_isp_total = 0, NULL, dns_isp_blocked_sum_total / dns_isp_total) as dns_isp_blocked,
     if(dns_isp_total = 0, NULL, dns_isp_down_sum_total / dns_isp_total) as dns_isp_down,
@@ -216,7 +216,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         ) as dns_failure
         SELECT
             {",".join(extra_cols.values())},
-            COUNT() as cnt,
+            COUNT() as count,
         
             anyHeavy(top_probe_analysis) as probe_analysis,
         
