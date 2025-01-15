@@ -5,7 +5,7 @@ from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from .utils import get_measurement_start_day_agg, TimeGrains
+from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn
 from ...dependencies import (
     get_clickhouse_session,
 )
@@ -30,6 +30,7 @@ AggregationKeys = Literal[
     "probe_cc",
     "probe_asn",
     "test_name",
+    "input"
 ]
 
 
@@ -47,13 +48,15 @@ class AggregationEntry(BaseModel):
     ok_count: float
     measurement_count: float
 
-    measurement_start_day: date
+    measurement_start_day: Optional[datetime] = None
     outcome_label: str
     outcome_value: float
 
     domain: Optional[str] = None
     probe_cc: Optional[str] = None
     probe_asn: Optional[int] = None
+    test_name: Optional[str] = None
+    input: Optional[str] = None
 
 
 class AggregationResponse(BaseModel):
@@ -67,7 +70,6 @@ class AggregationResponse(BaseModel):
 async def get_aggregation_analysis(
     axis_x: Annotated[AggregationKeys, Query()] = "measurement_start_day",
     axis_y: Annotated[Optional[AggregationKeys], Query()] = None,
-    category_code: Annotated[Optional[str], Query()] = None,
     test_name: Annotated[Optional[str], Query()] = None,
     domain: Annotated[Optional[str], Query()] = None,
     input: Annotated[Optional[str], Query()] = None,
@@ -97,8 +99,7 @@ async def get_aggregation_analysis(
         extra_cols[axis_x] = axis_x
 
     if probe_asn is not None:
-        if isinstance(probe_asn, str) and probe_asn.startswith("AS"):
-            probe_asn = int(probe_asn[2:])
+        probe_asn = parse_probe_asn(probe_asn)
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
         extra_cols["probe_asn"] = "probe_asn"
@@ -259,7 +260,6 @@ async def get_aggregation_analysis(
     results: List[AggregationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            print(row)
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
             outcome_value = d["outcome_value"]
             outcome_label = d["outcome_label"]
@@ -285,12 +285,14 @@ async def get_aggregation_analysis(
                 failure_count=failure_count,
                 ok_count=ok_count,
                 measurement_count=1.0,
-                measurement_start_day=d["measurement_start_day"],
+                measurement_start_day=d.get("measurement_start_day"),
                 outcome_label=outcome_label,
                 outcome_value=outcome_value,
                 domain=d.get("domain"),
                 probe_cc=d.get("probe_cc"),
                 probe_asn=d.get("probe_asn"),
+                test_name=d.get("test_name"),
+                input=d.get("input"),
             )
             results.append(entry)
     return AggregationResponse(
