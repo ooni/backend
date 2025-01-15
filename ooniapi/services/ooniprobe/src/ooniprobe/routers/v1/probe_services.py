@@ -11,9 +11,6 @@ from ...common.utils import setnocacheresponse
 
 router = APIRouter(prefix="/v1")
 
-class Example(BaseModel):
-    msg : str
-
 log = logging.getLogger(__name__)
 
 class ProbeLogin(BaseModel):
