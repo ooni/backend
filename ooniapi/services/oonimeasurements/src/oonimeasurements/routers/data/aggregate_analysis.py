@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn
+from ...sql import format_aggregate_query
 from ...dependencies import (
     get_clickhouse_session,
 )
@@ -25,12 +26,7 @@ log = logging.getLogger(__name__)
 
 
 AggregationKeys = Literal[
-    "measurement_start_day",
-    "domain",
-    "probe_cc",
-    "probe_asn",
-    "test_name",
-    "input"
+    "measurement_start_day", "domain", "probe_cc", "probe_asn", "test_name", "input"
 ]
 
 
@@ -41,6 +37,27 @@ class DBStats(BaseModel):
     total_row_count: int
 
 
+class Loni(BaseModel):
+    cnt: int
+    dns_isp_blocked: float
+    dns_isp_down: float
+    dns_isp_ok: float
+    dns_other_blocked: float
+    dns_other_down: float
+    dns_other_ok: float
+    tls_blocked: float
+    tls_down: float
+    tls_ok: float
+    tcp_blocked: float
+    tcp_down: float
+    tcp_ok: float
+
+    dns_isp_outcome: str
+    dns_other_outcome: str
+    tcp_outcome: str
+    tls_outcome: str
+
+
 class AggregationEntry(BaseModel):
     anomaly_count: float
     confirmed_count: float
@@ -49,8 +66,13 @@ class AggregationEntry(BaseModel):
     measurement_count: float
 
     measurement_start_day: Optional[datetime] = None
+
     outcome_label: str
-    outcome_value: float
+    outcome_ok: float
+    outcome_blocked: float
+    outcome_down: float
+
+    loni: Loni
 
     domain: Optional[str] = None
     probe_cc: Optional[str] = None
@@ -148,108 +170,7 @@ async def get_aggregation_analysis(
         where += " WHERE "
         where += " AND ".join(and_clauses)
 
-    q = f"""
-    WITH
-    mapFilter((k, v) -> v != 0, dns_nok_outcomes) as dns_outcomes,
-    mapFilter((k, v) -> v != 0, tcp_nok_outcomes) as tcp_outcomes,
-    mapFilter((k, v) -> v != 0, tls_nok_outcomes) as tls_outcomes,
-
-    arrayZip(mapKeys(dns_outcomes), mapValues(dns_outcomes)) as dns_outcome_list,
-    arraySum((v) -> v.2, dns_outcome_list) as dns_nok_sum,
-    arraySort((v) -> -v.2, arrayMap((v) -> (v.1, v.2/dns_nok_sum), dns_outcome_list)) as dns_outcomes_norm,
-
-    arrayZip(mapKeys(tcp_outcomes), mapValues(tcp_outcomes)) as tcp_outcome_list,
-    arraySum((v) -> v.2, tcp_outcome_list) as tcp_nok_sum,
-    arraySort((v) -> -v.2, arrayMap((v) -> (v.1, v.2/tcp_nok_sum), tcp_outcome_list)) as tcp_outcomes_norm,
-
-    arrayZip(mapKeys(tls_outcomes), mapValues(tls_outcomes)) as tls_outcome_list,
-    arraySum((v) -> v.2, tls_outcome_list) as tls_nok_sum,
-    arraySort((v) -> -v.2, arrayMap((v) -> (v.1, v.2/tls_nok_sum), tls_outcome_list)) as tls_outcomes_norm,
-
-    arraySort(
-        (v) -> -v.2,
-        [
-            (dns_outcome_nok_label, dns_outcome_nok_value),
-            (tcp_outcome_nok_label, tcp_outcome_nok_value),
-            (tls_outcome_nok_label, tls_outcome_nok_value),
-            IF(
-                tls_ok_sum = 0 AND tls_outcome_nok_value = 0,
-                -- Special case for when the tested target was not supporting HTTPS and hence the TLS outcome is not so relevant
-                ('ok', arrayMin([dns_outcome_ok_value, tcp_outcome_ok_value])),
-                ('ok', arrayMin([dns_outcome_ok_value, tcp_outcome_ok_value, tls_outcome_ok_value]))
-            )
-        ]
-    ) as all_outcomes_sorted,
-
-    arrayConcat(dns_outcomes_norm, tcp_outcomes_norm, tls_outcomes_norm) as all_nok_outcomes,
-
-    dns_outcomes_norm[1].1 as dns_outcome_nok_label,
-    dns_outcomes_norm[1].2 as dns_outcome_nok_value,
-
-    tcp_outcomes_norm[1].1 as tcp_outcome_nok_label,
-    tcp_outcomes_norm[1].2 as tcp_outcome_nok_value,
-
-    tls_outcomes_norm[1].1 as tls_outcome_nok_label,
-    tls_outcomes_norm[1].2 as tls_outcome_nok_value,
-
-    IF(dns_ok_sum > 0, 1 - dns_outcome_nok_value, 0) as dns_outcome_ok_value,
-    IF(tcp_ok_sum > 0, 1 - tcp_outcome_nok_value, 0) as tcp_outcome_ok_value,
-    IF(tls_ok_sum > 0, 1 - tls_outcome_nok_value, 0) as tls_outcome_ok_value,
-
-    all_outcomes_sorted[1].1 as final_outcome_label,
-    IF(final_outcome_label = 'ok', all_outcomes_sorted[1].2, all_outcomes_sorted[1].2) as final_outcome_value
-
-    SELECT
-
-    {",".join(extra_cols.keys())},
-    probe_analysis,
-    all_nok_outcomes as all_outcomes,
-    final_outcome_label as outcome_label,
-    final_outcome_value as outcome_value
-
-    FROM (
-        WITH
-        IF(resolver_asn = probe_asn, 1, 0) as is_isp_resolver,
-        multiIf(
-            top_dns_failure IN ('android_dns_cache_no_data', 'dns_nxdomain_error'),
-            'nxdomain',
-            coalesce(top_dns_failure, 'got_answer')
-        ) as dns_failure
-        SELECT
-            {",".join(extra_cols.values())},
-
-            anyHeavy(top_probe_analysis) as probe_analysis,
-
-            sumMap(
-                map(
-                    CONCAT(IF(is_isp_resolver, 'dns_isp.blocked.', 'dns_other.blocked.'), dns_failure), dns_blocked,
-                    CONCAT(IF(is_isp_resolver, 'dns_isp.down.', 'dns_other.down.'), dns_failure), dns_down
-                )
-            ) as dns_nok_outcomes,
-            sum(dns_ok) as dns_ok_sum,
-
-            sumMap(
-                map(
-                    CONCAT('tcp.blocked.', coalesce(top_tcp_failure, '')), tcp_blocked,
-                    CONCAT('tcp.down.', coalesce(top_tcp_failure, '')), tcp_down
-                )
-            )  as tcp_nok_outcomes,
-            sum(tcp_ok) as tcp_ok_sum,
-
-            sumMap(
-                map(
-                    CONCAT('tls.blocked.', coalesce(top_tls_failure, '')), tls_blocked,
-                    CONCAT('tls.down.', coalesce(top_tls_failure, '')), tls_down
-                )
-            ) as tls_nok_outcomes,
-            sum(tls_ok) as tls_ok_sum
-
-        FROM analysis_web_measurement
-        {where}
-        GROUP BY {", ".join(extra_cols.keys())}
-        ORDER BY {", ".join(extra_cols.keys())}
-    )
-    """
+    q = format_aggregate_query(extra_cols, where)
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
@@ -261,23 +182,40 @@ async def get_aggregation_analysis(
     if rows and isinstance(rows, list):
         for row in rows:
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
-            outcome_value = d["outcome_value"]
-            outcome_label = d["outcome_label"]
+            loni = Loni(
+                cnt=d.get("cnt", 0),
+                dns_isp_blocked=d.get("dns_isp_blocked", 0.0),
+                dns_isp_down=d.get("dns_isp_down", 0.0),
+                dns_isp_ok=d.get("dns_isp_ok", 0.0),
+                dns_other_blocked=d.get("dns_other_blocked", 0.0),
+                dns_other_down=d.get("dns_other_down", 0.0),
+                dns_other_ok=d.get("dns_other_ok", 0.0),
+                tls_blocked=d.get("tls_blocked", 0.0),
+                tls_down=d.get("tls_down", 0.0),
+                tls_ok=d.get("tls_ok", 0.0),
+                tcp_blocked=d.get("tcp_blocked", 0.0),
+                tcp_down=d.get("tcp_down", 0.0),
+                tcp_ok=d.get("tcp_ok", 0.0),
+                dns_isp_outcome=d.get("dns_isp_outcome", ""),
+                dns_other_outcome=d.get("dns_other_outcome", ""),
+                tcp_outcome=d.get("tcp_outcome", ""),
+                tls_outcome=d.get("tls_outcome", ""),
+            )
+            outcome_label = d["most_likely_label"]
+            outcome_blocked = d["most_likely_blocked"]
+            outcome_down = d["most_likely_down"]
+            outcome_ok = d["most_likely_ok"]
             anomaly_count = 0
             confirmed_count = 0
             failure_count = 0
             ok_count = 0
-            if outcome_label == "ok":
-                ok_count = outcome_value
-            elif "blocked." in outcome_label:
-                if outcome_value >= anomaly_sensitivity:
-                    confirmed_count = outcome_value
-                else:
-                    anomaly_count = outcome_value
-
+            if outcome_blocked >= anomaly_sensitivity:
+                confirmed_count = outcome_blocked
+            elif outcome_blocked >= (outcome_down + outcome_ok):
+                anomaly_count = outcome_blocked
             # Map "down" to failures
-            else:
-                failure_count = outcome_value
+            elif outcome_down >= (outcome_blocked + outcome_ok):
+                failure_count = outcome_down
 
             entry = AggregationEntry(
                 anomaly_count=anomaly_count,
@@ -286,8 +224,11 @@ async def get_aggregation_analysis(
                 ok_count=ok_count,
                 measurement_count=1.0,
                 measurement_start_day=d.get("measurement_start_day"),
+                loni=loni,
                 outcome_label=outcome_label,
-                outcome_value=outcome_value,
+                outcome_blocked=outcome_blocked,
+                outcome_down=outcome_down,
+                outcome_ok=outcome_ok,
                 domain=d.get("domain"),
                 probe_cc=d.get("probe_cc"),
                 probe_asn=d.get("probe_asn"),
