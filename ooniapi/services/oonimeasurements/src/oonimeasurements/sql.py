@@ -133,21 +133,21 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     probe_analysis,
     count,
 
-    if(dns_isp_total = 0, NULL, dns_isp_blocked_sum_total / dns_isp_total) as dns_isp_blocked,
-    if(dns_isp_total = 0, NULL, dns_isp_down_sum_total / dns_isp_total) as dns_isp_down,
-    if(dns_isp_total = 0, NULL, dns_isp_ok_sum / dns_isp_total) as dns_isp_ok,
+    if(dns_isp_total = 0, 0, dns_isp_blocked_sum_total / dns_isp_total) as dns_isp_blocked,
+    if(dns_isp_total = 0, 0, dns_isp_down_sum_total / dns_isp_total) as dns_isp_down,
+    if(dns_isp_total = 0, 0, dns_isp_ok_sum / dns_isp_total) as dns_isp_ok,
 
-    if(dns_other_total = 0, NULL, dns_other_blocked_sum_total / dns_other_total) as dns_other_blocked,
-    if(dns_other_total = 0, NULL, dns_other_down_sum_total / dns_other_total) as dns_other_down,
-    if(dns_other_total = 0, NULL, dns_other_ok_sum / dns_other_total) as dns_other_ok,
+    if(dns_other_total = 0, 0, dns_other_blocked_sum_total / dns_other_total) as dns_other_blocked,
+    if(dns_other_total = 0, 0, dns_other_down_sum_total / dns_other_total) as dns_other_down,
+    if(dns_other_total = 0, 0, dns_other_ok_sum / dns_other_total) as dns_other_ok,
 
-    if(tls_total = 0, NULL, tls_blocked_sum_total / tls_total) as tls_blocked,
-    if(tls_total = 0, NULL, tls_down_sum_total / tls_total) as tls_down,
-    if(tls_total = 0, NULL, tls_ok_sum / tls_total) as tls_ok,
+    if(tls_total = 0, 0, tls_blocked_sum_total / tls_total) as tls_blocked,
+    if(tls_total = 0, 0, tls_down_sum_total / tls_total) as tls_down,
+    if(tls_total = 0, 0, tls_ok_sum / tls_total) as tls_ok,
 
-    if(tcp_total = 0, NULL, tcp_blocked_sum_total / tcp_total) as tcp_blocked,
-    if(tcp_total = 0, NULL, tcp_down_sum_total / tcp_total) as tcp_down,
-    if(tcp_total = 0, NULL, tcp_ok_sum / tcp_total) as tcp_ok,
+    if(tcp_total = 0, 0, tcp_blocked_sum_total / tcp_total) as tcp_blocked,
+    if(tcp_total = 0, 0, tcp_down_sum_total / tcp_total) as tcp_down,
+    if(tcp_total = 0, 0, tcp_ok_sum / tcp_total) as tcp_ok,
 
     multiIf(
         dns_isp_total = 0, '',
