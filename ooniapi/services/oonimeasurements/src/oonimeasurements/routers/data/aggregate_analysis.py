@@ -171,7 +171,30 @@ async def get_aggregation_analysis(
     log.info(f"running query {q} with {q_args}")
     rows = db.execute(q, q_args)
 
-    fixed_cols = ["probe_analysis", "all_outcomes", "outcome_label", "outcome_value"]
+    fixed_cols = [
+        "probe_analysis",
+        "count",
+        "dns_isp_blocked",
+        "dns_isp_down",
+        "dns_isp_ok",
+        "dns_other_blocked",
+        "dns_other_down",
+        "dns_other_ok",
+        "tls_blocked",
+        "tls_down",
+        "tls_ok",
+        "tcp_blocked",
+        "tcp_down",
+        "tcp_ok",
+        "dns_isp_outcome",
+        "dns_other_outcome",
+        "tcp_outcome",
+        "tls_outcome",
+        "most_likely_ok",
+        "most_likely_down",
+        "most_likely_blocked",
+        "most_likely_label",
+    ]
 
     results: List[AggregationEntry] = []
     if rows and isinstance(rows, list):
