@@ -32,10 +32,13 @@ def probe_login_post(
     global log
 
     token = probe_login.username
+    # TODO: We have to find a way to explicitly log metrics with prometheus.
+    # We're currently using the instrumentator default metrics, like http response counts 
+    # Maybe using the same exporter as the instrumentator?
     try:
         dec = decode_jwt(token, audience="probe_login", key=settings.jwt_encryption_key)
         registration_time = dec["iat"]
-        log.info("probe login successful")
+        log.info("probe login: successful")
         # metrics.incr("probe_login_successful")
     except jwt.exceptions.MissingRequiredClaimError:
         log.info("probe login: invalid or missing claim")
@@ -48,7 +51,7 @@ def probe_login_post(
     except jwt.exceptions.DecodeError:
         # Not a JWT token: treat it as a "legacy" login
         # return jerror("Invalid or missing credentials", code=401)
-        log.info("probe legacy login successful")
+        log.info("probe login: legacy login successful")
         # metrics.incr("probe_legacy_login_successful")
         registration_time = None
 
@@ -83,7 +86,9 @@ def probe_register_post(
     settings : Settings = Depends(get_settings),
 ) -> ProbeRegisterResponse:
     """Probe Services: Register
+
     Probes send a random string called password and receive a client_id
+
     The client_id/password tuple is saved by the probe and long-lived
 
     Note that most of the request body arguments are not actually 
