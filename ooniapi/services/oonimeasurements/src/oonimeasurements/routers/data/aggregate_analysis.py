@@ -38,7 +38,6 @@ class DBStats(BaseModel):
 
 
 class Loni(BaseModel):
-    count: int
     dns_isp_blocked: float
     dns_isp_down: float
     dns_isp_ok: float
@@ -59,11 +58,7 @@ class Loni(BaseModel):
 
 
 class AggregationEntry(BaseModel):
-    anomaly_count: float
-    confirmed_count: float
-    failure_count: float
-    ok_count: float
-    measurement_count: float
+    count: float
 
     measurement_start_day: Optional[datetime] = None
 
@@ -183,7 +178,6 @@ async def get_aggregation_analysis(
         for row in rows:
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
             loni = Loni(
-                count=d.get("count", 0),
                 dns_isp_blocked=d.get("dns_isp_blocked", 0.0),
                 dns_isp_down=d.get("dns_isp_down", 0.0),
                 dns_isp_ok=d.get("dns_isp_ok", 0.0),
@@ -205,24 +199,9 @@ async def get_aggregation_analysis(
             outcome_blocked = d["most_likely_blocked"]
             outcome_down = d["most_likely_down"]
             outcome_ok = d["most_likely_ok"]
-            anomaly_count = 0
-            confirmed_count = 0
-            failure_count = 0
-            ok_count = 0
-            if outcome_blocked >= anomaly_sensitivity:
-                confirmed_count = outcome_blocked
-            elif outcome_blocked >= (outcome_down + outcome_ok):
-                anomaly_count = outcome_blocked
-            # Map "down" to failures
-            elif outcome_down >= (outcome_blocked + outcome_ok):
-                failure_count = outcome_down
 
             entry = AggregationEntry(
-                anomaly_count=anomaly_count,
-                confirmed_count=confirmed_count,
-                failure_count=failure_count,
-                ok_count=ok_count,
-                measurement_count=1.0,
+                count=d["count"],
                 measurement_start_day=d.get("measurement_start_day"),
                 loni=loni,
                 outcome_label=outcome_label,
