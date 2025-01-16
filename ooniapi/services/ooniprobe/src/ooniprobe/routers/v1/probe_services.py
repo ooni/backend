@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -74,7 +75,7 @@ class ProbeRegister(BaseModel):
     probe_cc : str
     software_name : str 
     software_version : str
-    supported_tests : str
+    supported_tests : List[str]
 
 class ProbeRegisterResponse(BaseModel):
     client_id: str 
