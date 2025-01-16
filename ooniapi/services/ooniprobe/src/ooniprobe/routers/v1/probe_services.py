@@ -23,7 +23,7 @@ class ProbeLoginResponse(BaseModel):
     token : str
     expire : str
 
-@router.post("/ooniprobe/login/", tags=["ooniprobe"], response_model=ProbeLoginResponse)
+@router.post("/login", tags=["ooniprobe"], response_model=ProbeLoginResponse)
 def probe_login_post(
     probe_login : ProbeLogin, 
     response : Response,
@@ -79,7 +79,7 @@ class ProbeRegister(BaseModel):
 class ProbeRegisterResponse(BaseModel):
     client_id: str 
 
-@router.post("/ooniprobe/register/", tags=["ooniprobe"], response_model=ProbeRegisterResponse)
+@router.post("/register", tags=["ooniprobe"], response_model=ProbeRegisterResponse)
 def probe_register_post(
     probe_register : ProbeRegister, 
     response : Response,
