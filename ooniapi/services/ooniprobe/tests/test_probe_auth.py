@@ -39,12 +39,15 @@ def test_update(client : TestClient, jwt_encryption_key):
     # Update will just say ok to anything you send, no matter
     # the data 
 
+    # We can use whatever string for the client_id path parameter, 
+    # but we use the login token to make sure that the returned token
+    # works properly with the update endpoint
     c = _register(client)
     client_id = c["client_id"]
     c = postj(client, "/api/v1/login", username=client_id, password="some_pswd")
     token = c['token']
 
-    data = _update_data()
+    data = _get_update_data()
     resp = client.put(f"/api/v1/update/{token}",json=data)
     assert resp.status_code == 200
     json = resp.json()
@@ -52,7 +55,7 @@ def test_update(client : TestClient, jwt_encryption_key):
     assert json['status'] == "ok"
 
 
-def _update_data() -> Dict[str, str]:
+def _get_update_data() -> Dict[str, str]:
     return {
 		"probe_cc":            "IT",
 		"probe_asn":           "AS1234",
