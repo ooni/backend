@@ -1,3 +1,4 @@
+from typing import Dict
 from ooniprobe.common import auth
 from fastapi.testclient import TestClient
 
@@ -37,11 +38,27 @@ def test_register_then_login(client, jwt_encryption_key):
 def test_update(client : TestClient):
     # Update will just say ok to anything you send, no matter
     # the data 
-    resp = client.put("/api/v1/update",json={"some":"data"})
+    data = _update_data()
+    resp = client.put("/api/v1/update/123",json=data)
     assert resp.status_code == 200
     json = resp.json()
     assert "status" in json
     assert json['status'] == "ok"
+
+def _update_data() -> Dict[str, str]:
+    return {
+		"probe_cc":            "IT",
+		"probe_asn":           "AS1234",
+		"platform":           "android",
+		"software_name":       "ooni-testing",
+		"software_version":    "0.0.1",
+		"supported_tests":     "web_connectivity",
+		"network_type":        "wifi",
+		"available_bandwidth": "100",
+		"language":           "en",
+		"token":              "XXXX-TESTING",
+		"password":           "testingPassword",
+	}
 
 def postj(client, url, **kw):
     response = client.post(url, json=kw)
