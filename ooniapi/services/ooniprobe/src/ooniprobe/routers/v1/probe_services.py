@@ -16,9 +16,11 @@ router = APIRouter(prefix="/v1")
 log = logging.getLogger(__name__)
 
 class ProbeLogin(BaseModel):
-    username : str 
+    # Allow None username and password 
+    # to deliver informational 401 error when they're missing
+    username : str | None = None
     # not actually used but necessary to be compliant with the old API schema
-    password : str   
+    password : str | None = None 
 
 class ProbeLoginResponse(BaseModel):
     token : str
@@ -31,6 +33,9 @@ def probe_login_post(
     settings : Settings = Depends(get_settings),
 ) -> ProbeLoginResponse:
     global log
+
+    if probe_login.username is None or probe_login.password is None:
+        raise HTTPException(status_code=401, detail="Missing credentials")
 
     token = probe_login.username
     # TODO: We have to find a way to explicitly log metrics with prometheus.
