@@ -122,4 +122,5 @@ class ProbeUpdateResponse(BaseModel):
 
 @router.put("/update", tags=["ooniprobe"])
 def probe_update_post(probe_update : ProbeUpdate) -> ProbeUpdateResponse:
+    log.info("update successful")
     return ProbeUpdateResponse(status="ok") 
