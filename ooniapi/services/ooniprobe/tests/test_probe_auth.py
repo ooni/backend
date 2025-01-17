@@ -1,5 +1,4 @@
 from ooniprobe.common import auth
-from ooniprobe.dependencies import get_settings
 from httpx import Response
 
 
@@ -9,18 +8,17 @@ def test_register(client):
     assert len(c["client_id"]) == 132
 
 
-def test_register_then_login(client):
+def test_register_then_login(client, jwt_encryption_key):
     pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
     c = _register(client)
     assert "client_id" in c
     assert len(c["client_id"]) == 132
 
-    settings = get_settings()
-    tok = auth.decode_jwt(c["client_id"], audience="probe_login", key = settings.jwt_encryption_key)
+    tok = auth.decode_jwt(c["client_id"], audience="probe_login", key = jwt_encryption_key)
 
     client_id = c["client_id"]
     c = postj(client, "/api/v1/login", username=client_id, password=pwd)
-    tok = auth.decode_jwt(c["token"], audience="probe_token", key = settings.jwt_encryption_key)
+    tok = auth.decode_jwt(c["token"], audience="probe_token", key = jwt_encryption_key)
     assert tok["registration_time"] is not None
 
     # Login with a bogus client id emulating probes before 2022
@@ -28,13 +26,12 @@ def test_register_then_login(client):
     j = dict(username=client_id, password=pwd)
     r = client.post("/api/v1/login", json=j)
     assert r.status_code == 200
-    token = r.json["token"]
-    tok = auth.decode_jwt(token, audience="probe_token", key=settings.jwt_encryption_key)
+    token = r.json()["token"]
+    tok = auth.decode_jwt(token, audience="probe_token", key = jwt_encryption_key)
     assert tok["registration_time"] is None  # we don't know the reg. time
 
     # Expect failed login
     resp = client.post("/api/v1/login", json=dict())
-    # FIXME assert resp.status_code == 401
     assert resp.status_code == 401
 
 def postj(client, url, **kw):
