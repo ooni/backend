@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import models
-from .routers import v2
+from .routers.v2 import vpn
+from .routers.v1 import probe_services
 
 from .dependencies import get_postgresql_session
 from .common.dependencies import get_settings
@@ -45,7 +46,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(v2.router, prefix="/api")
+app.include_router(vpn.router, prefix="/api")
+app.include_router(probe_services.router, prefix="/api")
 
 
 @app.get("/version")
