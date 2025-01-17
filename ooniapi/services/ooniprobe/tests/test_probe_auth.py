@@ -1,5 +1,4 @@
 from ooniprobe.common import auth
-from httpx import Response
 
 
 def test_register(client):
@@ -35,7 +34,7 @@ def test_register_then_login(client, jwt_encryption_key):
     assert resp.status_code == 401
 
 def postj(client, url, **kw):
-    response : Response = client.post(url, json=kw)
+    response = client.post(url, json=kw)
     assert response.status_code == 200, f"Error: {response.content}"
     assert response.headers.get('content-type') == 'application/json'
     return response.json()
