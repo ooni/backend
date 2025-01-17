@@ -19,6 +19,8 @@ def get_measurement_start_day_agg(
         return f"toStartOfWeek({column_name})"
     if time_grain == "month":
         return f"toStartOfMonth({column_name})"
+    if time_grain == "year":
+        return f"toStartOfYear({column_name})"
     return f"toStartOfDay({column_name})"
 
 
@@ -50,3 +52,11 @@ def test_name_to_group(tn):
         return "websites"
     # TODO(arturo): currently we only support websites
     return ""
+
+
+def parse_probe_asn(probe_asn):
+    if probe_asn.startswith("AS"):
+        probe_asn = probe_asn[2:]
+    if isinstance(probe_asn, str):
+        probe_asn = int(probe_asn)
+    return probe_asn

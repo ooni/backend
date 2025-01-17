@@ -44,7 +44,7 @@ imagedefinitions.json:
 	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
 test:
-	hatch run test
+	hatch run test $(ARGS)
 
 test-cov:
 	hatch run test-cov

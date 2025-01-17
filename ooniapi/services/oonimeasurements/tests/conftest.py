@@ -150,3 +150,22 @@ def client_with_admin_role(client):
     jwt_token = create_session_token("0" * 16, "admin")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
+
+
+@pytest.fixture
+def params_since_and_until_with_two_days():
+    return set_since_and_until_params(since="2024-11-01", until="2024-11-02")
+
+
+@pytest.fixture
+def params_since_and_until_with_ten_days():
+    return set_since_and_until_params(since="2024-11-01", until="2024-11-10")
+
+
+def set_since_and_until_params(since, until):
+    params = {
+        "since": since,
+        "until": until
+    }
+
+    return params
