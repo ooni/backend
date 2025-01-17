@@ -1,4 +1,5 @@
 from ooniprobe.common import auth
+from fastapi.testclient import TestClient
 
 
 def test_register(client):
@@ -32,6 +33,15 @@ def test_register_then_login(client, jwt_encryption_key):
     # Expect failed login
     resp = client.post("/api/v1/login", json=dict())
     assert resp.status_code == 401
+
+def test_update(client : TestClient):
+    # Update will just say ok to anything you send, no matter
+    # the data 
+    resp = client.put("/api/v1/update",json={"some":"data"})
+    assert resp.status_code == 200
+    json = resp.json()
+    assert "status" in json
+    assert json['status'] == "ok"
 
 def postj(client, url, **kw):
     response = client.post(url, json=kw)

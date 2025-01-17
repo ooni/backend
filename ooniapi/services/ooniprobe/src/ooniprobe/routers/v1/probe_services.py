@@ -113,3 +113,13 @@ def probe_register_post(
     setnocacheresponse(response)
 
     return register_response
+
+class ProbeUpdate(BaseModel):
+    pass
+
+class ProbeUpdateResponse(BaseModel):
+    status : str 
+
+@router.put("/update", tags=["ooniprobe"])
+def probe_update_post(probe_update : ProbeUpdate) -> ProbeUpdateResponse:
+   return ProbeUpdateResponse(status="ok") 
