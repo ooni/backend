@@ -35,15 +35,22 @@ def test_register_then_login(client, jwt_encryption_key):
     resp = client.post("/api/v1/login", json=dict())
     assert resp.status_code == 401
 
-def test_update(client : TestClient):
+def test_update(client : TestClient, jwt_encryption_key):
     # Update will just say ok to anything you send, no matter
     # the data 
+
+    c = _register(client)
+    client_id = c["client_id"]
+    c = postj(client, "/api/v1/login", username=client_id, password="some_pswd")
+    token = c['token']
+
     data = _update_data()
-    resp = client.put("/api/v1/update/123",json=data)
+    resp = client.put(f"/api/v1/update/{token}",json=data)
     assert resp.status_code == 200
     json = resp.json()
     assert "status" in json
     assert json['status'] == "ok"
+
 
 def _update_data() -> Dict[str, str]:
     return {
