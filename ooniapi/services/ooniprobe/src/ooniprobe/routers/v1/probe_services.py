@@ -109,7 +109,7 @@ def probe_register_post(
 
     # **IMPORTANT** You have to compute this token using a different key
     # to the one used in ooniauth service, because you could allow
-    # a login bypass attack. 
+    # a login bypass attack if you don't. 
     #
     # Note that this token is generated regardless of any authentication, 
     # so if you use the same jwt_encryption_key for ooniauth, you give users
