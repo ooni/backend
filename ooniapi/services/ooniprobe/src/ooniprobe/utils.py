@@ -3,6 +3,7 @@ VPN Services
 
 Insert VPN credentials into database.
 """
+
 import base64
 from datetime import datetime, timezone
 import itertools
@@ -27,10 +28,12 @@ class OpenVPNConfig(TypedDict):
     cert: str
     key: str
 
+
 class OpenVPNEndpoint(TypedDict):
     address: str
     protocol: str
     transport: str
+
 
 def fetch_riseup_ca() -> str:
     r = httpx.get(RISEUP_CA_URL)
@@ -50,6 +53,7 @@ def fetch_openvpn_config() -> OpenVPNConfig:
     key, cert = pem.parse(pem_cert)
     return OpenVPNConfig(ca=ca, cert=cert.as_text(), key=key.as_text())
 
+
 def fetch_openvpn_endpoints() -> List[OpenVPNEndpoint]:
     endpoints = []
 
@@ -59,26 +63,33 @@ def fetch_openvpn_endpoints() -> List[OpenVPNEndpoint]:
     for ep in j["gateways"]:
         ip = ep["ip_address"]
         # TODO(art): do we want to store this metadata somewhere?
-        #location = ep["location"]
-        #hostname = ep["host"]
+        # location = ep["location"]
+        # hostname = ep["host"]
         for t in ep["capabilities"]["transport"]:
             if t["type"] != "openvpn":
                 continue
             for transport, port in itertools.product(t["protocols"], t["ports"]):
-                endpoints.append(OpenVPNEndpoint(
-                    address=f"{ip}:{port}",
-                    protocol="openvpn",
-                    transport=transport
-                ))
+                endpoints.append(
+                    OpenVPNEndpoint(
+                        address=f"{ip}:{port}", protocol="openvpn", transport=transport
+                    )
+                )
     return endpoints
+
 
 def format_endpoint(provider_name: str, ep: OONIProbeVPNProviderEndpoint) -> str:
     return f"{ep.protocol}://{provider_name}.corp/?address={ep.address}&transport={ep.transport}"
 
-def upsert_endpoints(db: Session, new_endpoints: List[OpenVPNEndpoint], provider: OONIProbeVPNProvider):
-    new_endpoints_map = {f'{ep["address"]}-{ep["protocol"]}-{ep["transport"]}': ep for ep in new_endpoints}
+
+def upsert_endpoints(
+    db: Session, new_endpoints: List[OpenVPNEndpoint], provider: OONIProbeVPNProvider
+):
+    new_endpoints_map = {
+        f'{ep["address"]}-{ep["protocol"]}-{ep["transport"]}': ep
+        for ep in new_endpoints
+    }
     for endpoint in provider.endpoints:
-        key = f'{endpoint.address}-{endpoint.protocol}-{endpoint.transport}'
+        key = f"{endpoint.address}-{endpoint.protocol}-{endpoint.transport}"
         if key in new_endpoints_map:
             endpoint.date_updated = datetime.now(timezone.utc)
             new_endpoints_map.pop(key)
@@ -86,11 +97,13 @@ def upsert_endpoints(db: Session, new_endpoints: List[OpenVPNEndpoint], provider
             db.delete(endpoint)
 
     for ep in new_endpoints_map.values():
-        db.add(OONIProbeVPNProviderEndpoint(
-            date_created=datetime.now(timezone.utc),
-            date_updated=datetime.now(timezone.utc),
-            protocol=ep["protocol"],
-            address=ep["address"],
-            transport=ep["transport"],
-            provider=provider
-        ))
+        db.add(
+            OONIProbeVPNProviderEndpoint(
+                date_created=datetime.now(timezone.utc),
+                date_updated=datetime.now(timezone.utc),
+                protocol=ep["protocol"],
+                address=ep["address"],
+                transport=ep["transport"],
+                provider=provider,
+            )
+        )

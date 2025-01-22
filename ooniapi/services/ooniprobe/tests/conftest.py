@@ -67,7 +67,10 @@ def client_with_bad_settings():
     client = TestClient(app)
     yield client
 
+
 JWT_ENCRYPTION_KEY = "super_secure"
+
+
 @pytest.fixture
 def client(alembic_migration):
     app.dependency_overrides[get_settings] = make_override_get_settings(
@@ -78,6 +81,7 @@ def client(alembic_migration):
 
     client = TestClient(app)
     yield client
+
 
 @pytest.fixture
 def jwt_encryption_key():

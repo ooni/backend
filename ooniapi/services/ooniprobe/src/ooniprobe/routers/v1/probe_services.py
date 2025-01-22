@@ -15,22 +15,25 @@ router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
 
+
 class ProbeLogin(BaseModel):
-    # Allow None username and password 
+    # Allow None username and password
     # to deliver informational 401 error when they're missing
-    username : str | None = None
+    username: str | None = None
     # not actually used but necessary to be compliant with the old API schema
-    password : str | None = None 
+    password: str | None = None
+
 
 class ProbeLoginResponse(BaseModel):
-    token : str
-    expire : str
+    token: str
+    expire: str
+
 
 @router.post("/login", tags=["ooniprobe"], response_model=ProbeLoginResponse)
 def probe_login_post(
-    probe_login : ProbeLogin, 
-    response : Response,
-    settings : Settings = Depends(get_settings),
+    probe_login: ProbeLogin,
+    response: Response,
+    settings: Settings = Depends(get_settings),
 ) -> ProbeLoginResponse:
 
     if probe_login.username is None or probe_login.password is None:
@@ -38,7 +41,7 @@ def probe_login_post(
 
     token = probe_login.username
     # TODO: We have to find a way to explicitly log metrics with prometheus.
-    # We're currently using the instrumentator default metrics, like http response counts 
+    # We're currently using the instrumentator default metrics, like http response counts
     # Maybe using the same exporter as the instrumentator?
     try:
         dec = decode_jwt(token, audience="probe_login", key=settings.jwt_encryption_key)
@@ -48,11 +51,11 @@ def probe_login_post(
     except jwt.exceptions.MissingRequiredClaimError:
         log.info("probe login: invalid or missing claim")
         # metrics.incr("probe_login_failed")
-        raise HTTPException(status_code=401, detail="Invalid credentials") 
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.InvalidSignatureError:
         log.info("probe login: invalid signature")
         # metrics.incr("probe_login_failed")
-        raise HTTPException(status_code=401, detail="Invalid credentials") 
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.DecodeError:
         # Not a JWT token: treat it as a "legacy" login
         # return jerror("Invalid or missing credentials", code=401)
@@ -65,30 +68,33 @@ def probe_login_post(
     token = create_jwt(payload, key=settings.jwt_encryption_key)
     # expiration string used by the probe e.g. 2006-01-02T15:04:05Z
     expire = exp.strftime("%Y-%m-%dT%H:%M:%SZ")
-    login_response = ProbeLoginResponse(token=token, expire = expire)
+    login_response = ProbeLoginResponse(token=token, expire=expire)
     setnocacheresponse(response)
 
     return login_response
 
+
 class ProbeRegister(BaseModel):
     # None of this values is actually used, but I add them
     # to keep it compliant with the old api
-    password : str
-    platform : str
-    probe_asn : str
-    probe_cc : str
-    software_name : str 
-    software_version : str
-    supported_tests : List[str]
+    password: str
+    platform: str
+    probe_asn: str
+    probe_cc: str
+    software_name: str
+    software_version: str
+    supported_tests: List[str]
+
 
 class ProbeRegisterResponse(BaseModel):
-    client_id: str 
+    client_id: str
+
 
 @router.post("/register", tags=["ooniprobe"], response_model=ProbeRegisterResponse)
 def probe_register_post(
-    probe_register : ProbeRegister, 
-    response : Response,
-    settings : Settings = Depends(get_settings),
+    probe_register: ProbeRegister,
+    response: Response,
+    settings: Settings = Depends(get_settings),
 ) -> ProbeRegisterResponse:
     """Probe Services: Register
 
@@ -96,7 +102,7 @@ def probe_register_post(
 
     The client_id/password tuple is saved by the probe and long-lived
 
-    Note that most of the request body arguments are not actually 
+    Note that most of the request body arguments are not actually
     used but are kept here to use the same API as the old version
     """
 
@@ -112,13 +118,16 @@ def probe_register_post(
 
     return register_response
 
+
 class ProbeUpdate(BaseModel):
     pass
 
+
 class ProbeUpdateResponse(BaseModel):
-    status : str 
+    status: str
+
 
 @router.put("/update/{client_id}", tags=["ooniprobe"])
-def probe_update_post(probe_update : ProbeUpdate) -> ProbeUpdateResponse:
+def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     log.info("update successful")
-    return ProbeUpdateResponse(status="ok") 
+    return ProbeUpdateResponse(status="ok")
