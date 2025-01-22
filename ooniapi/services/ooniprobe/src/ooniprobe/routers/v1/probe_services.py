@@ -32,7 +32,6 @@ def probe_login_post(
     response : Response,
     settings : Settings = Depends(get_settings),
 ) -> ProbeLoginResponse:
-    global log
 
     if probe_login.username is None or probe_login.password is None:
         raise HTTPException(status_code=401, detail="Missing credentials")
@@ -100,7 +99,6 @@ def probe_register_post(
     Note that most of the request body arguments are not actually 
     used but are kept here to use the same API as the old version
     """
-    global log
 
     # client_id is a JWT token with "issued at" claim and
     # "audience" claim. The "issued at" claim is rounded up.
