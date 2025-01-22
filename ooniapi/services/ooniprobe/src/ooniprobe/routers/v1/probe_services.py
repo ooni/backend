@@ -104,7 +104,18 @@ def probe_register_post(
 
     Note that most of the request body arguments are not actually
     used but are kept here to use the same API as the old version
+    
     """
+
+    # **IMPORTANT** You have to compute this token using a different key
+    # to the one used in ooniauth service, because you could allow
+    # a login bypass attack. 
+    #
+    # Note that this token is generated regardless of any authentication, 
+    # so if you use the same jwt_encryption_key for ooniauth, you give users
+    # an auth token for free
+    #
+    # We set this up in the terraform level
 
     # client_id is a JWT token with "issued at" claim and
     # "audience" claim. The "issued at" claim is rounded up.
