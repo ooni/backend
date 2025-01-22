@@ -68,13 +68,21 @@ def client_with_bad_settings():
     yield client
 
 
+JWT_ENCRYPTION_KEY = "super_secure"
+
+
 @pytest.fixture
 def client(alembic_migration):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         postgresql_url=alembic_migration,
-        jwt_encryption_key="super_secure",
+        jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",
     )
 
     client = TestClient(app)
     yield client
+
+
+@pytest.fixture
+def jwt_encryption_key():
+    return JWT_ENCRYPTION_KEY

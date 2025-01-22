@@ -184,6 +184,16 @@ async def create_user_session(
     settings: Settings = Depends(get_settings),
 ):
     """Auth Services: login using a registration/login link"""
+
+    # **IMPORTANT** You have to compute this token using a different key
+    # to the one used in ooniprobe service, because you could allow
+    # a login bypass attack if you don't. 
+    #
+    # The token used in ooniprobe is generated regardless of any authentication,
+    # because it's a toy token to please old probes. 
+    #
+    # We set this up in terraform
+
     if req and req.login_token:
         user_session = get_user_session_from_login_token(
             login_token=req.login_token,
