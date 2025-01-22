@@ -54,7 +54,7 @@ def test_name_to_group(tn):
     return ""
 
 
-def parse_probe_asn(probe_asn):
+def parse_probe_asn(probe_asn: Union[str, int]) -> int:
     if probe_asn.startswith("AS"):
         probe_asn = probe_asn[2:]
     if isinstance(probe_asn, str):
