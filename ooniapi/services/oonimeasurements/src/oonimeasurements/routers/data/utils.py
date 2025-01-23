@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from typing import Annotated, Literal, Union
 
 from fastapi import Query
@@ -54,9 +55,13 @@ def test_name_to_group(tn):
     return ""
 
 
-def parse_probe_asn(probe_asn: Union[str, int]) -> int:
-    if probe_asn.startswith("AS"):
-        probe_asn = probe_asn[2:]
-    if isinstance(probe_asn, str):
-        probe_asn = int(probe_asn)
-    return probe_asn
+def parse_probe_asn_to_int(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        probe_asn = kwargs.get("probe_asn", None)
+        if isinstance(probe_asn, str):
+            if probe_asn.startswith("AS"):
+                probe_asn = probe_asn[2:]
+            kwargs['probe_asn'] = int(probe_asn)
+        return await func(*args, **kwargs)
+    return wrapper
