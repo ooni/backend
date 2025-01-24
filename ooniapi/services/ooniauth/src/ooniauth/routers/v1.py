@@ -66,10 +66,20 @@ async def user_register(
     ses_client=Depends(get_ses_client),
 ):
     """Auth Services: start email-based user registration"""
+
+    # **IMPORTANT** You have to be very careful to use an audience different to "probe_login"
+    # 
+    # "probe_login" is the audience field used to generate tokens in ooniprobe
+    #
+    # The tokens used in ooniprobe are generated regardless of any authentication,
+    # because they are a toy token used to please old probes. We use the aud field to distinguish 
+    # those tokens to the ones used in this service
+
     email_address = user_register.email_address.lower()
 
     now = datetime.now(timezone.utc)
     expiration = now + timedelta(days=1)
+    # ! aud should never be "probe_login"
     # On the backend side the registration is stateless
     payload = {
         "nbf": now,
@@ -116,16 +126,8 @@ async def user_login(
 ):
     """Auth Services: login using a registration/login link"""
 
-    # **IMPORTANT** You have to compute this token using a different key
-    # to the one used in ooniprobe service, because you could allow
-    # a login bypass attack if you don't. 
-    #
-    # The token used in ooniprobe is generated regardless of any authentication,
-    # because it's a toy token to please old probes. 
-    #
-    # We set this up in terraform
-
     try:
+        # ! audience should never be "probe_login"
         dec = decode_jwt(
             token=token, key=settings.jwt_encryption_key, audience="register"
         )

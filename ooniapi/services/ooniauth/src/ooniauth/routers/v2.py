@@ -73,6 +73,7 @@ async def create_user_login(
     now = datetime.now(timezone.utc)
     login_token_expiration = now + timedelta(days=1)
     # On the backend side the registration is stateless
+    # !aud should never be "probe_login"
     payload = {
         "nbf": now,
         "exp": login_token_expiration,
@@ -143,6 +144,7 @@ def get_user_session_from_login_token(
     login_token: str, jwt_encryption_key: str, hashing_key: str, admin_emails: List[str]
 ) -> UserSession:
     try:
+        # ! audience should never be "probe_login"
         d = decode_jwt(
             token=login_token,
             key=jwt_encryption_key,
