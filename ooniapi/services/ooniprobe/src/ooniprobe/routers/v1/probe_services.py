@@ -64,6 +64,7 @@ def probe_login_post(
         registration_time = None
 
     exp = datetime.now(timezone.utc) + timedelta(days=7)
+    # ! aud should never be "register"
     payload = {"registration_time": registration_time, "aud": "probe_token"}
     token = create_jwt(payload, key=settings.jwt_encryption_key)
     # expiration string used by the probe e.g. 2006-01-02T15:04:05Z
@@ -107,19 +108,18 @@ def probe_register_post(
     
     """
 
-    # **IMPORTANT** You have to compute this token using a different key
-    # to the one used in ooniauth service, because you could allow
+    # **IMPORTANT** You have to be careful to use the right audience. 
+    # You have to use a different audience to the ones used in ooniauth, because you could allow
     # a login bypass attack if you don't. 
     #
     # Note that this token is generated regardless of any authentication, 
-    # so if you use the same jwt_encryption_key for ooniauth, you give users
-    # an auth token for free
-    #
-    # We set this up in the terraform level
+    # so if you use the same audience as ooniauth, you give users
+    # an auth token for free without auth
 
     # client_id is a JWT token with "issued at" claim and
     # "audience" claim. The "issued at" claim is rounded up.
     issued_at = int(time.time())
+    # ! aud should never be "register"
     payload = {"iat": issued_at, "aud": "probe_login"}
     client_id = create_jwt(payload, key=settings.jwt_encryption_key)
     log.info("register successful")
