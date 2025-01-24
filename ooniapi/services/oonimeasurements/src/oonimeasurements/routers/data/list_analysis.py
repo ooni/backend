@@ -1,16 +1,15 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime
 import logging
 import math
 import time
 from typing import List, Literal, Optional, Union
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 from ...common.dependencies import get_settings
 from ...dependencies import get_clickhouse_session
-from .utils import SinceUntil, test_name_to_group, utc_30_days_ago, utc_today
+from .utils import SinceUntil, parse_probe_asn_to_int, test_name_to_group, utc_30_days_ago, utc_today
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +61,7 @@ class ListAnalysisResponse(BaseModel):
 
 
 @router.get("/v1/analysis", tags=["analysis", "list_data"])
+@parse_probe_asn_to_int
 async def list_measurements(
     measurement_uid: Annotated[Optional[str], Query()] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
@@ -92,8 +92,6 @@ async def list_measurements(
         q_args["measurement_uid"] = measurement_uid
         and_clauses.append("measurement_uid = %(measurement_uid)s")
     if probe_asn is not None:
-        if isinstance(probe_asn, str) and probe_asn.startswith("AS"):
-            probe_asn = int(probe_asn[2:])
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
     if probe_cc is not None:

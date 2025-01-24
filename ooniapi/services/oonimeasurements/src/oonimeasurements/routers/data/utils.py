@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from typing import Annotated, Literal, Union
 
 from fastapi import Query
@@ -19,6 +20,8 @@ def get_measurement_start_day_agg(
         return f"toStartOfWeek({column_name})"
     if time_grain == "month":
         return f"toStartOfMonth({column_name})"
+    if time_grain == "year":
+        return f"toStartOfYear({column_name})"
     return f"toStartOfDay({column_name})"
 
 
@@ -50,3 +53,15 @@ def test_name_to_group(tn):
         return "websites"
     # TODO(arturo): currently we only support websites
     return ""
+
+
+def parse_probe_asn_to_int(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        probe_asn = kwargs.get("probe_asn", None)
+        if isinstance(probe_asn, str):
+            if probe_asn.startswith("AS"):
+                probe_asn = probe_asn[2:]
+            kwargs['probe_asn'] = int(probe_asn)
+        return await func(*args, **kwargs)
+    return wrapper

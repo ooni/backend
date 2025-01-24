@@ -9,6 +9,7 @@ from typing_extensions import Annotated
 
 from ...common.dependencies import get_settings
 from ...dependencies import get_clickhouse_session
+from .utils import parse_probe_asn_to_int
 
 from fastapi import APIRouter
 
@@ -165,6 +166,7 @@ class ListObservationsResponse(BaseModel):
 
 
 @router.get("/v1/observations", tags=["observations", "list_data"])
+@parse_probe_asn_to_int
 async def list_observations(
     report_id: Annotated[Optional[str], Query()] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
@@ -204,8 +206,6 @@ async def list_observations(
         q_args["report_id"] = report_id
         and_clauses.append("report_id = %(report_id)s")
     if probe_asn is not None:
-        if isinstance(probe_asn, str) and probe_asn.startswith("AS"):
-            probe_asn = int(probe_asn[2:])
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
     if probe_cc is not None:
@@ -213,7 +213,7 @@ async def list_observations(
         and_clauses.append("probe_cc = %(probe_cc)s")
 
     if software_name is not None:
-        q_args["software_name"] = software_version
+        q_args["software_name"] = software_name
         and_clauses.append("software_name = %(software_name)s")
     if software_version is not None:
         q_args["software_version"] = software_version
