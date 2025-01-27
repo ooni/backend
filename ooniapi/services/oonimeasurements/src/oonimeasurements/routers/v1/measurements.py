@@ -421,7 +421,7 @@ class MeasurementBase(BaseModel):
     probe_asn: Optional[str] = Field(default=None, title="ASN of the measurement probe")
     probe_cc: Optional[str] = Field(default=None, title="country code of the probe ASN")
     report_id: Optional[str] = Field(default=None, title="report id of the measurement")
-    scores: Optional[str] = Field(
+    scores: Optional[Dict[str, object]] = Field(
         default=None, title="blocking scores of the measurement"
     )
     test_name: Optional[str] = Field(default=None, title="test name of the measurement")
@@ -531,46 +531,46 @@ def genurl(base_url: str, path: str, **kw) -> str:
 async def list_measurements(
     request: Request,
     response: Response,
-    report_id: Annotated[
-        Optional[str],
-        Query(description="Report_id to search measurements for", min_length=3),
-    ],
-    input: Annotated[
-        Optional[str],
-        Query(
-            description="Input (for example a URL or IP address) to search measurements for",
-            min_length=3,
-        ),
-    ],
-    domain: Annotated[
-        Optional[str],
-        Query(description="Domain to search measurements for", min_length=3),
-    ],
-    probe_cc: Annotated[Optional[str], Query(description="Two letter country code")],
+    report_id: Optional[str] = Query(
+        None,
+        description="Report_id to search measurements for",
+        min_length=3,
+    ),
+    input: Optional[str] = Query(
+        None,
+        description="Input (for example a URL or IP address) to search measurements for",
+        min_length=3,
+    ),
+    domain: Optional[str] = Query(
+        None,
+        description="Domain to search measurements for",
+        min_length=3,
+    ),
+    probe_cc: Annotated[Optional[str], Query(description="Two letter country code")] = None,
     probe_asn: Annotated[
         Union[str, int, None],
         Query(description='Autonomous system number in the format "ASXXX"'),
-    ],
+    ] = None,
     test_name: Annotated[
         Optional[str],
         Query(description="Name of the test"),
-    ],
+    ] = None,
     category_code: Annotated[
         Optional[str],
         Query(description="Category code from the citizenlab list"),
-    ],
+    ] = None,
     since: Annotated[
         Optional[str],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
-    ],
+    ] = None,
     until: Annotated[
         Optional[str],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
-    ],
+    ] = None,
     confirmed: Annotated[
         Optional[bool],
         Query(
@@ -579,7 +579,7 @@ async def list_measurements(
                 "Default: no filtering (show both true and false)"
             )
         ),
-    ],
+    ] = None,
     anomaly: Annotated[
         Optional[bool],
         Query(
@@ -588,7 +588,7 @@ async def list_measurements(
                 "Default: no filtering (show both true and false)"
             )
         ),
-    ],
+    ] = None,
     failure: Annotated[
         Optional[bool],
         Query(
@@ -597,22 +597,22 @@ async def list_measurements(
                 "Default: no filtering (show both true and false)"
             )
         ),
-    ],
+    ] = None,
     software_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by software version. Comma-separated."),
-    ],
+    ] = None,
     test_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by test version. Comma-separated."),
-    ],
+    ] = None,
     engine_version: Annotated[
         Optional[str],
         Query(description="Filter measurements by engine version. Comma-separated."),
-    ],
+    ] = None,
     ooni_run_link_id: Annotated[
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
-    ],
+    ] = None,
     order_by: Annotated[
         Optional[str],
         Query(
@@ -626,7 +626,7 @@ async def list_measurements(
                 "test_name",
             ],
         ),
-    ],
+    ] = None,
     order: Annotated[
         str,
         Query(
@@ -651,12 +651,6 @@ async def list_measurements(
     # - lang: 'curl'
     #    source: |
     #    curl "https://api.ooni.io/api/v1/measurements?probe_cc=IT&confirmed=true&since=2017-09-01"
-    if (
-        probe_asn is not None
-        and isinstance(probe_asn, str)
-        and probe_asn.startswith("AS")
-    ):
-        probe_asn = int(probe_asn[2:])
     software_versions = None
     if software_version:
         software_versions = commasplit(software_version)
@@ -735,28 +729,31 @@ async def list_measurements(
         fpwhere.append(sql.text("report_id = :report_id"))
 
     if probe_cc:
-        if probe_cc == "ZZ":
-            log.info("Refusing list_measurements with probe_cc set to ZZ")
-            raise AbortMeasurementList
-        query_params["probe_cc"] = probe_cc
-        fpwhere.append(sql.text("probe_cc = :probe_cc"))
+        probe_cc_list = probe_cc.split(",")
+        query_params["probe_cc"] = probe_cc_list
+        fpwhere.append(sql.text("probe_cc IN :probe_cc"))
     else:
         fpwhere.append(sql.text("probe_cc != 'ZZ'"))
 
     if probe_asn is not None:
-        if probe_asn == 0:
-            log.info("Refusing list_measurements with probe_asn set to 0")
-            raise AbortMeasurementList
-        query_params["probe_asn"] = probe_asn
-        fpwhere.append(sql.text("probe_asn = :probe_asn"))
+        if isinstance(probe_asn, str):
+            probe_asn_list = probe_asn.split(",")
+            probe_asn_integer_list = []
+            for probe_asn_value in probe_asn_list:
+                if probe_asn_value.startswith("AS"):
+                    probe_asn_integer_list.append(int(probe_asn_value[2:]))
+        query_params["probe_asn"] = probe_asn_integer_list
+        fpwhere.append(sql.text("probe_asn IN :probe_asn"))
+
     else:
         # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
         # https://github.com/ooni/explorer/issues/495
         fpwhere.append(sql.text("probe_asn != 0"))
 
     if test_name is not None:
-        query_params["test_name"] = test_name
-        fpwhere.append(sql.text("test_name = :test_name"))
+        test_name_list = test_name.split(",")
+        query_params["test_name"] = test_name_list
+        fpwhere.append(sql.text("test_name IN :test_name"))
 
     if software_versions is not None:
         query_params["software_versions"] = software_versions
@@ -809,8 +806,9 @@ async def list_measurements(
     elif domain or category_code:
         # both domain and category_code can be set at the same time
         if domain:
-            query_params["domain"] = domain
-            fpwhere.append(sql.text("domain = :domain"))
+            domain_list = domain.split(",")
+            query_params["domain"] = domain_list
+            fpwhere.append(sql.text("domain IN :domain"))
 
         if category_code:
             query_params["category_code"] = category_code
@@ -853,7 +851,7 @@ async def list_measurements(
                     probe_asn="AS{}".format(row["probe_asn"]),
                     test_name=row["test_name"],
                     measurement_start_time=row["measurement_start_time"],
-                    input=row["input"],
+                    input_=row["input"],
                     anomaly=row["anomaly"] == "t",  # TODO: This is wrong
                     confirmed=row["confirmed"] == "t",
                     failure=row["msm_failure"] == "t",
@@ -861,22 +859,6 @@ async def list_measurements(
                 )
             )
 
-            results.append(
-                {
-                    "measurement_uid": msmt_uid,
-                    "measurement_url": url,
-                    "report_id": row["report_id"],
-                    "probe_cc": row["probe_cc"],
-                    "probe_asn": "AS{}".format(row["probe_asn"]),
-                    "test_name": row["test_name"],
-                    "measurement_start_time": row["measurement_start_time"],
-                    "input": row["input"],
-                    "anomaly": row["anomaly"] == "t",
-                    "confirmed": row["confirmed"] == "t",
-                    "failure": row["msm_failure"] == "t",
-                    "scores": json.loads(row["scores"]),
-                }
-            )
     except OperationalError as exc:
         log.error(exc)
         if isinstance(exc.orig, QueryCanceledError):
@@ -889,8 +871,8 @@ async def list_measurements(
 
     # Replace the special value INULL for "input" with None
     for i, r in enumerate(results):
-        if r["input"] == INULL:
-            results[i]["input"] = None
+        if r.input_ == INULL:
+            results[i].input_ = None
 
     pages = -1
     count = -1
