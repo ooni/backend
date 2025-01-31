@@ -1,0 +1,35 @@
+services:
+  fastpath:
+    build: .
+    container_name: fastpath-ooni
+    ports:
+      - "5000:5000"
+    environment:
+      - CLICKHOUSE_HOST=clickhouse-server
+      - CLICKHOUSE_PORT=8123
+    networks:
+      - fastpath-network
+    depends_on:
+      - clickhouse-server
+
+  clickhouse-server:
+    image: yandex/clickhouse-server:latest
+    container_name: clickhouse-server
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=default
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    networks:
+      - fastpath-network
+
+networks:
+  fastpath-network:
+    driver: bridge
+
+volumes:
+  clickhouse-data:
