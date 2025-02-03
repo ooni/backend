@@ -46,9 +46,10 @@ def test_list_measurements_with_one_value_to_filters(client, filter_param, filte
         assert result[filter_param] == filter_value, result
 
 
-def test_list_measurements_with_one_value_to_filters_not_in_the_result(client):
+def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(client):
+    domain = "cloudflare-dns.com"
     params = {
-        "domain": "cloudflare-dns.com",
+        "domain": domain,
     }
 
     response = client.get(route, params=params)
@@ -56,6 +57,8 @@ def test_list_measurements_with_one_value_to_filters_not_in_the_result(client):
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
+    for result in json["results"]:
+        assert domain in result["input"], result
 
 
 @pytest.mark.parametrize(
@@ -80,8 +83,9 @@ def test_list_measurements_with_multiple_values_to_filters(client, filter_param,
 
 
 def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
+    domainCollection = "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1"
     params = {
-        "domain": "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1",
+        "domain": domainCollection
     }
 
     response = client.get(route, params=params)
@@ -89,3 +93,5 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
+    for result in json["results"]:
+        assert any(domain in result["input"] for domain in domainCollection), result

@@ -851,7 +851,7 @@ async def list_measurements(
                     probe_asn="AS{}".format(row["probe_asn"]),
                     test_name=row["test_name"],
                     measurement_start_time=row["measurement_start_time"],
-                    input_=row["input"],
+                    input=row["input"],
                     anomaly=row["anomaly"] == "t",  # TODO: This is wrong
                     confirmed=row["confirmed"] == "t",
                     failure=row["msm_failure"] == "t",
