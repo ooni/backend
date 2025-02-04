@@ -93,5 +93,6 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
+    domain_list = domainCollection.split(", ")
     for result in json["results"]:
-        assert any(domain in result["input"] for domain in domainCollection), result
+        assert any(domain in result["input"] for domain in domain_list), result
