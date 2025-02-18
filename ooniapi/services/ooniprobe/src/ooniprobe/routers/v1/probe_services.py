@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -131,7 +131,28 @@ def probe_register_post(
 
 
 class ProbeUpdate(BaseModel):
-    pass
+    """
+    The original format of this comes from: 
+    https://github.com/ooni/orchestra/blob/master/registry/registry/handler/registry.go#L25
+    """
+    probe_cc : Optional[str] = None
+    probe_asn : Optional[str] = None
+    platform : Optional[str]  = None
+
+    software_name : Optional[str]  = None
+    software_version : Optional[str]  = None
+    supported_tests : Optional[List[str]] = None
+
+    network_type : Optional[str] = None
+    available_bandwidth : Optional[str] = None
+    language : Optional[str] = None
+
+    token : Optional[str] = None
+
+    probe_family : Optional[str] = None
+    probe_id : Optional[str] = None
+
+    password : Optional[str] = None
 
 
 class ProbeUpdateResponse(BaseModel):
