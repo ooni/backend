@@ -5,6 +5,7 @@ OONI Probe Services API
 from base64 import b64encode
 from datetime import datetime, timedelta, date
 from hashlib import sha512
+import json
 from os import urandom
 from pathlib import Path
 import random
@@ -834,23 +835,31 @@ def open_report() -> Response:
     )
 
 
-def compare_probe_msmt_cc_asn(cc: str, asn: str):
+def compare_probe_msmt_cc_asn(cc: str, asn: str) -> Tuple[str, str, str, bool]:
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
     Generates a metric.
     """
+    safe_ip = "0.0.0.0"
     try:
         cc = cc.upper()
         ipaddr = extract_probe_ipaddr()
+        # only extract safe_ip when it's an ipv4 address
+        if "." in ipaddr:
+            parts = ipaddr.split(".")
+            assert len(parts) == 4, "probably not an IPv4 address"
+            safe_ip = ".".join(parts[:3]) + ".0"
         db_probe_cc = lookup_probe_cc(ipaddr)
         db_asn, _ = lookup_probe_network(ipaddr)
         if db_asn.startswith("AS"):
             db_asn = db_asn[2:]
-        if db_probe_cc == cc and db_asn == asn:
+        match = db_probe_cc == cc and db_asn == asn
+        if match:
             metrics.incr("probe_cc_asn_match")
         else:
             metrics.incr("probe_cc_asn_nomatch")
+        return (db_probe_cc, db_asn, safe_ip, match)
     except Exception:
-        pass
+        return ("", "", safe_ip, False)
 
 
 @probe_services_blueprint.route("/report/<report_id>", methods=["POST"])
@@ -926,7 +935,9 @@ def receive_measurement(report_id) -> Response:
     dirname = f"{hour}_{cc}_{test_name}"
     spooldir = Path(current_app.config["MSMT_SPOOL_DIR"])
     msmtdir = spooldir / "incoming" / dirname
+    msmt_meta_dir = spooldir / "msmt_meta"
     msmtdir.mkdir(parents=True, exist_ok=True)
+    msmt_meta_dir.mkdir(parents=True, exist_ok=True)
 
     h = sha512(data).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
@@ -938,10 +949,22 @@ def receive_measurement(report_id) -> Response:
     msmt_f_tmp.rename(msmt_f)
     metrics.incr("receive_measurement_count")
 
-    compare_probe_msmt_cc_asn(cc, asn)
+    db_cc, db_asn, safe_ip, match = compare_probe_msmt_cc_asn(cc, asn)
     try:
         url = f"http://127.0.0.1:8472/{msmt_uid}"
         urlopen(url, data, 59)
+        msmt_meta_f = msmt_meta_dir / f"{msmt_uid}.meta"
+        msmt_meta_f.write_text(
+            json.dumps(
+                {
+                    "db_cc": db_cc,
+                    "db_asn": db_asn,
+                    "match": match,
+                    "measurement_uid": msmt_uid,
+                    "safe_ip": safe_ip,
+                }
+            )
+        )
         return nocachejson(measurement_uid=msmt_uid)
 
     except Exception as e:
