@@ -51,9 +51,6 @@ def probe_login_post(
         raise HTTPException(status_code=401, detail="Missing credentials")
 
     token = probe_login.username
-    # TODO: We have to find a way to explicitly log metrics with prometheus.
-    # We're currently using the instrumentator default metrics, like http response counts
-    # Maybe using the same exporter as the instrumentator?
 
     try:
         dec = decode_jwt(token, audience="probe_login", key=settings.jwt_encryption_key)
