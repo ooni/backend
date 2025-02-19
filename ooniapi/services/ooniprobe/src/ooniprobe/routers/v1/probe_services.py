@@ -23,6 +23,10 @@ class Metrics:
             labelnames=["state", "detail", "login"]
         )
 
+    PROBE_UPDATE_INFO = Info(
+        "probe_update_info", "Information reported in the probe update endpoint",
+        )
+
 class ProbeLogin(BaseModel):
     # Allow None username and password
     # to deliver informational 401 error when they're missing
@@ -173,4 +177,17 @@ class ProbeUpdateResponse(BaseModel):
 @router.put("/update/{client_id}", tags=["ooniprobe"])
 def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     log.info("update successful")
+    
+    # Log update metadata into prometheus
+    probe_update_dict = probe_update.model_dump(exclude_none=True)
+
+    # Info doesn't allows list, if we have a list we have to convert it 
+    # to string
+    if probe_update_dict['supported_tests'] is not None:
+        tests = probe_update_dict['supported_tests']
+        tests_str = ";".join(tests)
+        probe_update_dict['supported_tests'] = tests_str
+
+    Metrics.PROBE_UPDATE_INFO.info(probe_update_dict)
+
     return ProbeUpdateResponse(status="ok")
