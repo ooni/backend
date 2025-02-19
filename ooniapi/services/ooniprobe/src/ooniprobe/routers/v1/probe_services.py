@@ -4,6 +4,8 @@ import time
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from prometheus_client import Counter, Info
+from enum import Enum
 
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
@@ -15,6 +17,11 @@ router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
 
+class Metrics:
+    PROBE_LOGIN = Counter(
+            "probe_login_requests", "Requests made to the probe login endpoint", 
+            labelnames=["state", "detail", "login"]
+        )
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -43,24 +50,28 @@ def probe_login_post(
     # TODO: We have to find a way to explicitly log metrics with prometheus.
     # We're currently using the instrumentator default metrics, like http response counts
     # Maybe using the same exporter as the instrumentator?
+
     try:
         dec = decode_jwt(token, audience="probe_login", key=settings.jwt_encryption_key)
         registration_time = dec["iat"]
+
         log.info("probe login: successful")
-        # metrics.incr("probe_login_successful")
+        Metrics.PROBE_LOGIN.labels(login = 'standard', detail="ok", state="successful").inc()
+
     except jwt.exceptions.MissingRequiredClaimError:
         log.info("probe login: invalid or missing claim")
-        # metrics.incr("probe_login_failed")
+        Metrics.PROBE_LOGIN.labels(login = 'standard', detail="invalid_or_missing_claim", state="failed").inc()
+
         raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.InvalidSignatureError:
         log.info("probe login: invalid signature")
-        # metrics.incr("probe_login_failed")
+        Metrics.PROBE_LOGIN.labels(login = 'standard', detail="invalid_signature", state="failed").inc()
+
         raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.DecodeError:
-        # Not a JWT token: treat it as a "legacy" login
-        # return jerror("Invalid or missing credentials", code=401)
         log.info("probe login: legacy login successful")
-        # metrics.incr("probe_legacy_login_successful")
+        Metrics.PROBE_LOGIN.labels(login = 'legacy', detail="ok", state="successful").inc()
+
         registration_time = None
 
     exp = datetime.now(timezone.utc) + timedelta(days=7)
