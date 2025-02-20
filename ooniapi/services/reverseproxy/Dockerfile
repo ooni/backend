@@ -9,4 +9,9 @@ RUN tar -xzvf ./nginx-prom-exporter/prom-exporter.tar.gz -C ./nginx-prom-exporte
 RUN mv ./nginx-prom-exporter/nginx-prometheus-exporter /bin
 RUN rm -r nginx-prom-exporter
 
+
+# Add this script to the entrypoint.d directory so it will be called on startup
+COPY scripts/40-start-prom-exporter.sh docker-entrypoint.d
+RUN chmod +x docker-entrypoint.d/40-start-prom-exporter.sh
+
 COPY templates/backend-proxy.conf.template /etc/nginx/templates/
