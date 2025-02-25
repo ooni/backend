@@ -18,7 +18,7 @@ server {
 
     server_name _;
 
-    location /metrics {
+    location /metrics { 
       proxy_pass http://localhost:9113;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
