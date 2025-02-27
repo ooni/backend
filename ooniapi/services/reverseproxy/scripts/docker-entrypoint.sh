@@ -3,6 +3,9 @@
 
 set -e
 
+# Copied from: 
+# https://github.com/nginxinc/docker-nginx/blob/cffeb933620093bc0c08c0b28c3d5cbaec79d729/mainline/debian/docker-entrypoint.sh
+
 entrypoint_log() {
     if [ -z "${NGINX_ENTRYPOINT_QUIET_LOGS:-}" ]; then
         echo "$@"
