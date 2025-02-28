@@ -193,8 +193,9 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
 
     # Info doesn't allows list, if we have a list we have to convert it
     # to string
-    if probe_update_dict["supported_tests"] is not None:
+    if probe_update_dict.get("supported_tests") is not None:
         tests = probe_update_dict["supported_tests"]
+        tests.sort()
         tests_str = ";".join(tests)
         probe_update_dict["supported_tests"] = tests_str
 
