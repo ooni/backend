@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from prometheus_client import Counter, Info
+from enum import Enum
 
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
@@ -14,6 +16,19 @@ from ...common.utils import setnocacheresponse
 router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
+
+
+class Metrics:
+    PROBE_LOGIN = Counter(
+        "probe_login_requests",
+        "Requests made to the probe login endpoint",
+        labelnames=["state", "detail", "login"],
+    )
+
+    PROBE_UPDATE_INFO = Info(
+        "probe_update_info",
+        "Information reported in the probe update endpoint",
+    )
 
 
 class ProbeLogin(BaseModel):
@@ -40,27 +55,36 @@ def probe_login_post(
         raise HTTPException(status_code=401, detail="Missing credentials")
 
     token = probe_login.username
-    # TODO: We have to find a way to explicitly log metrics with prometheus.
-    # We're currently using the instrumentator default metrics, like http response counts
-    # Maybe using the same exporter as the instrumentator?
+
     try:
         dec = decode_jwt(token, audience="probe_login", key=settings.jwt_encryption_key)
         registration_time = dec["iat"]
+
         log.info("probe login: successful")
-        # metrics.incr("probe_login_successful")
+        Metrics.PROBE_LOGIN.labels(
+            login="standard", detail="ok", state="successful"
+        ).inc()
+
     except jwt.exceptions.MissingRequiredClaimError:
         log.info("probe login: invalid or missing claim")
-        # metrics.incr("probe_login_failed")
+        Metrics.PROBE_LOGIN.labels(
+            login="standard", detail="invalid_or_missing_claim", state="failed"
+        ).inc()
+
         raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.InvalidSignatureError:
         log.info("probe login: invalid signature")
-        # metrics.incr("probe_login_failed")
+        Metrics.PROBE_LOGIN.labels(
+            login="standard", detail="invalid_signature", state="failed"
+        ).inc()
+
         raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.DecodeError:
-        # Not a JWT token: treat it as a "legacy" login
-        # return jerror("Invalid or missing credentials", code=401)
         log.info("probe login: legacy login successful")
-        # metrics.incr("probe_legacy_login_successful")
+        Metrics.PROBE_LOGIN.labels(
+            login="legacy", detail="ok", state="successful"
+        ).inc()
+
         registration_time = None
 
     exp = datetime.now(timezone.utc) + timedelta(days=7)
@@ -104,14 +128,14 @@ def probe_register_post(
 
     Note that most of the request body arguments are not actually
     used but are kept here to use the same API as the old version
-    
+
     """
 
     # **IMPORTANT** You have to compute this token using a different key
     # to the one used in ooniauth service, because you could allow
-    # a login bypass attack if you don't. 
+    # a login bypass attack if you don't.
     #
-    # Note that this token is generated regardless of any authentication, 
+    # Note that this token is generated regardless of any authentication,
     # so if you use the same jwt_encryption_key for ooniauth, you give users
     # an auth token for free
     #
@@ -131,7 +155,29 @@ def probe_register_post(
 
 
 class ProbeUpdate(BaseModel):
-    pass
+    """
+    The original format of this comes from:
+    https://github.com/ooni/orchestra/blob/master/registry/registry/handler/registry.go#L25
+    """
+
+    probe_cc: Optional[str] = None
+    probe_asn: Optional[str] = None
+    platform: Optional[str] = None
+
+    software_name: Optional[str] = None
+    software_version: Optional[str] = None
+    supported_tests: Optional[List[str]] = None
+
+    network_type: Optional[str] = None
+    available_bandwidth: Optional[str] = None
+    language: Optional[str] = None
+
+    token: Optional[str] = None
+
+    probe_family: Optional[str] = None
+    probe_id: Optional[str] = None
+
+    password: Optional[str] = None
 
 
 class ProbeUpdateResponse(BaseModel):
@@ -141,4 +187,18 @@ class ProbeUpdateResponse(BaseModel):
 @router.put("/update/{client_id}", tags=["ooniprobe"])
 def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     log.info("update successful")
+
+    # Log update metadata into prometheus
+    probe_update_dict = probe_update.model_dump(exclude_none=True)
+
+    # Info doesn't allows list, if we have a list we have to convert it
+    # to string
+    if probe_update_dict.get("supported_tests") is not None:
+        tests = probe_update_dict["supported_tests"]
+        tests.sort()
+        tests_str = ";".join(tests)
+        probe_update_dict["supported_tests"] = tests_str
+
+    Metrics.PROBE_UPDATE_INFO.info(probe_update_dict)
+
     return ProbeUpdateResponse(status="ok")

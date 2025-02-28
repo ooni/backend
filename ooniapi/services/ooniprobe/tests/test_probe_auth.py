@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 from ooniprobe.common import auth
 from fastapi.testclient import TestClient
 
@@ -58,14 +58,14 @@ def test_update(client: TestClient, jwt_encryption_key):
     assert json["status"] == "ok"
 
 
-def _get_update_data() -> Dict[str, str]:
+def _get_update_data() -> Dict[str, Any]:
     return {
         "probe_cc": "IT",
         "probe_asn": "AS1234",
         "platform": "android",
         "software_name": "ooni-testing",
         "software_version": "0.0.1",
-        "supported_tests": "web_connectivity",
+        "supported_tests": ["web_connectivity"],
         "network_type": "wifi",
         "available_bandwidth": "100",
         "language": "en",
