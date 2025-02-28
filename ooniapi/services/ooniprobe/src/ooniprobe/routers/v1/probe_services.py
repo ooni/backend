@@ -17,15 +17,19 @@ router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
 
+
 class Metrics:
     PROBE_LOGIN = Counter(
-            "probe_login_requests", "Requests made to the probe login endpoint", 
-            labelnames=["state", "detail", "login"]
-        )
+        "probe_login_requests",
+        "Requests made to the probe login endpoint",
+        labelnames=["state", "detail", "login"],
+    )
 
     PROBE_UPDATE_INFO = Info(
-        "probe_update_info", "Information reported in the probe update endpoint",
-        )
+        "probe_update_info",
+        "Information reported in the probe update endpoint",
+    )
+
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -57,21 +61,29 @@ def probe_login_post(
         registration_time = dec["iat"]
 
         log.info("probe login: successful")
-        Metrics.PROBE_LOGIN.labels(login = 'standard', detail="ok", state="successful").inc()
+        Metrics.PROBE_LOGIN.labels(
+            login="standard", detail="ok", state="successful"
+        ).inc()
 
     except jwt.exceptions.MissingRequiredClaimError:
         log.info("probe login: invalid or missing claim")
-        Metrics.PROBE_LOGIN.labels(login = 'standard', detail="invalid_or_missing_claim", state="failed").inc()
+        Metrics.PROBE_LOGIN.labels(
+            login="standard", detail="invalid_or_missing_claim", state="failed"
+        ).inc()
 
         raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.InvalidSignatureError:
         log.info("probe login: invalid signature")
-        Metrics.PROBE_LOGIN.labels(login = 'standard', detail="invalid_signature", state="failed").inc()
+        Metrics.PROBE_LOGIN.labels(
+            login="standard", detail="invalid_signature", state="failed"
+        ).inc()
 
         raise HTTPException(status_code=401, detail="Invalid credentials")
     except jwt.exceptions.DecodeError:
         log.info("probe login: legacy login successful")
-        Metrics.PROBE_LOGIN.labels(login = 'legacy', detail="ok", state="successful").inc()
+        Metrics.PROBE_LOGIN.labels(
+            login="legacy", detail="ok", state="successful"
+        ).inc()
 
         registration_time = None
 
@@ -116,14 +128,14 @@ def probe_register_post(
 
     Note that most of the request body arguments are not actually
     used but are kept here to use the same API as the old version
-    
+
     """
 
     # **IMPORTANT** You have to compute this token using a different key
     # to the one used in ooniauth service, because you could allow
-    # a login bypass attack if you don't. 
+    # a login bypass attack if you don't.
     #
-    # Note that this token is generated regardless of any authentication, 
+    # Note that this token is generated regardless of any authentication,
     # so if you use the same jwt_encryption_key for ooniauth, you give users
     # an auth token for free
     #
@@ -144,27 +156,28 @@ def probe_register_post(
 
 class ProbeUpdate(BaseModel):
     """
-    The original format of this comes from: 
+    The original format of this comes from:
     https://github.com/ooni/orchestra/blob/master/registry/registry/handler/registry.go#L25
     """
-    probe_cc : Optional[str] = None
-    probe_asn : Optional[str] = None
-    platform : Optional[str]  = None
 
-    software_name : Optional[str]  = None
-    software_version : Optional[str]  = None
-    supported_tests : Optional[List[str]] = None
+    probe_cc: Optional[str] = None
+    probe_asn: Optional[str] = None
+    platform: Optional[str] = None
 
-    network_type : Optional[str] = None
-    available_bandwidth : Optional[str] = None
-    language : Optional[str] = None
+    software_name: Optional[str] = None
+    software_version: Optional[str] = None
+    supported_tests: Optional[List[str]] = None
 
-    token : Optional[str] = None
+    network_type: Optional[str] = None
+    available_bandwidth: Optional[str] = None
+    language: Optional[str] = None
 
-    probe_family : Optional[str] = None
-    probe_id : Optional[str] = None
+    token: Optional[str] = None
 
-    password : Optional[str] = None
+    probe_family: Optional[str] = None
+    probe_id: Optional[str] = None
+
+    password: Optional[str] = None
 
 
 class ProbeUpdateResponse(BaseModel):
@@ -174,16 +187,16 @@ class ProbeUpdateResponse(BaseModel):
 @router.put("/update/{client_id}", tags=["ooniprobe"])
 def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     log.info("update successful")
-    
+
     # Log update metadata into prometheus
     probe_update_dict = probe_update.model_dump(exclude_none=True)
 
-    # Info doesn't allows list, if we have a list we have to convert it 
+    # Info doesn't allows list, if we have a list we have to convert it
     # to string
-    if probe_update_dict['supported_tests'] is not None:
-        tests = probe_update_dict['supported_tests']
+    if probe_update_dict["supported_tests"] is not None:
+        tests = probe_update_dict["supported_tests"]
         tests_str = ";".join(tests)
-        probe_update_dict['supported_tests'] = tests_str
+        probe_update_dict["supported_tests"] = tests_str
 
     Metrics.PROBE_UPDATE_INFO.info(probe_update_dict)
 
