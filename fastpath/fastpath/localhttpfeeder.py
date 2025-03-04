@@ -21,6 +21,8 @@ class MsmtFeeder(BaseApplication):
             assert key in self.cfg.settings
             self.cfg.set(key, value)
 
+        self.cfg.set('reload', True)
+
     def load(self):
         return self.application
 

@@ -1,10 +1,11 @@
 
 local_quickdeploy:
-	sudo cp fastpath/*.py /usr/lib/python3.7/dist-packages/fastpath/
-	sudo systemctl restart fastpath
+	cp fastpath/*.py /usr/local/lib/python3.9/
+	systemctl restart fastpath
 
 local_functests:
-	PYTHONPATH=. pytest-3 -s --log-cli-level info $(args)
+	# PYTHONPATH=. pytest-3 -s --log-cli-level info $(args)
+	pytest -s --log-cli-level info $(args)
 
 local_functests_coverage:
 	PYTHONPATH=. pytest-3 -s --cov=fastpath
