@@ -1,31 +1,48 @@
 services:
   fastpath:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.fastpath
     container_name: fastpath-ooni
     ports:
       - "5000:5000"
+      - "8472:8472"
     environment:
       - CLICKHOUSE_HOST=clickhouse-server
       - CLICKHOUSE_PORT=8123
+    volumes:
+      - .:/app
+    working_dir: /app
     networks:
       - fastpath-network
     depends_on:
-      - clickhouse-server
+      clickhouse-server:
+        condition: service_healthy
+        restart: true
 
   clickhouse-server:
-    image: yandex/clickhouse-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.clickhouse
     container_name: clickhouse-server
     environment:
       - CLICKHOUSE_DB=default
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=default
     ports:
-      - "8123:8123"
       - "9000:9000"
+      - "8123:8123"
+      - "9009:9009"
     volumes:
-      - clickhouse-data:/var/lib/clickhouse
+       - ./clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - fastpath-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-u", "default:default", "http://localhost:8123/?query=SELECT%201"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
 
 networks:
   fastpath-network:
