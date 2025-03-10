@@ -202,3 +202,4 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     Metrics.PROBE_UPDATE_INFO.info(probe_update_dict)
 
     return ProbeUpdateResponse(status="ok")
+
