@@ -1,10 +1,10 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from prometheus_client import Counter, Info
+from prometheus_client import Counter, Info, Gauge
 from enum import Enum
 
 from ...common.dependencies import get_settings
@@ -30,6 +30,7 @@ class Metrics:
         "Information reported in the probe update endpoint",
     )
 
+    CHECK_IN_TEST_LIST_COUNT = Gauge("check-in-test-list-count", "Amount of test lists present in each experiment")
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -204,12 +205,133 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     return ProbeUpdateResponse(status="ok")
 
 class CheckIn(BaseModel):
-    pass
+    run_type: str = 'timed'
+    charging: bool = True
+    probe_cc: str = "ZZ"
+    probe_asn: str = "AS0"
+    software_name: str = ""
+    software_version: str = ""
+    web_connectivity: Optional[Dict[str, Any]] = None
 
 class CheckInResponse(BaseModel):
     pass
 
 @router.post("/check-in", tags=["ooniprobe"])
-def check_in(check_in_request : CheckIn) -> CheckInResponse:
+def check_in(check_in : CheckIn) -> CheckInResponse:
+
+    # TODO: Implement throttling
+    run_type = check_in.run_type
+    charging = check_in.charging
+    probe_cc = check_in.probe_cc.upper()
+    probe_asn = check_in.probe_asn
+    software_name = check_in.software_name
+    software_version = check_in.software_version
+
+    resp, probe_cc, asn_i = probe_geoip(probe_cc, probe_asn)
+
+    # On run_type=manual preserve the old behavior: test the whole list
+    # On timed runs test few URLs, especially when on battery
+    if run_type == "manual":
+        url_limit = 9999  # same as prio.py
+    elif charging:
+        url_limit = 100
+    else:
+        url_limit = 20
+
+    try:
+        charging = bool(charging)
+    except Exception:
+        log.error(
+            f"check-in params: {url_limit} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
+        )
+
+    if check_in.web_connectivity is not None:
+        catcodes = check_in.web_connectivity.get("category_codes", [])
+        if isinstance(catcodes, str):
+            category_codes = catcodes.split(",")
+        else:
+            category_codes = catcodes
+
+    else:
+        category_codes = []
+
+    for c in category_codes:
+        assert c.isalpha()
+
+    try:
+        test_items, _1, _2 = generate_test_list(
+            probe_cc, category_codes, asn_i, url_limit, False
+        )
+    except Exception as e:
+        log.error(e, exc_info=True)
+        # TODO: use same failover as prio.py:list_test_urls
+        # failover_generate_test_list runs without any database interaction
+        # test_items = failover_generate_test_list(country_code, category_codes, limit)
+        test_items = []
+
+    Metrics.CHECK_IN_TEST_LIST_COUNT.set(len(test_items))
+
+    conf: Dict[str, Any] = dict(
+        features={
+            # TODO(https://github.com/ooni/probe-cli/pull/1522): we disable torsf until we have
+            # addressed the issue with the fast.ly based rendezvous method being broken
+            "torsf_enabled": False,
+            "vanilla_tor_enabled": True,
+        }
+    )
+
+    # set webconnectivity_0.5 feature flag for some probes
+    # Temporarily disabled while we work towards deploying this in prod:
+    # https://github.com/ooni/probe/issues/2674
+    #
+    # octect = extract_probe_ipaddr_octect(1, 0)
+    # if octect in (34, 239):
+    #    conf["features"]["webconnectivity_0.5"] = True
+
+    conf["test_helpers"] = generate_test_helpers_conf()
+
+    resp["tests"] = {
+        "web_connectivity": {"urls": test_items},
+    }
+    resp["conf"] = conf
+    resp["utc_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    test_names = (
+        "bridge_reachability",
+        "dash",
+        "dns_consistency",
+        "dnscheck",
+        "facebook_messenger",
+        "http_header_field_manipulation",
+        "http_host",
+        "http_invalid_request_line",
+        "http_requests",
+        "meek_fronted_requests_test",
+        "multi_protocol_traceroute",
+        "ndt",
+        "psiphon",
+        "riseupvpn",
+        "tcp_connect",
+        "telegram",
+        "tor",
+        "urlgetter",
+        "vanilla_tor",
+        "web_connectivity",
+        "whatsapp",
+    )
+    for tn in test_names:
+        rid = generate_report_id(tn, probe_cc, asn_i)
+        resp["tests"].setdefault(tn, {})  # type: ignore
+        resp["tests"][tn]["report_id"] = rid  # type: ignore
+
+    til = len(test_items)
+    log.debug(
+        f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
+    )
+
+    # TODO(luis) use this to set the response to use no cache 
+    # setnocacheresponse(response)
+
+    return nocachejson(**resp)
     
     return CheckInResponse()
