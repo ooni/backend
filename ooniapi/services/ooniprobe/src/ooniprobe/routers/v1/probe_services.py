@@ -202,3 +202,14 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
     Metrics.PROBE_UPDATE_INFO.info(probe_update_dict)
 
     return ProbeUpdateResponse(status="ok")
+
+class CheckIn(BaseModel):
+    pass
+
+class CheckInResponse(BaseModel):
+    pass
+
+@router.post("/check-in", tags=["ooniprobe"])
+def check_in(check_in_request : CheckIn) -> CheckInResponse:
+    
+    return CheckInResponse()
