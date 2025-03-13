@@ -1,12 +1,15 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Tuple, Annotated, TypeAlias, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+import geoip2
+import geoip2.errors
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
 from prometheus_client import Counter, Info, Gauge
 from enum import Enum
 
+from ...dependencies import CCReaderDep, ASNReaderDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -31,6 +34,14 @@ class Metrics:
     )
 
     CHECK_IN_TEST_LIST_COUNT = Gauge("check-in-test-list-count", "Amount of test lists present in each experiment")
+
+    GEOIP_ADDR_FOUND = Counter("geoip_ipaddr_found", "If the ip address was found by geoip", labelnames=["probe_cc", "asn"])
+
+    GEOIP_ADDR_NOT_FOUND = Counter("geoip_ipaddr_not_found", "We couldn't look up the IP address in the database")
+
+    GEOIP_CC_DIFFERS = Counter("geoip_cc_differs", "There's a mismatch between reported CC and observed CC")
+
+    GEOIP_ASN_DIFFERS = Counter("geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN")
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -216,8 +227,9 @@ class CheckIn(BaseModel):
 class CheckInResponse(BaseModel):
     pass
 
+StrHeader : TypeAlias = Annotated[List[str] | None, Header()]
 @router.post("/check-in", tags=["ooniprobe"])
-def check_in(check_in : CheckIn) -> CheckInResponse:
+def check_in(request : Request, check_in : CheckIn, x_forwarded_for : StrHeader, x_real_ip : StrHeader, cc_reader : CCReaderDep, asn_reader : ASNReaderDep) -> CheckInResponse:
 
     # TODO: Implement throttling
     run_type = check_in.run_type
@@ -227,7 +239,7 @@ def check_in(check_in : CheckIn) -> CheckInResponse:
     software_name = check_in.software_name
     software_version = check_in.software_version
 
-    resp, probe_cc, asn_i = probe_geoip(probe_cc, probe_asn)
+    resp, probe_cc, asn_i = probe_geoip(request, probe_cc, probe_asn, x_forwarded_for or [], x_real_ip or [], cc_reader, asn_reader)
 
     # On run_type=manual preserve the old behavior: test the whole list
     # On timed runs test few URLs, especially when on battery
@@ -335,3 +347,69 @@ def check_in(check_in : CheckIn) -> CheckInResponse:
     return nocachejson(**resp)
     
     return CheckInResponse()
+
+def probe_geoip(request : Request, probe_cc: str, asn: str, x_forwarded_for : List[str], x_real_ip : List[str], cc_reader : CCReaderDep, asn_reader : ASNReaderDep) -> Tuple[Dict, str, int]:
+    """Looks up probe CC, ASN, network name using GeoIP, prepare
+    response dict
+    """
+    db_probe_cc = "ZZ"
+    db_asn = "AS0"
+    db_probe_network_name = None
+    try:
+        ipaddr = extract_probe_ipaddr(request, [x_forwarded_for, x_real_ip])
+        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
+        db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
+        Metrics.GEOIP_ADDR_FOUND.labels(probe_cc = db_probe_cc, asn=db_asn).inc()
+    except geoip2.errors.AddressNotFoundError:
+        Metrics.GEOIP_ADDR_NOT_FOUND.inc()
+    except Exception as e:
+        log.error(str(e), exc_info=True)
+
+    if probe_cc != "ZZ" and probe_cc != db_probe_cc:
+        log.info(f"probe_cc != db_probe_cc ({probe_cc} != {db_probe_cc})")
+        Metrics.GEOIP_CC_DIFFERS.inc()
+    if asn != "AS0" and asn != db_asn:
+        log.info(f"probe_asn != db_probe_as ({asn} != {db_asn})")
+        Metrics.GEOIP_ASN_DIFFERS.inc()
+
+    # We always returns the looked up probe_cc and probe_asn to the probe
+    resp: Dict[str, Any] = dict(v=1)
+    resp["probe_cc"] = db_probe_cc
+    resp["probe_asn"] = db_asn
+    resp["probe_network_name"] = db_probe_network_name
+
+    # Don't override probe_cc or asn unless the probe has omitted these
+    # values. This is done because the IP address we see might not match the
+    # actual probe ipaddr in cases in which a circumvention tool is being used.
+    # TODO: eventually we should have the probe signal to the backend that it
+    # wants the lookup to be done by the backend and have it pass the public IP
+    # through a specific header.
+    if probe_cc == "ZZ" and asn == "AS0":
+        probe_cc = db_probe_cc
+        asn = db_asn
+
+    assert asn.startswith("AS")
+    asn_int = int(asn[2:])
+    assert probe_cc.isalpha()
+    assert len(probe_cc) == 2
+
+    return resp, probe_cc, asn_int
+
+def extract_probe_ipaddr(request : Request, header_vals : List[List[str] | None]) -> str:
+    for h in header_vals:
+        if h is not None and len(h) > 0:
+            return h[0].rpartition(" ")[-1]
+    
+    return request.client.host if request.client else ""
+
+def lookup_probe_network(ipaddr: str, asn_reader : ASNReaderDep) -> Tuple[str, str]:
+    resp = asn_reader.asn(ipaddr)
+
+    return (
+        "AS{}".format(resp.autonomous_system_number),
+        resp.autonomous_system_organization or "0",
+    )
+
+def lookup_probe_cc(ipaddr: str, cc_reader : CCReaderDep) -> str:
+    resp = cc_reader.country(ipaddr)
+    return resp.country.iso_code or "ZZ"
