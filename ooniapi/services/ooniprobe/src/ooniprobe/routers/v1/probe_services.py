@@ -39,7 +39,7 @@ class Metrics:
         "Information reported in the probe update endpoint",
     )
 
-    CHECK_IN_TEST_LIST_COUNT = Gauge("check-in-test-list-count", "Amount of test lists present in each experiment")
+    CHECK_IN_TEST_LIST_COUNT = Gauge("check_in_test_list_count", "Amount of test lists present in each experiment")
 
     GEOIP_ADDR_FOUND = Counter("geoip_ipaddr_found", "If the ip address was found by geoip", labelnames=["probe_cc", "asn"])
 
