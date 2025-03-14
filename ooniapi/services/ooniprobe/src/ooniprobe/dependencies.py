@@ -47,3 +47,5 @@ def get_clickhouse_session(settings: SettingsDep):
         yield db
     finally:
         db.disconnect()
+
+ClickhouseDep = Annotated[Clickhouse, Depends(get_clickhouse_session)]
