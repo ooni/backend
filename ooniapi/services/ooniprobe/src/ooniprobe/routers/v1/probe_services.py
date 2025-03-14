@@ -1,7 +1,10 @@
+from base64 import b64encode
+from os import urandom
 import logging
 from datetime import datetime, timezone, timedelta
 import time
 from typing import List, Optional, Any, Dict, Tuple, Annotated, TypeAlias, Optional
+import random
 
 import geoip2
 import geoip2.errors
@@ -9,8 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
 from prometheus_client import Counter, Info, Gauge
 from enum import Enum
 import sqlalchemy as sa
+from clickhouse_driver import Client as Clickhouse
 
-from ...dependencies import CCReaderDep, ASNReaderDep
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -226,12 +230,74 @@ class CheckIn(BaseModel):
     software_version: str = ""
     web_connectivity: Optional[Dict[str, Any]] = None
 
+class WebConnProps(BaseModel):
+    category_code : str
+    country_code: str
+    url : str
+
+class WebConnectivity(BaseModel):
+    report_id: str
+    urls : List[WebConnProps]
+
+class Tests(BaseModel):
+    web_connectivity: WebConnectivity
+
 class CheckInResponse(BaseModel):
-    pass
+    """
+            v:
+              type: integer
+              description: response format version
+            probe_cc:
+              type: string
+              description: probe CC inferred from GeoIP or ZZ
+            probe_asn:
+              type: string
+              description: probe ASN inferred from GeoIP or AS0
+            probe_network_name:
+              type: string
+              description: probe network name inferred from GeoIP or None
+            utc_time:
+              type: string
+              description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
+            conf:
+              type: object
+              description: auxiliary configuration parameters
+              features:
+                type: object
+                description: feature flags
+            tests:
+              type: object
+              description: test-specific configuration
+              properties:
+                web_connectivity:
+                  type: object
+                  properties:
+                    report_id:
+                      type: string
+                    urls:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          category_code:
+                            type: string
+                          country_code:
+                            type: string
+                          url:
+                            type: string
+    """
+    v: int
+    probe_cc: str
+    probe_asn: str
+    probe_network_name: str
+    utc_time: str
+    conf: Dict[str, Any]
+    tests: Dict[str, Any]
+
 
 StrHeader : TypeAlias = Annotated[List[str] | None, Header()]
 @router.post("/check-in", tags=["ooniprobe"])
-def check_in(request : Request, check_in : CheckIn, x_forwarded_for : StrHeader, x_real_ip : StrHeader, cc_reader : CCReaderDep, asn_reader : ASNReaderDep) -> CheckInResponse:
+def check_in(request : Request, response : Response, check_in : CheckIn, x_forwarded_for : StrHeader, x_real_ip : StrHeader, cc_reader : CCReaderDep, asn_reader : ASNReaderDep, clickhouse : ClickhouseDep, settings : SettingsDep) -> CheckInResponse:
 
     # TODO: Implement throttling
     run_type = check_in.run_type
@@ -273,7 +339,7 @@ def check_in(request : Request, check_in : CheckIn, x_forwarded_for : StrHeader,
         assert c.isalpha()
 
     try:
-        test_items, _1, _2 = generate_test_list(
+        test_items, _1, _2 = generate_test_list(clickhouse,
             probe_cc, category_codes, asn_i, url_limit, False
         )
     except Exception as e:
@@ -308,7 +374,7 @@ def check_in(request : Request, check_in : CheckIn, x_forwarded_for : StrHeader,
         "web_connectivity": {"urls": test_items},
     }
     resp["conf"] = conf
-    resp["utc_time"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    resp["utc_time"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     test_names = (
         "bridge_reachability",
@@ -334,7 +400,7 @@ def check_in(request : Request, check_in : CheckIn, x_forwarded_for : StrHeader,
         "whatsapp",
     )
     for tn in test_names:
-        rid = generate_report_id(tn, probe_cc, asn_i)
+        rid = generate_report_id(tn, settings, probe_cc, asn_i)
         resp["tests"].setdefault(tn, {})  # type: ignore
         resp["tests"][tn]["report_id"] = rid  # type: ignore
 
@@ -343,12 +409,10 @@ def check_in(request : Request, check_in : CheckIn, x_forwarded_for : StrHeader,
         f"check-in params: {url_limit} {til} '{probe_cc}' '{charging}' '{run_type}' '{software_name}' '{software_version}'"
     )
 
-    # TODO(luis) use this to set the response to use no cache 
-    # setnocacheresponse(response)
-
-    return nocachejson(**resp)
+    setnocacheresponse(response)
+    checkin_response = CheckInResponse(v = resp['v'], probe_cc = resp["probe_cc"], probe_asn = resp["probe_asn"], probe_network_name=resp["probe_network_name"], utc_time=resp["utc_time"], conf=resp['conf'], tests = resp["tests"])
     
-    return CheckInResponse()
+    return checkin_response
 
 def probe_geoip(request : Request, probe_cc: str, asn: str, x_forwarded_for : List[str], x_real_ip : List[str], cc_reader : CCReaderDep, asn_reader : ASNReaderDep) -> Tuple[Dict, str, int]:
     """Looks up probe CC, ASN, network name using GeoIP, prepare
@@ -416,14 +480,14 @@ def lookup_probe_cc(ipaddr: str, cc_reader : CCReaderDep) -> str:
     resp = cc_reader.country(ipaddr)
     return resp.country.iso_code or "ZZ"
 
-def generate_test_list(
-    country_code: str, category_codes: tuple, probe_asn: int, limit: int, debug: bool
-) -> Tuple[List, List, List]:
+def generate_test_list(clickhouse : Clickhouse, 
+    country_code: str, category_codes: List, probe_asn: int, limit: int, debug: bool
+) -> Tuple[List, Tuple, Tuple]:
     """Generate test list based on the amount of measurements in the last
     N days"""
-    entries = fetch_reactive_url_list(country_code, probe_asn)
+    entries = fetch_reactive_url_list(clickhouse, country_code, probe_asn)
     log.info("fetched %d url entries", len(entries))
-    prio_rules = fetch_prioritization_rules(country_code)
+    prio_rules = fetch_prioritization_rules(clickhouse, country_code)
     log.info("fetched %d priority rules", len(prio_rules))
     li = compute_priorities(entries, prio_rules)
     # Filter unwanted category codes, replace ZZ, trim priority <= 0
@@ -450,9 +514,9 @@ def generate_test_list(
 
     if debug:
         return out, entries, prio_rules
-    return out, [], []
+    return out, (), ()
 
-def fetch_reactive_url_list(cc: str, probe_asn: int) -> tuple:
+def fetch_reactive_url_list(clickhouse_db : Clickhouse, cc: str, probe_asn: int) -> tuple:
     """Select all citizenlab URLs for the given probe_cc + ZZ
     Select measurements count from the current and previous week
     using a left outer join (without any info about priority)"""
@@ -480,5 +544,111 @@ def fetch_reactive_url_list(cc: str, probe_asn: int) -> tuple:
         q = q.replace("--asn-filter--", "AND probe_asn = :asn")
 
     # support uppercase or lowercase match
-    r = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=1)
+    r = query_click(clickhouse_db, sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=1)
     return tuple(r)
+
+def fetch_prioritization_rules(clickhouse_db : Clickhouse, cc: str) -> tuple:
+    sql = """SELECT category_code, cc, domain, url, priority
+    FROM url_priorities WHERE cc = :cc OR cc = '*' OR cc = ''
+    """
+    q = query_click(clickhouse_db, sa.text(sql), dict(cc=cc), query_prio=1)
+    return tuple(q)
+
+def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
+    # Order based on (msmt_cnt / priority) to provide balancing
+    test_list = []
+    for e in entries:
+        # Calculate priority for an URL
+        priority = 0
+        for pr in prio_rules:
+            if match_prio_rule(e, pr):
+                priority += pr["priority"]
+
+        o = dict(e)
+        o["priority"] = priority
+        o["weight"] = priority / max(e["msmt_cnt"], 0.1)
+        test_list.append(o)
+
+    return sorted(test_list, key=lambda k: k["weight"], reverse=True)
+
+def match_prio_rule(cz, pr: dict) -> bool:
+    """Match a priority rule to citizenlab entry"""
+    for k in ["category_code", "domain", "url"]:
+        if pr[k] not in ("", "*", cz[k]):
+            return False
+
+    if cz["cc"] != "ZZ" and pr["cc"] not in ("", "*", cz["cc"]):
+        return False
+
+    return True
+
+def generate_test_helpers_conf() -> Dict:
+    # Load-balance test helpers deterministically
+    conf = {
+        "dns": [
+            {"address": "37.218.241.93:57004", "type": "legacy"},
+            {"address": "37.218.241.93:57004", "type": "legacy"},
+        ],
+        "http-return-json-headers": [
+            {"address": "http://37.218.241.94:80", "type": "legacy"},
+            {"address": "http://37.218.241.94:80", "type": "legacy"},
+        ],
+        "ssl": [
+            {"address": "https://37.218.241.93", "type": "legacy"},
+            {"address": "https://37.218.241.93", "type": "legacy"},
+        ],
+        "tcp-echo": [
+            {"address": "37.218.241.93", "type": "legacy"},
+            {"address": "37.218.241.93", "type": "legacy"},
+        ],
+        "traceroute": [
+            {"address": "37.218.241.93", "type": "legacy"},
+            {"address": "37.218.241.93", "type": "legacy"},
+        ],
+        "web-connectivity": [
+            {"address": "httpo://o7mcp5y4ibyjkcgs.onion", "type": "legacy"},
+            {"address": "https://wcth.ooni.io", "type": "https"},
+            {
+                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
+                "front": "d33d1gs9kpq1c5.cloudfront.net",
+                "type": "cloudfront",
+            },
+            {"address": "httpo://y3zq5fwelrzkkv3s.onion", "type": "legacy"},
+            {"address": "https://wcth.ooni.io", "type": "https"},
+            {
+                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
+                "front": "d33d1gs9kpq1c5.cloudfront.net",
+                "type": "cloudfront",
+            },
+        ],
+    }
+    conf["web-connectivity"] = random_web_test_helpers(
+        [
+            "https://6.th.ooni.org",
+            "https://5.th.ooni.org",
+        ]
+    )
+    conf["web-connectivity"].append(
+        {
+            "address": "https://d33d1gs9kpq1c5.cloudfront.net",
+            "front": "d33d1gs9kpq1c5.cloudfront.net",
+            "type": "cloudfront",
+        }
+    )
+    return conf
+
+def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
+    """Randomly sort test helpers"""
+    random.shuffle(th_list)
+    out = []
+    for th_addr in th_list:
+        out.append({"address": th_addr, "type": "https"})
+    return out
+
+def generate_report_id(test_name, settings : Settings, cc: str, asn_i: int) -> str:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    cid = settings.collector_id
+    rand = b64encode(urandom(12), b"oo").decode()
+    stn = test_name.replace("_", "")
+    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
+    return rid
