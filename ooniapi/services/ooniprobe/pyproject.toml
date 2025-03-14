@@ -68,6 +68,7 @@ dependencies = [
   "pytest-postgresql",
   "pytest-asyncio",
   "freezegun",
+  "pytest-docker",
 ]
 path = ".venv/"
 
