@@ -8,6 +8,7 @@ import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
 from prometheus_client import Counter, Info, Gauge
 from enum import Enum
+import sqlalchemy as sa
 
 from ...dependencies import CCReaderDep, ASNReaderDep
 from ...common.dependencies import get_settings
@@ -15,6 +16,7 @@ from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
+from ...common.clickhouse_utils import query_click 
 
 router = APIRouter(prefix="/v1")
 
@@ -413,3 +415,70 @@ def lookup_probe_network(ipaddr: str, asn_reader : ASNReaderDep) -> Tuple[str, s
 def lookup_probe_cc(ipaddr: str, cc_reader : CCReaderDep) -> str:
     resp = cc_reader.country(ipaddr)
     return resp.country.iso_code or "ZZ"
+
+def generate_test_list(
+    country_code: str, category_codes: tuple, probe_asn: int, limit: int, debug: bool
+) -> Tuple[List, List, List]:
+    """Generate test list based on the amount of measurements in the last
+    N days"""
+    entries = fetch_reactive_url_list(country_code, probe_asn)
+    log.info("fetched %d url entries", len(entries))
+    prio_rules = fetch_prioritization_rules(country_code)
+    log.info("fetched %d priority rules", len(prio_rules))
+    li = compute_priorities(entries, prio_rules)
+    # Filter unwanted category codes, replace ZZ, trim priority <= 0
+    out = []
+    for entry in li:
+        if category_codes and entry["category_code"] not in category_codes:
+            continue
+        if entry["priority"] <= 0:
+            continue
+
+        cc = "XX" if entry["cc"] == "ZZ" else entry["cc"].upper()
+        i = {
+            "category_code": entry["category_code"],
+            "url": entry["url"],
+            "country_code": cc,
+        }
+        if debug:
+            i["msmt_cnt"] = entry["msmt_cnt"]
+            i["priority"] = entry["priority"]
+            i["weight"] = entry["weight"]
+        out.append(i)
+        if len(out) >= limit:
+            break
+
+    if debug:
+        return out, entries, prio_rules
+    return out, [], []
+
+def fetch_reactive_url_list(cc: str, probe_asn: int) -> tuple:
+    """Select all citizenlab URLs for the given probe_cc + ZZ
+    Select measurements count from the current and previous week
+    using a left outer join (without any info about priority)"""
+    q = """
+        SELECT category_code, domain, url, cc, COALESCE(msmt_cnt, 0) AS msmt_cnt
+        FROM (
+            SELECT domain, url, cc, category_code
+            FROM citizenlab
+            WHERE
+            citizenlab.cc = :cc_low
+            OR citizenlab.cc = :cc
+            OR citizenlab.cc = 'ZZ'
+        ) AS citiz
+        LEFT OUTER JOIN (
+            SELECT input, SUM(msmt_cnt) AS msmt_cnt
+            FROM counters_asn_test_list
+            WHERE probe_cc = :cc
+            AND (week IN (toStartOfWeek(now()), toStartOfWeek(now() - interval 1 week)))
+            --asn-filter--
+            GROUP BY input
+        ) AS cnt
+        ON (citiz.url = cnt.input)
+        """
+    if probe_asn != 0:
+        q = q.replace("--asn-filter--", "AND probe_asn = :asn")
+
+    # support uppercase or lowercase match
+    r = query_click(sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=1)
+    return tuple(r)

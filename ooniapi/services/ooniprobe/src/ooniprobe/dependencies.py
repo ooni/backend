@@ -8,11 +8,14 @@ import geoip2.database
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from clickhouse_driver import Client as Clickhouse
+
 from .common.config import Settings
 from .common.dependencies import get_settings
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
 def get_postgresql_session(settings: SettingsDep):
     engine = create_engine(settings.postgresql_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -36,3 +39,11 @@ def get_asn_reader(settings: SettingsDep):
     db_path = ""
     reader = geoip2.database.Reader(db_path)
 ASNReaderDep = Annotated[geoip2.database.Reader, Depends(get_asn_reader)]
+
+
+def get_clickhouse_session(settings: SettingsDep):
+    db = Clickhouse.from_url(settings.clickhouse_url)
+    try:
+        yield db
+    finally:
+        db.disconnect()
