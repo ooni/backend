@@ -48,7 +48,7 @@ def is_clickhouse_running(url):
 @pytest.fixture(scope="session")
 def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     port = docker_services.port_for("clickhouse", 9000)
-    url = "clickhouse://{}:{}".format(docker_ip, port)
+    url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
     docker_services.wait_until_responsive(
         timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
     )
