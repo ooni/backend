@@ -7,7 +7,6 @@ services:
     volumes:
         - ./fixtures:/fixtures
         - ./fixtures/initdb:/docker-entrypoint-initdb.d/
-
     environment:
       CLICKHOUSE_PASSWORD: test
       CLICKHOUSE_USER: test
