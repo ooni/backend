@@ -5,7 +5,7 @@ import json
 ## Test /api/v1/check-in
 
 
-def test_check_in(client, mocks):
+def test_check_in(client):
     j = dict(
         probe_cc="US",
         probe_asn="AS1234",
@@ -31,7 +31,7 @@ def test_check_in(client, mocks):
     assert sorted(c["conf"]) == ["features", "psiphon", "tor"]
 
 
-def test_check_in_url_category_news(client, mocks):
+def test_check_in_url_category_news(client):
     j = dict(
         on_wifi=True,
         charging=True,
@@ -51,7 +51,7 @@ def test_check_in_url_category_news(client, mocks):
     assert cc == "ZZ"
 
 
-def test_check_in_url_category_multi(client, mocks):
+def test_check_in_url_category_multi(client):
     j = dict(
         probe_cc="IT",
         on_wifi=True,
@@ -78,7 +78,7 @@ def test_check_in_url_category_multi(client, mocks):
 
 
 @pytest.mark.skip(reason="broken")
-def test_check_in_url_category_code_passed_as_string(client, mocks):
+def test_check_in_url_category_code_passed_as_string(client):
     # category_codes should be sent as an array, but comma-separated string
     # is handled anyways
     j = dict(
@@ -92,7 +92,7 @@ def test_check_in_url_category_code_passed_as_string(client, mocks):
         assert ui["category_code"] in ("NEWS", "HUMR")
 
 
-def test_check_in_url_prioritization_category_codes(client, mocks):
+def test_check_in_url_prioritization_category_codes(client):
     c = getjson(
         client,
         "/api/v1/test-list/urls?category_codes=NEWS,HUMR&country_code=US&limit=100",
@@ -111,7 +111,7 @@ def test_check_in_url_prioritization_category_codes(client, mocks):
     assert len(set(r["url"] for r in c["results"])) == 100
 
 
-def test_check_in_geoip(client, mocks):
+def test_check_in_geoip(client):
     j = dict(
         on_wifi=True,
         charging=False,
