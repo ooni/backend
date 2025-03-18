@@ -126,8 +126,9 @@ def update_geoip(db_dir : Path) -> None:
     Metrics.GEOIP_UPDATED.inc()
 
 
-def try_update(db_dir : Path):
-    if is_already_updated(db_dir):
+def try_update(db_dir : str):
+    db_dir_path = Path(db_dir)
+    if is_already_updated(db_dir_path):
         log.debug("Database already updated. Exiting.")
         return
 
@@ -135,4 +136,4 @@ def try_update(db_dir : Path):
         log.debug("Update not available yet. Exiting.")
         return
 
-    update_geoip(db_dir)
+    update_geoip(db_dir_path)

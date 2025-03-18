@@ -13,6 +13,7 @@ from . import models
 from .routers.v2 import vpn
 from .routers.v1 import probe_services
 
+from .download_geoip import try_update
 from .dependencies import get_postgresql_session, get_clickhouse_session
 from .common.dependencies import get_settings
 from .common.version import get_build_label
@@ -30,6 +31,9 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
+
+    log.debug("Downloading geoip DB...")
+    try_update(settings.geoip_db_dir)
     yield
 
 
