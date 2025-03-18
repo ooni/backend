@@ -240,6 +240,8 @@ class CheckIn(BaseModel):
     charging: bool = True
     probe_cc: str = "ZZ"
     probe_asn: str = "AS0"
+    on_wifi: bool = False
+    charging: bool = False
     software_name: str = ""
     software_version: str = ""
     web_connectivity: Optional[Dict[str, Any]] = None
@@ -308,13 +310,10 @@ class CheckInResponse(BaseModel):
     v: int
     probe_cc: str
     probe_asn: str
-    probe_network_name: str
+    probe_network_name: Optional[str]
     utc_time: str
     conf: Dict[str, Any]
     tests: Dict[str, Any]
-
-
-StrHeader: TypeAlias = Annotated[List[str] | None, Header()]
 
 
 @router.post("/check-in", tags=["ooniprobe"])
@@ -322,8 +321,6 @@ def check_in(
     request: Request,
     response: Response,
     check_in: CheckIn,
-    x_forwarded_for: StrHeader,
-    x_real_ip: StrHeader,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     clickhouse: ClickhouseDep,
@@ -342,8 +339,6 @@ def check_in(
         request,
         probe_cc,
         probe_asn,
-        x_forwarded_for or [],
-        x_real_ip or [],
         cc_reader,
         asn_reader,
     )
@@ -466,8 +461,6 @@ def probe_geoip(
     request: Request,
     probe_cc: str,
     asn: str,
-    x_forwarded_for: List[str],
-    x_real_ip: List[str],
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
 ) -> Tuple[Dict, str, int]:
@@ -478,7 +471,7 @@ def probe_geoip(
     db_asn = "AS0"
     db_probe_network_name = None
     try:
-        ipaddr = extract_probe_ipaddr(request, [x_forwarded_for, x_real_ip])
+        ipaddr = extract_probe_ipaddr(request)
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
@@ -518,10 +511,12 @@ def probe_geoip(
     return resp, probe_cc, asn_int
 
 
-def extract_probe_ipaddr(request: Request, header_vals: List[List[str] | None]) -> str:
-    for h in header_vals:
-        if h is not None and len(h) > 0:
-            return h[0].rpartition(" ")[-1]
+def extract_probe_ipaddr(request: Request) -> str:
+
+    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
+    for h in real_ip_headers:
+        if h in request.headers:
+            return request.headers.getlist(h)[0].rpartition(" ")[-1]
 
     return request.client.host if request.client else ""
 
