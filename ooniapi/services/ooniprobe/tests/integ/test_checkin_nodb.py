@@ -119,7 +119,9 @@ def test_check_in_geoip(client):
     headers = [
         ("X-Forwarded-For", "192.33.4.12")  # The IP address of c.root-servers.net
     ]
-    c = client.post("/api/v1/check-in", json=j, headers=headers).json
+    resp = client.post("/api/v1/check-in", json=j, headers=headers)
+    assert resp.status_code == 200, f"Error {resp.json()}"
+    c = resp.json()
     assert c["probe_cc"] == "US"
     assert c["probe_asn"] == "AS2149"
     assert c["probe_network_name"] is not None
@@ -127,11 +129,9 @@ def test_check_in_geoip(client):
 def postj(client, url, **kw):
     response = client.post(url, json=kw)
     assert response.status_code == 200
-    assert response.is_json
-    return response.json
+    return response.json()
 
 def getjson(client, url):
     response = client.get(url)
     assert response.status_code == 200
-    assert response.is_json
-    return response.json
+    return response.json()
