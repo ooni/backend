@@ -20,7 +20,7 @@ from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
-from ...common.clickhouse_utils import query_click 
+from ...common.clickhouse_utils import query_click
 
 router = APIRouter(prefix="/v1")
 
@@ -39,15 +39,28 @@ class Metrics:
         "Information reported in the probe update endpoint",
     )
 
-    CHECK_IN_TEST_LIST_COUNT = Gauge("check_in_test_list_count", "Amount of test lists present in each experiment")
+    CHECK_IN_TEST_LIST_COUNT = Gauge(
+        "check_in_test_list_count", "Amount of test lists present in each experiment"
+    )
 
-    GEOIP_ADDR_FOUND = Counter("geoip_ipaddr_found", "If the ip address was found by geoip", labelnames=["probe_cc", "asn"])
+    GEOIP_ADDR_FOUND = Counter(
+        "geoip_ipaddr_found",
+        "If the ip address was found by geoip",
+        labelnames=["probe_cc", "asn"],
+    )
 
-    GEOIP_ADDR_NOT_FOUND = Counter("geoip_ipaddr_not_found", "We couldn't look up the IP address in the database")
+    GEOIP_ADDR_NOT_FOUND = Counter(
+        "geoip_ipaddr_not_found", "We couldn't look up the IP address in the database"
+    )
 
-    GEOIP_CC_DIFFERS = Counter("geoip_cc_differs", "There's a mismatch between reported CC and observed CC")
+    GEOIP_CC_DIFFERS = Counter(
+        "geoip_cc_differs", "There's a mismatch between reported CC and observed CC"
+    )
 
-    GEOIP_ASN_DIFFERS = Counter("geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN")
+    GEOIP_ASN_DIFFERS = Counter(
+        "geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN"
+    )
+
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -221,8 +234,9 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
 
     return ProbeUpdateResponse(status="ok")
 
+
 class CheckIn(BaseModel):
-    run_type: str = 'timed'
+    run_type: str = "timed"
     charging: bool = True
     probe_cc: str = "ZZ"
     probe_asn: str = "AS0"
@@ -230,62 +244,67 @@ class CheckIn(BaseModel):
     software_version: str = ""
     web_connectivity: Optional[Dict[str, Any]] = None
 
+
 class WebConnProps(BaseModel):
-    category_code : str
+    category_code: str
     country_code: str
-    url : str
+    url: str
+
 
 class WebConnectivity(BaseModel):
     report_id: str
-    urls : List[WebConnProps]
+    urls: List[WebConnProps]
+
 
 class Tests(BaseModel):
     web_connectivity: WebConnectivity
 
+
 class CheckInResponse(BaseModel):
     """
-            v:
-              type: integer
-              description: response format version
-            probe_cc:
+    v:
+      type: integer
+      description: response format version
+    probe_cc:
+      type: string
+      description: probe CC inferred from GeoIP or ZZ
+    probe_asn:
+      type: string
+      description: probe ASN inferred from GeoIP or AS0
+    probe_network_name:
+      type: string
+      description: probe network name inferred from GeoIP or None
+    utc_time:
+      type: string
+      description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
+    conf:
+      type: object
+      description: auxiliary configuration parameters
+      features:
+        type: object
+        description: feature flags
+    tests:
+      type: object
+      description: test-specific configuration
+      properties:
+        web_connectivity:
+          type: object
+          properties:
+            report_id:
               type: string
-              description: probe CC inferred from GeoIP or ZZ
-            probe_asn:
-              type: string
-              description: probe ASN inferred from GeoIP or AS0
-            probe_network_name:
-              type: string
-              description: probe network name inferred from GeoIP or None
-            utc_time:
-              type: string
-              description: current UTC time as YYYY-mm-ddTHH:MM:SSZ
-            conf:
-              type: object
-              description: auxiliary configuration parameters
-              features:
+            urls:
+              type: array
+              items:
                 type: object
-                description: feature flags
-            tests:
-              type: object
-              description: test-specific configuration
-              properties:
-                web_connectivity:
-                  type: object
-                  properties:
-                    report_id:
-                      type: string
-                    urls:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          category_code:
-                            type: string
-                          country_code:
-                            type: string
-                          url:
-                            type: string
+                properties:
+                  category_code:
+                    type: string
+                  country_code:
+                    type: string
+                  url:
+                    type: string
     """
+
     v: int
     probe_cc: str
     probe_asn: str
@@ -295,9 +314,21 @@ class CheckInResponse(BaseModel):
     tests: Dict[str, Any]
 
 
-StrHeader : TypeAlias = Annotated[List[str] | None, Header()]
+StrHeader: TypeAlias = Annotated[List[str] | None, Header()]
+
+
 @router.post("/check-in", tags=["ooniprobe"])
-def check_in(request : Request, response : Response, check_in : CheckIn, x_forwarded_for : StrHeader, x_real_ip : StrHeader, cc_reader : CCReaderDep, asn_reader : ASNReaderDep, clickhouse : ClickhouseDep, settings : SettingsDep) -> CheckInResponse:
+def check_in(
+    request: Request,
+    response: Response,
+    check_in: CheckIn,
+    x_forwarded_for: StrHeader,
+    x_real_ip: StrHeader,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    clickhouse: ClickhouseDep,
+    settings: SettingsDep,
+) -> CheckInResponse:
 
     # TODO: Implement throttling
     run_type = check_in.run_type
@@ -307,7 +338,15 @@ def check_in(request : Request, response : Response, check_in : CheckIn, x_forwa
     software_name = check_in.software_name
     software_version = check_in.software_version
 
-    resp, probe_cc, asn_i = probe_geoip(request, probe_cc, probe_asn, x_forwarded_for or [], x_real_ip or [], cc_reader, asn_reader)
+    resp, probe_cc, asn_i = probe_geoip(
+        request,
+        probe_cc,
+        probe_asn,
+        x_forwarded_for or [],
+        x_real_ip or [],
+        cc_reader,
+        asn_reader,
+    )
 
     # On run_type=manual preserve the old behavior: test the whole list
     # On timed runs test few URLs, especially when on battery
@@ -339,8 +378,8 @@ def check_in(request : Request, response : Response, check_in : CheckIn, x_forwa
         assert c.isalpha()
 
     try:
-        test_items, _1, _2 = generate_test_list(clickhouse,
-            probe_cc, category_codes, asn_i, url_limit, False
+        test_items, _1, _2 = generate_test_list(
+            clickhouse, probe_cc, category_codes, asn_i, url_limit, False
         )
     except Exception as e:
         log.error(e, exc_info=True)
@@ -410,11 +449,28 @@ def check_in(request : Request, response : Response, check_in : CheckIn, x_forwa
     )
 
     setnocacheresponse(response)
-    checkin_response = CheckInResponse(v = resp['v'], probe_cc = resp["probe_cc"], probe_asn = resp["probe_asn"], probe_network_name=resp["probe_network_name"], utc_time=resp["utc_time"], conf=resp['conf'], tests = resp["tests"])
-    
+    checkin_response = CheckInResponse(
+        v=resp["v"],
+        probe_cc=resp["probe_cc"],
+        probe_asn=resp["probe_asn"],
+        probe_network_name=resp["probe_network_name"],
+        utc_time=resp["utc_time"],
+        conf=resp["conf"],
+        tests=resp["tests"],
+    )
+
     return checkin_response
 
-def probe_geoip(request : Request, probe_cc: str, asn: str, x_forwarded_for : List[str], x_real_ip : List[str], cc_reader : CCReaderDep, asn_reader : ASNReaderDep) -> Tuple[Dict, str, int]:
+
+def probe_geoip(
+    request: Request,
+    probe_cc: str,
+    asn: str,
+    x_forwarded_for: List[str],
+    x_real_ip: List[str],
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+) -> Tuple[Dict, str, int]:
     """Looks up probe CC, ASN, network name using GeoIP, prepare
     response dict
     """
@@ -425,7 +481,7 @@ def probe_geoip(request : Request, probe_cc: str, asn: str, x_forwarded_for : Li
         ipaddr = extract_probe_ipaddr(request, [x_forwarded_for, x_real_ip])
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
-        Metrics.GEOIP_ADDR_FOUND.labels(probe_cc = db_probe_cc, asn=db_asn).inc()
+        Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
     except geoip2.errors.AddressNotFoundError:
         Metrics.GEOIP_ADDR_NOT_FOUND.inc()
     except Exception as e:
@@ -461,14 +517,16 @@ def probe_geoip(request : Request, probe_cc: str, asn: str, x_forwarded_for : Li
 
     return resp, probe_cc, asn_int
 
-def extract_probe_ipaddr(request : Request, header_vals : List[List[str] | None]) -> str:
+
+def extract_probe_ipaddr(request: Request, header_vals: List[List[str] | None]) -> str:
     for h in header_vals:
         if h is not None and len(h) > 0:
             return h[0].rpartition(" ")[-1]
-    
+
     return request.client.host if request.client else ""
 
-def lookup_probe_network(ipaddr: str, asn_reader : ASNReaderDep) -> Tuple[str, str]:
+
+def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
     resp = asn_reader.asn(ipaddr)
 
     return (
@@ -476,12 +534,19 @@ def lookup_probe_network(ipaddr: str, asn_reader : ASNReaderDep) -> Tuple[str, s
         resp.autonomous_system_organization or "0",
     )
 
-def lookup_probe_cc(ipaddr: str, cc_reader : CCReaderDep) -> str:
+
+def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
     resp = cc_reader.country(ipaddr)
     return resp.country.iso_code or "ZZ"
 
-def generate_test_list(clickhouse : Clickhouse, 
-    country_code: str, category_codes: List, probe_asn: int, limit: int, debug: bool
+
+def generate_test_list(
+    clickhouse: Clickhouse,
+    country_code: str,
+    category_codes: List,
+    probe_asn: int,
+    limit: int,
+    debug: bool,
 ) -> Tuple[List, Tuple, Tuple]:
     """Generate test list based on the amount of measurements in the last
     N days"""
@@ -516,7 +581,10 @@ def generate_test_list(clickhouse : Clickhouse,
         return out, entries, prio_rules
     return out, (), ()
 
-def fetch_reactive_url_list(clickhouse_db : Clickhouse, cc: str, probe_asn: int) -> tuple:
+
+def fetch_reactive_url_list(
+    clickhouse_db: Clickhouse, cc: str, probe_asn: int
+) -> tuple:
     """Select all citizenlab URLs for the given probe_cc + ZZ
     Select measurements count from the current and previous week
     using a left outer join (without any info about priority)"""
@@ -544,15 +612,22 @@ def fetch_reactive_url_list(clickhouse_db : Clickhouse, cc: str, probe_asn: int)
         q = q.replace("--asn-filter--", "AND probe_asn = :asn")
 
     # support uppercase or lowercase match
-    r = query_click(clickhouse_db, sa.text(q), dict(cc=cc, cc_low=cc.lower(), asn=probe_asn), query_prio=1)
+    r = query_click(
+        clickhouse_db,
+        sa.text(q),
+        dict(cc=cc, cc_low=cc.lower(), asn=probe_asn),
+        query_prio=1,
+    )
     return tuple(r)
 
-def fetch_prioritization_rules(clickhouse_db : Clickhouse, cc: str) -> tuple:
+
+def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities WHERE cc = :cc OR cc = '*' OR cc = ''
     """
     q = query_click(clickhouse_db, sa.text(sql), dict(cc=cc), query_prio=1)
     return tuple(q)
+
 
 def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
     # Order based on (msmt_cnt / priority) to provide balancing
@@ -571,6 +646,7 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
 
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
+
 def match_prio_rule(cz, pr: dict) -> bool:
     """Match a priority rule to citizenlab entry"""
     for k in ["category_code", "domain", "url"]:
@@ -581,6 +657,7 @@ def match_prio_rule(cz, pr: dict) -> bool:
         return False
 
     return True
+
 
 def generate_test_helpers_conf() -> Dict:
     # Load-balance test helpers deterministically
@@ -637,6 +714,7 @@ def generate_test_helpers_conf() -> Dict:
     )
     return conf
 
+
 def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     """Randomly sort test helpers"""
     random.shuffle(th_list)
@@ -645,7 +723,8 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
         out.append({"address": th_addr, "type": "https"})
     return out
 
-def generate_report_id(test_name, settings : Settings, cc: str, asn_i: int) -> str:
+
+def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     cid = settings.collector_id
     rand = b64encode(urandom(12), b"oo").decode()
