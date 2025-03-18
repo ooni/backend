@@ -130,10 +130,10 @@ def update_geoip() -> None:
 def try_update():
     if is_already_updated():
         log.debug("Database already updated. Exiting.")
-        sys.exit(0)
+        return
 
     if not is_latest_available(ASN_URL) or not is_latest_available(CC_URL):
         log.debug("Update not available yet. Exiting.")
-        sys.exit(0)
+        return
 
     update_geoip()
