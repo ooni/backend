@@ -17,6 +17,8 @@ from urllib.request import urlopen, Request
 
 from prometheus_client import metrics
 
+from .common.config import Settings
+
 class Metrics:
     GEOIP_ASN_NODE_CNT = metrics.Gauge("geoip_asn_node_cnt", "Count of geoi nodes")
     GEOIP_ASN_EPOCH = metrics.Gauge("geoip_asn_epoch", "Geoip current ASN epoch")
@@ -31,7 +33,7 @@ TS = datetime.now(timezone.utc).strftime("%Y-%m")
 ASN_URL = f"https://download.db-ip.com/free/dbip-asn-lite-{TS}.mmdb.gz"
 CC_URL = f"https://download.db-ip.com/free/dbip-country-lite-{TS}.mmdb.gz"
 
-OONI_API_DIR = Path("/var/lib/ooniapi/")
+GEOIP_DB_DIR = Path(Settings.geoip_db_dir)
 
 log = logging.getLogger("ooni_download_geoip")
 
@@ -48,7 +50,7 @@ def get_request(url):
 
 def is_already_updated() -> bool:
     try:
-        with (OONI_API_DIR / "geoipdbts").open() as in_file:
+        with (GEOIP_DB_DIR / "geoipdbts").open() as in_file:
             current_ts = in_file.read()
     except FileNotFoundError:
         return False
@@ -92,8 +94,8 @@ def download_geoip(url: str, filename: str) -> None:
     start_time = timeit.default_timer() # Start timer
     log.info(f"Updating geoip database for {url} ({filename})")
 
-    tmp_gz_out = OONI_API_DIR / f"{filename}.gz.tmp"
-    tmp_out = OONI_API_DIR / f"{filename}.tmp"
+    tmp_gz_out = GEOIP_DB_DIR / f"{filename}.gz.tmp"
+    tmp_out = GEOIP_DB_DIR / f"{filename}.tmp"
 
     with get_request(url) as resp:
         with tmp_gz_out.open("wb") as out_file:
@@ -110,17 +112,17 @@ def download_geoip(url: str, filename: str) -> None:
         Metrics.GEOIP_CHECKFAIL.inc()
         return
 
-    tmp_out.rename(OONI_API_DIR / filename)
+    tmp_out.rename(GEOIP_DB_DIR / filename)
     endtime = timeit.default_timer() # End timer
     Metrics.GEOIP_DOWNLOAD_TIME.observe(endtime - start_time)
 
 
 def update_geoip() -> None:
-    OONI_API_DIR.mkdir(parents=True, exist_ok=True)
+    GEOIP_DB_DIR.mkdir(parents=True, exist_ok=True)
     download_geoip(ASN_URL, "asn.mmdb")
     download_geoip(CC_URL, "cc.mmdb")
 
-    with (OONI_API_DIR / "geoipdbts").open("w") as out_file:
+    with (GEOIP_DB_DIR / "geoipdbts").open("w") as out_file:
         out_file.write(TS)
 
     log.info("Updated GeoIP databases")
