@@ -1,11 +1,13 @@
 from tempfile import tempdir
 import pathlib
+from pathlib import Path
 import pytest
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
+import requests
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
@@ -69,25 +71,27 @@ def client_with_bad_settings():
 
 
 JWT_ENCRYPTION_KEY = "super_secure"
+GEOIP_DB_DIR = f"{tempdir}/ooni/geoip"
 
 
 @pytest.fixture
-def client(alembic_migration, clickhouse_server, docker_ip, docker_services):
+def client(clickhouse_server, test_settings):
+    app.dependency_overrides[get_settings] = test_settings
+    # lifespan won't run so do this here to have the DB 
+    try_update(GEOIP_DB_DIR)
+    client = TestClient(app)
+    yield client
+
+@pytest.fixture
+def test_settings(alembic_migration, docker_ip, docker_services):
     port = docker_services.port_for("clickhouse", 9000)
-    geoip_db_dir = f"{tempdir}/ooni/geoip"
-    app.dependency_overrides[get_settings] = make_override_get_settings(
+    yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
-        geoip_db_dir = geoip_db_dir
+        geoip_db_dir = GEOIP_DB_DIR
     )
-
-    # lifespan won't run so do this here to have the DB 
-    try_update(geoip_db_dir)
-    client = TestClient(app)
-    yield client
-
 
 @pytest.fixture
 def jwt_encryption_key():

@@ -24,8 +24,9 @@ def test_metrics(client):
 
 
 @pytest.mark.asyncio
-async def test_lifecycle():
-    async with lifespan(app) as ls:
+async def test_lifecycle(test_settings):
+    settings = test_settings()
+    async with lifespan(app, settings) as ls:
         client = TestClient(app)
         r = client.get("/metrics")
         assert r.status_code == 401

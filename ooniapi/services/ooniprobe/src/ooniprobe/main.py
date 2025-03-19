@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -16,6 +17,7 @@ from .routers.v1 import probe_services
 from .download_geoip import try_update
 from .dependencies import get_postgresql_session, get_clickhouse_session
 from .common.dependencies import get_settings
+from .common.config import Settings
 from .common.version import get_build_label
 from .common.metrics import mount_metrics
 from .common.clickhouse_utils import query_click
@@ -27,8 +29,9 @@ build_label = get_build_label(pkg_name)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = get_settings()
+async def lifespan(app: FastAPI, test_settings : Optional[Settings] = None):
+    # Use the test settings in tests to mock parameters
+    settings = test_settings or get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
 
