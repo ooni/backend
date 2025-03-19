@@ -29,13 +29,13 @@ def get_postgresql_session(settings: SettingsDep):
 def get_cc_reader(settings: SettingsDep):
     # TODO(luis) decide where to put the database within the filesystem
     db_path = Path(settings.geoip_db_dir, "cc.mmdb")
-    reader = geoip2.database.Reader(db_path)
+    return geoip2.database.Reader(db_path)
 CCReaderDep = Annotated[geoip2.database.Reader, Depends(get_cc_reader)]
 
 def get_asn_reader(settings: SettingsDep):
     # TODO(luis) decide where to put the database within the filesystem
     db_path = Path(settings.geoip_db_dir, "asn.mmdb")
-    reader = geoip2.database.Reader(db_path)
+    return geoip2.database.Reader(db_path)
 ASNReaderDep = Annotated[geoip2.database.Reader, Depends(get_asn_reader)]
 
 
