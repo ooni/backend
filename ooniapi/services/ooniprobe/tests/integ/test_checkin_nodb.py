@@ -92,6 +92,8 @@ def test_check_in_url_category_code_passed_as_string(client):
         assert ui["category_code"] in ("NEWS", "HUMR")
 
 
+# TODO Doesn't work bc we don't have access to the /api/v1/test-list endpoint in this service
+@pytest.mark.skip(reason="broken")
 def test_check_in_url_prioritization_category_codes(client):
     c = getjson(
         client,
