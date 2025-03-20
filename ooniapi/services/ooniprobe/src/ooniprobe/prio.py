@@ -61,6 +61,7 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
 
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
+#TODO(luis) add timing to this function
 def fetch_reactive_url_list(
     clickhouse_db: Clickhouse, cc: str, probe_asn: int
 ) -> tuple:
