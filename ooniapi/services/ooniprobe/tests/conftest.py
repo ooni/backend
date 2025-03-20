@@ -114,3 +114,7 @@ def clickhouse_server(docker_ip, docker_services):
         timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
     )
     yield url
+
+@pytest.fixture(scope="session")
+def clickhouse_db(clickhouse_server):
+    yield ClickhouseClient.from_url(clickhouse_server)
