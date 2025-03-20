@@ -1,12 +1,15 @@
 from pathlib import Path
 import pytest
 import json
+import logging
 
 from clickhouse_driver import Client as ClickhouseClient
 import sqlalchemy as sa
 from time import sleep
 
-from ooniprobe.common.clickhouse_utils import query_click
+from ooniprobe.common.clickhouse_utils import insert_click
+
+log = logging.getLogger(__name__)
 
 ## Fixtures
 @pytest.fixture(scope="session")
@@ -18,26 +21,13 @@ def populate_db(clickhouse_db):
     with file.open("r") as fd:
         j = json.load(fd)
     
-    inserts = []
-    params = dict()
-    for i, row in enumerate(j):
-        category_code = f"category{i}"
-        cc = f"cc{i}"
-        domain = f"domain{i}"
-        priority = f"priority{i}"
-        url = f"url{i}"
+    # json doesn't provide sign, default is 0 and must be
+    # 1 or -1 to work
+    for row in j:
+        row['sign'] = 1
 
-        insert = f"INSERT INTO url_priorities VALUES (1, :{category_code}, :{cc}, :{domain}, :{url}, :{priority})"
-        params[category_code] = row["category_code"]
-        params[cc] = row["cc"]
-        params[domain] = row["domain"]
-        params[priority] = row["priority"],
-        params[url] = row["url"]
-
-        inserts.append(insert)
-
-    query = "; ".join(inserts)
-    query_click(clickhouse_db, sa.text(query), params)
+    query = f"INSERT INTO url_priorities (sign, category_code, cc, domain, priority, url) VALUES "
+    insert_click(clickhouse_db, query, j)
 
 
 ## Test /api/v1/check-in
