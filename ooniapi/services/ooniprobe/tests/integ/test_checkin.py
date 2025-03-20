@@ -2,9 +2,9 @@ from pathlib import Path
 import json
 import pytest
 
-import sqlalchemy as sa
 
 from ooniprobe.common.clickhouse_utils import insert_click
+
 
 def getjson(client, url):
     response = client.get(url)
@@ -31,6 +31,7 @@ def postj(client, url, **kw):
     assert response.status_code == 200
     return response.json()
 
+
 ## Fixtures
 @pytest.fixture
 def load_url_priorities(clickhouse_db):
@@ -40,17 +41,18 @@ def load_url_priorities(clickhouse_db):
 
     with file.open("r") as f:
         j = json.load(f)
-    
+
     # 'sign' is being created with default value of 0, causing a db error
     # trying to insert the default value of 0
     for row in j:
-        row['sign'] = 1
+        row["sign"] = 1
 
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, j)
 
 
 ## Tests
+
 
 def test_check_in_geoip(client):
     j = dict(
@@ -64,6 +66,7 @@ def test_check_in_geoip(client):
     assert c["probe_cc"] == "US"
     assert c["probe_asn"] == "AS2149"
     assert c["probe_network_name"] is not None
+
 
 def test_check_in_basic(client, load_url_priorities):
     j = dict(
