@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 
 from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
+
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from . import models
 from .routers.v2 import vpn
@@ -37,7 +38,18 @@ async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None):
 
     log.debug("Downloading geoip DB...")
     try_update(settings.geoip_db_dir)
+    
+    # for background tasks
+    scheduler = BackgroundScheduler()
+
+    scheduler.add_job(lambda: try_update(settings.geoip_db_dir), 'interval', seconds=3600)
+
+    scheduler.start()
+
     yield
+
+    scheduler.shutdown()
+
 
 
 app = FastAPI(lifespan=lifespan)
