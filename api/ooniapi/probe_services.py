@@ -511,30 +511,6 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     return out
 
 
-def round_robin_web_test_helpers() -> List[Dict]:
-    """Round robin test helpers based on the probe ipaddr.
-    0.th is special and gets only 10% of the traffic.
-    """
-    try:
-        ipa = extract_probe_ipaddr()
-        # ipaddr as (large) integer representation (v4 or v6)
-        q = int(ipaddress.ip_address(ipa))
-        q = q % 100
-    except Exception:
-        q = 12  # pick 1.th
-
-    if q < 10:
-        shift = 0
-    else:
-        shift = q % 4 + 1
-
-    out = []
-    for n in range(5):
-        n = (n + shift) % 5
-        out.append({"address": f"https://{n}.th.ooni.org", "type": "https"})
-
-    return out
-
 
 def generate_test_helpers_conf() -> Dict:
     # Load-balance test helpers deterministically
