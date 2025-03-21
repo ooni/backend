@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -13,10 +14,13 @@ from . import models
 from .routers.v2 import vpn
 from .routers.v1 import probe_services
 
-from .dependencies import get_postgresql_session
+from .download_geoip import try_update
+from .dependencies import get_postgresql_session, get_clickhouse_session
 from .common.dependencies import get_settings
+from .common.config import Settings
 from .common.version import get_build_label
 from .common.metrics import mount_metrics
+from .common.clickhouse_utils import query_click
 from .__about__ import VERSION
 
 pkg_name = "ooniprobe"
@@ -25,10 +29,14 @@ build_label = get_build_label(pkg_name)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = get_settings()
+async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None):
+    # Use the test settings in tests to mock parameters
+    settings = test_settings or get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
+
+    log.debug("Downloading geoip DB...")
+    try_update(settings.geoip_db_dir)
     yield
 
 
@@ -50,6 +58,9 @@ app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
 
 
+log = logging.getLogger(__name__)
+
+
 @app.get("/version")
 async def version():
     return {"version": VERSION, "build_label": build_label}
@@ -66,8 +77,18 @@ class HealthStatus(BaseModel):
 async def health(
     settings=Depends(get_settings),
     db=Depends(get_postgresql_session),
+    clickhouse=Depends(get_clickhouse_session),
 ):
     errors = []
+    try:
+        query = """SELECT *
+        FROM fastpath FINAL
+        """
+        query_click(db=clickhouse, query=query, query_params={})
+    except Exception as e:
+        errors.append("clickhouse_error")
+        log.error(e)
+
     try:
         db.query(models.OONIProbeVPNProvider).limit(1).all()
     except Exception as exc:
