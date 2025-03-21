@@ -75,7 +75,7 @@ GEOIP_DB_DIR = f"{tempdir}/ooni/geoip"
 
 
 @pytest.fixture
-def client(clickhouse_server, test_settings):
+def client(alembic_migration, clickhouse_server, test_settings):
     app.dependency_overrides[get_settings] = test_settings
     # lifespan won't run so do this here to have the DB 
     try_update(GEOIP_DB_DIR)
