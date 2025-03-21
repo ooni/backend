@@ -43,7 +43,7 @@ def load_url_priorities(clickhouse_db):
         j = json.load(f)
 
     # 'sign' is created with default value 0, causing a db error.
-    # use 1 to prevent it 
+    # use 1 to prevent it
     for row in j:
         row["sign"] = 1
 

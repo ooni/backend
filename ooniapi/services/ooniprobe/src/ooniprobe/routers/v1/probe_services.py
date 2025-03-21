@@ -246,6 +246,7 @@ class CheckIn(BaseModel):
     software_version: str = ""
     web_connectivity: Optional[Dict[str, Any]] = None
 
+
 class CheckInResponse(BaseModel):
     """
     v:

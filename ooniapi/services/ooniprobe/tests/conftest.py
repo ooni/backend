@@ -77,10 +77,11 @@ GEOIP_DB_DIR = f"{tempdir}/ooni/geoip"
 @pytest.fixture
 def client(clickhouse_server, test_settings):
     app.dependency_overrides[get_settings] = test_settings
-    # lifespan won't run so do this here to have the DB 
+    # lifespan won't run so do this here to have the DB
     try_update(GEOIP_DB_DIR)
     client = TestClient(app)
     yield client
+
 
 @pytest.fixture
 def test_settings(alembic_migration, docker_ip, docker_services):
@@ -90,12 +91,14 @@ def test_settings(alembic_migration, docker_ip, docker_services):
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
-        geoip_db_dir = GEOIP_DB_DIR
+        geoip_db_dir=GEOIP_DB_DIR,
     )
+
 
 @pytest.fixture
 def jwt_encryption_key():
     return JWT_ENCRYPTION_KEY
+
 
 def is_clickhouse_running(url):
     try:
@@ -104,6 +107,7 @@ def is_clickhouse_running(url):
         return True
     except Exception:
         return False
+
 
 @pytest.fixture(scope="session")
 def clickhouse_server(docker_ip, docker_services):
@@ -114,6 +118,7 @@ def clickhouse_server(docker_ip, docker_services):
         timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
     )
     yield url
+
 
 @pytest.fixture(scope="session")
 def clickhouse_db(clickhouse_server):

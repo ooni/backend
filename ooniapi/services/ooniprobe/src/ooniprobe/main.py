@@ -29,7 +29,7 @@ build_label = get_build_label(pkg_name)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, test_settings : Optional[Settings] = None):
+async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None):
     # Use the test settings in tests to mock parameters
     settings = test_settings or get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
@@ -59,6 +59,8 @@ app.include_router(probe_services.router, prefix="/api")
 
 
 log = logging.getLogger(__name__)
+
+
 @app.get("/version")
 async def version():
     return {"version": VERSION, "build_label": build_label}
@@ -75,10 +77,10 @@ class HealthStatus(BaseModel):
 async def health(
     settings=Depends(get_settings),
     db=Depends(get_postgresql_session),
-    clickhouse=Depends(get_clickhouse_session)
+    clickhouse=Depends(get_clickhouse_session),
 ):
     errors = []
-    try: 
+    try:
         query = """SELECT *
         FROM fastpath FINAL
         """

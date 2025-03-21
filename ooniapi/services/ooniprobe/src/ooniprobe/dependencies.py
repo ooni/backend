@@ -14,7 +14,8 @@ from .common.config import Settings
 from .common.dependencies import get_settings
 
 
-SettingsDep : TypeAlias = Annotated[Settings, Depends(get_settings)]
+SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
+
 
 def get_postgresql_session(settings: SettingsDep):
     engine = create_engine(settings.postgresql_url)
@@ -26,15 +27,22 @@ def get_postgresql_session(settings: SettingsDep):
     finally:
         db.close()
 
+
 def get_cc_reader(settings: SettingsDep):
     db_path = Path(settings.geoip_db_dir, "cc.mmdb")
     return geoip2.database.Reader(db_path)
+
+
 CCReaderDep = Annotated[geoip2.database.Reader, Depends(get_cc_reader)]
+
 
 def get_asn_reader(settings: SettingsDep):
     db_path = Path(settings.geoip_db_dir, "asn.mmdb")
     return geoip2.database.Reader(db_path)
+
+
 ASNReaderDep = Annotated[geoip2.database.Reader, Depends(get_asn_reader)]
+
 
 def get_clickhouse_session(settings: SettingsDep):
     db = Clickhouse.from_url(settings.clickhouse_url)
@@ -42,5 +50,6 @@ def get_clickhouse_session(settings: SettingsDep):
         yield db
     finally:
         db.disconnect()
+
 
 ClickhouseDep = Annotated[Clickhouse, Depends(get_clickhouse_session)]

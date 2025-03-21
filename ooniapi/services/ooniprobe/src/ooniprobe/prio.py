@@ -1,4 +1,3 @@
-
 """
 OONI Probe Services API - reactive URL prioritization
 
@@ -21,6 +20,7 @@ blockdiag {
 }
 ```
 """
+
 from typing import List, Tuple
 import logging
 
@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 
 ## Reactive algorithm
 
+
 def match_prio_rule(cz, pr: dict) -> bool:
     """Match a priority rule to citizenlab entry"""
     for k in ["category_code", "domain", "url"]:
@@ -44,6 +45,7 @@ def match_prio_rule(cz, pr: dict) -> bool:
         return False
 
     return True
+
 
 def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
     # Order based on (msmt_cnt / priority) to provide balancing
@@ -61,6 +63,7 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
         test_list.append(o)
 
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
+
 
 @timer
 def fetch_reactive_url_list(
@@ -101,6 +104,7 @@ def fetch_reactive_url_list(
     )
     return tuple(r)
 
+
 @timer
 def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
@@ -108,6 +112,7 @@ def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     """
     q = query_click(clickhouse_db, sa.text(sql), dict(cc=cc), query_prio=1)
     return tuple(q)
+
 
 @timer
 def generate_test_list(
