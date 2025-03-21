@@ -24,7 +24,8 @@ dependencies = [
   "prometheus-fastapi-instrumentator ~= 6.1.0",
   "prometheus-client",
   "pem ~= 23.1.0",
-  "geoip2 ~= 5.0.1"
+  "geoip2 ~= 5.0.1",
+  "APScheduler ~= 3.11.0"
 ]
 
 readme = "README.md"
