@@ -42,8 +42,8 @@ def load_url_priorities(clickhouse_db):
     with file.open("r") as f:
         j = json.load(f)
 
-    # 'sign' is being created with default value of 0, causing a db error
-    # trying to insert the default value of 0
+    # 'sign' is being created with default value 0, causing a db error.
+    # use 1 to prevent it 
     for row in j:
         row["sign"] = 1
 
