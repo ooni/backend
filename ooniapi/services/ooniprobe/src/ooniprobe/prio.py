@@ -25,6 +25,7 @@ from typing import List, Tuple
 import logging
 
 from .common.clickhouse_utils import query_click
+from .common.metrics import timer
 
 from clickhouse_driver import Client as Clickhouse
 import sqlalchemy as sa
@@ -61,7 +62,7 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
 
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
-#TODO(luis) add timing to this function
+@timer
 def fetch_reactive_url_list(
     clickhouse_db: Clickhouse, cc: str, probe_asn: int
 ) -> tuple:
@@ -100,7 +101,7 @@ def fetch_reactive_url_list(
     )
     return tuple(r)
 
-# TODO(luis) add timing
+@timer
 def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities WHERE cc = :cc OR cc = '*' OR cc = ''
@@ -108,7 +109,7 @@ def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     q = query_click(clickhouse_db, sa.text(sql), dict(cc=cc), query_prio=1)
     return tuple(q)
 
-# TODO(luis) add timing 
+@timer
 def generate_test_list(
     clickhouse: Clickhouse,
     country_code: str,
