@@ -50,7 +50,7 @@ async def setup_repeating_tasks(settings : Settings):
     # See: https://fastapi-utils.davidmontague.xyz/user-guide/repeated-tasks/
     await update_geoip_task()
 
-@repeat_every(seconds = 5, logger=log)
+@repeat_every(seconds = 3600, logger=log) # Every hour
 def update_geoip_task():
     settings = get_settings()
     try_update(settings.geoip_db_dir)
