@@ -33,7 +33,11 @@ build_label = get_build_label(pkg_name)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None, repeating_tasks_active : bool = True):
+async def lifespan(
+    app: FastAPI,
+    test_settings: Optional[Settings] = None,
+    repeating_tasks_active: bool = True,
+):
     # Use the test settings in tests to mock parameters
     settings = test_settings or get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
@@ -44,15 +48,18 @@ async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None, repea
 
     yield
 
-async def setup_repeating_tasks(settings : Settings):
+
+async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start
     # See: https://fastapi-utils.davidmontague.xyz/user-guide/repeated-tasks/
     await update_geoip_task()
 
-@repeat_every(seconds = 3600, logger=log) # Every hour
+
+@repeat_every(seconds=3600, logger=log)  # Every hour
 def update_geoip_task():
     settings = get_settings()
     try_update(settings.geoip_db_dir)
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -70,8 +77,6 @@ app.add_middleware(
 
 app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
-
-
 
 
 @app.get("/version")
