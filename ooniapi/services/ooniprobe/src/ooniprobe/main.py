@@ -33,13 +33,14 @@ build_label = get_build_label(pkg_name)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None):
+async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None, repeating_tasks_active : bool = True):
     # Use the test settings in tests to mock parameters
     settings = test_settings or get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
 
-    await setup_repeating_tasks(settings)
+    if repeating_tasks_active:
+        await setup_repeating_tasks(settings)
 
     print("Server initialization finished")
     yield
