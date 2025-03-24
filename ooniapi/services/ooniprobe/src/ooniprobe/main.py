@@ -42,7 +42,6 @@ async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None, repea
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
 
-    print("Server initialization finished")
     yield
 
 async def setup_repeating_tasks(settings : Settings):
