@@ -25,7 +25,7 @@ dependencies = [
   "prometheus-client",
   "pem ~= 23.1.0",
   "geoip2 ~= 5.0.1",
-  "fastapi-utils ~= 0.8.0"
+  "fastapi-utils[all] ~= 0.8.0"
 ]
 
 readme = "README.md"

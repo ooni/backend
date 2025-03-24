@@ -5,11 +5,12 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi_utils.tasks import repeat_every
+
 from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from apscheduler.schedulers.background import BackgroundScheduler
 
 from . import models
 from .routers.v2 import vpn
@@ -24,6 +25,8 @@ from .common.metrics import mount_metrics
 from .common.clickhouse_utils import query_click
 from .__about__ import VERSION
 
+log = logging.getLogger(__name__)
+
 pkg_name = "ooniprobe"
 
 build_label = get_build_label(pkg_name)
@@ -36,21 +39,20 @@ async def lifespan(app: FastAPI, test_settings: Optional[Settings] = None):
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
 
-    log.debug("Downloading geoip DB...")
-    try_update(settings.geoip_db_dir)
-    
-    # for background tasks
-    scheduler = BackgroundScheduler()
+    await setup_repeating_tasks(settings)
 
-    scheduler.add_job(lambda: try_update(settings.geoip_db_dir), 'interval', seconds=3600)
-
-    scheduler.start()
-
+    print("Server initialization finished")
     yield
 
-    scheduler.shutdown()
+async def setup_repeating_tasks(settings : Settings):
+    # Call all repeating tasks here to make them start
+    # See: https://fastapi-utils.davidmontague.xyz/user-guide/repeated-tasks/
+    await update_geoip_task()
 
-
+@repeat_every(seconds = 5, logger=log)
+def update_geoip_task():
+    settings = get_settings()
+    try_update(settings.geoip_db_dir)
 
 app = FastAPI(lifespan=lifespan)
 
@@ -70,7 +72,6 @@ app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
 
 
-log = logging.getLogger(__name__)
 
 
 @app.get("/version")
