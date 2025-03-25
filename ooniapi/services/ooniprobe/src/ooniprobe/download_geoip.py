@@ -108,7 +108,7 @@ def download_geoip(db_dir: Path, url: str, filename: str) -> None:
     except Exception as exc:
         log.error(f"consistenty check on the geoip DB failed: {exc}")
         Metrics.GEOIP_CHECKFAIL.inc()
-        return
+        raise 
 
     tmp_out.rename(db_dir / filename)
     endtime = timeit.default_timer()  # End timer
