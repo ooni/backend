@@ -99,8 +99,10 @@ async def health(
 ):
     errors = []
     try:
-        query = """SELECT *
-        FROM fastpath FINAL
+        query = """SELECT
+                COUNT()
+                FROM fastpath
+                WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
         """
         query_click(db=clickhouse, query=query, query_params={})
     except Exception as e:
