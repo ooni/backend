@@ -99,10 +99,10 @@ async def health(
 ):
     errors = []
     try:
-        query = """SELECT
-                COUNT()
-                FROM fastpath
-                WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
+        query = """
+        SELECT COUNT()
+        FROM fastpath
+        WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
         """
         query_click(db=clickhouse, query=query, query_params={})
     except Exception as e:
@@ -138,4 +138,3 @@ async def root():
     # TODO(art): fix this redirect by pointing health monitoring to /health
     # return RedirectResponse("/docs")
     return {"msg": "hello from ooniprobe"}
-
