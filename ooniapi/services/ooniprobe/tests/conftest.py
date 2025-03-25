@@ -2,12 +2,13 @@ from tempfile import tempdir
 import pathlib
 from pathlib import Path
 import pytest
+import shutil
+import os
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
-import requests
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
@@ -71,27 +72,46 @@ def client_with_bad_settings():
 
 
 JWT_ENCRYPTION_KEY = "super_secure"
-GEOIP_DB_DIR = f"{tempdir}/ooni/geoip"
+
+@pytest.fixture(scope="session")
+def fixture_path():
+    """
+    Directory for this fixtures used to store temporary data, will be 
+    deleted after the tests are finished
+    """
+    FIXTURE_PATH = Path(os.path.dirname(os.path.realpath(__file__))) / "data"
+
+    yield FIXTURE_PATH
+
+    try:
+        shutil.rmtree(FIXTURE_PATH)
+    except FileNotFoundError:
+        pass
+
+@pytest.fixture()
+def geoip_db_dir(fixture_path):
+    ooni_tempdir = fixture_path / "geoip"
+    return str(ooni_tempdir)
 
 
 @pytest.fixture
-def client(clickhouse_server, test_settings):
+def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
     # lifespan won't run so do this here to have the DB
-    try_update(GEOIP_DB_DIR)
+    try_update(geoip_db_dir)
     client = TestClient(app)
     yield client
 
 
 @pytest.fixture
-def test_settings(alembic_migration, docker_ip, docker_services):
+def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
     port = docker_services.port_for("clickhouse", 9000)
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
-        geoip_db_dir=GEOIP_DB_DIR,
+        geoip_db_dir=geoip_db_dir,
     )
 
 
