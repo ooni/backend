@@ -33,12 +33,6 @@ class Metrics:
         "geoip_download_time", "How long it takes to download the DB"
     )
 
-
-TS = datetime.now(timezone.utc).strftime("%Y-%m")
-ASN_URL = f"https://download.db-ip.com/free/dbip-asn-lite-{TS}.mmdb.gz"
-CC_URL = f"https://download.db-ip.com/free/dbip-country-lite-{TS}.mmdb.gz"
-
-
 log = logging.getLogger("ooni_download_geoip")
 
 log.addHandler(logging.StreamHandler(sys.stdout))
@@ -52,14 +46,14 @@ def get_request(url):
     return urlopen(req)
 
 
-def is_already_updated(db_dir: Path) -> bool:
+def is_already_updated(db_dir: Path, ts : str) -> bool:
     try:
         with (db_dir / "geoipdbts").open() as in_file:
             current_ts = in_file.read()
     except FileNotFoundError:
         return False
 
-    return current_ts == TS
+    return current_ts == ts
 
 
 def is_latest_available(url: str) -> bool:
@@ -121,13 +115,13 @@ def download_geoip(db_dir: Path, url: str, filename: str) -> None:
     Metrics.GEOIP_DOWNLOAD_TIME.observe(endtime - start_time)
 
 
-def update_geoip(db_dir: Path) -> None:
+def update_geoip(db_dir: Path, ts : str, asn_url : str, cc_url : str) -> None:
     db_dir.mkdir(parents=True, exist_ok=True)
-    download_geoip(db_dir, ASN_URL, "asn.mmdb")
-    download_geoip(db_dir, CC_URL, "cc.mmdb")
+    download_geoip(db_dir, asn_url, "asn.mmdb")
+    download_geoip(db_dir, cc_url, "cc.mmdb")
 
     with (db_dir / "geoipdbts").open("w") as out_file:
-        out_file.write(TS)
+        out_file.write(ts)
 
     log.info("Updated GeoIP databases")
     Metrics.GEOIP_UPDATED.inc()
@@ -135,12 +129,17 @@ def update_geoip(db_dir: Path) -> None:
 
 def try_update(db_dir: str):
     db_dir_path = Path(db_dir)
-    if is_already_updated(db_dir_path):
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m")
+    asn_url = f"https://download.db-ip.com/free/dbip-asn-lite-{ts}.mmdb.gz"
+    cc_url = f"https://download.db-ip.com/free/dbip-country-lite-{ts}.mmdb.gz"
+
+    if is_already_updated(db_dir_path, ts):
         log.debug("Database already updated. Exiting.")
         return
 
-    if not is_latest_available(ASN_URL) or not is_latest_available(CC_URL):
+    if not is_latest_available(asn_url) or not is_latest_available(cc_url):
         log.debug("Update not available yet. Exiting.")
         return
 
-    update_geoip(db_dir_path)
+    update_geoip(db_dir_path, ts, asn_url, cc_url)
