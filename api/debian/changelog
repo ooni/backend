@@ -1,3 +1,9 @@
+ooni-api (1.0.96) unstable; urgency=medium
+
+  * disable openvpn from check-in
+
+ -- Mehul <mehul@ooni.org>  Tue, 1 Apr 2025 10:41:29 +0530
+
 ooni-api (1.0.95) unstable; urgency=medium
 
   * return only 6,5 test helpers

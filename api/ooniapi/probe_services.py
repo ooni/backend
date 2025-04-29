@@ -280,6 +280,7 @@ def check_in() -> Response:
             # addressed the issue with the fast.ly based rendezvous method being broken
             "torsf_enabled": False,
             "vanilla_tor_enabled": True,
+            "openvpn_enabled": False,
         }
     )
 

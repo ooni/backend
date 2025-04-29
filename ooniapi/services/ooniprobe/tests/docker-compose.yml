@@ -1,12 +1,12 @@
 version: '2'
 services:
   clickhouse:
-    image: "clickhouse/clickhouse-server:25.2"
+    image: "clickhouse/clickhouse-server"
     ports:
       - "9000"
     volumes:
         - ./fixtures:/fixtures
         - ./fixtures/initdb:/docker-entrypoint-initdb.d/
-    environment:
-      CLICKHOUSE_PASSWORD: test
+    environment: 
       CLICKHOUSE_USER: test
+      CLICKHOUSE_PASSWORD: test

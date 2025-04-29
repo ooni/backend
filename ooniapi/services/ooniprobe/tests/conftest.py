@@ -1,16 +1,19 @@
+from tempfile import tempdir
 import pathlib
+from pathlib import Path
 import pytest
-
-import time
-import jwt
+import shutil
+import os
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
 from ooniprobe.main import app
+from ooniprobe.download_geoip import try_update
 
 
 def make_override_get_settings(**kw):
@@ -70,19 +73,73 @@ def client_with_bad_settings():
 
 JWT_ENCRYPTION_KEY = "super_secure"
 
+@pytest.fixture(scope="session")
+def fixture_path():
+    """
+    Directory for this fixtures used to store temporary data, will be 
+    deleted after the tests are finished
+    """
+    FIXTURE_PATH = Path(os.path.dirname(os.path.realpath(__file__))) / "data"
+
+    yield FIXTURE_PATH
+
+    try:
+        shutil.rmtree(FIXTURE_PATH)
+    except FileNotFoundError:
+        pass
+
+@pytest.fixture()
+def geoip_db_dir(fixture_path):
+    ooni_tempdir = fixture_path / "geoip"
+    return str(ooni_tempdir)
+
 
 @pytest.fixture
-def client(alembic_migration):
-    app.dependency_overrides[get_settings] = make_override_get_settings(
-        postgresql_url=alembic_migration,
-        jwt_encryption_key=JWT_ENCRYPTION_KEY,
-        prometheus_metrics_password="super_secure",
-    )
-
+def client(clickhouse_server, test_settings, geoip_db_dir):
+    app.dependency_overrides[get_settings] = test_settings
+    # lifespan won't run so do this here to have the DB
+    try_update(geoip_db_dir)
     client = TestClient(app)
     yield client
 
 
 @pytest.fixture
+def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
+    port = docker_services.port_for("clickhouse", 9000)
+    yield make_override_get_settings(
+        postgresql_url=alembic_migration,
+        jwt_encryption_key=JWT_ENCRYPTION_KEY,
+        prometheus_metrics_password="super_secure",
+        clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
+        geoip_db_dir=geoip_db_dir,
+    )
+
+
+@pytest.fixture
 def jwt_encryption_key():
     return JWT_ENCRYPTION_KEY
+
+
+def is_clickhouse_running(url):
+    try:
+        with ClickhouseClient.from_url(url) as client:
+            client.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+def clickhouse_server(docker_ip, docker_services):
+    port = docker_services.port_for("clickhouse", 9000)
+    # See password in docker compose
+    url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+    )
+    yield url
+
+
+@pytest.fixture(scope="session")
+def clickhouse_db(clickhouse_server):
+    yield ClickhouseClient.from_url(clickhouse_server)

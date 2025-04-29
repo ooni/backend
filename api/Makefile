@@ -23,12 +23,12 @@ TESTARGS ?= \
 #tests/integ/test_integration_auth.py
 
 .state/docker-build: Dockerfile
-	docker-compose build --force-rm api
+	docker compose build --force-rm api
 	mkdir -p .state
 	touch .state/docker-build
 
 serve: .state/docker-build
-	docker-compose up --remove-orphans
+	docker compose up --remove-orphans
 
 build:
 	@$(MAKE) .state/docker-build
@@ -37,12 +37,12 @@ initdb:
 	# Setup database fixtures
 	# Fetch fingerprints from github
 	# run fastpath to populate the DB
-	docker-compose run --rm api python3 -m pytest --setup-only --create-db -s -x tests/unit/test_unit.py
+	docker compose run --rm api python3 -m pytest --setup-only --create-db -s -x tests/unit/test_unit.py
 
 tests: .state/docker-build
-	docker-compose run --rm api python3 -m pytest $(T) $(TESTARGS)
+	docker compose run --rm api python3 -m pytest $(T) $(TESTARGS)
 
 run-local:
-	docker-compose run --service-ports --rm api
+	docker compose run --service-ports --rm api
 
 .PHONY: build initdb tests serve run-local
