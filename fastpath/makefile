@@ -59,3 +59,19 @@ beta_functests:
 beta_monitor_metrics:
 	ssh $(shell cat .betahost) \
 		"tcpdump -npqi lo udp port 8125 -A -l | grep --line-buffered fastpat | sed 's/.*fastpath\.//'"
+
+docker:
+	docker compose --profile default up --build -d
+
+docker-test:
+	docker compose --profile test up --build -d
+
+docker-all: 
+	docker compose --profile all up --build -d
+
+docker-down:
+	docker compose --profile all down 
+
+# Use this to login into the fastpath service container, useful for testing
+docker-login:
+	docker compose exec fastpath bash
