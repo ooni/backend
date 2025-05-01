@@ -22,6 +22,7 @@ services:
       - all
       - test
 
+  # This service is used only for testing, in prod we use the actual clickhouse db
   clickhouse-server:
     build:
       context: .
