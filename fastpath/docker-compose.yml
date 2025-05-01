@@ -7,16 +7,12 @@ services:
     ports:
       - "5000:5000"
       - "8472:8472"
-    environment:
-      - CLICKHOUSE_HOST=clickhouse-server
-      - CLICKHOUSE_PORT=8123
     volumes:
       - .:/app
     working_dir: /app
     profiles:
       - default
       - all
-      - test
 
   # This service is used only for testing, in prod we use the actual clickhouse db
   clickhouse-server:
@@ -40,7 +36,7 @@ services:
       timeout: 10s
     profiles:
       - all
-      - test
+      - clickhouse 
 
 volumes:
   clickhouse-data:

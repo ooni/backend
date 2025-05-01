@@ -63,15 +63,26 @@ beta_monitor_metrics:
 docker:
 	docker compose --profile default up --build -d
 
-docker-test:
-	docker compose --profile test up --build -d
+# Runs docker in foreground, useful for checking errors in the image before it runs
+docker-fg:
+	docker compose --profile default up --build 
 
-docker-all: 
-	docker compose --profile all up --build -d
+# Runs both fastpath and the testing clickhous. 
+# Mind the fastpath configuration in fastpath.conf
+docker-all: docker-clickhouse
+	docker compose --profile default up --build -d
 
 docker-down:
 	docker compose --profile all down 
 
+# If you need to test the fastpath locally you can use this rule to spawn the clickhouse database
+# locally and then use `make docker` or `make docker-fg` to start the fastpath container
+docker-clickhouse:
+	docker compose --profile clickhouse up -d
+
 # Use this to login into the fastpath service container, useful for testing
 docker-login:
 	docker compose exec fastpath bash
+
+docker-logs:
+	docker compose logs fastapth -f $(args)
