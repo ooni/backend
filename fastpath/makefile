@@ -70,13 +70,21 @@ docker-fg:
 # Runs both fastpath and the testing clickhous. 
 # Mind the fastpath configuration in fastpath.conf
 docker-all: docker-clickhouse
-	docker compose --profile default up --build -d
+	echo "Waiting for clickhouse..."
+	sleep 4 
+	docker compose --profile default up --build -d 
 
+# Turns off every service
 docker-down:
 	docker compose --profile all down 
 
 # If you need to test the fastpath locally you can use this rule to spawn the clickhouse database
-# locally and then use `make docker` or `make docker-fg` to start the fastpath container
+# locally and then use `make docker` or `make docker-fg` to start the fastpath container. Ex:
+# ```
+# make docker-clickhouse
+# make docker
+# ```
+# You can also use `make docker-all` for that purpose
 docker-clickhouse:
 	docker compose --profile clickhouse up -d
 
@@ -84,5 +92,11 @@ docker-clickhouse:
 docker-login:
 	docker compose exec fastpath bash
 
+# Get logs from the fastpath docker service
 docker-logs:
-	docker compose logs fastapth -f $(args)
+	docker compose logs fastpath -f 
+
+# Get logs for a specified service. Example: 
+# `make docker-logs-for args="clickhouse-server"`
+docker-logs-for:
+	docker compose logs $(args) -f 
