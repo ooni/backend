@@ -2,7 +2,7 @@ services:
   fastpath:
     build:
       context: .
-      dockerfile: Dockerfile.fastpath
+      dockerfile: Dockerfile
     container_name: ooni-fastpath 
     ports:
       - "5000:5000"
@@ -20,9 +20,7 @@ services:
 
   # This service is used only for testing, in prod we use the actual clickhouse db
   clickhouse-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.clickhouse
+    image: clickhouse/clickhouse-server:latest
     container_name: clickhouse-server
     environment:
       - CLICKHOUSE_DB=default
