@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.fastpath
-    container_name: fastpath-ooni
+    container_name: ooni-fastpath 
     ports:
       - "5000:5000"
       - "8472:8472"
@@ -13,12 +13,14 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    networks:
-      - fastpath-network
     depends_on:
       clickhouse-server:
         condition: service_healthy
         restart: true
+    profiles:
+      - default
+      - all
+      - test
 
   clickhouse-server:
     build:
@@ -35,18 +37,15 @@ services:
       - "9009:9009"
     volumes:
        - ./clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - fastpath-network
     healthcheck:
       test: ["CMD", "curl", "-f", "-u", "default:default", "http://localhost:8123/?query=SELECT%201"]
       interval: 30s
       retries: 3
       start_period: 60s
       timeout: 10s
-
-networks:
-  fastpath-network:
-    driver: bridge
+    profiles:
+      - all
+      - test
 
 volumes:
   clickhouse-data:
