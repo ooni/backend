@@ -10,3 +10,4 @@ psycopg2-binary
 clickhouse-driver
 pytest
 requests
+pytest-docker
