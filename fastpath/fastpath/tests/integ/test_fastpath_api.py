@@ -1,43 +1,31 @@
-import json
-from urllib.error import HTTPError
-from urllib.request import urlopen
 import requests as r
 
-import pytest
+
+def test_fastpath_error_measurement_uid_is_empty(fastpath_service):
+    measurement_uid = ""
+    url = f"{fastpath_service}/{measurement_uid}"
+    resp = r.post(url, data={})
+    assert resp.status_code == 500
+    assert "Internal Server Error" in resp.content.decode()
+
+def test_fastpath_error_measurement_uid_does_not_start_with_2(fastpath_service):
+    measurement_uid = "10210208220710.181572_MA_ndt_7888edc7748936bf"
+    url = f"{fastpath_service}/{measurement_uid}"
+    resp = r.post(url, data = b"")
+
+    assert resp.status_code == 500
+    assert "Internal Server Error" in resp.content.decode()
 
 
-# def test_fastpath_error_data_is_empty():
-#     url = f"http://127.0.0.1:8472/"
-#     data = ""
+def test_fastpath_empty_response_ok(fastpath_service):
+    measurement_uid = "20210208220710.181572_MA_ndt_7888edc7748936bf"
+    url = f"{fastpath_service}/{measurement_uid}"
+    data = {}
 
-#     with pytest.raises(TypeError, match="POST data should be bytes, an iterable of bytes, or a file object. It cannot be of type str."):
-#         urlopen(url, data)
+    response = r.post(url, data=data)
 
-# def test_fastpath_error_measurement_uid_is_empty():
-#     measurement_uid = ""
-#     url = f"http://127.0.0.1:8472/{measurement_uid}"
-#     data = "some_data".encode('utf-8')
-
-#     with pytest.raises(HTTPError, match="Internal Server Error"):
-#         urlopen(url, data)
-
-# def test_fastpath_error_measurement_uid_does_not_start_with_2():
-#     measurement_uid = "10210208220710.181572_MA_ndt_7888edc7748936bf"
-#     url = f"http://127.0.0.1:8472/{measurement_uid}"
-#     data = "some_data".encode('utf-8')
-
-#     with pytest.raises(HTTPError, match="Internal Server Error"):
-#         urlopen(url, data)
-
-# def test_fastpath_response_ok():
-#     measurement_uid = "20210208220710.181572_MA_ndt_7888edc7748936bf"
-#     url = f"http://127.0.0.1:8472/{measurement_uid}"
-#     data = {}
-
-#     response = urlopen(url, json.dumps(data).encode('utf-8'))
-
-#     assert response.getcode() == 200
-#     assert response.read() == b""
+    assert response.status_code == 200
+    assert response.content == b""
 
 def test_fastpath_basic(fastpath_service):
     measurement_uid = "20210208220710.181572_MA_ndt_7888edc7748936bf"
@@ -48,7 +36,7 @@ def test_fastpath_basic(fastpath_service):
         'probe_cc': 'ZZ'
     }
 
-    response = r.get(url, data=data)
+    response = r.post(url, data=data)
 
     assert response.status_code == 200
     assert response.content == b""
