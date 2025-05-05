@@ -2,22 +2,24 @@ import pytest
 import requests
 from clickhouse_driver.client import Client as ClickhouseClient
 
+# Time to wait for docker services
+TIMEOUT = 10.0
 
 @pytest.fixture(scope="session")
-def clickhouse_server(docker_ip, docker_services):
-    port = docker_services.port_for("clickhouse", 9000)
-    url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
+def clickhouse_service(docker_ip, docker_services):
+    port = docker_services.port_for("clickhouse-server", 9000)
+    url = "clickhouse://default:default@{}:{}".format(docker_ip, port)
     docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+        timeout=TIMEOUT, pause=0.1, check=lambda: is_clickhouse_running(url)
     )
     yield url
 
 @pytest.fixture(scope="session")
-def fastpath_service(docker_ip, docker_services):
+def fastpath_service(docker_ip, docker_services, clickhouse_service):
     port = docker_services.port_for("fastpath", 8472)
     url = f"http://{docker_ip}:{port}"
     docker_services.wait_until_responsive(
-        timeout=20, pause=0.1, check=lambda: is_fastpath_running(url)
+        timeout=TIMEOUT, pause=0.1, check=lambda: is_fastpath_running(url)
     )
 
     yield url
@@ -26,8 +28,7 @@ def is_fastpath_running(url : str) -> bool:
     print("checking if fastpath is running...")
     try: 
         req = requests.get(url)
-        assert req.status_code == 200
-        return True
+        return req.status_code == 200
     except Exception:
         return False
 

@@ -39,10 +39,8 @@ import pytest
 #     assert response.read() == b""
 
 def test_fastpath_TESTS(fastpath_service):
-    raise ValueError("Crashing on purpose")
-    print(fastpath_service)
     measurement_uid = "20210208220710.181572_MA_ndt_7888edc7748936bf"
-    url = f"http://127.0.0.1:8472/{measurement_uid}"
+    url = f"{fastpath_service}/{measurement_uid}"
     data = {
         'report_id': 'report_id',
         # 'input': 'input',
