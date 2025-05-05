@@ -1,6 +1,7 @@
 import json
 from urllib.error import HTTPError
 from urllib.request import urlopen
+import requests as r
 
 import pytest
 
@@ -38,7 +39,7 @@ import pytest
 #     assert response.getcode() == 200
 #     assert response.read() == b""
 
-def test_fastpath_TESTS(fastpath_service):
+def test_fastpath_basic(fastpath_service):
     measurement_uid = "20210208220710.181572_MA_ndt_7888edc7748936bf"
     url = f"{fastpath_service}/{measurement_uid}"
     data = {
@@ -47,7 +48,7 @@ def test_fastpath_TESTS(fastpath_service):
         'probe_cc': 'ZZ'
     }
 
-    response = urlopen(url, json.dumps(data).encode('utf-8'))
+    response = r.get(url, data=data)
 
-    assert response.getcode() == 200
-    assert response.read() == b""
+    assert response.status_code == 200
+    assert response.content == b""
