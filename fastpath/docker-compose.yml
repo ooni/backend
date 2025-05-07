@@ -29,7 +29,7 @@ services:
     volumes:
        - ./clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "curl", "-f", "-u", "default:default", "http://localhost:8123/?query=SELECT%201"]
+      test: ["CMD", "clickhouse-client", "--query", "select 1;"]
       interval: 30s
       retries: 3
       start_period: 60s
