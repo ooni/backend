@@ -51,7 +51,10 @@ def setup_pg_connection(c):
 def setup_click_connection(c : Dict[str, Any]):
     log.info("Connecting to Clickhouse")
     url  = c.get("clickhouse_url")
-    return Clickhouse.from_url(url)
+    if url is not None:
+        return Clickhouse.from_url(url)
+    else: 
+        return Clickhouse("localhost")
 
 
 @metrics.timer("sync_clickhouse_fastpath")
