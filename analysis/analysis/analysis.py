@@ -61,10 +61,13 @@ conf = Namespace()
 
 log = logging.getLogger("analysis")
 metrics = setup_metrics(name="analysis")
-DB_URI = "clickhouse://api:api@localhost/default"
+DEFAULT_DB_URI = "clickhouse://api:api@localhost/default"
+CONF_FILE = Path("/etc/ooni/analysis.conf")
+DEV_CONF_FILE = Path(os.getcwd()) / "analysis.conf"
 
 
 def parse_args() -> Namespace:
+    # Parse command line args
     ap = ArgumentParser("Analysis script " + __doc__)
     ap.add_argument(
         "--update-citizenlab", action="store_true", help="Update citizenlab test lists"
@@ -81,31 +84,57 @@ def parse_args() -> Namespace:
     # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
-    ap.add_argument("--db-uri", help="Override DB URI", default=DB_URI)
+    ap.add_argument("--db-uri", help="Override DB URI")
+    ap.add_argument("--conf-file", help="Override config file")
+    
     return ap.parse_args()
 
 
-def main() -> None:
+def setup():
     global conf
-    log.info("Analysis starting")
-    # cp = ConfigParser()
-    # with open("/etc/ooni/analysis.conf") as f:
-    #     cp.read_file(f)
 
     conf = parse_args()
+
+    # Set up logs
     if conf.devel or conf.stdout or not has_systemd:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
-
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="analysis"))
         log.setLevel(logging.DEBUG)
 
     log.info("Logging started")
+
     conf.output_directory = (
         Path("./var/lib/analysis") if conf.devel else Path("/var/lib/analysis")
     )
     os.makedirs(conf.output_directory, exist_ok=True)
+
+    # Parse configs
+    if conf.conf_file:
+        conf_file = Path(conf.conf_file)
+    else:
+        conf_file = DEV_CONF_FILE if conf.devel else CONF_FILE
+
+    # nothing else to do if there's no config to parse
+    if not conf_file.exists():
+        conf.db_uri = DEFAULT_DB_URI
+        return     
+
+    cp = ConfigParser()
+    with conf_file.open("r") as f:
+        cp.read_file(f)
+        # Priorities: 
+        # 1. CLI argument (override)
+        # 2. Config 
+        # 3. Default DB URI
+        conf.db_uri = conf.db_uri or cp['DB'].get("db_uri") or DEFAULT_DB_URI
+        conf.table_names = cp['backup'].get("table_names", "").split()
+
+def main() -> None:
+    global conf
+    log.info("Analysis starting")
+    setup()
 
     try:
         if conf.update_citizenlab:
