@@ -128,7 +128,12 @@ def setup():
         # 1. CLI argument (override)
         # 2. Config 
         # 3. Default DB URI
-        conf.db_uri = conf.db_uri or cp['DB'].get("db_uri") or DEFAULT_DB_URI
+        conf.db_uri = conf.db_uri or cp['DB'].get("uri") or DEFAULT_DB_URI
+        conf.db_host = cp['DB'].get("host")
+        conf.db_port = cp['DB'].get("port")
+        conf.db_user = cp['DB'].get("user")
+        conf.db_pass = cp['DB'].get("password")
+
         conf.table_names = cp['backup'].get("table_names", "").split()
 
 def main() -> None:
