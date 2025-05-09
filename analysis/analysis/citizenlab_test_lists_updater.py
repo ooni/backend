@@ -101,7 +101,7 @@ def update_citizenlab_table(conf: Namespace, citizenlab: list) -> None:
     """Overwrite citizenlab_flip and swap tables atomically"""
     if conf.dry_run:
         return
-    click = Clickhouse("localhost", user="citizenlab")
+    click = Clickhouse(conf.db_uri, user="citizenlab")
     log.info("Emptying Clickhouse citizenlab_flip table")
     q = "TRUNCATE TABLE citizenlab_flip"
     click.execute(q)
