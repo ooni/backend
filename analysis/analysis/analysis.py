@@ -84,7 +84,6 @@ def parse_args() -> Namespace:
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
     ap.add_argument("--db-uri", help="Override DB URI")
-    ap.add_argument("--conf-file", help="Override config file")
     
     return ap.parse_args()
 
@@ -110,10 +109,7 @@ def setup():
     os.makedirs(conf.output_directory, exist_ok=True)
 
     # Parse configs
-    if conf.conf_file:
-        conf_file = Path(conf.conf_file)
-    else:
-        conf_file = DEV_CONF_FILE if conf.devel else CONF_FILE
+    conf_file = DEV_CONF_FILE if conf.devel else CONF_FILE
 
     # nothing else to do if there's no config to parse
     if not conf_file.exists():
