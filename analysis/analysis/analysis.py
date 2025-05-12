@@ -67,7 +67,6 @@ DEV_CONF_FILE = Path(os.getcwd()) / "analysis.conf"
 
 
 def parse_args() -> Namespace:
-    # Parse command line args
     ap = ArgumentParser("Analysis script " + __doc__)
     ap.add_argument(
         "--update-citizenlab", action="store_true", help="Update citizenlab test lists"
@@ -128,7 +127,11 @@ def setup():
         # 1. CLI argument (override)
         # 2. Config 
         # 3. Default DB URI
-        conf.db_uri = conf.db_uri or cp['DB'].get("uri") or DEFAULT_DB_URI
+        if "DB" not in cp: 
+            conf.db_uri = conf.db_uri or DEFAULT_DB_URI
+        else:
+            conf.db_uri = conf.db_uri or cp['DB'].get("uri") or DEFAULT_DB_URI
+
         conf.table_names = cp['backup'].get("table_names", "").split()
 
 def main() -> None:
