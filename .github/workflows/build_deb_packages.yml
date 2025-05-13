@@ -3,7 +3,7 @@ on: pull_request
 
 jobs:
   build_deb_packages:
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-24.04"
     container: debian:11
     steps:
       - name: Change Owner of Container Working Directory
