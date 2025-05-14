@@ -83,7 +83,7 @@ def parse_args() -> Namespace:
     # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
-    ap.add_argument("--db-uri", help="Override DB URI")
+    ap.add_argument("--db-uri", help="Override DB URI", default=DEFAULT_DB_URI)
     
     return ap.parse_args()
 
@@ -108,27 +108,6 @@ def setup():
     )
     os.makedirs(conf.output_directory, exist_ok=True)
 
-    # Parse configs
-    conf_file = DEV_CONF_FILE if conf.devel else CONF_FILE
-
-    # nothing else to do if there's no config to parse
-    if not conf_file.exists():
-        conf.db_uri = DEFAULT_DB_URI
-        return     
-
-    cp = ConfigParser()
-    with conf_file.open("r") as f:
-        cp.read_file(f)
-        # Priorities: 
-        # 1. CLI argument (override)
-        # 2. Config 
-        # 3. Default DB URI
-        if "DB" not in cp: 
-            conf.db_uri = conf.db_uri or DEFAULT_DB_URI
-        else:
-            conf.db_uri = conf.db_uri or cp['DB'].get("uri") or DEFAULT_DB_URI
-
-        conf.table_names = cp['backup'].get("table_names", "").split()
 
 def main() -> None:
     global conf
