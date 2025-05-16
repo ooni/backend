@@ -4,7 +4,8 @@ Wants=ooni-update-asn-metadata.timer
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/analysis --update-asnmeta
+EnvironmentFile=/etc/ooni/analysis.env
+ExecStart=/usr/bin/analysis --update-asnmeta ${EXTRA_ARGS}
 
 [Install]
 WantedBy=multi-user.target

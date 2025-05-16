@@ -1,3 +1,12 @@
+analysis (1.13) unstable; urgency=medium
+
+  * Change localhost hardcoded clickhouse references to a parameter
+  * Update the .conf in ooni-update-asn-metadata.service, ooni-update-citizenlab.service and 
+    ooni-update-citizenlab.service to include environment file and pass additional parameters
+    to these services
+
+ -- Luis <luis@openobservatory.org> Fri, 16 May 2025 10:37:12 +0100
+
 analysis (1.12) unstable; urgency=medium
 
   * Drop th rotation script
