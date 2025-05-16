@@ -22,7 +22,7 @@ from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_none,
 )
-from ..dependencies import get_postgresql_session
+from ..dependencies import PostgresSession, get_postgresql_session
 
 
 log = logging.getLogger(__name__)
@@ -151,9 +151,9 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
 )
 def create_oonirun_link(
     create_request: OONIRunLinkCreateEdit,
+    db : PostgresSession,
     token=Depends(role_required(["admin", "user"])),
-    db=Depends(get_postgresql_session),
-):
+) -> OONIRunLink:
     """Create a new oonirun link or a new version for an existing one."""
     log.debug("creating oonirun")
     account_id = token["account_id"]
@@ -233,8 +233,8 @@ def create_oonirun_link(
 def edit_oonirun_link(
     oonirun_link_id: str,
     edit_request: OONIRunLinkCreateEdit,
+    db : PostgresSession,
     token=Depends(role_required(["admin", "user"])),
-    db=Depends(get_postgresql_session),
 ):
     """Edit an existing OONI Run link"""
     log.debug(f"edit oonirun {oonirun_link_id}")
@@ -411,7 +411,7 @@ class OONIRunLinkRevisions(BaseModel):
 )
 def get_oonirun_link_revisions(
     oonirun_link_id: str,
-    db=Depends(get_postgresql_session),
+    db : PostgresSession,
 ):
     """
     Obtain the list of revisions for a certain OONI Run link
@@ -451,7 +451,7 @@ def get_oonirun_link_engine_descriptor(
             },
         ),
     ],
-    db=Depends(get_postgresql_session),
+    db : PostgresSession,
 ):
     """Fetch an OONI Run link by specifying the revision number"""
     try:
@@ -499,8 +499,8 @@ def get_oonirun_link_revision(
             },
         ),
     ],
+    db : PostgresSession,
     authorization: str = Header("authorization"),
-    db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
 ):
     """Fetch an OONI Run link by specifying the revision number"""
@@ -528,8 +528,8 @@ def get_oonirun_link_revision(
 )
 def get_latest_oonirun_link(
     oonirun_link_id: str,
+    db : PostgresSession,
     authorization: str = Header("authorization"),
-    db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
 ):
     """Fetch OONIRun descriptor by creation time or the newest one"""
@@ -551,6 +551,7 @@ class OONIRunLinkList(BaseModel):
 
 @router.get("/v2/oonirun/links", tags=["oonirun"])
 def list_oonirun_links(
+    db : PostgresSession,
     is_mine: Annotated[
         Optional[bool],
         Query(description="List only the my descriptors"),
@@ -560,7 +561,6 @@ def list_oonirun_links(
         Query(description="List also expired descriptors"),
     ] = None,
     authorization: str = Header("authorization"),
-    db=Depends(get_postgresql_session),
     settings=Depends(get_settings),
 ) -> OONIRunLinkList:
     """List OONIRun descriptors"""

@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from .common.config import Settings
 from .common.dependencies import get_settings
@@ -19,3 +19,5 @@ def get_postgresql_session(settings: Annotated[Settings, Depends(get_settings)])
         yield db
     finally:
         db.close()
+
+PostgresSession = Annotated[Session, Depends(get_postgresql_session)]
