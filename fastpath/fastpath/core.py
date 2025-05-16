@@ -25,7 +25,7 @@ import sys
 import time
 import yaml
 
-from pkg_resources import parse_version
+from packaging.version import Version
 import ujson  # debdeps: python3-ujson
 
 try:
@@ -1367,14 +1367,14 @@ def score_signal(msm: dict) -> dict:
             scores["accuracy"] = 0.0
             return scores
 
-        if parse_version(tv) <= parse_version("0.2.3") and start_time >= datetime(
+        if Version(tv) <= Version("0.2.3") and start_time >= datetime(
             2023, 11, 7
         ):
             # https://github.com/ooni/probe/issues/2627
             scores["accuracy"] = 0.0
             return scores
 
-        if parse_version(tv) < parse_version("0.2.2") and start_time >= datetime(
+        if Version(tv) < Version("0.2.2") and start_time >= datetime(
             2022, 10, 19
         ):
             scores["accuracy"] = 0.0
@@ -1384,7 +1384,7 @@ def score_signal(msm: dict) -> dict:
         # engine_version < 3.17.2 and measurement_start_time > 2023-05-02
         annot = g_or(msm, "annotations", {})
         ev = g_or(annot, "engine_version", "0.0.0")
-        if parse_version(ev) < parse_version("3.17.2") and start_time >= datetime(
+        if Version(ev) < Version("3.17.2") and start_time >= datetime(
             2023, 5, 2
         ):
             scores["accuracy"] = 0.0
