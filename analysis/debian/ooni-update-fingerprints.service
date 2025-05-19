@@ -5,7 +5,7 @@ Wants=ooni-update-fingerprints.timer
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/ooni/analysis.env
-ExecStart=/usr/bin/analysis --update-fingerprints ${EXTRA_ARGS}
+ExecStart=/usr/bin/analysis --update-fingerprints --db-uri {{DB_URI}}
 
 [Install]
 WantedBy=multi-user.target
