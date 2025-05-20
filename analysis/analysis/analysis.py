@@ -62,8 +62,6 @@ conf = Namespace()
 log = logging.getLogger("analysis")
 metrics = setup_metrics(name="analysis")
 DEFAULT_DB_URI = "clickhouse://api:api@localhost/default"
-CONF_FILE = Path("/etc/ooni/analysis.conf")
-DEV_CONF_FILE = Path(os.getcwd()) / "analysis.conf"
 
 
 def parse_args() -> Namespace:
