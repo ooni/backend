@@ -51,6 +51,15 @@ class OONIRunLinkNettest(BaseModel):
         default=False, title="if this test should be enabled by default for manual runs"
     )
 
+    targets_name : Optional[str] = Field (
+        default=None, 
+        description="string used to specify during creation that the input list should be dynamically generated."
+    )
+
+    inputs_extra : Optional[List[Dict[str, Any]]] = Field (
+        default = None,
+        description = "provides a richer JSON array containing extra parameters for each input. If provided, the length of inputs_extra should match the length of inputs."
+    )
 
 class OONIRunLinkEngineDescriptor(BaseModel):
     revision: str = Field(title="revision of the nettest descriptor")
@@ -114,17 +123,6 @@ class OONIRunLinkBase(BaseModel):
         default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
-
-    targets_name : Optional[str] = Field (
-        default=None, 
-        description="string used to specify during creation that the input list should be dynamically generated."
-    )
-
-    inputs_extra : Optional[List[Dict[str, Any]]] = Field (
-        default = None,
-        description = "provides a richer JSON array containing extra parameters for each input. If provided, the length of inputs_extra should match the length of inputs."
-    )
-
 
 class OONIRunLink(OONIRunLinkBase):
     oonirun_link_id: str
