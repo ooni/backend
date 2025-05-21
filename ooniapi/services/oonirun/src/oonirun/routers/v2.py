@@ -5,7 +5,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import logging
 
 import sqlalchemy as sa
@@ -113,6 +113,16 @@ class OONIRunLinkBase(BaseModel):
     expiration_date: datetime = Field(
         default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
+    )
+
+    targets_name : Optional[str] = Field (
+        default=None, 
+        description="string used to specify during creation that the input list should be dynamically generated."
+    )
+
+    inputs_extra : Optional[List[Dict[str, Any]]] = Field (
+        default = None,
+        description = "provides a richer JSON array containing extra parameters for each input. If provided, the length of inputs_extra should match the length of inputs."
     )
 
 
