@@ -152,14 +152,14 @@ def test_upgrade_to_head(postgresql):
         ),
         models.OONIRunLinkNettest(
             **nettests[2],
-            revision=4,
-            nettest_index=1,
+            revision=1,
+            nettest_index=2,
             date_created=utcnow_seconds(),
         ),
         models.OONIRunLinkNettest(
             **nettests[3],
-            revision=5,
-            nettest_index=1,
+            revision=1,
+            nettest_index=3,
             date_created=utcnow_seconds(),
         ),
     ]
@@ -168,7 +168,7 @@ def test_upgrade_to_head(postgresql):
 
     new_row = db.query(models.OONIRunLink).first()
     assert new_row
-    assert new_row.nettests[0].revision == 3
+    assert new_row.nettests[0].revision == 3, "First one to show up should have the latest revision"
 
     db.close()
 
