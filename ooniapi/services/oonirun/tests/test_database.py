@@ -150,6 +150,18 @@ def test_upgrade_to_head(postgresql):
             nettest_index=0,
             date_created=utcnow_seconds(),
         ),
+        models.OONIRunLinkNettest(
+            **nettests[2],
+            revision=4,
+            nettest_index=1,
+            date_created=utcnow_seconds(),
+        ),
+        models.OONIRunLinkNettest(
+            **nettests[3],
+            revision=5,
+            nettest_index=1,
+            date_created=utcnow_seconds(),
+        ),
     ]
     db.add(db_runlink)
     db.commit()
