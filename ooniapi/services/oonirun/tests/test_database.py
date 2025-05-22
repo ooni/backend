@@ -45,6 +45,29 @@ SAMPLE_OONIRUN = {
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
         },
+        {
+            "targets_name" : "sample_target",
+            "options": {},
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "dnscheck",
+        },
+        {
+            "inputs" : [
+                "https://example.com/",
+                "https://ooni.org/",
+            ],
+            "inputs_extra" : [
+                {"category_code" : "HUMR"},
+                {}
+            ], 
+            "options": {},
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "dnscheck",
+        },
     ],
 }
 
