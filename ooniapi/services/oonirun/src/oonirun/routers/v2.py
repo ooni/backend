@@ -42,6 +42,7 @@ class OONIRunLinkNettest(BaseModel):
         default=[], title="list of input dictionaries for the nettest"
     )
     options: Dict = Field(default={}, title="options for the nettest")
+    # TODO(luis): Not in the new spec. Should be removed?
     backend_options: Dict = Field(default={}, title="options to send to the backend")
     is_background_run_enabled_default: bool = Field(
         default=False,
@@ -131,6 +132,11 @@ class OONIRunLinkBase(BaseModel):
     )
 
 class OONIRunLink(OONIRunLinkBase):
+
+    # TODO(luis): spec mentions that there should be a title, description and author here.
+    # see: https://github.com/ooni/spec/blob/oonirun-v2.1/backends/bk-005-ooni-run-v2.md#response-body
+    # should we add it?
+
     oonirun_link_id: str
     date_created: datetime = Field(
         description="time when the ooni run link was created"
