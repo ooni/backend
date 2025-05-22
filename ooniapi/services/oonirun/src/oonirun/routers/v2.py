@@ -133,9 +133,6 @@ class OONIRunLinkBase(BaseModel):
 
 class OONIRunLink(OONIRunLinkBase):
 
-    # TODO(luis): spec mentions that there should be a title, description and author here.
-    # see: https://github.com/ooni/spec/blob/oonirun-v2.1/backends/bk-005-ooni-run-v2.md#response-body
-    # should we add it?
 
     oonirun_link_id: str
     date_created: datetime = Field(
