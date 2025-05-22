@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
 from pydantic import computed_field, Field
-from pydantic.functional_validators import field_validator
-from typing_extensions import Annotated
+from pydantic.functional_validators import field_validator, model_validator
+from typing_extensions import Annotated, Self
 
 from .. import models
 
@@ -60,6 +60,12 @@ class OONIRunLinkNettest(BaseModel):
         default = None,
         description = "provides a richer JSON array containing extra parameters for each input. If provided, the length of inputs_extra should match the length of inputs."
     )
+
+    @model_validator(mode="after")
+    def validate_inputs_extra(self) -> Self:
+        if self.inputs_extra is not None and len(self.inputs) != len(self.inputs_extra):
+            raise ValueError("When provided, inputs_extra should be the same length as inputs")
+        return self
 
 class OONIRunLinkEngineDescriptor(BaseModel):
     revision: str = Field(title="revision of the nettest descriptor")
