@@ -33,6 +33,8 @@ SAMPLE_OONIRUN = {
                 "https://example.com/",
                 "https://ooni.org/",
             ],
+            "targets_name" : None,
+            "inputs_extra" : None,
             "options": {
                 "HTTP3Enabled": True,
             },
@@ -43,6 +45,8 @@ SAMPLE_OONIRUN = {
         },
         {
             "inputs": [],
+            "targets_name" : None,
+            "inputs_extra" : None,
             "options": {},
             "backend_options": {},
             "is_background_run_enabled_default": False,
@@ -215,6 +219,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["name"] == z["name"]
     assert j["name_intl"] == z["name_intl"]
     assert j["description"] == z["description"]
+    from pprint import pprint
     assert j["nettests"] == z["nettests"]
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
