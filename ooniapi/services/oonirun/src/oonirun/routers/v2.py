@@ -469,8 +469,17 @@ def get_oonirun_link_engine_descriptor(
         ),
     ],
     db : PostgresSession,
+    run_type : Annotated[
+        Optional[str],
+        Query(description="Run type", pattern="^(timed|manual)$")
+    ] = None,
+    is_charging : Annotated [
+        bool,
+        Query(description="If the probe is charging"),
+    ] = False,
 ):
     """Fetch an OONI Run link by specifying the revision number"""
+    #TODO Use is_charging and run_type
     try:
         revision = int(revision_number)
     except:

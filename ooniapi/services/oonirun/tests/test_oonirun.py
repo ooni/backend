@@ -660,3 +660,26 @@ def test_is_latest_list(client, client_with_user_role):
     j = r.json()
     nts = j['oonirun_links'][0]['nettests']
     assert len(nts) == 4, "There are 4 nettests between all revisions"
+
+def test_link_revision_args(client, client_with_user_role):
+    # Check args parsing for oonirun engine-descriptor
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing descriptor revision"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code, r.json()
+    j = r.json()
+    id = j['oonirun_link_id']
+
+    # Check that arguments defaults work properly
+    r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1")
+    assert r.status_code == 200, r.json()
+
+    # Try with good arguments
+    gs = ['timed', 'manual']
+    for good in gs:
+        r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : good})
+        assert r.status_code == 200, r.json()
+
+    # Try with bad arguments
+    r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : "bad"})
+    assert r.status_code == 422, r.json()
