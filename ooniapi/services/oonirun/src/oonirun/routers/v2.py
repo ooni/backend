@@ -52,21 +52,24 @@ class OONIRunLinkNettest(BaseModel):
         default=False, title="if this test should be enabled by default for manual runs"
     )
 
-    targets_name : Optional[str] = Field (
-        default=None, 
-        description="string used to specify during creation that the input list should be dynamically generated."
+    targets_name: Optional[str] = Field(
+        default=None,
+        description="string used to specify during creation that the input list should be dynamically generated.",
     )
 
-    inputs_extra : Optional[List[Dict[str, Any]]] = Field (
-        default = None,
-        description = "provides a richer JSON array containing extra parameters for each input. If provided, the length of inputs_extra should match the length of inputs."
+    inputs_extra: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="provides a richer JSON array containing extra parameters for each input. If provided, the length of inputs_extra should match the length of inputs.",
     )
 
     @model_validator(mode="after")
     def validate_inputs_extra(self) -> Self:
         if self.inputs_extra is not None and len(self.inputs) != len(self.inputs_extra):
-            raise ValueError("When provided, inputs_extra should be the same length as inputs")
+            raise ValueError(
+                "When provided, inputs_extra should be the same length as inputs"
+            )
         return self
+
 
 class OONIRunLinkEngineDescriptor(BaseModel):
     revision: str = Field(title="revision of the nettest descriptor")
@@ -131,8 +134,8 @@ class OONIRunLinkBase(BaseModel):
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
 
-class OONIRunLink(OONIRunLinkBase):
 
+class OONIRunLink(OONIRunLinkBase):
 
     oonirun_link_id: str
     date_created: datetime = Field(
@@ -168,7 +171,7 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
 )
 def create_oonirun_link(
     create_request: OONIRunLinkCreateEdit,
-    db : PostgresSession,
+    db: PostgresSession,
     token=Depends(role_required(["admin", "user"])),
 ) -> OONIRunLink:
     """Create a new oonirun link or a new version for an existing one."""
@@ -250,7 +253,7 @@ def create_oonirun_link(
 def edit_oonirun_link(
     oonirun_link_id: str,
     edit_request: OONIRunLinkCreateEdit,
-    db : PostgresSession,
+    db: PostgresSession,
     token=Depends(role_required(["admin", "user"])),
 ):
     """Edit an existing OONI Run link"""
@@ -428,7 +431,7 @@ class OONIRunLinkRevisions(BaseModel):
 )
 def get_oonirun_link_revisions(
     oonirun_link_id: str,
-    db : PostgresSession,
+    db: PostgresSession,
 ):
     """
     Obtain the list of revisions for a certain OONI Run link
@@ -468,34 +471,39 @@ def get_oonirun_link_engine_descriptor(
             },
         ),
     ],
-    db : PostgresSession,
-    run_type : Annotated[
-        Optional[str],
-        Query(description="Run type", pattern="^(timed|manual)$")
+    db: PostgresSession,
+    run_type: Annotated[
+        Optional[str], Query(description="Run type", pattern="^(timed|manual)$")
     ] = None,
-    is_charging : Annotated [
+    is_charging: Annotated[
         bool,
         Query(description="If the probe is charging"),
     ] = False,
-    x_ooni_networkinfo : Annotated[
-        Optional[str], #TODO Marked as optional to avoid breaking old proves
-        Header(description="Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)")
+    x_ooni_networkinfo: Annotated[
+        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Header(
+            description="Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)"
+        ),
     ] = None,
-    x_ooni_websitecategorycodes : Annotated[
-        Optional[str], #TODO Marked as optional to avoid breaking old proves
-        Header(description="Comma separated list of category codes that user has chosen to test (eg. NEWS,HUMR)")
+    x_ooni_websitecategorycodes: Annotated[
+        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Header(
+            description="Comma separated list of category codes that user has chosen to test (eg. NEWS,HUMR)"
+        ),
     ] = None,
-    x_ooni_credentials : Annotated[
-        Optional[str], #TODO Marked as optional to avoid breaking old proves
-        Header(description="base64 encoded OONI anonymous credentials")
+    x_ooni_credentials: Annotated[
+        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Header(description="base64 encoded OONI anonymous credentials"),
     ] = None,
     user_agent: Annotated[
-        Optional[str], #TODO Marked as optional to avoid breaking old proves
-        Header(description="Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)")
-    ] = None
+        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Header(
+            description="Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)"
+        ),
+    ] = None,
 ):
     """Fetch an OONI Run link by specifying the revision number"""
-    #TODO Use is_charging and run_type
+    # TODO Use is_charging and run_type
     try:
         revision = int(revision_number)
     except:
@@ -541,7 +549,7 @@ def get_oonirun_link_revision(
             },
         ),
     ],
-    db : PostgresSession,
+    db: PostgresSession,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ):
@@ -570,7 +578,7 @@ def get_oonirun_link_revision(
 )
 def get_latest_oonirun_link(
     oonirun_link_id: str,
-    db : PostgresSession,
+    db: PostgresSession,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ):
@@ -593,7 +601,7 @@ class OONIRunLinkList(BaseModel):
 
 @router.get("/v2/oonirun/links", tags=["oonirun"])
 def list_oonirun_links(
-    db : PostgresSession,
+    db: PostgresSession,
     is_mine: Annotated[
         Optional[bool],
         Query(description="List only the my descriptors"),
@@ -603,8 +611,8 @@ def list_oonirun_links(
         Query(description="List also expired descriptors"),
     ] = None,
     only_latest: Annotated[
-        Optional[bool], 
-        Query(description = "List only descriptors in the latest revision")
+        Optional[bool],
+        Query(description="List only descriptors in the latest revision"),
     ] = True,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
