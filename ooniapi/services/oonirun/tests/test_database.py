@@ -45,6 +45,29 @@ SAMPLE_OONIRUN = {
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
         },
+        {
+            "targets_name" : "sample_target",
+            "options": {},
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "dnscheck",
+        },
+        {
+            "inputs" : [
+                "https://example.com/",
+                "https://ooni.org/",
+            ],
+            "inputs_extra" : [
+                {"category_code" : "HUMR"},
+                {}
+            ], 
+            "options": {},
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "dnscheck",
+        },
     ],
 }
 
@@ -127,13 +150,25 @@ def test_upgrade_to_head(postgresql):
             nettest_index=0,
             date_created=utcnow_seconds(),
         ),
+        models.OONIRunLinkNettest(
+            **nettests[2],
+            revision=1,
+            nettest_index=2,
+            date_created=utcnow_seconds(),
+        ),
+        models.OONIRunLinkNettest(
+            **nettests[3],
+            revision=1,
+            nettest_index=3,
+            date_created=utcnow_seconds(),
+        ),
     ]
     db.add(db_runlink)
     db.commit()
 
     new_row = db.query(models.OONIRunLink).first()
     assert new_row
-    assert new_row.nettests[0].revision == 3
+    assert new_row.nettests[0].revision == 3, "First one to show up should have the latest revision"
 
     db.close()
 

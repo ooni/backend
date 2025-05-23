@@ -33,6 +33,8 @@ SAMPLE_OONIRUN = {
                 "https://example.com/",
                 "https://ooni.org/",
             ],
+            "targets_name": None,
+            "inputs_extra": None,
             "options": {
                 "HTTP3Enabled": True,
             },
@@ -43,6 +45,8 @@ SAMPLE_OONIRUN = {
         },
         {
             "inputs": [],
+            "targets_name": None,
+            "inputs_extra": None,
             "options": {},
             "backend_options": {},
             "is_background_run_enabled_default": False,
@@ -215,6 +219,8 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["name"] == z["name"]
     assert j["name_intl"] == z["name_intl"]
     assert j["description"] == z["description"]
+    from pprint import pprint
+
     assert j["nettests"] == z["nettests"]
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -588,3 +594,92 @@ def test_oonirun_revisions(client, client_with_user_role):
     r = client.get(f"/api/v2/oonirun/links/404/engine-descriptor/latest")
     j = r.json()
     assert r.status_code == 404, r.json()
+
+
+def test_inputs_extra_length(client, client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "integ-test name in English"
+    nettests = z.pop("nettests")
+    nettests = nettests[:1]
+    nettests[0]["inputs_extra"] = [
+        {
+            "provider": "riseupvpn",
+        }
+    ]
+    z['nettests'] = nettests
+
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, "Should fail when inputs_extra != None and len(inputs_extra) != len(inputs)"
+
+    nettests[0]["inputs_extra"] = [
+        {
+            "provider": "riseupvpn",
+        },
+        {
+            "provider": "riseupvpn",
+        }
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, "Appropiate inputs extra size, should pass"
+
+    nettests[0].pop("inputs_extra")
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, "No checks should be performed when inputs_extra is None"
+
+def test_is_latest_list(client, client_with_user_role):
+    """
+    Test that the only_latest argument in /links filters properly
+    """
+
+    # Create link 
+    z =  deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing list filtering"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Now update it
+    id = j['oonirun_link_id']
+    z['nettests'][0]['inputs'].append("https://ooni.io/")
+    r = client_with_user_role.put(f"/api/v2/oonirun/links/{id}", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+
+    # Check filtering
+    # Only last revision by default
+    r = client.get("/api/v2/oonirun/links")
+    assert r.status_code == 200
+    j = r.json()
+    nts = j['oonirun_links'][0]['nettests']
+    assert len(nts) == 2, "There are only 2 nettests in the last revision"
+
+    # All revisions
+    r = client.get("/api/v2/oonirun/links", params = {"only_latest" : False})
+    assert r.status_code == 200
+    j = r.json()
+    nts = j['oonirun_links'][0]['nettests']
+    assert len(nts) == 4, "There are 4 nettests between all revisions"
+
+def test_link_revision_args(client, client_with_user_role):
+    # Check args parsing for oonirun engine-descriptor
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing descriptor revision"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code, r.json()
+    j = r.json()
+    id = j['oonirun_link_id']
+
+    # Check that arguments defaults work properly
+    r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1")
+    assert r.status_code == 200, r.json()
+
+    # Try with good arguments
+    gs = ['timed', 'manual']
+    for good in gs:
+        r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : good})
+        assert r.status_code == 200, r.json()
+
+    # Try with bad arguments
+    r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : "bad"})
+    assert r.status_code == 422, r.json()
