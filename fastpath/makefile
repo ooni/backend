@@ -1,10 +1,11 @@
 
 local_quickdeploy:
-	sudo cp fastpath/*.py /usr/lib/python3.7/dist-packages/fastpath/
-	sudo systemctl restart fastpath
+	cp fastpath/*.py /usr/local/lib/python3.9/
+	systemctl restart fastpath
 
 local_functests:
-	PYTHONPATH=. pytest-3 -s --log-cli-level info $(args)
+	# PYTHONPATH=. pytest-3 -s --log-cli-level info $(args)
+	pytest -s --log-cli-level info $(args)
 
 local_functests_coverage:
 	PYTHONPATH=. pytest-3 -s --cov=fastpath
@@ -58,3 +59,44 @@ beta_functests:
 beta_monitor_metrics:
 	ssh $(shell cat .betahost) \
 		"tcpdump -npqi lo udp port 8125 -A -l | grep --line-buffered fastpat | sed 's/.*fastpath\.//'"
+
+docker:
+	docker compose --profile default up --build -d
+
+# Runs docker in foreground, useful for checking errors in the image before it runs
+docker-fg:
+	docker compose --profile default up --build 
+
+# Runs both fastpath and the testing clickhous. 
+# Mind the fastpath configuration in fastpath.conf
+docker-all: docker-clickhouse
+	echo "Waiting for clickhouse..."
+	sleep 4 
+	docker compose --profile default up --build -d 
+
+# Turns off every service
+docker-down:
+	docker compose --profile all down 
+
+# If you need to test the fastpath locally you can use this rule to spawn the clickhouse database
+# locally and then use `make docker` or `make docker-fg` to start the fastpath container. Ex:
+# ```
+# make docker-clickhouse
+# make docker
+# ```
+# You can also use `make docker-all` for that purpose
+docker-clickhouse:
+	docker compose --profile clickhouse up -d
+
+# Use this to login into the fastpath service container, useful for testing
+docker-login:
+	docker compose exec fastpath bash
+
+# Get logs from the fastpath docker service
+docker-logs:
+	docker compose logs fastpath -f 
+
+# Get logs for a specified service. Example: 
+# `make docker-logs-for args="clickhouse-server"`
+docker-logs-for:
+	docker compose logs $(args) -f 
