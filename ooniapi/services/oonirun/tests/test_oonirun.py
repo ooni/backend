@@ -630,8 +630,6 @@ def test_is_latest_list(client, client_with_user_role):
     """
     Test that the only_latest argument in /links filters properly
     """
-    from pprint import pprint
-    from sys import stderr
 
     # Create link 
     z =  deepcopy(SAMPLE_OONIRUN)
