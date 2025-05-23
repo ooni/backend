@@ -41,8 +41,8 @@ class OONIRunLinkNettest(BaseModel):
     inputs: List[str] = Field(
         default=[], title="list of input dictionaries for the nettest"
     )
+    # TODO(luis): Options and backend_options not in the new spec. Should be removed?
     options: Dict = Field(default={}, title="options for the nettest")
-    # TODO(luis): Not in the new spec. Should be removed?
     backend_options: Dict = Field(default={}, title="options to send to the backend")
     is_background_run_enabled_default: bool = Field(
         default=False,
@@ -577,6 +577,10 @@ def list_oonirun_links(
         Optional[bool],
         Query(description="List also expired descriptors"),
     ] = None,
+    only_latest: Annotated[
+        Optional[bool], 
+        Query(description = "List only descriptors in the latest revision")
+    ] = True,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ) -> OONIRunLinkList:
@@ -596,7 +600,10 @@ def list_oonirun_links(
         assert (
             row.nettests[-1].revision <= revision
         ), "nettests must be sorted by revision"
-        nettests, _ = get_nettests(row, revision)
+
+        # if revision is None, it will get all the nettests, including from old revisions
+        nettests, _ = get_nettests(row, revision if only_latest else None)
+
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
             name=row.name,

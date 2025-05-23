@@ -625,3 +625,40 @@ def test_inputs_extra_length(client, client_with_user_role):
     nettests[0].pop("inputs_extra")
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, "No checks should be performed when inputs_extra is None"
+
+def test_is_latest_list(client, client_with_user_role):
+    """
+    Test that the only_latest argument in /links filters properly
+    """
+    from pprint import pprint
+    from sys import stderr
+
+    # Create link 
+    z =  deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing list filtering"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Now update it
+    id = j['oonirun_link_id']
+    z['nettests'][0]['inputs'].append("https://ooni.io/")
+    r = client_with_user_role.put(f"/api/v2/oonirun/links/{id}", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+
+    # Check filtering
+    # Only last revision by default
+    r = client.get("/api/v2/oonirun/links")
+    assert r.status_code == 200
+    j = r.json()
+    nts = j['oonirun_links'][0]['nettests']
+    assert len(nts) == 2, "There are only 2 nettests in the last revision"
+
+    # All revisions
+    r = client.get("/api/v2/oonirun/links", params = {"only_latest" : False})
+    assert r.status_code == 200
+    j = r.json()
+    nts = j['oonirun_links'][0]['nettests']
+    assert len(nts) == 4, "There are 4 nettests between all revisions"
