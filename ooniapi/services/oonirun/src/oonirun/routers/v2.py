@@ -480,23 +480,23 @@ def get_oonirun_link_engine_descriptor(
         Query(description="If the probe is charging"),
     ] = False,
     x_ooni_networkinfo: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
             description="Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)"
         ),
     ] = None,
     x_ooni_websitecategorycodes: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
             description="Comma separated list of category codes that user has chosen to test (eg. NEWS,HUMR)"
         ),
     ] = None,
     x_ooni_credentials: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(description="base64 encoded OONI anonymous credentials"),
     ] = None,
     user_agent: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old proves
+        Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
             description="Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)"
         ),
