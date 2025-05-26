@@ -11,8 +11,9 @@ def test_oonidata_list_analysis(client):
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 0
 
-def test_oonidata_list_analysis_with_since_and_until(client):
-    response = client.get(f"{route}?since={since}&until={until}")
+
+def test_oonidata_list_analysis_with_since_and_until(client, params_since_and_until_with_two_days):
+    response = client.get(route, params=params_since_and_until_with_two_days)
 
     json = response.json()
     assert isinstance(json["results"], list), json
@@ -30,11 +31,8 @@ def test_oonidata_list_analysis_with_since_and_until(client):
         ("test_name", "web_connectivity"),
     ]
 )
-def test_oonidata_list_analysis_with_filters(client, filter_param, filter_value):
-    params = {
-        "since": since,
-        "until": until
-    }
+def test_oonidata_list_analysis_with_filters(client, filter_param, filter_value, params_since_and_until_with_two_days):
+    params = params_since_and_until_with_two_days
     params[filter_param] = filter_value
 
     response = client.get(route, params=params)
@@ -45,11 +43,13 @@ def test_oonidata_list_analysis_with_filters(client, filter_param, filter_value)
     for result in json["results"]:
         assert result[filter_param] == filter_value, result
 
-def test_oonidata_list_analysis_filtering_by_probe_asn_as_a_string_with_since_and_until(client):
-    probe_asn = 45758
-    probe_asn_as_a_string =  "AS" + str(probe_asn)
 
-    response = client.get(f"{route}?probe_asn={probe_asn_as_a_string}&since={since}&until={until}")
+def test_oonidata_list_analysis_filtering_by_probe_asn_as_a_string_with_since_and_until(client, params_since_and_until_with_two_days):
+    params = params_since_and_until_with_two_days
+    probe_asn = 45758
+    params["probe_asn"] =  "AS" + str(probe_asn)
+
+    response = client.get(route, params=params)
 
     json = response.json()
     assert isinstance(json["results"], list), json
@@ -57,8 +57,8 @@ def test_oonidata_list_analysis_filtering_by_probe_asn_as_a_string_with_since_an
     for result in json["results"]:
         assert result["probe_asn"] == probe_asn, result
 
-def test_oonidata_list_analysis_order_default(client):
-    response = client.get(f"{route}?since={since}&until={until}")
+def test_oonidata_list_analysis_order_default(client, params_since_and_until_with_two_days):
+    response = client.get(route, params=params_since_and_until_with_two_days)
 
     json = response.json()
     assert isinstance(json["results"], list), json
@@ -69,8 +69,12 @@ def test_oonidata_list_analysis_order_default(client):
         current_date = json["results"][i]["measurement_start_time"]
         assert previous_date >= current_date, f"The dates are not ordered: {previous_date} < {current_date}"
 
-def test_oonidata_list_analysis_order_asc(client):
-    response = client.get(f"{route}?order=ASC&since={since}&until={until}")
+
+def test_oonidata_list_analysis_order_asc(client, params_since_and_until_with_two_days):
+    params = params_since_and_until_with_two_days
+    params["order"] = "ASC"
+
+    response = client.get(route, params=params)
 
     json = response.json()
     assert isinstance(json["results"], list), json
@@ -81,8 +85,9 @@ def test_oonidata_list_analysis_order_asc(client):
         current_date = json["results"][i]["measurement_start_time"]
         assert previous_date <= current_date, f"The dates are not ordered: {previous_date} > {current_date}"
 
+
 @pytest.mark.parametrize(
-    "order_param, order",
+    "field, order",
     [
         ("input", "asc"),
         ("probe_cc", "asc"),
@@ -94,30 +99,37 @@ def test_oonidata_list_analysis_order_asc(client):
         ("test_name", "desc"),
     ]
 )
-def test_oonidata_list_analysis_order_by_field(client, order_param, order):
-    response = client.get(f"{route}?order_by={order_param}&order={order}&since={since}&until={until}")
+def test_oonidata_list_analysis_order_by_field(client, field, order, params_since_and_until_with_two_days):
+    params = params_since_and_until_with_two_days
+    params['order_by'] = field
+    params['order'] = order
 
+    response = client.get(route, params=params)
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
     for i in range(1, len(json["results"])):
-        assert order_param in json["results"][i], json["results"][i]
-        previous = json["results"][i - 1][order_param]
-        current = json["results"][i][order_param]
+        assert field in json["results"][i], json["results"][i]
+        previous = json["results"][i - 1][field]
+        current = json["results"][i][field]
         if order == "asc":
-            assert previous <= current, f"The {order_param} values are not ordered in ascending order: {previous} > {current}"
+            assert previous <= current, f"The {field} values are not ordered in ascending order: {previous} > {current}"
         else:
-            assert previous >= current, f"The {order_param} values are not ordered in descending order: {previous} < {current}"
+            assert previous >= current, f"The {field} values are not ordered in descending order: {previous} < {current}"
 
-def test_oonidata_list_analysis_limit_by_default(client):
-    response = client.get(f"{route}?since={since}&until={until}")
+
+def test_oonidata_list_analysis_limit_by_default(client, params_since_and_until_with_two_days):
+    response = client.get(route, params=params_since_and_until_with_two_days)
 
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
 
-def test_oonidata_list_analysis_with_limit_and_offset(client):
-    response = client.get(f"{route}?limit=10&offset=10&since={since}&until={until}")
+def test_oonidata_list_analysis_with_limit_and_offset(client, params_since_and_until_with_two_days):
+    params = params_since_and_until_with_two_days
+    params["limit"] = 10
+
+    response = client.get(route, params=params)
 
     json = response.json()
     assert isinstance(json["results"], list), json

@@ -61,7 +61,7 @@ conf = Namespace()
 
 log = logging.getLogger("analysis")
 metrics = setup_metrics(name="analysis")
-DB_URI = "clickhouse://api:api@localhost/default"
+DEFAULT_DB_URI = "clickhouse://api:api@localhost/default"
 
 
 def parse_args() -> Namespace:
@@ -81,31 +81,36 @@ def parse_args() -> Namespace:
     # ap.add_argument("--", action="store_true", help="")
     ap.add_argument("--devel", action="store_true", help="Devel mode")
     ap.add_argument("--stdout", action="store_true", help="Log to stdout")
-    ap.add_argument("--db-uri", help="Override DB URI", default=DB_URI)
+    ap.add_argument("--db-uri", help="Override DB URI", default=DEFAULT_DB_URI)
+    
     return ap.parse_args()
 
 
-def main() -> None:
+def setup():
     global conf
-    log.info("Analysis starting")
-    # cp = ConfigParser()
-    # with open("/etc/ooni/analysis.conf") as f:
-    #     cp.read_file(f)
 
     conf = parse_args()
+
+    # Set up logs
     if conf.devel or conf.stdout or not has_systemd:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
-
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="analysis"))
         log.setLevel(logging.DEBUG)
 
     log.info("Logging started")
+
     conf.output_directory = (
         Path("./var/lib/analysis") if conf.devel else Path("/var/lib/analysis")
     )
     os.makedirs(conf.output_directory, exist_ok=True)
+
+
+def main() -> None:
+    global conf
+    log.info("Analysis starting")
+    setup()
 
     try:
         if conf.update_citizenlab:

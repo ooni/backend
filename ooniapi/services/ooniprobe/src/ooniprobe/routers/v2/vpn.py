@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 import random
 from typing import Dict, List
 import logging
@@ -7,22 +7,22 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import models
+from ... import models
 
-from ..utils import (
+from ...utils import (
     fetch_openvpn_config,
     fetch_openvpn_endpoints,
     format_endpoint,
     upsert_endpoints,
 )
-from ..common.routers import BaseModel
-from ..common.dependencies import get_settings
-from ..dependencies import get_postgresql_session
+from ...common.routers import BaseModel
+from ...common.dependencies import get_settings
+from ...dependencies import get_postgresql_session
+
+router = APIRouter(prefix="/v2")
 
 
 log = logging.getLogger(__name__)
-
-router = APIRouter()
 
 
 class VPNConfig(BaseModel):
@@ -113,7 +113,7 @@ def get_or_update_riseupvpn(
         raise HTTPException(status_code=500, detail="error updating provider")
 
 
-@router.get("/v2/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
+@router.get("/ooniprobe/vpn-config/{provider_name}", tags=["ooniprobe"])
 def get_vpn_config(
     provider_name: str,
     db=Depends(get_postgresql_session),

@@ -11,7 +11,7 @@ import pytest
 
 from ooniprobe.utils import OpenVPNConfig
 from ooniprobe import models
-from ooniprobe.routers import v2
+from ooniprobe.routers.v2 import vpn
 
 DUMMY_VPN_CERT = OpenVPNConfig(
     ca="-----BEGIN CERTIFICATE-----\nSAMPLE CERTIFICATE\n-----END CERTIFICATE-----\n",
@@ -93,11 +93,11 @@ def test_config_updated(client, db):
 @pytest.mark.parametrize("error", [HTTPError, Exception])
 def test_get_config_fails_if_exception_while_fetching_credentials(client, db, error):
     # no previous credential; when forcing any exception on the fetch code the http client should get a 500
-    with patch.object(v2, "get_or_update_riseupvpn", side_effect=error("err")):
+    with patch.object(vpn, "get_or_update_riseupvpn", side_effect=error("err")):
         r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
         assert r.status_code == 500
 
-    with patch.object(v2, "update_vpn_provider", side_effect=error("err")):
+    with patch.object(vpn, "update_vpn_provider", side_effect=error("err")):
         r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
         assert r.status_code == 500
 
@@ -113,6 +113,6 @@ def test_get_config_fails_if_exception_while_fetching_credentials(client, db, er
     db.add(provider)
     db.commit()
 
-    with patch.object(v2, "update_vpn_provider", side_effect=error("err")):
+    with patch.object(vpn, "update_vpn_provider", side_effect=error("err")):
         r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
         assert r.status_code == 200

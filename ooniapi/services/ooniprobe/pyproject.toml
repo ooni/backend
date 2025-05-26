@@ -24,6 +24,8 @@ dependencies = [
   "prometheus-fastapi-instrumentator ~= 6.1.0",
   "prometheus-client",
   "pem ~= 23.1.0",
+  "geoip2 ~= 5.0.1",
+  "fastapi-utils[all] ~= 0.8.0"
 ]
 
 readme = "README.md"
@@ -67,6 +69,7 @@ dependencies = [
   "pytest-postgresql",
   "pytest-asyncio",
   "freezegun",
+  "pytest-docker",
 ]
 path = ".venv/"
 

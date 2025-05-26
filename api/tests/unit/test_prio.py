@@ -107,3 +107,43 @@ def test_compute_priorities():
             "weight": -4.7368421052631575,
         }
     ]
+
+
+def test_compute_priorities_country_list():
+    entries = [
+        {
+            "category_code": "HUMR",
+            "domain": "ooni.org",
+            "url": "https://ooni.org/",
+            "cc": "it",
+            "msmt_cnt": 38,
+        }
+    ]
+    prio_rules = [
+        {
+            "category_code": "*",
+            "cc": "IT",
+            "domain": "ooni.org",
+            "priority": 20,
+            "url": "*",
+        },
+        {
+            "category_code": "*",
+            "cc": "IT",
+            "domain": "ooni.org",
+            "priority": 400,
+            "url": "*",
+        },
+    ]
+    out = prio.compute_priorities(entries, prio_rules)
+    assert out == [
+        {
+            "category_code": "HUMR",
+            "cc": "it",
+            "domain": "ooni.org",
+            "msmt_cnt": 38,
+            "priority": 420,
+            "url": "https://ooni.org/",
+            "weight": 11.052631578947368,
+        }
+    ]

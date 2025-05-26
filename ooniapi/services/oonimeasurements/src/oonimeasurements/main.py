@@ -48,7 +48,9 @@ instrumentor = Instrumentator().instrument(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
+    # allow from observable notebooks
+    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+    #allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,8 +85,10 @@ async def health(
     errors = []
 
     try:
-        query = """SELECT *
-        FROM fastpath FINAL
+        query = """
+        SELECT COUNT()
+        FROM fastpath
+        WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
         """
         query_click(db=db, query=query, query_params={})
     except Exception as exc:

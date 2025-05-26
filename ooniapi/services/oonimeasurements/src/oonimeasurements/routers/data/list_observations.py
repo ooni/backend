@@ -9,7 +9,7 @@ from typing_extensions import Annotated
 
 from ...common.dependencies import get_settings
 from ...dependencies import get_clickhouse_session
-from .utils import parse_probe_asn
+from .utils import parse_probe_asn_to_int
 
 from fastapi import APIRouter
 
@@ -166,6 +166,7 @@ class ListObservationsResponse(BaseModel):
 
 
 @router.get("/v1/observations", tags=["observations", "list_data"])
+@parse_probe_asn_to_int
 async def list_observations(
     report_id: Annotated[Optional[str], Query()] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
@@ -205,7 +206,6 @@ async def list_observations(
         q_args["report_id"] = report_id
         and_clauses.append("report_id = %(report_id)s")
     if probe_asn is not None:
-        probe_asn = parse_probe_asn(probe_asn)
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
     if probe_cc is not None:

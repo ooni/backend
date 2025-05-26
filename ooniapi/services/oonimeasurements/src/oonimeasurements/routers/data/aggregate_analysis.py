@@ -1,11 +1,11 @@
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime
 from typing import List, Literal, Optional, Union, Dict
 from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn
+from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int
 from ...sql import format_aggregate_query
 from ...dependencies import (
     get_clickhouse_session,
@@ -26,7 +26,12 @@ log = logging.getLogger(__name__)
 
 
 AggregationKeys = Literal[
-    "measurement_start_day", "domain", "probe_cc", "probe_asn", "test_name", "input"
+    "measurement_start_day",
+    "domain",
+    "probe_cc",
+    "probe_asn",
+    "test_name",
+    "input"
 ]
 
 
@@ -84,6 +89,7 @@ class AggregationResponse(BaseModel):
 
 
 @router.get("/v1/aggregation/analysis", tags=["aggregation", "analysis"])
+@parse_probe_asn_to_int
 async def get_aggregation_analysis(
     axis_x: Annotated[AggregationKeys, Query()] = "measurement_start_day",
     axis_y: Annotated[Optional[AggregationKeys], Query()] = None,
@@ -116,7 +122,6 @@ async def get_aggregation_analysis(
         extra_cols[axis_x] = axis_x
 
     if probe_asn is not None:
-        probe_asn = parse_probe_asn(probe_asn)
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
         extra_cols["probe_asn"] = "probe_asn"
