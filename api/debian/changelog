@@ -1,3 +1,9 @@
+ooni-api (1.0.97) unstable; urgency=medium
+
+  * Add fix and test for priority calculation
+
+ -- Luis Diaz <luis@openobservatory.org>  Mon, 26 May 2025 13:57:34 +0200
+
 ooni-api (1.0.96) unstable; urgency=medium
 
   * disable openvpn from check-in
