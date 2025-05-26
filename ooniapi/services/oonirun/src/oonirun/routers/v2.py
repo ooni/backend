@@ -22,7 +22,7 @@ from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_none,
 )
-from ..dependencies import PostgresSession, get_postgresql_session
+from ..dependencies import DependsPostgresSession, get_postgresql_session
 
 
 log = logging.getLogger(__name__)
@@ -171,7 +171,7 @@ class OONIRunLinkCreateEdit(OONIRunLinkBase):
 )
 def create_oonirun_link(
     create_request: OONIRunLinkCreateEdit,
-    db: PostgresSession,
+    db: DependsPostgresSession,
     token=Depends(role_required(["admin", "user"])),
 ) -> OONIRunLink:
     """Create a new oonirun link or a new version for an existing one."""
@@ -253,7 +253,7 @@ def create_oonirun_link(
 def edit_oonirun_link(
     oonirun_link_id: str,
     edit_request: OONIRunLinkCreateEdit,
-    db: PostgresSession,
+    db: DependsPostgresSession,
     token=Depends(role_required(["admin", "user"])),
 ):
     """Edit an existing OONI Run link"""
@@ -431,7 +431,7 @@ class OONIRunLinkRevisions(BaseModel):
 )
 def get_oonirun_link_revisions(
     oonirun_link_id: str,
-    db: PostgresSession,
+    db: DependsPostgresSession,
 ):
     """
     Obtain the list of revisions for a certain OONI Run link
@@ -471,7 +471,7 @@ def get_oonirun_link_engine_descriptor(
             },
         ),
     ],
-    db: PostgresSession,
+    db: DependsPostgresSession,
     run_type: Annotated[
         Optional[str], Query(description="Run type", pattern="^(timed|manual)$")
     ] = None,
@@ -549,7 +549,7 @@ def get_oonirun_link_revision(
             },
         ),
     ],
-    db: PostgresSession,
+    db: DependsPostgresSession,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ):
@@ -578,7 +578,7 @@ def get_oonirun_link_revision(
 )
 def get_latest_oonirun_link(
     oonirun_link_id: str,
-    db: PostgresSession,
+    db: DependsPostgresSession,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ):
@@ -601,7 +601,7 @@ class OONIRunLinkList(BaseModel):
 
 @router.get("/v2/oonirun/links", tags=["oonirun"])
 def list_oonirun_links(
-    db: PostgresSession,
+    db: DependsPostgresSession,
     is_mine: Annotated[
         Optional[bool],
         Query(description="List only the my descriptors"),

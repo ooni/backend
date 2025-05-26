@@ -20,4 +20,4 @@ def get_postgresql_session(settings: Annotated[Settings, Depends(get_settings)])
     finally:
         db.close()
 
-PostgresSession = Annotated[Session, Depends(get_postgresql_session)]
+DependsPostgresSession = Annotated[Session, Depends(get_postgresql_session)]
