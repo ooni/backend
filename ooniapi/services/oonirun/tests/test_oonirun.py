@@ -38,7 +38,6 @@ SAMPLE_OONIRUN = {
             "options": {
                 "HTTP3Enabled": True,
             },
-            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -48,7 +47,6 @@ SAMPLE_OONIRUN = {
             "targets_name": None,
             "inputs_extra": None,
             "options": {},
-            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
@@ -706,7 +704,6 @@ def test_inputs_and_targets_name(client_with_user_role):
             "options": {
                 "HTTP3Enabled": True,
             },
-            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -727,7 +724,6 @@ def test_inputs_and_targets_name(client_with_user_role):
             "options": {
                 "HTTP3Enabled": True,
             },
-            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -744,7 +740,6 @@ def test_inputs_and_targets_name(client_with_user_role):
             "options": {
                 "HTTP3Enabled": True,
             },
-            "backend_options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",

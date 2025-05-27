@@ -220,7 +220,6 @@ def create_oonirun_link(
             test_name=nt.test_name,
             inputs=nt.inputs,
             options=nt.options,
-            backend_options=nt.backend_options,
             is_background_run_enabled_default=nt.is_background_run_enabled_default,
             is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
         )
@@ -309,7 +308,6 @@ def edit_oonirun_link(
                 test_name=nt.test_name,
                 inputs=nt.inputs,
                 options=nt.options,
-                backend_options=nt.backend_options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
             )
@@ -325,7 +323,6 @@ def edit_oonirun_link(
                 test_name=nt.test_name,
                 inputs=nt.inputs,
                 options=nt.options,
-                backend_options=nt.backend_options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
                 oonirun_link=oonirun_link,
@@ -380,7 +377,6 @@ def get_nettests(
                 test_name=nt.test_name,
                 inputs=nt.inputs,
                 options=nt.options,
-                backend_options=nt.backend_options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
             )
