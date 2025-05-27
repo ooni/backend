@@ -21,6 +21,8 @@ class MsmtFeeder(BaseApplication):
             assert key in self.cfg.settings
             self.cfg.set(key, value)
 
+        self.cfg.set('reload', True)
+
     def load(self):
         return self.application
 
@@ -40,5 +42,5 @@ def start_http_api(queue):
         start_response("200 OK", [])
         return [b""]
 
-    options = {"bind": f"127.0.0.1:{API_PORT}"}
+    options = {"bind": f"0.0.0.0:{API_PORT}"}
     MsmtFeeder(handler_app, options).run()
