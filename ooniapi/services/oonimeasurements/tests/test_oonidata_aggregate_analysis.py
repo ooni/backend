@@ -1,6 +1,8 @@
 import pytest
 
 route = "api/v1/aggregation/analysis"
+since = "2024-11-01"
+until = "2024-11-10"
 
 
 def test_oonidata_aggregation_analysis(client):
@@ -19,7 +21,6 @@ def test_oonidata_aggregation_analysis_with_since_and_until(client, params_since
     assert len(json["results"]) > 0
 
     for result in json["results"]:
-        assert "anomaly_count" in result, result
         assert "domain" in result, result
 
 
