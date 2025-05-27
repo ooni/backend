@@ -7,6 +7,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 import logging
+import re
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -461,6 +462,30 @@ def get_oonirun_link_revisions(
         revisions.append(str(r))
     return OONIRunLinkRevisions(revisions=revisions)
 
+class XOoniNetworkInfo(BaseModel):
+    probe_asn : str
+    probe_cc : str
+    network_type : str
+
+    @staticmethod
+    def get_header_pattern() -> str:
+        return r'^([a-zA-Z0-9]+),([a-zA-Z0-9]+) \(([a-zA-Z0-9]+)\)$'
+
+    @classmethod
+    def from_header(cls, header : str) -> Self:
+        pattern = cls.get_header_pattern()
+        matched = re.match(pattern, header)
+        
+        assert matched is not None, "Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)"
+
+        probe_asn, probe_cc, network_type = matched.groups()
+        return cls(probe_asn=probe_asn, probe_cc=probe_cc, network_type=network_type)
+
+HeaderXOoniNetworkInfo = Annotated[Optional[str], Header(
+        description="Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)", 
+        pattern=XOoniNetworkInfo.get_header_pattern()
+    )
+]
 
 @router.get(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
@@ -486,12 +511,7 @@ def get_oonirun_link_engine_descriptor(
         bool,
         Query(description="If the probe is charging"),
     ] = False,
-    x_ooni_networkinfo: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old probes
-        Header(
-            description="Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)"
-        ),
-    ] = None,
+    x_ooni_networkinfo: HeaderXOoniNetworkInfo = None,
     x_ooni_websitecategorycodes: Annotated[
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
@@ -517,6 +537,10 @@ def get_oonirun_link_engine_descriptor(
         # We can assert it, since we are doing validation
         assert revision_number == "latest"
         revision = None
+
+    network_info = None
+    if x_ooni_networkinfo is not None:
+        network_info = XOoniNetworkInfo.from_header(x_ooni_networkinfo)
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id

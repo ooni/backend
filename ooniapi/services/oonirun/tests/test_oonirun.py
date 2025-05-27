@@ -747,3 +747,18 @@ def test_inputs_and_targets_name(client_with_user_role):
     ]
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
+
+def test_x_ooni_networkinfo_header_parsing(client_with_user_role, client):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing header parsing"
+
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+
+    headers = {
+        "X-Ooni-NetworkInfo" : "AS1234,VE (wifi)"
+    }
+    r = client.get(f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/{j['revision']}", headers=headers)
+    assert r.status_code == 200, r.content
