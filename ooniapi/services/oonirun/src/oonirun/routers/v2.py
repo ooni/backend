@@ -43,7 +43,6 @@ class OONIRunLinkNettest(BaseModel):
     )
     # TODO(luis): Options and backend_options not in the new spec. Should be removed?
     options: Dict = Field(default={}, title="options for the nettest")
-    backend_options: Dict = Field(default={}, title="options to send to the backend")
     is_background_run_enabled_default: bool = Field(
         default=False,
         title="if this test should be enabled by default for background runs",
