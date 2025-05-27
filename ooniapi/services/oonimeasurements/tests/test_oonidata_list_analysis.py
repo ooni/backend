@@ -1,7 +1,8 @@
 import pytest
 
 route = "api/v1/analysis"
-
+since = "2024-11-01"
+until = "2024-11-02"
 
 def test_oonidata_list_analysis(client):
     response = client.get(route)
@@ -20,7 +21,6 @@ def test_oonidata_list_analysis_with_since_and_until(client, params_since_and_un
     for result in json["results"]:
         assert "test_name" in result, result
         assert "probe_cc" in result, result
-
 
 @pytest.mark.parametrize(
     "filter_param, filter_value",
@@ -56,7 +56,6 @@ def test_oonidata_list_analysis_filtering_by_probe_asn_as_a_string_with_since_an
     assert len(json["results"]) > 0
     for result in json["results"]:
         assert result["probe_asn"] == probe_asn, result
-
 
 def test_oonidata_list_analysis_order_default(client, params_since_and_until_with_two_days):
     response = client.get(route, params=params_since_and_until_with_two_days)
@@ -125,7 +124,6 @@ def test_oonidata_list_analysis_limit_by_default(client, params_since_and_until_
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
-
 
 def test_oonidata_list_analysis_with_limit_and_offset(client, params_since_and_until_with_two_days):
     params = params_since_and_until_with_two_days
