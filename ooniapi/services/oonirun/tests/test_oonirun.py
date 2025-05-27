@@ -666,7 +666,7 @@ def test_link_revision_args(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     z['name'] = "Testing descriptor revision"
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-    assert r.status_code, r.json()
+    assert r.status_code == 200, r.json()
     j = r.json()
     id = j['oonirun_link_id']
 
@@ -682,4 +682,73 @@ def test_link_revision_args(client, client_with_user_role):
 
     # Try with bad arguments
     r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : "bad"})
+    assert r.status_code == 422, r.json()
+
+def test_inputs_and_targets_name(client_with_user_role):
+    """
+    Test that you can't specify targets_name and inputs in the same request 
+    """
+
+    # Both 
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing no targets and inputs at the same time"
+
+    # Only inputs = OK 
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+
+    # Only targets = OK
+    z['nettests'] = [
+        {
+            "inputs": None,
+            "targets_name": "example_name",
+            "inputs_extra": None,
+            "options": {
+                "HTTP3Enabled": True,
+            },
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+
+    # Both targets and input = error
+    z['nettests'] = [
+        {
+            "inputs": [
+                "https://example.com/",
+                "https://ooni.org/",
+            ],
+            "targets_name": "example_name",
+            "inputs_extra": None,
+            "options": {
+                "HTTP3Enabled": True,
+            },
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, r.json()
+
+    # Both targets and inputs_extra = error
+    z['nettests'] = [
+        {
+            "targets_name": "example_name",
+            "inputs_extra": [{}, {}],
+            "options": {
+                "HTTP3Enabled": True,
+            },
+            "backend_options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()

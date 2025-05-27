@@ -38,7 +38,7 @@ class OONIRunLinkNettest(BaseModel):
     test_name: str = Field(
         default="", title="name of the ooni nettest", min_length=2, max_length=100
     )
-    inputs: List[str] = Field(
+    inputs: Optional[List[str]] = Field(
         default=[], title="list of input dictionaries for the nettest"
     )
     # TODO(luis): Options and backend_options not in the new spec. Should be removed?
@@ -68,6 +68,18 @@ class OONIRunLinkNettest(BaseModel):
             raise ValueError(
                 "When provided, inputs_extra should be the same length as inputs"
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_no_inputs_and_targets_name(self):
+        """
+        Check that you are not providing targets_name and inputs-inputs_extra in the same request
+        """
+        if self.targets_name is not None and (self.inputs is not None or self.inputs_extra is not None):
+            raise ValueError(
+                "When targets_name is provided, you can't provide inputs or inputs_extra"
+            )
+        
         return self
 
 
