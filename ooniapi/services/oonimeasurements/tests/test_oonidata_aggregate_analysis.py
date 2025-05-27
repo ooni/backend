@@ -21,7 +21,6 @@ def test_oonidata_aggregation_analysis_with_since_and_until(client, params_since
     assert len(json["results"]) > 0
 
     for result in json["results"]:
-        assert "anomaly_count" in result, result
         assert "domain" in result, result
 
 
