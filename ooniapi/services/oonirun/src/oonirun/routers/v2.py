@@ -22,7 +22,7 @@ from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_none,
 )
-from ..dependencies import DependsPostgresSession, get_postgresql_session
+from ..dependencies import DependsPostgresSession
 
 
 log = logging.getLogger(__name__)
