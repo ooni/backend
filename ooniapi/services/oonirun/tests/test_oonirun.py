@@ -217,7 +217,6 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["name"] == z["name"]
     assert j["name_intl"] == z["name_intl"]
     assert j["description"] == z["description"]
-    from pprint import pprint
 
     assert j["nettests"] == z["nettests"]
     date_created = datetime.strptime(
@@ -564,16 +563,18 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert j["revisions"][0] == "3", "the latest one is 3"
 
     ## Fetch nettests for latest
-    r = client.get(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest"
+    r = client.post(
+        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest",
+        json={}
     )
+    assert r.status_code == 200, r.json()
     j_latest = r.json()
     assert j_latest["revision"] == "3", "revision is 3"
     assert j_latest["nettests"] == lastest_nettests, "nettests are the same"
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
     ## Should match latest
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3")
+    r = client.post(f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json={})
     assert j_latest == r.json()
 
     ## Fetch invalid revision number
@@ -589,7 +590,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 404, r.json()
 
     ## Get not-existing engine descriptor
-    r = client.get(f"/api/v2/oonirun/links/404/engine-descriptor/latest")
+    r = client.post(f"/api/v2/oonirun/links/404/engine-descriptor/latest", json={})
     j = r.json()
     assert r.status_code == 404, r.json()
 
@@ -669,17 +670,17 @@ def test_link_revision_args(client, client_with_user_role):
     id = j['oonirun_link_id']
 
     # Check that arguments defaults work properly
-    r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1")
+    r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json={})
     assert r.status_code == 200, r.json()
 
     # Try with good arguments
     gs = ['timed', 'manual']
     for good in gs:
-        r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : good})
+        r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json={"run_type" : good})
         assert r.status_code == 200, r.json()
 
     # Try with bad arguments
-    r = client.get(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", params={"run_type" : "bad"})
+    r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json={"run_type" : "bad"})
     assert r.status_code == 422, r.json()
 
 def test_inputs_and_targets_name(client_with_user_role):
@@ -748,7 +749,7 @@ def test_inputs_and_targets_name(client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
 
-def test_x_ooni_networkinfo_header_parsing(client_with_user_role, client):
+def test_x_user_agent_header_parsing(client_with_user_role, client):
     z = deepcopy(SAMPLE_OONIRUN)
     z['name'] = "Testing header parsing"
 
@@ -756,9 +757,23 @@ def test_x_ooni_networkinfo_header_parsing(client_with_user_role, client):
     assert r.status_code == 200, r.json()
     j = r.json()
 
+    # Test with good headers
+    headers = {
+        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2 ooniprobe-engine_1.2.3"
+    }
+    r = client.post(
+        f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/{j['revision']}", 
+        headers=headers, 
+        json={}
+        )
+    assert r.status_code == 200, r.json()
 
     headers = {
-        "X-Ooni-NetworkInfo" : "AS1234,VE (wifi)"
+        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2"
     }
-    r = client.get(f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/{j['revision']}", headers=headers)
-    assert r.status_code == 200, r.content
+    r = client.post(
+        f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/{j['revision']}", 
+        headers=headers, 
+        json={}
+        )
+    assert r.status_code == 422, r.json()

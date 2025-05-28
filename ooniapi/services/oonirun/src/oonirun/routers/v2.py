@@ -481,13 +481,15 @@ class XOoniNetworkInfo(BaseModel):
         probe_asn, probe_cc, network_type = matched.groups()
         return cls(probe_asn=probe_asn, probe_cc=probe_cc, network_type=network_type)
 
-HeaderXOoniNetworkInfo = Annotated[Optional[str], Header(
-        description="Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)", 
-        pattern=XOoniNetworkInfo.get_header_pattern()
-    )
-]
+class GetOoniRunLinkEngineDescriptorRequest(BaseModel):
+    run_type : Optional[str] = Field(description="Run type", pattern="^(timed|manual)$", default="manual")
+    is_charging : Optional[bool] = Field(description="If the probe is charging", default=False)
+    probe_asn : Optional[str] = Field(pattern=r"^([a-zA-Z0-9]+)$", default="AS0")
+    probe_cc : Optional[str] = Field(description="Country code. Ex: VE", default="ZZ")
+    network_type : Optional[str] = Field(description="Ex: wifi", default=None)
+    website_category_codes : Optional[List[str]] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=None)
 
-@router.get(
+@router.post(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
     tags=["oonirun"],
     response_model=OONIRunLinkEngineDescriptor,
@@ -504,31 +506,18 @@ def get_oonirun_link_engine_descriptor(
         ),
     ],
     db: DependsPostgresSession,
-    run_type: Annotated[
-        Optional[str], Query(description="Run type", pattern="^(timed|manual)$")
-    ] = None,
-    is_charging: Annotated[
-        bool,
-        Query(description="If the probe is charging"),
-    ] = False,
-    x_ooni_networkinfo: HeaderXOoniNetworkInfo = None,
-    x_ooni_websitecategorycodes: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old probes
-        Header(
-            description="Comma separated list of category codes that user has chosen to test (eg. NEWS,HUMR)"
-        ),
-    ] = None,
-    x_ooni_credentials: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old probes
-        Header(description="base64 encoded OONI anonymous credentials"),
-    ] = None,
+    request : GetOoniRunLinkEngineDescriptorRequest,
     user_agent: Annotated[
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
+            # TODO(luis) This is crashing when the header is not provided (optional). But maybe this header shouldn't be optional at all?
+            # pattern=r"^([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+) \(([a-zA-Z0-9\ ]+)\) ([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+)$",
+            error_message = "Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)",
             description="Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)"
         ),
     ] = None,
-):
+    credentials : Annotated[Optional[bytes], Header(description="base64 encoded OONI anonymous credentials")] = None,
+    ):
     """Fetch an OONI Run link by specifying the revision number"""
     # TODO Use is_charging and run_type
     try:
@@ -537,10 +526,6 @@ def get_oonirun_link_engine_descriptor(
         # We can assert it, since we are doing validation
         assert revision_number == "latest"
         revision = None
-
-    network_info = None
-    if x_ooni_networkinfo is not None:
-        network_info = XOoniNetworkInfo.from_header(x_ooni_networkinfo)
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
