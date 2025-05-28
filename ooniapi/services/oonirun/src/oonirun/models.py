@@ -62,4 +62,4 @@ class OONIRunLinkNettest(Base):
     is_background_run_enabled_default: Mapped[bool] = mapped_column(default=False)
     is_manual_run_enabled_default: Mapped[bool] = mapped_column(default=False)
     targets_name: Mapped[str] = mapped_column(nullable=True)
-    inputs_extra: Mapped[Dict[str, Any]] = mapped_column(nullable=True)
+    inputs_extra: Mapped[List[Dict[str, Any]]] = mapped_column(nullable=True)

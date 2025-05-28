@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column("targets_name", sa.String(), nullable=True)
     )
     op.add_column("oonirun_nettest",
-        sa.Column("inputs_extra", sa.JSON(), nullable=True)
+        sa.Column("inputs_extra", sa.ARRAY(sa.JSON()), nullable=True)
     )
 
 
