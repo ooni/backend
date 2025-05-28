@@ -1,4 +1,4 @@
-from ooniprobe import prio
+from ooniprobe.common import prio
 
 
 def test_prio():
