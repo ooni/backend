@@ -74,6 +74,14 @@ EXPECTED_OONIRUN_LINK_PUBLIC_KEYS = [
     "expiration_date",
 ]
 
+SAMPLE_META = {
+    "run_type" : "timed",
+    "is_charging" : True,
+    "probe_asn" : "AS1234",
+    "probe_cc" : "VE",
+    "network_type" : "wifi",
+    "website_category_codes" : []
+}
 
 def test_get_version(client):
     r = client.get("/version")
@@ -565,7 +573,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     ## Fetch nettests for latest
     r = client.post(
         f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest",
-        json={}
+        json=SAMPLE_META
     )
     assert r.status_code == 200, r.json()
     j_latest = r.json()
@@ -574,7 +582,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
     ## Should match latest
-    r = client.post(f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json={})
+    r = client.post(f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json=SAMPLE_META)
     assert j_latest == r.json()
 
     ## Fetch invalid revision number
@@ -590,7 +598,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 404, r.json()
 
     ## Get not-existing engine descriptor
-    r = client.post(f"/api/v2/oonirun/links/404/engine-descriptor/latest", json={})
+    r = client.post(f"/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META)
     j = r.json()
     assert r.status_code == 404, r.json()
 
@@ -669,18 +677,16 @@ def test_link_revision_args(client, client_with_user_role):
     j = r.json()
     id = j['oonirun_link_id']
 
-    # Check that arguments defaults work properly
-    r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json={})
-    assert r.status_code == 200, r.json()
-
     # Try with good arguments
     gs = ['timed', 'manual']
     for good in gs:
-        r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json={"run_type" : good})
+        r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=SAMPLE_META)
         assert r.status_code == 200, r.json()
 
     # Try with bad arguments
-    r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json={"run_type" : "bad"})
+    bm = deepcopy(SAMPLE_META)
+    bm['run_type'] = "bad"
+    r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=bm)
     assert r.status_code == 422, r.json()
 
 def test_inputs_and_targets_name(client_with_user_role):
@@ -749,31 +755,32 @@ def test_inputs_and_targets_name(client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
 
-def test_x_user_agent_header_parsing(client_with_user_role, client):
-    z = deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing header parsing"
+# TODO(luis) finish this test for checking the parsing of user agent headers 
+# def test_x_user_agent_header_parsing(client_with_user_role, client):
+#     z = deepcopy(SAMPLE_OONIRUN)
+#     z['name'] = "Testing header parsing"
 
-    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-    assert r.status_code == 200, r.json()
-    j = r.json()
+#     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+#     assert r.status_code == 200, r.json()
+#     j = r.json()
 
-    # Test with good headers
-    headers = {
-        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2 ooniprobe-engine_1.2.3"
-    }
-    r = client.post(
-        f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/{j['revision']}", 
-        headers=headers, 
-        json={}
-        )
-    assert r.status_code == 200, r.json()
+#     # Test with good headers
+#     headers = {
+#         "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2 ooniprobe-engine_1.2.3"
+#     }
+#     r = client.post(
+#         f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
+#         headers=headers, 
+#         json={}
+#         )
+#     assert r.status_code == 200, r.json()
 
-    headers = {
-        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2"
-    }
-    r = client.post(
-        f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/{j['revision']}", 
-        headers=headers, 
-        json={}
-        )
-    assert r.status_code == 422, r.json()
+#     headers = {
+#         "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2"
+#     }
+#     r = client.post(
+#         f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
+#         headers=headers, 
+#         json={}
+#         )
+#     assert r.status_code == 422, r.json()

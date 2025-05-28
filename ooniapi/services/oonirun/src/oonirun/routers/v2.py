@@ -482,12 +482,12 @@ class XOoniNetworkInfo(BaseModel):
         return cls(probe_asn=probe_asn, probe_cc=probe_cc, network_type=network_type)
 
 class GetOoniRunLinkEngineDescriptorRequest(BaseModel):
-    run_type : Optional[str] = Field(description="Run type", pattern="^(timed|manual)$", default="manual")
-    is_charging : Optional[bool] = Field(description="If the probe is charging", default=False)
-    probe_asn : Optional[str] = Field(pattern=r"^([a-zA-Z0-9]+)$", default="AS0")
-    probe_cc : Optional[str] = Field(description="Country code. Ex: VE", default="ZZ")
-    network_type : Optional[str] = Field(description="Ex: wifi", default=None)
-    website_category_codes : Optional[List[str]] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=None)
+    run_type : str = Field(description="Run type", pattern="^(timed|manual)$")
+    is_charging : bool = Field(description="If the probe is charging")
+    probe_asn : str = Field(pattern=r"^([a-zA-Z0-9]+)$")
+    probe_cc : str = Field(description="Country code. Ex: VE")
+    network_type : str = Field(description="Ex: wifi")
+    website_category_codes : List[str] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=[])
 
 @router.post(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
