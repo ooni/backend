@@ -32,4 +32,4 @@ def get_clickhouse_session(settings: DependsSettings):
     finally:
         db.disconnect()
 
-DependsClickhouseSession = Annotated[Clickhouse, Depends(get_clickhouse_session)]
+DependsClickhouseClient = Annotated[Clickhouse, Depends(get_clickhouse_session)]

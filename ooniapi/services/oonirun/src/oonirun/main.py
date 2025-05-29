@@ -11,7 +11,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from . import models
 from .routers import v2
 
-from .dependencies import DependsPostgresSession, DependsClickhouseSession, DependsSettings
+from .dependencies import DependsPostgresSession, DependsClickhouseClient, DependsSettings
 from .common.dependencies import get_settings
 from .common.version import get_build_label, get_pkg_version
 from .common.version import get_build_label, get_pkg_version
@@ -67,7 +67,7 @@ class HealthStatus(BaseModel):
 async def health(
     settings : DependsSettings,
     db : DependsPostgresSession,
-    clickhouse : DependsClickhouseSession,
+    clickhouse : DependsClickhouseClient,
 ):
     errors = []
 

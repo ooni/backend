@@ -23,7 +23,8 @@ from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_none,
 )
-from ..dependencies import DependsPostgresSession
+from ..common.prio import generate_test_list
+from ..dependencies import DependsPostgresSession, DependsClickhouseClient
 
 
 log = logging.getLogger(__name__)
@@ -34,6 +35,13 @@ router = APIRouter()
 def utcnow_seconds():
     return datetime.now(timezone.utc).replace(microsecond=0)
 
+class OonirunMeta(BaseModel):
+    run_type : str = Field(description="Run type", pattern="^(timed|manual)$")
+    is_charging : bool = Field(description="If the probe is charging")
+    probe_asn : str = Field(pattern=r"^([a-zA-Z0-9]+)$")
+    probe_cc : str = Field(description="Country code. Ex: VE")
+    network_type : str = Field(description="Ex: wifi")
+    website_category_codes : List[str] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=[])
 
 class OONIRunLinkNettest(BaseModel):
     test_name: str = Field(
@@ -363,20 +371,50 @@ def edit_oonirun_link(
         is_mine=oonirun_link.creator_account_id == account_id,
     )
 
+def make_nettests_from_targets_name(targets_name : str, meta : OonirunMeta) -> Tuple[List[str], List[Dict[str, Any]]]:
+    if targets_name == "websites_list_prioritized":
+        return make_nettest_websites_list_prioritized(meta)
+    
+    raise ValueError("Unknown target name: " + targets_name)
+
+
+def make_nettest_websites_list_prioritized(meta : OonirunMeta) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Generates an inputs list using prio. 
+    Returns:
+        Tuple[List[str], List[Dict[str, Any]]]: (Inputs, InputsExtra)
+    """
+
+    raise NotImplementedError("websites_list_prioritized not yet implemented")
+
 
 def get_nettests(
-    oonirun_link: models.OONIRunLink, revision: Optional[int]
+    oonirun_link: models.OONIRunLink, revision: Optional[int], meta : Optional[OonirunMeta] = None
 ) -> Tuple[List[OONIRunLinkNettest], datetime]:
+    """Computes a list of nettests related to the given oonirun link
+
+    The `meta` parameter is required for the dynamic tests list calculation. If not provided, 
+    it will skip it.  
+    """
+
     date_created = oonirun_link.nettests[0].date_created
     nettests = []
     for nt in oonirun_link.nettests:
         if revision and nt.revision != revision:
             continue
         date_created = nt.date_created
+        inputs, inputs_extra = nt.inputs, nt.inputs_extra
+        targets_name = nt.targets_name
+        if nt.targets_name is not None and meta is not None: 
+            inputs, inputs_extra = make_nettests_from_targets_name(nt.targets_name, meta)
+            # it will crash if we add inputs and targets_name at the same time
+            targets_name = None 
+
         nettests.append(
             OONIRunLinkNettest(
+                targets_name=targets_name,
                 test_name=nt.test_name,
-                inputs=nt.inputs,
+                inputs=inputs,
+                inputs_extra=inputs_extra,
                 options=nt.options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
@@ -389,6 +427,7 @@ def make_oonirun_link(
     db: Session,
     oonirun_link_id: str,
     account_id: Optional[str],
+    meta : Optional[OonirunMeta] = None,
     revision: Optional[int] = None,
 ):
     q = db.query(models.OONIRunLink).filter(
@@ -407,7 +446,7 @@ def make_oonirun_link(
 
     assert isinstance(revision, int)
 
-    nettests, date_created = get_nettests(res, revision)
+    nettests, date_created = get_nettests(res, revision, meta)
     return OONIRunLink(
         oonirun_link_id=res.oonirun_link_id,
         name=res.name,
@@ -481,13 +520,6 @@ class XOoniNetworkInfo(BaseModel):
         probe_asn, probe_cc, network_type = matched.groups()
         return cls(probe_asn=probe_asn, probe_cc=probe_cc, network_type=network_type)
 
-class GetOoniRunLinkEngineDescriptorRequest(BaseModel):
-    run_type : str = Field(description="Run type", pattern="^(timed|manual)$")
-    is_charging : bool = Field(description="If the probe is charging")
-    probe_asn : str = Field(pattern=r"^([a-zA-Z0-9]+)$")
-    probe_cc : str = Field(description="Country code. Ex: VE")
-    network_type : str = Field(description="Ex: wifi")
-    website_category_codes : List[str] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=[])
 
 @router.post(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
@@ -506,7 +538,7 @@ def get_oonirun_link_engine_descriptor(
         ),
     ],
     db: DependsPostgresSession,
-    request : GetOoniRunLinkEngineDescriptorRequest,
+    meta : OonirunMeta,
     user_agent: Annotated[
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
@@ -541,7 +573,7 @@ def get_oonirun_link_engine_descriptor(
         revision = latest_revision
 
     assert isinstance(revision, int)
-    nettests, date_created = get_nettests(res, revision)
+    nettests, date_created = get_nettests(res, revision, meta)
     return OONIRunLinkEngineDescriptor(
         nettests=nettests,
         date_created=date_created,
