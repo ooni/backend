@@ -78,7 +78,6 @@ class OONIRunLinkNettest(BaseModel):
             )
         return self
 
-    @model_validator(mode="after")
     def validate_no_inputs_and_targets_name(self):
         """
         Check that you are not providing targets_name and inputs-inputs_extra in the same request
@@ -204,6 +203,15 @@ def create_oonirun_link(
             status_code=400,
             detail="email_address must match the email address of the user who created the oonirun link",
         )
+    
+    for nt in create_request.nettests:
+        try: 
+            nt.validate_no_inputs_and_targets_name()
+        except ValueError as e:
+            raise HTTPException(
+                status_code = 422, 
+                detail = {"error": str(e)}
+            )
 
     now = utcnow_seconds()
 
@@ -278,6 +286,15 @@ def edit_oonirun_link(
     """Edit an existing OONI Run link"""
     log.debug(f"edit oonirun {oonirun_link_id}")
     account_id = token["account_id"]
+
+    for nt in edit_request.nettests:
+        try: 
+            nt.validate_no_inputs_and_targets_name()
+        except ValueError as e:
+            raise HTTPException(
+                status_code = 422, 
+                detail = {"error": str(e)}
+            )
 
     now = utcnow_seconds()
 
