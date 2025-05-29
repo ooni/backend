@@ -41,7 +41,8 @@ def alembic_migration(postgresql):
 @pytest.fixture
 def client_with_bad_settings():
     app.dependency_overrides[get_settings] = make_override_get_settings(
-        postgresql_url="postgresql://bad:bad@localhost/bad"
+        postgresql_url="postgresql://bad:bad@localhost/bad",
+        clickhouse_url="clickhouse://bad:bad@localhost/bad"
     )
 
     client = TestClient(app)
@@ -49,11 +50,12 @@ def client_with_bad_settings():
 
 
 @pytest.fixture
-def client(alembic_migration):
+def client(alembic_migration, clickhouse_server):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
+        clickhouse_client = clickhouse_server
     )
 
     client = TestClient(app)
