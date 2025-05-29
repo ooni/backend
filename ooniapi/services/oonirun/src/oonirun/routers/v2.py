@@ -388,7 +388,7 @@ def edit_oonirun_link(
         is_mine=oonirun_link.creator_account_id == account_id,
     )
 
-def make_nettests_from_targets_name(targets_name : str, meta : OonirunMeta) -> Tuple[List[str], List[Dict[str, Any]]]:
+def make_test_lists_from_targets_name(targets_name : str, meta : OonirunMeta) -> Tuple[List[str], List[Dict[str, Any]]]:
     if targets_name == "websites_list_prioritized":
         return make_nettest_websites_list_prioritized(meta)
     
@@ -422,7 +422,7 @@ def get_nettests(
         inputs, inputs_extra = nt.inputs, nt.inputs_extra
         targets_name = nt.targets_name
         if nt.targets_name is not None and meta is not None: 
-            inputs, inputs_extra = make_nettests_from_targets_name(nt.targets_name, meta)
+            inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta)
             # it will crash if we add inputs and targets_name at the same time
             targets_name = None 
 
