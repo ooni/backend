@@ -77,7 +77,7 @@ class OONIRunLinkNettest(BaseModel):
 
     @model_validator(mode="after")
     def validate_inputs_extra(self) -> Self:
-        if self.inputs_extra is not None and len(self.inputs) != len(self.inputs_extra):
+        if self.inputs_extra is not None and (self.inputs is None or len(self.inputs) != len(self.inputs_extra)):
             raise ValueError(
                 "When provided, inputs_extra should be the same length as inputs"
             )
@@ -584,7 +584,6 @@ def get_oonirun_link_engine_descriptor(
     credentials : Annotated[Optional[bytes], Header(description="base64 encoded OONI anonymous credentials")] = None,
     ):
     """Fetch an OONI Run link by specifying the revision number"""
-    # TODO Use is_charging and run_type
     try:
         revision = int(revision_number)
     except:
