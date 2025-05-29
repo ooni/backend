@@ -55,7 +55,7 @@ def client(alembic_migration, clickhouse_server):
         postgresql_url=alembic_migration,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
-        clickhouse_client = clickhouse_server
+        clickhouse_url = clickhouse_server
     )
 
     client = TestClient(app)

@@ -694,7 +694,6 @@ def test_inputs_and_targets_name(client_with_user_role):
     Test that you can't specify targets_name and inputs in the same request 
     """
 
-    # Both 
     z = deepcopy(SAMPLE_OONIRUN)
     z['name'] = "Testing no targets and inputs at the same time"
 
@@ -754,6 +753,58 @@ def test_inputs_and_targets_name(client_with_user_role):
     ]
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
+
+def test_creation_with_targets_name(client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing dynamic test lists calculation"
+    z['nettests'][0]['inputs'] = None
+    z['nettests'][0]['targets_name'] = "websites_list_prioritized"
+    z['nettests'] = z['nettests'][:1]
+
+    # Create
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Retrieve
+    r = client_with_user_role.get(f"/api/v2/oonirun/links/{j['oonirun_link_id']}")
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Does it have the targets name?
+    assert j['nettests'][0]['targets_name'] == "websites_list_prioritized", "Missing targets_name"
+
+    # now test that you can edit
+    z['nettests'][0]['targets_name'] = "new_value"
+    r = client_with_user_role.put(f"/api/v2/oonirun/links/{j['oonirun_link_id']}", json=z)
+    assert r.status_code == 200, r.json()
+
+    # Retrieve again
+    r = client_with_user_role.get(f"/api/v2/oonirun/links/{j['oonirun_link_id']}")
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    assert j['nettests'][0]['targets_name'] == 'new_value', "Value of nettest should be changed by now"
+    
+
+
+
+def test_dynamic_test_lists_calculation(client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing dynamic test lists calculation"
+    z['nettests'][0]['inputs'] = None
+    z['nettests'][0]['targets_name'] = "websites_list_prioritized"
+    z['nettests'] = z['nettests'][:1]
+
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
+    assert r.status_code == 200, r.json()
+
+    j = r.json()
+
 
 # TODO(luis) finish this test for checking the parsing of user agent headers 
 # def test_x_user_agent_header_parsing(client_with_user_role, client):

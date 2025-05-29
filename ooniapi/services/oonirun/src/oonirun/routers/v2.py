@@ -243,6 +243,7 @@ def create_oonirun_link(
             test_name=nt.test_name,
             inputs=nt.inputs,
             options=nt.options,
+            targets_name=nt.targets_name,
             is_background_run_enabled_default=nt.is_background_run_enabled_default,
             is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
         )
@@ -337,6 +338,7 @@ def edit_oonirun_link(
         assert nt.nettest_index == nettest_index, "inconsistent nettest index"
         latest_nettests.append(
             OONIRunLinkNettest(
+                targets_name=nt.targets_name,
                 test_name=nt.test_name,
                 inputs=nt.inputs,
                 options=nt.options,
@@ -349,6 +351,7 @@ def edit_oonirun_link(
         latest_revision += 1
         for nettest_index, nt in enumerate(edit_request.nettests):
             new_nettest = models.OONIRunLinkNettest(
+                targets_name=nt.targets_name,
                 revision=latest_revision,
                 nettest_index=nettest_index,
                 date_created=now,
