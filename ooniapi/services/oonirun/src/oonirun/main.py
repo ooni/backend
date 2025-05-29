@@ -11,12 +11,14 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from . import models
 from .routers import v2
 
-from .dependencies import get_postgresql_session
+from .dependencies import DependsPostgresSession, DependsClickhouseSession, DependsSettings
 from .common.dependencies import get_settings
 from .common.version import get_build_label, get_pkg_version
 from .common.version import get_build_label, get_pkg_version
 from .common.metrics import mount_metrics
+from .common.clickhouse_utils import query_click
 
+log = logging.getLogger(__name__)
 
 pkg_name = "oonirun"
 
@@ -63,10 +65,23 @@ class HealthStatus(BaseModel):
 
 @app.get("/health")
 async def health(
-    settings=Depends(get_settings),
-    db=Depends(get_postgresql_session),
+    settings : DependsSettings,
+    db : DependsPostgresSession,
+    clickhouse : DependsClickhouseSession,
 ):
     errors = []
+
+    try:
+        query = """
+        SELECT COUNT()
+        FROM fastpath
+        WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
+        """
+        query_click(db=clickhouse, query=query, query_params={})
+    except Exception as e:
+        errors.append("clickhouse_error")
+        log.error(e)
+
     try:
         db.query(models.OONIRunLink).limit(1).all()
     except Exception as exc:

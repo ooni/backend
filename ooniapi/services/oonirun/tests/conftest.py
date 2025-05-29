@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from oonirun.common.config import Settings
 from oonirun.common.dependencies import get_settings
 from oonirun.main import app
+from clickhouse_driver import Client as ClickhouseClient
 
 
 def make_override_get_settings(**kw):
@@ -92,3 +93,25 @@ def client_with_admin_role(client):
     jwt_token = create_session_token("0" * 16, "admin")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
+
+def is_clickhouse_running(url):
+    try:
+        with ClickhouseClient.from_url(url) as client:
+            client.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+@pytest.fixture(scope="session")
+def clickhouse_server(docker_ip, docker_services):
+    port = docker_services.port_for("clickhouse", 9000)
+    # See password in docker compose
+    url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+    )
+    yield url
+
+@pytest.fixture(scope="session")
+def clickhouse_db(clickhouse_server):
+    yield ClickhouseClient.from_url(clickhouse_server)
