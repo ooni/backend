@@ -6,6 +6,7 @@ https://github.com/ooni/spec/blob/master/backends/bk-005-ooni-run-v2.md
 
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
+from typing_extensions import Annotated, Self
 import logging
 import re
 
@@ -14,7 +15,8 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
 from pydantic import computed_field, Field
 from pydantic.functional_validators import field_validator, model_validator
-from typing_extensions import Annotated, Self
+
+from clickhouse_driver.client import Client as Clickhouse
 
 from .. import models
 
@@ -42,6 +44,9 @@ class OonirunMeta(BaseModel):
     probe_cc : str = Field(description="Country code. Ex: VE")
     network_type : str = Field(description="Ex: wifi")
     website_category_codes : List[str] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=[])
+
+    def probe_asn_int(self) -> int:
+        return int(self.probe_asn.replace("AS", ""))
 
 class OONIRunLinkNettest(BaseModel):
     test_name: str = Field(
@@ -388,29 +393,38 @@ def edit_oonirun_link(
         is_mine=oonirun_link.creator_account_id == account_id,
     )
 
-def make_test_lists_from_targets_name(targets_name : str, meta : OonirunMeta) -> Tuple[List[str], List[Dict[str, Any]]]:
+def make_test_lists_from_targets_name(targets_name : str, meta : OonirunMeta, clickhouse : Clickhouse) -> Tuple[List[str], List[Dict[str, Any]]]:
     if targets_name == "websites_list_prioritized":
-        return make_nettest_websites_list_prioritized(meta)
+        return make_nettest_websites_list_prioritized(meta, clickhouse)
     
     raise ValueError("Unknown target name: " + targets_name)
 
 
-def make_nettest_websites_list_prioritized(meta : OonirunMeta) -> Tuple[List[str], List[Dict[str, Any]]]:
+def make_nettest_websites_list_prioritized(meta : OonirunMeta, clickhouse : Clickhouse) -> Tuple[List[str], List[Dict[str, Any]]]:
     """Generates an inputs list using prio. 
     Returns:
         Tuple[List[str], List[Dict[str, Any]]]: (Inputs, InputsExtra)
     """
 
-    raise NotImplementedError("websites_list_prioritized not yet implemented")
+    if meta.run_type == "manual":
+        url_limit = 9999  # same as prio.py
+    elif meta.is_charging:
+        url_limit = 100
+    else:
+        url_limit = 20
+    urls, _1, _2 = generate_test_list(clickhouse, meta.probe_cc, meta.website_category_codes, meta.probe_asn_int(), url_limit, False)
+
+    return urls, [{}] * len(urls)
 
 
 def get_nettests(
-    oonirun_link: models.OONIRunLink, revision: Optional[int], meta : Optional[OonirunMeta] = None
+    oonirun_link: models.OONIRunLink, revision: Optional[int], meta : Optional[OonirunMeta] = None, clickhouse : Optional[Clickhouse] = None
 ) -> Tuple[List[OONIRunLinkNettest], datetime]:
     """Computes a list of nettests related to the given oonirun link
 
     The `meta` parameter is required for the dynamic tests list calculation. If not provided, 
     it will skip it.  
+
     """
 
     date_created = oonirun_link.nettests[0].date_created
@@ -422,7 +436,8 @@ def get_nettests(
         inputs, inputs_extra = nt.inputs, nt.inputs_extra
         targets_name = nt.targets_name
         if nt.targets_name is not None and meta is not None: 
-            inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta)
+            assert clickhouse is not None, "Clickhouse is required to compute the dynamic lists"
+            inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta, clickhouse)
             # it will crash if we add inputs and targets_name at the same time
             targets_name = None 
 
@@ -555,6 +570,7 @@ def get_oonirun_link_engine_descriptor(
         ),
     ],
     db: DependsPostgresSession,
+    clickhouse: DependsClickhouseClient, 
     meta : OonirunMeta,
     user_agent: Annotated[
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
@@ -590,7 +606,7 @@ def get_oonirun_link_engine_descriptor(
         revision = latest_revision
 
     assert isinstance(revision, int)
-    nettests, date_created = get_nettests(res, revision, meta)
+    nettests, date_created = get_nettests(res, revision, meta, clickhouse)
     return OONIRunLinkEngineDescriptor(
         nettests=nettests,
         date_created=date_created,
