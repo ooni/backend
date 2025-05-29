@@ -65,6 +65,7 @@ class OONIRunLinkNettest(BaseModel):
         default=False, title="if this test should be enabled by default for manual runs"
     )
 
+    # TODO(luis): Add validation for expected variants of targets_name
     targets_name: Optional[str] = Field(
         default=None,
         description="string used to specify during creation that the input list should be dynamically generated.",
