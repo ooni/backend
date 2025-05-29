@@ -442,8 +442,6 @@ def get_nettests(
         if nt.targets_name is not None and meta is not None: 
             assert clickhouse is not None, "Clickhouse is required to compute the dynamic lists"
             inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta, clickhouse)
-            # it will crash if we add inputs and targets_name at the same time
-            targets_name = None 
 
         nettests.append(
             OONIRunLinkNettest(
