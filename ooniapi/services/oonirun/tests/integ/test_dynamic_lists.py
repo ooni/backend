@@ -10,7 +10,7 @@ def postj(client, url, **kw):
     assert response.status_code == 200
     return response.json()
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def url_priorities(clickhouse_db):
     path = Path("tests/fixtures/data")
     filename = "url_priorities_us.json"
@@ -26,6 +26,8 @@ def url_priorities(clickhouse_db):
 
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, j)
+    yield
+    clickhouse_db.execute("TRUNCATE TABLE url_priorities")
 
 def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
     z = deepcopy(SAMPLE_OONIRUN)
