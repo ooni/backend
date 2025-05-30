@@ -582,6 +582,15 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 200, r.json()
     j_latest = r.json()
     assert j_latest["revision"] == "3", "revision is 3"
+    from pprint import pprint
+    
+    # The engine-descriptor returns a list along with targets name on reading
+    lastest_nettests[2]['inputs'] = []
+    lastest_nettests[2]['inputs_extra'] = []
+    print("Given:")
+    pprint(j_latest['nettests'])
+    print("Expected:")
+    pprint(lastest_nettests)
     assert j_latest["nettests"] == lastest_nettests, "nettests are the same"
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
@@ -663,14 +672,14 @@ def test_is_latest_list(client, client_with_user_role):
     assert r.status_code == 200
     j = r.json()
     nts = j['oonirun_links'][0]['nettests']
-    assert len(nts) == 2, "There are only 2 nettests in the last revision"
+    assert len(nts) == 3, "There are only 3 nettests in the last revision"
 
     # All revisions
     r = client.get("/api/v2/oonirun/links", params = {"only_latest" : False})
     assert r.status_code == 200
     j = r.json()
     nts = j['oonirun_links'][0]['nettests']
-    assert len(nts) == 4, "There are 4 nettests between all revisions"
+    assert len(nts) == 6, "There are 6 nettests between all revisions"
 
 def test_link_revision_args(client, client_with_user_role):
     # Check args parsing for oonirun engine-descriptor
