@@ -20,7 +20,7 @@ from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
-from ...prio import generate_test_list
+from ...common.prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
 
