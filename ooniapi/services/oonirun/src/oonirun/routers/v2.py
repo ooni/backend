@@ -416,9 +416,18 @@ def make_nettest_websites_list_prioritized(meta : OonirunMeta, clickhouse : Clic
         url_limit = 100
     else:
         url_limit = 20
-    urls, _1, _2 = generate_test_list(clickhouse, meta.probe_cc, meta.website_category_codes, meta.probe_asn_int(), url_limit, False)
+    tests, _1, _2 = generate_test_list(clickhouse, meta.probe_cc, meta.website_category_codes, meta.probe_asn_int(), url_limit, False)
 
-    return urls, [{}] * len(urls)
+    inputs = []
+    inputs_extra = []
+    for test in tests:
+        url = test['url']
+        del test['url']
+        inputs.append(url)
+        inputs_extra.append(test)
+
+
+    return inputs, inputs_extra
 
 
 def get_nettests(
@@ -443,6 +452,8 @@ def get_nettests(
             assert clickhouse is not None, "Clickhouse is required to compute the dynamic lists"
             inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta, clickhouse)
 
+        from pprint import pprint
+        pprint(inputs)
         nettests.append(
             OONIRunLinkNettest(
                 targets_name=targets_name,
