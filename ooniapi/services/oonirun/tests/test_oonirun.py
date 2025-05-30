@@ -582,15 +582,10 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 200, r.json()
     j_latest = r.json()
     assert j_latest["revision"] == "3", "revision is 3"
-    from pprint import pprint
     
     # The engine-descriptor returns a list along with targets name on reading
     lastest_nettests[2]['inputs'] = []
     lastest_nettests[2]['inputs_extra'] = []
-    print("Given:")
-    pprint(j_latest['nettests'])
-    print("Expected:")
-    pprint(lastest_nettests)
     assert j_latest["nettests"] == lastest_nettests, "nettests are the same"
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 

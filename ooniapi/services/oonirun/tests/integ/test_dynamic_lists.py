@@ -39,18 +39,9 @@ def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
     j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
     orlid = j['oonirun_link_id']
 
-    j = {
-    "run_type" : "timed",
-    "is_charging" : True,
-    "probe_asn" : "AS1234",
-    "probe_cc" : "VE",
-    "network_type" : "wifi",
-    "website_category_codes" : []
-    }
-
     r = client_with_user_role.post(
         f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest",
-        json=j
+        json=SAMPLE_META
     )
     assert r.status_code == 200, r.json()
     j = r.json()
