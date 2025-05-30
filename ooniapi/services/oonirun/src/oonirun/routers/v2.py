@@ -555,6 +555,7 @@ class XOoniNetworkInfo(BaseModel):
         return cls(probe_asn=probe_asn, probe_cc=probe_cc, network_type=network_type)
 
 
+USER_AGENT_PATTERN = r"^([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+) \(([a-zA-Z0-9\ ]+)\) ([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+) \(([a-zA-Z0-9\-\_\.]+)\)$"
 @router.post(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
     tags=["oonirun"],
@@ -574,11 +575,10 @@ def get_oonirun_link_engine_descriptor(
     db: DependsPostgresSession,
     clickhouse: DependsClickhouseClient, 
     meta : OonirunMeta,
-    user_agent: Annotated[
+    useragent: Annotated[
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
-            # TODO(luis) This is crashing when the header is not provided (optional). But maybe this header shouldn't be optional at all?
-            # pattern=r"^([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+) \(([a-zA-Z0-9\ ]+)\) ([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+)$",
+            pattern=USER_AGENT_PATTERN,
             error_message = "Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)",
             description="Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)"
         ),
@@ -592,6 +592,13 @@ def get_oonirun_link_engine_descriptor(
         # We can assert it, since we are doing validation
         assert revision_number == "latest"
         revision = None
+    
+    if useragent is not None:
+        result = re.match(USER_AGENT_PATTERN, useragent)
+        # Validated by fastapi
+        assert result is not None
+        software_name, software_version, platform, engine_name, engine_version, engine_version_full = result.groups()
+        # TODO Log this metadata
 
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id

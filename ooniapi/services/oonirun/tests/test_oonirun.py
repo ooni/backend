@@ -6,13 +6,8 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import time
 
-from oonirun import models
 from oonirun.routers.v2 import utcnow_seconds
-import pytest
 
-import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
 
 SAMPLE_OONIRUN = {
     "name": "",
@@ -45,6 +40,15 @@ SAMPLE_OONIRUN = {
         {
             "inputs": [],
             "targets_name": None,
+            "inputs_extra": None,
+            "options": {},
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "dnscheck",
+        },
+        {
+            "inputs": None,
+            "targets_name": "websites_list_prioritized",
             "inputs_extra": None,
             "options": {},
             "is_background_run_enabled_default": False,
@@ -807,31 +811,42 @@ def test_dynamic_test_lists_calculation(client_with_user_role):
 
 
 # TODO(luis) finish this test for checking the parsing of user agent headers 
-# def test_x_user_agent_header_parsing(client_with_user_role, client):
-#     z = deepcopy(SAMPLE_OONIRUN)
-#     z['name'] = "Testing header parsing"
+def test_x_user_agent_header_parsing(client_with_user_role, client):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing header parsing"
 
-#     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-#     assert r.status_code == 200, r.json()
-#     j = r.json()
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
 
-#     # Test with good headers
-#     headers = {
-#         "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2 ooniprobe-engine_1.2.3"
-#     }
-#     r = client.post(
-#         f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
-#         headers=headers, 
-#         json={}
-#         )
-#     assert r.status_code == 200, r.json()
+    # Test with good headers
+    headers = {
+        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2 (ooniprobe-engine_1.2.3)"
+    }
 
-#     headers = {
-#         "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2"
-#     }
-#     r = client.post(
-#         f"/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
-#         headers=headers, 
-#         json={}
-#         )
-#     assert r.status_code == 422, r.json()
+    r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
+    r = client.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
+        headers=headers, 
+        json=SAMPLE_META
+        )
+    assert r.status_code == 200, r.json()
+
+    # Should be able to skip the header
+    r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
+    r = client.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
+        json=SAMPLE_META
+        )
+    assert r.status_code == 200, r.json()
+
+    # Bad header
+    headers = {
+        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2"
+    }
+    r = client.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
+        headers=headers, 
+        json=SAMPLE_META
+        )
+    assert r.status_code == 422, r.json()

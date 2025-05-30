@@ -7,7 +7,6 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 from oonirun import models
-from oonirun.dependencies import get_postgresql_session
 from sqlalchemy import create_engine
 
 SAMPLE_OONIRUN = {
