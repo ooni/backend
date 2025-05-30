@@ -417,7 +417,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     r = client_with_user_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     descs = r.json()["nettests"]
-    assert len(descs) == 2, r.json()
+    assert len(descs) == 3, r.json()
 
     ## List descriptors
     r = client_with_user_role.get(f"/api/v2/oonirun/links")
