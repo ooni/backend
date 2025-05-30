@@ -452,8 +452,6 @@ def get_nettests(
             assert clickhouse is not None, "Clickhouse is required to compute the dynamic lists"
             inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta, clickhouse)
 
-        from pprint import pprint
-        pprint(inputs)
         nettests.append(
             OONIRunLinkNettest(
                 targets_name=targets_name,
