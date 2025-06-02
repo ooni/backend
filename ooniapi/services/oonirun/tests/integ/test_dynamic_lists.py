@@ -29,6 +29,7 @@ def url_priorities(clickhouse_db):
     yield
     clickhouse_db.execute("TRUNCATE TABLE url_priorities")
 
+
 def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
     z = deepcopy(SAMPLE_OONIRUN)
     z['name'] = "Testing header parsing"
@@ -41,7 +42,8 @@ def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
     j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
     orlid = j['oonirun_link_id']
 
-    r = client_with_user_role.post(
+    # Get link
+    r = client.post(
         f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest",
         json=SAMPLE_META
     )
@@ -50,3 +52,29 @@ def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
 
     urls = j["nettests"][0]["inputs"]
     assert len(urls) > 1, urls
+
+def test_check_in_url_category_news(client, client_with_user_role):
+    """
+    Test that you can filter by category codes
+    """
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing header parsing"
+    z['nettests'][0]['targets_name'] = 'websites_list_prioritized'
+    z['nettests'][0]['inputs'] = None
+    z['nettests'][0]['inputs_extra'] = None
+    z['nettests'] = z['nettests'][:1]
+
+    # Create a link
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
+    orlid = j['oonirun_link_id']
+
+    # fetch the link
+    meta = deepcopy(SAMPLE_META)
+    meta['website_category_codes'] = ["NEWS"]
+    j = postj(client,f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    inputs = j["nettests"][0]["inputs"]
+    inputs_extra = j['nettests'][0]["inputs_extra"]
+    assert len(inputs), inputs
+    assert len(inputs) == len(inputs_extra)
+    for extra in inputs_extra:
+        assert extra["category_code"] == "NEWS"
