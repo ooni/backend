@@ -4,6 +4,8 @@ from pathlib import Path
 from oonirun.common.clickhouse_utils import insert_click
 import pytest
 from ..test_oonirun import SAMPLE_OONIRUN, SAMPLE_META
+from datetime import datetime, timedelta, UTC
+import random
 
 def postj(client, url, **kw):
     response = client.post(url, json=kw)
@@ -11,10 +13,13 @@ def postj(client, url, **kw):
     return response.json()
 
 @pytest.fixture(scope="module")
-def url_priorities(clickhouse_db):
-    path = Path("tests/fixtures/data")
+def fixtures_data_dir():
+    yield Path("tests/fixtures/data")
+
+@pytest.fixture(scope="module")
+def url_priorities(clickhouse_db, fixtures_data_dir):
     filename = "url_priorities_us.json"
-    file = Path(path, filename)
+    file = Path(fixtures_data_dir, filename)
 
     with file.open("r") as f:
         j = json.load(f)
@@ -27,6 +32,29 @@ def url_priorities(clickhouse_db):
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, j)
     yield
+    clickhouse_db.execute("TRUNCATE TABLE url_priorities")
+
+def generate_random_date_last_7_days() -> datetime:
+    start = datetime.now(tz=UTC) + timedelta(days=7)
+
+    # return a random date between 7 days ago and now
+    return start + timedelta(seconds=random.randrange(0, 3600 * 24 * 7))
+
+@pytest.fixture(scope="module")
+def measurements(clickhouse_db, fixtures_data_dir):
+    msmnts_dir = Path(fixtures_data_dir, "measurements.json")
+    with open(msmnts_dir, "r") as f: 
+        measurements = json.load(f)
+    
+    for ms in measurements:
+        date = generate_random_date_last_7_days()
+        ms['measurement_start_time'] = date
+        ms['test_start_time'] = date
+    
+    query = "INSERT INTO fastpath VALUES"
+    insert_click(clickhouse_db, query, measurements)
+
+    yield  
     clickhouse_db.execute("TRUNCATE TABLE url_priorities")
 
 
@@ -53,7 +81,7 @@ def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
     urls = j["nettests"][0]["inputs"]
     assert len(urls) > 1, urls
 
-def test_check_in_url_category_news(client, client_with_user_role):
+def test_check_in_url_category_news(client, client_with_user_role, url_priorities):
     """
     Test that you can filter by category codes
     """
@@ -78,3 +106,8 @@ def test_check_in_url_category_news(client, client_with_user_role):
     assert len(inputs) == len(inputs_extra)
     for extra in inputs_extra:
         assert extra["category_code"] == "NEWS"
+
+def test_priorization_with_measurements(client, client_with_user_role, url_priorities, measurements):
+    """
+    Test priorization including measurements
+    """
