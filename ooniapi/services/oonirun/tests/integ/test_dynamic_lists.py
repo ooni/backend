@@ -1,7 +1,7 @@
 from copy import deepcopy
 import json
 from pathlib import Path
-from oonirun.common.clickhouse_utils import insert_click, query_click
+from oonirun.common.clickhouse_utils import insert_click 
 import pytest
 from ..test_oonirun import SAMPLE_OONIRUN, SAMPLE_META
 from datetime import datetime, timedelta, UTC
@@ -150,3 +150,41 @@ def test_prioritization_with_measurements(client, client_with_user_role, url_pri
     assert len(inputs), inputs
     assert "twitter.com" in inputs[0], "Twitter should be the first one"
     assert "facebook.com" in inputs[-1], "Facebook should be the last one"
+
+@pytest.fixture
+def super_prioritized_website(clickhouse_db): 
+    values = {
+        "category_code": "*",
+        "cc": "*",
+        "domain": "ooni.org",
+        "priority": 99999,
+        "url": "*",
+        "sign" : 1
+    } 
+    query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
+    insert_click(clickhouse_db, query, [values])
+    yield 
+    clickhouse_db.execute("DELETE FROM url_priorities WHERE domain='www.ooni.com'")
+
+
+    
+def test_priorities_basic(client, client_with_user_role, measurements, url_priorities, super_prioritized_website):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z['name'] = "Testing header parsing"
+    z['nettests'][0]['targets_name'] = 'websites_list_prioritized'
+    z['nettests'][0]['inputs'] = None
+    z['nettests'][0]['inputs_extra'] = None
+    z['nettests'] = z['nettests'][:1]
+    
+    # Create a link
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
+    orlid = j['oonirun_link_id']
+
+    meta = deepcopy(SAMPLE_META)
+    meta['probe_cc'] = 'ES'
+    j = postj(client,f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    inputs = j["nettests"][0]["inputs"]
+    assert len(inputs), inputs
+    from pprint import pprint
+    pprint(inputs)
+    assert "ooni.org" in inputs[0], "Ooni should be the first one"

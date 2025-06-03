@@ -17,6 +17,7 @@ INSERT INTO citizenlab VALUES ('facebook.com','https://facebook.com/watch','jo',
 INSERT INTO citizenlab VALUES ('twitter.com','http://twitter.com/ghonim','kw','POLR');
 INSERT INTO citizenlab VALUES ('twitter.com','http://twitter.com/ghonim','so','POLR');
 INSERT INTO citizenlab VALUES ('twitter.com','https://twitter.com/','ZZ','GRP');
+INSERT INTO citizenlab VALUES ('ooni.org','https://ooni.org/','ZZ','GRP');
 
 -- get_measurement_meta integ tests
 INSERT INTO jsonl (report_id, input, s3path, linenum) VALUES ('20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3', 'https://www.backtrack-linux.org/', 'raw/20210709/00/MY/webconnectivity/2021070900_MY_webconnectivity.n0.2.jsonl.gz', 35)
