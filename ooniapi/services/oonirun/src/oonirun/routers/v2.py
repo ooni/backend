@@ -431,8 +431,7 @@ def make_nettest_websites_list_prioritized(meta : OonirunMeta, clickhouse : Clic
 
 
 def get_nettests(
-    oonirun_link: models.OONIRunLink, revision: Optional[int], meta : Optional[OonirunMeta] = None, clickhouse : Optional[Clickhouse] = None
-) -> Tuple[List[OONIRunLinkNettest], datetime]:
+    oonirun_link: models.OONIRunLink, revision: Optional[int]) -> Tuple[List[OONIRunLinkNettest], datetime]:
     """Computes a list of nettests related to the given oonirun link
 
     The `meta` parameter is required for the dynamic tests list calculation. If not provided, 
@@ -448,9 +447,6 @@ def get_nettests(
         date_created = nt.date_created
         inputs, inputs_extra = nt.inputs, nt.inputs_extra
         targets_name = nt.targets_name
-        if nt.targets_name is not None and meta is not None: 
-            assert clickhouse is not None, "Clickhouse is required to compute the dynamic lists"
-            inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta, clickhouse)
 
         nettests.append(
             OONIRunLinkNettest(
@@ -465,6 +461,13 @@ def get_nettests(
         )
     return nettests, date_created
 
+def compute_dynamic_test_lists(clickhouse : Clickhouse, nettest : OONIRunLinkNettest, meta : OonirunMeta):
+    if nettest.targets_name is None: 
+        return # No need of dynamic lists
+
+    inputs, inputs_extra = make_test_lists_from_targets_name(nettest.targets_name, meta, clickhouse)
+    nettest.inputs = inputs
+    nettest.inputs_extra = inputs_extra
 
 def make_oonirun_link(
     db: Session,
@@ -489,7 +492,7 @@ def make_oonirun_link(
 
     assert isinstance(revision, int)
 
-    nettests, date_created = get_nettests(res, revision, meta)
+    nettests, date_created = get_nettests(res, revision)
     return OONIRunLink(
         oonirun_link_id=res.oonirun_link_id,
         name=res.name,
@@ -603,7 +606,11 @@ def get_oonirun_link_engine_descriptor(
         revision = latest_revision
 
     assert isinstance(revision, int)
-    nettests, date_created = get_nettests(res, revision, meta, clickhouse)
+
+    nettests, date_created = get_nettests(res, revision)
+    for nt in nettests:
+        compute_dynamic_test_lists(clickhouse, nt, meta)
+
     return OONIRunLinkEngineDescriptor(
         nettests=nettests,
         date_created=date_created,
