@@ -185,6 +185,4 @@ def test_priorities_basic(client, client_with_user_role, measurements, url_prior
     j = postj(client,f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
     inputs = j["nettests"][0]["inputs"]
     assert len(inputs), inputs
-    from pprint import pprint
-    pprint(inputs)
     assert "ooni.org" in inputs[0], "Ooni should be the first one"
