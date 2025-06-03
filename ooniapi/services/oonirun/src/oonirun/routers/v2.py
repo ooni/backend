@@ -544,27 +544,7 @@ def get_oonirun_link_revisions(
         revisions.append(str(r))
     return OONIRunLinkRevisions(revisions=revisions)
 
-class XOoniNetworkInfo(BaseModel):
-    probe_asn : str
-    probe_cc : str
-    network_type : str
-
-    @staticmethod
-    def get_header_pattern() -> str:
-        return r'^([a-zA-Z0-9]+),([a-zA-Z0-9]+) \(([a-zA-Z0-9]+)\)$'
-
-    @classmethod
-    def from_header(cls, header : str) -> Self:
-        pattern = cls.get_header_pattern()
-        matched = re.match(pattern, header)
-        
-        assert matched is not None, "Expected format: <probe_asn>,<probe_cc> (<network_type>), eg AS1234,IT (wifi)"
-
-        probe_asn, probe_cc, network_type = matched.groups()
-        return cls(probe_asn=probe_asn, probe_cc=probe_cc, network_type=network_type)
-
-
-USER_AGENT_PATTERN = r"^([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+) \(([a-zA-Z0-9\ ]+)\) ([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_\.]+) \(([a-zA-Z0-9\-\_\.]+)\)$"
+USER_AGENT_PATTERN = r"^([a-zA-Z0-9\-\_]+),([a-zA-Z0-9\-\_\.]+),([a-zA-Z0-9\ ]+),([a-zA-Z0-9\-\_]+),([a-zA-Z0-9\-\_\.]+),([a-zA-Z0-9\-\_\.]+)$"
 @router.post(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
     tags=["oonirun"],
@@ -588,8 +568,8 @@ def get_oonirun_link_engine_descriptor(
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
             pattern=USER_AGENT_PATTERN,
-            error_message = "Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)",
-            description="Expected format: <software_name>/<software_version> (<platform>) <engine_name>/<engine_version> (<engine_version_full>)"
+            error_message = "Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",
+            description="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>"
         ),
     ] = None,
     credentials : Annotated[Optional[bytes], Header(description="base64 encoded OONI anonymous credentials")] = None,

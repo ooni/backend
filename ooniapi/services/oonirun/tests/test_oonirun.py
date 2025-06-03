@@ -825,7 +825,7 @@ def test_x_user_agent_header_parsing(client_with_user_role, client):
 
     # Test with good headers
     headers = {
-        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2 (ooniprobe-engine_1.2.3)"
+        "UserAgent" : "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2,ooniprobe-engine_1.2.3"
     }
 
     r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
@@ -846,7 +846,7 @@ def test_x_user_agent_header_parsing(client_with_user_role, client):
 
     # Bad header
     headers = {
-        "UserAgent" : "ooniprobe-android-unattended/3.8.2 (android) ooniprobe-engine/3.17.2"
+        "UserAgent" : "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2"
     }
     r = client.post(
         f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
