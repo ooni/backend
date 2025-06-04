@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from typing_extensions import Annotated, Self
 import logging
-import re
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -70,9 +69,9 @@ class OONIRunLinkNettest(BaseModel):
         default="", title="name of the ooni nettest", min_length=2, max_length=100
     )
     inputs: Optional[List[str]] = Field(
-        default=[], title="list of input dictionaries for the nettest"
+        default=None, title="list of input dictionaries for the nettest"
     )
-    # TODO(luis): Options and backend_options not in the new spec. Should be removed?
+    # TODO(luis): Options not in the new spec. Should be removed?
     options: Dict = Field(default={}, title="options for the nettest")
     is_background_run_enabled_default: bool = Field(
         default=False,
@@ -601,7 +600,7 @@ def get_oonirun_link_engine_descriptor(
     clickhouse: DependsClickhouseClient,
     meta: OonirunMeta,
     useragent: Annotated[
-        Optional[str],  
+        Optional[str],
         Header(
             pattern=USER_AGENT_PATTERN,
             error_message="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",

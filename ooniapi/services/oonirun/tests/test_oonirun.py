@@ -741,6 +741,23 @@ def test_inputs_and_targets_name(client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
 
+    # Targets with inputs = [] still an error
+    z["nettests"] = [
+        {
+            "targets_name": "example_name",
+            "inputs_extra": [],
+            "inputs": [],
+            "options": {
+                "HTTP3Enabled": True,
+            },
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, r.json()
+
 
 def test_creation_with_targets_name(client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
