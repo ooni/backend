@@ -30,9 +30,6 @@ SAMPLE_OONIRUN = {
             ],
             "targets_name": None,
             "inputs_extra": None,
-            "options": {
-                "HTTP3Enabled": True,
-            },
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -41,7 +38,6 @@ SAMPLE_OONIRUN = {
             "inputs": [],
             "targets_name": None,
             "inputs_extra": None,
-            "options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
@@ -50,7 +46,6 @@ SAMPLE_OONIRUN = {
             "inputs": None,
             "targets_name": "websites_list_prioritized",
             "inputs_extra": None,
-            "options": {},
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
@@ -694,9 +689,6 @@ def test_inputs_and_targets_name(client_with_user_role):
             "inputs": None,
             "targets_name": "example_name",
             "inputs_extra": None,
-            "options": {
-                "HTTP3Enabled": True,
-            },
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -714,9 +706,6 @@ def test_inputs_and_targets_name(client_with_user_role):
             ],
             "targets_name": "example_name",
             "inputs_extra": None,
-            "options": {
-                "HTTP3Enabled": True,
-            },
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -730,9 +719,6 @@ def test_inputs_and_targets_name(client_with_user_role):
         {
             "targets_name": "example_name",
             "inputs_extra": [{}, {}],
-            "options": {
-                "HTTP3Enabled": True,
-            },
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
@@ -747,9 +733,6 @@ def test_inputs_and_targets_name(client_with_user_role):
             "targets_name": "example_name",
             "inputs_extra": [],
             "inputs": [],
-            "options": {
-                "HTTP3Enabled": True,
-            },
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
