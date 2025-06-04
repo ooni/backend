@@ -733,10 +733,6 @@ def list_oonirun_links(
         Optional[bool],
         Query(description="List also expired descriptors"),
     ] = None,
-    only_latest: Annotated[
-        Optional[bool],
-        Query(description="List only descriptors in the latest revision"),
-    ] = True,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ) -> OONIRunLinkList:
@@ -758,7 +754,7 @@ def list_oonirun_links(
         ), "nettests must be sorted by revision"
 
         # if revision is None, it will get all the nettests, including from old revisions
-        nettests, _ = get_nettests(row, revision if only_latest else None)
+        nettests, _ = get_nettests(row, revision)
 
         oonirun_link = OONIRunLink(
             oonirun_link_id=row.oonirun_link_id,
