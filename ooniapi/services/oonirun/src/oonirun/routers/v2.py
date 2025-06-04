@@ -453,9 +453,6 @@ def make_nettest_websites_list_prioritized(
 def get_nettests(
     oonirun_link: models.OONIRunLink,
     revision: Optional[int],
-    compute_dynamic_lists: bool = False,
-    meta: Optional[OonirunMeta] = None,
-    clickhouse: Optional[Clickhouse] = None,
 ) -> Tuple[List[OONIRunLinkNettest], datetime]:
     """Computes a list of nettests related to the given oonirun link
 
@@ -472,14 +469,6 @@ def get_nettests(
         date_created = nt.date_created
         inputs, inputs_extra = nt.inputs, nt.inputs_extra
         targets_name = nt.targets_name
-        if compute_dynamic_lists and nt.targets_name is not None:
-            assert meta is not None, "OoniMeta is required to compute dynamic lists"
-            assert (
-                clickhouse is not None
-            ), "Clickhouse is required to compute the dynamic lists"
-            inputs, inputs_extra = make_test_lists_from_targets_name(
-                nt.targets_name, meta, clickhouse
-            )
 
         nettests.append(
             OONIRunLinkNettest(
@@ -493,12 +482,21 @@ def get_nettests(
         )
     return nettests, date_created
 
+def populate_dynamic_lists(nettest : OONIRunLinkNettest, meta : OonirunMeta, clickhouse : Clickhouse):
+
+    if nettest.targets_name is None:
+        return
+
+    inputs, inputs_extra = make_test_lists_from_targets_name(
+        nettest.targets_name, meta, clickhouse
+    )
+    nettest.inputs = inputs
+    nettest.inputs_extra = inputs_extra
 
 def make_oonirun_link(
     db: Session,
     oonirun_link_id: str,
     account_id: Optional[str],
-    meta: Optional[OonirunMeta] = None,
     revision: Optional[int] = None,
 ):
     q = db.query(models.OONIRunLink).filter(
@@ -517,7 +515,7 @@ def make_oonirun_link(
 
     assert isinstance(revision, int)
 
-    nettests, date_created = get_nettests(res, revision, meta)
+    nettests, date_created = get_nettests(res, revision)
     return OONIRunLink(
         oonirun_link_id=res.oonirun_link_id,
         name=res.name,
@@ -640,7 +638,11 @@ def get_oonirun_link_engine_descriptor(
         revision = latest_revision
 
     assert isinstance(revision, int)
-    nettests, date_created = get_nettests(res, revision, True, meta, clickhouse)
+
+    nettests, date_created = get_nettests(res, revision)
+    for nt in nettests:
+        populate_dynamic_lists(nt, meta, clickhouse)
+
     return OONIRunLinkEngineDescriptor(
         nettests=nettests,
         date_created=date_created,
