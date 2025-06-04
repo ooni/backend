@@ -608,7 +608,7 @@ def get_oonirun_link_engine_descriptor(
             description="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",
         ),
     ] = None,
-    credentials: Annotated[
+    x_ooni_credentials: Annotated[
         Optional[bytes], Header(description="base64 encoded OONI anonymous credentials")
     ] = None,
 ):
