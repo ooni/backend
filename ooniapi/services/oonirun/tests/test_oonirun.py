@@ -836,10 +836,7 @@ def test_dynamic_test_lists_calculation(client_with_user_role):
     j = r.json()
     assert j["nettests"][0]["targets_name"] == "websites_list_prioritized"
 
-    # TODO(luis) Finish this test
 
-
-# TODO(luis) finish this test for checking the parsing of user agent headers
 def test_x_user_agent_header_parsing(client_with_user_role, client):
     z = deepcopy(SAMPLE_OONIRUN)
     z["name"] = "Testing header parsing"
