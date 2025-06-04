@@ -458,6 +458,7 @@ def make_nettest_websites_list_prioritized(
 def get_nettests(
     oonirun_link: models.OONIRunLink,
     revision: Optional[int],
+    compute_dynamic_lists: bool = False,
     meta: Optional[OonirunMeta] = None,
     clickhouse: Optional[Clickhouse] = None,
 ) -> Tuple[List[OONIRunLinkNettest], datetime]:
@@ -476,7 +477,8 @@ def get_nettests(
         date_created = nt.date_created
         inputs, inputs_extra = nt.inputs, nt.inputs_extra
         targets_name = nt.targets_name
-        if nt.targets_name is not None and meta is not None:
+        if compute_dynamic_lists and nt.targets_name is not None:
+            assert meta is not None, "OoniMeta is required to compute dynamic lists"
             assert (
                 clickhouse is not None
             ), "Clickhouse is required to compute the dynamic lists"
@@ -644,7 +646,7 @@ def get_oonirun_link_engine_descriptor(
         revision = latest_revision
 
     assert isinstance(revision, int)
-    nettests, date_created = get_nettests(res, revision, meta, clickhouse)
+    nettests, date_created = get_nettests(res, revision, True, meta, clickhouse)
     return OONIRunLinkEngineDescriptor(
         nettests=nettests,
         date_created=date_created,
