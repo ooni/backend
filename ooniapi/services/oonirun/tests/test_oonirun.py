@@ -79,13 +79,14 @@ EXPECTED_OONIRUN_LINK_PUBLIC_KEYS = [
 ]
 
 SAMPLE_META = {
-    "run_type" : "timed",
-    "is_charging" : True,
-    "probe_asn" : "AS1234",
-    "probe_cc" : "VE",
-    "network_type" : "wifi",
-    "website_category_codes" : []
+    "run_type": "timed",
+    "is_charging": True,
+    "probe_asn": "AS1234",
+    "probe_cc": "VE",
+    "network_type": "wifi",
+    "website_category_codes": [],
 }
+
 
 def test_get_version(client):
     r = client.get("/version")
@@ -577,20 +578,23 @@ def test_oonirun_revisions(client, client_with_user_role):
     ## Fetch nettests for latest
     r = client.post(
         f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest",
-        json=SAMPLE_META
+        json=SAMPLE_META,
     )
     assert r.status_code == 200, r.json()
     j_latest = r.json()
     assert j_latest["revision"] == "3", "revision is 3"
-    
+
     # The engine-descriptor returns a list along with targets name on reading
-    lastest_nettests[2]['inputs'] = []
-    lastest_nettests[2]['inputs_extra'] = []
+    lastest_nettests[2]["inputs"] = []
+    lastest_nettests[2]["inputs_extra"] = []
     assert j_latest["nettests"] == lastest_nettests, "nettests are the same"
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
     ## Should match latest
-    r = client.post(f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json=SAMPLE_META)
+    r = client.post(
+        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3",
+        json=SAMPLE_META,
+    )
     assert j_latest == r.json()
 
     ## Fetch invalid revision number
@@ -606,7 +610,9 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 404, r.json()
 
     ## Get not-existing engine descriptor
-    r = client.post(f"/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META)
+    r = client.post(
+        f"/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META
+    )
     j = r.json()
     assert r.status_code == 404, r.json()
 
@@ -621,10 +627,12 @@ def test_inputs_extra_length(client, client_with_user_role):
             "provider": "riseupvpn",
         }
     ]
-    z['nettests'] = nettests
+    z["nettests"] = nettests
 
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-    assert r.status_code == 422, "Should fail when inputs_extra != None and len(inputs_extra) != len(inputs)"
+    assert (
+        r.status_code == 422
+    ), "Should fail when inputs_extra != None and len(inputs_extra) != len(inputs)"
 
     nettests[0]["inputs_extra"] = [
         {
@@ -632,85 +640,91 @@ def test_inputs_extra_length(client, client_with_user_role):
         },
         {
             "provider": "riseupvpn",
-        }
+        },
     ]
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, "Appropiate inputs extra size, should pass"
 
     nettests[0].pop("inputs_extra")
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-    assert r.status_code == 200, "No checks should be performed when inputs_extra is None"
+    assert (
+        r.status_code == 200
+    ), "No checks should be performed when inputs_extra is None"
+
 
 def test_is_latest_list(client, client_with_user_role):
     """
     Test that the only_latest argument in /links filters properly
     """
 
-    # Create link 
-    z =  deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing list filtering"
+    # Create link
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing list filtering"
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
 
     # Now update it
-    id = j['oonirun_link_id']
-    z['nettests'][0]['inputs'].append("https://ooni.io/")
+    id = j["oonirun_link_id"]
+    z["nettests"][0]["inputs"].append("https://ooni.io/")
     r = client_with_user_role.put(f"/api/v2/oonirun/links/{id}", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
-
 
     # Check filtering
     # Only last revision by default
     r = client.get("/api/v2/oonirun/links")
     assert r.status_code == 200
     j = r.json()
-    nts = j['oonirun_links'][0]['nettests']
+    nts = j["oonirun_links"][0]["nettests"]
     assert len(nts) == 3, "There are only 3 nettests in the last revision"
 
     # All revisions
-    r = client.get("/api/v2/oonirun/links", params = {"only_latest" : False})
+    r = client.get("/api/v2/oonirun/links", params={"only_latest": False})
     assert r.status_code == 200
     j = r.json()
-    nts = j['oonirun_links'][0]['nettests']
+    nts = j["oonirun_links"][0]["nettests"]
     assert len(nts) == 6, "There are 6 nettests between all revisions"
+
 
 def test_link_revision_args(client, client_with_user_role):
     # Check args parsing for oonirun engine-descriptor
     z = deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing descriptor revision"
+    z["name"] = "Testing descriptor revision"
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
-    id = j['oonirun_link_id']
+    id = j["oonirun_link_id"]
 
     # Try with good arguments
-    gs = ['timed', 'manual']
+    gs = ["timed", "manual"]
     for good in gs:
-        r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=SAMPLE_META)
+        r = client.post(
+            f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=SAMPLE_META
+        )
         assert r.status_code == 200, r.json()
 
     # Try with bad arguments
     bm = deepcopy(SAMPLE_META)
-    bm['run_type'] = "bad"
+    bm["run_type"] = "bad"
     r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=bm)
     assert r.status_code == 422, r.json()
 
+
 def test_inputs_and_targets_name(client_with_user_role):
     """
-    Test that you can't specify targets_name and inputs in the same request 
+    Test that you can't specify targets_name and inputs in the same request
     """
 
     z = deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing no targets and inputs at the same time"
+    z["name"] = "Testing no targets and inputs at the same time"
 
-    # Only inputs = OK 
+    # Only inputs = OK
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
 
     # Only targets = OK
-    z['nettests'] = [
+    z["nettests"] = [
         {
             "inputs": None,
             "targets_name": "example_name",
@@ -727,7 +741,7 @@ def test_inputs_and_targets_name(client_with_user_role):
     assert r.status_code == 200, r.json()
 
     # Both targets and input = error
-    z['nettests'] = [
+    z["nettests"] = [
         {
             "inputs": [
                 "https://example.com/",
@@ -747,7 +761,7 @@ def test_inputs_and_targets_name(client_with_user_role):
     assert r.status_code == 422, r.json()
 
     # Both targets and inputs_extra = error
-    z['nettests'] = [
+    z["nettests"] = [
         {
             "targets_name": "example_name",
             "inputs_extra": [{}, {}],
@@ -762,12 +776,13 @@ def test_inputs_and_targets_name(client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
 
+
 def test_creation_with_targets_name(client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing dynamic test lists calculation"
-    z['nettests'][0]['inputs'] = None
-    z['nettests'][0]['targets_name'] = "websites_list_prioritized"
-    z['nettests'] = z['nettests'][:1]
+    z["name"] = "Testing dynamic test lists calculation"
+    z["nettests"][0]["inputs"] = None
+    z["nettests"][0]["targets_name"] = "websites_list_prioritized"
+    z["nettests"] = z["nettests"][:1]
 
     # Create
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
@@ -780,11 +795,15 @@ def test_creation_with_targets_name(client_with_user_role):
     j = r.json()
 
     # Does it have the targets name?
-    assert j['nettests'][0]['targets_name'] == "websites_list_prioritized", "Missing targets_name"
+    assert (
+        j["nettests"][0]["targets_name"] == "websites_list_prioritized"
+    ), "Missing targets_name"
 
     # now test that you can edit
-    z['nettests'][0]['targets_name'] = "new_value"
-    r = client_with_user_role.put(f"/api/v2/oonirun/links/{j['oonirun_link_id']}", json=z)
+    z["nettests"][0]["targets_name"] = "new_value"
+    r = client_with_user_role.put(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}", json=z
+    )
     assert r.status_code == 200, r.json()
 
     # Retrieve again
@@ -792,32 +811,38 @@ def test_creation_with_targets_name(client_with_user_role):
     assert r.status_code == 200, r.json()
     j = r.json()
 
-    assert j['nettests'][0]['targets_name'] == 'new_value', "Value of nettest should be changed by now"
+    assert (
+        j["nettests"][0]["targets_name"] == "new_value"
+    ), "Value of nettest should be changed by now"
+
 
 def test_dynamic_test_lists_calculation(client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing dynamic test lists calculation"
-    z['nettests'][0]['inputs'] = None
-    z['nettests'][0]['targets_name'] = "websites_list_prioritized"
-    z['nettests'] = z['nettests'][:1]
+    z["name"] = "Testing dynamic test lists calculation"
+    z["nettests"][0]["inputs"] = None
+    z["nettests"][0]["targets_name"] = "websites_list_prioritized"
+    z["nettests"] = z["nettests"][:1]
 
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
 
-    r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
     assert r.status_code == 200, r.json()
 
     j = r.json()
-    assert j['nettests'][0]['targets_name'] == "websites_list_prioritized" 
+    assert j["nettests"][0]["targets_name"] == "websites_list_prioritized"
 
     # TODO(luis) Finish this test
 
 
-# TODO(luis) finish this test for checking the parsing of user agent headers 
+# TODO(luis) finish this test for checking the parsing of user agent headers
 def test_x_user_agent_header_parsing(client_with_user_role, client):
     z = deepcopy(SAMPLE_OONIRUN)
-    z['name'] = "Testing header parsing"
+    z["name"] = "Testing header parsing"
 
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
@@ -825,32 +850,38 @@ def test_x_user_agent_header_parsing(client_with_user_role, client):
 
     # Test with good headers
     headers = {
-        "UserAgent" : "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2,ooniprobe-engine_1.2.3"
+        "UserAgent": "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2,ooniprobe-engine_1.2.3"
     }
 
-    r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
     r = client.post(
-        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
-        headers=headers, 
-        json=SAMPLE_META
-        )
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        headers=headers,
+        json=SAMPLE_META,
+    )
     assert r.status_code == 200, r.json()
 
     # Should be able to skip the header
-    r = client_with_user_role.post(f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", json=SAMPLE_META)
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
     r = client.post(
-        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
-        json=SAMPLE_META
-        )
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
     assert r.status_code == 200, r.json()
 
     # Bad header
     headers = {
-        "UserAgent" : "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2"
+        "UserAgent": "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2"
     }
     r = client.post(
-        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest", 
-        headers=headers, 
-        json=SAMPLE_META
-        )
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        headers=headers,
+        json=SAMPLE_META,
+    )
     assert r.status_code == 422, r.json()

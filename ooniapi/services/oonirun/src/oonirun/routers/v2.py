@@ -37,16 +37,21 @@ router = APIRouter()
 def utcnow_seconds():
     return datetime.now(timezone.utc).replace(microsecond=0)
 
+
 class OonirunMeta(BaseModel):
-    run_type : str = Field(description="Run type", pattern="^(timed|manual)$")
-    is_charging : bool = Field(description="If the probe is charging")
-    probe_asn : str = Field(pattern=r"^([a-zA-Z0-9]+)$")
-    probe_cc : str = Field(description="Country code. Ex: VE")
-    network_type : str = Field(description="Ex: wifi")
-    website_category_codes : List[str] = Field(description="List of category codes that user has chosen to test (eg. NEWS,HUMR)", default=[])
+    run_type: str = Field(description="Run type", pattern="^(timed|manual)$")
+    is_charging: bool = Field(description="If the probe is charging")
+    probe_asn: str = Field(pattern=r"^([a-zA-Z0-9]+)$")
+    probe_cc: str = Field(description="Country code. Ex: VE")
+    network_type: str = Field(description="Ex: wifi")
+    website_category_codes: List[str] = Field(
+        description="List of category codes that user has chosen to test (eg. NEWS,HUMR)",
+        default=[],
+    )
 
     def probe_asn_int(self) -> int:
         return int(self.probe_asn.replace("AS", ""))
+
 
 class OONIRunLinkNettest(BaseModel):
     test_name: str = Field(
@@ -78,7 +83,9 @@ class OONIRunLinkNettest(BaseModel):
 
     @model_validator(mode="after")
     def validate_inputs_extra(self) -> Self:
-        if self.inputs_extra is not None and (self.inputs is None or len(self.inputs) != len(self.inputs_extra)):
+        if self.inputs_extra is not None and (
+            self.inputs is None or len(self.inputs) != len(self.inputs_extra)
+        ):
             raise ValueError(
                 "When provided, inputs_extra should be the same length as inputs"
             )
@@ -88,11 +95,13 @@ class OONIRunLinkNettest(BaseModel):
         """
         Check that you are not providing targets_name and inputs-inputs_extra in the same request
         """
-        if self.targets_name is not None and (self.inputs is not None or self.inputs_extra is not None):
+        if self.targets_name is not None and (
+            self.inputs is not None or self.inputs_extra is not None
+        ):
             raise ValueError(
                 "When targets_name is provided, you can't provide inputs or inputs_extra"
             )
-        
+
         return self
 
 
@@ -209,15 +218,12 @@ def create_oonirun_link(
             status_code=400,
             detail="email_address must match the email address of the user who created the oonirun link",
         )
-    
+
     for nt in create_request.nettests:
-        try: 
+        try:
             nt.validate_no_inputs_and_targets_name()
         except ValueError as e:
-            raise HTTPException(
-                status_code = 422, 
-                detail = {"error": str(e)}
-            )
+            raise HTTPException(status_code=422, detail={"error": str(e)})
 
     now = utcnow_seconds()
 
@@ -295,13 +301,10 @@ def edit_oonirun_link(
     account_id = token["account_id"]
 
     for nt in edit_request.nettests:
-        try: 
+        try:
             nt.validate_no_inputs_and_targets_name()
         except ValueError as e:
-            raise HTTPException(
-                status_code = 422, 
-                detail = {"error": str(e)}
-            )
+            raise HTTPException(status_code=422, detail={"error": str(e)})
 
     now = utcnow_seconds()
 
@@ -397,15 +400,20 @@ def edit_oonirun_link(
         is_mine=oonirun_link.creator_account_id == account_id,
     )
 
-def make_test_lists_from_targets_name(targets_name : str, meta : OonirunMeta, clickhouse : Clickhouse) -> Tuple[List[str], List[Dict[str, Any]]]:
+
+def make_test_lists_from_targets_name(
+    targets_name: str, meta: OonirunMeta, clickhouse: Clickhouse
+) -> Tuple[List[str], List[Dict[str, Any]]]:
     if targets_name == "websites_list_prioritized":
         return make_nettest_websites_list_prioritized(meta, clickhouse)
-    
+
     raise ValueError("Unknown target name: " + targets_name)
 
 
-def make_nettest_websites_list_prioritized(meta : OonirunMeta, clickhouse : Clickhouse) -> Tuple[List[str], List[Dict[str, Any]]]:
-    """Generates an inputs list using prio. 
+def make_nettest_websites_list_prioritized(
+    meta: OonirunMeta, clickhouse: Clickhouse
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Generates an inputs list using prio.
     Returns:
         Tuple[List[str], List[Dict[str, Any]]]: (Inputs, InputsExtra)
     """
@@ -416,27 +424,36 @@ def make_nettest_websites_list_prioritized(meta : OonirunMeta, clickhouse : Clic
         url_limit = 100
     else:
         url_limit = 20
-    tests, _1, _2 = generate_test_list(clickhouse, meta.probe_cc, meta.website_category_codes, meta.probe_asn_int(), url_limit, False)
+    tests, _1, _2 = generate_test_list(
+        clickhouse,
+        meta.probe_cc,
+        meta.website_category_codes,
+        meta.probe_asn_int(),
+        url_limit,
+        False,
+    )
 
     inputs = []
     inputs_extra = []
     for test in tests:
-        url = test['url']
-        del test['url']
+        url = test["url"]
+        del test["url"]
         inputs.append(url)
         inputs_extra.append(test)
-
 
     return inputs, inputs_extra
 
 
 def get_nettests(
-    oonirun_link: models.OONIRunLink, revision: Optional[int], meta : Optional[OonirunMeta] = None, clickhouse : Optional[Clickhouse] = None
+    oonirun_link: models.OONIRunLink,
+    revision: Optional[int],
+    meta: Optional[OonirunMeta] = None,
+    clickhouse: Optional[Clickhouse] = None,
 ) -> Tuple[List[OONIRunLinkNettest], datetime]:
     """Computes a list of nettests related to the given oonirun link
 
-    The `meta` parameter is required for the dynamic tests list calculation. If not provided, 
-    it will skip it.  
+    The `meta` parameter is required for the dynamic tests list calculation. If not provided,
+    it will skip it.
 
     """
 
@@ -448,9 +465,13 @@ def get_nettests(
         date_created = nt.date_created
         inputs, inputs_extra = nt.inputs, nt.inputs_extra
         targets_name = nt.targets_name
-        if nt.targets_name is not None and meta is not None: 
-            assert clickhouse is not None, "Clickhouse is required to compute the dynamic lists"
-            inputs, inputs_extra = make_test_lists_from_targets_name(nt.targets_name, meta, clickhouse)
+        if nt.targets_name is not None and meta is not None:
+            assert (
+                clickhouse is not None
+            ), "Clickhouse is required to compute the dynamic lists"
+            inputs, inputs_extra = make_test_lists_from_targets_name(
+                nt.targets_name, meta, clickhouse
+            )
 
         nettests.append(
             OONIRunLinkNettest(
@@ -470,7 +491,7 @@ def make_oonirun_link(
     db: Session,
     oonirun_link_id: str,
     account_id: Optional[str],
-    meta : Optional[OonirunMeta] = None,
+    meta: Optional[OonirunMeta] = None,
     revision: Optional[int] = None,
 ):
     q = db.query(models.OONIRunLink).filter(
@@ -544,7 +565,10 @@ def get_oonirun_link_revisions(
         revisions.append(str(r))
     return OONIRunLinkRevisions(revisions=revisions)
 
+
 USER_AGENT_PATTERN = r"^([a-zA-Z0-9\-\_]+),([a-zA-Z0-9\-\_\.]+),([a-zA-Z0-9\ ]+),([a-zA-Z0-9\-\_]+),([a-zA-Z0-9\-\_\.]+),([a-zA-Z0-9\-\_\.]+)$"
+
+
 @router.post(
     "/v2/oonirun/links/{oonirun_link_id}/engine-descriptor/{revision_number}",
     tags=["oonirun"],
@@ -562,18 +586,20 @@ def get_oonirun_link_engine_descriptor(
         ),
     ],
     db: DependsPostgresSession,
-    clickhouse: DependsClickhouseClient, 
-    meta : OonirunMeta,
+    clickhouse: DependsClickhouseClient,
+    meta: OonirunMeta,
     useragent: Annotated[
         Optional[str],  # TODO Marked as optional to avoid breaking old probes
         Header(
             pattern=USER_AGENT_PATTERN,
-            error_message = "Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",
-            description="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>"
+            error_message="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",
+            description="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",
         ),
     ] = None,
-    credentials : Annotated[Optional[bytes], Header(description="base64 encoded OONI anonymous credentials")] = None,
-    ):
+    credentials: Annotated[
+        Optional[bytes], Header(description="base64 encoded OONI anonymous credentials")
+    ] = None,
+):
     """Fetch an OONI Run link by specifying the revision number"""
     try:
         revision = int(revision_number)
@@ -581,12 +607,19 @@ def get_oonirun_link_engine_descriptor(
         # We can assert it, since we are doing validation
         assert revision_number == "latest"
         revision = None
-    
+
     if useragent is not None:
         result = re.match(USER_AGENT_PATTERN, useragent)
         # Validated by fastapi
         assert result is not None
-        software_name, software_version, platform, engine_name, engine_version, engine_version_full = result.groups()
+        (
+            software_name,
+            software_version,
+            platform,
+            engine_name,
+            engine_version,
+            engine_version_full,
+        ) = result.groups()
         # TODO Log this metadata
 
     q = db.query(models.OONIRunLink).filter(

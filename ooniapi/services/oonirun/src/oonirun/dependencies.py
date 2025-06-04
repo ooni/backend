@@ -13,6 +13,7 @@ from .common.dependencies import get_settings
 
 DependsSettings = Annotated[Settings, Depends(get_settings)]
 
+
 def get_postgresql_session(settings: DependsSettings):
     engine = create_engine(settings.postgresql_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -23,7 +24,9 @@ def get_postgresql_session(settings: DependsSettings):
     finally:
         db.close()
 
+
 DependsPostgresSession = Annotated[Session, Depends(get_postgresql_session)]
+
 
 def get_clickhouse_session(settings: DependsSettings):
     db = Clickhouse.from_url(settings.clickhouse_url)
@@ -31,5 +34,6 @@ def get_clickhouse_session(settings: DependsSettings):
         yield db
     finally:
         db.disconnect()
+
 
 DependsClickhouseClient = Annotated[Clickhouse, Depends(get_clickhouse_session)]

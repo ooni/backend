@@ -42,7 +42,7 @@ def alembic_migration(postgresql):
 def client_with_bad_settings():
     app.dependency_overrides[get_settings] = make_override_get_settings(
         postgresql_url="postgresql://bad:bad@localhost/bad",
-        clickhouse_url="clickhouse://bad:bad@localhost/bad"
+        clickhouse_url="clickhouse://bad:bad@localhost/bad",
     )
 
     client = TestClient(app)
@@ -55,7 +55,7 @@ def client(alembic_migration, clickhouse_server):
         postgresql_url=alembic_migration,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
-        clickhouse_url = clickhouse_server
+        clickhouse_url=clickhouse_server,
     )
 
     client = TestClient(app)
@@ -96,6 +96,7 @@ def client_with_admin_role(client):
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
 
+
 def is_clickhouse_running(url):
     try:
         with ClickhouseClient.from_url(url) as client:
@@ -103,6 +104,7 @@ def is_clickhouse_running(url):
         return True
     except Exception:
         return False
+
 
 @pytest.fixture(scope="session")
 def clickhouse_server(docker_ip, docker_services):
@@ -113,6 +115,7 @@ def clickhouse_server(docker_ip, docker_services):
         timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
     )
     yield url
+
 
 @pytest.fixture(scope="session")
 def clickhouse_db(clickhouse_server):
