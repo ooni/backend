@@ -601,7 +601,7 @@ def get_oonirun_link_engine_descriptor(
     clickhouse: DependsClickhouseClient,
     meta: OonirunMeta,
     useragent: Annotated[
-        Optional[str],  # TODO Marked as optional to avoid breaking old probes
+        Optional[str],  
         Header(
             pattern=USER_AGENT_PATTERN,
             error_message="Expected format: <software_name>,<software_version>,<platform>,<engine_name>,<engine_version>,<engine_version_full>",
@@ -621,9 +621,6 @@ def get_oonirun_link_engine_descriptor(
         revision = None
 
     if useragent is not None:
-        result = re.match(USER_AGENT_PATTERN, useragent)
-        # Validated by fastapi
-        assert result is not None
         (
             software_name,
             software_version,
@@ -631,7 +628,7 @@ def get_oonirun_link_engine_descriptor(
             engine_name,
             engine_version,
             engine_version_full,
-        ) = result.groups()
+        ) = useragent.split(",")
         # TODO Log this metadata
 
     q = db.query(models.OONIRunLink).filter(
