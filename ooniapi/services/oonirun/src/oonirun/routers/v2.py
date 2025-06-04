@@ -38,12 +38,24 @@ def utcnow_seconds():
     return datetime.now(timezone.utc).replace(microsecond=0)
 
 
+NETWORK_TYPES = [
+    "vpn",
+    "wifi",
+    "mobile",
+    "wired_ethernet",
+    "no_internet",
+    "unknown",
+]
+
+
 class OonirunMeta(BaseModel):
     run_type: str = Field(description="Run type", pattern="^(timed|manual)$")
     is_charging: bool = Field(description="If the probe is charging")
     probe_asn: str = Field(pattern=r"^([a-zA-Z0-9]+)$")
     probe_cc: str = Field(description="Country code. Ex: VE")
-    network_type: str = Field(description="Ex: wifi")
+    network_type: str = Field(
+        description="Ex: wifi", pattern=f"^({'|'.join(NETWORK_TYPES)})$"
+    )
     website_category_codes: List[str] = Field(
         description="List of category codes that user has chosen to test (eg. NEWS,HUMR)",
         default=[],

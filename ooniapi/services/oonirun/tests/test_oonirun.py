@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import time
 
-from oonirun.routers.v2 import utcnow_seconds
+from oonirun.routers.v2 import utcnow_seconds, NETWORK_TYPES
 
 
 SAMPLE_OONIRUN = {
@@ -880,5 +880,36 @@ def test_x_user_agent_header_parsing(client_with_user_role, client):
         f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
         headers=headers,
         json=SAMPLE_META,
+    )
+    assert r.status_code == 422, r.json()
+
+
+def test_network_type_validation(client_with_user_role, client):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing dynamic test lists calculation"
+    z["nettests"][0]["inputs"] = None
+    z["nettests"][0]["targets_name"] = "websites_list_prioritized"
+    z["nettests"] = z["nettests"][:1]
+
+    # Create
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # try to compute dynamic list with each network type
+    meta = deepcopy(SAMPLE_META)
+    for nt in NETWORK_TYPES:
+        meta["network_type"] = nt
+        r = client_with_user_role.post(
+            f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+            json=meta,
+        )
+        assert r.status_code == 200, r.json()
+
+    # try with a bad network type
+    meta["network_type"] = "bad"
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=meta,
     )
     assert r.status_code == 422, r.json()
