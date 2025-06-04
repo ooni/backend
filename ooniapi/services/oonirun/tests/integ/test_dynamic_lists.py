@@ -173,7 +173,7 @@ def super_prioritized_website(clickhouse_db):
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, [values])
     yield
-    clickhouse_db.execute("DELETE FROM url_priorities WHERE domain='www.ooni.com'")
+    clickhouse_db.execute("DELETE FROM url_priorities WHERE domain='ooni.org'")
 
 
 def test_priorities_basic(
