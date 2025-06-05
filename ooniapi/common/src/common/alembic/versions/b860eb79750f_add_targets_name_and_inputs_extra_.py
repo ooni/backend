@@ -33,3 +33,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("oonirun_nettest", "targets_name")
     op.drop_column("oonirun_nettest", "inputs_extra")
+
+    op.add_column("oonirun_nettest", sa.Column("backend_options", sa.ARRAY(sa.JSON()), nullable=True))
+    op.add_column("oonirun_nettest", sa.Column("options", sa.ARRAY(sa.JSON()), nullable=True))
