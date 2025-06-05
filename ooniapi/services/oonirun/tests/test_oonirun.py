@@ -6,13 +6,8 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import time
 
-from oonirun import models
-from oonirun.routers.v2 import utcnow_seconds
-import pytest
+from oonirun.routers.v2 import utcnow_seconds, NETWORK_TYPES
 
-import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
 
 SAMPLE_OONIRUN = {
     "name": "",
@@ -33,18 +28,24 @@ SAMPLE_OONIRUN = {
                 "https://example.com/",
                 "https://ooni.org/",
             ],
-            "options": {
-                "HTTP3Enabled": True,
-            },
-            "backend_options": {},
+            "targets_name": None,
+            "inputs_extra": None,
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "web_connectivity",
         },
         {
             "inputs": [],
-            "options": {},
-            "backend_options": {},
+            "targets_name": None,
+            "inputs_extra": None,
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "dnscheck",
+        },
+        {
+            "inputs": None,
+            "targets_name": "websites_list_prioritized",
+            "inputs_extra": None,
             "is_background_run_enabled_default": False,
             "is_manual_run_enabled_default": False,
             "test_name": "dnscheck",
@@ -71,6 +72,15 @@ EXPECTED_OONIRUN_LINK_PUBLIC_KEYS = [
     "color",
     "expiration_date",
 ]
+
+SAMPLE_META = {
+    "run_type": "timed",
+    "is_charging": True,
+    "probe_asn": "AS1234",
+    "probe_cc": "VE",
+    "network_type": "wifi",
+    "website_category_codes": [],
+}
 
 
 def test_get_version(client):
@@ -215,6 +225,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     assert j["name"] == z["name"]
     assert j["name_intl"] == z["name_intl"]
     assert j["description"] == z["description"]
+
     assert j["nettests"] == z["nettests"]
     date_created = datetime.strptime(
         j["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -402,7 +413,7 @@ def test_oonirun_full_workflow(client, client_with_user_role, client_with_admin_
     r = client_with_user_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     descs = r.json()["nettests"]
-    assert len(descs) == 2, r.json()
+    assert len(descs) == 3, r.json()
 
     ## List descriptors
     r = client_with_user_role.get(f"/api/v2/oonirun/links")
@@ -560,16 +571,25 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert j["revisions"][0] == "3", "the latest one is 3"
 
     ## Fetch nettests for latest
-    r = client.get(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest"
+    r = client.post(
+        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest",
+        json=SAMPLE_META,
     )
+    assert r.status_code == 200, r.json()
     j_latest = r.json()
     assert j_latest["revision"] == "3", "revision is 3"
+
+    # The engine-descriptor returns a list along with targets name on reading
+    lastest_nettests[2]["inputs"] = []
+    lastest_nettests[2]["inputs_extra"] = []
     assert j_latest["nettests"] == lastest_nettests, "nettests are the same"
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
     ## Should match latest
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3")
+    r = client.post(
+        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3",
+        json=SAMPLE_META,
+    )
     assert j_latest == r.json()
 
     ## Fetch invalid revision number
@@ -585,6 +605,276 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code == 404, r.json()
 
     ## Get not-existing engine descriptor
-    r = client.get(f"/api/v2/oonirun/links/404/engine-descriptor/latest")
+    r = client.post(
+        f"/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META
+    )
     j = r.json()
     assert r.status_code == 404, r.json()
+
+
+def test_inputs_extra_length(client, client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "integ-test name in English"
+    nettests = z.pop("nettests")
+    nettests = nettests[:1]
+    nettests[0]["inputs_extra"] = [
+        {
+            "provider": "riseupvpn",
+        }
+    ]
+    z["nettests"] = nettests
+
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert (
+        r.status_code == 422
+    ), "Should fail when inputs_extra != None and len(inputs_extra) != len(inputs)"
+
+    nettests[0]["inputs_extra"] = [
+        {
+            "provider": "riseupvpn",
+        },
+        {
+            "provider": "riseupvpn",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, "Appropiate inputs extra size, should pass"
+
+    nettests[0].pop("inputs_extra")
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert (
+        r.status_code == 200
+    ), "No checks should be performed when inputs_extra is None"
+
+
+def test_link_revision_args(client, client_with_user_role):
+    # Check args parsing for oonirun engine-descriptor
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing descriptor revision"
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+    id = j["oonirun_link_id"]
+
+    # Try with good arguments
+    gs = ["timed", "manual"]
+    for good in gs:
+        r = client.post(
+            f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=SAMPLE_META
+        )
+        assert r.status_code == 200, r.json()
+
+    # Try with bad arguments
+    bm = deepcopy(SAMPLE_META)
+    bm["run_type"] = "bad"
+    r = client.post(f"/api/v2/oonirun/links/{id}/engine-descriptor/1", json=bm)
+    assert r.status_code == 422, r.json()
+
+
+def test_inputs_and_targets_name(client_with_user_role):
+    """
+    Test that you can't specify targets_name and inputs in the same request
+    """
+
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing no targets and inputs at the same time"
+
+    # Only inputs = OK
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+
+    # Only targets = OK
+    z["nettests"] = [
+        {
+            "inputs": None,
+            "targets_name": "example_name",
+            "inputs_extra": None,
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+
+    # Both targets and input = error
+    z["nettests"] = [
+        {
+            "inputs": [
+                "https://example.com/",
+                "https://ooni.org/",
+            ],
+            "targets_name": "example_name",
+            "inputs_extra": None,
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, r.json()
+
+    # Both targets and inputs_extra = error
+    z["nettests"] = [
+        {
+            "targets_name": "example_name",
+            "inputs_extra": [{}, {}],
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, r.json()
+
+    # Targets with inputs = [] still an error
+    z["nettests"] = [
+        {
+            "targets_name": "example_name",
+            "inputs_extra": [],
+            "inputs": [],
+            "is_background_run_enabled_default": False,
+            "is_manual_run_enabled_default": False,
+            "test_name": "web_connectivity",
+        },
+    ]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, r.json()
+
+
+def test_creation_with_targets_name(client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing dynamic test lists calculation"
+    z["nettests"][0]["inputs"] = None
+    z["nettests"][0]["targets_name"] = "websites_list_prioritized"
+    z["nettests"] = z["nettests"][:1]
+
+    # Create
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Retrieve
+    r = client_with_user_role.get(f"/api/v2/oonirun/links/{j['oonirun_link_id']}")
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Does it have the targets name?
+    assert (
+        j["nettests"][0]["targets_name"] == "websites_list_prioritized"
+    ), "Missing targets_name"
+
+    # now test that you can edit
+    z["nettests"][0]["targets_name"] = "new_value"
+    r = client_with_user_role.put(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}", json=z
+    )
+    assert r.status_code == 200, r.json()
+
+    # Retrieve again
+    r = client_with_user_role.get(f"/api/v2/oonirun/links/{j['oonirun_link_id']}")
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    assert (
+        j["nettests"][0]["targets_name"] == "new_value"
+    ), "Value of nettest should be changed by now"
+
+
+def test_dynamic_test_lists_calculation(client_with_user_role):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing dynamic test lists calculation"
+    z["nettests"][0]["inputs"] = None
+    z["nettests"][0]["targets_name"] = "websites_list_prioritized"
+    z["nettests"] = z["nettests"][:1]
+
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
+    assert r.status_code == 200, r.json()
+
+    j = r.json()
+    assert j["nettests"][0]["targets_name"] == "websites_list_prioritized"
+
+
+def test_x_user_agent_header_parsing(client_with_user_role, client):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing header parsing"
+
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # Test with good headers
+    headers = {
+        "UserAgent": "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2,ooniprobe-engine_1.2.3"
+    }
+
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
+    r = client.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        headers=headers,
+        json=SAMPLE_META,
+    )
+    assert r.status_code == 200, r.json()
+
+    # Should be able to skip the header
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
+    r = client.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=SAMPLE_META,
+    )
+    assert r.status_code == 200, r.json()
+
+    # Bad header
+    headers = {
+        "UserAgent": "ooniprobe-android-unattended,3.8.2,android,ooniprobe-engine,3.17.2"
+    }
+    r = client.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        headers=headers,
+        json=SAMPLE_META,
+    )
+    assert r.status_code == 422, r.json()
+
+
+def test_network_type_validation(client_with_user_role, client):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing dynamic test lists calculation"
+    z["nettests"][0]["inputs"] = None
+    z["nettests"][0]["targets_name"] = "websites_list_prioritized"
+    z["nettests"] = z["nettests"][:1]
+
+    # Create
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    j = r.json()
+
+    # try to compute dynamic list with each network type
+    meta = deepcopy(SAMPLE_META)
+    for nt in NETWORK_TYPES:
+        meta["network_type"] = nt
+        r = client_with_user_role.post(
+            f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+            json=meta,
+        )
+        assert r.status_code == 200, r.json()
+
+    # try with a bad network type
+    meta["network_type"] = "bad"
+    r = client_with_user_role.post(
+        f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest",
+        json=meta,
+    )
+    assert r.status_code == 422, r.json()
