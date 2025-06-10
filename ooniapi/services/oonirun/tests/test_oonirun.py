@@ -725,7 +725,7 @@ def test_inputs_and_targets_name(client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
 
-    # Both targets and inputs_extra = error
+    # Both targets and inputs_extra = error 
     z["nettests"] = [
         {
             "targets_name": "example_name",
