@@ -71,6 +71,7 @@ class OONIRunLinkNettest(BaseModel):
     inputs: Optional[List[str]] = Field(
         default=None, title="list of input dictionaries for the nettest"
     )
+    options: Dict = Field(default={}, title="options for the nettest")
     is_background_run_enabled_default: bool = Field(
         default=False,
         title="if this test should be enabled by default for background runs",
@@ -257,6 +258,7 @@ def create_oonirun_link(
         nettest = OONIRunLinkNettest(
             test_name=nt.test_name,
             inputs=nt.inputs,
+            options=nt.options,
             targets_name=nt.targets_name,
             is_background_run_enabled_default=nt.is_background_run_enabled_default,
             is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
@@ -352,6 +354,7 @@ def edit_oonirun_link(
                 targets_name=nt.targets_name,
                 test_name=nt.test_name,
                 inputs=nt.inputs,
+                options=nt.options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
             )
@@ -367,6 +370,7 @@ def edit_oonirun_link(
                 date_created=now,
                 test_name=nt.test_name,
                 inputs=nt.inputs,
+                options=nt.options,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
                 oonirun_link=oonirun_link,
@@ -475,6 +479,7 @@ def get_nettests(
                 targets_name=targets_name,
                 test_name=nt.test_name,
                 inputs=inputs,
+                options=nt.options,
                 inputs_extra=inputs_extra,
                 is_background_run_enabled_default=nt.is_background_run_enabled_default,
                 is_manual_run_enabled_default=nt.is_manual_run_enabled_default,
