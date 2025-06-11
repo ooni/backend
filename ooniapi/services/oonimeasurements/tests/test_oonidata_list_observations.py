@@ -2,7 +2,6 @@ import pytest
 
 route = "api/v1/observations"
 
-
 def test_oonidata_list_observations(client):
     response = client.get(route)
 
@@ -130,7 +129,6 @@ def test_oonidata_list_observations_limit_by_default(client, params_since_and_un
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
-
 
 def test_oonidata_list_observations_with_limit_and_offset(client, params_since_and_until_with_two_days):
     params = params_since_and_until_with_two_days

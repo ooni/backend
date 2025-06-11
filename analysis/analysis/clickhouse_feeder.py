@@ -23,6 +23,7 @@ import logging
 import time
 from configparser import ConfigParser
 from pathlib import Path
+from typing import Any, Dict
 
 from filelock import FileLock  # debdeps: python3-filelock
 import psycopg2  # debdeps: python3-psycopg2
@@ -47,9 +48,13 @@ def setup_pg_connection(c):
     return conn
 
 
-def setup_click_connection(c):
+def setup_click_connection(c : Dict[str, Any]):
     log.info("Connecting to Clickhouse")
-    return Clickhouse("localhost")
+    url  = c.get("clickhouse_url")
+    if url is not None:
+        return Clickhouse.from_url(url)
+    else: 
+        return Clickhouse("localhost")
 
 
 @metrics.timer("sync_clickhouse_fastpath")

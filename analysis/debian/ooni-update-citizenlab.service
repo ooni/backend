@@ -4,7 +4,8 @@ Wants=ooni-update-citizenlab.timer
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/analysis --update-citizenlab
+EnvironmentFile=/etc/ooni/analysis.env
+ExecStart=/usr/bin/analysis --update-citizenlab --db-uri ${DB_URI}
 
 [Install]
 WantedBy=multi-user.target

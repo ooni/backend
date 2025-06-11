@@ -93,7 +93,7 @@ def match_prio_rule(cz, pr: dict) -> bool:
         if pr[k] not in ("", "*", cz[k]):
             return False
 
-    if cz["cc"] != "ZZ" and pr["cc"] not in ("", "*", cz["cc"]):
+    if cz["cc"] != "ZZ" and pr["cc"].upper() not in ("", "*", cz["cc"].upper()):
         return False
 
     return True
