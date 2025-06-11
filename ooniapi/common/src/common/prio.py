@@ -1,3 +1,4 @@
+
 """
 OONI Probe Services API - reactive URL prioritization
 
@@ -24,8 +25,8 @@ blockdiag {
 from typing import List, Tuple
 import logging
 
-from .common.clickhouse_utils import query_click
-from .common.metrics import timer
+from .clickhouse_utils import query_click
+from .metrics import timer
 
 from clickhouse_driver import Client as Clickhouse
 import sqlalchemy as sa
