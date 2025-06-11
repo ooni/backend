@@ -5,7 +5,6 @@ services:
       dockerfile: Dockerfile
     container_name: ooni-fastpath 
     ports:
-      - "5000:5000"
       - "8472:8472"
     volumes:
       - .:/app
