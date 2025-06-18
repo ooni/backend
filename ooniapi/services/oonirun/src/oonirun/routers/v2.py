@@ -26,6 +26,7 @@ from ..common.auth import (
 )
 from ..common.prio import generate_test_list
 from ..dependencies import DependsPostgresSession, DependsClickhouseClient
+from uuid import uuid4
 
 
 log = logging.getLogger(__name__)
@@ -43,6 +44,8 @@ NETWORK_TYPES = [
     "mobile",
     "wired_ethernet",
     "no_internet",
+    "bluetooth",
+    "usb",
     "unknown",
 ]
 
