@@ -124,3 +124,16 @@ docker-build:
 		-t ${IMAGE_NAME}:${ENV_LABEL} \
 		-
 	echo "built image: ${IMAGE_NAME}:${BUILD_LABEL} (${IMAGE_NAME}:${VERSION_LABEL} ${IMAGE_NAME}:${ENV_LABEL})"
+
+docker-push:
+	# We need to use tar -czh to resolve the common dir symlink
+	docker push ${IMAGE_NAME}:${BUILD_LABEL}
+	docker push ${IMAGE_NAME}:${VERSION_LABEL}
+	docker push ${IMAGE_NAME}:${ENV_LABEL}
+
+imagedefinitions.json:
+	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
+
+# Used by other ECS services but not implemented for fastpath yet
+docker-smoketest:
+	echo "Smoketest not yet implemented"
