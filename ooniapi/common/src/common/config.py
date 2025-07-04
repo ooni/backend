@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     collector_id: str = "CHANGEME"
     session_expiry_days: int = 10
     login_expiry_days: int = 10
-    msmt_spool_dir: str = "" # Only used in ooniprobe
 
     admin_emails: List[str] = [
         "admin@ooni.org",
@@ -35,3 +34,6 @@ class Settings(BaseSettings):
 
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
+    # Ooniprobe only
+    msmt_spool_dir: str = "" 
+    fastpath_url: str = "" # example: http://123.123.123.123:8472

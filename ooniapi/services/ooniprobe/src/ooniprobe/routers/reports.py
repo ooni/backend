@@ -7,9 +7,8 @@ import zstd
 from datetime import datetime, timezone
 
 from fastapi import Request, Response, APIRouter, HTTPException, Header
-from fastapi.datastructures import Headers
 from pydantic import Field
-from prometheus_client import Counter, Info, Gauge
+from prometheus_client import Counter
 
 from ..utils import generate_report_id, extract_probe_ipaddr, lookup_probe_cc, lookup_probe_network
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep
@@ -97,6 +96,9 @@ def open_report(data: OpenReportRequest, response: Response, settings : Settings
     return resp
 
 class ReceiveMeasurementResponse(BaseModel): 
+    """
+    Acknowledge
+    """
     measurement_uid: str = Field(examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"])
 
 @timer
@@ -110,27 +112,8 @@ def receive_measurement(
     asn_reader: ASNReaderDep,
     settings: SettingsDep
     ) -> ReceiveMeasurementResponse:
-    """Probe Services: Submit measurement
-    ---
-    produces:
-      - application/json
-    consumes:
-      - application/json
-    parameters:
-      - name: report_id
-        in: path
-        example: 20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a
-        type: string
-        minLength: 10
-        required: true
-    responses:
-      200:
-        description: Acknowledge
-        schema:
-          type: object
-          properties:
-            measurement_uid:
-              type: string
+    """
+    Submit measurement
     """
     setnocacheresponse(response)
     empty_measurement = ReceiveMeasurementResponse(measurement_uid = "")
@@ -194,8 +177,7 @@ def receive_measurement(
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
     try:
-        # TODO convert this into a parameter 
-        url = f"http://127.0.0.1:8472/{msmt_uid}"
+        url = f"{settings.fastpath_url}/{msmt_uid}"
         urlopen(url, data, 59)
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
