@@ -1,5 +1,3 @@
-from base64 import b64encode
-from os import urandom
 import logging
 from datetime import datetime, timezone, timedelta
 import time
@@ -11,13 +9,13 @@ import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 
+from ...utils import generate_report_id
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
-from ...common.metrics import timer
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
@@ -584,12 +582,3 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     return out
 
 
-def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    cid = settings.collector_id
-    rand = b64encode(urandom(12), b"oo").decode()
-    stn = test_name.replace("_", "")
-    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
-    return rid
-
-# -- Reports -------------------------------------------------------------------------

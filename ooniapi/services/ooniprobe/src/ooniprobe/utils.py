@@ -4,7 +4,8 @@ VPN Services
 Insert VPN credentials into database.
 """
 
-import base64
+from base64 import b64encode
+from os import urandom
 from datetime import datetime, timezone
 import itertools
 import logging
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 import pem
 import httpx
 
+from .common.config import Settings
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
@@ -107,3 +109,11 @@ def upsert_endpoints(
                 provider=provider,
             )
         )
+
+def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    cid = settings.collector_id
+    rand = b64encode(urandom(12), b"oo").decode()
+    stn = test_name.replace("_", "")
+    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
+    return rid

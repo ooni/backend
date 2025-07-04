@@ -3,6 +3,7 @@ import logging
 
 from fastapi import Response, APIRouter
 
+from ..utils import generate_report_id
 from ..dependencies import SettingsDep
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
@@ -35,9 +36,9 @@ class OpenReportResponse(BaseModel):
     supported_formats: List[str]
 
 
-@router.post("/report", tags=["reports"])
+@router.post("/report", tags=["reports"], response_model=OpenReportResponse)
 @timer
-def open_report(response: Response, data: OpenReportRequest, settings : SettingsDep) -> OpenReportResponse:
+def open_report(data: OpenReportRequest, response: Response, settings : SettingsDep) -> OpenReportResponse:
     """
     Opens a new report 
     """
