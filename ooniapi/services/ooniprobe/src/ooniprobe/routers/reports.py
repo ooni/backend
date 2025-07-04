@@ -36,8 +36,8 @@ class OpenReportResponse(BaseModel):
     supported_formats: List[str]
 
 
-@router.post("/report", tags=["reports"], response_model=OpenReportResponse)
 @timer
+@router.post("/report", tags=["reports"], response_model=OpenReportResponse)
 def open_report(data: OpenReportRequest, response: Response, settings : SettingsDep) -> OpenReportResponse:
     """
     Opens a new report 
