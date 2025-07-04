@@ -9,7 +9,7 @@ import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 
-from ...utils import generate_report_id
+from ...utils import generate_report_id, extract_probe_ipaddr, lookup_probe_cc, lookup_probe_network
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
@@ -492,29 +492,6 @@ def probe_geoip(
 
     return resp, probe_cc, asn_int
 
-
-def extract_probe_ipaddr(request: Request) -> str:
-
-    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
-    for h in real_ip_headers:
-        if h in request.headers:
-            return request.headers.getlist(h)[0].rpartition(" ")[-1]
-
-    return request.client.host if request.client else ""
-
-
-def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    resp = asn_reader.asn(ipaddr)
-
-    return (
-        "AS{}".format(resp.autonomous_system_number),
-        resp.autonomous_system_organization or "0",
-    )
-
-
-def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    resp = cc_reader.country(ipaddr)
-    return resp.country.iso_code or "ZZ"
 
 
 def generate_test_helpers_conf() -> Dict:

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     collector_id: str = "CHANGEME"
     session_expiry_days: int = 10
     login_expiry_days: int = 10
+    msmt_spool_dir: str = "" # Only used in ooniprobe
 
     admin_emails: List[str] = [
         "admin@ooni.org",

@@ -9,14 +9,16 @@ from os import urandom
 from datetime import datetime, timezone
 import itertools
 import logging
-from typing import Dict, List, Mapping, TypedDict
+from typing import Dict, List, Mapping, TypedDict, Tuple
 
+from fastapi import Request
 from sqlalchemy.orm import Session
 import pem
 import httpx
 
 from .common.config import Settings
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
+from .dependencies import CCReaderDep, ASNReaderDep
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"
@@ -117,3 +119,24 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
     stn = test_name.replace("_", "")
     rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
     return rid
+
+def extract_probe_ipaddr(request: Request) -> str:
+
+    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
+    for h in real_ip_headers:
+        if h in request.headers:
+            return request.headers.getlist(h)[0].rpartition(" ")[-1]
+
+    return request.client.host if request.client else ""
+
+def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
+    resp = cc_reader.country(ipaddr)
+    return resp.country.iso_code or "ZZ"
+
+def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
+    resp = asn_reader.asn(ipaddr)
+
+    return (
+        "AS{}".format(resp.autonomous_system_number),
+        resp.autonomous_system_organization or "0",
+    )
