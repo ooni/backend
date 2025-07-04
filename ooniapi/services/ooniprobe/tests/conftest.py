@@ -112,6 +112,7 @@ def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
         prometheus_metrics_password="super_secure",
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
         geoip_db_dir=geoip_db_dir,
+        collector_id="1"
     )
 
 
