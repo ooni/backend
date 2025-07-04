@@ -105,6 +105,7 @@ class ReceiveMeasurementResponse(BaseModel):
 @router.post("/report/{report_id}", tags=['reports'])
 def receive_measurement(
     report_id: str, 
+    data: bytes,
     request: Request,  
     response: Response, 
     content_encoding: Annotated[str, Header()],
@@ -145,7 +146,6 @@ def receive_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
-    data = request.data
     if content_encoding == "zstd":
         try:
             data = zstd.decompress(data)
@@ -177,6 +177,7 @@ def receive_measurement(
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
     try:
+        # TODO upload missed measurement to s3 
         url = f"{settings.fastpath_url}/{msmt_uid}"
         urlopen(url, data, 59)
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
