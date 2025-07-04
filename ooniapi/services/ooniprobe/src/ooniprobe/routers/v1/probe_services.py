@@ -3,16 +3,13 @@ from os import urandom
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict, Tuple, Annotated, TypeAlias, Optional
+from typing import List, Optional, Any, Dict, Tuple, Optional
 import random
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
-from enum import Enum
-import sqlalchemy as sa
-from clickhouse_driver import Client as Clickhouse
 
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
