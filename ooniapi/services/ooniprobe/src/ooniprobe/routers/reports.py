@@ -1,4 +1,4 @@
-from typing import List, Annotated
+from typing import List, Annotated, Dict, Any
 from pathlib import Path
 import logging
 from hashlib import sha512
@@ -6,7 +6,7 @@ from urllib.request import urlopen
 import zstd
 from datetime import datetime, timezone
 
-from fastapi import Request, Response, APIRouter, HTTPException, Header
+from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
 from pydantic import Field
 from prometheus_client import Counter
 
@@ -99,25 +99,24 @@ class ReceiveMeasurementResponse(BaseModel):
     """
     Acknowledge
     """
-    measurement_uid: str = Field(examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"])
+    measurement_uid: str | None = Field(examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None)
 
 @timer
 @router.post("/report/{report_id}", tags=['reports'])
-def receive_measurement(
+async def receive_measurement(
     report_id: str, 
-    data: bytes,
     request: Request,  
     response: Response, 
-    content_encoding: Annotated[str, Header()],
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
-    settings: SettingsDep
-    ) -> ReceiveMeasurementResponse:
+    settings: SettingsDep,
+    content_encoding: str = Header(default=None),
+    ) -> ReceiveMeasurementResponse | Dict[str, Any]:
     """
     Submit measurement
     """
     setnocacheresponse(response)
-    empty_measurement = ReceiveMeasurementResponse(measurement_uid = "")
+    empty_measurement = {}
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
     except Exception:
@@ -146,6 +145,7 @@ def receive_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
+    data = await request.body()
     if content_encoding == "zstd":
         try:
             data = zstd.decompress(data)
@@ -172,7 +172,7 @@ def receive_measurement(
     # TODO move writing this file to the fastpath 
     # msmt_f_tmp.write_bytes(data)
     msmt_f = msmtdir / f"{msmt_uid}.post"
-    msmt_f_tmp.rename(msmt_f)
+    # msmt_f_tmp.rename(msmt_f)
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
