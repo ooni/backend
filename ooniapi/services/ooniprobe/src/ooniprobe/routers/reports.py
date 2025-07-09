@@ -200,17 +200,21 @@ async def receive_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
-    try:
-        # TODO upload missed measurement to s3
-        url = f"{settings.fastpath_url}/{msmt_uid}"
-        # TODO would be nice to make this async due to the size of the data being transmitted.
-        urlopen(url, data, 59)
-        return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+    N_RETRIES = 3
+    for t in range(N_RETRIES):
+        try:
+            # TODO upload missed measurement to s3
+            url = f"{settings.fastpath_url}/{msmt_uid}"
+            # TODO would be nice to make this async due to the size of the data being transmitted.
+            urlopen(url, data, 59)
+            return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
-    except Exception as e:
-        Metrics.MISSED_MSMNTS.inc()
-        log.exception(e)
-        return empty_measurement
+        except Exception as exc:
+            log.error(f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}")
+    
+    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
+    Metrics.MISSED_MSMNTS.inc()
+    return empty_measurement
 
 
 @router.post("/report/{report_id}/close")
