@@ -112,6 +112,7 @@ def upsert_endpoints(
             )
         )
 
+
 def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     cid = settings.collector_id
@@ -119,6 +120,7 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
     stn = test_name.replace("_", "")
     rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
     return rid
+
 
 def extract_probe_ipaddr(request: Request) -> str:
 
@@ -129,9 +131,11 @@ def extract_probe_ipaddr(request: Request) -> str:
 
     return request.client.host if request.client else ""
 
+
 def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
     resp = cc_reader.country(ipaddr)
     return resp.country.iso_code or "ZZ"
+
 
 def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
     resp = asn_reader.asn(ipaddr)

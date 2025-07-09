@@ -10,7 +10,12 @@ from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
 from pydantic import Field
 from prometheus_client import Counter
 
-from ..utils import generate_report_id, extract_probe_ipaddr, lookup_probe_cc, lookup_probe_network
+from ..utils import (
+    generate_report_id,
+    extract_probe_ipaddr,
+    lookup_probe_cc,
+    lookup_probe_network,
+)
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
@@ -19,6 +24,7 @@ from ..common.metrics import timer
 router = APIRouter()
 
 log = logging.getLogger(__name__)
+
 
 class Metrics:
     MSMNT_DISCARD_ASN0 = Counter(
@@ -44,13 +50,15 @@ class Metrics:
     PROBE_CC_ASN_NO_MATCH = Counter(
         "probe_cc_asn_nomatch",
         "How many mismatches between reported and observed probe_cc and asn",
-        labelnames=["mismatch"]
+        labelnames=["mismatch"],
     )
+
 
 class OpenReportRequest(BaseModel):
     """
     Open report
     """
+
     data_format_version: str
     format: str
     probe_asn: str = "AS0"
@@ -61,10 +69,12 @@ class OpenReportRequest(BaseModel):
     test_start_time: str
     test_version: str
 
+
 class OpenReportResponse(BaseModel):
     """
     Open report confirmation
     """
+
     backend_version: str
     report_id: str
     supported_formats: List[str]
@@ -72,9 +82,11 @@ class OpenReportResponse(BaseModel):
 
 @timer
 @router.post("/report", tags=["reports"], response_model=OpenReportResponse)
-def open_report(data: OpenReportRequest, response: Response, settings : SettingsDep) -> OpenReportResponse:
+def open_report(
+    data: OpenReportRequest, response: Response, settings: SettingsDep
+) -> OpenReportResponse:
     """
-    Opens a new report 
+    Opens a new report
     """
 
     log.info("Open report %r", data.model_dump())
@@ -91,27 +103,34 @@ def open_report(data: OpenReportRequest, response: Response, settings : Settings
         cc = "ZZ"
     test_name = data.test_name.lower()
     rid = generate_report_id(test_name, settings, cc, asn_i)
-    resp = OpenReportResponse(backend_version="1.3.5", supported_formats=["yaml", "json"], report_id=rid)
+    resp = OpenReportResponse(
+        backend_version="1.3.5", supported_formats=["yaml", "json"], report_id=rid
+    )
     setnocacheresponse(response)
     return resp
 
-class ReceiveMeasurementResponse(BaseModel): 
+
+class ReceiveMeasurementResponse(BaseModel):
     """
     Acknowledge
     """
-    measurement_uid: str | None = Field(examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None)
+
+    measurement_uid: str | None = Field(
+        examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
+    )
+
 
 @timer
-@router.post("/report/{report_id}", tags=['reports'])
+@router.post("/report/{report_id}", tags=["reports"])
 async def receive_measurement(
-    report_id: str, 
-    request: Request,  
-    response: Response, 
+    report_id: str,
+    request: Request,
+    response: Response,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
     content_encoding: str = Header(default=None),
-    ) -> ReceiveMeasurementResponse | Dict[str, Any]:
+) -> ReceiveMeasurementResponse | Dict[str, Any]:
     """
     Submit measurement
     """
@@ -138,7 +157,7 @@ async def receive_measurement(
     if asn_i == 0:
         log.info("Discarding ASN == 0")
         Metrics.MSMNT_DISCARD_ASN0.inc()
-        return empty_measurement 
+        return empty_measurement
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
@@ -169,7 +188,7 @@ async def receive_measurement(
     # msmt_uid is a unique id based on upload time, cc, testname and hash
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
-    # TODO move writing this file to the fastpath 
+    # TODO move writing this file to the fastpath
     # msmt_f_tmp.write_bytes(data)
     msmt_f = msmtdir / f"{msmt_uid}.post"
     # msmt_f_tmp.rename(msmt_f)
@@ -177,15 +196,16 @@ async def receive_measurement(
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
     try:
-        # TODO upload missed measurement to s3 
+        # TODO upload missed measurement to s3
         url = f"{settings.fastpath_url}/{msmt_uid}"
-        # TODO would be nice to make this async due to the size of the data being transmitted. 
+        # TODO would be nice to make this async due to the size of the data being transmitted.
         urlopen(url, data, 59)
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
     except Exception as e:
         log.exception(e)
         return empty_measurement
+
 
 @router.post("/report/{report_id}/close")
 def close_report(report_id):
@@ -194,10 +214,18 @@ def close_report(report_id):
     """
     return {}
 
-def error(msg: str, status_code: int = 400):
-    raise HTTPException(status_code = status_code, detail=msg)
 
-def compare_probe_msmt_cc_asn(cc: str, asn: str, request: Request, cc_reader : CCReaderDep, asn_reader: ASNReaderDep):
+def error(msg: str, status_code: int = 400):
+    raise HTTPException(status_code=status_code, detail=msg)
+
+
+def compare_probe_msmt_cc_asn(
+    cc: str,
+    asn: str,
+    request: Request,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+):
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
     Generates a metric.
     """

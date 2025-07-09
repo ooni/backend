@@ -9,7 +9,12 @@ import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 
-from ...utils import generate_report_id, extract_probe_ipaddr, lookup_probe_cc, lookup_probe_network
+from ...utils import (
+    generate_report_id,
+    extract_probe_ipaddr,
+    lookup_probe_cc,
+    lookup_probe_network,
+)
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
@@ -493,7 +498,6 @@ def probe_geoip(
     return resp, probe_cc, asn_int
 
 
-
 def generate_test_helpers_conf() -> Dict:
     # Load-balance test helpers deterministically
     conf = {
@@ -557,5 +561,3 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
-
-
