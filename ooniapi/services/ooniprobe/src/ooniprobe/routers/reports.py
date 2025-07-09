@@ -53,6 +53,11 @@ class Metrics:
         labelnames=["mismatch"],
     )
 
+    MISSED_MSMNTS = Counter(
+        "missed_msmnts",
+        "Measurements that failed to be sent to the fast path."
+    )
+
 
 class OpenReportRequest(BaseModel):
     """
@@ -203,6 +208,7 @@ async def receive_measurement(
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
     except Exception as e:
+        Metrics.MISSED_MSMNTS.inc()
         log.exception(e)
         return empty_measurement
 
