@@ -3,12 +3,13 @@ from pathlib import Path
 import logging
 from hashlib import sha512
 from urllib.request import urlopen
-import zstd
 from datetime import datetime, timezone
+import io
 
 from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
 from pydantic import Field
 from prometheus_client import Counter
+import zstd
 
 from ..utils import (
     generate_report_id,
@@ -16,7 +17,7 @@ from ..utils import (
     lookup_probe_cc,
     lookup_probe_network,
 )
-from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep
+from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
 from ..common.metrics import timer
@@ -134,6 +135,7 @@ async def receive_measurement(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
+    s3_client: S3ClientDep,
     content_encoding: str = Header(default=None),
 ) -> ReceiveMeasurementResponse | Dict[str, Any]:
     """
@@ -211,6 +213,13 @@ async def receive_measurement(
 
         except Exception as exc:
             log.error(f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}")
+    
+    # wasn't possible to send msmnt to fastpath, try to send it to s3
+    try:
+        s3_client.upload_fileobj(io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id)
+    except Exception as exc:
+        log.error(f"Unable to upload measurement to s3. Error: {exc}" )
+
     
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
