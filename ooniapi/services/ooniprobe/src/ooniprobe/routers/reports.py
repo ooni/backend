@@ -219,7 +219,6 @@ async def receive_measurement(
         s3_client.upload_fileobj(io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id)
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}" )
-
     
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()

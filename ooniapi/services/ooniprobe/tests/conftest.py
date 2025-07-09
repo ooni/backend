@@ -12,6 +12,7 @@ from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
+from ooniprobe.dependencies import get_s3_client
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
 
@@ -97,6 +98,7 @@ def geoip_db_dir(fixture_path):
 @pytest.fixture
 def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
+    app.dependency_overrides[get_s3_client] = get_s3_client_mock
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
@@ -144,3 +146,14 @@ def clickhouse_server(docker_ip, docker_services):
 @pytest.fixture(scope="session")
 def clickhouse_db(clickhouse_server):
     yield ClickhouseClient.from_url(clickhouse_server)
+
+class S3ClientMock:
+
+    def __init__(self) -> None:
+        self.files = []
+
+    def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
+        self.files.append(f"{Bucket}/{Key}")
+
+def get_s3_client_mock() -> S3ClientMock:
+    return S3ClientMock()
