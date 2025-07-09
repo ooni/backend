@@ -92,7 +92,7 @@ def open_report(
     data: OpenReportRequest, response: Response, settings: SettingsDep
 ) -> OpenReportResponse:
     """
-    Opens a new report
+    Opens a new report 
     """
 
     log.info("Open report %r", data.model_dump())
