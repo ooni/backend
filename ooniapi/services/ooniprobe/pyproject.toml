@@ -26,7 +26,8 @@ dependencies = [
   "pem ~= 23.1.0",
   "geoip2 ~= 5.0.1",
   "fastapi-utils[all] ~= 0.8.0",
-  "zstd ~= 1.5.7.2"
+  "zstd ~= 1.5.7.2",
+  "boto3 ~= 1.39.3"
 ]
 
 readme = "README.md"
