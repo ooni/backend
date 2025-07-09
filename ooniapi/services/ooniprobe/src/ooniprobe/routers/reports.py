@@ -179,12 +179,20 @@ async def receive_measurement(
     try:
         # TODO upload missed measurement to s3 
         url = f"{settings.fastpath_url}/{msmt_uid}"
+        # TODO would be nice to make this async due to the size of the data being transmitted. 
         urlopen(url, data, 59)
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
     except Exception as e:
         log.exception(e)
         return empty_measurement
+
+@router.post("/report/{report_id}/close")
+def close_report(report_id):
+    """
+    Close a report
+    """
+    return {}
 
 def error(msg: str, status_code: int = 400):
     raise HTTPException(status_code = status_code, detail=msg)

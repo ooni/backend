@@ -63,7 +63,7 @@ def test_collector_upload_msmt_valid(client):
     assert c == {}
 
     # TODO uncomment when close it's implemented
-    # c = postj(client, f"/report/{rid}/close", json={})
+    c = postj(client, f"/report/{rid}/close", json={})
     assert c == {}
 
 def test_collector_upload_msmt_valid_zstd(client):
