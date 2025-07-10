@@ -225,7 +225,7 @@ async def receive_measurement(
     return empty_measurement
 
 
-@router.post("/report/{report_id}/close")
+@router.post("/report/{report_id}/close", tags=["reports"])
 def close_report(report_id):
     """
     Close a report
