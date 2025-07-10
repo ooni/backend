@@ -118,7 +118,7 @@ def open_report(
 
 class ReceiveMeasurementResponse(BaseModel):
     """
-    Acknowledge
+    Acknowledge 
     """
 
     measurement_uid: str | None = Field(
