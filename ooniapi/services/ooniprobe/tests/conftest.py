@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import shutil
 import os
+from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -106,7 +107,7 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
+def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, fastpath_server):
     port = docker_services.port_for("clickhouse", 9000)
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
@@ -114,7 +115,8 @@ def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
         prometheus_metrics_password="super_secure",
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
         geoip_db_dir=geoip_db_dir,
-        collector_id="1"
+        collector_id="1",
+        fastpath_url=fastpath_server
     )
 
 
@@ -157,3 +159,19 @@ class S3ClientMock:
 
 def get_s3_client_mock() -> S3ClientMock:
     return S3ClientMock()
+
+@pytest.fixture(scope="session")
+def fastpath_server(docker_ip, docker_services):
+    port = docker_services.port_for("fakepath", 80)
+    url = f"http://{docker_ip}:{port}"
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=0.1, check=lambda: is_fastpath_running(url)
+    )
+    yield url
+
+def is_fastpath_running(url: str) -> bool: 
+    try: 
+        resp = urlopen(url)
+        return resp.status == 200
+    except:
+        return False
