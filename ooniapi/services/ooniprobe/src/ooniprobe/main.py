@@ -112,10 +112,11 @@ async def health(
         errors.append("clickhouse_error")
         log.error(e)
 
-    try: 
+    try:
         response = urlopen(settings.fastpath_url)
-        assert response.status == 200, \
-            "Unexpected status trying to connect to fastpath: " + str(response.status)
+        assert (
+            response.status == 200
+        ), "Unexpected status trying to connect to fastpath: " + str(response.status)
     except Exception as exc:
         log.error(str(exc))
         errors.append("fastpath_connection_error")

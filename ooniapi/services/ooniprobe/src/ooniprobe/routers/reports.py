@@ -55,8 +55,7 @@ class Metrics:
     )
 
     MISSED_MSMNTS = Counter(
-        "missed_msmnts",
-        "Measurements that failed to be sent to the fast path."
+        "missed_msmnts", "Measurements that failed to be sent to the fast path."
     )
 
 
@@ -92,7 +91,7 @@ def open_report(
     data: OpenReportRequest, response: Response, settings: SettingsDep
 ) -> OpenReportResponse:
     """
-    Opens a new report 
+    Opens a new report
     """
 
     log.info("Open report %r", data.model_dump())
@@ -118,7 +117,7 @@ def open_report(
 
 class ReceiveMeasurementResponse(BaseModel):
     """
-    Acknowledge 
+    Acknowledge
     """
 
     measurement_uid: str | None = Field(
@@ -205,21 +204,24 @@ async def receive_measurement(
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
-            # TODO upload missed measurement to s3
             url = f"{settings.fastpath_url}/{msmt_uid}"
             # TODO would be nice to make this async due to the size of the data being transmitted.
             urlopen(url, data, 59)
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
-            log.error(f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}")
-    
+            log.error(
+                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
+            )
+
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     try:
-        s3_client.upload_fileobj(io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id)
+        s3_client.upload_fileobj(
+            io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id
+        )
     except Exception as exc:
-        log.error(f"Unable to upload measurement to s3. Error: {exc}" )
-    
+        log.error(f"Unable to upload measurement to s3. Error: {exc}")
+
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
