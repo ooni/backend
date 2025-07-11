@@ -157,6 +157,7 @@ def setup() -> None:
         log.info("collectors: %s", conf.collector_hostnames)
         conf.s3_access_key = cp["DEFAULT"]["s3_access_key"].strip()
         conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
+        conf.msmt_spool_dir = cp["DEFAULT"]["msmt_spool_dir"].strip()
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
 
@@ -1606,13 +1607,19 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
         scores["msg"] = "Measurement start time too old"
 
 def write_measurement_to_disk(msm_tup) -> None:
+    """Write this measurement to disk so that it can be 
+    processed by the measurement uploader
+
+    Args:
+        msm_tup: Measurement tuple as it comes from the work queue
+    """
     data, measurement, msmt_uid = msm_tup
-    rid_timestamp, test_name, cc, asn, format_cid, rand = msmt_uid.split("_")
+    ts, cc, test_name, h = msmt_uid.split("_")
 
     now = datetime.now(timezone.utc)
     hour = now.strftime("%Y%m%d%H")
     dirname = f"{hour}_{cc}_{test_name}"
-    spooldir = Path(conf.get("msmt_spool_dir"))
+    spooldir = Path(conf.msmt_spool_dir)
     msmtdir = spooldir / "incoming" / dirname
     msmtdir.mkdir(parents=True, exist_ok=True)
 
