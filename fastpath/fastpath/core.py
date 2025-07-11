@@ -1619,13 +1619,16 @@ def write_measurement_to_disk(msm_tup) -> None:
     h = sha512(data).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
-    # msmt_uid is a unique id based on upload time, cc, testname and hash
-    msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
-    msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
-    msmt_f_tmp.write_bytes(data)
+    try: 
+        # msmt_uid is a unique id based on upload time, cc, testname and hash
+        msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
+        msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
+        msmt_f_tmp.write_bytes(data)
 
-    msmt_f = msmtdir / f"{msmt_uid}.post"
-    msmt_f_tmp.rename(msmt_f)
+        msmt_f = msmtdir / f"{msmt_uid}.post"
+        msmt_f_tmp.rename(msmt_f)
+    except Exception as exc:
+        log.error(f"Failed to upload measurement {msmt_uid}. Error: {exc}")
 
 @metrics.timer("full_run")
 def process_measurement(msm_tup, buffer_writes=False) -> None:
