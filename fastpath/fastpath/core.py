@@ -11,12 +11,15 @@ See README.adoc
 # Compatible with Python3.6 and 3.7 - linted with Black
 # debdeps: python3-setuptools
 
+from typing import Tuple
+from datetime import datetime, timezone
 from argparse import ArgumentParser, Namespace
 from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, TypedDict
+from hashlib import sha512
 import binascii
 import logging
 import multiprocessing as mp
@@ -1577,6 +1580,7 @@ def msm_processor(queue):
             log.info("Worker with PID %d exiting", os.getpid())
             return
 
+        write_measurement_to_disk(msm_tup)
         process_measurement(msm_tup)
         update_fingerprints_if_needed()
 
@@ -1601,6 +1605,27 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
         scores["accuracy"] = 0.0
         scores["msg"] = "Measurement start time too old"
 
+def write_measurement_to_disk(msm_tup) -> None:
+    data, measurement, msmt_uid = msm_tup
+    rid_timestamp, test_name, cc, asn, format_cid, rand = msmt_uid.split("_")
+
+    now = datetime.now(timezone.utc)
+    hour = now.strftime("%Y%m%d%H")
+    dirname = f"{hour}_{cc}_{test_name}"
+    spooldir = Path(conf.get("msmt_spool_dir"))
+    msmtdir = spooldir / "incoming" / dirname
+    msmtdir.mkdir(parents=True, exist_ok=True)
+
+    h = sha512(data).hexdigest()[:16]
+    ts = now.strftime("%Y%m%d%H%M%S.%f")
+
+    # msmt_uid is a unique id based on upload time, cc, testname and hash
+    msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
+    msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
+    msmt_f_tmp.write_bytes(data)
+
+    msmt_f = msmtdir / f"{msmt_uid}.post"
+    msmt_f_tmp.rename(msmt_f)
 
 @metrics.timer("full_run")
 def process_measurement(msm_tup, buffer_writes=False) -> None:
