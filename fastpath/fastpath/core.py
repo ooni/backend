@@ -11,7 +11,6 @@ See README.adoc
 # Compatible with Python3.6 and 3.7 - linted with Black
 # debdeps: python3-setuptools
 
-from typing import Tuple
 from datetime import datetime, timezone
 from argparse import ArgumentParser, Namespace
 from base64 import b64decode
