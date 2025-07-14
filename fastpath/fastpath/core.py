@@ -157,7 +157,15 @@ def setup() -> None:
         log.info("collectors: %s", conf.collector_hostnames)
         conf.s3_access_key = cp["DEFAULT"]["s3_access_key"].strip()
         conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
-        conf.msmt_spool_dir = cp["DEFAULT"]["msmt_spool_dir"].strip()
+
+        write_to_disk = cp["DEFAULT"].get("write_to_disk")
+        if write_to_disk:
+            conf.write_to_disk = write_to_disk.strip().lower() == 'true'
+            # msmt_spool_dir is only used with write_to_disk
+            conf.msmt_spool_dir = cp["DEFAULT"]["msmt_spool_dir"].strip()
+        else:
+            conf.write_to_disk = False
+
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
 
@@ -1613,6 +1621,9 @@ def write_measurement_to_disk(msm_tup) -> None:
     Args:
         msm_tup: Measurement tuple as it comes from the work queue
     """
+    if not conf.write_to_disk:
+        return
+
     data, measurement, msmt_uid = msm_tup
     ts, cc, test_name, h = msmt_uid.split("_")
 
