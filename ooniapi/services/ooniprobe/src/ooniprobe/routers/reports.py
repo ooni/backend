@@ -183,21 +183,11 @@ async def receive_measurement(
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
-    hour = now.strftime("%Y%m%d%H")
-    dirname = f"{hour}_{cc}_{test_name}"
-    spooldir = Path(settings.msmt_spool_dir)
-    msmtdir = spooldir / "incoming" / dirname
-    msmtdir.mkdir(parents=True, exist_ok=True)
-
     h = sha512(data).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
+
     # msmt_uid is a unique id based on upload time, cc, testname and hash
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
-    msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
-    # TODO move writing this file to the fastpath
-    # msmt_f_tmp.write_bytes(data)
-    msmt_f = msmtdir / f"{msmt_uid}.post"
-    # msmt_f_tmp.rename(msmt_f)
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
