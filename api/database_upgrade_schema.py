@@ -121,16 +121,6 @@ CREATE TABLE IF NOT EXISTS accounts
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY account_id"""
     )
-    run(
-        """
-CREATE TABLE IF NOT EXISTS session_expunge
-(
-    `account_id` FixedString(32),
-    `threshold` DateTime DEFAULT now()
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id"""
-    )
 
     # Materialized views
     run(
