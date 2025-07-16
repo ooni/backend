@@ -162,6 +162,7 @@ def setup() -> None:
         if conf.write_to_disk:
             # msmt_spool_dir is only used with write_to_disk
             conf.msmt_spool_dir = cp["DEFAULT"]["msmt_spool_dir"].strip()
+            log.info(f"writing measurements to disk at path {conf.msmt_spool_dir}")
 
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
