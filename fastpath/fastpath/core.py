@@ -1588,7 +1588,9 @@ def msm_processor(queue):
             log.info("Worker with PID %d exiting", os.getpid())
             return
 
-        write_measurement_to_disk(msm_tup)
+        if conf.write_to_disk:
+            write_measurement_to_disk(msm_tup)
+
         process_measurement(msm_tup)
         update_fingerprints_if_needed()
 
@@ -1620,8 +1622,6 @@ def write_measurement_to_disk(msm_tup) -> None:
     Args:
         msm_tup: Measurement tuple as it comes from the work queue
     """
-    if not conf.write_to_disk:
-        return
 
     data, measurement, msmt_uid = msm_tup
     ts, cc, test_name, h = msmt_uid.split("_")
