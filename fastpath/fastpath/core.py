@@ -127,6 +127,8 @@ def setup() -> None:
     ap.add_argument("--ccs", help="Filter comma-separated CCs when feeding from S3")
     h = "Filter comma-separated test names when feeding from S3 (without underscores)"
     ap.add_argument("--testnames", help=h)
+    h = "Allow writing measurements to spool dir, see: https://github.com/ooni/backend/pull/971"
+    ap.add_argument("--write-to-disk", action="store_true", help=h)
 
     conf = ap.parse_args()
 
@@ -157,13 +159,9 @@ def setup() -> None:
         conf.s3_access_key = cp["DEFAULT"]["s3_access_key"].strip()
         conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
 
-        write_to_disk = cp["DEFAULT"].get("write_to_disk")
-        if write_to_disk:
-            conf.write_to_disk = write_to_disk.strip().lower() == 'true'
+        if conf.write_to_disk:
             # msmt_spool_dir is only used with write_to_disk
             conf.msmt_spool_dir = cp["DEFAULT"]["msmt_spool_dir"].strip()
-        else:
-            conf.write_to_disk = False
 
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
