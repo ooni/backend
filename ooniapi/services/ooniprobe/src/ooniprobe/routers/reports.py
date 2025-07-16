@@ -58,6 +58,17 @@ class Metrics:
         "missed_msmnts", "Measurements that failed to be sent to the fast path."
     )
 
+    SEND_FASTPATH_FAILURE = Counter(
+        "measurement_fastpath_send_failure_count",
+        "How many times ooniprobe failed to send a measurement to fastpath"
+    )
+
+    SEND_S3_FAILURE = Counter(
+        "measurement_s3_upload_failure_count",
+        "How many times ooniprobe failed to send a measurement to s3. "
+        "Measurements are sent to s3 when they can't be sent to the fastpath"
+    )
+
 
 class OpenReportRequest(BaseModel):
     """
@@ -203,6 +214,8 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
+    
+    Metrics.SEND_FASTPATH_FAILURE.inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     try:
@@ -211,6 +224,7 @@ async def receive_measurement(
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
+        Metrics.SEND_S3_FAILURE.inc()
 
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
