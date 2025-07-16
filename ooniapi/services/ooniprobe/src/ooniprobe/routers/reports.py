@@ -1,10 +1,12 @@
 from typing import List, Annotated, Dict, Any
+import asyncio
 from pathlib import Path
 import logging
 from hashlib import sha512
 from urllib.request import urlopen
 from datetime import datetime, timezone
 import io
+import random
 
 from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
 from pydantic import Field
@@ -202,6 +204,7 @@ async def receive_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
+    # Use exponential back off with jitter between retries
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
@@ -214,6 +217,8 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
+            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
