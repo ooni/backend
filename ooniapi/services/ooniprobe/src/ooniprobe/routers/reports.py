@@ -60,13 +60,13 @@ class Metrics:
 
     SEND_FASTPATH_FAILURE = Counter(
         "measurement_fastpath_send_failure_count",
-        "How many times ooniprobe failed to send a measurement to fastpath"
+        "How many times ooniprobe failed to send a measurement to fastpath",
     )
 
     SEND_S3_FAILURE = Counter(
         "measurement_s3_upload_failure_count",
         "How many times ooniprobe failed to send a measurement to s3. "
-        "Measurements are sent to s3 when they can't be sent to the fastpath"
+        "Measurements are sent to s3 when they can't be sent to the fastpath",
     )
 
 
@@ -96,7 +96,7 @@ class OpenReportResponse(BaseModel):
     supported_formats: List[str]
 
 
-@timer
+@timer(name="open_report")
 @router.post("/report", tags=["reports"], response_model=OpenReportResponse)
 def open_report(
     data: OpenReportRequest, response: Response, settings: SettingsDep
@@ -136,7 +136,7 @@ class ReceiveMeasurementResponse(BaseModel):
     )
 
 
-@timer
+@timer(name="receive_measurement")
 @router.post("/report/{report_id}", tags=["reports"])
 async def receive_measurement(
     report_id: str,
@@ -214,7 +214,7 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
-    
+
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
@@ -231,6 +231,7 @@ async def receive_measurement(
     return empty_measurement
 
 
+@timer(name="close_report")
 @router.post("/report/{report_id}/close", tags=["reports"])
 def close_report(report_id):
     """
