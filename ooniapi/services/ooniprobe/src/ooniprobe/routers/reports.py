@@ -9,6 +9,7 @@ import io
 import random
 
 from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
+import httpx
 from pydantic import Field
 from prometheus_client import Counter
 import zstd
@@ -209,8 +210,11 @@ async def receive_measurement(
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
-            # TODO would be nice to make this async due to the size of the data being transmitted.
-            urlopen(url, data, 59)
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, content=data, timeout=59)
+            
+            assert resp.status_code == 200, resp.content
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
