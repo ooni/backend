@@ -6,7 +6,7 @@ DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
 SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
 # PKG_VERSION := $(shell hatch version) where to get the PKG version?
-PKG_VERSION = 0.1
+PKG_VERSION = 0.87
 
 BUILD_LABEL := $(DATE)-$(SHORT_SHA)
 VERSION_LABEL = v$(PKG_VERSION)
