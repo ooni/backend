@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import shutil
 import os
+from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -12,6 +13,7 @@ from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
+from ooniprobe.dependencies import get_s3_client
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
 
@@ -97,6 +99,7 @@ def geoip_db_dir(fixture_path):
 @pytest.fixture
 def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
+    app.dependency_overrides[get_s3_client] = get_s3_client_mock
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
@@ -104,7 +107,7 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
+def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, fastpath_server):
     port = docker_services.port_for("clickhouse", 9000)
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
@@ -112,6 +115,8 @@ def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir):
         prometheus_metrics_password="super_secure",
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
         geoip_db_dir=geoip_db_dir,
+        collector_id="1",
+        fastpath_url=fastpath_server
     )
 
 
@@ -143,3 +148,30 @@ def clickhouse_server(docker_ip, docker_services):
 @pytest.fixture(scope="session")
 def clickhouse_db(clickhouse_server):
     yield ClickhouseClient.from_url(clickhouse_server)
+
+class S3ClientMock:
+
+    def __init__(self) -> None:
+        self.files = []
+
+    def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
+        self.files.append(f"{Bucket}/{Key}")
+
+def get_s3_client_mock() -> S3ClientMock:
+    return S3ClientMock()
+
+@pytest.fixture(scope="session")
+def fastpath_server(docker_ip, docker_services):
+    port = docker_services.port_for("fakepath", 80)
+    url = f"http://{docker_ip}:{port}"
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=0.1, check=lambda: is_fastpath_running(url)
+    )
+    yield url
+
+def is_fastpath_running(url: str) -> bool: 
+    try: 
+        resp = urlopen(url)
+        return resp.status == 200
+    except:
+        return False

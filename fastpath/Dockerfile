@@ -25,4 +25,5 @@ COPY . .
 ENV PYTHONPATH=/app
 COPY fastpath.conf /etc/ooni/fastpath.conf
 
-CMD ["python", "/app/run_fastpath"]
+
+CMD ["python", "/app/run_fastpath", "--write-to-disk"]
