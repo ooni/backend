@@ -5,8 +5,9 @@ IMAGE_NAME ?= ooni/$(SERVICE_NAME)
 DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
 GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
 SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
-# PKG_VERSION := $(shell hatch version) where to get the PKG version?
-PKG_VERSION = 0.87
+# this magic line will parse the version from the changelog file
+PKG_VERSION = $(shell grep -m1 '^fastpath (' debian/changelog | sed -E 's/^fastpath \(([^)]+)\).*/\1/')
+
 
 BUILD_LABEL := $(DATE)-$(SHORT_SHA)
 VERSION_LABEL = v$(PKG_VERSION)
