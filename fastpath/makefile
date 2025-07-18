@@ -1,3 +1,18 @@
+SERVICE_NAME ?= fastpath
+
+CONTAINER_NAME ?= $(SERVICE_NAME)
+IMAGE_NAME ?= ooni/$(SERVICE_NAME)
+DATE := $(shell python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d'))")
+GIT_FULL_SHA ?= $(shell git rev-parse HEAD)
+SHORT_SHA := $(shell echo ${GIT_FULL_SHA} | cut -c1-8)
+# this magic line will parse the version from the changelog file
+PKG_VERSION = $(shell grep -m1 '^fastpath (' debian/changelog | sed -E 's/^fastpath \(([^)]+)\).*/\1/')
+
+
+BUILD_LABEL := $(DATE)-$(SHORT_SHA)
+VERSION_LABEL = v$(PKG_VERSION)
+ENV_LABEL ?= latest
+
 
 local_quickdeploy:
 	cp fastpath/*.py /usr/local/lib/python3.9/
@@ -100,3 +115,27 @@ docker-logs:
 # `make docker-logs-for args="clickhouse-server"`
 docker-logs-for:
 	docker compose logs $(args) -f 
+
+# Used for actually building the fastpath docker image
+docker-build: 
+# We need to use tar -czh to resolve the common dir symlink
+	tar -czh . | docker build \
+		--build-arg BUILD_LABEL=${BUILD_LABEL} \
+		-t ${IMAGE_NAME}:${BUILD_LABEL} \
+		-t ${IMAGE_NAME}:${VERSION_LABEL} \
+		-t ${IMAGE_NAME}:${ENV_LABEL} \
+		-
+	echo "built image: ${IMAGE_NAME}:${BUILD_LABEL} (${IMAGE_NAME}:${VERSION_LABEL} ${IMAGE_NAME}:${ENV_LABEL})"
+
+docker-push:
+	# We need to use tar -czh to resolve the common dir symlink
+	docker push ${IMAGE_NAME}:${BUILD_LABEL}
+	docker push ${IMAGE_NAME}:${VERSION_LABEL}
+	docker push ${IMAGE_NAME}:${ENV_LABEL}
+
+imagedefinitions.json:
+	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
+
+# Used by other ECS services but not implemented for fastpath yet
+docker-smoketest:
+	echo "Smoketest not yet implemented"

@@ -25,6 +25,4 @@ COPY . .
 ENV PYTHONPATH=/app
 COPY fastpath.conf /etc/ooni/fastpath.conf
 
-EXPOSE 5000
-
 CMD ["python", "/app/run_fastpath"]
