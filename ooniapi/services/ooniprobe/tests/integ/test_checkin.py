@@ -9,15 +9,13 @@ from ooniprobe.common.clickhouse_utils import insert_click
 def getjson(client, url):
     response = client.get(url)
     assert response.status_code == 200
-    assert response.is_json
-    return response.json
+    return response.json()
 
 
 def getjsonh(client, url, headers=None):
     response = client.get(url, headers=headers)
     assert response.status_code == 200
-    assert response.is_json
-    return response.json
+    return response.json()
 
 
 def post(client, url, data):
@@ -108,3 +106,8 @@ def test_check_in_url_category_news(client):
     assert int(asn_i) == 0
     assert stn == "webconnectivity"
     assert cc == "ZZ"
+
+
+def test_test_helpers(client):
+    c = getjson(client, "/api/v1/test-helpers")
+    assert len(c) == 6

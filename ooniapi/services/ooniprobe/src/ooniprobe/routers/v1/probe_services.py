@@ -13,6 +13,7 @@ from prometheus_client import Counter, Info, Gauge
 from enum import Enum
 import sqlalchemy as sa
 from clickhouse_driver import Client as Clickhouse
+from pydantic import Field
 
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
@@ -299,6 +300,34 @@ class CheckInResponse(BaseModel):
     utc_time: str
     conf: Dict[str, Any]
     tests: Dict[str, Any]
+
+
+class TestHelperEntry(BaseModel):
+    address: str
+    type: str
+    front: Optional[str] = None
+
+
+class ListTestHelpersResponse(BaseModel):
+    dns: List[TestHelperEntry]
+    http_return_json_headers: List[TestHelperEntry] = Field(
+        alias="http-return-json-headers"
+    )
+    ssl: List[TestHelperEntry]
+    tcp_echo: List[TestHelperEntry] = Field(alias="tcp-echo")
+    traceroute: List[TestHelperEntry]
+    web_connectivity: List[TestHelperEntry] = Field(alias="web-connectivity")
+
+
+@router.get("/test-helpers", tags=["ooniprobe"])
+def list_test_helpers(response: Response):
+    setnocacheresponse(response)
+    conf = generate_test_helpers_conf()
+    conf_typed = {}
+    for key, value in conf.items():
+        conf_typed[key] = [TestHelperEntry(**e) for e in value]
+
+    return ListTestHelpersResponse.model_validate(conf_typed)
 
 
 @router.post("/check-in", tags=["ooniprobe"])
