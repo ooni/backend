@@ -65,7 +65,7 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
 
-@timer
+@timer(name="fetch_reactive_url_list")
 def fetch_reactive_url_list(
     clickhouse_db: Clickhouse, cc: str, probe_asn: int
 ) -> tuple:
@@ -105,7 +105,7 @@ def fetch_reactive_url_list(
     return tuple(r)
 
 
-@timer
+@timer(name="fetch_prioritization_rules")
 def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     sql = """SELECT category_code, cc, domain, url, priority
     FROM url_priorities WHERE cc = :cc OR cc = '*' OR cc = ''
@@ -114,7 +114,7 @@ def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
     return tuple(q)
 
 
-@timer
+@timer(name="generate_test_list")
 def generate_test_list(
     clickhouse: Clickhouse,
     country_code: str,
