@@ -1,6 +1,7 @@
 import pytest
 import requests
 from clickhouse_driver.client import Client as ClickhouseClient
+import os 
 
 # Time to wait for docker services
 TIMEOUT = 10.0
@@ -39,3 +40,10 @@ def is_clickhouse_running(url):
         return True
     except Exception:
         return False
+
+@pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    # Fastpath has a weird file layout, causing 
+    # the docker plugin to generate the wrong docker-compose.yml path
+    # This line will make sure that the tests run properly with make 
+    return os.path.join(str(pytestconfig.rootdir), "fastpath", "tests", "docker-compose.yml")

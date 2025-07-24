@@ -1,20 +1,21 @@
-from base64 import b64encode
-from os import urandom
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict, Tuple, Annotated, TypeAlias, Optional
+from typing import List, Optional, Any, Dict, Tuple, Optional
 import random
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
-from enum import Enum
-import sqlalchemy as sa
-from clickhouse_driver import Client as Clickhouse
 from pydantic import Field
 
+from ...utils import (
+    generate_report_id,
+    extract_probe_ipaddr,
+    lookup_probe_cc,
+    lookup_probe_network,
+)
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
@@ -526,30 +527,6 @@ def probe_geoip(
     return resp, probe_cc, asn_int
 
 
-def extract_probe_ipaddr(request: Request) -> str:
-
-    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
-    for h in real_ip_headers:
-        if h in request.headers:
-            return request.headers.getlist(h)[0].rpartition(" ")[-1]
-
-    return request.client.host if request.client else ""
-
-
-def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    resp = asn_reader.asn(ipaddr)
-
-    return (
-        "AS{}".format(resp.autonomous_system_number),
-        resp.autonomous_system_organization or "0",
-    )
-
-
-def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    resp = cc_reader.country(ipaddr)
-    return resp.country.iso_code or "ZZ"
-
-
 def generate_test_helpers_conf() -> Dict:
     # Load-balance test helpers deterministically
     conf = {
@@ -613,12 +590,3 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
-
-
-def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    cid = settings.collector_id
-    rand = b64encode(urandom(12), b"oo").decode()
-    stn = test_name.replace("_", "")
-    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
-    return rid

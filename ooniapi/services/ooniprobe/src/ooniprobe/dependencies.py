@@ -10,6 +10,9 @@ from sqlalchemy.orm import sessionmaker
 
 from clickhouse_driver import Client as Clickhouse
 
+import boto3
+from mypy_boto3_s3 import S3Client
+
 from .common.config import Settings
 from .common.dependencies import get_settings
 
@@ -53,3 +56,11 @@ def get_clickhouse_session(settings: SettingsDep):
 
 
 ClickhouseDep = Annotated[Clickhouse, Depends(get_clickhouse_session)]
+
+
+def get_s3_client() -> S3Client:
+    s3 = boto3.client("s3")
+    return s3
+
+
+S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]

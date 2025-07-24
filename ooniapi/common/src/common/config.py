@@ -34,3 +34,7 @@ class Settings(BaseSettings):
 
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
+    # Ooniprobe only
+    msmt_spool_dir: str = ""
+    fastpath_url: str = ""  # example: http://123.123.123.123:8472
+    failed_reports_bucket: str = "" # for uploading reports that couldn't be sent to fastpath
