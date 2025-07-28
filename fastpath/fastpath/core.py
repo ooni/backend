@@ -372,7 +372,7 @@ def match_http_headers_fingerprints(resp, matches) -> None:
         if not loc_found.startswith("header."):
             continue
         pat_type = fp["pattern_type"]
-        hname = loc_found[8:]
+        hname = loc_found[7:]
         if pat_type == "full":
             if headers.get(hname) == fp["pattern"]:
                 matches.append(minifp(fp))
