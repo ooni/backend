@@ -7,7 +7,7 @@ RUN apt update && apt install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /var/lib/fastpath
-RUN chmod 777 /var/lib/fastpath
+RUN chmod 777 /var/lib/fastpath 
 
 WORKDIR /app
 
