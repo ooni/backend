@@ -299,7 +299,7 @@ def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
         scores=msmt_meta["scores"],
         anomaly=(msmt_meta["anomaly"] == "t"),
         confirmed=(msmt_meta["confirmed"] == "t"),
-        failure=(msmt_meta["failure"] == "t"),
+        failure=(msmt_meta["msm_failure"] == "t"),
         category_code=msmt_meta.get("category_code", None),
     )
     return formatted_msmt_meta
