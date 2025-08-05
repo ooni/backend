@@ -1,5 +1,8 @@
 import pytest
-
+from clickhouse_driver import Client as Clickhouse
+from oonimeasurements.common.clickhouse_utils import query_click_one_row
+from oonimeasurements.routers.v1.measurements import format_msmt_meta
+from sqlalchemy import sql
 
 route = "api/v1/measurements"
 
@@ -96,3 +99,20 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
     domain_list = domainCollection.split(", ")
     for result in json["results"]:
         assert any(domain in result["input"] for domain in domain_list), result
+
+def test_failure_format(db):
+    ch = Clickhouse.from_url(db)
+    msm = query_click_one_row(ch, "select * from fastpath where test_name = 'web_connectivity'", {}) or {}
+    uid = msm['measurement_uid']
+
+    q = """
+    SELECT * FROM fastpath
+        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+        WHERE measurement_uid = :uid
+        LIMIT 1
+    """
+    query_params = dict(uid=uid)
+    row = query_click_one_row(ch, sql.text(q), query_params, query_prio=3) or {}
+
+    # Validation shouldn't crash
+    format_msmt_meta(row)
