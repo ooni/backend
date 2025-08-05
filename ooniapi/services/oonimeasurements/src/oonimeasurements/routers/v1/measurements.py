@@ -294,7 +294,7 @@ def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
         report_id=msmt_meta["report_id"],
         test_name=msmt_meta["test_name"],
         test_start_time=msmt_meta["test_start_time"],
-        probe_asn=msmt_meta["probe_asn"],
+        probe_asn=str(msmt_meta["probe_asn"]),
         probe_cc=msmt_meta["probe_cc"],
         scores=msmt_meta["scores"],
         anomaly=(msmt_meta["anomaly"] == "t"),
