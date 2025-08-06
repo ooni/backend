@@ -102,7 +102,7 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
 
 def test_failure_format(db):
     ch = Clickhouse.from_url(db)
-    msm = query_click_one_row(ch, "select * from fastpath where test_name = 'web_connectivity'", {}) or {}
+    msm = query_click_one_row(ch, "SELECT * FROM fastpath WHERE test_name = 'web_connectivity' LIMIT 1", {}) or {}
     uid = msm['measurement_uid']
 
     q = """
