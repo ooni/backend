@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     clickhouse_url: str = "clickhouse://localhost"
     postgresql_url: str = "postgresql://oonidb:oonidb@localhost/oonidb"
     log_level: str = "info"
-    s3_bucket_name: str = "ooni-data-eu-fra"
+    # s3_bucket_name: str = "ooni-data-eu-fra" # Prod bucket
+    s3_bucket_name: str = "ooni-data-eu-fra-test"
     other_collectors: List[str] = []
     statsd_host: str = "localhost"
     statsd_port: int = 8125
