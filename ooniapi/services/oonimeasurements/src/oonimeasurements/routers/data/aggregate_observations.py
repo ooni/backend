@@ -124,13 +124,13 @@ async def get_aggregation_observations(
         columns.append(
             f"""multiIf(
     dns_failure IS NOT NULL,
-    CONCAT('dns_', dns_failure),
+    CONCAT('dns_', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
     tcp_failure IS NOT NULL,
-    CONCAT('tcp_', tcp_failure),
+    CONCAT('tcp_', IF(startsWith(tcp_failure, 'unknown_failure'), 'unknown_failure', tcp_failure)),
     IF(
         tls_failure IS NULL AND tls_server_name IS NOT NULL,
         'none',
-        CONCAT('tls_', tls_failure)
+        CONCAT('tls_', IF(startsWith(tls_failure, 'unknown_failure'), 'unknown_failure', tls_failure))
     )
 ) as failure
 """
