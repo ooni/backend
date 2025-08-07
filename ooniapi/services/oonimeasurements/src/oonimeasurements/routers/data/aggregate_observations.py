@@ -123,17 +123,15 @@ async def get_aggregation_observations(
     if "failure" in group_by:
         columns.append(
             f"""multiIf(
-dns_failure IS NOT NULL,
-CONCAT('dns_', dns_failure),
-tcp_failure IS NOT NULL,
-CONCAT('tcp_', tcp_failure),
-multiIf(
-tls_handshake_last_operation = 'write_1',
-CONCAT('tls_', tls_failure, '_after_CH'),
-tls_failure IS NULL AND tls_server_name IS NOT NULL,
-'none',
-CONCAT('tls_', tls_failure)
-)
+    dns_failure IS NOT NULL,
+    CONCAT('dns_', dns_failure),
+    tcp_failure IS NOT NULL,
+    CONCAT('tcp_', tcp_failure),
+    IF(
+        tls_failure IS NULL AND tls_server_name IS NOT NULL,
+        'none',
+        CONCAT('tls_', tls_failure)
+    )
 ) as failure
 """
         )
