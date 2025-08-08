@@ -35,13 +35,13 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     arrayMap(
         x -> multiIf(
             x.2 = 'dns_isp',
-            CONCAT(x.2, '.', dns_isp_blocked_outcome),
+            (CONCAT(x.2, '.', dns_isp_blocked_outcome), dns_isp_blocked),
             x.2 = 'dns_other',
-            CONCAT(x.2, '.', dns_other_blocked_outcome),
+            (CONCAT(x.2, '.', dns_other_blocked_outcome), dns_other_blocked),
             x.2 = 'tcp',
-            CONCAT(x.2, '.', tcp_blocked_outcome),
+            (CONCAT(x.2, '.', tcp_blocked_outcome), tcp_blocked),
             x.2 = 'tls',
-            CONCAT(x.2, '.', tls_blocked_outcome),
+            (CONCAT(x.2, '.', tls_blocked_outcome), tls_blocked),
             'none'
         ),
         arraySort(

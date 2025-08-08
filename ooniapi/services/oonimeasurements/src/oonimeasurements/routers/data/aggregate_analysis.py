@@ -52,7 +52,8 @@ class Loni(BaseModel):
     tcp_ok: float
 
     likely_blocked_protocols: List[str]
-    blocked_max_protocol: str
+    blocked_max_outcome: str
+    blocked_max: float
 
     dns_isp_blocked_outcome: str
     dns_other_blocked_outcome: str
@@ -198,6 +199,8 @@ async def get_aggregation_analysis(
     if rows and isinstance(rows, list):
         for row in rows:
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
+            blocked_max_protocol = d.get("blocked_max_protocol", ["", 0.0])
+
             loni = Loni(
                 dns_isp_blocked=d.get("dns_isp_blocked", 0.0),
                 dns_isp_down=d.get("dns_isp_down", 0.0),
@@ -211,8 +214,11 @@ async def get_aggregation_analysis(
                 tcp_blocked=d.get("tcp_blocked", 0.0),
                 tcp_down=d.get("tcp_down", 0.0),
                 tcp_ok=d.get("tcp_ok", 0.0),
-                blocked_max_protocol=d.get("blocked_max_protocol", ""),
                 likely_blocked_protocols=d.get("likely_blocked_protocols", []),
+                blocked_max_outcome=(
+                    blocked_max_protocol[0] if blocked_max_protocol else ""
+                ),
+                blocked_max=blocked_max_protocol[1] if blocked_max_protocol else 0.0,
                 dns_isp_blocked_outcome=d.get("dns_isp_blocked_outcome", ""),
                 dns_other_blocked_outcome=d.get("dns_other_blocked_outcome", ""),
                 tcp_blocked_outcome=d.get("tcp_blocked_outcome", ""),
