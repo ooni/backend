@@ -1626,7 +1626,7 @@ def write_measurement_to_disk(msm_tup) -> None:
     data, measurement, msmt_uid = msm_tup
     ts, cc, test_name, h = msmt_uid.split("_")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.strptime(ts, "%Y%m%d%H%M%S.%f")
     hour = now.strftime("%Y%m%d%H")
     dirname = f"{hour}_{cc}_{test_name}"
     spooldir = Path(conf.msmt_spool_dir)
