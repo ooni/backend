@@ -1,5 +1,5 @@
 # Stage 1: Building
-FROM python:3.13.3-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 RUN apt update && apt install -y --no-install-recommends \
     build-essential \
@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
 
 # Stage 2: Running
-FROM python:3.13.3-slim-bookworm 
+FROM python:3.12-slim-bookworm 
 
 RUN apt update && rm -rf /var/lib/apt/lists/*
 

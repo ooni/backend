@@ -152,7 +152,7 @@ def _fetch_measurement_body_from_hosts(
         return None
 
     for hostname in other_collectors:
-        url = urljoin(f"https://{hostname}/measurement_spool/", path)
+        url = urljoin(f"{hostname}/measurement_spool/", path)
         log.debug(f"Attempt to load {url}")
         try:
             r = urllib_pool.request("GET", url)
