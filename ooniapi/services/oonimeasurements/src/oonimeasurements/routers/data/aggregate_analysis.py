@@ -26,12 +26,7 @@ log = logging.getLogger(__name__)
 
 
 AggregationKeys = Literal[
-    "measurement_start_day",
-    "domain",
-    "probe_cc",
-    "probe_asn",
-    "test_name",
-    "input"
+    "measurement_start_day", "domain", "probe_cc", "probe_asn", "test_name", "input"
 ]
 
 
