@@ -51,21 +51,19 @@ class Loni(BaseModel):
     tcp_down: float
     tcp_ok: float
 
-    dns_isp_outcome: str
-    dns_other_outcome: str
-    tcp_outcome: str
-    tls_outcome: str
+    likely_blocked_protocols: List[str]
+    blocked_max_protocol: str
+
+    dns_isp_blocked_outcome: str
+    dns_other_blocked_outcome: str
+    tcp_blocked_outcome: str
+    tls_blocked_outcome: str
 
 
 class AggregationEntry(BaseModel):
     count: float
 
     measurement_start_day: Optional[datetime] = None
-
-    outcome_label: str
-    outcome_ok: float
-    outcome_blocked: float
-    outcome_down: float
 
     loni: Loni
 
@@ -213,24 +211,18 @@ async def get_aggregation_analysis(
                 tcp_blocked=d.get("tcp_blocked", 0.0),
                 tcp_down=d.get("tcp_down", 0.0),
                 tcp_ok=d.get("tcp_ok", 0.0),
-                dns_isp_outcome=d.get("dns_isp_outcome", ""),
-                dns_other_outcome=d.get("dns_other_outcome", ""),
-                tcp_outcome=d.get("tcp_outcome", ""),
-                tls_outcome=d.get("tls_outcome", ""),
+                blocked_max_protocol=d.get("blocked_max_protocol", ""),
+                likely_blocked_protocols=d.get("likely_blocked_protocols", []),
+                dns_isp_blocked_outcome=d.get("dns_isp_blocked_outcome", ""),
+                dns_other_blocked_outcome=d.get("dns_other_blocked_outcome", ""),
+                tcp_blocked_outcome=d.get("tcp_blocked_outcome", ""),
+                tls_blocked_outcome=d.get("tls_blocked_outcome", ""),
             )
-            outcome_label = d["most_likely_label"]
-            outcome_blocked = d["most_likely_blocked"]
-            outcome_down = d["most_likely_down"]
-            outcome_ok = d["most_likely_ok"]
 
             entry = AggregationEntry(
                 count=d["count"],
                 measurement_start_day=d.get("measurement_start_day"),
                 loni=loni,
-                outcome_label=outcome_label,
-                outcome_blocked=outcome_blocked,
-                outcome_down=outcome_down,
-                outcome_ok=outcome_ok,
                 domain=d.get("domain"),
                 probe_cc=d.get("probe_cc"),
                 probe_asn=d.get("probe_asn"),
