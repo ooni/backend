@@ -43,12 +43,14 @@ class Loni(BaseModel):
     dns_other_blocked: float
     dns_other_down: float
     dns_other_ok: float
-    tls_blocked: float
-    tls_down: float
-    tls_ok: float
+
     tcp_blocked: float
     tcp_down: float
     tcp_ok: float
+
+    tls_blocked: float
+    tls_down: float
+    tls_ok: float
 
     likely_blocked_protocols: List[str]
     blocked_max_outcome: str
@@ -122,7 +124,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
             (CONCAT(x.2, '.', tcp_blocked_outcome), tcp_blocked),
             x.2 = 'tls',
             (CONCAT(x.2, '.', tls_blocked_outcome), tls_blocked),
-            'none'
+            ('none', 0.0)
         ),
         arraySort(
             x -> -x.1,
@@ -150,7 +152,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         ) as dns_failure
 
         SELECT
-            probe_cc,
+            {",".join(extra_cols.values())},
             COUNT() as count,
 
             anyHeavy(top_probe_analysis) as probe_analysis,
