@@ -83,6 +83,7 @@ class AggregationResponse(BaseModel):
     results: List[AggregationEntry]
 
 
+# editable chart link: https://excalidraw.com/#json=mnoOrMXdSDLVirr8Albuu,xRyHC8-8JlsTTEovwNxOdQ
 analysis_description = """
 ## Overview
 
@@ -99,7 +100,7 @@ and 1.0, where 1.0 is absolute certainty, while 0.0 is the opposite.
 
 It's useful to represent the outcome space as the following Venn diagram:
 
-https://excalidraw.com/#json=mnoOrMXdSDLVirr8Albuu,xRyHC8-8JlsTTEovwNxOdQ
+![https://raw.githubusercontent.com/ooni/backend/a12522a729b6880b5e604cb80d6500e27d82fd57/ooniapi/services/oonimeasurements/docs/loni-outcome-space.svg]
 
 Below we expand upon the meaning of each set:
 
