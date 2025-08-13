@@ -70,3 +70,17 @@ def test_oonidata_aggregation_observations_time_grain(client, time_grain, total,
 
     json = response.json()
     assert len(json["results"]) == total
+
+
+def test_oonidata_aggregation_observations_groupby_failure(client, params_since_and_until_with_two_days):
+    params = params_since_and_until_with_two_days
+    params["group_by"] = ["failure", "timestamp"]
+
+    response = client.get(route, params=params)
+
+    json = response.json()
+    assert len(json["results"]) == 20
+    first_result = json["results"][0]
+    assert "failure" in first_result.keys()
+    assert "timestamp" in first_result.keys()
+    assert "observation_count" in first_result.keys()

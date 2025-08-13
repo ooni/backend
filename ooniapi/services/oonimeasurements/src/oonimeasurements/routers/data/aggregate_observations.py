@@ -150,7 +150,7 @@ async def get_aggregation_observations(
         IF(startsWith(http_request_url, 'https://'), 'https_', 'http_'),
         IF(startsWith(http_failure, 'unknown_failure'), 'unknown_failure', http_failure)
     ),
-    'none',
+    'none'
 ) as failure
 """
         )
