@@ -83,6 +83,101 @@ class AggregationResponse(BaseModel):
     results: List[AggregationEntry]
 
 
+analysis_description = """
+## Overview
+
+The goal of analysis is to use observations to produce likelyhood of network
+interference vectors.
+These vectors are expressing the level of belief we have in a certain target
+(eg. a web resource) being blocked (ie. intentionally unavailable), down (ie.
+unavailable, but not due to a restriction) or ok (ie. available and not
+blocked) in a certain location (eg. country, ASN pair) in a given window of time
+(eg. from the 1st of January 2025 until the 20th of January 2025).
+
+We express the outcome space a likelyhood vector where each value is between 0.0
+and 1.0, where 1.0 is absolute certainty, while 0.0 is the opposite.
+
+It's useful to represent the outcome space as the following Venn diagram:
+
+https://excalidraw.com/#json=mnoOrMXdSDLVirr8Albuu,xRyHC8-8JlsTTEovwNxOdQ
+
+Below we expand upon the meaning of each set:
+
+* B = { something is blocked, and also down or ok or both or only blocked}
+* D = { something is down, but also blocked or ok or both or only down}
+* K = { something is ok, and also down or blocked or both or only ok}
+* PB = { something is blocked, but is NOT down or blocked}
+* PD = { something is down, but is NOT blocked or ok}
+* PK = { something is ok, but is NOT down or blocked}
+* BD¬K = { something is blocked and down, but NOT ok}
+* BK¬D = { something is blocked and ok, but NOT down}
+* DK¬B = { something is down and ok, but NOT blocked}
+* BDK = { something is blocked and down and ok}
+
+At first one might expect the intersection sets to always be null, after
+something can't be blocked and ok at the same time, however it's important to
+keep in mind that these likelyhood vectors apply to a variable location and time
+contour. This means that within a certain window of time the target might be
+unavailable only transiently or it might be unavailable only in a certain subset
+of all locations, resulting in it being, for example, blocked and ok at the same
+time.
+
+While it would be nice to have something where the properties of these
+likelyhood vectors are expressed in such a way where they are indepndent from
+one another (ie. they sum to 1.0), doing so is not so easy.
+For example, it's non-trivial to calculate the "Pure" (PB, PD, PK) values or the
+¬ values.
+
+As a result we decide to focus in this first iteration on just estimating B,
+which we approximate by calculating a robust maximum value on the fuzzy logic
+based analysis vectors.
+Specifically they are estimated using quantiles over all the
+measurement_analysis tables. We don't use just a simple maximum, a single
+outlier would obviously skew the whole calculation.
+
+We then proceed to estimate the likelyhood of the blocking happening at each
+level, dns_isp (probe_asn == resolver_asn), dns_other (probe_asn !=
+resolver_asn), tcp or tls.
+
+We don't consider http level blocking, since that's prone to issues related to
+older versions of the engine not properly marking the address of the
+measurement.
+
+Each entry inside of the analysis endpoint contains the following:
+
+* dns_isp_blocked: value between 0-1 (equivalent to P(B))
+* dns_isp_down: value between 0-1 (equivalent to P(D))
+* dns_isp_ok: value between 0-1 (equivalent to P(K))
+
+* dns_other_blocked: value between 0-1 (equivalent to P(B))
+* dns_other_down: value between 0-1 (equivalent to P(D))
+* dns_other_ok: value between 0-1 (equivalent to P(K))
+
+* tcp_blocked: value between 0-1 (equivalent to P(B))
+* tcp_down: value between 0-1 (equivalent to P(D))
+* tcp_ok: value between 0-1 (equivalent to P(K))
+
+* tls_blocked: value between 0-1 (equivalent to P(B))
+* tls_down: value between 0-1 (equivalent to P(D))
+* tls_ok: value between 0-1 (equivalent to P(K))
+
+* likely_blocked_protocols: is a list of strings identifying the protocols and
+  failure reason string with the associated max blocked likelyhood. (eg.
+  [(tcp.generic_timeout_error, 0.75)]). They are sorted by blocked likelyhood
+* blocked_max_outcome: the string of the first item in the likely_blocked_protocols list (eg. tcp.generic_timeout_error)
+* blocked_max: value between 0-1 of the first item in the likely_blocked_protocols list (eg. 0.75)
+
+* dns_isp_blocked_outcome: string value of the reason for which dns_isp is likely blocked
+* dns_other_blocked_outcome: string value of the reason for which dns_other is likely blocked
+* tcp_blocked_outcome: string value of the reason for which tcp is likely blocked
+* tls_blocked_outcome: string value of the reason for which tls is likely blocked
+
+It's important to remember that since B, D and K are not independent, P(K) +
+P(D) + P(B) does not = 1!
+
+"""
+
+
 def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     return f"""
     SELECT
@@ -205,7 +300,11 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     """
 
 
-@router.get("/v1/aggregation/analysis", tags=["aggregation", "analysis"])
+@router.get(
+    "/v1/aggregation/analysis",
+    tags=["aggregation", "analysis"],
+    description=analysis_description,
+)
 @parse_probe_asn_to_int
 async def get_aggregation_analysis(
     axis_x: Annotated[AggregationKeys, Query()] = "measurement_start_day",
