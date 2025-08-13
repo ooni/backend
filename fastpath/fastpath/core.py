@@ -1622,25 +1622,19 @@ def write_measurement_to_disk(msm_tup) -> None:
         msm_tup: Measurement tuple as it comes from the work queue
     """
 
+    # msmt_uid is a unique id based on upload time, cc, testname and hash
     data, measurement, msmt_uid = msm_tup
     ts, cc, test_name, h = msmt_uid.split("_")
 
-    now = datetime.now(timezone.utc)
-    hour = now.strftime("%Y%m%d%H")
+    hour = ts[:10] #only take until the hour
     dirname = f"{hour}_{cc}_{test_name}"
     spooldir = Path(conf.msmt_spool_dir)
     msmtdir = spooldir / "incoming" / dirname
     msmtdir.mkdir(parents=True, exist_ok=True)
 
-    h = sha512(data).hexdigest()[:16]
-    ts = now.strftime("%Y%m%d%H%M%S.%f")
-
     try: 
-        # msmt_uid is a unique id based on upload time, cc, testname and hash
-        msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
         msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
         msmt_f_tmp.write_bytes(data)
-
         msmt_f = msmtdir / f"{msmt_uid}.post"
         msmt_f_tmp.rename(msmt_f)
     except Exception as exc:
