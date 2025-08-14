@@ -293,7 +293,6 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
 
         FROM analysis_web_measurement
 
-        WHERE
         {where}
         GROUP BY {", ".join(extra_cols.keys())}
         ORDER BY {", ".join(extra_cols.keys())}
