@@ -1,6 +1,7 @@
 import time
+import math
 from datetime import datetime
-from typing import List, Literal, Optional, Union, Dict
+from typing import List, Literal, Optional, Tuple, Union, Dict
 from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -37,29 +38,29 @@ class DBStats(BaseModel):
 
 
 class Loni(BaseModel):
-    dns_isp_blocked: float
-    dns_isp_down: float
-    dns_isp_ok: float
-    dns_other_blocked: float
-    dns_other_down: float
-    dns_other_ok: float
+    dns_isp_blocked: Optional[float]
+    dns_isp_down: Optional[float]
+    dns_isp_ok: Optional[float]
+    dns_other_blocked: Optional[float]
+    dns_other_down: Optional[float]
+    dns_other_ok: Optional[float]
 
-    tcp_blocked: float
-    tcp_down: float
-    tcp_ok: float
+    tcp_blocked: Optional[float]
+    tcp_down: Optional[float]
+    tcp_ok: Optional[float]
 
-    tls_blocked: float
-    tls_down: float
-    tls_ok: float
+    tls_blocked: Optional[float]
+    tls_down: Optional[float]
+    tls_ok: Optional[float]
 
-    likely_blocked_protocols: List[str]
-    blocked_max_outcome: str
-    blocked_max: float
+    likely_blocked_protocols: List[Tuple[str, float]]
+    blocked_max_outcome: Optional[str]
+    blocked_max: Optional[float]
 
-    dns_isp_blocked_outcome: str
-    dns_other_blocked_outcome: str
-    tcp_blocked_outcome: str
-    tls_blocked_outcome: str
+    dns_isp_blocked_outcome: Optional[str]
+    dns_other_blocked_outcome: Optional[str]
+    tcp_blocked_outcome: Optional[str]
+    tls_blocked_outcome: Optional[str]
 
 
 class AggregationEntry(BaseModel):
@@ -275,21 +276,21 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
                 toInt8(tls_blocked * 100)
             ) as top_tls_failures_by_impact,
 
-            quantileIf(0.99)(dns_blocked, is_isp_resolver = 1) as dns_isp_blocked_q99,
-            quantileIf(0.99)(dns_down, is_isp_resolver = 1) as dns_isp_down_q99,
-            quantileIf(0.99)(dns_ok, is_isp_resolver = 1) as dns_isp_ok_q99,
+            quantileIf(0.95)(dns_blocked, is_isp_resolver = 1) as dns_isp_blocked_q99,
+            quantileIf(0.95)(dns_down, is_isp_resolver = 1) as dns_isp_down_q99,
+            quantileIf(0.95)(dns_ok, is_isp_resolver = 1) as dns_isp_ok_q99,
 
-            quantileIf(0.99)(dns_blocked, is_isp_resolver = 0) as dns_other_blocked_q99,
-            quantileIf(0.99)(dns_down, is_isp_resolver = 0) as dns_other_down_q99,
-            quantileIf(0.99)(dns_ok, is_isp_resolver = 0) as dns_other_ok_q99,
+            quantileIf(0.95)(dns_blocked, is_isp_resolver = 0) as dns_other_blocked_q99,
+            quantileIf(0.95)(dns_down, is_isp_resolver = 0) as dns_other_down_q99,
+            quantileIf(0.95)(dns_ok, is_isp_resolver = 0) as dns_other_ok_q99,
 
-            quantile(0.99)(tcp_blocked) as tcp_blocked_q99,
-            quantile(0.99)(tcp_down) as tcp_down_q99,
-            quantile(0.99)(tcp_ok) as tcp_ok_q99,
+            quantile(0.95)(tcp_blocked) as tcp_blocked_q99,
+            quantile(0.95)(tcp_down) as tcp_down_q99,
+            quantile(0.95)(tcp_ok) as tcp_ok_q99,
 
-            quantile(0.99)(tls_blocked) as tls_blocked_q99,
-            quantile(0.99)(tls_down) as tls_down_q99,
-            quantile(0.99)(tls_ok) as tls_ok_q99
+            quantile(0.95)(tls_blocked) as tls_blocked_q99,
+            quantile(0.95)(tls_down) as tls_down_q99,
+            quantile(0.95)(tls_ok) as tls_ok_q99
 
         FROM analysis_web_measurement
 
@@ -407,44 +408,51 @@ async def get_aggregation_analysis(
         "tcp_blocked",
         "tcp_down",
         "tcp_ok",
-        "dns_isp_outcome",
-        "dns_other_outcome",
-        "tcp_outcome",
-        "tls_outcome",
-        "most_likely_ok",
-        "most_likely_down",
-        "most_likely_blocked",
-        "most_likely_label",
+        "dns_isp_blocked_outcome",
+        "dns_other_blocked_outcome",
+        "tcp_blocked_outcome",
+        "tls_blocked_outcome",
+        "likely_blocked_protocols",
+        "blocked_max_protocol",
     ]
 
     results: List[AggregationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
-            blocked_max_protocol = d.get("blocked_max_protocol", ["", 0.0])
+            blocked_max_protocol = d["blocked_max_protocol"]
+
+            def nan_to_none(val):
+                if math.isnan(val):
+                    return None
+                return val
 
             loni = Loni(
-                dns_isp_blocked=d.get("dns_isp_blocked", 0.0),
-                dns_isp_down=d.get("dns_isp_down", 0.0),
-                dns_isp_ok=d.get("dns_isp_ok", 0.0),
-                dns_other_blocked=d.get("dns_other_blocked", 0.0),
-                dns_other_down=d.get("dns_other_down", 0.0),
-                dns_other_ok=d.get("dns_other_ok", 0.0),
-                tls_blocked=d.get("tls_blocked", 0.0),
-                tls_down=d.get("tls_down", 0.0),
-                tls_ok=d.get("tls_ok", 0.0),
-                tcp_blocked=d.get("tcp_blocked", 0.0),
-                tcp_down=d.get("tcp_down", 0.0),
-                tcp_ok=d.get("tcp_ok", 0.0),
-                likely_blocked_protocols=d.get("likely_blocked_protocols", []),
+                dns_isp_blocked=nan_to_none(d["dns_isp_blocked"]),
+                dns_isp_down=nan_to_none(d["dns_isp_down"]),
+                dns_isp_ok=nan_to_none(d["dns_isp_ok"]),
+                dns_other_blocked=nan_to_none(d["dns_other_blocked"]),
+                dns_other_down=nan_to_none(d["dns_other_down"]),
+                dns_other_ok=nan_to_none(d["dns_other_ok"]),
+                tls_blocked=nan_to_none(d["tls_blocked"]),
+                tls_down=nan_to_none(d["tls_down"]),
+                tls_ok=nan_to_none(d["tls_ok"]),
+                tcp_blocked=nan_to_none(d["tcp_blocked"]),
+                tcp_down=nan_to_none(d["tcp_down"]),
+                tcp_ok=nan_to_none(d["tcp_ok"]),
+                likely_blocked_protocols=d["likely_blocked_protocols"],
                 blocked_max_outcome=(
                     blocked_max_protocol[0] if blocked_max_protocol else ""
                 ),
-                blocked_max=blocked_max_protocol[1] if blocked_max_protocol else 0.0,
-                dns_isp_blocked_outcome=d.get("dns_isp_blocked_outcome", ""),
-                dns_other_blocked_outcome=d.get("dns_other_blocked_outcome", ""),
-                tcp_blocked_outcome=d.get("tcp_blocked_outcome", ""),
-                tls_blocked_outcome=d.get("tls_blocked_outcome", ""),
+                blocked_max=(
+                    nan_to_none(blocked_max_protocol[1])
+                    if blocked_max_protocol
+                    else 0.0
+                ),
+                dns_isp_blocked_outcome=d["dns_isp_blocked_outcome"],
+                dns_other_blocked_outcome=d["dns_other_blocked_outcome"],
+                tcp_blocked_outcome=d["tcp_blocked_outcome"],
+                tls_blocked_outcome=d["tls_blocked_outcome"],
             )
 
             entry = AggregationEntry(
