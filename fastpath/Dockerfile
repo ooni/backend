@@ -32,7 +32,7 @@ RUN mkdir -p /var/lib/fastpath
 RUN chown -R fastpath:fastpath /var/lib/fastpath
 RUN chown -R fastpath:fastpath /etc/ooni/
 RUN mkdir -p /var/lib/ooniapi/
-RUN chown -R fastpath:fastpath /var/lib/ooniapi/ 
+RUN chown -R fastpath:fastpath /var/lib/ooniapi/  
 
 
 USER fastpath
