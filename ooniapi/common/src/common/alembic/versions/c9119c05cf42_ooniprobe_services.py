@@ -40,7 +40,9 @@ def upgrade() -> None:
         sa.Column("openvpn_key", sa.String(), nullable=False),
     )
 
-    ooniprobe_vpn_provider_endpoint_id_seq = Sequence("ooniprobe_vpn_provider_endpoint_id_seq", start=1)
+    ooniprobe_vpn_provider_endpoint_id_seq = Sequence(
+        "ooniprobe_vpn_provider_endpoint_id_seq", start=1
+    )
     op.execute(CreateSequence(ooniprobe_vpn_provider_endpoint_id_seq))
 
     op.create_table(
@@ -63,6 +65,7 @@ def upgrade() -> None:
             ["ooniprobe_vpn_provider.id"],
         ),
     )
+
 
 def downgrade() -> None:
     op.drop_table("ooniprobe_vpn_provider_endpoint")

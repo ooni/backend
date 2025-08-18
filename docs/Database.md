@@ -70,8 +70,6 @@ An overview of the more important tables:
 
 - [oonirun table](#oonirun-table)&thinsp;⛁ ReplacingMergeTree
 
-- [session_expunge table](#session_expunge-table)&thinsp;⛁ EmbeddedRocksDB
-
 - [test_groups table](#test_groups-table)&thinsp;⛁ Join
 
 - [url_priorities table](#url_priorities-table)&thinsp;⛁ CollapsingMergeTree
@@ -510,22 +508,6 @@ CREATE TABLE default.oonirun
 ENGINE = ReplacingMergeTree(translation_creation_time)
 ORDER BY (ooni_run_link_id, descriptor_creation_time)
 SETTINGS index_granularity = 1
-```
-
-#### session_expunge table
-
-Used for authentication. It stores
-
-Schema:
-
-```sql
-CREATE TABLE default.session_expunge
-(
-    `account_id` FixedString(32),
-    `threshold` DateTime DEFAULT now()
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id
 ```
 
 #### obs_openvpn table

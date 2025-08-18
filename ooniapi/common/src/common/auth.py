@@ -1,5 +1,5 @@
 import hashlib
-from typing import Optional, Dict, Any 
+from typing import Optional, Dict, Any
 import jwt
 
 
@@ -9,12 +9,11 @@ def hash_email_address(email_address: str, key: str) -> str:
 
 
 def check_email_address(
-    authorization: str,
-    jwt_encryption_key: str,
-    email_address: str,
-    key: str
+    authorization: str, jwt_encryption_key: str, email_address: str, key: str
 ) -> bool:
-    account_id = get_account_id_or_raise(authorization, jwt_encryption_key=jwt_encryption_key)
+    account_id = get_account_id_or_raise(
+        authorization, jwt_encryption_key=jwt_encryption_key
+    )
     hashed = hash_email_address(email_address, key=key)
     if account_id == hashed:
         return True
@@ -51,6 +50,7 @@ def get_client_role(authorization: str, jwt_encryption_key: str) -> str:
         return tok["role"]
     except:
         return None
+
 
 def get_account_id_or_none(
     authorization: str, jwt_encryption_key: str
