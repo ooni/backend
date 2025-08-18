@@ -237,7 +237,11 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         )
     ) as likely_blocked_protocols,
 
-    arrayElementOrNull(likely_blocked_protocols, 1) as blocked_max_protocol
+    IF(
+        likely_blocked_protocols IS NOT NULL AND length(likely_blocked_protocols) > 0,
+        arrayElement(likely_blocked_protocols, 1),
+        NULL
+    ) as blocked_max_protocol,
 
     FROM (
         WITH
