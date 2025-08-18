@@ -240,7 +240,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     IF(
         likely_blocked_protocols IS NOT NULL AND length(likely_blocked_protocols) > 0,
         arrayElement(likely_blocked_protocols, 1),
-        NULL
+        ('none', 0.0)
     ) as blocked_max_protocol
 
     FROM (
