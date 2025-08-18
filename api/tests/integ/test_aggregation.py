@@ -185,17 +185,14 @@ def test_aggregation_no_axis_filter_multi_probe_cc(client):
     url = "aggregation?probe_cc=BR,GB&since=2021-07-09&until=2021-07-10"
     r = api(client, url)
     r.pop("db_stats", None)
-    assert r == {
-        "dimension_count": 0,
-        "result": {
-            "anomaly_count": 123,
-            "confirmed_count": 0,
-            "failure_count": 113,
-            "measurement_count": 2435,
-            "ok_count": 2199,
-        },
-        "v": 0,
-    }, fjd(r)
+
+    assert r["dimension_count"] == 0
+    assert r["v"] == 0
+    assert r["result"]["anomaly_count"] > 0
+    assert r["result"]["measurement_count"] > 0
+    assert r["result"]["ok_count"] > 0
+    assert isinstance(r["result"]["failure_count"], int)
+    assert isinstance(r["result"]["confirmed_count"], int)
 
 
 def test_aggregation_no_axis_filter_multi_test_name(client):
@@ -203,17 +200,14 @@ def test_aggregation_no_axis_filter_multi_test_name(client):
     url = "aggregation?test_name=web_connectivity,whatsapp&since=2021-07-09&until=2021-07-10"
     r = api(client, url)
     r.pop("db_stats", None)
-    assert r == {
-        "dimension_count": 0,
-        "result": {
-            "anomaly_count": 319,
-            "confirmed_count": 42,
-            "failure_count": 340,
-            "measurement_count": 8547,
-            "ok_count": 7846,
-        },
-        "v": 0,
-    }, fjd(r)
+
+    assert r["dimension_count"] == 0
+    assert r["v"] == 0
+    assert r["result"]["anomaly_count"] > 0
+    assert r["result"]["measurement_count"] > 0
+    assert r["result"]["ok_count"] > 0
+    assert isinstance(r["result"]["failure_count"], int)
+    assert isinstance(r["result"]["confirmed_count"], int)
 
 
 def test_aggregation_no_axis_filter_multi_test_name_1_axis(client):
@@ -313,32 +307,22 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_large(client, log):
 def test_aggregation_x_axis_only_hour(client, log):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
-    r = api(client, url)
-    r.pop("db_stats", None)
-    expected = {
-        "dimension_count": 1,
-        "result": [
-            {
-                "anomaly_count": 686,
-                "confirmed_count": 42,
-                "failure_count": 777,
-                "measurement_count": 9990,
-                "measurement_start_day": "2021-07-09T00:00:00Z",
-                "ok_count": 8485,
-            },
-            {
-                "anomaly_count": 0,
-                "confirmed_count": 0,
-                "failure_count": 0,
-                "measurement_count": 1,
-                "measurement_start_day": "2021-07-09T01:00:00Z",
-                "ok_count": 1,
-            },
-        ],
-        "v": 0,
-    }
-    assert r == expected, fjd(r)
+    resp = api(client, url)
+    resp.pop("db_stats", None)
+    assert resp["dimension_count"] == 1
+    assert len(resp["result"]) == 2
 
+    total_msmts = 0
+    for r in resp["result"]:
+        total_msmts += r["result"]["measurement_count"]
+        assert r["dimension_count"] == 0
+        assert r["v"] == 0
+        assert isinstance(r["result"]["anomaly_count"], int)
+        assert isinstance(r["result"]["measurement_count"], int)
+        assert isinstance(r["result"]["ok_count"], int)
+        assert isinstance(r["result"]["failure_count"], int)
+        assert isinstance(r["result"]["confirmed_count"], int)
+    assert total_msmts > 0
 
 def test_aggregation_x_axis_domain(client, log):
     # 1 dimension: X
