@@ -23,15 +23,16 @@ def get_file_path(file_path: str):
 def maybe_download_fixtures():
     base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/"
     filenames = [
-        "samples/analysis_web_measurement-sample.sql.gz",
-        "samples/obs_web-sample.sql.gz",
-        "raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz",
+        # s3path, filename, outputdir
+        ("samples/", "analysis_web_measurement-sample.sql.gz", "."),
+        ("samples", "/obs_web-sample.sql.gz", "."),
+        ("raw/20250709/07/US/webconnectivity/","2025070907_US_webconnectivity.n1.7.jsonl.gz", "raw/20250709/07/US/webconnectivity/"),
     ]
-    for fn in filenames:
-        dst_path = get_file_path(f"fixtures/{fn}")
+    for (s3path, filename, outputdir) in filenames:
+        dst_path = get_file_path(f"fixtures/{outputdir}/{filename}")
         if dst_path.exists():
             continue
-        url = base_url + fn
+        url = base_url + s3path + filename
         print(f"Downloading {url} to {dst_path}")
         r = requests.get(url)
         dst_path.parent.mkdir(parents=True, exist_ok=True)
