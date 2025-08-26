@@ -548,7 +548,9 @@ async def list_measurements(
         description="Domain to search measurements for",
         min_length=3,
     ),
-    probe_cc: Annotated[Optional[str], Query(description="Two letter country code")] = None,
+    probe_cc: Annotated[
+        Optional[str], Query(description="Two letter country code")
+    ] = None,
     probe_asn: Annotated[
         Union[str, int, None],
         Query(description='Autonomous system number in the format "ASXXX"'),
@@ -988,6 +990,7 @@ async def get_torsf_stats(
     except Exception as e:
         setnocacheresponse(response)
         return ErrorResponse(msg=str(e), v=0)
+
 
 def get_bucket_url(bucket_name: str) -> str:
     return f"https://{bucket_name}.s3.amazonaws.com/"

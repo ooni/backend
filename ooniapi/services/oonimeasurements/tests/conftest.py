@@ -163,9 +163,6 @@ def params_since_and_until_with_ten_days():
 
 
 def set_since_and_until_params(since, until):
-    params = {
-        "since": since,
-        "until": until
-    }
+    params = {"since": since, "until": until}
 
     return params
