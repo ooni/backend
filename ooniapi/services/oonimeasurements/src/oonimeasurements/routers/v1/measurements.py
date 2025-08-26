@@ -80,7 +80,7 @@ def _fetch_jsonl_measurement_body_from_s3(
     """
     Fetch jsonl from S3, decompress it, extract single msmt
     """
-    baseurl = f"https://{s3_bucket_name}.s3.amazonaws.com/"
+    baseurl = get_bucket_url(s3_bucket_name)
     url = urljoin(baseurl, s3path)
 
     log.info(f"Fetching {url}")
@@ -988,3 +988,6 @@ async def get_torsf_stats(
     except Exception as e:
         setnocacheresponse(response)
         return ErrorResponse(msg=str(e), v=0)
+
+def get_bucket_url(bucket_name: str) -> str:
+    return f"https://{bucket_name}.s3.amazonaws.com/"
