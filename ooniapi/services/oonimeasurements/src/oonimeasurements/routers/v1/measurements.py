@@ -380,7 +380,9 @@ async def get_raw_measurement(
     settings=Depends(get_settings),
 ) -> Response:
     """
-    Get raw measurement body
+    Get raw measurement body.
+
+    You should always provide at the least one of: `report_id`, `measurement_uid`
     """
     # This is used by Explorer to let users download msmts
     if measurement_uid:
