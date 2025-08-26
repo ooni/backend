@@ -131,13 +131,13 @@ def test_failure_format(db):
     format_msmt_meta(row)
 
 
-def test_raw_measurement_args_optional(client, monkeypatch):
+def test_raw_measurement_args_optional(client, monkeypatch, s3_files):
     """
     Test that all arguments in raw_measurements are optional
     """
 
     def fake_get_bucket_url(bucket_name):
-        return f"file://{get_file_path('fixtures/s3')}/s3"
+        return f"file://{s3_files}"
 
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 
+from urllib.request import urlopen
 import requests
 import time
 import jwt
@@ -166,3 +167,19 @@ def set_since_and_until_params(since, until):
     params = {"since": since, "until": until}
 
     return params
+
+@pytest.fixture
+def s3_files():
+    dir = Path(THIS_DIR, "fixtures/cache/s3/raw/20250709/07/US/webconnectivity")
+    file = dir / "2025070907_US_webconnectivity.n1.7.jsonl.gz"
+    s3_files_path = str(Path(THIS_DIR, "fixtures/cache/s3").absolute()) + "/"
+
+    if file.exists(): # do nothing if file exists
+        return s3_files_path
+
+    data = urlopen("https://ooni-data-eu-fra.s3.amazonaws.com/raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz")
+    dir.mkdir(parents=True, exist_ok=True)
+    with file.open("wb") as f:
+        f.write(data.read())
+
+    return s3_files_path
