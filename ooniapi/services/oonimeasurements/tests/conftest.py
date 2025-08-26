@@ -1,7 +1,6 @@
 from pathlib import Path
 import pytest
 
-from urllib.request import urlopen
 import requests
 import time
 import jwt
@@ -22,10 +21,11 @@ def get_file_path(file_path: str):
 
 @pytest.fixture(scope="session")
 def maybe_download_fixtures():
-    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/"
+    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/"
     filenames = [
-        "analysis_web_measurement-sample.sql.gz",
-        "obs_web-sample.sql.gz",
+        "samples/analysis_web_measurement-sample.sql.gz",
+        "samples/obs_web-sample.sql.gz",
+        "raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz",
     ]
     for fn in filenames:
         dst_path = get_file_path(f"fixtures/{fn}")
@@ -34,6 +34,7 @@ def maybe_download_fixtures():
         url = base_url + fn
         print(f"Downloading {url} to {dst_path}")
         r = requests.get(url)
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
         dst_path.write_bytes(r.content)
 
 
@@ -167,19 +168,3 @@ def set_since_and_until_params(since, until):
     params = {"since": since, "until": until}
 
     return params
-
-@pytest.fixture
-def s3_files():
-    dir = Path(THIS_DIR, "fixtures/cache/s3/raw/20250709/07/US/webconnectivity")
-    file = dir / "2025070907_US_webconnectivity.n1.7.jsonl.gz"
-    s3_files_path = str(Path(THIS_DIR, "fixtures/cache/s3").absolute()) + "/"
-
-    if file.exists(): # do nothing if file exists
-        return s3_files_path
-
-    data = urlopen("https://ooni-data-eu-fra.s3.amazonaws.com/raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz")
-    dir.mkdir(parents=True, exist_ok=True)
-    with file.open("wb") as f:
-        f.write(data.read())
-
-    return s3_files_path

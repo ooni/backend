@@ -4,7 +4,7 @@ from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
-from .conftest import get_file_path
+from .conftest import THIS_DIR
 
 route = "api/v1/measurements"
 
@@ -131,13 +131,13 @@ def test_failure_format(db):
     format_msmt_meta(row)
 
 
-def test_raw_measurement_args_optional(client, monkeypatch, s3_files):
+def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtures):
     """
     Test that all arguments in raw_measurements are optional
     """
 
     def fake_get_bucket_url(bucket_name):
-        return f"file://{s3_files}"
+        return f"file://{THIS_DIR}/fixtures/"
 
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
