@@ -130,11 +130,6 @@ def test_raw_measurement_args_optional(client, monkeypatch):
 
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
-
-    # TODO this test is a bit hard to do right because /raw_measurement requires the s3 bucket
-    # We should either give it access to the public bucket for read only operations only, or
-    # mock the bucket with a fixture
-
     # Taken from fixtures
     uid = "20250709075147.833477_US_webconnectivity_8f0e0b49950f2592"
     rid = "20250709T074913Z_webconnectivity_US_10796_n1_XDgk16bsGyJbx6Jl"
