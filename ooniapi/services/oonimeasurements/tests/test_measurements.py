@@ -117,3 +117,25 @@ def test_failure_format(db):
 
     # Validation shouldn't crash
     format_msmt_meta(row)
+
+def test_raw_measurement_args_optional(client):
+    """
+    Test that all arguments in raw_measurements are optional
+    """
+
+    # TODO this test is a bit hard to do right because /raw_measurement requires the s3 bucket
+    # We should either give it access to the public bucket for read only operations only, or
+    # mock the bucket with a fixture
+
+    # Taken from fixtures
+    uid = "20250709075147.833477_US_webconnectivity_8f0e0b49950f2592"
+    rid = "20250709T074913Z_webconnectivity_US_10796_n1_XDgk16bsGyJbx6Jl"
+
+    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid" : uid})
+    assert resp.status_code != 422, resp.status_code
+
+    resp = client.get("/api/v1/raw_measurement", params={"report_id" : rid, "input" : "https://freenetproject.org/"})
+    assert resp.status_code != 422, resp.status_code
+
+    resp = client.get("/api/v1/raw_measurement", params={})
+    assert resp.status_code == 400, resp.status_code

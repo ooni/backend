@@ -358,24 +358,24 @@ def _get_measurement_meta_by_uid(
 
 @router.get("/v1/raw_measurement")
 async def get_raw_measurement(
+    response: Response,
     report_id: Annotated[
         Optional[str],
         Query(description="The report_id to search measurements for", min_length=3),
-    ],
+    ] = None,
     input: Annotated[
         Optional[str],
         Query(
             description="The input (for example a URL or IP address) to search measurements for",
             min_length=3,
         ),
-    ],
+    ] = None,
     measurement_uid: Annotated[
         Optional[str],
         Query(
             description="The measurement_uid to search measurements for", min_length=3
         ),
-    ],
-    response: Response,
+    ] = None,
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> Response:
