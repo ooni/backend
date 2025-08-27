@@ -52,7 +52,7 @@ FUNCTION_TIME = Histogram(
 )
 
 
-def timer(func = None, name: Optional[str] = None):
+def timer(func=None, name: Optional[str] = None):
     """Measure function execution time in seconds.
 
     Metric will include execution status (error or success) and function name, you

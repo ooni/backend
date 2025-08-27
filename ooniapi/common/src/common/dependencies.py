@@ -29,7 +29,7 @@ def role_required(roles: list[str]):
             tok = get_client_token(authorization, settings.jwt_encryption_key)
         except:
             raise HTTPException(detail="Authentication required", status_code=401)
-        
+
         if not tok:
             raise HTTPException(detail="Authentication required", status_code=401)
         if tok["role"] not in roles:

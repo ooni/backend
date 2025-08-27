@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     clickhouse_url: str = "clickhouse://localhost"
     postgresql_url: str = "postgresql://oonidb:oonidb@localhost/oonidb"
     log_level: str = "info"
-    # Prod bucket: "ooni-data-eu-fra"  
+    # Prod bucket: "ooni-data-eu-fra"
     s3_bucket_name: str = "ooni-data-eu-fra-test"
     other_collectors: List[str] = []
     statsd_host: str = "localhost"
@@ -38,4 +38,6 @@ class Settings(BaseSettings):
     # Ooniprobe only
     msmt_spool_dir: str = ""
     fastpath_url: str = ""  # example: http://123.123.123.123:8472
-    failed_reports_bucket: str = "" # for uploading reports that couldn't be sent to fastpath
+    failed_reports_bucket: str = (
+        ""  # for uploading reports that couldn't be sent to fastpath
+    )

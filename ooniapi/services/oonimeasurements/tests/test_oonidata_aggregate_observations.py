@@ -11,7 +11,9 @@ def test_oonidata_aggregation_observations(client):
     assert len(json["results"]) == 0
 
 
-def test_oonidata_aggregation_observations_with_since_and_until(client, params_since_and_until_with_two_days):
+def test_oonidata_aggregation_observations_with_since_and_until(
+    client, params_since_and_until_with_two_days
+):
     response = client.get(route, params=params_since_and_until_with_two_days)
 
     json = response.json()
@@ -32,9 +34,11 @@ def test_oonidata_aggregation_observations_with_since_and_until(client, params_s
         ("test_name", "whatsapp"),
         ("hostname", "www.on-instant.com"),
         ("ip", "64.233.190.139"),
-    ]
+    ],
 )
-def test_oonidata_aggregation_observations_with_filters(client, filter_name, filter_value, params_since_and_until_with_ten_days):
+def test_oonidata_aggregation_observations_with_filters(
+    client, filter_name, filter_value, params_since_and_until_with_ten_days
+):
     params = params_since_and_until_with_ten_days
     params[filter_name] = filter_value
 
@@ -59,9 +63,11 @@ def test_oonidata_aggregation_observations_with_filters(client, filter_name, fil
         ("month", 1),
         ("year", 1),
         ("auto", 9),
-    ]
+    ],
 )
-def test_oonidata_aggregation_observations_time_grain(client, time_grain, total, params_since_and_until_with_ten_days):
+def test_oonidata_aggregation_observations_time_grain(
+    client, time_grain, total, params_since_and_until_with_ten_days
+):
     params = params_since_and_until_with_ten_days
     params["group_by"] = "timestamp"
     params["time_grain"] = time_grain
@@ -72,7 +78,9 @@ def test_oonidata_aggregation_observations_time_grain(client, time_grain, total,
     assert len(json["results"]) == total
 
 
-def test_oonidata_aggregation_observations_groupby_failure(client, params_since_and_until_with_two_days):
+def test_oonidata_aggregation_observations_groupby_failure(
+    client, params_since_and_until_with_two_days
+):
     params = params_since_and_until_with_two_days
     params["group_by"] = ["failure", "timestamp"]
 

@@ -80,7 +80,7 @@ def _fetch_jsonl_measurement_body_from_s3(
     """
     Fetch jsonl from S3, decompress it, extract single msmt
     """
-    baseurl = f"https://{s3_bucket_name}.s3.amazonaws.com/"
+    baseurl = get_bucket_url(s3_bucket_name)
     url = urljoin(baseurl, s3path)
 
     log.info(f"Fetching {url}")
@@ -358,29 +358,31 @@ def _get_measurement_meta_by_uid(
 
 @router.get("/v1/raw_measurement")
 async def get_raw_measurement(
+    response: Response,
     report_id: Annotated[
         Optional[str],
         Query(description="The report_id to search measurements for", min_length=3),
-    ],
+    ] = None,
     input: Annotated[
         Optional[str],
         Query(
             description="The input (for example a URL or IP address) to search measurements for",
             min_length=3,
         ),
-    ],
+    ] = None,
     measurement_uid: Annotated[
         Optional[str],
         Query(
             description="The measurement_uid to search measurements for", min_length=3
         ),
-    ],
-    response: Response,
+    ] = None,
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> Response:
     """
-    Get raw measurement body
+    Get raw measurement body.
+
+    You should always provide at the least one of: `report_id`, `measurement_uid`
     """
     # This is used by Explorer to let users download msmts
     if measurement_uid:
@@ -546,7 +548,9 @@ async def list_measurements(
         description="Domain to search measurements for",
         min_length=3,
     ),
-    probe_cc: Annotated[Optional[str], Query(description="Two letter country code")] = None,
+    probe_cc: Annotated[
+        Optional[str], Query(description="Two letter country code")
+    ] = None,
     probe_asn: Annotated[
         Union[str, int, None],
         Query(description='Autonomous system number in the format "ASXXX"'),
@@ -986,3 +990,7 @@ async def get_torsf_stats(
     except Exception as e:
         setnocacheresponse(response)
         return ErrorResponse(msg=str(e), v=0)
+
+
+def get_bucket_url(bucket_name: str) -> str:
+    return f"https://{bucket_name}.s3.amazonaws.com/"

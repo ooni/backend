@@ -1,7 +1,7 @@
 """init tables
 
 Revision ID: 981d92cf8790
-Revises: 
+Revises:
 Create Date: 2024-03-11 08:03:55.462815
 
 """

@@ -18,13 +18,13 @@ THIS_DIR = Path(__file__).parent.resolve()
 def get_file_path(file_path: str):
     return Path(__file__).parent / file_path
 
-
 @pytest.fixture(scope="session")
 def maybe_download_fixtures():
-    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/"
+    base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/"
     filenames = [
-        "analysis_web_measurement-sample.sql.gz",
-        "obs_web-sample.sql.gz",
+        "samples/analysis_web_measurement-sample.sql.gz",
+        "samples/obs_web-sample.sql.gz",
+        "raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz"
     ]
     for fn in filenames:
         dst_path = get_file_path(f"fixtures/{fn}")
@@ -33,6 +33,7 @@ def maybe_download_fixtures():
         url = base_url + fn
         print(f"Downloading {url} to {dst_path}")
         r = requests.get(url)
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
         dst_path.write_bytes(r.content)
 
 
@@ -163,9 +164,6 @@ def params_since_and_until_with_ten_days():
 
 
 def set_since_and_until_params(since, until):
-    params = {
-        "since": since,
-        "until": until
-    }
+    params = {"since": since, "until": until}
 
     return params
