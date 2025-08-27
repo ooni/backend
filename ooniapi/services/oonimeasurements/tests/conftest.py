@@ -22,17 +22,20 @@ def get_file_path(file_path: str):
 @pytest.fixture(scope="session")
 def maybe_download_fixtures():
     base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/"
-    filenames = [
-        # s3path, filename, outputdir
+    files = [
+        # s3dir: directory in s3 to find the file
+        # filename: name of the file to download
+        # outputdir: where (relative to fixtures) to download this file
+        # s3dir, filename, outputdir
         ("samples/", "analysis_web_measurement-sample.sql.gz", "."),
-        ("samples", "/obs_web-sample.sql.gz", "."),
+        ("samples/", "obs_web-sample.sql.gz", "."),
         ("raw/20250709/07/US/webconnectivity/","2025070907_US_webconnectivity.n1.7.jsonl.gz", "raw/20250709/07/US/webconnectivity/"),
     ]
-    for (s3path, filename, outputdir) in filenames:
+    for (s3dir, filename, outputdir) in files:
         dst_path = get_file_path(f"fixtures/{outputdir}/{filename}")
         if dst_path.exists():
             continue
-        url = base_url + s3path + filename
+        url = base_url + s3dir + filename
         print(f"Downloading {url} to {dst_path}")
         r = requests.get(url)
         dst_path.parent.mkdir(parents=True, exist_ok=True)
