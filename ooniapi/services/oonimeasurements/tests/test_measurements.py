@@ -156,3 +156,28 @@ def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtu
 
     resp = client.get("/api/v1/raw_measurement", params={})
     assert resp.status_code == 400, resp.status_code
+
+def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtures):
+    """
+    Test that raw_measurements returns json instead of a string
+    """
+
+    def fake_get_bucket_url(bucket_name):
+        return f"file://{THIS_DIR}/fixtures/"
+
+    monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
+
+    uid = "20250709075147.833477_US_webconnectivity_8f0e0b49950f2592"
+    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid" : uid})
+    assert resp.status_code == 200, resp.status_code
+
+    j = resp.json()
+    assert isinstance(j, dict), type(j)
+
+    # When not found should return empty dict
+    uid = "20250709075147.833477_US_webconnectivity_baddbaddbaddbadd"
+    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid" : uid})
+    assert resp.status_code == 200, resp.status_code
+
+    j = resp.json()
+    assert j == {}, j
