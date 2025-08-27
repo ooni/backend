@@ -18,24 +18,19 @@ THIS_DIR = Path(__file__).parent.resolve()
 def get_file_path(file_path: str):
     return Path(__file__).parent / file_path
 
-
 @pytest.fixture(scope="session")
 def maybe_download_fixtures():
     base_url = "https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/"
-    files = [
-        # s3dir: directory in s3 to find the file
-        # filename: name of the file to download
-        # outputdir: where (relative to fixtures) to download this file
-        # s3dir, filename, outputdir
-        ("samples/", "analysis_web_measurement-sample.sql.gz", "."),
-        ("samples/", "obs_web-sample.sql.gz", "."),
-        ("raw/20250709/07/US/webconnectivity/","2025070907_US_webconnectivity.n1.7.jsonl.gz", "raw/20250709/07/US/webconnectivity/"),
+    filenames = [
+        "samples/analysis_web_measurement-sample.sql.gz",
+        "samples/obs_web-sample.sql.gz",
+        "raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz"
     ]
-    for (s3dir, filename, outputdir) in files:
-        dst_path = get_file_path(f"fixtures/{outputdir}/{filename}")
+    for fn in filenames:
+        dst_path = get_file_path(f"fixtures/{fn}")
         if dst_path.exists():
             continue
-        url = base_url + s3dir + filename
+        url = base_url + fn
         print(f"Downloading {url} to {dst_path}")
         r = requests.get(url)
         dst_path.parent.mkdir(parents=True, exist_ok=True)
