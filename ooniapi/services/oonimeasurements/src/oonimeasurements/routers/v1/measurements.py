@@ -402,9 +402,9 @@ async def get_raw_measurement(
             db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
         )
     else:
-        body = {}
+        body = "{}"
 
-    response = JSONResponse(content=jsonable_encoder(body))
+    response = Response(content=body, media_type="application/json")
     setcacheresponse("1d", response)
     return response
 
