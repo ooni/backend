@@ -142,7 +142,7 @@ async def get_aggregation_observations(
     dns_failure IS NOT NULL,
     IF(resolver_asn = probe_asn,
        CONCAT('dns_isp.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
-       CONCAT('dns_other.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
+       CONCAT('dns_other.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure))
     ),
     tcp_failure IS NOT NULL,
     CONCAT('tcp.', IF(startsWith(tcp_failure, 'unknown_failure'), 'unknown_failure', tcp_failure)),

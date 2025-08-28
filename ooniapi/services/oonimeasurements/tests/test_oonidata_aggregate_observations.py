@@ -87,7 +87,7 @@ def test_oonidata_aggregation_observations_groupby_failure(
     response = client.get(route, params=params)
 
     json = response.json()
-    assert len(json["results"]) == 20
+    assert len(json["results"]) == 24
     first_result = json["results"][0]
     assert "failure" in first_result.keys()
     assert "timestamp" in first_result.keys()
