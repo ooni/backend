@@ -140,14 +140,17 @@ async def get_aggregation_observations(
         columns.append(
             f"""multiIf(
     dns_failure IS NOT NULL,
-    CONCAT('dns_', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
+    IF(resolver_asn = probe_asn,
+       CONCAT('dns_isp.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
+       CONCAT('dns_other.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
+    ),
     tcp_failure IS NOT NULL,
-    CONCAT('tcp_', IF(startsWith(tcp_failure, 'unknown_failure'), 'unknown_failure', tcp_failure)),
+    CONCAT('tcp.', IF(startsWith(tcp_failure, 'unknown_failure'), 'unknown_failure', tcp_failure)),
     tls_failure IS NOT NULL,
-    CONCAT('tls_', IF(startsWith(tls_failure, 'unknown_failure'), 'unknown_failure', tls_failure)),
+    CONCAT('tls.', IF(startsWith(tls_failure, 'unknown_failure'), 'unknown_failure', tls_failure)),
     http_failure IS NOT NULL,
     CONCAT(
-        IF(startsWith(http_request_url, 'https://'), 'https_', 'http_'),
+        IF(startsWith(http_request_url, 'https://'), 'https.', 'http.'),
         IF(startsWith(http_failure, 'unknown_failure'), 'unknown_failure', http_failure)
     ),
     'none'
