@@ -38,12 +38,9 @@ class DBStats(BaseModel):
 
 
 class Loni(BaseModel):
-    dns_isp_blocked: Optional[float]
-    dns_isp_down: Optional[float]
-    dns_isp_ok: Optional[float]
-    dns_other_blocked: Optional[float]
-    dns_other_down: Optional[float]
-    dns_other_ok: Optional[float]
+    dns_blocked: Optional[float]
+    dns_down: Optional[float]
+    dns_ok: Optional[float]
 
     tcp_blocked: Optional[float]
     tcp_down: Optional[float]
@@ -57,8 +54,7 @@ class Loni(BaseModel):
     blocked_max_outcome: Optional[str]
     blocked_max: Optional[float]
 
-    dns_isp_blocked_outcome: Optional[str]
-    dns_other_blocked_outcome: Optional[str]
+    dns_blocked_outcome: Optional[str]
     tcp_blocked_outcome: Optional[str]
     tls_blocked_outcome: Optional[str]
 
@@ -187,13 +183,9 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     probe_analysis,
     count,
 
-    dns_isp_blocked_q99 as dns_isp_blocked,
-    dns_isp_down_q99 as dns_isp_down,
-    dns_isp_ok_q99 as dns_isp_ok,
-
-    dns_other_blocked_q99 as dns_other_blocked,
-    dns_other_down_q99 as dns_other_down,
-    dns_other_ok_q99 as dns_other_ok,
+    dns_blocked_q99 as dns_blocked,
+    dns_down_q99 as dns_down,
+    dns_ok_q99 as dns_ok,
 
     tcp_blocked_q99 as tcp_blocked,
     tcp_down_q99 as tcp_down,
@@ -203,9 +195,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     tls_down_q99 as tls_down,
     tls_ok_q99 as tls_ok,
 
-    arrayFirst(x -> TRUE, top_dns_isp_failures_by_impact).1 as dns_isp_blocked_outcome,
-
-    arrayFirst(x -> TRUE, top_dns_other_failures_by_impact).1 as dns_other_blocked_outcome,
+    arrayFirst(x -> TRUE, top_dns_failures_by_impact).1 as dns_blocked_outcome,
 
     arrayFirst(x -> TRUE, top_tcp_failures_by_impact).1 as tcp_blocked_outcome,
 
@@ -213,10 +203,8 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
 
     arrayMap(
         x -> multiIf(
-            x.2 = 'dns_isp',
-            (CONCAT(x.2, '.', dns_isp_blocked_outcome), dns_isp_blocked),
-            x.2 = 'dns_other',
-            (CONCAT(x.2, '.', dns_other_blocked_outcome), dns_other_blocked),
+            x.2 = 'dns',
+            (CONCAT(x.2, '.', dns_blocked_outcome), dns_blocked),
             x.2 = 'tcp',
             (CONCAT(x.2, '.', tcp_blocked_outcome), tcp_blocked),
             x.2 = 'tls',
@@ -228,8 +216,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
             arrayFilter(
                 x -> x.1 > 0.5,
                 [
-                    (dns_isp_blocked, 'dns_isp'),
-                    (dns_other_blocked, 'dns_other'),
+                    (dns_blocked, 'dns'),
                     (tcp_blocked, 'tcp'),
                     (tls_blocked, 'tls')
                 ]
@@ -245,7 +232,6 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
 
     FROM (
         WITH
-        IF(resolver_asn = probe_asn, 1, 0) as is_isp_resolver,
         multiIf(
             top_dns_failure IN ('android_dns_cache_no_data', 'dns_nxdomain_error'),
             'nxdomain',
@@ -258,17 +244,10 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
 
             anyHeavy(top_probe_analysis) as probe_analysis,
 
-            topKWeightedIf(10, 3, 'counts')(
-                IF(startsWith(top_dns_failure, 'unknown_failure'), 'unknown_failure', top_dns_failure),
-                toInt8(dns_blocked * 100),
-                is_isp_resolver = 1
-            ) as top_dns_isp_failures_by_impact,
-
-            topKWeightedIf(10, 3, 'counts')(
-                IF(startsWith(top_dns_failure, 'unknown_failure'), 'unknown_failure', top_dns_failure),
-                toInt8(dns_blocked * 100),
-                is_isp_resolver = 0
-            ) as top_dns_other_failures_by_impact,
+            topKWeighted(10, 3, 'counts')(
+                IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
+                toInt8(dns_blocked * 100)
+            ) as top_dns_failures_by_impact,
 
             topKWeighted(10, 3, 'counts')(
                 IF(startsWith(top_tcp_failure, 'unknown_failure'), 'unknown_failure', top_tcp_failure),
@@ -280,13 +259,9 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
                 toInt8(tls_blocked * 100)
             ) as top_tls_failures_by_impact,
 
-            quantileIf(0.95)(dns_blocked, is_isp_resolver = 1) as dns_isp_blocked_q99,
-            quantileIf(0.95)(dns_down, is_isp_resolver = 1) as dns_isp_down_q99,
-            quantileIf(0.95)(dns_ok, is_isp_resolver = 1) as dns_isp_ok_q99,
-
-            quantileIf(0.95)(dns_blocked, is_isp_resolver = 0) as dns_other_blocked_q99,
-            quantileIf(0.95)(dns_down, is_isp_resolver = 0) as dns_other_down_q99,
-            quantileIf(0.95)(dns_ok, is_isp_resolver = 0) as dns_other_ok_q99,
+            quantile(0.95)(dns_blocked) as dns_blocked_q99,
+            quantile(0.95)(dns_down) as dns_down_q99,
+            quantile(0.95)(dns_ok) as dns_ok_q99,
 
             quantile(0.95)(tcp_blocked) as tcp_blocked_q99,
             quantile(0.95)(tcp_down) as tcp_down_q99,
@@ -400,20 +375,16 @@ async def get_aggregation_analysis(
     fixed_cols = [
         "probe_analysis",
         "count",
-        "dns_isp_blocked",
-        "dns_isp_down",
-        "dns_isp_ok",
-        "dns_other_blocked",
-        "dns_other_down",
-        "dns_other_ok",
+        "dns_blocked",
+        "dns_down",
+        "dns_ok",
         "tls_blocked",
         "tls_down",
         "tls_ok",
         "tcp_blocked",
         "tcp_down",
         "tcp_ok",
-        "dns_isp_blocked_outcome",
-        "dns_other_blocked_outcome",
+        "dns_blocked_outcome",
         "tcp_blocked_outcome",
         "tls_blocked_outcome",
         "likely_blocked_protocols",
@@ -432,12 +403,9 @@ async def get_aggregation_analysis(
                 return val
 
             loni = Loni(
-                dns_isp_blocked=nan_to_none(d["dns_isp_blocked"]),
-                dns_isp_down=nan_to_none(d["dns_isp_down"]),
-                dns_isp_ok=nan_to_none(d["dns_isp_ok"]),
-                dns_other_blocked=nan_to_none(d["dns_other_blocked"]),
-                dns_other_down=nan_to_none(d["dns_other_down"]),
-                dns_other_ok=nan_to_none(d["dns_other_ok"]),
+                dns_blocked=nan_to_none(d["dns_blocked"]),
+                dns_down=nan_to_none(d["dns_down"]),
+                dns_ok=nan_to_none(d["dns_ok"]),
                 tls_blocked=nan_to_none(d["tls_blocked"]),
                 tls_down=nan_to_none(d["tls_down"]),
                 tls_ok=nan_to_none(d["tls_ok"]),
@@ -453,8 +421,7 @@ async def get_aggregation_analysis(
                     if blocked_max_protocol
                     else 0.0
                 ),
-                dns_isp_blocked_outcome=d["dns_isp_blocked_outcome"],
-                dns_other_blocked_outcome=d["dns_other_blocked_outcome"],
+                dns_blocked_outcome=d["dns_blocked_outcome"],
                 tcp_blocked_outcome=d["tcp_blocked_outcome"],
                 tls_blocked_outcome=d["tls_blocked_outcome"],
             )
