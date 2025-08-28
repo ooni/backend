@@ -259,24 +259,24 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
             anyHeavy(top_probe_analysis) as probe_analysis,
 
             topKWeightedIf(10, 3, 'counts')(
-                dns_failure,
+                IF(startsWith(top_dns_failure, 'unknown_failure'), 'unknown_failure', top_dns_failure),
                 toInt8(dns_blocked * 100),
                 is_isp_resolver = 1
             ) as top_dns_isp_failures_by_impact,
 
             topKWeightedIf(10, 3, 'counts')(
-                dns_failure,
+                IF(startsWith(top_dns_failure, 'unknown_failure'), 'unknown_failure', top_dns_failure),
                 toInt8(dns_blocked * 100),
                 is_isp_resolver = 0
             ) as top_dns_other_failures_by_impact,
 
             topKWeighted(10, 3, 'counts')(
-                top_tcp_failure,
+                IF(startsWith(top_tcp_failure, 'unknown_failure'), 'unknown_failure', top_tcp_failure),
                 toInt8(tcp_blocked * 100)
             ) as top_tcp_failures_by_impact,
 
             topKWeighted(10, 3, 'counts')(
-                top_tls_failure,
+                IF(startsWith(top_tls_failure, 'unknown_failure'), 'unknown_failure', top_tls_failure),
                 toInt8(tls_blocked * 100)
             ) as top_tls_failures_by_impact,
 
