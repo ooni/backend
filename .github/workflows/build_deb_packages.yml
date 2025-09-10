@@ -26,7 +26,7 @@ jobs:
 
       - name: Fetch debops-ci
         run: |
-          wget https://raw.githubusercontent.com/ooni/sysadmin/master/tools/debops-ci
+          wget https://raw.githubusercontent.com/ooni/sysadmin/refs/heads/fix-backend-ci/tools/debops-ci
           chmod +x debops-ci
 
       - name: Build the package
