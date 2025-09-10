@@ -181,3 +181,32 @@ def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtur
 
     j = resp.json()
     assert j == {}, j
+
+def test_measurements_order_by_test_start_time_forbidden(client):
+    """
+    Tests that the `test_start_time` is NOT a valid order by field in oonimeasurements
+    """
+
+    resp = client.get("/api/v1/measurements", params = {
+        "order_by":  "test_start_time"
+    })
+
+    assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
+
+def test_measurements_limit_hard_capped(client):
+    """
+    Tests that the `limit` field in oonimeasurements is hard capped to 100
+    """
+
+    valids = [50, 100]
+    for valid in valids:
+        resp = client.get("/api/v1/measurements", params = {
+            "limit": valid
+        })
+        assert resp.status_code == 200, f"Unexpected code: {resp.status_code}"
+
+    resp = client.get("/api/v1/measurements", params = {
+        "limit": 101
+    })
+    assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
+

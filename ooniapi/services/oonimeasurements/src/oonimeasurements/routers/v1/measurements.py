@@ -3,6 +3,7 @@ Measurements API
 """
 
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Any, Dict, Union, TypedDict, Tuple
 import gzip
@@ -528,6 +529,12 @@ def genurl(base_url: str, path: str, **kw) -> str:
     """Generate absolute URL for the API"""
     return urljoin(base_url, path) + "?" + urlencode(kw)
 
+class OrderBy(str, Enum):
+    measurement_start_time = "measurement_start_time"
+    input = "input"
+    probe_cc = "probe_cc"
+    probe_asn = "probe_asn"
+    test_name = "test_name"
 
 @router.get("/v1/measurements")
 async def list_measurements(
@@ -618,17 +625,9 @@ async def list_measurements(
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
     ] = None,
     order_by: Annotated[
-        Optional[str],
+        Optional[OrderBy], # Use an actual enum to enforce validation of ordering fields
         Query(
             description="By which key the results should be ordered by (default: `null`)",
-            enum=[
-                "test_start_time",
-                "measurement_start_time",
-                "input",
-                "probe_cc",
-                "probe_asn",
-                "test_name",
-            ],
         ),
     ] = None,
     order: Annotated[
@@ -642,7 +641,7 @@ async def list_measurements(
         int, Query(description="Offset into the result set (default: 0)")
     ] = 0,
     limit: Annotated[
-        int, Query(description="Number of records to return (default: 100)")
+        int, Query(description="Number of records to return (default: 100)", ge=0, le=100)
     ] = 100,
     user_agent: Annotated[str | None, Header()] = None,
     db=Depends(get_clickhouse_session),
