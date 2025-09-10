@@ -4,7 +4,7 @@ ooni-api (1.0.98) unstable; urgency=medium
   * Validate ordering fields for measurements endpoint
   * Remove `test_start_time` ordering field from measurement list endpoint
 
- -- Luis Diaz <luis@openobservatory.org>  Wed, 10 Sep 2025 13:22:01 +0200
+ -- Luis Diaz <luis@openobservatory.org>  Wed, 10 Sep 2025 16:07:00 +0200
 
 ooni-api (1.0.97) unstable; urgency=medium
 
