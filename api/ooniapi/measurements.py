@@ -772,7 +772,7 @@ def list_measurements() -> Response:
         "probe_asn",
         "test_name"
     ]
-    if order_by.lower() not in valid_order_fields:
+    if order_by and order_by.lower() not in valid_order_fields:
         raise BadRequest("Invalid field for ordering: " + order_by + 
                          ". Valid options: " + str(valid_order_fields))
 
