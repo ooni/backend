@@ -1,3 +1,9 @@
+fastpath (0.88) unstable; urgency=medium
+
+  * Remove fingerprints bytes metrics
+
+ -- Luis Diaz <luis@openobservatory.org> Wed, 10 Sep 2025 17:01:00 +0200
+
 fastpath (0.87) unstable; urgency=medium
 
   * Add writing measurements to disk

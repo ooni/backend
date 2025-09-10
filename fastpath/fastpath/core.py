@@ -358,7 +358,8 @@ def match_http_body_fingerprints(resp, matches) -> None:
             # Used for statistics
             metrics.gauge("fingerprint_body_match_location", idx)
 
-        per_s("fingerprints_bytes", len(body), tb)
+        # This metric is generating too much data
+        # per_s("fingerprints_bytes", len(body), tb)
 
 
 def match_http_headers_fingerprints(resp, matches) -> None:
