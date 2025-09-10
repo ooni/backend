@@ -2,7 +2,7 @@ ooni-api (1.0.98) unstable; urgency=medium
 
   * Cap measurements api limit to 100
   * Validate ordering fields for measurements endpoint
-  * Remove `test_start_time` from measurement list endpoint
+  * Remove `test_start_time` ordering field from measurement list endpoint
 
  -- Luis Diaz <luis@openobservatory.org>  Wed, 10 Sep 2025 13:22:01 +0200
 
