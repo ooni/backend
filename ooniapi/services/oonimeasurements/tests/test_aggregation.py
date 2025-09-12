@@ -730,4 +730,5 @@ def test_aggregation_probe_asn_result_wont_crash(client):
 
     # should not crash
     r = api(client, url)
+    assert r['dimension_count'] == 2
     assert isinstance(r['result'][0]['probe_asn'], int)
