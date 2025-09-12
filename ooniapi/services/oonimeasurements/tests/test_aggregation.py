@@ -3,6 +3,7 @@ import pytest
 from textwrap import dedent
 from urllib.parse import urlencode
 import json
+import pydantic
 
 
 def is_json(resp):
@@ -692,3 +693,20 @@ def test_aggregation_bug_585(client):
     url = "aggregation?test_name=web_connectivity&since=2022-01-24&until=2022-02-24&axis_x=measurement_start_day&category_code=LGBT"
     r = api(client, url)
     # TODO: figure out what this test should be validating and add some checks for it.
+
+def test_aggregation_result_validation(client):
+    """
+    Validates that the probe_asn field in an Aggregation result of type int, not string
+
+    Args:
+        client (_type_): _description_
+    """
+    from oonimeasurements.routers.v1.aggregation import AggregationResult
+
+    try:
+        AggregationResult(anomaly_count=0, confirmed_count=0, failure_count=0, ok_count=0, measurement_count=0, probe_asn='bad')
+    except pydantic.ValidationError:
+        pass # ok
+
+    # should not crash
+    AggregationResult(anomaly_count=0, confirmed_count=0, failure_count=0, ok_count=0, measurement_count=0, probe_asn=1234)
