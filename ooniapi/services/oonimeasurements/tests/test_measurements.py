@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from clickhouse_driver import Client as Clickhouse
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
@@ -209,4 +210,24 @@ def test_measurements_limit_hard_capped(client):
         "limit": 101
     })
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
+
+def test_measurements_desc_default(client):
+    """
+    Test that the default ordering is descending by default
+    """
+
+    resp = client.get("/api/v1/measurements", params = {"order_by" : "measurement_start_time"})
+    assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. {resp.content}"
+    j = resp.json()
+    assert len(j['results']) > 1, "Not enough results"
+
+    def get_time(row):
+        return datetime.strptime(row['measurement_start_time'], "%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+    d = get_time(j['results'][0])
+    for row in j['results'][1:]:
+        next_d = get_time(row)
+        assert (next_d <= d), "Results should be in descending order"
+        d = next_d
 

@@ -636,7 +636,7 @@ async def list_measurements(
             description="If the order should be ascending or descending (one of: `asc` or `desc`)",
             enum=["asc", "desc", "ASC", "DESC"],
         ),
-    ] = "asc",
+    ] = "desc",
     offset: Annotated[
         int, Query(description="Offset into the result set (default: 0)")
     ] = 0,
@@ -824,9 +824,9 @@ async def list_measurements(
     fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
 
     if order_by is None:
-        order_by = "measurement_start_time"
+        order_by = OrderBy("measurement_start_time")
 
-    fp_query = fp_query.order_by(text("{} {}".format(order_by, order)))
+    fp_query = fp_query.order_by(text("{} {}".format(order_by.value, order)))
 
     # Assemble the "external" query. Run a final order by followed by limit and
     # offset
