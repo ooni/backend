@@ -196,10 +196,10 @@ def test_measurements_order_by_test_start_time_forbidden(client):
 
 def test_measurements_limit_hard_capped(client):
     """
-    Tests that the `limit` field in oonimeasurements is hard capped to 100
+    Tests that the `limit` field in oonimeasurements is hard capped to 1_000_000
     """
 
-    valids = [50, 100]
+    valids = [50, 1_000_000]
     for valid in valids:
         resp = client.get("/api/v1/measurements", params = {
             "limit": valid
@@ -207,7 +207,7 @@ def test_measurements_limit_hard_capped(client):
         assert resp.status_code == 200, f"Unexpected code: {resp.status_code}"
 
     resp = client.get("/api/v1/measurements", params = {
-        "limit": 101
+        "limit": 1_000_001
     })
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
 
