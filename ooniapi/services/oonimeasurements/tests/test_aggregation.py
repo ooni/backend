@@ -701,7 +701,7 @@ def test_aggregation_result_validation(client):
     """
     from oonimeasurements.routers.v1.aggregation import AggregationResult
 
-    try:
+    with pytest.raises(pydantic.ValidationError):
         AggregationResult(
             anomaly_count=0,
             confirmed_count=0,
@@ -710,8 +710,6 @@ def test_aggregation_result_validation(client):
             measurement_count=0,
             probe_asn="bad",
         )
-    except pydantic.ValidationError:
-        pass  # ok
 
     # should not crash
     AggregationResult(
@@ -722,3 +720,13 @@ def test_aggregation_result_validation(client):
         measurement_count=0,
         probe_asn=1234,
     )
+
+def test_aggregation_probe_asn_result_wont_crash(client):
+    """
+    Validates that the API is able to generate the response model when probe_asn is not None
+    """
+    # 2d data over a special column: probe_asn
+    url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn"
+
+    # should not crash
+    api(client, url)
