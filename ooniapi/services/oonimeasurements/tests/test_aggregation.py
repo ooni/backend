@@ -697,9 +697,6 @@ def test_aggregation_bug_585(client):
 def test_aggregation_result_validation(client):
     """
     Validates that the probe_asn field in an Aggregation result of type int, not string
-
-    Args:
-        client (_type_): _description_
     """
     from oonimeasurements.routers.v1.aggregation import AggregationResult
 
