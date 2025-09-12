@@ -641,8 +641,8 @@ async def list_measurements(
         int, Query(description="Offset into the result set (default: 0)")
     ] = 0,
     limit: Annotated[
-        int, Query(description="Number of records to return (default: 100)", ge=0, le=100)
-    ] = 1_000_000,
+        int, Query(description="Number of records to return (default: 100)", ge=0, le=1_000_000)
+    ] = 100,
     user_agent: Annotated[str | None, Header()] = None,
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
