@@ -729,4 +729,5 @@ def test_aggregation_probe_asn_result_wont_crash(client):
     url = "aggregation?since=2021-07-09&until=2021-07-10&axis_x=measurement_start_day&axis_y=probe_asn"
 
     # should not crash
-    api(client, url)
+    r = api(client, url)
+    assert isinstance(r['result'][0]['probe_asn'], int)
