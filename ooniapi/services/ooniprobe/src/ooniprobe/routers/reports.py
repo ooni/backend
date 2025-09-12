@@ -274,7 +274,7 @@ def compare_probe_msmt_cc_asn(
             Metrics.PROBE_CC_ASN_MATCH.inc()
         elif db_probe_cc != cc:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        elif db_asn == asn:
+        elif db_asn != asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
     except Exception:
         pass
