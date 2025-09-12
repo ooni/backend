@@ -694,6 +694,7 @@ def test_aggregation_bug_585(client):
     r = api(client, url)
     # TODO: figure out what this test should be validating and add some checks for it.
 
+
 def test_aggregation_result_validation(client):
     """
     Validates that the probe_asn field in an Aggregation result of type int, not string
@@ -701,9 +702,23 @@ def test_aggregation_result_validation(client):
     from oonimeasurements.routers.v1.aggregation import AggregationResult
 
     try:
-        AggregationResult(anomaly_count=0, confirmed_count=0, failure_count=0, ok_count=0, measurement_count=0, probe_asn='bad')
+        AggregationResult(
+            anomaly_count=0,
+            confirmed_count=0,
+            failure_count=0,
+            ok_count=0,
+            measurement_count=0,
+            probe_asn="bad",
+        )
     except pydantic.ValidationError:
-        pass # ok
+        pass  # ok
 
     # should not crash
-    AggregationResult(anomaly_count=0, confirmed_count=0, failure_count=0, ok_count=0, measurement_count=0, probe_asn=1234)
+    AggregationResult(
+        anomaly_count=0,
+        confirmed_count=0,
+        failure_count=0,
+        ok_count=0,
+        measurement_count=0,
+        probe_asn=1234,
+    )
