@@ -98,14 +98,6 @@ CREATE TABLE accounts
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY account_id;
 
-CREATE TABLE session_expunge
-(
-    `account_id` FixedString(32),
-    `threshold` DateTime DEFAULT now()
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id;
-
 -- Materialized views
 
 CREATE MATERIALIZED VIEW default.counters_test_list
