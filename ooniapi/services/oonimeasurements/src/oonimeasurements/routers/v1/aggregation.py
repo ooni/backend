@@ -120,7 +120,7 @@ class AggregationResult(BaseModel):
     domain: Optional[str] = None
     input: Optional[str] = None
     probe_cc: Optional[str] = None
-    probe_asn: Optional[str] = None
+    probe_asn: Optional[int] = None
     test_name: Optional[str] = None
 
 
