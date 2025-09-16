@@ -127,9 +127,6 @@ The API als provides entry points to:
 - Set account roles
   <https://api.ooni.io/apidocs/#/default/post_api_v1_set_account_role>
 
-- Expunge sessions (see below)
-  <https://api.ooni.io/apidocs/#/default/post_api_v1_set_session_expunge>
-
 Browsers sessions can be expunged to require users to log in again. This
 can be used if an account role needs to be downgraded or terminated
 urgently.
