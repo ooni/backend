@@ -268,10 +268,10 @@ def compare_probe_msmt_cc_asn(
         ipaddr = extract_probe_ipaddr(request)
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
-        log.info(f"db_cc = {db_probe_cc} - cc = {cc}")
-        log.info(f"db_asn = {db_asn} - asn = {asn}")
         if db_asn.startswith("AS"):
             db_asn = db_asn[2:]
+        log.info(f"db_cc = {db_probe_cc} - cc = {cc}")
+        log.info(f"db_asn = {db_asn} - asn = {asn}")
         if db_probe_cc == cc and db_asn == asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
         elif db_probe_cc != cc:
