@@ -10,6 +10,12 @@ from .conftest import THIS_DIR
 route = "api/v1/measurements"
 
 
+def normalize_probe_asn(probe_asn):
+    if probe_asn.startswith("AS"):
+        return probe_asn
+    return f"AS{probe_asn}"
+
+
 def test_list_measurements(client):
     response = client.get(route)
     json = response.json()
@@ -37,6 +43,7 @@ def test_list_measurements_with_since_and_until(client):
         ("test_name", "web_connectivity"),
         ("probe_cc", "IT"),
         ("probe_asn", "AS30722"),
+        ("probe_asn", "30722"),
     ],
 )
 def test_list_measurements_with_one_value_to_filters(
@@ -50,6 +57,11 @@ def test_list_measurements_with_one_value_to_filters(
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
+
+    # we support filtering without the AS prefix, but it's always included in
+    # the return value
+    if filter_param == "probe_asn":
+        filter_value = normalize_probe_asn(filter_value)
     for result in json["results"]:
         assert result[filter_param] == filter_value, result
 
@@ -82,6 +94,9 @@ def test_list_measurements_with_multiple_values_to_filters(
 ):
     params = {}
     params[filter_param] = filter_value
+    filter_value_list = filter_value.split(",")
+    if filter_param == "probe_asn":
+        filter_value_list = list(map(normalize_probe_asn, filter_value_list))
 
     response = client.get(route, params=params)
 
@@ -89,7 +104,7 @@ def test_list_measurements_with_multiple_values_to_filters(
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
     for result in json["results"]:
-        assert result[filter_param] in filter_value, result
+        assert result[filter_param] in filter_value_list, result
 
 
 def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
