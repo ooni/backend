@@ -270,13 +270,13 @@ def compare_probe_msmt_cc_asn(
         db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
         if db_asn.startswith("AS"):
             db_asn = db_asn[2:]
-        log.info(f"db_cc = {db_probe_cc} - cc = {cc}")
-        log.info(f"db_asn = {db_asn} - asn = {asn}")
         if db_probe_cc == cc and db_asn == asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
-        elif db_probe_cc != cc:
+        if db_probe_cc != cc:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        elif db_asn != asn:
+            log.info(f"db_cc != cc:  {db_probe_cc} != {cc}")
+        if db_asn != asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+            log.info(f"db_asn != asn: {db_asn} != {asn}")
     except Exception:
         pass
