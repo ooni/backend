@@ -183,17 +183,17 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     probe_analysis,
     count,
 
-    dns_blocked_q99 as dns_blocked,
-    dns_down_q99 as dns_down,
-    dns_ok_q99 as dns_ok,
+    dns_blocked_q as dns_blocked,
+    dns_down_q as dns_down,
+    dns_ok_q as dns_ok,
 
-    tcp_blocked_q99 as tcp_blocked,
-    tcp_down_q99 as tcp_down,
-    tcp_ok_q99 as tcp_ok,
+    tcp_blocked_q as tcp_blocked,
+    tcp_down_q as tcp_down,
+    tcp_ok_q as tcp_ok,
 
-    tls_blocked_q99 as tls_blocked,
-    tls_down_q99 as tls_down,
-    tls_ok_q99 as tls_ok,
+    tls_blocked_q as tls_blocked,
+    tls_down_q as tls_down,
+    tls_ok_q as tls_ok,
 
     arrayFirst(x -> TRUE, top_dns_failures_by_impact).1 as dns_blocked_outcome,
 
@@ -259,17 +259,17 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
                 toInt8(tls_blocked * 100)
             ) as top_tls_failures_by_impact,
 
-            quantile(0.95)(dns_blocked) as dns_blocked_q99,
-            quantile(0.95)(dns_down) as dns_down_q99,
-            quantile(0.95)(dns_ok) as dns_ok_q99,
+            quantile(0.95)(dns_blocked) as dns_blocked_q,
+            quantile(0.95)(dns_down) as dns_down_q,
+            quantile(0.95)(dns_ok) as dns_ok_q,
 
-            quantile(0.95)(tcp_blocked) as tcp_blocked_q99,
-            quantile(0.95)(tcp_down) as tcp_down_q99,
-            quantile(0.95)(tcp_ok) as tcp_ok_q99,
+            quantile(0.95)(tcp_blocked) as tcp_blocked_q,
+            quantile(0.95)(tcp_down) as tcp_down_q,
+            quantile(0.95)(tcp_ok) as tcp_ok_q,
 
-            quantile(0.95)(tls_blocked) as tls_blocked_q99,
-            quantile(0.95)(tls_down) as tls_down_q99,
-            quantile(0.95)(tls_ok) as tls_ok_q99
+            quantile(0.95)(tls_blocked) as tls_blocked_q,
+            quantile(0.95)(tls_down) as tls_down_q,
+            quantile(0.95)(tls_ok) as tls_ok_q
 
         FROM analysis_web_measurement
 
