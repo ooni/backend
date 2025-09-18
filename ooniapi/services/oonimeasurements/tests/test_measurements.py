@@ -173,6 +173,7 @@ def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtu
     resp = client.get("/api/v1/raw_measurement", params={})
     assert resp.status_code == 400, resp.status_code
 
+
 def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtures):
     """
     Test that raw_measurements returns json instead of a string
@@ -184,7 +185,7 @@ def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtur
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
     uid = "20250709075147.833477_US_webconnectivity_8f0e0b49950f2592"
-    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid" : uid})
+    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid": uid})
     assert resp.status_code == 200, resp.status_code
 
     j = resp.json()
@@ -192,22 +193,22 @@ def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtur
 
     # When not found should return empty dict
     uid = "20250709075147.833477_US_webconnectivity_baddbaddbaddbadd"
-    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid" : uid})
+    resp = client.get("/api/v1/raw_measurement", params={"measurement_uid": uid})
     assert resp.status_code == 200, resp.status_code
 
     j = resp.json()
     assert j == {}, j
+
 
 def test_measurements_order_by_test_start_time_forbidden(client):
     """
     Tests that the `test_start_time` is NOT a valid order by field in oonimeasurements
     """
 
-    resp = client.get("/api/v1/measurements", params = {
-        "order_by":  "test_start_time"
-    })
+    resp = client.get("/api/v1/measurements", params={"order_by": "test_start_time"})
 
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
+
 
 def test_measurements_limit_hard_capped(client):
     """
@@ -216,33 +217,32 @@ def test_measurements_limit_hard_capped(client):
 
     valids = [50, 1_000_000]
     for valid in valids:
-        resp = client.get("/api/v1/measurements", params = {
-            "limit": valid
-        })
+        resp = client.get("/api/v1/measurements", params={"limit": valid})
         assert resp.status_code == 200, f"Unexpected code: {resp.status_code}"
 
-    resp = client.get("/api/v1/measurements", params = {
-        "limit": 1_000_001
-    })
+    resp = client.get("/api/v1/measurements", params={"limit": 1_000_001})
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
+
 
 def test_measurements_desc_default(client):
     """
     Test that the default ordering is descending by default
     """
 
-    resp = client.get("/api/v1/measurements", params = {"order_by" : "measurement_start_time"})
-    assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. {resp.content}"
+    resp = client.get(
+        "/api/v1/measurements", params={"order_by": "measurement_start_time"}
+    )
+    assert (
+        resp.status_code == 200
+    ), f"Unexpected status code: {resp.status_code}. {resp.content}"
     j = resp.json()
-    assert len(j['results']) > 1, "Not enough results"
+    assert len(j["results"]) > 1, "Not enough results"
 
     def get_time(row):
-        return datetime.strptime(row['measurement_start_time'], "%Y-%m-%dT%H:%M:%S.%fZ")
+        return datetime.strptime(row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ")
 
-
-    d = get_time(j['results'][0])
-    for row in j['results'][1:]:
+    d = get_time(j["results"][0])
+    for row in j["results"][1:]:
         next_d = get_time(row)
-        assert (next_d <= d), "Results should be in descending order"
+        assert next_d <= d, "Results should be in descending order"
         d = next_d
-
