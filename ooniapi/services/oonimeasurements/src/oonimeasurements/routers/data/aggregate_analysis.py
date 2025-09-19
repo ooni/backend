@@ -298,9 +298,6 @@ async def get_aggregation_analysis(
     since: SinceUntil = utc_30_days_ago(),
     until: SinceUntil = utc_today(),
     time_grain: Annotated[TimeGrains, Query()] = "day",
-    anomaly_sensitivity: Annotated[float, Query()] = 0.9,
-    format: Annotated[Literal["JSON", "CSV"], Query()] = "JSON",
-    download: Annotated[bool, Query()] = False,
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
     q_args = {}
