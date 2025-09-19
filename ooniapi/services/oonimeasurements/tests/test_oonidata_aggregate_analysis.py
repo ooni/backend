@@ -162,3 +162,13 @@ def test_oonidata_format_aggregate_query():
     q, fixed_cols = format_aggregate_query(extra_cols, where, split_dns_outcome=True)
     for col in fixed_cols:
         assert col in q
+
+
+def test_oonidata_detector_events(client, params_since_and_until_with_ten_days):
+    params = params_since_and_until_with_ten_days
+
+    response = client.get("api/v1/detector/events", params=params)
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    print(json["results"])

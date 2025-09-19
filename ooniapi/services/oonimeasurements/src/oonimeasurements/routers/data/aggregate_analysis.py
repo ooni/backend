@@ -179,7 +179,6 @@ P(D) + P(B) does not = 1!
 def format_aggregate_query(
     extra_cols: Dict[str, str], where: str, split_dns_outcome: bool = False
 ) -> Tuple[str, List[str]]:
-    dns_with_inner_select = ""
     dns_inner_select = """
     topKWeighted(10, 3, 'counts')(
         IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
@@ -224,9 +223,10 @@ def format_aggregate_query(
         "blocked_max_protocol",
     ]
     if split_dns_outcome:
-        extra_cols["is_isp_resolver"] = "is_isp_resolver"
+        extra_cols["is_isp_resolver"] = (
+            "IF(resolver_asn = probe_asn, 1, 0) as is_isp_resolver"
+        )
 
-        dns_with_inner_select = "IF(resolver_asn = probe_asn, 1, 0) as is_isp_resolver,"
         dns_inner_select = """
         topKWeightedIf(10, 3, 'counts')(
             IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
@@ -295,6 +295,7 @@ def format_aggregate_query(
             "blocked_max_protocol",
         ]
 
+    extra_cols_list = list(extra_cols.keys())
     q = f"""
     SELECT
     {",".join(extra_cols.keys())},
@@ -345,8 +346,6 @@ def format_aggregate_query(
 
     FROM (
         WITH
-        {dns_with_inner_select}
-
         multiIf(
             top_dns_failure IN ('android_dns_cache_no_data', 'dns_nxdomain_error'),
             'nxdomain',
@@ -382,11 +381,267 @@ def format_aggregate_query(
         FROM analysis_web_measurement
 
         {where}
-        GROUP BY {", ".join(extra_cols.keys())}
-        ORDER BY {", ".join(extra_cols.keys())}
+        GROUP BY {", ".join(extra_cols_list)}
+        ORDER BY {", ".join(extra_cols_list)}
     )
     """
-    return q, fixed_cols
+    return q, extra_cols_list + fixed_cols
+
+
+def format_event_detector_query(
+    extra_cols: Dict[str, str],
+    where: str,
+):
+    inner_extra_cols = extra_cols.copy()
+    inner_extra_cols["ts"] = "toStartOfHour(measurement_start_time) as ts"
+    extra_cols["ts"] = "ts"
+    BLOCKING_CATEGORIES = ["dns_isp", "dns_other", "tcp", "tls"]
+    inner_q, _ = format_aggregate_query(
+        extra_cols=inner_extra_cols, where=where, split_dns_outcome=True
+    )
+
+    rolling_sum_hours = 12
+    halflife_hours = 24
+    agg_ema_section = ""
+    ema_section = ""
+    event_section = ""
+    for category in BLOCKING_CATEGORIES:
+        for outcome in ["blocked", "ok"]:
+            ema_section += f"""
+            exponentialTimeDecayedAvg({halflife_hours})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain ORDER BY ts
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS {category}_{outcome}_ewm_medium,
+
+            exponentialTimeDecayedAvg({halflife_hours/6})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain ORDER BY ts
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS {category}_{outcome}_ewm_fast,
+
+            exponentialTimeDecayedAvg({halflife_hours*2})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain ORDER BY ts
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS {category}_{outcome}_ewm_slow,
+
+            AVG({category}_{outcome}) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN 48 * 3600 PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_mean,
+
+            {category}_{outcome},
+            """
+            agg_ema_section += f"""
+            multiIf(
+                rolling_sum > rolling_sum_qmid,
+                {category}_{outcome}_ewm_fast,
+                rolling_sum < rolling_sum_qmid AND rolling_sum > rolling_sum_qlow,
+                {category}_{outcome}_ewm_medium,
+                {category}_{outcome}_ewm_slow
+            ) as {category}_{outcome}_ewm,
+
+            SUM(({category}_{outcome} - {category}_{outcome}_mean) * SQRT(count)) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN 7 * 24 * 3600 PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_cumsum,
+            """
+        agg_ema_section += f"""
+        ABS({category}_ok_mean - {category}_blocked_mean) as {category}_mean_delta,
+
+        multiIf(
+            {category}_mean_delta > 0.5 AND {category}_blocked_mean > 0.5 AND rolling_sum > rolling_sum_qlow,
+            1,
+            {category}_mean_delta > 0.5 AND {category}_ok_mean > 0.5 AND rolling_sum > rolling_sum_qlow,
+            -1,
+            NULL
+        ) as {category}_blocked_status,
+        """
+        event_section += f"""
+        last_value({category}_blocked_status) OVER (
+            PARTITION BY probe_cc, probe_asn, domain
+            ORDER BY ts
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) as {category}_last_known_blocked_status,
+
+        last_value({category}_blocked_status) OVER (
+            PARTITION BY probe_cc, probe_asn, domain
+            ORDER BY ts
+            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+        ) as {category}_previous_known_blocked_status,
+
+        ({category}_last_known_blocked_status -
+            {category}_previous_known_blocked_status) as {category}_event,
+
+        abs({category}_event) > 1 as {category}_is_event,
+        """
+    any_section = (
+        "("
+        + " OR ".join([f"{x}_is_event" for x in BLOCKING_CATEGORIES])
+        + ") as is_event,"
+    )
+    any_section += (
+        "("
+        + " OR ".join([f"{x}_event < 0" for x in BLOCKING_CATEGORIES])
+        + ") as is_blocking_event,"
+    )
+    any_section += (
+        "("
+        + " OR ".join([f"{x}_event > 0" for x in BLOCKING_CATEGORIES])
+        + ") as is_ok_event"
+    )
+    fixed_cols = [
+        "count",
+        "tst",
+        "dns_isp_blocked_ewm_medium",
+        "dns_isp_blocked_ewm_fast",
+        "dns_isp_blocked_ewm_slow",
+        "dns_isp_blocked_mean",
+        "dns_isp_blocked",
+        "dns_isp_ok_ewm_medium",
+        "dns_isp_ok_ewm_fast",
+        "dns_isp_ok_ewm_slow",
+        "dns_isp_ok_mean",
+        "dns_isp_ok",
+        "dns_other_blocked_ewm_medium",
+        "dns_other_blocked_ewm_fast",
+        "dns_other_blocked_ewm_slow",
+        "dns_other_blocked_mean",
+        "dns_other_blocked",
+        "dns_other_ok_ewm_medium",
+        "dns_other_ok_ewm_fast",
+        "dns_other_ok_ewm_slow",
+        "dns_other_ok_mean",
+        "dns_other_ok",
+        "tcp_blocked_ewm_medium",
+        "tcp_blocked_ewm_fast",
+        "tcp_blocked_ewm_slow",
+        "tcp_blocked_mean",
+        "tcp_blocked",
+        "tcp_ok_ewm_medium",
+        "tcp_ok_ewm_fast",
+        "tcp_ok_ewm_slow",
+        "tcp_ok_mean",
+        "tcp_ok",
+        "tls_blocked_ewm_medium",
+        "tls_blocked_ewm_fast",
+        "tls_blocked_ewm_slow",
+        "tls_blocked_mean",
+        "tls_blocked",
+        "tls_ok_ewm_medium",
+        "tls_ok_ewm_fast",
+        "tls_ok_ewm_slow",
+        "tls_ok_mean",
+        "tls_ok",
+        "rolling_sum",
+        "dns_isp_blocked_ewm",
+        "dns_isp_blocked_cumsum",
+        "dns_isp_ok_ewm",
+        "dns_isp_ok_cumsum",
+        "dns_isp_mean_delta",
+        "dns_isp_blocked_status",
+        "dns_other_blocked_ewm",
+        "dns_other_blocked_cumsum",
+        "dns_other_ok_ewm",
+        "dns_other_ok_cumsum",
+        "dns_other_mean_delta",
+        "dns_other_blocked_status",
+        "tcp_blocked_ewm",
+        "tcp_blocked_cumsum",
+        "tcp_ok_ewm",
+        "tcp_ok_cumsum",
+        "tcp_mean_delta",
+        "tcp_blocked_status",
+        "tls_blocked_ewm",
+        "tls_blocked_cumsum",
+        "tls_ok_ewm",
+        "tls_ok_cumsum",
+        "tls_mean_delta",
+        "tls_blocked_status",
+        "rolling_sum_std",
+        "rolling_sum_qlow",
+        "rolling_sum_qmid",
+        "rolling_sum_qhigh",
+        "dns_isp_last_known_blocked_status",
+        "dns_isp_previous_known_blocked_status",
+        "dns_isp_event",
+        "dns_isp_is_event",
+        "dns_other_last_known_blocked_status",
+        "dns_other_previous_known_blocked_status",
+        "dns_other_event",
+        "dns_other_is_event",
+        "tcp_last_known_blocked_status",
+        "tcp_previous_known_blocked_status",
+        "tcp_event",
+        "tcp_is_event",
+        "tls_last_known_blocked_status",
+        "tls_previous_known_blocked_status",
+        "tls_event",
+        "tls_is_event",
+        "is_event",
+        "is_blocking_event",
+        "is_ok_event",
+    ]
+    q = f"""
+    SELECT * FROM (
+        SELECT *,
+            {event_section}
+            {any_section} FROM (
+            SELECT
+            *,
+            {agg_ema_section}
+            varPop(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN {rolling_sum_hours} * 3600 PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_std,
+
+            quantile(0.25)(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_qlow,
+
+            quantile(0.5)(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_qmid,
+
+            quantile(0.75)(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_qhigh
+
+            FROM (
+                SELECT
+                {",".join(extra_cols.values())},
+                count,
+                toUnixTimestamp(ts)/86400 as tst,
+                {ema_section}
+
+                sum(count) OVER (
+                    PARTITION BY probe_cc, probe_asn, domain
+                    ORDER BY ts
+                    RANGE BETWEEN {rolling_sum_hours} * 3600 PRECEDING AND CURRENT ROW
+                ) as rolling_sum
+
+                FROM (
+                    {inner_q}
+                )
+            )
+        )
+    ) WHERE is_event = 1
+    """
+    return q, list(extra_cols.keys()) + fixed_cols
 
 
 @router.get(
@@ -472,7 +727,7 @@ async def get_aggregation_analysis(
         where += " WHERE "
         where += " AND ".join(and_clauses)
 
-    q, fixed_cols = format_aggregate_query(extra_cols, where)
+    q, cols = format_aggregate_query(extra_cols, where)
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
@@ -481,7 +736,7 @@ async def get_aggregation_analysis(
     results: List[AggregationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
+            d = dict(zip(cols, row))
             blocked_max_protocol = d["blocked_max_protocol"]
 
             def nan_to_none(val):
@@ -534,3 +789,64 @@ async def get_aggregation_analysis(
         dimension_count=dimension_count,
         results=results,
     )
+
+
+@router.get(
+    "/v1/detector/events",
+    tags=["detector", "analysis"],
+    description=analysis_description,
+)
+@parse_probe_asn_to_int
+async def get_detector_events(
+    test_name: Annotated[Optional[str], Query()] = None,
+    domain: Annotated[Optional[str], Query()] = None,
+    probe_asn: Annotated[Union[int, str, None], Query()] = None,
+    probe_cc: Annotated[Optional[str], Query(min_length=2, max_length=2)] = None,
+    since: SinceUntil = utc_30_days_ago(),
+    until: SinceUntil = utc_today(),
+    db=Depends(get_clickhouse_session),
+):
+    q_args = {}
+    and_clauses = []
+    extra_cols = {"probe_cc": "probe_cc", "probe_asn": "probe_asn", "domain": "domain"}
+    if probe_asn is not None:
+        q_args["probe_asn"] = probe_asn
+        and_clauses.append("probe_asn = %(probe_asn)d")
+        extra_cols["probe_asn"] = "probe_asn"
+    if probe_cc is not None:
+        q_args["probe_cc"] = probe_cc
+        and_clauses.append("probe_cc = %(probe_cc)s")
+        extra_cols["probe_cc"] = "probe_cc"
+    if test_name is not None:
+        q_args["test_name"] = test_name
+        and_clauses.append("test_name = %(test_name)s")
+        extra_cols["test_name"] = "test_name"
+    if domain is not None:
+        q_args["domain"] = domain
+        and_clauses.append("domain = %(domain)s")
+        extra_cols["domain"] = "domain"
+
+    if since is not None:
+        q_args["since"] = since
+        and_clauses.append("measurement_start_time >= %(since)s")
+    if until is not None:
+        and_clauses.append("measurement_start_time <= %(until)s")
+        q_args["until"] = until
+
+    where = ""
+    if len(and_clauses) > 0:
+        where += " WHERE "
+        where += " AND ".join(and_clauses)
+
+    q, cols = format_event_detector_query(extra_cols, where)
+
+    t = time.perf_counter()
+    log.info(f"running query {q} with {q_args}")
+    rows = db.execute(q, q_args)
+
+    results = []
+    if rows and isinstance(rows, list):
+        for row in rows:
+            d = dict(zip(cols, row))
+            results.append(d)
+    return {"results": results}
