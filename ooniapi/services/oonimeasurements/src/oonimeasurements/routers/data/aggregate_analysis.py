@@ -30,6 +30,12 @@ AggregationKeys = Literal[
 ]
 
 
+def nan_to_none(val):
+    if math.isnan(val):
+        return None
+    return val
+
+
 class DBStats(BaseModel):
     bytes: int
     elapsed_seconds: float
@@ -739,11 +745,6 @@ async def get_aggregation_analysis(
             d = dict(zip(cols, row))
             blocked_max_protocol = d["blocked_max_protocol"]
 
-            def nan_to_none(val):
-                if math.isnan(val):
-                    return None
-                return val
-
             loni = Loni(
                 dns_blocked=nan_to_none(d["dns_blocked"]),
                 dns_down=nan_to_none(d["dns_down"]),
@@ -848,5 +849,6 @@ async def get_detector_events(
     if rows and isinstance(rows, list):
         for row in rows:
             d = dict(zip(cols, row))
+            d = {k: nan_to_none(v) if isinstance(v, float) else v for k, v in d.items()}
             results.append(d)
     return {"results": results}
