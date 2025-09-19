@@ -744,7 +744,8 @@ async def list_measurements(
             probe_asn_integer_list = []
             for probe_asn_value in probe_asn_list:
                 if probe_asn_value.startswith("AS"):
-                    probe_asn_integer_list.append(int(probe_asn_value[2:]))
+                    probe_asn_value = probe_asn_value[2:]
+                probe_asn_integer_list.append(int(probe_asn_value))
         query_params["probe_asn"] = probe_asn_integer_list
         fpwhere.append(sql.text("probe_asn IN :probe_asn"))
 
