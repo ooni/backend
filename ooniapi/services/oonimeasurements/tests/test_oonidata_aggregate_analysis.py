@@ -1,5 +1,12 @@
 import pytest
 
+from sqlalchemy import text
+from sqlalchemy.sql import sqltypes
+from sqlalchemy.sql.elements import Label, ColumnElement
+from sqlalchemy.dialects import postgresql
+
+from oonimeasurements.routers.data.aggregate_analysis import format_aggregate_query
+
 route = "api/v1/aggregation/analysis"
 since = "2024-11-01"
 until = "2024-11-10"
@@ -142,3 +149,16 @@ def test_oonidata_aggregation_analysis_time_grain(
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == total
+
+
+def test_oonidata_format_aggregate_query():
+    extra_cols = {"probe_asn": "probe_asn", "domain": "domain"}
+    where = ""
+    ## TODO: add more rigorous tests that validate the correct column ordering
+    q, fixed_cols = format_aggregate_query(extra_cols, where)
+    for col in fixed_cols:
+        assert col in q
+
+    q, fixed_cols = format_aggregate_query(extra_cols, where, split_dns_outcome=True)
+    for col in fixed_cols:
+        assert col in q
