@@ -402,17 +402,21 @@ def format_event_detector_query(
     inner_extra_cols["ts"] = "toStartOfHour(measurement_start_time) as ts"
     extra_cols["ts"] = "ts"
     BLOCKING_CATEGORIES = ["dns_isp", "dns_other", "tcp", "tls"]
+    OUTCOMES = ["blocked", "ok"]
     inner_q, _ = format_aggregate_query(
         extra_cols=inner_extra_cols, where=where, split_dns_outcome=True
     )
 
-    rolling_sum_hours = 12
+    delta = 0.5
+    h_scale = 24
+    baseline_stddev = 0.1
+    rolling_sum_hours = 48
     halflife_hours = 24
     agg_ema_section = ""
     ema_section = ""
     event_section = ""
     for category in BLOCKING_CATEGORIES:
-        for outcome in ["blocked", "ok"]:
+        for outcome in OUTCOMES:
             ema_section += f"""
             exponentialTimeDecayedAvg({halflife_hours})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
             (
@@ -432,11 +436,17 @@ def format_event_detector_query(
                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
             ) AS {category}_{outcome}_ewm_slow,
 
-            AVG({category}_{outcome}) OVER (
+            SUM({category}_{outcome} * count) OVER (
                 PARTITION BY probe_cc, probe_asn, domain
                 ORDER BY ts
-                RANGE BETWEEN 48 * 3600 PRECEDING AND CURRENT ROW
-            ) as {category}_{outcome}_mean,
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_sum_count,
+
+            stddevSamp({category}_{outcome}) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_stddev,
 
             {category}_{outcome},
             """
@@ -449,148 +459,164 @@ def format_event_detector_query(
                 {category}_{outcome}_ewm_slow
             ) as {category}_{outcome}_ewm,
 
-            SUM(({category}_{outcome} - {category}_{outcome}_mean) * SQRT(count)) OVER (
+            {category}_{outcome}_sum_count / current_sum as {category}_{outcome}_mean,
+            (
+                ((({category}_{outcome} - {category}_{outcome}_mean) / {baseline_stddev}))*count
+            ) as {category}_{outcome}_normalized,
+
+            sumIf({category}_{outcome}_normalized  - ({delta} * count), isNaN({category}_{outcome}_normalized) != 1) OVER (
                 PARTITION BY probe_cc, probe_asn, domain
                 ORDER BY ts
-                RANGE BETWEEN 7 * 24 * 3600 PRECEDING AND CURRENT ROW
-            ) as {category}_{outcome}_cumsum,
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_cusum_pos,
+
+            sumIf(-1 * {category}_{outcome}_normalized  - ({delta} * count), isNaN({category}_{outcome}_normalized) != 1) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_cusum_neg,
+
+            --stddevSamp({category}_{outcome}_normalized) as {category}_{outcome}_normalized_std,
+
             """
         agg_ema_section += f"""
-        ABS({category}_ok_mean - {category}_blocked_mean) as {category}_mean_delta,
-
+        -- h value is chosen to be 5 times the median count of metrics multipled by 5*stddev([0.2, 0.8])
+        -- this should lead to an ARL of 5 hours for TP detection.
+        (count_factor * {h_scale} * 1.5) as h_val,
         multiIf(
-            {category}_mean_delta > 0.5 AND {category}_blocked_mean > 0.5 AND rolling_sum > rolling_sum_qlow,
+            {category}_blocked_cusum_pos > h_val,
             1,
-            {category}_mean_delta > 0.5 AND {category}_ok_mean > 0.5 AND rolling_sum > rolling_sum_qlow,
-            -1,
+            {category}_blocked_cusum_neg > h_val,
+            1,
             NULL
-        ) as {category}_blocked_status,
+        ) as {category}_changepoint_detected,
         """
         event_section += f"""
-        last_value({category}_blocked_status) OVER (
+        last_value({category}_changepoint_detected) OVER (
             PARTITION BY probe_cc, probe_asn, domain
             ORDER BY ts
             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-        ) as {category}_last_known_blocked_status,
-
-        last_value({category}_blocked_status) OVER (
-            PARTITION BY probe_cc, probe_asn, domain
-            ORDER BY ts
-            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
-        ) as {category}_previous_known_blocked_status,
-
-        ({category}_last_known_blocked_status -
-            {category}_previous_known_blocked_status) as {category}_event,
-
-        abs({category}_event) > 1 as {category}_is_event,
+        ) as {category}_found_event,
         """
     any_section = (
         "("
-        + " OR ".join([f"{x}_is_event" for x in BLOCKING_CATEGORIES])
-        + ") as is_event,"
+        + " OR ".join([f"{x}_found_event" for x in BLOCKING_CATEGORIES])
+        + ") as found_event"
     )
-    any_section += (
-        "("
-        + " OR ".join([f"{x}_event < 0" for x in BLOCKING_CATEGORIES])
-        + ") as is_blocking_event,"
-    )
-    any_section += (
-        "("
-        + " OR ".join([f"{x}_event > 0" for x in BLOCKING_CATEGORIES])
-        + ") as is_ok_event"
-    )
+
     fixed_cols = [
         "count",
         "tst",
         "dns_isp_blocked_ewm_medium",
         "dns_isp_blocked_ewm_fast",
         "dns_isp_blocked_ewm_slow",
-        "dns_isp_blocked_mean",
+        "dns_isp_blocked_sum_count",
+        "dns_isp_blocked_stddev",
         "dns_isp_blocked",
         "dns_isp_ok_ewm_medium",
         "dns_isp_ok_ewm_fast",
         "dns_isp_ok_ewm_slow",
-        "dns_isp_ok_mean",
+        "dns_isp_ok_sum_count",
+        "dns_isp_ok_stddev",
         "dns_isp_ok",
         "dns_other_blocked_ewm_medium",
         "dns_other_blocked_ewm_fast",
         "dns_other_blocked_ewm_slow",
-        "dns_other_blocked_mean",
+        "dns_other_blocked_sum_count",
+        "dns_other_blocked_stddev",
         "dns_other_blocked",
         "dns_other_ok_ewm_medium",
         "dns_other_ok_ewm_fast",
         "dns_other_ok_ewm_slow",
-        "dns_other_ok_mean",
+        "dns_other_ok_sum_count",
+        "dns_other_ok_stddev",
         "dns_other_ok",
         "tcp_blocked_ewm_medium",
         "tcp_blocked_ewm_fast",
         "tcp_blocked_ewm_slow",
-        "tcp_blocked_mean",
+        "tcp_blocked_sum_count",
+        "tcp_blocked_stddev",
         "tcp_blocked",
         "tcp_ok_ewm_medium",
         "tcp_ok_ewm_fast",
         "tcp_ok_ewm_slow",
-        "tcp_ok_mean",
+        "tcp_ok_sum_count",
+        "tcp_ok_stddev",
         "tcp_ok",
         "tls_blocked_ewm_medium",
         "tls_blocked_ewm_fast",
         "tls_blocked_ewm_slow",
-        "tls_blocked_mean",
+        "tls_blocked_sum_count",
+        "tls_blocked_stddev",
         "tls_blocked",
         "tls_ok_ewm_medium",
         "tls_ok_ewm_fast",
         "tls_ok_ewm_slow",
-        "tls_ok_mean",
+        "tls_ok_sum_count",
+        "tls_ok_stddev",
         "tls_ok",
+        "current_sum",
+        "count_factor",
         "rolling_sum",
         "dns_isp_blocked_ewm",
-        "dns_isp_blocked_cumsum",
+        "dns_isp_blocked_mean",
+        "dns_isp_blocked_normalized",
+        "dns_isp_blocked_cusum_pos",
+        "dns_isp_blocked_cusum_neg",
         "dns_isp_ok_ewm",
-        "dns_isp_ok_cumsum",
-        "dns_isp_mean_delta",
-        "dns_isp_blocked_status",
+        "dns_isp_ok_mean",
+        "dns_isp_ok_normalized",
+        "dns_isp_ok_cusum_pos",
+        "dns_isp_ok_cusum_neg",
+        "h_val",
+        "dns_isp_changepoint_detected",
         "dns_other_blocked_ewm",
-        "dns_other_blocked_cumsum",
+        "dns_other_blocked_mean",
+        "dns_other_blocked_normalized",
+        "dns_other_blocked_cusum_pos",
+        "dns_other_blocked_cusum_neg",
         "dns_other_ok_ewm",
-        "dns_other_ok_cumsum",
-        "dns_other_mean_delta",
-        "dns_other_blocked_status",
+        "dns_other_ok_mean",
+        "dns_other_ok_normalized",
+        "dns_other_ok_cusum_pos",
+        "dns_other_ok_cusum_neg",
+        "h_val",
+        "dns_other_changepoint_detected",
         "tcp_blocked_ewm",
-        "tcp_blocked_cumsum",
+        "tcp_blocked_mean",
+        "tcp_blocked_normalized",
+        "tcp_blocked_cusum_pos",
+        "tcp_blocked_cusum_neg",
         "tcp_ok_ewm",
-        "tcp_ok_cumsum",
-        "tcp_mean_delta",
-        "tcp_blocked_status",
+        "tcp_ok_mean",
+        "tcp_ok_normalized",
+        "tcp_ok_cusum_pos",
+        "tcp_ok_cusum_neg",
+        "h_val",
+        "tcp_changepoint_detected",
         "tls_blocked_ewm",
-        "tls_blocked_cumsum",
+        "tls_blocked_mean",
+        "tls_blocked_normalized",
+        "tls_blocked_cusum_pos",
+        "tls_blocked_cusum_neg",
         "tls_ok_ewm",
-        "tls_ok_cumsum",
-        "tls_mean_delta",
-        "tls_blocked_status",
+        "tls_ok_mean",
+        "tls_ok_normalized",
+        "tls_ok_cusum_pos",
+        "tls_ok_cusum_neg",
+        "h_val",
+        "tls_changepoint_detected",
         "rolling_sum_std",
         "rolling_sum_qlow",
         "rolling_sum_qmid",
         "rolling_sum_qhigh",
-        "dns_isp_last_known_blocked_status",
-        "dns_isp_previous_known_blocked_status",
-        "dns_isp_event",
-        "dns_isp_is_event",
-        "dns_other_last_known_blocked_status",
-        "dns_other_previous_known_blocked_status",
-        "dns_other_event",
-        "dns_other_is_event",
-        "tcp_last_known_blocked_status",
-        "tcp_previous_known_blocked_status",
-        "tcp_event",
-        "tcp_is_event",
-        "tls_last_known_blocked_status",
-        "tls_previous_known_blocked_status",
-        "tls_event",
-        "tls_is_event",
-        "is_event",
-        "is_blocking_event",
-        "is_ok_event",
+        "dns_isp_found_event",
+        "dns_other_found_event",
+        "tcp_found_event",
+        "tls_found_event",
+        "found_event",
     ]
+
     q = f"""
     SELECT * FROM (
         SELECT *,
@@ -630,9 +656,20 @@ def format_event_detector_query(
             FROM (
                 SELECT
                 {",".join(extra_cols.values())},
-                count,
                 toUnixTimestamp(ts)/86400 as tst,
                 {ema_section}
+
+                sum(count) OVER (
+                    PARTITION BY probe_cc, probe_asn, domain
+                    ORDER BY ts
+                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) as current_sum,
+
+                quantile(0.75)(count) OVER (
+                    PARTITION BY probe_cc, probe_asn, domain
+                    ORDER BY ts
+                    RANGE BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                ) as count_factor,
 
                 sum(count) OVER (
                     PARTITION BY probe_cc, probe_asn, domain
@@ -645,7 +682,7 @@ def format_event_detector_query(
                 )
             )
         )
-    ) WHERE is_event = 1
+    ) WHERE found_event = 1
     """
     return q, list(extra_cols.keys()) + fixed_cols
 
