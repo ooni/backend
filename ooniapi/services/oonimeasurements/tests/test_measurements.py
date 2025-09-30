@@ -249,10 +249,23 @@ def test_measurements_desc_default(client):
 
 def test_fix_msm_report_id_str(client):
 
+    # TODO: Can't reproduce the error
     resp = client.get("/api/v1/measurement_meta", params={
         "report_id" : "20241209T185959Z_openvpn_MZ_37223_n1_x51ewx3QwQcqXNgW",
         "full" : True,
         "input" : "openvpn://oonivpn.corp?address=37.218.243.98%3A1194&transport=tcp"
+    })
+
+    assert resp.status_code == 200, resp.content
+
+def test_fix_msm_date_parsing(client):
+
+    # This query was raising an error parsing the date:
+    # /api/v1/measurements?probe_cc=SY&since=2025-09-29T00:00:00&until=2025-09-29T23:59:59&limit=2000&since_index=20250910T105502Z_tor_SY_29256_n1_C8NFgxmJpyaP5Bsd
+    resp = client.get("/api/v1/measurements", params={
+        "since" : "2025-09-29T00:00:00",
+        "until" : "2025-09-29T23:59:59",
+        "limit" : "2000"
     })
 
     assert resp.status_code == 200, resp.content

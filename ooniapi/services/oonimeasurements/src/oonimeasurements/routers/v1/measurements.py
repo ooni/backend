@@ -571,13 +571,13 @@ async def list_measurements(
         Query(description="Category code from the citizenlab list"),
     ] = None,
     since: Annotated[
-        Optional[str],
+        Optional[datetime],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
     ] = None,
     until: Annotated[
-        Optional[str],
+        Optional[datetime],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
@@ -681,31 +681,6 @@ async def list_measurements(
         )
 
     ### Prepare query parameters
-
-    until_dt = None
-    if until is not None:
-        until_dt = datetime.strptime(until, "%Y-%m-%d")
-
-    # Set reasonable since/until ranges if not specified.
-    try:
-        if until is None:
-            if report_id is None:
-                t = datetime.now(timezone.utc) + timedelta(days=1)
-                until_dt = datetime(t.year, t.month, t.day)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid until parameter")
-
-    since_dt = None
-    if since is not None:
-        since_dt = datetime.strptime(since, "%Y-%m-%d")
-
-    try:
-        if since_dt is None:
-            if report_id is None and until_dt is not None:
-                since_dt = until_dt - timedelta(days=30)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid since parameter")
-
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
 
