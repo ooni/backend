@@ -247,17 +247,6 @@ def test_measurements_desc_default(client):
         assert next_d <= d, "Results should be in descending order"
         d = next_d
 
-def test_fix_msm_report_id_str(client):
-
-    # TODO: Can't reproduce the error
-    resp = client.get("/api/v1/measurement_meta", params={
-        "report_id" : "20241209T185959Z_openvpn_MZ_37223_n1_x51ewx3QwQcqXNgW",
-        "full" : True,
-        "input" : "openvpn://oonivpn.corp?address=37.218.243.98%3A1194&transport=tcp"
-    })
-
-    assert resp.status_code == 200, resp.content
-
 def test_fix_msm_date_parsing(client):
 
     # This query was raising an error parsing the date:

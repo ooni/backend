@@ -483,7 +483,7 @@ async def get_measurement_meta(
     if not full:  # return without raw_measurement
         return msmt_meta
 
-    if msmt_meta == {}:  # measurement not found
+    if msmt_meta == MeasurementMeta():  # measurement not found
         return MeasurementMeta(raw_measurement=body)
 
     try:
