@@ -282,6 +282,28 @@ def test_fix_msm_date_parsing(client):
 
     assert resp.status_code == 200, resp.content
 
+def test_get_measurement_meta_basic(client):
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
+    response = client.get(f"/api/v1/measurement_meta?report_id={rid}&input={inp}")
+    assert response.status_code == 200, response.status_code
+    j = response.json()
+    assert j == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": False,
+        "input": inp,
+        "measurement_start_time": "2021-07-09T00:55:13Z",
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "report_id": rid,
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
+        "test_name": "web_connectivity",
+        "test_start_time": "2021-07-09T00:43:40Z",
+        "category_code": "",
+    }
+
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
     assert measurements.asn_to_int("1234") == 1234

@@ -20,7 +20,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from typing_extensions import Annotated
 
-from pydantic import Field
+from pydantic import Field, field_serializer
 
 import sqlalchemy as sa
 from sqlalchemy import tuple_, Row, sql
@@ -286,6 +286,9 @@ class MeasurementMeta(BaseModel):
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
 
+    @field_serializer("measurement_start_time", "test_start_time")
+    def format_ts(self, v: datetime) -> str:
+        return v.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
