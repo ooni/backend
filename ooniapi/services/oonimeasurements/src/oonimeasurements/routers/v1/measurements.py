@@ -493,8 +493,6 @@ async def get_measurement_meta(
         body = _fetch_measurement_body(
             db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
         )
-        assert isinstance(body, bytes)
-        body = body.decode()
     except Exception as e:
         log.error(e, exc_info=True)
 
