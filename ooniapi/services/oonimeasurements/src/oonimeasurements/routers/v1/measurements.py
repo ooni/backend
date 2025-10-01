@@ -276,7 +276,7 @@ class MeasurementMeta(BaseModel):
     report_id: Optional[str] = None
     test_name: Optional[str] = None
     test_start_time: Optional[datetime] = None
-    probe_asn: Optional[str] = None
+    probe_asn: Optional[str | int] = None
     probe_cc: Optional[str] = None
     scores: Optional[str] = None
     category_code: Optional[str] = None
@@ -495,6 +495,12 @@ async def get_measurement_meta(
         )
     except Exception as e:
         log.error(e, exc_info=True)
+
+    try:
+        # Emulates the monolith behavior of returning probe_asn as int
+        msmt_meta.probe_asn = int(msmt_meta.probe_asn) if msmt_meta.probe_asn else msmt_meta.probe_asn
+    except ValueError as e:
+        log.error(f"Invalid probe_asn format: {e}")
 
     msmt_meta.raw_measurement = body
     return msmt_meta

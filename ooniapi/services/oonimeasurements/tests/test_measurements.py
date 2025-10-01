@@ -247,6 +247,29 @@ def test_measurements_desc_default(client):
         assert next_d <= d, "Results should be in descending order"
         d = next_d
 
+def test_msm_meta_probe_asn_int(client, monkeypatch):
+    """
+    The monolith returns probe_asn as an int in /measurement_meta
+    This test ensures the same functionality
+    """
+
+    def fake_get_bucket_url(bucket_name):
+        return f"file://{THIS_DIR}/fixtures/"
+
+    monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
+
+    report_id = "20250709T074749Z_webconnectivity_US_10796_n1_oljUoi3ZVNHUzjdp"
+    input = "https://www.quora.com/"
+    resp = client.get("/api/v1/measurement_meta", params={
+        "report_id" : report_id,
+        "full" : True,
+        "input" : input
+    })
+
+    assert resp.status_code == 200, resp.content
+    j = resp.json()
+    assert isinstance(j['probe_asn'], int), "probe_asn should be int"
+
 def test_fix_msm_date_parsing(client):
 
     # This query was raising an error parsing the date:
