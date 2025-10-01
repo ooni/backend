@@ -460,7 +460,7 @@ async def get_measurement_meta(
     full: Annotated[bool, Query(description="Include JSON measurement data")] = False,
     settings=Depends(get_settings),
     db=Depends(get_clickhouse_session),
-) -> MeasurementMeta:
+) -> MeasurementMeta | Dict[str, Any]:
     """
     Get metadata on one measurement by measurement_uid or report_id + input
     """
@@ -471,38 +471,27 @@ async def get_measurement_meta(
     elif report_id:
         log.info(f"get_measurement_meta {report_id} {input}")
         msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="Either report_id or measurement_uid must be provided",
-        )
 
-    setcacheresponse("1m", response)
-    body = ""
+    if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
+        # Emulates old monolith behaviour of returning int as probe_asn
+        msmt_meta.probe_asn = asn_to_int(msmt_meta.probe_asn)
 
-    if not full:  # return without raw_measurement
+    setcacheresponse("1m",response)
+
+    if not full:
         return msmt_meta
 
     if msmt_meta == MeasurementMeta():  # measurement not found
-        return MeasurementMeta(raw_measurement=body)
+        return {"raw_measurement" : ""}
 
     try:
-        assert isinstance(msmt_meta.report_id, str) and isinstance(
-            msmt_meta.measurement_uid, str
-        )
-        body = _fetch_measurement_body(
-            db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
-        )
+        # TODO: uid_cleanup
+        assert msmt_meta.report_id is not None
+        msmt_meta.raw_measurement = _fetch_measurement_body(db, settings,msmt_meta.report_id, msmt_meta.measurement_uid)
     except Exception as e:
         log.error(e, exc_info=True)
+        msmt_meta.raw_measurement = ""
 
-    try:
-        # Emulates the monolith behavior of returning probe_asn as int
-        msmt_meta.probe_asn = int(msmt_meta.probe_asn) if msmt_meta.probe_asn else msmt_meta.probe_asn
-    except ValueError as e:
-        log.error(f"Invalid probe_asn format: {e}")
-
-    msmt_meta.raw_measurement = body
     return msmt_meta
 
 
@@ -973,3 +962,6 @@ async def get_torsf_stats(
 
 def get_bucket_url(bucket_name: str) -> str:
     return f"https://{bucket_name}.s3.amazonaws.com/"
+
+def asn_to_int(asn_str : str) -> int:
+    return int(asn_str.strip("AS"))

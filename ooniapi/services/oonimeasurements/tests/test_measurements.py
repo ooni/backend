@@ -281,3 +281,7 @@ def test_fix_msm_date_parsing(client):
     })
 
     assert resp.status_code == 200, resp.content
+
+def test_asn_to_int():
+    assert measurements.asn_to_int("AS1234") == 1234
+    assert measurements.asn_to_int("1234") == 1234
