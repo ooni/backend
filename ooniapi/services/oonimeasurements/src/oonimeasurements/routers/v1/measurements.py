@@ -16,7 +16,16 @@ import string
 import ujson
 import urllib3
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Header, Response, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+    HTTPException,
+    Header,
+    Response,
+    Request,
+    status,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from typing_extensions import Annotated
@@ -291,6 +300,7 @@ class MeasurementMeta(BaseModel):
     def format_ts(self, v: datetime) -> str:
         return v.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+
 def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
         input=msmt_meta["input"],
@@ -459,7 +469,7 @@ class GetMeasurementMetaRequest(BaseModel):
     )
 
     @field_validator("report_id")
-    def report_id_validator(cls, report_id : str) -> str:
+    def report_id_validator(cls, report_id: str) -> str:
         if report_id:
             return validate_report_id(report_id)
 
@@ -482,24 +492,28 @@ async def get_measurement_meta(
         msmt_meta = _get_measurement_meta_by_uid(db, request.measurement_uid)
     elif request.report_id:
         log.info(f"get_measurement_meta {request.report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(db, request.report_id, request.input)
+        msmt_meta = _get_measurement_meta_clickhouse(
+            db, request.report_id, request.input
+        )
 
     if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
         # Emulates old monolith behaviour of returning int as probe_asn
         msmt_meta.probe_asn = asn_to_int(msmt_meta.probe_asn)
 
-    setcacheresponse("1m",response)
+    setcacheresponse("1m", response)
 
     if not request.full:
         return msmt_meta
 
     if msmt_meta == MeasurementMeta():  # measurement not found
-        return {"raw_measurement" : ""}
+        return {"raw_measurement": ""}
 
     try:
         # TODO: uid_cleanup
         assert msmt_meta.report_id is not None
-        msmt_meta.raw_measurement = _fetch_measurement_body(db, settings,msmt_meta.report_id, msmt_meta.measurement_uid)
+        msmt_meta.raw_measurement = _fetch_measurement_body(
+            db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
+        )
     except Exception as e:
         log.error(e, exc_info=True)
         msmt_meta.raw_measurement = ""
@@ -534,12 +548,14 @@ def genurl(base_url: str, path: str, **kw) -> str:
     """Generate absolute URL for the API"""
     return urljoin(base_url, path) + "?" + urlencode(kw)
 
+
 class OrderBy(str, Enum):
     measurement_start_time = "measurement_start_time"
     input = "input"
     probe_cc = "probe_cc"
     probe_asn = "probe_asn"
     test_name = "test_name"
+
 
 @router.get("/v1/measurements")
 async def list_measurements(
@@ -630,7 +646,9 @@ async def list_measurements(
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
     ] = None,
     order_by: Annotated[
-        Optional[OrderBy], # Use an actual enum to enforce validation of ordering fields
+        Optional[
+            OrderBy
+        ],  # Use an actual enum to enforce validation of ordering fields
         Query(
             description="By which key the results should be ordered by (default: `null`)",
         ),
@@ -646,7 +664,10 @@ async def list_measurements(
         int, Query(description="Offset into the result set (default: 0)")
     ] = 0,
     limit: Annotated[
-        int, Query(description="Number of records to return (default: 100)", ge=0, le=1_000_000)
+        int,
+        Query(
+            description="Number of records to return (default: 100)", ge=0, le=1_000_000
+        ),
     ] = 100,
     user_agent: Annotated[str | None, Header()] = None,
     db=Depends(get_clickhouse_session),
@@ -975,14 +996,21 @@ async def get_torsf_stats(
 def get_bucket_url(bucket_name: str) -> str:
     return f"https://{bucket_name}.s3.amazonaws.com/"
 
-def asn_to_int(asn_str : str) -> int:
+
+def asn_to_int(asn_str: str) -> int:
     return int(asn_str.strip("AS"))
 
-def validate_report_id(report_id : str) -> str:
-    if len(report_id) < 15 or len(report_id) > 100:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid report_id field")
 
-    validate(report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field")
+def validate_report_id(report_id: str) -> str:
+    if len(report_id) < 15 or len(report_id) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid report_id field",
+        )
+
+    validate(
+        report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field"
+    )
 
     return report_id
 
@@ -991,4 +1019,6 @@ def validate(item: str, accepted: str, error_msg: str):
     """Ensure item contains only valid"""
     for c in item:
         if c not in accepted:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg
+            )

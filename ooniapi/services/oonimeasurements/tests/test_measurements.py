@@ -247,6 +247,7 @@ def test_measurements_desc_default(client):
         assert next_d <= d, "Results should be in descending order"
         d = next_d
 
+
 def test_msm_meta_probe_asn_int(client, monkeypatch):
     """
     The monolith returns probe_asn as an int in /measurement_meta
@@ -260,27 +261,31 @@ def test_msm_meta_probe_asn_int(client, monkeypatch):
 
     report_id = "20250709T074749Z_webconnectivity_US_10796_n1_oljUoi3ZVNHUzjdp"
     input = "https://www.quora.com/"
-    resp = client.get("/api/v1/measurement_meta", params={
-        "report_id" : report_id,
-        "full" : True,
-        "input" : input
-    })
+    resp = client.get(
+        "/api/v1/measurement_meta",
+        params={"report_id": report_id, "full": True, "input": input},
+    )
 
     assert resp.status_code == 200, resp.content
     j = resp.json()
-    assert isinstance(j['probe_asn'], int), "probe_asn should be int"
+    assert isinstance(j["probe_asn"], int), "probe_asn should be int"
+
 
 def test_fix_msm_date_parsing(client):
 
     # This query was raising an error parsing the date:
     # /api/v1/measurements?probe_cc=SY&since=2025-09-29T00:00:00&until=2025-09-29T23:59:59&limit=2000&since_index=20250910T105502Z_tor_SY_29256_n1_C8NFgxmJpyaP5Bsd
-    resp = client.get("/api/v1/measurements", params={
-        "since" : "2025-09-29T00:00:00",
-        "until" : "2025-09-29T23:59:59",
-        "limit" : "2000"
-    })
+    resp = client.get(
+        "/api/v1/measurements",
+        params={
+            "since": "2025-09-29T00:00:00",
+            "until": "2025-09-29T23:59:59",
+            "limit": "2000",
+        },
+    )
 
     assert resp.status_code == 200, resp.content
+
 
 def test_get_measurement_meta_basic(client):
     rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
@@ -304,9 +309,11 @@ def test_get_measurement_meta_basic(client):
         "category_code": "",
     }
 
+
 def test_get_measurement_meta_invalid_rid(client):
     response = client.get("/api/v1/measurement_meta?report_id=BOGUS")
     assert b"Invalid report_id" in response.content
+
 
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
