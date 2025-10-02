@@ -11,16 +11,17 @@ import json
 import logging
 import math
 import time
+import string
 
 import ujson
 import urllib3
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Header, Response, Request
+from fastapi import APIRouter, Depends, Query, HTTPException, Header, Response, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from typing_extensions import Annotated
 
-from pydantic import Field, field_serializer
+from pydantic import Field, field_serializer, field_validator, ValidationError
 
 import sqlalchemy as sa
 from sqlalchemy import tuple_, Row, sql
@@ -433,34 +434,42 @@ class MeasurementBase(BaseModel):
     test_name: Optional[str] = Field(default=None, title="test name of the measurement")
 
 
+class GetMeasurementMetaRequest(BaseModel):
+    measurement_uid: Optional[str] = Field(
+        None,
+        description="The measurement ID, mutually exclusive with report_id + input",
+        min_length=3,
+    )
+    report_id: Optional[str] = Field(
+        None,
+        description=(
+            "The report_id to search measurements for example: "
+            "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a"
+        ),
+        min_length=3,
+    )
+    input: Optional[str] = Field(
+        None,
+        description="The input (for example a URL or IP address) to search measurements for",
+        min_length=3,
+    )
+    full: bool = Field(
+        False,
+        description="Include JSON measurement data",
+    )
+
+    @field_validator("report_id")
+    def report_id_validator(cls, report_id : str) -> str:
+        if report_id:
+            return validate_report_id(report_id)
+
+        return report_id
+
+
 @router.get("/v1/measurement_meta", response_model_exclude_unset=True)
 async def get_measurement_meta(
     response: Response,
-    measurement_uid: Annotated[
-        Optional[str],
-        Query(
-            description="The measurement ID, mutually exclusive with report_id + input",
-            min_length=3,
-        ),
-    ] = None,
-    report_id: Annotated[
-        Optional[str],
-        Query(
-            description=(
-                "The report_id to search measurements for example: "
-                "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a"
-            ),
-            min_length=3,
-        ),
-    ] = None,
-    input: Annotated[
-        Optional[str],
-        Query(
-            description="The input (for example a URL or IP address) to search measurements for",
-            min_length=3,
-        ),
-    ] = None,
-    full: Annotated[bool, Query(description="Include JSON measurement data")] = False,
+    request: GetMeasurementMetaRequest = Depends(),
     settings=Depends(get_settings),
     db=Depends(get_clickhouse_session),
 ) -> MeasurementMeta | Dict[str, Any]:
@@ -468,12 +477,12 @@ async def get_measurement_meta(
     Get metadata on one measurement by measurement_uid or report_id + input
     """
 
-    if measurement_uid:
-        log.info(f"get_measurement_meta {measurement_uid}")
-        msmt_meta = _get_measurement_meta_by_uid(db, measurement_uid)
-    elif report_id:
-        log.info(f"get_measurement_meta {report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
+    if request.measurement_uid:
+        log.info(f"get_measurement_meta {request.measurement_uid}")
+        msmt_meta = _get_measurement_meta_by_uid(db, request.measurement_uid)
+    elif request.report_id:
+        log.info(f"get_measurement_meta {request.report_id} {input}")
+        msmt_meta = _get_measurement_meta_clickhouse(db, request.report_id, request.input)
 
     if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
         # Emulates old monolith behaviour of returning int as probe_asn
@@ -481,7 +490,7 @@ async def get_measurement_meta(
 
     setcacheresponse("1m",response)
 
-    if not full:
+    if not request.full:
         return msmt_meta
 
     if msmt_meta == MeasurementMeta():  # measurement not found
@@ -968,3 +977,18 @@ def get_bucket_url(bucket_name: str) -> str:
 
 def asn_to_int(asn_str : str) -> int:
     return int(asn_str.strip("AS"))
+
+def validate_report_id(report_id : str) -> str:
+    if len(report_id) < 15 or len(report_id) > 100:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid report_id field")
+
+    validate(report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field")
+
+    return report_id
+
+
+def validate(item: str, accepted: str, error_msg: str):
+    """Ensure item contains only valid"""
+    for c in item:
+        if c not in accepted:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg)

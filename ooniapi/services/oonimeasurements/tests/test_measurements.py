@@ -304,6 +304,10 @@ def test_get_measurement_meta_basic(client):
         "category_code": "",
     }
 
+def test_get_measurement_meta_invalid_rid(client):
+    response = client.get("/api/v1/measurement_meta?report_id=BOGUS")
+    assert b"Invalid report_id" in response.content
+
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
     assert measurements.asn_to_int("1234") == 1234
