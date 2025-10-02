@@ -388,6 +388,5 @@ def test_no_measurements_before_30_days(client):
 
 
 def test_asn_to_int():
-
     assert measurements.asn_to_int("AS1234") == 1234
     assert measurements.asn_to_int("1234") == 1234
