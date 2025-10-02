@@ -21,7 +21,7 @@ def normalize_probe_asn(probe_asn):
 
 
 def test_list_measurements(client):
-    response = client.get(route)
+    response = client.get(route, params={"since":SINCE})
     json = response.json()
 
     assert isinstance(json["results"], list), json
@@ -40,6 +40,7 @@ def test_list_measurements_with_since_and_until(client):
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
 
+SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 
 @pytest.mark.parametrize(
     "filter_param, filter_value",
@@ -55,6 +56,7 @@ def test_list_measurements_with_one_value_to_filters(
 ):
     params = {}
     params[filter_param] = filter_value
+    params["since"] = SINCE
 
     response = client.get(route, params=params)
 
@@ -74,6 +76,7 @@ def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(c
     domain = "cloudflare-dns.com"
     params = {
         "domain": domain,
+        "since": SINCE
     }
 
     response = client.get(route, params=params)
@@ -98,6 +101,7 @@ def test_list_measurements_with_multiple_values_to_filters(
 ):
     params = {}
     params[filter_param] = filter_value
+    params['since'] = SINCE
     filter_value_list = filter_value.split(",")
     if filter_param == "probe_asn":
         filter_value_list = list(map(normalize_probe_asn, filter_value_list))
@@ -113,7 +117,7 @@ def test_list_measurements_with_multiple_values_to_filters(
 
 def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
     domainCollection = "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1"
-    params = {"domain": domainCollection}
+    params = {"domain": domainCollection, "since" : SINCE}
 
     response = client.get(route, params=params)
 
@@ -226,7 +230,7 @@ def test_measurements_desc_default(client):
     """
 
     resp = client.get(
-        "/api/v1/measurements", params={"order_by": "measurement_start_time"}
+        "/api/v1/measurements", params={"order_by": "measurement_start_time", "since" : SINCE}
     )
     assert (
         resp.status_code == 200

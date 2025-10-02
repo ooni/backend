@@ -702,6 +702,13 @@ async def list_measurements(
         )
 
     ### Prepare query parameters
+    if until is None and report_id is None:
+        t = datetime.now(timezone.utc) + timedelta(days=1)
+        until = datetime(t.year, t.month, t.day)
+
+    if since is None and report_id is None and until is not None:
+        since = until - timedelta(days=30)
+
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
 
