@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from clickhouse_driver import Client as Clickhouse
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
@@ -19,6 +19,10 @@ def normalize_probe_asn(probe_asn):
         return probe_asn
     return f"AS{probe_asn}"
 
+def get_time(row):
+    return datetime.strptime(row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ")
+
+SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 
 def test_list_measurements(client):
     response = client.get(route, params={"since":SINCE})
@@ -39,8 +43,6 @@ def test_list_measurements_with_since_and_until(client):
 
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
-
-SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 
 @pytest.mark.parametrize(
     "filter_param, filter_value",
@@ -238,8 +240,6 @@ def test_measurements_desc_default(client):
     j = resp.json()
     assert len(j["results"]) > 1, "Not enough results"
 
-    def get_time(row):
-        return datetime.strptime(row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ")
 
     d = get_time(j["results"][0])
     for row in j["results"][1:]:
@@ -369,6 +369,18 @@ def test_get_measurement_meta_full(client, monkeypatch):
     }
     assert raw_msm
 
+def test_no_measurements_before_30_days(client):
+    """
+    The default filtering should not retrieve measurements older than 30 days since tomorrow
+    """
+
+    resp = client.get("/api/v1/measurements") # no since/until
+    assert resp.status_code, resp.status_code
+    json = resp.json()
+    min_date = datetime.now(timezone.utc) - timedelta(29)
+    for r in json['results']:
+        date = get_time(r)
+        assert date >= min_date
 
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
