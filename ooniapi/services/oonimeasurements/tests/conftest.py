@@ -26,7 +26,7 @@ def maybe_download_fixtures():
         "samples/analysis_web_measurement-sample.sql.gz",
         "samples/obs_web-sample.sql.gz",
         "raw/20250709/07/US/webconnectivity/2025070907_US_webconnectivity.n1.7.jsonl.gz",
-        "raw/20210709/00/MY/webconnectivity/2021070900_MY_webconnectivity.n0.2.jsonl.gz"
+        "raw/20210709/00/MY/webconnectivity/2021070900_MY_webconnectivity.n0.2.jsonl.gz",
     ]
     for fn in filenames:
         dst_path = get_file_path(f"fixtures/{fn}")

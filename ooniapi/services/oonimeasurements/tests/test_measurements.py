@@ -9,8 +9,10 @@ from .conftest import THIS_DIR
 
 route = "api/v1/measurements"
 
+
 def fake_get_bucket_url(bucket_name):
     return f"file://{THIS_DIR}/fixtures/"
+
 
 def normalize_probe_asn(probe_asn):
     if probe_asn.startswith("AS"):
@@ -304,6 +306,7 @@ def test_get_measurement_meta_invalid_rid(client):
     response = client.get("/api/v1/measurement_meta?report_id=BOGUS")
     assert b"Invalid report_id" in response.content
 
+
 def test_get_measurement_meta_not_found(client):
     url = "/api/v1/measurement_meta?report_id=20200712T100000Z_AS9999_BOGUSsYKWBS2S0hdzXf7rhUusKfYP5cQM9HwAdZRPmUfroVoCn"
     resp = client.get(url)
@@ -311,11 +314,12 @@ def test_get_measurement_meta_not_found(client):
     assert resp.status_code == 200
     assert resp.json() == {}
 
+
 def test_get_measurement_meta_input_none_from_fp(client):
     rid = "20210709T000017Z_httpinvalidrequestline_CH_3303_n1_8mr2M3dzkoFmmjIU"
     # input is None
     response = client.get(f"/api/v1/measurement_meta?report_id={rid}")
-    assert response.status_code == 200,response.status_code
+    assert response.status_code == 200, response.status_code
     assert response.json() == {
         "anomaly": False,
         "category_code": None,
@@ -332,12 +336,15 @@ def test_get_measurement_meta_input_none_from_fp(client):
         "test_start_time": "2021-07-09T00:00:16Z",
     }
 
+
 def test_get_measurement_meta_full(client, monkeypatch):
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
     rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
     inp = "https://www.backtrack-linux.org/"
-    response = client.get(f"/api/v1/measurement_meta?report_id={rid}&input={inp}&full=True")
+    response = client.get(
+        f"/api/v1/measurement_meta?report_id={rid}&input={inp}&full=True"
+    )
     assert response.status_code == 200, response.status_code
     data = response.json()
     raw_msm = data.pop("raw_measurement")
@@ -357,6 +364,7 @@ def test_get_measurement_meta_full(client, monkeypatch):
         "category_code": "",
     }
     assert raw_msm
+
 
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
