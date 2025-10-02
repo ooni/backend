@@ -721,6 +721,7 @@ def test_aggregation_result_validation(client):
         probe_asn=1234,
     )
 
+
 def test_aggregation_probe_asn_result_wont_crash(client):
     """
     Validates that the API is able to generate the response model when probe_asn is not None
@@ -730,5 +731,5 @@ def test_aggregation_probe_asn_result_wont_crash(client):
 
     # should not crash
     r = api(client, url)
-    assert r['dimension_count'] == 2
-    assert isinstance(r['result'][0]['probe_asn'], int)
+    assert r["dimension_count"] == 2
+    assert isinstance(r["result"][0]["probe_asn"], int)
