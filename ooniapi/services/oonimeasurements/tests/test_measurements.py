@@ -9,6 +9,8 @@ from .conftest import THIS_DIR
 
 route = "api/v1/measurements"
 
+def fake_get_bucket_url(bucket_name):
+    return f"file://{THIS_DIR}/fixtures/"
 
 def normalize_probe_asn(probe_asn):
     if probe_asn.startswith("AS"):
@@ -151,10 +153,6 @@ def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtu
     """
     Test that all arguments in raw_measurements are optional
     """
-
-    def fake_get_bucket_url(bucket_name):
-        return f"file://{THIS_DIR}/fixtures/"
-
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
     # Taken from fixtures
@@ -178,10 +176,6 @@ def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtur
     """
     Test that raw_measurements returns json instead of a string
     """
-
-    def fake_get_bucket_url(bucket_name):
-        return f"file://{THIS_DIR}/fixtures/"
-
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
     uid = "20250709075147.833477_US_webconnectivity_8f0e0b49950f2592"
@@ -253,10 +247,6 @@ def test_msm_meta_probe_asn_int(client, monkeypatch):
     The monolith returns probe_asn as an int in /measurement_meta
     This test ensures the same functionality
     """
-
-    def fake_get_bucket_url(bucket_name):
-        return f"file://{THIS_DIR}/fixtures/"
-
     monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
 
     report_id = "20250709T074749Z_webconnectivity_US_10796_n1_oljUoi3ZVNHUzjdp"
@@ -314,6 +304,59 @@ def test_get_measurement_meta_invalid_rid(client):
     response = client.get("/api/v1/measurement_meta?report_id=BOGUS")
     assert b"Invalid report_id" in response.content
 
+def test_get_measurement_meta_not_found(client):
+    url = "/api/v1/measurement_meta?report_id=20200712T100000Z_AS9999_BOGUSsYKWBS2S0hdzXf7rhUusKfYP5cQM9HwAdZRPmUfroVoCn"
+    resp = client.get(url)
+    # TODO: is this a bug?
+    assert resp.status_code == 200
+    assert resp.json() == {}
+
+def test_get_measurement_meta_input_none_from_fp(client):
+    rid = "20210709T000017Z_httpinvalidrequestline_CH_3303_n1_8mr2M3dzkoFmmjIU"
+    # input is None
+    response = client.get(f"/api/v1/measurement_meta?report_id={rid}")
+    assert response.status_code == 200,response.status_code
+    assert response.json() == {
+        "anomaly": False,
+        "category_code": None,
+        "confirmed": False,
+        "failure": False,
+        "input": "",
+        "measurement_start_time": "2021-07-09T00:00:18Z",
+        "measurement_uid": "20210709000024.440526_CH_httpinvalidrequestline_3937f817503ed4ea",
+        "probe_asn": 3303,
+        "probe_cc": "CH",
+        "report_id": rid,
+        "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
+        "test_name": "http_invalid_request_line",
+        "test_start_time": "2021-07-09T00:00:16Z",
+    }
+
+def test_get_measurement_meta_full(client, monkeypatch):
+    monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
+
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
+    response = client.get(f"/api/v1/measurement_meta?report_id={rid}&input={inp}&full=True")
+    assert response.status_code == 200, response.status_code
+    data = response.json()
+    raw_msm = data.pop("raw_measurement")
+    assert data == {
+        "anomaly": True,
+        "confirmed": False,
+        "failure": False,
+        "input": inp,
+        "measurement_uid": "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874",
+        "measurement_start_time": "2025-07-09T00:55:13Z",
+        "probe_asn": 4818,
+        "probe_cc": "MY",
+        "scores": '{"blocking_general":1.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0,"analysis":{"blocking_type":"http-failure"}}',
+        "report_id": rid,
+        "test_name": "web_connectivity",
+        "test_start_time": "2025-07-09T00:43:40Z",
+        "category_code": "",
+    }
+    assert raw_msm
 
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
