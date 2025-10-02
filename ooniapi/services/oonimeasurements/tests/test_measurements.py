@@ -20,7 +20,7 @@ def normalize_probe_asn(probe_asn):
     return f"AS{probe_asn}"
 
 def get_time(row):
-    return datetime.strptime(row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.strptime(row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo= timezone.utc)
 
 SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 
