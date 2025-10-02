@@ -19,13 +19,18 @@ def normalize_probe_asn(probe_asn):
         return probe_asn
     return f"AS{probe_asn}"
 
+
 def get_time(row):
-    return datetime.strptime(row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo= timezone.utc)
+    return datetime.strptime(
+        row["measurement_start_time"], "%Y-%m-%dT%H:%M:%S.%fZ"
+    ).replace(tzinfo=timezone.utc)
+
 
 SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 
+
 def test_list_measurements(client):
-    response = client.get(route, params={"since":SINCE})
+    response = client.get(route, params={"since": SINCE})
     json = response.json()
 
     assert isinstance(json["results"], list), json
@@ -43,6 +48,7 @@ def test_list_measurements_with_since_and_until(client):
 
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
+
 
 @pytest.mark.parametrize(
     "filter_param, filter_value",
@@ -76,10 +82,7 @@ def test_list_measurements_with_one_value_to_filters(
 
 def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(client):
     domain = "cloudflare-dns.com"
-    params = {
-        "domain": domain,
-        "since": SINCE
-    }
+    params = {"domain": domain, "since": SINCE}
 
     response = client.get(route, params=params)
 
@@ -103,7 +106,7 @@ def test_list_measurements_with_multiple_values_to_filters(
 ):
     params = {}
     params[filter_param] = filter_value
-    params['since'] = SINCE
+    params["since"] = SINCE
     filter_value_list = filter_value.split(",")
     if filter_param == "probe_asn":
         filter_value_list = list(map(normalize_probe_asn, filter_value_list))
@@ -119,7 +122,7 @@ def test_list_measurements_with_multiple_values_to_filters(
 
 def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
     domainCollection = "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1"
-    params = {"domain": domainCollection, "since" : SINCE}
+    params = {"domain": domainCollection, "since": SINCE}
 
     response = client.get(route, params=params)
 
@@ -232,14 +235,14 @@ def test_measurements_desc_default(client):
     """
 
     resp = client.get(
-        "/api/v1/measurements", params={"order_by": "measurement_start_time", "since" : SINCE}
+        "/api/v1/measurements",
+        params={"order_by": "measurement_start_time", "since": SINCE},
     )
     assert (
         resp.status_code == 200
     ), f"Unexpected status code: {resp.status_code}. {resp.content}"
     j = resp.json()
     assert len(j["results"]) > 1, "Not enough results"
-
 
     d = get_time(j["results"][0])
     for row in j["results"][1:]:
@@ -369,18 +372,20 @@ def test_get_measurement_meta_full(client, monkeypatch):
     }
     assert raw_msm
 
+
 def test_no_measurements_before_30_days(client):
     """
     The default filtering should not retrieve measurements older than 30 days since tomorrow
     """
 
-    resp = client.get("/api/v1/measurements") # no since/until
+    resp = client.get("/api/v1/measurements")  # no since/until
     assert resp.status_code, resp.status_code
     json = resp.json()
     min_date = datetime.now(timezone.utc) - timedelta(29)
-    for r in json['results']:
+    for r in json["results"]:
         date = get_time(r)
         assert date >= min_date
+
 
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
