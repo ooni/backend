@@ -4,8 +4,7 @@ Measurements API
 
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from pathlib import Path
-from typing import List, Optional, Any, Dict, Union, TypedDict, Tuple
+from typing import List, Optional, Any, Dict, Union
 import gzip
 import json
 import logging
@@ -30,14 +29,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from typing_extensions import Annotated
 
-from pydantic import Field, field_serializer, field_validator, ValidationError
+from pydantic import Field, field_serializer, field_validator
 
-import sqlalchemy as sa
-from sqlalchemy import tuple_, Row, sql
-from sqlalchemy.orm import Session
+from sqlalchemy import sql
 from sqlalchemy.sql.expression import and_, text, select, column
-from sqlalchemy.sql.expression import text as sql_text
-from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
 
