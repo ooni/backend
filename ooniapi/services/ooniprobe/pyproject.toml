@@ -28,7 +28,8 @@ dependencies = [
   "fastapi-utils[all] ~= 0.8.0",
   "zstd ~= 1.5.7.2",
   "boto3 ~= 1.39.3",
-  "boto3-stubs[s3] ~= 1.39.3"
+  "boto3-stubs[s3] ~= 1.39.3",
+  "ooniauth-py @ https://github.com/ooni/userauth/raw/refs/heads/str-serialization/ooniauth-py/wheels/ooniauth_py-0.1.0-cp310-abi3-manylinux_2_34_x86_64.whl"
 ]
 
 readme = "README.md"
@@ -81,6 +82,13 @@ test = "pytest {args:tests}"
 test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
 cov-report = ["coverage report"]
 cov = ["test-cov", "cov-report"]
+
+# Allows specifyng dependencies as a direct reference like an URL
+# or a file path.
+# Required by ooniauth-py
+# See: https://hatch.pypa.io/1.13/config/metadata/#allowing-direct-references
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
