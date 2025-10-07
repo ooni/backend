@@ -1,5 +1,5 @@
 # Python builder
-FROM python:3.11-bookworm as builder
+FROM python:3.11-bookworm AS builder
 ARG BUILD_LABEL=docker
 
 WORKDIR /build
@@ -14,10 +14,10 @@ RUN find /build -type f -name '._*' -delete
 
 RUN echo "$BUILD_LABEL" > /build/src/ooniprobe/BUILD_LABEL
 
-RUN hatch build
+RUN make build
 
 ### Actual image running on the host
-FROM python:3.11-bookworm as runner
+FROM python:3.11-bookworm AS runner
 
 WORKDIR /app
 
