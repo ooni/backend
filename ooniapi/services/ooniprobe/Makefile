@@ -50,6 +50,14 @@ test-cov:
 	hatch run test-cov
 
 build:
+	mkdir -p include
+	# Git pull if already present or git clone if not
+	cd include && \
+	if [ -d "userauth/.git" ]; then \
+		cd userauth && git pull && cd ..; \
+	else \
+		git clone -b str-serialization https://github.com/ooni/userauth.git; \
+	fi
 	hatch build
 
 clean:
