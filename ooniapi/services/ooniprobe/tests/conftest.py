@@ -16,6 +16,8 @@ from ooniprobe.common.dependencies import get_settings
 from ooniprobe.dependencies import get_s3_client
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
+from ooniprobe.dependencies import get_postgresql_session
+from ooniprobe.models import OONIProbeServerState
 
 
 def make_override_get_settings(**kw):
@@ -100,6 +102,13 @@ def geoip_db_dir(fixture_path):
 def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
+
+    # Initialize server state
+    db = get_postgresql_session(test_settings())
+    session = next(db)
+    OONIProbeServerState.init_table(session)
+    next(db, None)
+
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
