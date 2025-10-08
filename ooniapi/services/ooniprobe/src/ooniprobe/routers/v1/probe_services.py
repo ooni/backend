@@ -604,7 +604,7 @@ class ManifestResponse(BaseModel):
     date_created: datetime
 
 @router.get("/manifest", tags=["anonymous_credentials"])
-def manifest(Response, state : LatestStateDep):
+def manifest(state : LatestStateDep) -> ManifestResponse:
     return ManifestResponse(
         nym_scope="ooni.org/{probe_cc}/{probe_asn}",
         public_parameters=state.public_parameters,
@@ -620,8 +620,8 @@ class RegisterResponse(BaseModel):
     credential_sign_response: str
     emission_day: int
 
-@router.get("/register", tags=["anonymous_credentials"])
-def register(register_request: RegisterRequest, session : PostgresSessionDep):
+@router.post("/sign_credential", tags=["anonymous_credentials"])
+def sign_credential(register_request: RegisterRequest, session : PostgresSessionDep):
 
     state = OONIProbeServerState.get_by_datetime(session, register_request.manifest_date_created)
     if state is None:
