@@ -38,3 +38,5 @@ def test_registration_basic(client):
             "manifest_date_created" : manifest['date_created']
         }
     )
+    # should be able to verify this credential
+    user_state.handle_registration_response(resp['credential_sign_response']) # should not crash
