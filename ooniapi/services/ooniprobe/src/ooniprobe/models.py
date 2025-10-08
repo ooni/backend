@@ -2,11 +2,13 @@ from datetime import datetime
 from typing import Self
 from .common.models import UtcDateTime
 from .common.postgresql import Base
-from sqlalchemy import ForeignKey, Sequence, String
+from sqlalchemy import ForeignKey, Sequence, String, func
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column, relationship, Session
 from sqlalchemy import desc
 from ooniauth_py import ServerState
+import logging
+log = logging.getLogger(__name__)
 
 
 class OONIProbeVPNProvider(Base):
@@ -57,7 +59,7 @@ class OONIProbeServerState(Base):
     """
     Server state used for the anonymous credentials protocol.
     Stores public parameters and secret key used for credential
-    generation
+    generation and validation
     """
 
     __tablename__ = "ooniprobe_server_state"
@@ -68,7 +70,7 @@ class OONIProbeServerState(Base):
         primary_key=True,
         nullable=False,
     )
-    date_created: Mapped[datetime] = mapped_column(UtcDateTime())
+    date_created: Mapped[datetime] = mapped_column(UtcDateTime(), default=func.now())
     secret_key: Mapped[str] = mapped_column()
     public_parameters: Mapped[str] = mapped_column()
 
@@ -107,3 +109,15 @@ class OONIProbeServerState(Base):
         """
 
         return ServerState.from_creds(self.public_parameters, self.secret_key)
+
+    @classmethod
+    def init_table(cls, session: Session):
+        """
+        Creates a new entry if none exists.
+        """
+        latest = cls.get_latest(session)
+        if latest is None:
+            log.info("No OONIProbeServerState entry found. Creating a new one...")
+            cls.make_new_state(session)
+        else:
+            log.info("OONIProbeServerState already initialized!")

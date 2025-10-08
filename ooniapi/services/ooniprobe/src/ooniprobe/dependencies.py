@@ -6,7 +6,7 @@ from fastapi import Depends
 import geoip2.database
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from clickhouse_driver import Client as Clickhouse
 
@@ -23,13 +23,13 @@ SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
 def get_postgresql_session(settings: SettingsDep):
     engine = create_engine(settings.postgresql_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
+PostgresSessionDep = Annotated[Session, get_postgresql_session]
 
 def get_cc_reader(settings: SettingsDep):
     db_path = Path(settings.geoip_db_dir, "cc.mmdb")
