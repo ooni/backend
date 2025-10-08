@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import Dict
 from .common.models import UtcDateTime
 from .common.postgresql import Base
-from sqlalchemy import ForeignKey, Sequence, String, Integer
+from sqlalchemy import ForeignKey, Sequence, String
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column, relationship
 
