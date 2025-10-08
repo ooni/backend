@@ -6,9 +6,10 @@ import random
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field
+from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed
 
 from ...utils import (
     generate_report_id,
@@ -16,12 +17,13 @@ from ...utils import (
     lookup_probe_cc,
     lookup_probe_network,
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestStateDep
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestStateDep, PostgresSessionDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
+from ...models import OONIProbeServerState
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
@@ -602,11 +604,51 @@ class ManifestResponse(BaseModel):
     date_created: datetime
 
 @router.get("/manifest", tags=["anonymous_credentials"])
-def manifest(response: Response, state : LatestStateDep):
-    setnocacheresponse(response)
+def manifest(Response, state : LatestStateDep):
     return ManifestResponse(
         nym_scope="ooni.org/{probe_cc}/{probe_asn}",
         public_parameters=state.public_parameters,
         submission_policy={},
         date_created=state.date_created
+        )
+
+class RegisterRequest(BaseModel):
+    manifest_date_created: datetime
+    credential_sign_request: str
+
+class RegisterResponse(BaseModel):
+    credential_sign_response: str
+    emission_day: int
+
+@router.get("/register", tags=["anonymous_credentials"])
+def register(register_request: RegisterRequest, session : PostgresSessionDep):
+
+    state = OONIProbeServerState.get_by_datetime(session, register_request.manifest_date_created)
+    if state is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            {"error" : f"No manifest with creation date '{register_request.manifest_date_created.isoformat()}' was found"}
+            )
+
+    protocol_state = state.to_protocol()
+
+    try:
+        resp = protocol_state.handle_registration_request(register_request.credential_sign_request)
+    except (ProtocolError, CredentialError, DeserializationFailed) as e:
+        raise to_http_exception(e)
+
+    return RegisterResponse(
+        credential_sign_response=resp,
+        emission_day=protocol_state.today()
+    )
+
+
+def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+    if isinstance(error, (ProtocolError, DeserializationFailed)):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail={"error": str(error)}
+        )
+    if isinstance(error, CredentialError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail={"error": str(error)}
         )

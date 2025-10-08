@@ -75,6 +75,15 @@ class OONIProbeServerState(Base):
     public_parameters: Mapped[str] = mapped_column()
 
     @classmethod
+    def get_by_datetime(cls, session: Session, dt : datetime) -> Self | None:
+        return (
+            session
+            .query(cls)
+            .where(cls.date_created == dt)
+            .one_or_none()
+        )
+
+    @classmethod
     def get_latest(cls, session: Session) -> Self | None:
         return (
             session
