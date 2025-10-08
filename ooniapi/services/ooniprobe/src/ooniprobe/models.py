@@ -48,3 +48,22 @@ class OONIProbeVPNProviderEndpoint(Base):
 
     provider_id = mapped_column(ForeignKey("ooniprobe_vpn_provider.id"))
     provider = relationship("OONIProbeVPNProvider", back_populates="endpoints")
+
+
+class OONIProbeServerState(Base):
+    """
+    Server state used for the anonymous credentials protocol.
+    Stores public parameters and secret key used for credential
+    generation
+    """
+    __tablename__ = "ooniprobe_server_state"
+
+    id: Mapped[str] = mapped_column(
+        String,
+        Sequence("ooniprobe_server_state_id_seq", start=1),
+        primary_key=True,
+        nullable=False
+    )
+    date_created: Mapped[datetime] = mapped_column(UtcDateTime())
+    secret_key: Mapped[str] = mapped_column()
+    public_parameters: Mapped[str] = mapped_column()
