@@ -182,5 +182,5 @@ def is_fastpath_running(url: str) -> bool:
     try: 
         resp = urlopen(url)
         return resp.status == 200
-    except:
+    except Exception:
         return False
