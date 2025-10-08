@@ -1,4 +1,3 @@
-from tempfile import tempdir
 import pathlib
 from pathlib import Path
 import pytest
