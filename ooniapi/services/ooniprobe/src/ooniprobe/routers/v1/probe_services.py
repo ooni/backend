@@ -599,13 +599,14 @@ class ManifestResponse(BaseModel):
     submission_policy: Dict[str, Any]
     # TODO: Is the manifest version different from the server state? For now we assume it's the same
     # and use the `date_created` as version
-    date_created: str
+    date_created: datetime
 
-@router.get("/manifest")
-def manifest(state : LatestStateDep):
+@router.get("/manifest", tags=["anonymous_credentials"])
+def manifest(response: Response, state : LatestStateDep):
+    setnocacheresponse(response)
     return ManifestResponse(
         nym_scope="ooni.org/{probe_cc}/{probe_asn}",
         public_parameters=state.public_parameters,
         submission_policy={},
-        date_created=state.date_created.isoformat()
+        date_created=state.date_created
         )

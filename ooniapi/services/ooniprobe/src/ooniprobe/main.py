@@ -8,8 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi_utils.tasks import repeat_every
 
-from sqlalchemy.orm import Session
-
 from pydantic import BaseModel
 
 from prometheus_fastapi_instrumentator import Instrumentator
