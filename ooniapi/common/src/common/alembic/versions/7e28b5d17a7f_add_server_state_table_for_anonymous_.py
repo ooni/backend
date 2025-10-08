@@ -36,10 +36,8 @@ def upgrade() -> None:
         sa.Column("secret_key", sa.String(), nullable=False),
         sa.Column("public_parameters", sa.String(), nullable=False)
     )
-    pass
 
 
 def downgrade() -> None:
     op.drop_table("ooniprobe_server_state")
     op.execute(sc.DropSequence(ooniprobe_server_state_id_seq))
-    pass
