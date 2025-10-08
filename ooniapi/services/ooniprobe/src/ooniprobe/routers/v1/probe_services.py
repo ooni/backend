@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict, Tuple, Optional
+from typing import List, Any, Dict, Tuple, Optional
 import random
 
 import geoip2

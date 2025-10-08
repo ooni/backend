@@ -1,9 +1,12 @@
 from datetime import datetime
+from typing import Self
 from .common.models import UtcDateTime
 from .common.postgresql import Base
 from sqlalchemy import ForeignKey, Sequence, String
 from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column, relationship
+from sqlalchemy.orm import mapped_column, relationship, Session
+from sqlalchemy import desc
+from ooniauth_py import ServerState
 
 
 class OONIProbeVPNProvider(Base):
@@ -56,14 +59,51 @@ class OONIProbeServerState(Base):
     Stores public parameters and secret key used for credential
     generation
     """
+
     __tablename__ = "ooniprobe_server_state"
 
     id: Mapped[str] = mapped_column(
         String,
         Sequence("ooniprobe_server_state_id_seq", start=1),
         primary_key=True,
-        nullable=False
+        nullable=False,
     )
     date_created: Mapped[datetime] = mapped_column(UtcDateTime())
     secret_key: Mapped[str] = mapped_column()
     public_parameters: Mapped[str] = mapped_column()
+
+    @classmethod
+    def get_latest(cls, session: Session) -> Self | None:
+        return (
+            session
+            .query(cls)
+            .order_by(desc(cls.date_created))
+            .limit(1)
+            .one_or_none()
+        )
+
+    @classmethod
+    def make_new_state(cls, session: Session, state : ServerState | None = None) -> Self:
+        """
+        Creates a new state, saving it to db
+        If no state value is provided, create a default one with random values
+        """
+        if state is None:
+            state = ServerState()
+
+        new = cls(
+            secret_key=state.get_secret_key(),
+            public_parameters = state.get_public_parameters()
+            )
+        session.add(new)
+        session.commit()
+        session.refresh(new)
+
+        return new
+
+    def to_protocol(self) -> ServerState:
+        """
+        Converts this instance into a protocol object
+        """
+
+        return ServerState.from_creds(self.public_parameters, self.secret_key)
