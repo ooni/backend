@@ -16,7 +16,7 @@ from ...utils import (
     lookup_probe_cc,
     lookup_probe_network,
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestStateDep
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -590,3 +590,22 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+# -- <Anonymous Credentials> ------------------------------------
+
+class ManifestResponse(BaseModel):
+    nym_scope: str
+    public_parameters: str
+    submission_policy: Dict[str, Any]
+    # TODO: Is the manifest version different from the server state? For now we assume it's the same
+    # and use the `date_created` as version
+    date_created: str
+
+@router.get("/manifest")
+def manifest(state : LatestStateDep):
+    return ManifestResponse(
+        nym_scope="ooni.org/{probe_cc}/{probe_asn}",
+        public_parameters=state.public_parameters,
+        submission_policy={},
+        date_created=state.date_created.isoformat()
+        )
