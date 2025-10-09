@@ -627,7 +627,9 @@ def sign_credential(register_request: RegisterRequest, session : PostgresSession
     if state is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
-            {"error" : f"No manifest with creation date '{register_request.manifest_date_created.isoformat()}' was found"}
+            {
+                "error" : "manifest_not_found",
+                "detail" : f"No manifest with creation date '{register_request.manifest_date_created.isoformat()}' was found"}
             )
 
     protocol_state = state.to_protocol()
@@ -644,11 +646,22 @@ def sign_credential(register_request: RegisterRequest, session : PostgresSession
 
 
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+
+    error_to_string = {
+        ProtocolError : "protocol_error",
+        DeserializationFailed : "deserialization_failed",
+        CredentialError : "credential_error"
+    }
+
+    error_str = error_to_string[type(error)]
+
     if isinstance(error, (ProtocolError, DeserializationFailed)):
         return HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail={"error": str(error)}
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": error_str, "detail": str(error)}
         )
     if isinstance(error, CredentialError):
         return HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail={"error": str(error)}
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": error_str, "detail": str(error)}
         )
