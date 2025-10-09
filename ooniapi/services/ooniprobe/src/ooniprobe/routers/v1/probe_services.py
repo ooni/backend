@@ -3,21 +3,30 @@ from datetime import datetime, timezone, timedelta
 import time
 from typing import List, Any, Dict, Tuple, Optional
 import random
+import zstd
+from hashlib import sha512
+import asyncio
+import io
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, status, Header
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field
 from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed
+import httpx
 
 from ...utils import (
     generate_report_id,
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
+    error,
+    compare_probe_msmt_cc_asn
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestStateDep, PostgresSessionDep
+
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestStateDep, PostgresSessionDep, S3ClientDep
+from ..reports import Metrics
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -29,41 +38,6 @@ from ...prio import generate_test_list
 router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
-
-
-class Metrics:
-    PROBE_LOGIN = Counter(
-        "probe_login_requests",
-        "Requests made to the probe login endpoint",
-        labelnames=["state", "detail", "login"],
-    )
-
-    PROBE_UPDATE_INFO = Info(
-        "probe_update_info",
-        "Information reported in the probe update endpoint",
-    )
-
-    CHECK_IN_TEST_LIST_COUNT = Gauge(
-        "check_in_test_list_count", "Amount of test lists present in each experiment"
-    )
-
-    GEOIP_ADDR_FOUND = Counter(
-        "geoip_ipaddr_found",
-        "If the ip address was found by geoip",
-        labelnames=["probe_cc", "asn"],
-    )
-
-    GEOIP_ADDR_NOT_FOUND = Counter(
-        "geoip_ipaddr_not_found", "We couldn't look up the IP address in the database"
-    )
-
-    GEOIP_CC_DIFFERS = Counter(
-        "geoip_cc_differs", "There's a mismatch between reported CC and observed CC"
-    )
-
-    GEOIP_ASN_DIFFERS = Counter(
-        "geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN"
-    )
 
 
 class ProbeLogin(BaseModel):
@@ -666,3 +640,112 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": error_str, "message": str(error)}
         )
+
+class SubmitMeasurementResponse(BaseModel):
+    """
+    Acknowledge
+    """
+
+    measurement_uid: str | None = Field(
+        examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
+    )
+
+@router.post("/submit_measurement/{report_id}")
+async def submit_measurement(
+    report_id: str,
+    request: Request,
+    response: Response,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    settings: SettingsDep,
+    s3_client: S3ClientDep,
+    content_encoding: str = Header(default=None),
+) -> SubmitMeasurementResponse | Dict[str, Any]:
+    """
+    Submit measurement
+    """
+    setnocacheresponse(response)
+    empty_measurement = {}
+    try:
+        rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
+    except Exception:
+        log.info("Unexpected report_id %r", report_id[:200])
+        raise error("Incorrect format")
+
+    # TODO validate the timestamp?
+    good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
+    if not good:
+        log.info("Unexpected report_id %r", report_id[:200])
+        error("Incorrect format")
+
+    try:
+        asn_i = int(asn)
+    except ValueError:
+        log.info("ASN value not parsable %r", asn)
+        error("Incorrect format")
+
+    if asn_i == 0:
+        log.info("Discarding ASN == 0")
+        Metrics.MSMNT_DISCARD_ASN0.inc()
+        return empty_measurement
+
+    if cc.upper() == "ZZ":
+        log.info("Discarding CC == ZZ")
+        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        return empty_measurement
+
+    data = await request.body()
+    if content_encoding == "zstd":
+        try:
+            compressed_len = len(data)
+            data = zstd.decompress(data)
+            ratio = compressed_len / len(data)
+            log.debug(f"Zstd compression ratio {ratio}")
+        except Exception as e:
+            log.info("Failed zstd decompression")
+            error("Incorrect format")
+
+    # Write the whole body of the measurement in a directory based on a 1-hour
+    # time window
+    now = datetime.now(timezone.utc)
+    h = sha512(data).hexdigest()[:16]
+    ts = now.strftime("%Y%m%d%H%M%S.%f")
+
+    # msmt_uid is a unique id based on upload time, cc, testname and hash
+    msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
+    Metrics.MSMNT_RECEIVED_CNT.inc()
+
+    compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
+    # Use exponential back off with jitter between retries
+    N_RETRIES = 3
+    for t in range(N_RETRIES):
+        try:
+            url = f"{settings.fastpath_url}/{msmt_uid}"
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, content=data, timeout=59)
+
+            assert resp.status_code == 200, resp.content
+            return SubmitMeasurementResponse(measurement_uid=msmt_uid)
+
+        except Exception as exc:
+            log.error(
+                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
+            )
+            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            await asyncio.sleep(sleep_time)
+
+    Metrics.SEND_FASTPATH_FAILURE.inc()
+
+    # wasn't possible to send msmnt to fastpath, try to send it to s3
+    try:
+        s3_client.upload_fileobj(
+            io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id
+        )
+    except Exception as exc:
+        log.error(f"Unable to upload measurement to s3. Error: {exc}")
+        Metrics.SEND_S3_FAILURE.inc()
+
+    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
+    Metrics.MISSED_MSMNTS.inc()
+    return empty_measurement
