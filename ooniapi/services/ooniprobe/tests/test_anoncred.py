@@ -4,7 +4,7 @@ from httpx import Client
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState
 from ooniprobe.common.routers import ISO_FORMAT_DATETIME
-from ooniauth_py import UserState
+from ooniauth_py import UserState, ServerState
 
 def getj(client : Client, url: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
     resp = client.get(url)
@@ -43,18 +43,28 @@ def test_registration_basic(client):
 
 def test_registration_errors(client):
 
-    manifest = getj(client, "/api/v1/manifest")
-    user_state = UserState(manifest['public_parameters'])
-    sign_req = user_state.make_registration_request()
     bad_date = datetime.strftime(datetime(2012, 12, 21), ISO_FORMAT_DATETIME)
     resp = client.post("/api/v1/sign_credential",
                        json={
-                            "credential_sign_request" : sign_req,
+                            "credential_sign_request" : "doesntmatter",
                             "manifest_date_created" : bad_date
                         }
                     )
-    # Bad date for credential should raise 404
+    # Bad manifest date should raise 404
     assert resp.status_code == 404, resp.content
     j = resp.json()
     assert 'error' in j['detail'] and 'message' in j['detail'], j
     assert j['detail']['error'] == "manifest_not_found"
+
+    # Not using the right public params should not verify
+    manifest = getj(client, "/api/v1/manifest")
+    bad_server = ServerState()
+    user = UserState(bad_server.get_public_parameters())
+    resp = client.post("/api/v1/sign_credential", json={
+        "credential_sign_request" : user.make_registration_request(),
+        "manifest_date_created" : manifest['date_created']
+    })
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN, resp.content
+    j = resp.json()
+    assert j['detail']['error'] == 'protocol_error'

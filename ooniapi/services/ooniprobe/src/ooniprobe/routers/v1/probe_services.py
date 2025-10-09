@@ -620,6 +620,7 @@ class RegisterResponse(BaseModel):
     credential_sign_response: str
     emission_day: int
 
+# TODO: choose a better name for this endpoint
 @router.post("/sign_credential", tags=["anonymous_credentials"])
 def sign_credential(register_request: RegisterRequest, session : PostgresSessionDep):
 
@@ -655,12 +656,12 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
 
     error_str = error_to_string[type(error)]
 
-    if isinstance(error, (ProtocolError, DeserializationFailed)):
+    if isinstance(error, DeserializationFailed):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": error_str, "detail": str(error)}
         )
-    if isinstance(error, CredentialError):
+    if isinstance(error, (CredentialError, ProtocolError)): #
         return HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": error_str, "message": str(error)}
