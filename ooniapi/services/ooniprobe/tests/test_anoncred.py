@@ -40,3 +40,21 @@ def test_registration_basic(client):
     )
     # should be able to verify this credential
     user_state.handle_registration_response(resp['credential_sign_response']) # should not crash
+
+def test_registration_errors(client):
+
+    manifest = getj(client, "/api/v1/manifest")
+    user_state = UserState(manifest['public_parameters'])
+    sign_req = user_state.make_registration_request()
+    bad_date = datetime.strftime(datetime(2012, 12, 21), ISO_FORMAT_DATETIME)
+    resp = client.post("/api/v1/sign_credential",
+                       json={
+                            "credential_sign_request" : sign_req,
+                            "manifest_date_created" : bad_date
+                        }
+                    )
+    # Bad date for credential should raise 404
+    assert resp.status_code == 404, resp.content
+    j = resp.json()
+    assert 'error' in j['detail'] and 'message' in j['detail'], j
+    assert j['detail']['error'] == "manifest_not_found"
