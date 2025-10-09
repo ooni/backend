@@ -68,3 +68,18 @@ def test_registration_errors(client):
     assert resp.status_code == status.HTTP_403_FORBIDDEN, resp.content
     j = resp.json()
     assert j['detail']['error'] == 'protocol_error'
+
+    # Changing random characters should mess with the serialization
+    user = UserState(manifest['public_parameters'])
+    sign_req = user.make_registration_request()
+    bad = "bad"
+    assert len(sign_req) >= len(bad), sign_req
+    sign_req = bad + sign_req[len(bad):]
+    resp = client.post("/api/v1/sign_credential", json={
+        "credential_sign_request" : sign_req,
+        "manifest_date_created" : manifest['date_created']
+    })
+
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.content
+    j = resp.json()
+    assert j['detail']['error'] == 'deserialization_failed', j
