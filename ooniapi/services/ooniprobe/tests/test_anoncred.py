@@ -127,7 +127,7 @@ def test_submission_basic(client):
         "manifest_version": manifest_version
     }
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c == {}
+    assert c == {'is_verified' : True, "measurement_uid" : rid}
 
 def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version
     manifest = getj(client, "/api/v1/manifest")

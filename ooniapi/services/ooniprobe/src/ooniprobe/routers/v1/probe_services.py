@@ -638,14 +638,6 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
             detail={"error": error_str, "message": str(error)}
         )
 
-class SubmitMeasurementResponse(BaseModel):
-    """
-    Acknowledge
-    """
-
-    measurement_uid: str | None = Field(
-        examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
-    )
 
 class SubmitMeasurementRequest(BaseModel):
 
@@ -658,6 +650,18 @@ class SubmitMeasurementRequest(BaseModel):
     age_range: Tuple[int,int]
     msm_range: Tuple[int,int]
     manifest_version: str
+
+class SubmitMeasurementResponse(BaseModel):
+    """
+    Acknowledge
+    """
+
+    measurement_uid: str | None = Field(
+        examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
+    )
+    is_verified: bool = Field(
+        description="if the ZKP was able to verify this request"
+    )
 
 @router.post("/submit_measurement/{report_id}")
 async def submit_measurement(
@@ -738,9 +742,10 @@ async def submit_measurement(
             list(submit_request.msm_range),
             )
         is_verified = True
-    except (DeserializationFailed, ProtocolError, CredentialError):
+    except (DeserializationFailed, ProtocolError, CredentialError) as e:
         # proof failed
         # TODO might be a good idea to add a "why not verified" field to the measurement
+        log.error(f"ZKP Failed: {e}")
         is_verified = False
 
     data = submit_request.model_dump()
@@ -771,11 +776,11 @@ async def submit_measurement(
                 resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
-            return SubmitMeasurementResponse(measurement_uid=msmt_uid)
+            return SubmitMeasurementResponse(measurement_uid=msmt_uid, is_verified=is_verified)
 
         except Exception as exc:
             log.error(
-                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
+                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
             await asyncio.sleep(sleep_time)

@@ -11,5 +11,8 @@ app = FastAPI()
 
 @app.get("/")
 def health():
-    return 
+    return
 
+@app.post("/{msmt_uid}")
+def receive_msm():
+    return {}
