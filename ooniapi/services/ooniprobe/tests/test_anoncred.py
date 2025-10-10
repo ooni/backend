@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 from httpx import Client
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
@@ -8,12 +8,12 @@ from ooniauth_py import UserState, ServerState
 
 def getj(client : Client, url: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
     resp = client.get(url)
-    assert resp.status_code == status.HTTP_200_OK, f"Unexpected status code: {resp.status_code}. {resp.content}"
+    assert resp.status_code == status.HTTP_200_OK, f"Unexpected status code: {resp.status_code} - {url}. {resp.content}"
     return resp.json()
 
 def postj(client : Client, url: str, json: Dict[str, Any] | None = None, headers: Dict[str, Any] | None = None) -> Dict[str, Any]:
     resp = client.post(url, json=json, headers=headers)
-    assert resp.status_code == status.HTTP_200_OK, f"Unexpected status code: {resp.status_code}. {resp.content}"
+    assert resp.status_code == status.HTTP_200_OK, f"Unexpected status code: {resp.status_code} - {url}. {resp.content}"
     return resp.json()
 
 def post(client, url, data, headers=None):
@@ -95,20 +95,48 @@ def test_registration_errors(client):
 def test_submission_basic(client):
     # open report
     j = {
+        "data_format_version": "0.2.0",
+        "format": "json",
+        "probe_asn": "AS34245",
+        "probe_cc": "IE",
+        "software_name": "miniooni",
+        "software_version": "0.17.0-beta",
+        "test_name": "web_connectivity",
+        "test_start_time": "2020-09-09 14:11:11",
+        "test_version": "0.1.0",
+    }
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    # Create user
+    user, manifest_version, emission_day = setup_user(client)
+
+    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    msm = {
         "format": "json",
         "content": {
-            "data_format_version": "0.2.0",
+            "test_name": "web_connectivity",
             "probe_asn": "AS34245",
             "probe_cc": "IE",
-            "software_name": "miniooni",
-            "software_version": "0.17.0-beta",
-            "test_name": "web_connectivity",
             "test_start_time": "2020-09-09 14:11:11",
-            "test_version": "0.1.0",
         },
+        "nym": submit_request.nym,
+        "zkp_request": submit_request.request,
+        "age_range": [emission_day - 30, emission_day + 1],
+        "msm_range": [0, 10],
+        "manifest_version": manifest_version
     }
-    c = postj(client, "/report", json=j)
-    rid = c.pop("report_id")
-    msmt = dict(test_keys={}, probe_cc = "VE", asn = "AS1234", test_name = "web_connectivity")
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", {"format":"json", "content":msmt})
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
     assert c == {}
+
+def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version
+    manifest = getj(client, "/api/v1/manifest")
+    user = UserState(manifest['public_parameters'])
+    req = user.make_registration_request()
+    resp = postj(client, "/api/v1/sign_credential", json = {
+        "credential_sign_request" : req,
+        "manifest_version" : manifest['version']
+    })
+    user.handle_registration_response(resp['credential_sign_response'])
+
+    return (user, manifest['version'], resp['emission_day'])
