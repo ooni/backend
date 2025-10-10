@@ -20,6 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 # ---
 ooniprobe_server_state_id_seq = sc.Sequence("ooniprobe_server_state_id_seq", start=1)
+ooniprobe_manifest_id_seq = sc.Sequence("ooniprobe_manifest_id_seq", start=1)
 def upgrade() -> None:
     op.execute(sc.CreateSequence(ooniprobe_server_state_id_seq))
 
@@ -37,7 +38,25 @@ def upgrade() -> None:
         sa.Column("public_parameters", sa.String(), nullable=False)
     )
 
+    op.execute(sc.CreateSequence(ooniprobe_manifest_id_seq))
+    op.create_table(
+        "ooniprobe_manifest",
+        sa.Column(
+            "version",
+            sa.String(),
+            nullable=False,
+            server_default=ooniprobe_manifest_id_seq.next_value(),
+            primary_key=True
+        ),
+        sa.Column("date_created", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("nym_scope", sa.JSON(), nullable=False),
+        sa.Column("submission_policy", sa.JSON(), nullable=False)
+
+    )
+
 
 def downgrade() -> None:
     op.drop_table("ooniprobe_server_state")
+    op.drop_table("ooniprobe_manifest")
     op.execute(sc.DropSequence(ooniprobe_server_state_id_seq))
+    op.execute(sc.DropSequence(ooniprobe_manifest_id_seq))

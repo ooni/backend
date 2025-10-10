@@ -11,7 +11,6 @@ import io
 import geoip2
 import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status, Header
-from prometheus_client import Counter, Info, Gauge
 from pydantic import Field
 from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed
 import httpx
@@ -569,13 +568,14 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
 
 # -- <Anonymous Credentials> ------------------------------------
 
+# make manifest table
 class ManifestResponse(BaseModel):
     nym_scope: str
     public_parameters: str
     submission_policy: Dict[str, Any]
     # TODO: Is the manifest version different from the server state? For now we assume it's the same
     # and use the `date_created` as version
-    date_created: datetime
+    date_created: datetime # change to version
 
 @router.get("/manifest", tags=["anonymous_credentials"])
 def manifest(state : LatestStateDep) -> ManifestResponse:
@@ -650,10 +650,20 @@ class SubmitMeasurementResponse(BaseModel):
         examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
     )
 
+class SubmitMeasurementRequest(BaseModel):
+
+    format: str
+    content: Dict[str, Any]
+    # not post quantum, in the future we might want to use a hashed key for storage
+    nym: str
+    zkp_request: str
+    age_range: Tuple[int,int]
+    msm_range: Tuple[int,int]
+
 @router.post("/submit_measurement/{report_id}")
 async def submit_measurement(
     report_id: str,
-    request: Request,
+    submit_request: SubmitMeasurementRequest,
     response: Response,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
@@ -694,16 +704,12 @@ async def submit_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
-    data = await request.body()
-    if content_encoding == "zstd":
-        try:
-            compressed_len = len(data)
-            data = zstd.decompress(data)
-            ratio = compressed_len / len(data)
-            log.debug(f"Zstd compression ratio {ratio}")
-        except Exception as e:
-            log.info("Failed zstd decompression")
-            error("Incorrect format")
+
+    # TODO
+    # Parse data into a json
+    # verify with anonymous credentials parameters
+    # add additional information to the json
+    # convert to data again
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window

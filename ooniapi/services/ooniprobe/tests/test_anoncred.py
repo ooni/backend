@@ -11,10 +11,15 @@ def getj(client : Client, url: str, params: Dict[str, Any] = {}) -> Dict[str, An
     assert resp.status_code == status.HTTP_200_OK, f"Unexpected status code: {resp.status_code}. {resp.content}"
     return resp.json()
 
-def postj(client : Client, url: str, json: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    resp = client.post(url, json=json)
+def postj(client : Client, url: str, json: Dict[str, Any] | None = None, headers: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    resp = client.post(url, json=json, headers=headers)
     assert resp.status_code == status.HTTP_200_OK, f"Unexpected status code: {resp.status_code}. {resp.content}"
     return resp.json()
+
+def post(client, url, data, headers=None):
+    response = client.post(url, data=data, headers=headers)
+    assert response.status_code == 200
+    return response.json()
 
 def test_manifest_basic(client, db):
     latest = OONIProbeServerState.get_latest(db)
@@ -83,3 +88,22 @@ def test_registration_errors(client):
     assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.content
     j = resp.json()
     assert j['detail']['error'] == 'deserialization_failed', j
+
+def test_submission_basic(client):
+    # open report
+    j = {
+        "data_format_version": "0.2.0",
+        "format": "json",
+        "probe_asn": "AS34245",
+        "probe_cc": "IE",
+        "software_name": "miniooni",
+        "software_version": "0.17.0-beta",
+        "test_name": "web_connectivity",
+        "test_start_time": "2020-09-09 14:11:11",
+        "test_version": "0.1.0",
+    }
+    c = postj(client, "/report", json=j)
+    rid = c.pop("report_id")
+    msmt = dict(test_keys={}, probe_cc = "VE", asn = "AS1234", test_name = "web_connectivity")
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", {"format":"json", "content":msmt})
+    assert c == {}
