@@ -31,7 +31,7 @@ from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
-from ...models import OONIProbeServerState
+from ...models import OONIProbeManifest, OONIProbeServerState
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
@@ -587,7 +587,7 @@ def manifest(state : LatestStateDep) -> ManifestResponse:
         )
 
 class RegisterRequest(BaseModel):
-    manifest_date_created: datetime
+    manifest_version: str
     credential_sign_request: str
 
 class RegisterResponse(BaseModel):
@@ -598,15 +598,15 @@ class RegisterResponse(BaseModel):
 @router.post("/sign_credential", tags=["anonymous_credentials"])
 def sign_credential(register_request: RegisterRequest, session : PostgresSessionDep):
 
-    state = OONIProbeServerState.get_by_datetime(session, register_request.manifest_date_created)
-    if state is None:
+    manifest = OONIProbeManifest.get_by_version(session, register_request.manifest_version)
+    if manifest is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             {
                 "error" : "manifest_not_found",
-                "message" : f"No manifest with creation date '{register_request.manifest_date_created.isoformat()}' was found"}
+                "message" : f"No manifest with version '{register_request.manifest_version}' was found"}
             )
-
+    state: OONIProbeServerState = manifest.server_state
     protocol_state = state.to_protocol()
 
     try:

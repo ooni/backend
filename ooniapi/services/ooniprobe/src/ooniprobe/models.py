@@ -4,7 +4,7 @@ from .common.models import UtcDateTime
 from .common.postgresql import Base
 from sqlalchemy import ForeignKey, Sequence, String, func
 from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column, relationship, Session
+from sqlalchemy.orm import mapped_column, relationship, Session, joinedload
 from sqlalchemy import desc
 from ooniauth_py import ServerState
 import logging
@@ -132,7 +132,7 @@ class OONIProbeManifest(Base):
     submission_policy: Mapped[Dict[str, Any]] = mapped_column(default={})
 
     server_state_id = mapped_column(ForeignKey("ooniprobe_server_state.id"))
-    server_state = relationship("ServerState")
+    server_state = relationship("OONIProbeServerState")
 
     @classmethod
     def get_latest(cls, session: Session) -> Self | None:
@@ -149,6 +149,7 @@ class OONIProbeManifest(Base):
         return (
             session
             .query(cls)
+            .options(joinedload(cls.server_state))
             .where(cls.version == version)
             .one_or_none()
         )
