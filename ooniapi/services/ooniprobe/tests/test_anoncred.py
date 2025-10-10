@@ -95,15 +95,17 @@ def test_registration_errors(client):
 def test_submission_basic(client):
     # open report
     j = {
-        "data_format_version": "0.2.0",
         "format": "json",
-        "probe_asn": "AS34245",
-        "probe_cc": "IE",
-        "software_name": "miniooni",
-        "software_version": "0.17.0-beta",
-        "test_name": "web_connectivity",
-        "test_start_time": "2020-09-09 14:11:11",
-        "test_version": "0.1.0",
+        "content": {
+            "data_format_version": "0.2.0",
+            "probe_asn": "AS34245",
+            "probe_cc": "IE",
+            "software_name": "miniooni",
+            "software_version": "0.17.0-beta",
+            "test_name": "web_connectivity",
+            "test_start_time": "2020-09-09 14:11:11",
+            "test_version": "0.1.0",
+        },
     }
     c = postj(client, "/report", json=j)
     rid = c.pop("report_id")

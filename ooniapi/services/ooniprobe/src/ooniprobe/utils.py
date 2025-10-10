@@ -9,7 +9,7 @@ from os import urandom
 from datetime import datetime, timezone
 import itertools
 import logging
-from typing import Dict, List, Mapping, TypedDict, Tuple
+from typing import Dict, List, TypedDict, Tuple, Any
 
 from fastapi import Request, HTTPException
 from sqlalchemy.orm import Session
@@ -147,7 +147,7 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
     )
 
 
-def error(msg: str, status_code: int = 400):
+def error(msg: str | Dict[str, Any], status_code: int = 400):
     raise HTTPException(status_code=status_code, detail=msg)
 
 

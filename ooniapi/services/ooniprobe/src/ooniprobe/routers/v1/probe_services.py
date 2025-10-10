@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 import time
 from typing import List, Any, Dict, Tuple, Optional
 import random
-import zstd
+import ujson
 from hashlib import sha512
 import asyncio
 import io
@@ -651,21 +651,25 @@ class SubmitMeasurementRequest(BaseModel):
 
     format: str
     content: Dict[str, Any]
+    # -- < Anonymous Credentials > ----------------------
     # not post quantum, in the future we might want to use a hashed key for storage
     nym: str
     zkp_request: str
     age_range: Tuple[int,int]
     msm_range: Tuple[int,int]
+    manifest_version: str
 
 @router.post("/submit_measurement/{report_id}")
 async def submit_measurement(
     report_id: str,
+    request: Request,
     submit_request: SubmitMeasurementRequest,
     response: Response,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
     s3_client: S3ClientDep,
+    session: PostgresSessionDep,
     content_encoding: str = Header(default=None),
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
     """
@@ -708,10 +712,48 @@ async def submit_measurement(
     # add additional information to the json
     # convert to data again
 
+    # Retrieve manifest known by the client
+    manifest = OONIProbeManifest.get_by_version(session, submit_request.manifest_version)
+    if manifest is None:
+        error({
+            "detail" : f"No manifest with version '{submit_request.manifest_version}' was found",
+            "error" : "manifest_not_found"
+        })
+
+    # Run verification
+    assert manifest
+    assert "probe_cc" in submit_request.content and isinstance(submit_request.content['probe_cc'], str)
+    assert "probe_asn" in submit_request.content and isinstance(submit_request.content['probe_asn'], str)
+
+    state: OONIProbeServerState = manifest.server_state
+    protocol_state = state.to_protocol()
+
+    try:
+        protocol_state.handle_submit_request(
+            submit_request.nym,
+            submit_request.zkp_request,
+            submit_request.content["probe_cc"],
+            submit_request.content["probe_asn"],
+            list(submit_request.age_range),
+            list(submit_request.msm_range),
+            )
+        is_verified = True
+    except (DeserializationFailed, ProtocolError, CredentialError):
+        # proof failed
+        # TODO might be a good idea to add a "why not verified" field to the measurement
+        is_verified = False
+
+    data = submit_request.model_dump()
+    data['is_verified'] = is_verified
+    data_buff = io.BytesIO()
+    stream = io.TextIOWrapper(data_buff, "utf-8")
+    ujson.dump(data, stream)
+    data_bin = data_buff.getvalue()
+
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
-    h = sha512(data).hexdigest()[:16]
+    h = sha512(data_bin).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
     # msmt_uid is a unique id based on upload time, cc, testname and hash
@@ -726,7 +768,7 @@ async def submit_measurement(
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
             async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data, timeout=59)
+                resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
             return SubmitMeasurementResponse(measurement_uid=msmt_uid)
@@ -743,7 +785,7 @@ async def submit_measurement(
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     try:
         s3_client.upload_fileobj(
-            io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id
+            data_buff, Bucket=settings.failed_reports_bucket, Key=report_id
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
