@@ -1,67 +1,42 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict, Tuple, Optional
+from typing import List, Any, Dict, Tuple, Optional
 import random
+import ujson
+from hashlib import sha512
+import asyncio
+import io
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
-from prometheus_client import Counter, Info, Gauge
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, status, Header
 from pydantic import Field
+from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed
+import httpx
 
 from ...utils import (
     generate_report_id,
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
+    error,
+    compare_probe_msmt_cc_asn
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
+
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestManifestDep, PostgresSessionDep, S3ClientDep
+from ..reports import Metrics
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse
+from ...models import OONIProbeManifest, OONIProbeServerState
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
-
-
-class Metrics:
-    PROBE_LOGIN = Counter(
-        "probe_login_requests",
-        "Requests made to the probe login endpoint",
-        labelnames=["state", "detail", "login"],
-    )
-
-    PROBE_UPDATE_INFO = Info(
-        "probe_update_info",
-        "Information reported in the probe update endpoint",
-    )
-
-    CHECK_IN_TEST_LIST_COUNT = Gauge(
-        "check_in_test_list_count", "Amount of test lists present in each experiment"
-    )
-
-    GEOIP_ADDR_FOUND = Counter(
-        "geoip_ipaddr_found",
-        "If the ip address was found by geoip",
-        labelnames=["probe_cc", "asn"],
-    )
-
-    GEOIP_ADDR_NOT_FOUND = Counter(
-        "geoip_ipaddr_not_found", "We couldn't look up the IP address in the database"
-    )
-
-    GEOIP_CC_DIFFERS = Counter(
-        "geoip_cc_differs", "There's a mismatch between reported CC and observed CC"
-    )
-
-    GEOIP_ASN_DIFFERS = Counter(
-        "geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN"
-    )
 
 
 class ProbeLogin(BaseModel):
@@ -590,3 +565,237 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+# -- <Anonymous Credentials> ------------------------------------
+
+class ManifestResponse(BaseModel):
+    nym_scope: str
+    public_parameters: str
+    submission_policy: Dict[str, Any]
+    version: str
+
+@router.get("/manifest", tags=["anonymous_credentials"])
+def manifest(manifest : LatestManifestDep) -> ManifestResponse:
+    return ManifestResponse(
+        nym_scope="ooni.org/{probe_cc}/{probe_asn}",
+        public_parameters=manifest.server_state.public_parameters,
+        submission_policy={},
+        version=manifest.version
+        )
+
+class RegisterRequest(BaseModel):
+    manifest_version: str
+    credential_sign_request: str
+
+class RegisterResponse(BaseModel):
+    credential_sign_response: str
+    emission_day: int
+
+# TODO: choose a better name for this endpoint
+@router.post("/sign_credential", tags=["anonymous_credentials"])
+def sign_credential(register_request: RegisterRequest, session : PostgresSessionDep):
+
+    manifest = OONIProbeManifest.get_by_version(session, register_request.manifest_version)
+    if manifest is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            {
+                "error" : "manifest_not_found",
+                "message" : f"No manifest with version '{register_request.manifest_version}' was found"}
+            )
+    state: OONIProbeServerState = manifest.server_state
+    protocol_state = state.to_protocol()
+
+    try:
+        resp = protocol_state.handle_registration_request(register_request.credential_sign_request)
+    except (ProtocolError, CredentialError, DeserializationFailed) as e:
+        raise to_http_exception(e)
+
+    return RegisterResponse(
+        credential_sign_response=resp,
+        emission_day=protocol_state.today()
+    )
+
+
+def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+
+    error_to_string = {
+        ProtocolError : "protocol_error",
+        DeserializationFailed : "deserialization_failed",
+        CredentialError : "credential_error"
+    }
+
+    error_str = error_to_string[type(error)]
+
+    if isinstance(error, DeserializationFailed):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": error_str, "detail": str(error)}
+        )
+    if isinstance(error, (CredentialError, ProtocolError)): #
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": error_str, "message": str(error)}
+        )
+
+
+class SubmitMeasurementRequest(BaseModel):
+
+    format: str
+    content: Dict[str, Any]
+    # -- < Anonymous Credentials > ----------------------
+    # not post quantum, in the future we might want to use a hashed key for storage
+    nym: str
+    zkp_request: str
+    age_range: Tuple[int,int]
+    msm_range: Tuple[int,int]
+    manifest_version: str
+
+class SubmitMeasurementResponse(BaseModel):
+    """
+    Acknowledge
+    """
+
+    measurement_uid: str | None = Field(
+        examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
+    )
+    is_verified: bool = Field(
+        description="if the ZKP was able to verify this request"
+    )
+
+@router.post("/submit_measurement/{report_id}")
+async def submit_measurement(
+    report_id: str,
+    request: Request,
+    submit_request: SubmitMeasurementRequest,
+    response: Response,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    settings: SettingsDep,
+    s3_client: S3ClientDep,
+    session: PostgresSessionDep,
+    content_encoding: str = Header(default=None),
+) -> SubmitMeasurementResponse | Dict[str, Any]:
+    """
+    Submit measurement
+    """
+    setnocacheresponse(response)
+    empty_measurement = {}
+    try:
+        rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
+    except Exception:
+        log.info("Unexpected report_id %r", report_id[:200])
+        raise error("Incorrect format")
+
+    # TODO validate the timestamp?
+    good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
+    if not good:
+        log.info("Unexpected report_id %r", report_id[:200])
+        error("Incorrect format")
+
+    try:
+        asn_i = int(asn)
+    except ValueError:
+        log.info("ASN value not parsable %r", asn)
+        error("Incorrect format")
+
+    if asn_i == 0:
+        log.info("Discarding ASN == 0")
+        Metrics.MSMNT_DISCARD_ASN0.inc()
+        return empty_measurement
+
+    if cc.upper() == "ZZ":
+        log.info("Discarding CC == ZZ")
+        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        return empty_measurement
+
+
+    # TODO
+    # Parse data into a json
+    # verify with anonymous credentials parameters
+    # add additional information to the json
+    # convert to data again
+
+    # Retrieve manifest known by the client
+    manifest = OONIProbeManifest.get_by_version(session, submit_request.manifest_version)
+    if manifest is None:
+        error({
+            "detail" : f"No manifest with version '{submit_request.manifest_version}' was found",
+            "error" : "manifest_not_found"
+        })
+
+    # Run verification
+    assert manifest
+    assert "probe_cc" in submit_request.content and isinstance(submit_request.content['probe_cc'], str)
+    assert "probe_asn" in submit_request.content and isinstance(submit_request.content['probe_asn'], str)
+
+    state: OONIProbeServerState = manifest.server_state
+    protocol_state = state.to_protocol()
+
+    try:
+        protocol_state.handle_submit_request(
+            submit_request.nym,
+            submit_request.zkp_request,
+            submit_request.content["probe_cc"],
+            submit_request.content["probe_asn"],
+            list(submit_request.age_range),
+            list(submit_request.msm_range),
+            )
+        is_verified = True
+    except (DeserializationFailed, ProtocolError, CredentialError) as e:
+        # proof failed
+        # TODO might be a good idea to add a "why not verified" field to the measurement
+        log.error(f"ZKP Failed: {e}")
+        is_verified = False
+
+    data = submit_request.model_dump()
+    data['is_verified'] = is_verified
+    data_buff = io.BytesIO()
+    stream = io.TextIOWrapper(data_buff, "utf-8")
+    ujson.dump(data, stream)
+    data_bin = data_buff.getvalue()
+
+    # Write the whole body of the measurement in a directory based on a 1-hour
+    # time window
+    now = datetime.now(timezone.utc)
+    h = sha512(data_bin).hexdigest()[:16]
+    ts = now.strftime("%Y%m%d%H%M%S.%f")
+
+    # msmt_uid is a unique id based on upload time, cc, testname and hash
+    msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
+    Metrics.MSMNT_RECEIVED_CNT.inc()
+
+    compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
+    # Use exponential back off with jitter between retries
+    N_RETRIES = 3
+    for t in range(N_RETRIES):
+        try:
+            url = f"{settings.fastpath_url}/{msmt_uid}"
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, content=data_bin, timeout=59)
+
+            assert resp.status_code == 200, resp.content
+            return SubmitMeasurementResponse(measurement_uid=msmt_uid, is_verified=is_verified)
+
+        except Exception as exc:
+            log.error(
+                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+            )
+            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            await asyncio.sleep(sleep_time)
+
+    Metrics.SEND_FASTPATH_FAILURE.inc()
+
+    # wasn't possible to send msmnt to fastpath, try to send it to s3
+    try:
+        s3_client.upload_fileobj(
+            data_buff, Bucket=settings.failed_reports_bucket, Key=report_id
+        )
+    except Exception as exc:
+        log.error(f"Unable to upload measurement to s3. Error: {exc}")
+        Metrics.SEND_S3_FAILURE.inc()
+
+    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
+    Metrics.MISSED_MSMNTS.inc()
+    return empty_measurement

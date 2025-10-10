@@ -1,4 +1,3 @@
-from tempfile import tempdir
 import pathlib
 from pathlib import Path
 import pytest
@@ -16,6 +15,8 @@ from ooniprobe.common.dependencies import get_settings
 from ooniprobe.dependencies import get_s3_client
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
+from ooniprobe.dependencies import get_postgresql_session
+from ooniprobe.models import OONIProbeManifest
 
 
 def make_override_get_settings(**kw):
@@ -78,7 +79,7 @@ JWT_ENCRYPTION_KEY = "super_secure"
 @pytest.fixture(scope="session")
 def fixture_path():
     """
-    Directory for this fixtures used to store temporary data, will be 
+    Directory for this fixtures used to store temporary data, will be
     deleted after the tests are finished
     """
     FIXTURE_PATH = Path(os.path.dirname(os.path.realpath(__file__))) / "data"
@@ -100,6 +101,13 @@ def geoip_db_dir(fixture_path):
 def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
+
+    # Initialize server state
+    db = get_postgresql_session(test_settings())
+    session = next(db)
+    OONIProbeManifest.init_table(session)
+    next(db, None)
+
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
@@ -169,9 +177,9 @@ def fastpath_server(docker_ip, docker_services):
     )
     yield url
 
-def is_fastpath_running(url: str) -> bool: 
-    try: 
+def is_fastpath_running(url: str) -> bool:
+    try:
         resp = urlopen(url)
         return resp.status == 200
-    except:
+    except Exception:
         return False
