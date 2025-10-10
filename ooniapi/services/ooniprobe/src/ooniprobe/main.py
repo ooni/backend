@@ -50,7 +50,7 @@ async def lifespan(
 
     db = get_postgresql_session(settings)
     session = next(db)
-    models.OONIProbeServerState.init_table(session)
+    models.OONIProbeManifest.init_table(session)
     next(db, None) # closes the connection
 
     yield
@@ -140,9 +140,12 @@ async def health(
 
     # check that we have at least one server state object for credentials validation
     try:
-        state = models.OONIProbeServerState.get_latest(db)
+        state = db.query(models.OONIProbeManifest).limit(1).one_or_none()
         if state is None:
             errors.append("no_server_state_entry")
+        manifest = models.OONIProbeManifest.get_latest(db)
+        if manifest == None:
+            errors.append("no_manifest_entry")
     except Exception as exc:
         log.error("Error trying to retrieve server state")
         log.error(exc)

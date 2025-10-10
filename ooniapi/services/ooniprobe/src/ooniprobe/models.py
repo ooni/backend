@@ -139,7 +139,8 @@ class OONIProbeManifest(Base):
         return (
             session
             .query(cls)
-            .order_by(desc(cls.date_created))
+            .options(joinedload(cls.server_state))
+            .order_by(desc(cls.version))
             .limit(1)
             .one_or_none()
         )
@@ -153,3 +154,21 @@ class OONIProbeManifest(Base):
             .where(cls.version == version)
             .one_or_none()
         )
+
+    @classmethod
+    def init_table(cls, session: Session):
+        """
+        Creates a new manifest entry if none exists
+        """
+        entry = session.query(cls).limit(1).one_or_none()
+        if entry is None:
+            log.info("No OONIProbeManifest entry found. Creating a new one...")
+
+            # Make sure there's a server state
+            OONIProbeServerState.init_table(session)
+            state = session.query(OONIProbeServerState).order_by(desc(OONIProbeServerState.date_created)).limit(1).one()
+            entry = cls(server_state_id=state.id)
+            session.add(entry)
+            session.commit()
+        else:
+            log.info("OONIProbeServerState already initialized!")

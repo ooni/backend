@@ -56,7 +56,7 @@ def upgrade() -> None:
         sa.Column("submission_policy", sa.JSON(), nullable=False),
 
         sa.Column(
-            "ooniprobe_server_state_id",
+            "server_state_id",
             sa.String(),
             sa.ForeignKey("ooniprobe_server_state.id"),
             nullable=False,

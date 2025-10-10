@@ -15,7 +15,7 @@ from mypy_boto3_s3 import S3Client
 
 from .common.config import Settings
 from .common.dependencies import get_settings
-from .models import OONIProbeServerState
+from .models import OONIProbeServerState, OONIProbeManifest
 
 
 SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
@@ -67,9 +67,9 @@ def get_s3_client() -> S3Client:
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
 
 
-def get_latest_state(session : PostgresSessionDep) -> OONIProbeServerState:
-    state = OONIProbeServerState.get_latest(session)
-    assert state is not None, "Uninitialized `OONIProbeServerState` table"
-    return state
+def get_latest_manifest(session : PostgresSessionDep) -> OONIProbeManifest:
+    manifest = OONIProbeManifest.get_latest(session)
+    assert manifest is not None, "Uninitialized `OONIProbeServerState` table"
+    return manifest
 
-LatestStateDep = Annotated[OONIProbeServerState, Depends(get_latest_state)]
+LatestManifestDep = Annotated[OONIProbeManifest, Depends(get_latest_manifest)]

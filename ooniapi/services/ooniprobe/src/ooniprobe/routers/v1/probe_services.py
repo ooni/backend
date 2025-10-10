@@ -24,7 +24,7 @@ from ...utils import (
     compare_probe_msmt_cc_asn
 )
 
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestStateDep, PostgresSessionDep, S3ClientDep
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestManifestDep, PostgresSessionDep, S3ClientDep
 from ..reports import Metrics
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
@@ -568,22 +568,19 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
 
 # -- <Anonymous Credentials> ------------------------------------
 
-# make manifest table
 class ManifestResponse(BaseModel):
     nym_scope: str
     public_parameters: str
     submission_policy: Dict[str, Any]
-    # TODO: Is the manifest version different from the server state? For now we assume it's the same
-    # and use the `date_created` as version
-    date_created: datetime # change to version
+    version: str
 
 @router.get("/manifest", tags=["anonymous_credentials"])
-def manifest(state : LatestStateDep) -> ManifestResponse:
+def manifest(manifest : LatestManifestDep) -> ManifestResponse:
     return ManifestResponse(
         nym_scope="ooni.org/{probe_cc}/{probe_asn}",
-        public_parameters=state.public_parameters,
+        public_parameters=manifest.server_state.public_parameters,
         submission_policy={},
-        date_created=state.date_created
+        version=manifest.version
         )
 
 class RegisterRequest(BaseModel):

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Dict
 from httpx import Client
 from fastapi import status
-from ooniprobe.models import OONIProbeServerState
+from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
 from ooniprobe.common.routers import ISO_FORMAT_DATETIME
 from ooniauth_py import UserState, ServerState
 
@@ -22,12 +22,15 @@ def post(client, url, data, headers=None):
     return response.json()
 
 def test_manifest_basic(client, db):
-    latest = OONIProbeServerState.get_latest(db)
+    latest = db.query(OONIProbeServerState).limit(1).one_or_none()
+    manifest = OONIProbeManifest.get_latest(db)
     assert latest is not None, "Server state not initialized"
+    assert manifest is not None, "Manifest not initialized"
 
     m = getj(client, "/api/v1/manifest")
+
     assert latest.public_parameters == m['public_parameters']
-    assert datetime.strftime(latest.date_created, ISO_FORMAT_DATETIME) == m['date_created']
+    assert manifest.version == m['version']
 
 def test_registration_basic(client):
 
@@ -40,7 +43,7 @@ def test_registration_basic(client):
         "/api/v1/sign_credential",
         {
             "credential_sign_request" : sign_req,
-            "manifest_date_created" : manifest['date_created']
+            "manifest_version" : manifest['version']
         }
     )
     # should be able to verify this credential
@@ -48,11 +51,11 @@ def test_registration_basic(client):
 
 def test_registration_errors(client):
 
-    bad_date = datetime.strftime(datetime(2012, 12, 21), ISO_FORMAT_DATETIME)
+    bad_version = "999"
     resp = client.post("/api/v1/sign_credential",
                        json={
                             "credential_sign_request" : "doesntmatter",
-                            "manifest_date_created" : bad_date
+                            "manifest_version" : bad_version
                         }
                     )
     # Bad manifest date should raise 404
@@ -67,7 +70,7 @@ def test_registration_errors(client):
     user = UserState(bad_server.get_public_parameters())
     resp = client.post("/api/v1/sign_credential", json={
         "credential_sign_request" : user.make_registration_request(),
-        "manifest_date_created" : manifest['date_created']
+        "manifest_version" : manifest['version']
     })
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN, resp.content
@@ -82,7 +85,7 @@ def test_registration_errors(client):
     sign_req = bad + sign_req[len(bad):]
     resp = client.post("/api/v1/sign_credential", json={
         "credential_sign_request" : sign_req,
-        "manifest_date_created" : manifest['date_created']
+        "manifest_version" : manifest['version']
     })
 
     assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.content
