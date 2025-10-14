@@ -65,7 +65,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("ooniprobe_server_state")
     op.drop_table("ooniprobe_manifest")
+    op.drop_table("ooniprobe_server_state")
     op.execute(sc.DropSequence(ooniprobe_server_state_id_seq))
     op.execute(sc.DropSequence(ooniprobe_manifest_id_seq))
