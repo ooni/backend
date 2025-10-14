@@ -1,9 +1,7 @@
-from datetime import datetime
 from typing import Any, Dict, Tuple
 from httpx import Client
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
-from ooniprobe.common.routers import ISO_FORMAT_DATETIME
 from ooniauth_py import UserState, ServerState
 
 def getj(client : Client, url: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
@@ -123,13 +121,16 @@ def test_submission_basic(client):
         "nym": submit_request.nym,
         "zkp_request": submit_request.request,
         "age_range": [emission_day - 30, emission_day + 1],
-        "msm_range": [0, 10],
+        "msm_range": [0, 100],
         "manifest_version": manifest_version
     }
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c == {'is_verified' : True, "measurement_uid" : rid}
+    assert c['is_verified'] == True  # noqa: E712
 
-def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version
+    assert c['submit_response'], "Submit response should not be null if the proof was verified"
+    user.handle_submit_response(c['submit_response'])
+
+def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, emission day
     manifest = getj(client, "/api/v1/manifest")
     user = UserState(manifest['public_parameters'])
     req = user.make_registration_request()

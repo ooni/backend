@@ -662,6 +662,9 @@ class SubmitMeasurementResponse(BaseModel):
     is_verified: bool = Field(
         description="if the ZKP was able to verify this request"
     )
+    submit_response: str | None = Field(
+        description="Anonymous credential verification response. Null if verification failed"
+    )
 
 @router.post("/submit_measurement/{report_id}")
 async def submit_measurement(
@@ -709,13 +712,6 @@ async def submit_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
-
-    # TODO
-    # Parse data into a json
-    # verify with anonymous credentials parameters
-    # add additional information to the json
-    # convert to data again
-
     # Retrieve manifest known by the client
     manifest = OONIProbeManifest.get_by_version(session, submit_request.manifest_version)
     if manifest is None:
@@ -733,7 +729,7 @@ async def submit_measurement(
     protocol_state = state.to_protocol()
 
     try:
-        protocol_state.handle_submit_request(
+        submit_response = protocol_state.handle_submit_request(
             submit_request.nym,
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
@@ -744,9 +740,10 @@ async def submit_measurement(
         is_verified = True
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         # proof failed
-        # TODO might be a good idea to add a "why not verified" field to the measurement
+        # TODO Q: should we add a "why not verified" field to the measurement?
         log.error(f"ZKP Failed: {e}")
         is_verified = False
+        submit_response = None
 
     data = submit_request.model_dump()
     data['is_verified'] = is_verified
@@ -776,7 +773,7 @@ async def submit_measurement(
                 resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
-            return SubmitMeasurementResponse(measurement_uid=msmt_uid, is_verified=is_verified)
+            return SubmitMeasurementResponse(measurement_uid=msmt_uid, is_verified=is_verified, submit_response=submit_response)
 
         except Exception as exc:
             log.error(
