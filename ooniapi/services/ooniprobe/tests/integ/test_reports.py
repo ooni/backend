@@ -60,10 +60,10 @@ def test_collector_upload_msmt_valid(client):
 
     msmt = dict(test_keys={})
     c = postj(client, f"/report/{rid}", {"format":"json", "content":msmt})
-    assert c == {}
+    assert c['measurement_uid'].endswith("_IE_webconnectivity_e7889aeba0b36729"), c
 
     c = postj(client, f"/report/{rid}/close", json={})
-    assert c == {}
+    assert c == {}, c
 
 def test_collector_upload_msmt_valid_zstd(client):
     rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
@@ -71,4 +71,5 @@ def test_collector_upload_msmt_valid_zstd(client):
     zmsmt = zstd.compress(msmt)
     headers = [("Content-Encoding", "zstd")]
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
-    assert c == {}
+    assert len(c) == 1
+    assert c['measurement_uid'].endswith("_IT_integtest_50be3cd5406bca65"), c
