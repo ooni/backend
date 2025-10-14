@@ -746,6 +746,8 @@ async def submit_measurement(
         submit_response = None
 
     data = submit_request.model_dump()
+
+    # Add verification-related data. 
     data['is_verified'] = is_verified
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")

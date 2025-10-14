@@ -209,6 +209,11 @@ def clickhouse_upsert_summary(
     test_helper_address: str,
     test_helper_type: str,
     ooni_run_link_id: Optional[int],
+    is_verified: bool,
+    zkp_request: Optional[str],
+    nym: Optional[str],
+    age_range: Optional[Tuple[int, int]],
+    msm_range: Optional[Tuple[int, int]],
     buffer_writes=False,
 ) -> None:
     """Insert a row in the fastpath table. Overwrite an existing one."""
@@ -257,6 +262,11 @@ def clickhouse_upsert_summary(
         test_helper_address=test_helper_address,
         test_helper_type=test_helper_type,
         ooni_run_link_id=ooni_run_link_id,
+        is_verified=tf(is_verified),
+        nym=nym,
+        zkp_request=zkp_request,
+        age_range=ujson.dumps(age_range),
+        msm_range=ujson.dumps(msm_range)
     )
 
     if buffer_writes:
