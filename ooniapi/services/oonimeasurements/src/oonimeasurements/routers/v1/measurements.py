@@ -470,6 +470,18 @@ class GetMeasurementMetaRequest(BaseModel):
 
         return report_id
 
+def validate_report_id(report_id: str) -> str:
+    if len(report_id) < 15 or len(report_id) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid report_id field",
+        )
+
+    validate(
+        report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field"
+    )
+
+    return report_id
 
 @router.get("/v1/measurement_meta", response_model_exclude_unset=True)
 async def get_measurement_meta(
@@ -1006,21 +1018,6 @@ def get_bucket_url(bucket_name: str) -> str:
 
 def asn_to_int(asn_str: str) -> int:
     return int(asn_str.strip("AS"))
-
-
-def validate_report_id(report_id: str) -> str:
-    if len(report_id) < 15 or len(report_id) > 100:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid report_id field",
-        )
-
-    validate(
-        report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field"
-    )
-
-    return report_id
-
 
 def validate(item: str, accepted: str, error_msg: str):
     """Ensure item contains only valid"""
