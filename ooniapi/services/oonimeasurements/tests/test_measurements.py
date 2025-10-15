@@ -314,6 +314,11 @@ def test_get_measurement_meta_basic(client):
         "category_code": "",
     }
 
+    # You can also query by measurment uid
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    response = client.get("/api/v1/measurement_meta", params={'measurement_uid' : uid})
+    assert response.status_code == 200, response.status_code
+
 
 def test_get_measurement_meta_invalid_rid(client):
     response = client.get("/api/v1/measurement_meta?report_id=BOGUS")
