@@ -10,7 +10,7 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 from datetime import datetime
 from textwrap import dedent
 from urllib.parse import urlparse
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 import logging
 
 try:
@@ -229,6 +229,10 @@ def clickhouse_upsert_summary(
     def tf(v: bool) -> str:
         return "t" if v else "f"
 
+    def s_or_n(x : Optional[Any]) -> Optional[str]:
+        """Serialize to string if not None, return None otherwise"""
+        return ujson.dumps(x) if x is not None else None
+
     test_name = msm.get("test_name", None) or ""
     input_, domain = extract_input_domain(msm, test_name)
     asn = int(msm["probe_asn"][2:])  # AS123
@@ -265,8 +269,8 @@ def clickhouse_upsert_summary(
         is_verified=tf(is_verified),
         nym=nym,
         zkp_request=zkp_request,
-        age_range=ujson.dumps(age_range),
-        msm_range=ujson.dumps(msm_range)
+        age_range=s_or_n(age_range),
+        msm_range=s_or_n(msm_range)
     )
 
     if buffer_writes:
