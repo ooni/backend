@@ -4,30 +4,35 @@ Measurements API
 
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from pathlib import Path
-from typing import List, Optional, Any, Dict, Union, TypedDict, Tuple
+from typing import List, Optional, Any, Dict, Union
 import gzip
 import json
 import logging
 import math
 import time
+import string
 
 import ujson
 import urllib3
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Header, Response, Request
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+    HTTPException,
+    Header,
+    Response,
+    Request,
+    status,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from typing_extensions import Annotated
 
-from pydantic import Field
+from pydantic import Field, field_serializer, field_validator
 
-import sqlalchemy as sa
-from sqlalchemy import tuple_, Row, sql
-from sqlalchemy.orm import Session
+from sqlalchemy import sql
 from sqlalchemy.sql.expression import and_, text, select, column
-from sqlalchemy.sql.expression import text as sql_text
-from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.exc import OperationalError
 from psycopg2.extensions import QueryCanceledError
 
@@ -276,7 +281,7 @@ class MeasurementMeta(BaseModel):
     report_id: Optional[str] = None
     test_name: Optional[str] = None
     test_start_time: Optional[datetime] = None
-    probe_asn: Optional[str] = None
+    probe_asn: Optional[str | int] = None
     probe_cc: Optional[str] = None
     scores: Optional[str] = None
     category_code: Optional[str] = None
@@ -285,6 +290,10 @@ class MeasurementMeta(BaseModel):
     failure: Optional[bool] = None
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
+
+    @field_serializer("measurement_start_time", "test_start_time")
+    def format_ts(self, v: datetime) -> str:
+        return v.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
@@ -430,75 +439,97 @@ class MeasurementBase(BaseModel):
     test_name: Optional[str] = Field(default=None, title="test name of the measurement")
 
 
+class GetMeasurementMetaRequest(BaseModel):
+    measurement_uid: Optional[str] = Field(
+        None,
+        description="The measurement ID, mutually exclusive with report_id + input",
+        min_length=3,
+    )
+    report_id: Optional[str] = Field(
+        None,
+        description=(
+            "The report_id to search measurements for example: "
+            "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a"
+        ),
+        min_length=3,
+    )
+    input: Optional[str] = Field(
+        None,
+        description="The input (for example a URL or IP address) to search measurements for",
+        min_length=3,
+    )
+    full: bool = Field(
+        False,
+        description="Include JSON measurement data",
+    )
+
+    @field_validator("report_id")
+    def report_id_validator(cls, report_id: str) -> str:
+        if report_id:
+            return validate_report_id(report_id)
+
+        return report_id
+
+def validate_report_id(report_id: str) -> str:
+    if len(report_id) < 15 or len(report_id) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid report_id field",
+        )
+
+    is_in_charset(
+        report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field"
+    )
+
+    return report_id
+
 @router.get("/v1/measurement_meta", response_model_exclude_unset=True)
 async def get_measurement_meta(
     response: Response,
-    measurement_uid: Annotated[
-        Optional[str],
-        Query(
-            description="The measurement ID, mutually exclusive with report_id + input",
-            min_length=3,
-        ),
-    ] = None,
-    report_id: Annotated[
-        Optional[str],
-        Query(
-            description=(
-                "The report_id to search measurements for example: "
-                "20210208T162755Z_ndt_DZ_36947_n1_8swgXi7xNuRUyO9a"
-            ),
-            min_length=3,
-        ),
-    ] = None,
-    input: Annotated[
-        Optional[str],
-        Query(
-            description="The input (for example a URL or IP address) to search measurements for",
-            min_length=3,
-        ),
-    ] = None,
-    full: Annotated[bool, Query(description="Include JSON measurement data")] = False,
+    request: GetMeasurementMetaRequest = Depends(),
     settings=Depends(get_settings),
     db=Depends(get_clickhouse_session),
-) -> MeasurementMeta:
+) -> MeasurementMeta | Dict[str, Any]:
     """
     Get metadata on one measurement by measurement_uid or report_id + input
     """
 
-    if measurement_uid:
-        log.info(f"get_measurement_meta {measurement_uid}")
-        msmt_meta = _get_measurement_meta_by_uid(db, measurement_uid)
-    elif report_id:
-        log.info(f"get_measurement_meta {report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
+    if request.measurement_uid:
+        log.info(f"get_measurement_meta {request.measurement_uid}")
+        msmt_meta = _get_measurement_meta_by_uid(db, request.measurement_uid)
+    elif request.report_id:
+        log.info(f"get_measurement_meta {request.report_id} {input}")
+        msmt_meta = _get_measurement_meta_clickhouse(
+            db, request.report_id, request.input
+        )
     else:
         raise HTTPException(
-            status_code=400,
-            detail="Either report_id or measurement_uid must be provided",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing measurement_uid or report_id. You should provide at the least one"
         )
+
+    if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
+        # Emulates old monolith behaviour of returning int as probe_asn
+        msmt_meta.probe_asn = asn_to_int(msmt_meta.probe_asn)
 
     setcacheresponse("1m", response)
-    body = ""
 
-    if not full:  # return without raw_measurement
+    if not request.full:
         return msmt_meta
 
-    if msmt_meta == {}:  # measurement not found
-        return MeasurementMeta(raw_measurement=body)
+    if msmt_meta == MeasurementMeta():  # measurement not found
+        return {"raw_measurement": ""}
 
     try:
-        assert isinstance(msmt_meta.report_id, str) and isinstance(
-            msmt_meta.measurement_uid, str
-        )
-        body = _fetch_measurement_body(
+        # TODO: uid_cleanup
+        assert msmt_meta.report_id is not None
+        msmt_meta.raw_measurement = _fetch_measurement_body(
             db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
         )
-        assert isinstance(body, bytes)
-        body = body.decode()
     except Exception as e:
         log.error(e, exc_info=True)
+        msmt_meta.raw_measurement = ""
 
-    msmt_meta.raw_measurement = body
     return msmt_meta
 
 
@@ -529,12 +560,14 @@ def genurl(base_url: str, path: str, **kw) -> str:
     """Generate absolute URL for the API"""
     return urljoin(base_url, path) + "?" + urlencode(kw)
 
+
 class OrderBy(str, Enum):
     measurement_start_time = "measurement_start_time"
     input = "input"
     probe_cc = "probe_cc"
     probe_asn = "probe_asn"
     test_name = "test_name"
+
 
 @router.get("/v1/measurements")
 async def list_measurements(
@@ -571,13 +604,13 @@ async def list_measurements(
         Query(description="Category code from the citizenlab list"),
     ] = None,
     since: Annotated[
-        Optional[str],
+        Optional[datetime],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
     ] = None,
     until: Annotated[
-        Optional[str],
+        Optional[datetime],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
@@ -625,7 +658,9 @@ async def list_measurements(
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
     ] = None,
     order_by: Annotated[
-        Optional[OrderBy], # Use an actual enum to enforce validation of ordering fields
+        Optional[
+            OrderBy
+        ],  # Use an actual enum to enforce validation of ordering fields
         Query(
             description="By which key the results should be ordered by (default: `null`)",
         ),
@@ -641,7 +676,10 @@ async def list_measurements(
         int, Query(description="Offset into the result set (default: 0)")
     ] = 0,
     limit: Annotated[
-        int, Query(description="Number of records to return (default: 100)", ge=0, le=1_000_000)
+        int,
+        Query(
+            description="Number of records to return (default: 100)", ge=0, le=1_000_000
+        ),
     ] = 100,
     user_agent: Annotated[str | None, Header()] = None,
     db=Depends(get_clickhouse_session),
@@ -681,30 +719,12 @@ async def list_measurements(
         )
 
     ### Prepare query parameters
+    if until is None and report_id is None:
+        t = datetime.now(timezone.utc) + timedelta(days=1)
+        until = datetime(t.year, t.month, t.day)
 
-    until_dt = None
-    if until is not None:
-        until_dt = datetime.strptime(until, "%Y-%m-%d")
-
-    # Set reasonable since/until ranges if not specified.
-    try:
-        if until is None:
-            if report_id is None:
-                t = datetime.now(timezone.utc) + timedelta(days=1)
-                until_dt = datetime(t.year, t.month, t.day)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid until parameter")
-
-    since_dt = None
-    if since is not None:
-        since_dt = datetime.strptime(since, "%Y-%m-%d")
-
-    try:
-        if since_dt is None:
-            if report_id is None and until_dt is not None:
-                since_dt = until_dt - timedelta(days=30)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid since parameter")
+    if since is None and report_id is None and until is not None:
+        since = until - timedelta(days=30)
 
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
@@ -994,3 +1014,15 @@ async def get_torsf_stats(
 
 def get_bucket_url(bucket_name: str) -> str:
     return f"https://{bucket_name}.s3.amazonaws.com/"
+
+
+def asn_to_int(asn_str: str) -> int:
+    return int(asn_str.strip("AS"))
+
+def is_in_charset(s: str, charset: str, error_msg: str):
+    """Ensure `s` contains only valid characters listed in `charset`"""
+    for c in s:
+        if c not in charset:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg
+            )
