@@ -490,6 +490,11 @@ async def get_measurement_meta(
         msmt_meta = _get_measurement_meta_clickhouse(
             db, request.report_id, request.input
         )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing measurement_uid or report_id. You should provide at the least one"
+        )
 
     if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
         # Emulates old monolith behaviour of returning int as probe_asn

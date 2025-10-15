@@ -269,6 +269,12 @@ def test_msm_meta_probe_asn_int(client, monkeypatch):
     j = resp.json()
     assert isinstance(j["probe_asn"], int), "probe_asn should be int"
 
+def test_no_report_id_msm_uid_400(client):
+    """
+    measurement_meta should return 400 if neither report_id nor measurement_uid are provided
+    """
+    resp = client.get("/api/v1/measurement_meta")
+    assert resp.status_code == 400
 
 def test_fix_msm_date_parsing(client):
 
