@@ -477,7 +477,7 @@ def validate_report_id(report_id: str) -> str:
             detail="Invalid report_id field",
         )
 
-    validate(
+    is_in_charset(
         report_id, string.ascii_letters + string.digits + "_", "Invalid report_id field"
     )
 
@@ -1019,10 +1019,10 @@ def get_bucket_url(bucket_name: str) -> str:
 def asn_to_int(asn_str: str) -> int:
     return int(asn_str.strip("AS"))
 
-def validate(item: str, accepted: str, error_msg: str):
-    """Ensure item contains only valid"""
-    for c in item:
-        if c not in accepted:
+def is_in_charset(s: str, charset: str, error_msg: str):
+    """Ensure `s` contains only valid characters listed in `charset`"""
+    for c in s:
+        if c not in charset:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg
             )

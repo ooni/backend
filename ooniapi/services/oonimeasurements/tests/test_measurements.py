@@ -378,6 +378,12 @@ def test_get_measurement_meta_full(client, monkeypatch):
     }
     assert raw_msm
 
+def test_bad_report_id_wont_validate(client):
+
+    resp = client.get("/api/v1/measurement_meta", params={
+        "report_id" : "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds#$%" # bad suffix
+    })
+    assert resp.status_code == 422, resp.json()
 
 def test_no_measurements_before_30_days(client):
     """
