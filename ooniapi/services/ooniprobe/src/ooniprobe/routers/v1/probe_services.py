@@ -619,25 +619,23 @@ def sign_credential(register_request: RegisterRequest, session : PostgresSession
 
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
 
-    error_to_string = {
+    type_to_str = {
         ProtocolError : "protocol_error",
         DeserializationFailed : "deserialization_failed",
         CredentialError : "credential_error"
     }
+    type_str = type_to_str[type(error)]
 
-    error_str = error_to_string[type(error)]
+    assert isinstance(error, (ProtocolError, CredentialError, DeserializationFailed))
+    status_code = status.HTTP_400_BAD_REQUEST if isinstance(error, DeserializationFailed) else status.HTTP_403_FORBIDDEN
 
-    if isinstance(error, DeserializationFailed):
-        return HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": error_str, "detail": str(error)}
-        )
-    if isinstance(error, (CredentialError, ProtocolError)): #
-        return HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"error": error_str, "message": str(error)}
-        )
-
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "error" : type_str,
+            "message" : str(error)
+        }
+    )
 
 class SubmitMeasurementRequest(BaseModel):
 
@@ -747,7 +745,7 @@ async def submit_measurement(
 
     data = submit_request.model_dump()
 
-    # Add verification-related data. 
+    # Add verification-related data.
     data['is_verified'] = is_verified
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
