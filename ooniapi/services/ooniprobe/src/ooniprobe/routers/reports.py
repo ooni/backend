@@ -273,8 +273,10 @@ def compare_probe_msmt_cc_asn(
         if db_probe_cc == cc and db_asn == asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
         elif db_probe_cc != cc:
+            log.error(f"db_cc != cc: {db_probe_cc} != {cc}")
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc", reported=cc, detected=db_probe_cc).inc()
         elif db_asn != asn:
+            log.error(f"db_asn != asn: {db_asn} != {asn}")
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn", reported=asn, detected=db_asn).inc()
     except Exception:
         pass
