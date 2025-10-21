@@ -54,7 +54,7 @@ class Metrics:
     PROBE_CC_ASN_NO_MATCH = Counter(
         "probe_cc_asn_nomatch",
         "How many mismatches between reported and observed probe_cc and asn",
-        labelnames=["mismatch"],
+        labelnames=["mismatch", "reported", "detected"],
     )
 
     MISSED_MSMNTS = Counter(
@@ -213,7 +213,7 @@ async def receive_measurement(
 
             async with httpx.AsyncClient() as client:
                 resp = await client.post(url, content=data, timeout=59)
-            
+
             assert resp.status_code == 200, resp.content
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
@@ -273,8 +273,8 @@ def compare_probe_msmt_cc_asn(
         if db_probe_cc == cc and db_asn == asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
         elif db_probe_cc != cc:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc", reported=cc, detected=db_probe_cc).inc()
         elif db_asn != asn:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn", reported=asn, detected=db_asn).inc()
     except Exception:
         pass
