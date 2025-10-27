@@ -6,9 +6,10 @@ from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int
+from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int, ProbeCCOrNone, ProbeASNOrNone
 from ...dependencies import (
     get_clickhouse_session,
+    ClickhouseDep
 )
 from .list_analysis import (
     SinceUntil,
@@ -292,8 +293,8 @@ async def get_aggregation_analysis(
     test_name: Annotated[Optional[str], Query()] = None,
     domain: Annotated[Optional[str], Query()] = None,
     input: Annotated[Optional[str], Query()] = None,
-    probe_asn: Annotated[Union[int, str, None], Query()] = None,
-    probe_cc: Annotated[Optional[str], Query(min_length=2, max_length=2)] = None,
+    probe_asn: ProbeASNOrNone = None,
+    probe_cc: ProbeCCOrNone = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
     since: SinceUntil = utc_30_days_ago(),
     until: SinceUntil = utc_today(),
@@ -447,3 +448,32 @@ async def get_aggregation_analysis(
         dimension_count=dimension_count,
         results=results,
     )
+
+class ListChangePointsRequest(BaseModel):
+    probe_asn: str
+    probe_cc: str
+    domain: str
+    since: datetime | None = None
+    until: datetime | None = None
+
+class ListChangePointsResponse(BaseModel):
+    response: str = "ok"
+    pass
+
+@router.get(
+        "/v1/detector/chagepoints",
+        tags=["detector"],
+        description="List changepoints detected by the event detector using the cusum algorithm",
+        response_model=ListChangePointsResponse,
+)
+def list_changepoints(
+    clickhouse : ClickhouseDep,
+    request : ListChangePointsRequest,
+    probe_asn: ProbeASNOrNone = None,
+    probe_cc: ProbeCCOrNone = None,
+    domain : str | None = Query(),
+    since : SinceUntil = utc_30_days_ago(),
+    until: SinceUntil = utc_today(),
+    ) -> ListChangePointsResponse:
+
+    return ListChangePointsResponse()

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Union, Optional
 
 from fastapi import Query
 from pydantic import AfterValidator
@@ -66,3 +66,6 @@ def parse_probe_asn_to_int(func):
         return await func(*args, **kwargs)
 
     return wrapper
+
+ProbeCCOrNone = Annotated[Optional[str], Query(min_length=2, max_length=2)]
+ProbeASNOrNone = Annotated[Union[int, str, None], Query()]
