@@ -449,13 +449,6 @@ async def get_aggregation_analysis(
         results=results,
     )
 
-class ListChangePointsRequest(BaseModel):
-    probe_asn: str
-    probe_cc: str
-    domain: str
-    since: datetime | None = None
-    until: datetime | None = None
-
 class ListChangePointsResponse(BaseModel):
     response: str = "ok"
     pass
@@ -468,10 +461,9 @@ class ListChangePointsResponse(BaseModel):
 )
 def list_changepoints(
     clickhouse : ClickhouseDep,
-    request : ListChangePointsRequest,
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
-    domain : str | None = Query(),
+    domain : str | None = Query(default=None),
     since : SinceUntil = utc_30_days_ago(),
     until: SinceUntil = utc_today(),
     ) -> ListChangePointsResponse:
