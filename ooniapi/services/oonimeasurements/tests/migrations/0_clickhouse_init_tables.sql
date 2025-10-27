@@ -65,7 +65,7 @@ ENGINE = MergeTree
 ORDER BY (report_id, input)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE oonitest.event_detector_changepoints
+CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
 (
     `probe_asn` UInt32,
     `probe_cc` String,
@@ -100,4 +100,8 @@ CREATE TABLE oonitest.event_detector_changepoints
     `s_neg` Nullable(Float32),
     `current_mean` Nullable(Float32),
     `h` Nullable(Float32)
-);
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (probe_asn, probe_cc, ts, domain)
+SETTINGS index_granularity = 8192;
