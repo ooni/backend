@@ -28,7 +28,7 @@ def app():
     return app
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def client(app):
     """
     Overriding the `client` fixture from pytest_flask to fix this bug:
