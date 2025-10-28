@@ -6,7 +6,7 @@ import os
 from flask import current_app
 
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.sql.selectable import Select
 
