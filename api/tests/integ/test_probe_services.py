@@ -78,6 +78,9 @@ def test_extract_probe_ipaddr_octect(app):
     with app.test_request_context("/", headers={"X-Real-IP": "1.2.3.4"}):
         assert ooniapi.probe_services.extract_probe_ipaddr() == "1.2.3.4"
 
+def test_extract_probe_ipaddr_spoofed_x_forwarded_for(app):
+    with app.test_request_context("/", headers={"X-Forwarded-For": "1.3.3.7, 1.2.3.4, 4.2.4.2"}):
+        assert ooniapi.probe_services.extract_probe_ipaddr() == "1.2.3.4"
 
 ## Test /api/v1/check-in
 
