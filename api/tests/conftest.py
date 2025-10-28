@@ -37,12 +37,13 @@ def client(app):
     with app.test_client() as client:
         yield client
 
-    while True:
-        top = flask._request_ctx_stack.top
-        if top is not None and top.preserved:
-            top.pop()
-        else:
-            break
+    # deprecated name _request_ctx_stack and marked as not a bug on issue #42
+    #while True:
+    #    top = flask._request_ctx_stack.top
+    #    if top is not None and top.preserved:
+    #        top.pop()
+    #    else:
+    #        break
 
 
 @pytest.fixture(autouse=True)
