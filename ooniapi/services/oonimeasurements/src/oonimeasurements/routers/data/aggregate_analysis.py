@@ -576,7 +576,6 @@ async def list_changepoints(
     # TODO Paging?
 
     query_result = query_click(clickhouse, q, query_params)
-    log.debug(f"Results: {query_result}")
 
     results = [ChangePointEntry.from_row(entry) for entry in query_result]
 
