@@ -1,6 +1,6 @@
 from typing import Dict, Any
 import httpx
-from datetime import datetime
+from datetime import datetime, UTC
 import pytest
 
 
@@ -14,8 +14,8 @@ def getj(
     return resp.json()
 
 # reasonable default since and until for the testing data
-since = datetime(2025, 10, 1)
-until = datetime(2025, 11, 1)
+since = datetime(2025, 10, 1, tzinfo=UTC)
+until = datetime(2025, 11, 1, tzinfo=UTC)
 
 def getjsu(client, url, params={}):
     # use this default since and until
@@ -43,6 +43,9 @@ def normalize_asn(asn: int | str):
 
     return int(asn)
 
+def parse_dt(dt : str) -> datetime:
+    return datetime.fromisoformat(dt)
+
 @pytest.mark.parametrize(
     "filter_param, filter_value",
     [
@@ -55,7 +58,6 @@ def normalize_asn(asn: int | str):
 )
 def test_changepoint_filter_basic(client, filter_param, filter_value):
 
-    # Check filtering by cc
     resp = getjsu(
         client,
         "/api/v1/detector/chagepoints",
@@ -67,6 +69,35 @@ def test_changepoint_filter_basic(client, filter_param, filter_value):
     assert len(resp['results']) > 0, "No results to validate"
 
     if filter_param == "probe_asn":
-        assert all(r[filter_param] == normalize_asn(filter_value) for r in resp['results']), resp['results']
+        normalize = normalize_asn
     else:
-        assert all(r[filter_param] == filter_value for r in resp['results']), resp['results']
+        normalize = id
+
+    if filter_param == "probe_asn":
+        for r in resp["results"]:
+            assert r[filter_param] == normalize(filter_value), r
+
+@pytest.mark.parametrize(
+        "since_param, until_param, expect_emtpy",
+        [
+            (since, until, False),
+            (datetime(2024, 1, 1, tzinfo=UTC), datetime(2024, 1, 30, tzinfo=UTC), True)
+        ],
+)
+def test_changepoint_date_filter(client, since_param, until_param, expect_emtpy):
+
+    resp = getj(
+        client,
+        "/api/v1/detector/chagepoints",
+        params={
+            "since" : since_param,
+            "until" : until_param
+        }
+    )
+
+    assert len(resp['results']) > 0 or expect_emtpy, "Not enough results to validate"
+    assert len(resp['results']) == 0 or not expect_emtpy, "Result should be empty"
+
+    for r in resp["results"]:
+        assert parse_dt(r['start_time']) >= since, r['start_time']
+        assert parse_dt(r['end_time']) <= until, r['end_time']
