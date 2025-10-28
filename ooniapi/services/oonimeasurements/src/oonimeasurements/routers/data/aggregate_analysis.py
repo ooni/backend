@@ -1,10 +1,12 @@
 import time
 import math
 from datetime import datetime
-from typing import List, Literal, Optional, Tuple, Union, Dict
+from ...common.clickhouse_utils import query_click
+from typing import Any, List, Literal, Optional, Self, Tuple, Union, Dict
 from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import sqlalchemy as sql
 
 from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int, ProbeCCOrNone, ProbeASNOrNone
 from ...dependencies import (
@@ -449,9 +451,87 @@ async def get_aggregation_analysis(
         results=results,
     )
 
+class ChangePointEntry(BaseModel):
+    # TODO Double check which fields are actually necessary
+    probe_asn: int
+    probe_cc: str
+    domain: str
+    start_time: datetime # TODO double check the naming of these datetime fields
+    end_time: datetime
+    count_isp_resolver: int
+    count_other_resolver: int
+    count: int
+    dns_isp_blocked: float | None
+    dns_other_blocked: float | None
+    tcp_blocked: float | None
+    tls_blocked: float | None
+    dns_isp_blocked_obs_w_sum: float | None
+    dns_isp_blocked_w_sum: float | None
+    dns_isp_blocked_s_pos: float | None
+    dns_isp_blocked_s_neg: float | None
+    dns_other_blocked_obs_w_sum: float | None
+    dns_other_blocked_w_sum: float | None
+    dns_other_blocked_s_pos: float | None
+    dns_other_blocked_s_neg: float | None
+    tcp_blocked_obs_w_sum: float | None
+    tcp_blocked_w_sum: float | None
+    tcp_blocked_s_pos: float | None
+    tcp_blocked_s_neg: float | None
+    tls_blocked_obs_w_sum: float | None
+    tls_blocked_w_sum: float | None
+    tls_blocked_s_pos: float | None
+    tls_blocked_s_neg: float | None
+    change_dir: int = Field() # TODO Add description of direction encoding
+    s_pos: float | None
+    s_neg: float | None
+    current_mean: float | None
+    h: float | None
+
+    @classmethod
+    def from_row(cls, row : Dict[str, Any]) -> Self:
+        """
+        Takes a row as it comes from the clickhouse table 'event_detector_changepoints'
+        and converts it to a chagepoint entry
+        """
+        return ChangePointEntry(
+            probe_asn=row.get("probe_asn"), # type: ignore
+            probe_cc=row.get("probe_cc"), # type: ignore
+            domain=row.get("domain"), # type: ignore
+            start_time=row.get("ts"), # type: ignore
+            end_time=row.get("last_ts"), # type: ignore
+
+            count_isp_resolver = row.get("count_isp_resolver"), # type: ignore
+            count_other_resolver = row.get("count_other_resolver"), # type: ignore
+            count = row.get("count"), # type: ignore
+            dns_isp_blocked = row.get("dns_isp_blocked"),
+            dns_other_blocked = row.get("dns_other_blocked"),
+            tcp_blocked = row.get("tcp_blocked"),
+            tls_blocked = row.get("tls_blocked"),
+            dns_isp_blocked_obs_w_sum = row.get("dns_isp_blocked_obs_w_sum"),
+            dns_isp_blocked_w_sum = row.get("dns_isp_blocked_w_sum"),
+            dns_isp_blocked_s_pos = row.get("dns_isp_blocked_s_pos"),
+            dns_isp_blocked_s_neg = row.get("dns_isp_blocked_s_neg"),
+            dns_other_blocked_obs_w_sum = row.get("dns_other_blocked_obs_w_sum"),
+            dns_other_blocked_w_sum = row.get("dns_other_blocked_w_sum"),
+            dns_other_blocked_s_pos = row.get("dns_other_blocked_s_pos"),
+            dns_other_blocked_s_neg = row.get("dns_other_blocked_s_neg"),
+            tcp_blocked_obs_w_sum = row.get("tcp_blocked_obs_w_sum"),
+            tcp_blocked_w_sum = row.get("tcp_blocked_w_sum"),
+            tcp_blocked_s_pos = row.get("tcp_blocked_s_pos"),
+            tcp_blocked_s_neg = row.get("tcp_blocked_s_neg"),
+            tls_blocked_obs_w_sum = row.get("tls_blocked_obs_w_sum"),
+            tls_blocked_w_sum = row.get("tls_blocked_w_sum"),
+            tls_blocked_s_pos = row.get("tls_blocked_s_pos"),
+            tls_blocked_s_neg = row.get("tls_blocked_s_neg"),
+            change_dir = row.get("change_dir"), # type: ignore
+            s_pos = row.get("s_pos"),
+            s_neg = row.get("s_neg"),
+            current_mean = row.get("current_mean"),
+            h = row.get("h")
+        ) # type: ignore
+
 class ListChangePointsResponse(BaseModel):
-    response: str = "ok"
-    pass
+    results: List[ChangePointEntry]
 
 @router.get(
         "/v1/detector/chagepoints",
@@ -459,7 +539,8 @@ class ListChangePointsResponse(BaseModel):
         description="List changepoints detected by the event detector using the cusum algorithm",
         response_model=ListChangePointsResponse,
 )
-def list_changepoints(
+@parse_probe_asn_to_int
+async def list_changepoints(
     clickhouse : ClickhouseDep,
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
@@ -468,4 +549,35 @@ def list_changepoints(
     until: SinceUntil = utc_today(),
     ) -> ListChangePointsResponse:
 
-    return ListChangePointsResponse()
+    conditions = []
+    query_params = {}
+
+    if probe_asn:
+        conditions.append(sql.text("probe_asn = :probe_asn"))
+        query_params['probe_asn'] = probe_asn
+
+    if probe_cc:
+        conditions.append(sql.text("probe_cc = :probe_cc"))
+        query_params['probe_cc'] = probe_cc
+
+    if domain:
+        conditions.append(sql.text("domain = :domain")) # TODO should this be 'like %domain%'?
+        query_params['domain'] = domain
+
+    conditions.append(sql.text("ts >= :since"))
+    query_params['since'] = since
+
+    conditions.append(sql.text("ts <= :until"))
+    query_params['until'] = until
+
+    changepoints = sql.table("event_detector_changepoints")
+    q = sql.select("*").select_from(changepoints).where(sql.and_(*conditions))
+
+    # TODO Paging?
+
+    query_result = query_click(clickhouse, q, query_params)
+    log.debug(f"Results: {query_result}")
+
+    results = [ChangePointEntry.from_row(entry) for entry in query_result]
+
+    return ListChangePointsResponse(results=results)
