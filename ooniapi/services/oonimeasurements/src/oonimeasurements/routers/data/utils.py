@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from typing import Annotated, Literal, Union, Optional
+from typing import Annotated, Literal, Union
 
 from fastapi import Query
 from pydantic import AfterValidator
