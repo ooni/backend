@@ -1,4 +1,3 @@
--- TODO This rows where randomly generated, we should replace them when we have actual data
 INSERT INTO default.event_detector_changepoints VALUES
 (945,'US','www.facebook.com','2024-01-15 18:00:00.000',0,2,2,nan,0,0.75,0,'2024-01-10 23:00:00.000',nan,0,0,0,0,373,0,0,1.5,373,0,0,0,373,0,0,-1,3.6899884,0,0.04597198,3.5),
 (15169,'VE','google.com','2024-01-25 23:00:00.000',6,0,6,0,nan,0,0.7,'2024-01-10 23:00:00.000',nan,660,0,0,nan,2,0,0,0,662,0,0,42.9,662,0,0,-1,3.6650198,0,0.084454976,3.5),
