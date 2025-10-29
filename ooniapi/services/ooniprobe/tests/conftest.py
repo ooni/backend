@@ -107,13 +107,12 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, fastpath_server):
-    port = docker_services.port_for("clickhouse", 9000)
+def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, clickhouse_server, fastpath_server):
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",
-        clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
+        clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
         fastpath_url=fastpath_server
