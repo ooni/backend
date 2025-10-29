@@ -101,3 +101,38 @@ def test_changepoint_date_filter(client, since_param, until_param, expect_emtpy)
     for r in resp["results"]:
         assert parse_dt(r['start_time']) >= since, r['start_time']
         assert parse_dt(r['end_time']) <= until, r['end_time']
+
+def test_changepoint_change_dir_values(client):
+
+    resp = getjsu(
+        client,
+        "/api/v1/detector/chagepoints",
+    )
+
+    assert len(resp["results"]) > 0, "Not enough data to validate"
+    for r in resp['results']:
+        assert r['change_dir'] in ['up', 'down']
+
+    resp = getjsu(
+        client,
+        "/api/v1/detector/chagepoints",
+        {
+            "probe_cc" : "VE",
+            "probe_asn" : 15169,
+            "domain" : "google.com"
+        }
+    )
+
+    assert resp["results"][0]['change_dir'] == 'down' # this one has change_dir == -1
+
+    resp = getjsu(
+        client,
+        "/api/v1/detector/chagepoints",
+        {
+            "probe_cc" : "VE",
+            "probe_asn" : 8048,
+            "domain" : "amazon.com"
+        }
+    )
+
+    assert resp["results"][0]['change_dir'] == 'up' # this one has change_dir == 1
