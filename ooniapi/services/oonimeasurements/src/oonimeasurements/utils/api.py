@@ -1,6 +1,7 @@
 """
 Utility functions and types to assist API development
 """
+
 from typing import Annotated, Optional, Union
 from fastapi import Query
 

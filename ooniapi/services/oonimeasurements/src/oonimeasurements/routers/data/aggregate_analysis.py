@@ -450,16 +450,18 @@ async def get_aggregation_analysis(
         results=results,
     )
 
+
 class ChangeDir(str, Enum):
     up = "up"
     down = "down"
 
     @classmethod
-    def from_n_or_i(cls, i : int | None) -> Self | None:
+    def from_n_or_i(cls, i: int | None) -> Self | None:
         if i is None:
             return None
 
         return cls("down") if i == -1 else cls("up")
+
 
 class ChangePointEntry(BaseModel):
     # TODO Double check which fields are actually necessary
@@ -491,7 +493,9 @@ class ChangePointEntry(BaseModel):
     tls_blocked_w_sum: float | None
     tls_blocked_s_pos: float | None
     tls_blocked_s_neg: float | None
-    change_dir: ChangeDir | None = Field(description="If blocking behaviour goes up or down")
+    change_dir: ChangeDir | None = Field(
+        description="If blocking behaviour goes up or down"
+    )
     s_pos: float | None
     s_neg: float | None
     current_mean: float | None
@@ -532,7 +536,7 @@ class ChangePointEntry(BaseModel):
             tls_blocked_w_sum=row.get("tls_blocked_w_sum"),
             tls_blocked_s_pos=row.get("tls_blocked_s_pos"),
             tls_blocked_s_neg=row.get("tls_blocked_s_neg"),
-            change_dir= ChangeDir.from_n_or_i(row.get("change_dir")),
+            change_dir=ChangeDir.from_n_or_i(row.get("change_dir")),
             s_pos=row.get("s_pos"),
             s_neg=row.get("s_neg"),
             current_mean=row.get("current_mean"),
