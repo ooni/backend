@@ -15,8 +15,8 @@ def getj(
 
 
 # reasonable default since and until for the testing data
-since = datetime(2025, 10, 1, tzinfo=UTC)
-until = datetime(2025, 11, 1, tzinfo=UTC)
+since = datetime(2024, 1, 1, tzinfo=UTC)
+until = datetime(2024, 1, 30, tzinfo=UTC)
 
 
 def getjsu(client, url, params={}):
@@ -84,7 +84,7 @@ def test_changepoint_filter_basic(client, filter_param, filter_value):
     "since_param, until_param, expect_emtpy",
     [
         (since, until, False),
-        (datetime(2024, 1, 1, tzinfo=UTC), datetime(2024, 1, 30, tzinfo=UTC), True),
+        (datetime(2021, 1, 1, tzinfo=UTC), datetime(2021, 1, 30, tzinfo=UTC), True),
     ],
 )
 def test_changepoint_date_filter(client, since_param, until_param, expect_emtpy):

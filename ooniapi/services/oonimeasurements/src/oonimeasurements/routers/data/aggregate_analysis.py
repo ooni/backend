@@ -281,6 +281,10 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     )
     """
 
+def nan_to_none(val):
+    if math.isnan(val):
+        return None
+    return val
 
 @router.get(
     "/v1/aggregation/analysis",
@@ -399,10 +403,6 @@ async def get_aggregation_analysis(
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
             blocked_max_protocol = d["blocked_max_protocol"]
 
-            def nan_to_none(val):
-                if math.isnan(val):
-                    return None
-                return val
 
             loni = Loni(
                 dns_blocked=nan_to_none(d["dns_blocked"]),
@@ -507,40 +507,44 @@ class ChangePointEntry(BaseModel):
         Takes a row as it comes from the clickhouse table 'event_detector_changepoints'
         and converts it to a chagepoint entry
         """
+
+        def g(s : str) -> Any | None:
+            return row.get(s)
+
         return ChangePointEntry(
-            probe_asn=row.get("probe_asn"),
-            probe_cc=row.get("probe_cc"),
-            domain=row.get("domain"),
-            start_time=row.get("ts"),
-            end_time=row.get("last_ts"),
-            count_isp_resolver=row.get("count_isp_resolver"),
-            count_other_resolver=row.get("count_other_resolver"),
-            count=row.get("count"),
-            dns_isp_blocked=row.get("dns_isp_blocked"),
-            dns_other_blocked=row.get("dns_other_blocked"),
-            tcp_blocked=row.get("tcp_blocked"),
-            tls_blocked=row.get("tls_blocked"),
-            dns_isp_blocked_obs_w_sum=row.get("dns_isp_blocked_obs_w_sum"),
-            dns_isp_blocked_w_sum=row.get("dns_isp_blocked_w_sum"),
-            dns_isp_blocked_s_pos=row.get("dns_isp_blocked_s_pos"),
-            dns_isp_blocked_s_neg=row.get("dns_isp_blocked_s_neg"),
-            dns_other_blocked_obs_w_sum=row.get("dns_other_blocked_obs_w_sum"),
-            dns_other_blocked_w_sum=row.get("dns_other_blocked_w_sum"),
-            dns_other_blocked_s_pos=row.get("dns_other_blocked_s_pos"),
-            dns_other_blocked_s_neg=row.get("dns_other_blocked_s_neg"),
-            tcp_blocked_obs_w_sum=row.get("tcp_blocked_obs_w_sum"),
-            tcp_blocked_w_sum=row.get("tcp_blocked_w_sum"),
-            tcp_blocked_s_pos=row.get("tcp_blocked_s_pos"),
-            tcp_blocked_s_neg=row.get("tcp_blocked_s_neg"),
-            tls_blocked_obs_w_sum=row.get("tls_blocked_obs_w_sum"),
-            tls_blocked_w_sum=row.get("tls_blocked_w_sum"),
-            tls_blocked_s_pos=row.get("tls_blocked_s_pos"),
-            tls_blocked_s_neg=row.get("tls_blocked_s_neg"),
-            change_dir=ChangeDir.from_n_or_i(row.get("change_dir")),
-            s_pos=row.get("s_pos"),
-            s_neg=row.get("s_neg"),
-            current_mean=row.get("current_mean"),
-            h=row.get("h"),
+            probe_asn=g("probe_asn"),
+            probe_cc=g("probe_cc"),
+            domain=g("domain"),
+            start_time=g("ts"),
+            end_time=g("last_ts"),
+            count_isp_resolver=g("count_isp_resolver"),
+            count_other_resolver=g("count_other_resolver"),
+            count=g("count"),
+            dns_isp_blocked= nan_to_none(g("dns_isp_blocked")),
+            dns_other_blocked=nan_to_none(g("dns_other_blocked")),
+            tcp_blocked=nan_to_none(g("tcp_blocked")),
+            tls_blocked=nan_to_none(g("tls_blocked")),
+            dns_isp_blocked_obs_w_sum=nan_to_none(g("dns_isp_blocked_obs_w_sum")),
+            dns_isp_blocked_w_sum=nan_to_none(g("dns_isp_blocked_w_sum")),
+            dns_isp_blocked_s_pos=nan_to_none(g("dns_isp_blocked_s_pos")),
+            dns_isp_blocked_s_neg=nan_to_none(g("dns_isp_blocked_s_neg")),
+            dns_other_blocked_obs_w_sum=nan_to_none(g("dns_other_blocked_obs_w_sum")),
+            dns_other_blocked_w_sum=nan_to_none(g("dns_other_blocked_w_sum")),
+            dns_other_blocked_s_pos=nan_to_none(g("dns_other_blocked_s_pos")),
+            dns_other_blocked_s_neg=nan_to_none(g("dns_other_blocked_s_neg")),
+            tcp_blocked_obs_w_sum=nan_to_none(g("tcp_blocked_obs_w_sum")),
+            tcp_blocked_w_sum=nan_to_none(g("tcp_blocked_w_sum")),
+            tcp_blocked_s_pos=nan_to_none(g("tcp_blocked_s_pos")),
+            tcp_blocked_s_neg=nan_to_none(g("tcp_blocked_s_neg")),
+            tls_blocked_obs_w_sum=nan_to_none(g("tls_blocked_obs_w_sum")),
+            tls_blocked_w_sum=nan_to_none(g("tls_blocked_w_sum")),
+            tls_blocked_s_pos=nan_to_none(g("tls_blocked_s_pos")),
+            tls_blocked_s_neg=nan_to_none(g("tls_blocked_s_neg")),
+            change_dir=ChangeDir.from_n_or_i(g("change_dir")),
+            s_pos=nan_to_none(g("s_pos")),
+            s_neg=nan_to_none(g("s_neg")),
+            current_mean=nan_to_none(g("current_mean")),
+            h=nan_to_none(g("h")),
         )  # type: ignore
 
 
