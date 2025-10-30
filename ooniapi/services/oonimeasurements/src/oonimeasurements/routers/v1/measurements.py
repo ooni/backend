@@ -470,6 +470,7 @@ class GetMeasurementMetaRequest(BaseModel):
 
         return report_id
 
+
 def validate_report_id(report_id: str) -> str:
     if len(report_id) < 15 or len(report_id) > 100:
         raise HTTPException(
@@ -482,6 +483,7 @@ def validate_report_id(report_id: str) -> str:
     )
 
     return report_id
+
 
 @router.get("/v1/measurement_meta", response_model_exclude_unset=True)
 async def get_measurement_meta(
@@ -505,7 +507,7 @@ async def get_measurement_meta(
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing measurement_uid or report_id. You should provide at the least one"
+            detail="Missing measurement_uid or report_id. You should provide at the least one",
         )
 
     if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
@@ -1018,6 +1020,7 @@ def get_bucket_url(bucket_name: str) -> str:
 
 def asn_to_int(asn_str: str) -> int:
     return int(asn_str.strip("AS"))
+
 
 def is_in_charset(s: str, charset: str, error_msg: str):
     """Ensure `s` contains only valid characters listed in `charset`"""
