@@ -36,12 +36,7 @@ CREATE TABLE IF NOT EXISTS default.fastpath
     `blocking_type` String,
     `test_helper_address` LowCardinality(String),
     `test_helper_type` LowCardinality(String),
-    `ooni_run_link_id` Nullable(UInt64),
-    `is_verified` Int8,
-    `nym` Nullable(String),
-    `zkp_request` Nullable(String),
-    `age_range` Nullable(String),
-    `msm_range` Nullable(String)
+    `ooni_run_link_id` Nullable(UInt64)
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_start_time, report_id, input)
@@ -69,3 +64,9 @@ CREATE TABLE IF NOT EXISTS default.jsonl
 ENGINE = MergeTree
 ORDER BY (report_id, input)
 SETTINGS index_granularity = 8192;
+
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` Int8;
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
