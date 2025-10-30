@@ -10,7 +10,7 @@ def getj(
     resp = client.get(url, params=params)
     assert (
         resp.status_code == 200
-    ), f"Unexpected status code: {resp.status_code}. {resp.content}"
+    ), f"Unexpected status code:  {resp.status_code}. {resp.content}"
     return resp.json()
 
 
