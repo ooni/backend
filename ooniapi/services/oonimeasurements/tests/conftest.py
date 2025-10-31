@@ -40,6 +40,8 @@ def maybe_download_fixtures():
 
 
 def is_clickhouse_running(url):
+    # using ClickhouseClient as probe spams WARN messages with logger in clickhouse_driver
+    time.sleep(2)
     try:
         with ClickhouseClient.from_url(url) as client:
             client.execute("SELECT 1")
@@ -53,7 +55,7 @@ def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     port = docker_services.port_for("clickhouse", 9000)
     url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
     docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+        timeout=30.0, pause=1.0, check=lambda: is_clickhouse_running(url)
     )
     yield url
 
