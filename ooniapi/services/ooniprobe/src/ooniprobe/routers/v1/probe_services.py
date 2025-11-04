@@ -590,3 +590,21 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+
+class CollectorEntry(BaseModel):
+    # not actually used but necessary to be compliant with the old API schema
+    address: str = Field(description="Address of collector")
+    front: Optional[str] = Field(default=None, description="Fronted domain")
+    type: Optional[str] = Field(default=None, description="Type of collector")
+
+@router.post("/collectors", tags=["ooniprobe"])
+def list_collectors(
+    settings: Settings = Depends(get_settings),
+    ) -> List[CollectorEntry]:
+    config_collectors = settings.collectors
+    collectors_response = []
+    for entry in config_collectors:
+        collector = CollectorEntry(**entry)
+        collectors_response.append(collector)
+    return collectors_response
