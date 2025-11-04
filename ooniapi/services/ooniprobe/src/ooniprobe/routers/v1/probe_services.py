@@ -592,16 +592,8 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
 
 
 class GeoLookupResponse(BaseModel):
-    """
-    v:
-      type: integer
-      description: response format version
-    geolocation:
-      type: object
-      description: dict of ip addresses to dict of country code, ASN, AS Name strings
-    """
-    v: int
-    geolocation: Dict[str, Dict[str, str]]
+    v: int = Field(description="response format version")
+    geolocation: Dict[str, Dict[str, str]] = Field(description="dict of ip addresses to dict of country code, ASN, AS Name strings")
 
 
 @router.post("/geolookup", tags=["ooniprobe"])
