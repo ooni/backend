@@ -349,9 +349,9 @@ def check_in(
     probe_asn = check_in.probe_asn
     software_name = check_in.software_name
     software_version = check_in.software_version
-
+    ipaddr = extract_probe_ipaddr(request)
     resp, probe_cc, asn_i = probe_geoip(
-        request,
+        ipaddr,
         probe_cc,
         probe_asn,
         cc_reader,
@@ -474,7 +474,7 @@ def check_in(
 
 
 def probe_geoip(
-    request: Request,
+    ipaddr: str,
     probe_cc: str,
     asn: str,
     cc_reader: CCReaderDep,
@@ -487,7 +487,6 @@ def probe_geoip(
     db_asn = "AS0"
     db_probe_network_name = None
     try:
-        ipaddr = extract_probe_ipaddr(request)
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
@@ -590,3 +589,46 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+
+class GeoLookupResponse(BaseModel):
+    """
+    v:
+      type: integer
+      description: response format version
+    geolocation:
+      type: object
+      description: dict of ip addresses to dict of country code, ASN, AS Name strings
+    """
+    v: int
+    geolocation: Dict[str, Dict[str, str]]
+
+
+@router.post("/geolookup", tags=["ooniprobe"])
+async def geolookup(
+        request: Request,
+        response: Response,
+        cc_reader: CCReaderDep,
+        asn_reader: ASNReaderDep,
+) -> GeoLookupResponse:
+
+    # initial values probe_geoip compares with
+    probe_cc = "ZZ"
+    asn = "AS0"
+
+    # extract addresses from request
+    json_body = await request.json()
+    ipaddrs = json_body.get("addresses", [])
+    geolocation: Dict[str, Any]=dict()
+
+    # for each address provided, call probe_geoip and add the data to our response
+    for ipaddr in ipaddrs:
+        # call probe_geoip() and map the keys to the geolookup v1 API
+        resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
+        geolocation[ipaddr] = {"cc": resp["probe_cc"],
+                               "asn": resp["probe_asn"],
+                               "as_name":resp["probe_network_name"]}
+
+    geolookup_resp = GeoLookupResponse(v=1, geolocation=geolocation)
+    setnocacheresponse(response)
+    return geolookup_resp
