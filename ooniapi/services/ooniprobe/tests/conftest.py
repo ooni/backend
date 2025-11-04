@@ -108,7 +108,7 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, clickhouse_server, fastpath_server):
+def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_server):
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
