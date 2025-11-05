@@ -598,7 +598,7 @@ class CollectorEntry(BaseModel):
     front: Optional[str] = Field(default=None, description="Fronted domain")
     type: Optional[str] = Field(default=None, description="Type of collector")
 
-@router.post("/collectors", tags=["ooniprobe"])
+@router.get("/collectors", tags=["ooniprobe"])
 def list_collectors(
     settings: Settings = Depends(get_settings),
     ) -> List[CollectorEntry]:
