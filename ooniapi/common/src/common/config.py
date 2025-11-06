@@ -41,3 +41,4 @@ class Settings(BaseSettings):
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
+    tor_targets: str = "" # path to json file containing Tor bridges and DirAuth endpoints
