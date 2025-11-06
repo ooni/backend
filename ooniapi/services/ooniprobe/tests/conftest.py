@@ -173,6 +173,7 @@ def test_settings(
         anonc_manifest_file="manifest.json",
         anonc_secret_key=secret_key,
         tor_targets="./tests/fixtures/data/tor-targets.json",
+        psiphon_conffile="./tests/fixtures/data/psiphon-config.json"
     )
 
 

@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     tor_targets: str = (
         ""  # filename of json containing Tor bridges and DirAuth endpoints
     )
+    psiphon_conffile: str = "" # path to psiphon config file
 
     # Used to store history of all manifests and retrieve next manifest to use
     anonc_manifest_bucket: str = Field(

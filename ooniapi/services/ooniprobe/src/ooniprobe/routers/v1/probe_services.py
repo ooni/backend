@@ -1091,3 +1091,45 @@ def list_tor_targets(
         return targets
     log.info("tor-targets: failed to receive tor-targets from s3")
     raise HTTPException(status_code=401, detail="Invalid tor-targets")
+
+
+class PsiphonServer(BaseModel):
+    OnlyAfterAttempts: int
+    SkipVerify: bool
+    URL: str
+
+
+class PsiphonConfig(BaseModel):
+    ClientPlatform: str
+    ClientVersion: str
+    EstablishTunnelTimeoutSeconds: int
+    LocalHttpProxyPort: int
+    LocalSocksProxyPort: int
+    PropagationChannelId: str
+    RemoteServerListDownloadFilename: str
+    RemoteServerListSignaturePublicKey: str
+    RemoteServerListURLs: List[PsiphonServer] = []
+    SponsorId: str
+    TargetApiProtocol: str
+    UseIndistinguishableTLS: bool
+
+
+@router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
+def psiphon_config(
+    request: Request,
+    settings: SettingsDep,
+    ) -> PsiphonConfig:
+
+    token = request.headers.get("Authorization")
+    if token == None:
+        # XXX not actually validated
+        pass
+    try:
+        with open(settings.psiphon_conffile, 'r') as f:
+            resp = ujson.load(f)
+        return resp
+    except FileNotFoundError:
+        log.info("psiphon-config: failed to open json")
+    except ujson.JSONDecodeError:
+        log.info("psiphon-config: failed to parse json")
+    raise HTTPException(status_code=401, detail="Invalid psiphon-config")
