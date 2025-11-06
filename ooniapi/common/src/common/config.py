@@ -41,3 +41,4 @@ class Settings(BaseSettings):
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
+    psiphon_conffile: str = "" # path to psiphon config file

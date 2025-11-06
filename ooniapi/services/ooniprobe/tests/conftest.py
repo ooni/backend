@@ -116,7 +116,8 @@ def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, f
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server
+        fastpath_url=fastpath_server,
+        psiphon_conffile="./tests/fixtures/data/psiphon-config.json"
     )
 
 

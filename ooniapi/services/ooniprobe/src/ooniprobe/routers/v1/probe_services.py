@@ -9,6 +9,7 @@ import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field
+import ujson
 
 from ...utils import (
     generate_report_id,
@@ -590,3 +591,45 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+
+class PsiphonServer(BaseModel):
+    OnlyAfterAttempts: int
+    SkipVerify: bool
+    URL: str
+
+
+class PsiphonConfig(BaseModel):
+    ClientPlatform: str
+    ClientVersion: str
+    EstablishTunnelTimeoutSeconds: int
+    LocalHttpProxyPort: int
+    LocalSocksProxyPort: int
+    PropagationChannelId: str
+    RemoteServerListDownloadFilename: str
+    RemoteServerListSignaturePublicKey: str
+    RemoteServerListURLs: List[PsiphonServer] = []
+    SponsorId: str
+    TargetApiProtocol: str
+    UseIndistinguishableTLS: bool
+
+
+@router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
+def list_tor_targets(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    ) -> PsiphonConfig:
+
+    token = request.headers.get("Authorization")
+    if token == None:
+        # XXX not actually validated
+        pass
+    try:
+        with open(settings.psiphon_conffile, 'r') as f:
+            resp = ujson.load(f)
+        return resp
+    except FileNotFoundError:
+        log.info("psiphon-config: failed to open json")
+    except ujson.JSONDecodeError:
+        log.info("psiphon-config: failed to parse json")
+    raise HTTPException(status_code=401, detail="Invalid psiphon-config")
