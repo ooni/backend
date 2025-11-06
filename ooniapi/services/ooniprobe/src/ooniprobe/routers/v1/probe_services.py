@@ -9,6 +9,7 @@ import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field
+import ujson
 
 from ...utils import (
     generate_report_id,
@@ -590,3 +591,31 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+
+class TorTarget(BaseModel):
+    address: str
+    fingerprint: str
+    name: Optional[str] = ''
+    protocol: str
+    params: Optional[Dict[str, List[str]]] = None
+
+@router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
+def list_tor_targets(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    ) -> Dict[str, TorTarget]:
+
+    token = request.headers.get("Authorization")
+    if token == None:
+        # XXX not actually validated
+        pass
+    try:
+        with open(settings.tor_targets, 'r') as f:
+            resp = ujson.load(f)
+        return resp
+    except ujson.JSONDecodeError:
+        log.info("tor-targets: failed to parse json")
+    except FileNotFoundError:
+         log.info("tor-targets: failed to open json")
+    raise HTTPException(status_code=401, detail="Invalid tor-targets")
