@@ -62,3 +62,4 @@ class Settings(BaseSettings):
             "type": "cloudfront",
         },
     ]
+    tor_targets: str = "" # path to json file containing Tor bridges and DirAuth endpoints
