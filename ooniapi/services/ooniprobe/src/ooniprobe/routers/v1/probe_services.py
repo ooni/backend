@@ -8,7 +8,7 @@ import geoip2
 import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
-from pydantic import Field
+from pydantic import Field, IPvAnyAddress
 
 from ...utils import (
     generate_report_id,
@@ -591,14 +591,17 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     return out
 
 
+class GeoLookupRequest(BaseModel):
+    addresses: List[IPvAnyAddress] = Field(description="list of IPv4 or IPv6 address to geolookup")
+
 class GeoLookupResponse(BaseModel):
     v: int = Field(description="response format version")
-    geolocation: Dict[str, Dict[str, str]] = Field(description="dict of ip addresses to dict of country code, ASN, AS Name strings")
+    geolocation: Dict[IPvAnyAddress, Dict[str, str]] = Field(description="dict of ip addresses to dict of country code, ASN, AS Name strings")
 
 
 @router.post("/geolookup", tags=["ooniprobe"])
 async def geolookup(
-        request: Request,
+        data: GeoLookupRequest,
         response: Response,
         cc_reader: CCReaderDep,
         asn_reader: ASNReaderDep,
@@ -609,12 +612,10 @@ async def geolookup(
     asn = "AS0"
 
     # extract addresses from request
-    json_body = await request.json()
-    ipaddrs = json_body.get("addresses", [])
-    geolocation: Dict[str, Any]=dict()
+    geolocation: Dict[IPvAnyAddress, Any]=dict()
 
     # for each address provided, call probe_geoip and add the data to our response
-    for ipaddr in ipaddrs:
+    for ipaddr in data.addresses:
         # call probe_geoip() and map the keys to the geolookup v1 API
         resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
         geolocation[ipaddr] = {"cc": resp["probe_cc"],
