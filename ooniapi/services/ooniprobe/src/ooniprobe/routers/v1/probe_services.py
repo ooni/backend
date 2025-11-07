@@ -591,12 +591,19 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     return out
 
 
+class GeoLookupResult(BaseModel):
+    cc: str = Field(description="Country Code")
+    asn: str = Field(description="Autonomous System Number (ASN)")
+    as_name: str = Field(description="Autonomous System Name")
+
+
 class GeoLookupRequest(BaseModel):
     addresses: List[IPvAnyAddress] = Field(description="list of IPv4 or IPv6 address to geolookup")
 
+
 class GeoLookupResponse(BaseModel):
-    v: int = Field(description="response format version")
-    geolocation: Dict[IPvAnyAddress, Dict[str, str]] = Field(description="dict of ip addresses to dict of country code, ASN, AS Name strings")
+    v: int = Field(description="response format version", default="1")
+    geolocation: Dict[IPvAnyAddress, GeoLookupResult] = Field(description="Dict of IP addresses to GeoLookupResult")
 
 
 @router.post("/geolookup", tags=["ooniprobe"])
@@ -610,18 +617,15 @@ async def geolookup(
     # initial values probe_geoip compares with
     probe_cc = "ZZ"
     asn = "AS0"
-
-    # extract addresses from request
-    geolocation: Dict[IPvAnyAddress, Any]=dict()
+    geolookup_resp = {"geolocation": {}}
 
     # for each address provided, call probe_geoip and add the data to our response
     for ipaddr in data.addresses:
         # call probe_geoip() and map the keys to the geolookup v1 API
         resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
-        geolocation[ipaddr] = {"cc": resp["probe_cc"],
-                               "asn": resp["probe_asn"],
-                               "as_name":resp["probe_network_name"]}
+        # it doesn't seem possible to have separate aliases for (de)serialization
+        geolookup_resp["geolocation"][ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
+            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
 
-    geolookup_resp = GeoLookupResponse(v=1, geolocation=geolocation)
     setnocacheresponse(response)
     return geolookup_resp
