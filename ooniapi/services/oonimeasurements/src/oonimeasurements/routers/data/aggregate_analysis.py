@@ -505,7 +505,7 @@ class ChangePointEntry(BaseModel):
     def from_row(cls, row: Dict[str, Any]) -> Self:
         """
         Takes a row as it comes from the clickhouse table 'event_detector_changepoints'
-        and converts it to a chagepoint entry
+        and converts it to a changepoint entry
         """
 
         def g(s : str) -> Any | None:
@@ -553,7 +553,7 @@ class ListChangePointsResponse(BaseModel):
 
 
 @router.get(
-    "/v1/detector/chagepoints",
+    "/v1/detector/changepoints",
     tags=["detector"],
     description="List changepoints detected by the event detector using the cusum algorithm",
     response_model=ListChangePointsResponse,

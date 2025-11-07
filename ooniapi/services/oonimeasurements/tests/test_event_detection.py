@@ -32,7 +32,7 @@ def getjsu(client, url, params={}):
 def test_changepoint_list_basic(client):
     resp = getjsu(
         client,
-        "/api/v1/detector/chagepoints",
+        "/api/v1/detector/changepoints",
     )
 
     assert "results" in resp, resp
@@ -65,7 +65,7 @@ def parse_dt(dt: str) -> datetime:
 def test_changepoint_filter_basic(client, filter_param, filter_value):
 
     resp = getjsu(
-        client, "/api/v1/detector/chagepoints", params={filter_param: filter_value}
+        client, "/api/v1/detector/changepoints", params={filter_param: filter_value}
     )
 
     assert len(resp["results"]) > 0, "No results to validate"
@@ -91,7 +91,7 @@ def test_changepoint_date_filter(client, since_param, until_param, expect_emtpy)
 
     resp = getj(
         client,
-        "/api/v1/detector/chagepoints",
+        "/api/v1/detector/changepoints",
         params={"since": since_param, "until": until_param},
     )
 
@@ -107,7 +107,7 @@ def test_changepoint_change_dir_values(client):
 
     resp = getjsu(
         client,
-        "/api/v1/detector/chagepoints",
+        "/api/v1/detector/changepoints",
     )
 
     assert len(resp["results"]) > 0, "Not enough data to validate"
@@ -116,7 +116,7 @@ def test_changepoint_change_dir_values(client):
 
     resp = getjsu(
         client,
-        "/api/v1/detector/chagepoints",
+        "/api/v1/detector/changepoints",
         {"probe_cc": "VE", "probe_asn": 15169, "domain": "google.com"},
     )
 
@@ -124,7 +124,7 @@ def test_changepoint_change_dir_values(client):
 
     resp = getjsu(
         client,
-        "/api/v1/detector/chagepoints",
+        "/api/v1/detector/changepoints",
         {"probe_cc": "VE", "probe_asn": 8048, "domain": "amazon.com"},
     )
 
