@@ -1,12 +1,14 @@
+from functools import lru_cache
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict, Tuple, Optional
+from typing import Annotated, List, Optional, Any, Dict, Tuple, Optional
 import random
 
+from fastapi.responses import JSONResponse
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, Request
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field
 
@@ -21,8 +23,8 @@ from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
-from ...common.utils import setnocacheresponse
-from ...prio import generate_test_list
+from ...common.utils import setnocacheresponse, cachedjson, setcacheresponse
+from ...prio import CTZ, FailoverTestListDep, failover_generate_test_list, generate_test_list, failover_fetch_citizenlab_data
 
 router = APIRouter(prefix="/v1")
 
@@ -589,4 +591,96 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     out = []
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
+    return out
+
+class TestListUrlsMeta(BaseModel):
+    count: int
+    current_page: int
+    limit: int
+    next_url: str
+    pages: int
+
+class TestListUrlsResult(BaseModel):
+    category_code: str
+    country_code: str
+    url: str
+
+class TestListUrlsResponse(BaseModel):
+    """
+    URL test list
+    """
+    metadata: TestListUrlsMeta
+    results: List[TestListUrlsResult]
+
+@router.get("/test-list/urls")
+def list_test_urls(
+    country_code : Annotated[
+        str,
+        Query(
+            description="Two letter, uppercase country code",
+            min_length=2, max_length=2,
+            alias="probe_cc",
+            default="ZZ"
+            )
+    ],
+    category_codes : Annotated[
+        str,
+        Query(
+            description="Comma separated list of URL categories, all uppercase",
+            regex=r"[A-Z,]*"
+        )
+    ],
+    limit: Annotated [
+        int,
+        Query(
+            description="Maximum number of URLs to return",
+            default=-1,
+            le=9999
+        )
+    ],
+    debug: Annotated [
+        bool,
+        Query(
+            description="Include measurement counts and priority",
+            default=False
+        )
+    ],
+    clickhouse: ClickhouseDep,
+    failover_test_items: FailoverTestListDep,
+    response: Response
+) -> TestListUrlsResponse | JSONResponse:
+    """
+    Generate test URL list with prioritization
+    """
+    try:
+        country_code = country_code.upper()
+        category_codes_list = category_codes.split(",")
+        if limit == -1:
+            limit = 9999
+    except Exception as e:
+        log.error(e, exc_info=True)
+        return cachedjson("0s")
+
+    try:
+        test_items, _1, _2 = generate_test_list(clickhouse,
+            country_code, category_codes_list, 0, limit, debug
+        )
+    except Exception as e:
+        log.error(e, exc_info=True)
+        # failover_generate_test_list runs without any database interaction
+        test_items = failover_generate_test_list(failover_test_items, tuple(category_codes_list), limit)
+
+    # TODO: remove current_page / next_url / pages ?
+    # metrics.gauge("test-list-urls-count", len(test_items))
+    out = TestListUrlsResponse(
+        metadata=TestListUrlsMeta(
+            count = len(test_items),
+            current_page=-1,
+            limit=-1,
+            next_url="",
+            pages=1
+        ),
+        results=test_items
+    )
+    setcacheresponse("1s", response)
     return out

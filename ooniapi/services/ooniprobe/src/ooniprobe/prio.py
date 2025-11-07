@@ -21,11 +21,17 @@ blockdiag {
 ```
 """
 
-from typing import List, Tuple
+from functools import lru_cache
+import random
+from typing import Annotated, Dict, List, Tuple
 import logging
+
+from fastapi import Depends
+from pydantic import BaseModel
 
 from .common.clickhouse_utils import query_click
 from .common.metrics import timer
+from .dependencies import ClickhouseDep
 
 from clickhouse_driver import Client as Clickhouse
 import sqlalchemy as sa
@@ -155,3 +161,56 @@ def generate_test_list(
     if debug:
         return out, entries, prio_rules
     return out, (), ()
+
+
+class CTZ(BaseModel):
+    url: str
+    category_code: str
+
+def failover_fetch_citizenlab_data(clickhouse : Clickhouse) -> Dict[str, List[CTZ]]:
+    """
+    Fetches the citizenlab table from the database.
+    Used only once at startime for failover.
+    """
+
+    log.info("Started failover_fetch_citizenlab_data")
+
+    sql = """SELECT category_code, url
+    FROM citizenlab
+    WHERE cc = 'ZZ'
+    """
+
+    out: Dict[str, List[CTZ]] = {}
+    query = query_click(clickhouse, sql, {}, query_prio=1)
+    for e in query:
+        catcode = e["category_code"]
+        c = CTZ(url=e["url"], category_code=catcode)
+        out.setdefault(catcode, []).append(c)
+
+    log.info("Fetch done: %d" % len(out))
+    return out
+
+@lru_cache
+def failover_test_lists_cache(clickhouse : ClickhouseDep):
+    return failover_fetch_citizenlab_data(clickhouse)
+
+FailoverTestListDep = Annotated[Dict[str, List[CTZ]], Depends(failover_test_lists_cache)]
+
+def failover_generate_test_list(failover_test_items: Dict[str, List[CTZ]], category_codes: tuple | None, limit: int):
+    if not category_codes:
+        category_codes = tuple(failover_test_items.keys())
+
+    candidates: List[CTZ] = []
+    for catcode in category_codes:
+        if catcode not in failover_test_items:
+            continue
+        new = failover_test_items[catcode]
+        candidates.extend(new)
+
+    limit = min(limit, len(candidates))
+    selected = random.sample(candidates, k=limit)
+    out = [
+        dict(category_code=entry.category_code, url=entry.url, country_code="XX")
+        for entry in selected
+    ]
+    return out
