@@ -157,7 +157,6 @@ def generate_test_list(
         out.append(i)
         if len(out) >= limit:
             break
-
     if debug:
         return out, entries, prio_rules
     return out, (), ()

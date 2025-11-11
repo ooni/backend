@@ -1,8 +1,7 @@
-from functools import lru_cache
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import Annotated, List, Optional, Any, Dict, Tuple, Optional
+from typing import Annotated, List, Optional, Any, Dict, Tuple
 import random
 
 from fastapi.responses import JSONResponse
@@ -24,7 +23,7 @@ from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
 from ...common.utils import setnocacheresponse, cachedjson, setcacheresponse
-from ...prio import CTZ, FailoverTestListDep, failover_generate_test_list, generate_test_list, failover_fetch_citizenlab_data
+from ...prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 router = APIRouter(prefix="/v1")
 
@@ -614,41 +613,38 @@ class TestListUrlsResponse(BaseModel):
 
 @router.get("/test-list/urls")
 def list_test_urls(
+    clickhouse: ClickhouseDep,
+    failover_test_items: FailoverTestListDep,
+    response: Response,
+    category_codes : Annotated[
+        str,
+        Query(
+            description="Comma separated list of URL categories, all uppercase",
+            pattern=r"[A-Z,]*"
+        )
+    ],
     country_code : Annotated[
         str,
         Query(
             description="Two letter, uppercase country code",
             min_length=2, max_length=2,
             alias="probe_cc",
-            default="ZZ"
             )
-    ],
-    category_codes : Annotated[
-        str,
-        Query(
-            description="Comma separated list of URL categories, all uppercase",
-            regex=r"[A-Z,]*"
-        )
-    ],
+    ] = "ZZ",
     limit: Annotated [
         int,
         Query(
             description="Maximum number of URLs to return",
-            default=-1,
             le=9999
         )
-    ],
+    ] = -1,
     debug: Annotated [
         bool,
         Query(
             description="Include measurement counts and priority",
-            default=False
         )
-    ],
-    clickhouse: ClickhouseDep,
-    failover_test_items: FailoverTestListDep,
-    response: Response
-) -> TestListUrlsResponse | JSONResponse:
+    ] = False
+) -> TestListUrlsResponse | Dict[str, Any]:
     """
     Generate test URL list with prioritization
     """
@@ -659,7 +655,8 @@ def list_test_urls(
             limit = 9999
     except Exception as e:
         log.error(e, exc_info=True)
-        return cachedjson("0s")
+        setnocacheresponse(response)
+        return {}
 
     try:
         test_items, _1, _2 = generate_test_list(clickhouse,

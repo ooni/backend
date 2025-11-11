@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import shutil
 import os
+import json
 from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
+from ooniprobe.common.clickhouse_utils import insert_click
 from ooniprobe.common.dependencies import get_settings
 from ooniprobe.dependencies import get_s3_client
 from ooniprobe.main import app
@@ -78,7 +80,7 @@ JWT_ENCRYPTION_KEY = "super_secure"
 @pytest.fixture(scope="session")
 def fixture_path():
     """
-    Directory for this fixtures used to store temporary data, will be 
+    Directory for this fixtures used to store temporary data, will be
     deleted after the tests are finished
     """
     FIXTURE_PATH = Path(os.path.dirname(os.path.realpath(__file__))) / "data"
@@ -169,9 +171,26 @@ def fastpath_server(docker_ip, docker_services):
     )
     yield url
 
-def is_fastpath_running(url: str) -> bool: 
-    try: 
+def is_fastpath_running(url: str) -> bool:
+    try:
         resp = urlopen(url)
         return resp.status == 200
     except:
         return False
+
+@pytest.fixture
+def load_url_priorities(clickhouse_db):
+    path = Path("tests/fixtures/data")
+    filename = "url_priorities_us.json"
+    file = Path(path, filename)
+
+    with file.open("r") as f:
+        j = json.load(f)
+
+    # 'sign' is created with default value 0, causing a db error.
+    # use 1 to prevent it
+    for row in j:
+        row["sign"] = 1
+
+    query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
+    insert_click(clickhouse_db, query, j)
