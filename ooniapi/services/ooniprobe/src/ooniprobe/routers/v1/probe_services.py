@@ -617,12 +617,12 @@ def list_test_urls(
     failover_test_items: FailoverTestListDep,
     response: Response,
     category_codes : Annotated[
-        str,
+        str | None,
         Query(
             description="Comma separated list of URL categories, all uppercase",
             pattern=r"[A-Z,]*"
         )
-    ],
+    ] = None,
     country_code : Annotated[
         str,
         Query(
@@ -650,7 +650,7 @@ def list_test_urls(
     """
     try:
         country_code = country_code.upper()
-        category_codes_list = category_codes.split(",")
+        category_codes_list = category_codes.split(",") if category_codes else None
         if limit == -1:
             limit = 9999
     except Exception as e:
@@ -665,7 +665,7 @@ def list_test_urls(
     except Exception as e:
         log.error(e, exc_info=True)
         # failover_generate_test_list runs without any database interaction
-        test_items = failover_generate_test_list(failover_test_items, tuple(category_codes_list), limit)
+        test_items = failover_generate_test_list(failover_test_items, category_codes_list, limit)
 
     # TODO: remove current_page / next_url / pages ?
     # metrics.gauge("test-list-urls-count", len(test_items)) # TODO Add this metric

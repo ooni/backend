@@ -124,7 +124,7 @@ def fetch_prioritization_rules(clickhouse_db: Clickhouse, cc: str) -> tuple:
 def generate_test_list(
     clickhouse: Clickhouse,
     country_code: str,
-    category_codes: List,
+    category_codes: List[str] | None,
     probe_asn: int,
     limit: int,
     debug: bool,
@@ -195,9 +195,9 @@ def failover_test_lists_cache(clickhouse : ClickhouseDep):
 
 FailoverTestListDep = Annotated[Dict[str, List[CTZ]], Depends(failover_test_lists_cache)]
 
-def failover_generate_test_list(failover_test_items: Dict[str, List[CTZ]], category_codes: tuple | None, limit: int):
+def failover_generate_test_list(failover_test_items: Dict[str, List[CTZ]], category_codes: List[str] | None, limit: int):
     if not category_codes:
-        category_codes = tuple(failover_test_items.keys())
+        category_codes = list(failover_test_items.keys())
 
     candidates: List[CTZ] = []
     for catcode in category_codes:
