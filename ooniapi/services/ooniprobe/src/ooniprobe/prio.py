@@ -166,7 +166,8 @@ class CTZ(BaseModel):
     url: str
     category_code: str
 
-def failover_fetch_citizenlab_data(clickhouse : Clickhouse) -> Dict[str, List[CTZ]]:
+
+def failover_fetch_citizenlab_data(clickhouse: Clickhouse) -> Dict[str, List[CTZ]]:
     """
     Fetches the citizenlab table from the database.
     Used only once at startime for failover.
@@ -189,13 +190,22 @@ def failover_fetch_citizenlab_data(clickhouse : Clickhouse) -> Dict[str, List[CT
     log.info("Fetch done: %d" % len(out))
     return out
 
+
 @lru_cache
-def failover_test_lists_cache(clickhouse : ClickhouseDep):
+def failover_test_lists_cache(clickhouse: ClickhouseDep):
     return failover_fetch_citizenlab_data(clickhouse)
 
-FailoverTestListDep = Annotated[Dict[str, List[CTZ]], Depends(failover_test_lists_cache)]
 
-def failover_generate_test_list(failover_test_items: Dict[str, List[CTZ]], category_codes: List[str] | None, limit: int):
+FailoverTestListDep = Annotated[
+    Dict[str, List[CTZ]], Depends(failover_test_lists_cache)
+]
+
+
+def failover_generate_test_list(
+    failover_test_items: Dict[str, List[CTZ]],
+    category_codes: List[str] | None,
+    limit: int,
+):
     if not category_codes:
         category_codes = list(failover_test_items.keys())
 

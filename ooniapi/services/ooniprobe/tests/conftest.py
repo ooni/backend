@@ -77,6 +77,7 @@ def client_with_bad_settings():
 
 JWT_ENCRYPTION_KEY = "super_secure"
 
+
 @pytest.fixture(scope="session")
 def fixture_path():
     """
@@ -91,6 +92,7 @@ def fixture_path():
         shutil.rmtree(FIXTURE_PATH)
     except FileNotFoundError:
         pass
+
 
 @pytest.fixture()
 def geoip_db_dir(fixture_path):
@@ -109,7 +111,9 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, fastpath_server):
+def test_settings(
+    alembic_migration, docker_ip, docker_services, geoip_db_dir, fastpath_server
+):
     port = docker_services.port_for("clickhouse", 9000)
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
@@ -118,7 +122,7 @@ def test_settings(alembic_migration, docker_ip, docker_services, geoip_db_dir, f
         clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server
+        fastpath_url=fastpath_server,
     )
 
 
@@ -151,6 +155,7 @@ def clickhouse_server(docker_ip, docker_services):
 def clickhouse_db(clickhouse_server):
     yield ClickhouseClient.from_url(clickhouse_server)
 
+
 class S3ClientMock:
 
     def __init__(self) -> None:
@@ -159,8 +164,10 @@ class S3ClientMock:
     def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
         self.files.append(f"{Bucket}/{Key}")
 
+
 def get_s3_client_mock() -> S3ClientMock:
     return S3ClientMock()
+
 
 @pytest.fixture(scope="session")
 def fastpath_server(docker_ip, docker_services):
@@ -171,12 +178,14 @@ def fastpath_server(docker_ip, docker_services):
     )
     yield url
 
+
 def is_fastpath_running(url: str) -> bool:
     try:
         resp = urlopen(url)
         return resp.status == 200
     except:
         return False
+
 
 @pytest.fixture
 def load_url_priorities(clickhouse_db):

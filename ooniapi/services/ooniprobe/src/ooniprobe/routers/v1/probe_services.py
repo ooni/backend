@@ -4,7 +4,6 @@ import time
 from typing import Annotated, List, Optional, Any, Dict, Tuple
 import random
 
-from fastapi.responses import JSONResponse
 import geoip2
 import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, Request
@@ -22,7 +21,7 @@ from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
-from ...common.utils import setnocacheresponse, cachedjson, setcacheresponse
+from ...common.utils import setnocacheresponse, setcacheresponse
 from ...prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 router = APIRouter(prefix="/v1")
@@ -596,6 +595,7 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
         out.append({"address": th_addr, "type": "https"})
     return out
 
+
 class TestListUrlsMeta(BaseModel):
     count: int
     current_page: int
@@ -603,51 +603,52 @@ class TestListUrlsMeta(BaseModel):
     next_url: str
     pages: int
 
+
 class TestListUrlsResult(BaseModel):
     category_code: str
     country_code: str
     url: str
 
+
 class TestListUrlsResponse(BaseModel):
     """
     URL test list
     """
+
     metadata: TestListUrlsMeta
     results: List[TestListUrlsResult]
+
 
 @router.get("/test-list/urls")
 def list_test_urls(
     clickhouse: ClickhouseDep,
     failover_test_items: FailoverTestListDep,
     response: Response,
-    category_codes : Annotated[
+    category_codes: Annotated[
         str | None,
         Query(
             description="Comma separated list of URL categories, all uppercase",
-            pattern=r"[A-Z,]*"
-        )
+            pattern=r"[A-Z,]*",
+        ),
     ] = None,
-    country_code : Annotated[
+    country_code: Annotated[
         str,
         Query(
             description="Two letter, uppercase country code",
-            min_length=2, max_length=2,
+            min_length=2,
+            max_length=2,
             alias="probe_cc",
-            )
+        ),
     ] = "ZZ",
-    limit: Annotated [
-        int,
-        Query(
-            description="Maximum number of URLs to return",
-            le=9999
-        )
+    limit: Annotated[
+        int, Query(description="Maximum number of URLs to return", le=9999)
     ] = -1,
-    debug: Annotated [
+    debug: Annotated[
         bool,
         Query(
             description="Include measurement counts and priority",
-        )
-    ] = False
+        ),
+    ] = False,
 ) -> TestListUrlsResponse | Dict[str, Any]:
     """
     Generate test URL list with prioritization
@@ -663,25 +664,23 @@ def list_test_urls(
         return {}
 
     try:
-        test_items, _1, _2 = generate_test_list(clickhouse,
-            country_code, category_codes_list, 0, limit, debug
+        test_items, _1, _2 = generate_test_list(
+            clickhouse, country_code, category_codes_list, 0, limit, debug
         )
     except Exception as e:
         log.error(e, exc_info=True)
         # failover_generate_test_list runs without any database interaction
-        test_items = failover_generate_test_list(failover_test_items, category_codes_list, limit)
+        test_items = failover_generate_test_list(
+            failover_test_items, category_codes_list, limit
+        )
 
     # TODO: remove current_page / next_url / pages ?
     Metrics.TEST_LIST_URLS_COUNT.set(len(test_items))
     out = TestListUrlsResponse(
         metadata=TestListUrlsMeta(
-            count = len(test_items),
-            current_page=-1,
-            limit=-1,
-            next_url="",
-            pages=1
+            count=len(test_items), current_page=-1, limit=-1, next_url="", pages=1
         ),
-        results=[TestListUrlsResult(**item) for item in test_items]
+        results=[TestListUrlsResult(**item) for item in test_items],
     )
     setcacheresponse("1s", response)
     return out

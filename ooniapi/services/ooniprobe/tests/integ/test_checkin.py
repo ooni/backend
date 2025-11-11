@@ -1,5 +1,3 @@
-
-
 def getjson(client, url):
     response = client.get(url)
     assert response.status_code == 200
@@ -22,6 +20,7 @@ def postj(client, url, **kw):
     response = client.post(url, json=kw)
     assert response.status_code == 200
     return response.json()
+
 
 ## Tests
 

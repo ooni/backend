@@ -1,15 +1,18 @@
 import json
 import zstd
 
+
 def postj(client, url, json):
     response = client.post(url, json=json)
     assert response.status_code == 200, response.json()
     return response.json()
 
+
 def post(client, url, data, headers=None):
     response = client.post(url, data=data, headers=headers)
     assert response.status_code == 200
     return response.json()
+
 
 def test_collector_open_report(client):
     j = {
@@ -32,10 +35,12 @@ def test_collector_open_report(client):
     }
     assert len(rid) == 61, rid
 
+
 def test_collector_upload_msmt_bogus(client):
     j = dict(format="json", content=dict(test_keys={}))
     resp = client.post("/report/bogus", json=j)
     assert resp.status_code == 400, resp
+
 
 def test_collector_upload_msmt_valid(client):
     # open report, upload
@@ -59,11 +64,12 @@ def test_collector_upload_msmt_valid(client):
     assert len(rid) == 61, rid
 
     msmt = dict(test_keys={})
-    c = postj(client, f"/report/{rid}", {"format":"json", "content":msmt})
+    c = postj(client, f"/report/{rid}", {"format": "json", "content": msmt})
     assert c == {}
 
     c = postj(client, f"/report/{rid}/close", json={})
     assert c == {}
+
 
 def test_collector_upload_msmt_valid_zstd(client):
     rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
