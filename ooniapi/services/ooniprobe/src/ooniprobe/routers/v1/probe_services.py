@@ -64,6 +64,10 @@ class Metrics:
         "geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN"
     )
 
+    TEST_LIST_URLS_COUNT = Gauge(
+        "test_list_urls_count", "How many urls were generated for a test list"
+    )
+
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -668,7 +672,7 @@ def list_test_urls(
         test_items = failover_generate_test_list(failover_test_items, category_codes_list, limit)
 
     # TODO: remove current_page / next_url / pages ?
-    # metrics.gauge("test-list-urls-count", len(test_items)) # TODO Add this metric
+    Metrics.TEST_LIST_URLS_COUNT.set(len(test_items))
     out = TestListUrlsResponse(
         metadata=TestListUrlsMeta(
             count = len(test_items),
