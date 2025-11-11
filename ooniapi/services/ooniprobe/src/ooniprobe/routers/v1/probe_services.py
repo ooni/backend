@@ -671,7 +671,7 @@ def list_test_urls(
         test_items = failover_generate_test_list(failover_test_items, tuple(category_codes_list), limit)
 
     # TODO: remove current_page / next_url / pages ?
-    # metrics.gauge("test-list-urls-count", len(test_items))
+    # metrics.gauge("test-list-urls-count", len(test_items)) # TODO Add this metric
     out = TestListUrlsResponse(
         metadata=TestListUrlsMeta(
             count = len(test_items),
@@ -680,7 +680,7 @@ def list_test_urls(
             next_url="",
             pages=1
         ),
-        results=test_items
+        results=[TestListUrlsResult(**item) for item in test_items]
     )
     setcacheresponse("1s", response)
     return out
