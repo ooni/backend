@@ -1,10 +1,11 @@
 import logging
-from fastapi import APIRouter, HTTPException, Response, Request
 from typing import List, Optional, Any, Dict
+
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import Field
 
-from ..common.utils import setnocacheresponse
-from ..common.routers import BaseModel
+from ooniprobe.common.utils import setnocacheresponse
+from ooniprobe.common.routers import BaseModel
 
 router = APIRouter(prefix="/bouncer")
 
@@ -36,13 +37,15 @@ class NetTest(BaseModel):
 class NetTestRequest(BaseModel):
     name: str
     version: str
-    
+
+
 class NetTestsRequest(BaseModel):
     nettests: List[NetTestRequest] = Field(alias="net-tests")
 
+
 class NetTestResponse(BaseModel):
     nettests: List[NetTest] = Field(alias="net-tests")
-    
+
 
 @router.post("/net-tests", tags=["bouncer"], response_model=NetTestResponse)
 async def bouncer_net_tests(
