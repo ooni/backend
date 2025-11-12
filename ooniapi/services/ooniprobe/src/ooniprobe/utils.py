@@ -147,6 +147,7 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
         "AS{}".format(resp.autonomous_system_number),
         resp.autonomous_system_organization or "0",
     )
+
   
 def get_first_ip(headers: str) -> str:
     """
@@ -158,9 +159,10 @@ def get_first_ip(headers: str) -> str:
     """
     return headers.partition(',')[0]
 
+
 def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
     """
-    Reads the content of `file` within `bucket` into a  string
+    Reads the content of `file` within `bucket` into a string
 
     Useful for reading config files from the s3 bucket
     """
