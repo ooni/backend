@@ -221,7 +221,7 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
@@ -274,9 +274,13 @@ def compare_probe_msmt_cc_asn(
             Metrics.PROBE_CC_ASN_MATCH.inc()
         elif db_probe_cc != cc:
             log.error(f"db_cc != cc: {db_probe_cc} != {cc}")
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc", reported=cc, detected=db_probe_cc).inc()
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(
+                mismatch="cc", reported=cc, detected=db_probe_cc
+            ).inc()
         elif db_asn != asn:
             log.error(f"db_asn != asn: {db_asn} != {asn}")
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn", reported=asn, detected=db_asn).inc()
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(
+                mismatch="asn", reported=asn, detected=db_asn
+            ).inc()
     except Exception:
         pass

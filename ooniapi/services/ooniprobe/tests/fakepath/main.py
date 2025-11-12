@@ -11,5 +11,4 @@ app = FastAPI()
 
 @app.get("/")
 def health():
-    return 
-
+    return
