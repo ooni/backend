@@ -150,7 +150,7 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
 
 def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
     """
-    Reads the content of `file` within `bucket` into a string
+    Reads the content of `file` within `bucket` into a  string
 
     Useful for reading config files from the s3 bucket
     """
