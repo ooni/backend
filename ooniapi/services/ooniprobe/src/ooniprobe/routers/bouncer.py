@@ -49,16 +49,14 @@ class NetTestResponse(BaseModel):
 
 @router.post("/net-tests", tags=["bouncer"], response_model=NetTestResponse)
 async def bouncer_net_tests(
-    request: Request,
-    response: Response
+    response: Response,
+    request: NetTestsRequest,
 ) -> Dict[str, List[NetTest]]:
+
     try:
-        data = await request.json()
-        ntr = NetTestsRequest(**data)
-        nt = ntr.nettests[0] # TODO: compose response for list of requested net-tests
-        name = nt.name
-        version = nt.version
-    except Exception:
+        name = request.nettests[0].name
+        version = request.nettests[0].version
+    except IndexError:
         raise HTTPException(status_code=401, detail="invalid net-tests request")
 
     # TODO: load this json from environment or filepath
