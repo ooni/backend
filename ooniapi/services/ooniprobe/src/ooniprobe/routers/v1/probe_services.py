@@ -17,7 +17,6 @@ from ...utils import (
     lookup_probe_network,
 )
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
-from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
@@ -81,7 +80,7 @@ class ProbeLoginResponse(BaseModel):
 def probe_login_post(
     probe_login: ProbeLogin,
     response: Response,
-    settings: Settings = Depends(get_settings),
+    settings: SettingsDep,
 ) -> ProbeLoginResponse:
 
     if probe_login.username is None or probe_login.password is None:
@@ -151,7 +150,7 @@ class ProbeRegisterResponse(BaseModel):
 def probe_register_post(
     probe_register: ProbeRegister,
     response: Response,
-    settings: Settings = Depends(get_settings),
+    settings: SettingsDep,
 ) -> ProbeRegisterResponse:
     """Probe Services: Register
 
@@ -590,3 +589,21 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     for th_addr in th_list:
         out.append({"address": th_addr, "type": "https"})
     return out
+
+
+class CollectorEntry(BaseModel):
+    # not actually used but necessary to be compliant with the old API schema
+    address: str = Field(description="Address of collector")
+    front: Optional[str] = Field(default=None, description="Fronted domain")
+    type: Optional[str] = Field(default=None, description="Type of collector")
+
+@router.get("/collectors", tags=["ooniprobe"])
+def list_collectors(
+    settings: SettingsDep,
+    ) -> List[CollectorEntry]:
+    config_collectors = settings.collectors
+    collectors_response = []
+    for entry in config_collectors:
+        collector = CollectorEntry(**entry)
+        collectors_response.append(collector)
+    return collectors_response
