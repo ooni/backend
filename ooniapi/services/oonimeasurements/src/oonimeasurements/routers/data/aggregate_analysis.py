@@ -30,6 +30,12 @@ AggregationKeys = Literal[
 ]
 
 
+def nan_to_none(val):
+    if math.isnan(val):
+        return None
+    return val
+
+
 class DBStats(BaseModel):
     bytes: int
     elapsed_seconds: float
@@ -176,26 +182,141 @@ P(D) + P(B) does not = 1!
 """
 
 
-def format_aggregate_query(extra_cols: Dict[str, str], where: str):
-    return f"""
+def format_aggregate_query(
+    extra_cols: Dict[str, str], where: str, split_dns_outcome: bool = False
+) -> Tuple[str, List[str]]:
+    dns_inner_select = """
+    topKWeighted(10, 3, 'counts')(
+        IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
+        toInt8(dns_blocked * 100)
+    ) as top_dns_failures_by_impact,
+
+    quantile(0.95)(dns_blocked) as dns_blocked_q,
+    quantile(0.95)(dns_down) as dns_down_q,
+    quantile(0.95)(dns_ok) as dns_ok_q,
+    """
+    dns_multi_if = """
+    x.2 = 'dns',
+    (CONCAT(x.2, '.', dns_blocked_outcome), dns_blocked),
+    """
+    dns_array_filter = """
+    (dns_blocked, 'dns'),
+    """
+    dns_outer_select = """
+    dns_blocked_q as dns_blocked,
+    dns_down_q as dns_down,
+    dns_ok_q as dns_ok,
+
+    arrayFirst(x -> TRUE, top_dns_failures_by_impact).1 as dns_blocked_outcome,
+    """
+
+    fixed_cols = [
+        "probe_analysis",
+        "count",
+        "tls_blocked",
+        "tls_down",
+        "tls_ok",
+        "tcp_blocked",
+        "tcp_down",
+        "tcp_ok",
+        "dns_blocked",
+        "dns_down",
+        "dns_ok",
+        "dns_blocked_outcome",
+        "tcp_blocked_outcome",
+        "tls_blocked_outcome",
+        "likely_blocked_protocols",
+        "blocked_max_protocol",
+    ]
+    if split_dns_outcome:
+        extra_cols["is_isp_resolver"] = (
+            "IF(resolver_asn = probe_asn, 1, 0) as is_isp_resolver"
+        )
+
+        dns_inner_select = """
+        topKWeightedIf(10, 3, 'counts')(
+            IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
+            toInt8(dns_blocked * 100),
+            is_isp_resolver = 1
+        ) as top_dns_isp_failures_by_impact,
+
+        topKWeightedIf(10, 3, 'counts')(
+            IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
+            toInt8(dns_blocked * 100),
+            is_isp_resolver = 0
+        ) as top_dns_other_failures_by_impact,
+
+        quantileIf(0.95)(dns_blocked, is_isp_resolver = 1) as dns_isp_blocked_q,
+        quantileIf(0.95)(dns_down, is_isp_resolver = 1) as dns_isp_down_q,
+        quantileIf(0.95)(dns_ok, is_isp_resolver = 1) as dns_isp_ok_q,
+
+        quantileIf(0.95)(dns_blocked, is_isp_resolver = 0) as dns_other_blocked_q,
+        quantileIf(0.95)(dns_down, is_isp_resolver = 0) as dns_other_down_q,
+        quantileIf(0.95)(dns_ok, is_isp_resolver = 0) as dns_other_ok_q,
+        """
+        dns_multi_if = """
+        x.2 = 'dns_isp',
+        (CONCAT(x.2, '.', dns_isp_blocked_outcome), dns_isp_blocked),
+        x.2 = 'dns_other',
+        (CONCAT(x.2, '.', dns_other_blocked_outcome), dns_other_blocked),
+        """
+        dns_array_filter = """
+        (dns_isp_blocked, 'dns_isp'),
+        (dns_other_blocked, 'dns_other'),
+        """
+        dns_outer_select = """
+        dns_isp_blocked_q as dns_isp_blocked,
+        dns_isp_down_q as dns_isp_down,
+        dns_isp_ok_q as dns_isp_ok,
+
+        dns_other_blocked_q as dns_other_blocked,
+        dns_other_down_q as dns_other_down,
+        dns_other_ok_q as dns_other_ok,
+
+        arrayFirst(x -> TRUE, top_dns_isp_failures_by_impact).1 as dns_isp_blocked_outcome,
+
+        arrayFirst(x -> TRUE, top_dns_other_failures_by_impact).1 as dns_other_blocked_outcome,
+        """
+
+        fixed_cols = [
+            "probe_analysis",
+            "count",
+            "tls_blocked",
+            "tls_down",
+            "tls_ok",
+            "tcp_blocked",
+            "tcp_down",
+            "tcp_ok",
+            "dns_isp_blocked",
+            "dns_isp_down",
+            "dns_isp_ok",
+            "dns_other_blocked",
+            "dns_other_down",
+            "dns_other_ok",
+            "dns_isp_blocked_outcome",
+            "dns_other_blocked_outcome",
+            "tcp_blocked_outcome",
+            "tls_blocked_outcome",
+            "likely_blocked_protocols",
+            "blocked_max_protocol",
+        ]
+
+    extra_cols_list = list(extra_cols.keys())
+    q = f"""
     SELECT
     {",".join(extra_cols.keys())},
     probe_analysis,
     count,
 
-    dns_blocked_q99 as dns_blocked,
-    dns_down_q99 as dns_down,
-    dns_ok_q99 as dns_ok,
+    tcp_blocked_q as tcp_blocked,
+    tcp_down_q as tcp_down,
+    tcp_ok_q as tcp_ok,
 
-    tcp_blocked_q99 as tcp_blocked,
-    tcp_down_q99 as tcp_down,
-    tcp_ok_q99 as tcp_ok,
+    tls_blocked_q as tls_blocked,
+    tls_down_q as tls_down,
+    tls_ok_q as tls_ok,
 
-    tls_blocked_q99 as tls_blocked,
-    tls_down_q99 as tls_down,
-    tls_ok_q99 as tls_ok,
-
-    arrayFirst(x -> TRUE, top_dns_failures_by_impact).1 as dns_blocked_outcome,
+    {dns_outer_select}
 
     arrayFirst(x -> TRUE, top_tcp_failures_by_impact).1 as tcp_blocked_outcome,
 
@@ -203,8 +324,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
 
     arrayMap(
         x -> multiIf(
-            x.2 = 'dns',
-            (CONCAT(x.2, '.', dns_blocked_outcome), dns_blocked),
+            {dns_multi_if}
             x.2 = 'tcp',
             (CONCAT(x.2, '.', tcp_blocked_outcome), tcp_blocked),
             x.2 = 'tls',
@@ -216,7 +336,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
             arrayFilter(
                 x -> x.1 > 0.5,
                 [
-                    (dns_blocked, 'dns'),
+                    {dns_array_filter}
                     (tcp_blocked, 'tcp'),
                     (tls_blocked, 'tls')
                 ]
@@ -245,11 +365,6 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
             anyHeavy(top_probe_analysis) as probe_analysis,
 
             topKWeighted(10, 3, 'counts')(
-                IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure),
-                toInt8(dns_blocked * 100)
-            ) as top_dns_failures_by_impact,
-
-            topKWeighted(10, 3, 'counts')(
                 IF(startsWith(top_tcp_failure, 'unknown_failure'), 'unknown_failure', top_tcp_failure),
                 toInt8(tcp_blocked * 100)
             ) as top_tcp_failures_by_impact,
@@ -259,25 +374,317 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
                 toInt8(tls_blocked * 100)
             ) as top_tls_failures_by_impact,
 
-            quantile(0.95)(dns_blocked) as dns_blocked_q99,
-            quantile(0.95)(dns_down) as dns_down_q99,
-            quantile(0.95)(dns_ok) as dns_ok_q99,
+            {dns_inner_select}
 
-            quantile(0.95)(tcp_blocked) as tcp_blocked_q99,
-            quantile(0.95)(tcp_down) as tcp_down_q99,
-            quantile(0.95)(tcp_ok) as tcp_ok_q99,
+            quantile(0.95)(tcp_blocked) as tcp_blocked_q,
+            quantile(0.95)(tcp_down) as tcp_down_q,
+            quantile(0.95)(tcp_ok) as tcp_ok_q,
 
-            quantile(0.95)(tls_blocked) as tls_blocked_q99,
-            quantile(0.95)(tls_down) as tls_down_q99,
-            quantile(0.95)(tls_ok) as tls_ok_q99
+            quantile(0.95)(tls_blocked) as tls_blocked_q,
+            quantile(0.95)(tls_down) as tls_down_q,
+            quantile(0.95)(tls_ok) as tls_ok_q
 
         FROM analysis_web_measurement
 
         {where}
-        GROUP BY {", ".join(extra_cols.keys())}
-        ORDER BY {", ".join(extra_cols.keys())}
+        GROUP BY {", ".join(extra_cols_list)}
+        ORDER BY {", ".join(extra_cols_list)}
     )
     """
+    return q, extra_cols_list + fixed_cols
+
+
+def format_event_detector_query(
+    extra_cols: Dict[str, str],
+    where: str,
+):
+    inner_extra_cols = extra_cols.copy()
+    inner_extra_cols["ts"] = "toStartOfHour(measurement_start_time) as ts"
+    extra_cols["ts"] = "ts"
+    BLOCKING_CATEGORIES = ["dns_isp", "dns_other", "tcp", "tls"]
+    OUTCOMES = ["blocked", "ok"]
+    inner_q, _ = format_aggregate_query(
+        extra_cols=inner_extra_cols, where=where, split_dns_outcome=True
+    )
+
+    delta = 0.5
+    h_scale = 24
+    baseline_stddev = 0.1
+    rolling_sum_hours = 48
+    halflife_hours = 24
+    agg_ema_section = ""
+    ema_section = ""
+    event_section = ""
+    for category in BLOCKING_CATEGORIES:
+        for outcome in OUTCOMES:
+            ema_section += f"""
+            exponentialTimeDecayedAvg({halflife_hours})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain ORDER BY ts
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS {category}_{outcome}_ewm_medium,
+
+            exponentialTimeDecayedAvg({halflife_hours/6})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain ORDER BY ts
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS {category}_{outcome}_ewm_fast,
+
+            exponentialTimeDecayedAvg({halflife_hours*2})({category}_{outcome}, toUnixTimestamp(ts)/3600.0) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain ORDER BY ts
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS {category}_{outcome}_ewm_slow,
+
+            SUM({category}_{outcome} * count) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_sum_count,
+
+            stddevSamp({category}_{outcome}) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_stddev,
+
+            {category}_{outcome},
+            """
+            agg_ema_section += f"""
+            multiIf(
+                rolling_sum > rolling_sum_qmid,
+                {category}_{outcome}_ewm_fast,
+                rolling_sum < rolling_sum_qmid AND rolling_sum > rolling_sum_qlow,
+                {category}_{outcome}_ewm_medium,
+                {category}_{outcome}_ewm_slow
+            ) as {category}_{outcome}_ewm,
+
+            {category}_{outcome}_sum_count / current_sum as {category}_{outcome}_mean,
+            (
+                ((({category}_{outcome} - {category}_{outcome}_mean) / {baseline_stddev}))*count
+            ) as {category}_{outcome}_normalized,
+
+            sumIf({category}_{outcome}_normalized  - ({delta} * count), isNaN({category}_{outcome}_normalized) != 1) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_cusum_pos,
+
+            sumIf(-1 * {category}_{outcome}_normalized  - ({delta} * count), isNaN({category}_{outcome}_normalized) != 1) OVER (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) as {category}_{outcome}_cusum_neg,
+
+            --stddevSamp({category}_{outcome}_normalized) as {category}_{outcome}_normalized_std,
+
+            """
+        agg_ema_section += f"""
+        -- h value is chosen to be 5 times the median count of metrics multipled by 5*stddev([0.2, 0.8])
+        -- this should lead to an ARL of 5 hours for TP detection.
+        (count_factor * {h_scale} * 1.5) as h_val,
+        multiIf(
+            {category}_blocked_cusum_pos > h_val,
+            1,
+            {category}_blocked_cusum_neg > h_val,
+            1,
+            NULL
+        ) as {category}_changepoint_detected,
+        """
+        event_section += f"""
+        last_value({category}_changepoint_detected) OVER (
+            PARTITION BY probe_cc, probe_asn, domain
+            ORDER BY ts
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) as {category}_found_event,
+        """
+    any_section = (
+        "("
+        + " OR ".join([f"{x}_found_event" for x in BLOCKING_CATEGORIES])
+        + ") as found_event"
+    )
+
+    fixed_cols = [
+        "count",
+        "tst",
+        "dns_isp_blocked_ewm_medium",
+        "dns_isp_blocked_ewm_fast",
+        "dns_isp_blocked_ewm_slow",
+        "dns_isp_blocked_sum_count",
+        "dns_isp_blocked_stddev",
+        "dns_isp_blocked",
+        "dns_isp_ok_ewm_medium",
+        "dns_isp_ok_ewm_fast",
+        "dns_isp_ok_ewm_slow",
+        "dns_isp_ok_sum_count",
+        "dns_isp_ok_stddev",
+        "dns_isp_ok",
+        "dns_other_blocked_ewm_medium",
+        "dns_other_blocked_ewm_fast",
+        "dns_other_blocked_ewm_slow",
+        "dns_other_blocked_sum_count",
+        "dns_other_blocked_stddev",
+        "dns_other_blocked",
+        "dns_other_ok_ewm_medium",
+        "dns_other_ok_ewm_fast",
+        "dns_other_ok_ewm_slow",
+        "dns_other_ok_sum_count",
+        "dns_other_ok_stddev",
+        "dns_other_ok",
+        "tcp_blocked_ewm_medium",
+        "tcp_blocked_ewm_fast",
+        "tcp_blocked_ewm_slow",
+        "tcp_blocked_sum_count",
+        "tcp_blocked_stddev",
+        "tcp_blocked",
+        "tcp_ok_ewm_medium",
+        "tcp_ok_ewm_fast",
+        "tcp_ok_ewm_slow",
+        "tcp_ok_sum_count",
+        "tcp_ok_stddev",
+        "tcp_ok",
+        "tls_blocked_ewm_medium",
+        "tls_blocked_ewm_fast",
+        "tls_blocked_ewm_slow",
+        "tls_blocked_sum_count",
+        "tls_blocked_stddev",
+        "tls_blocked",
+        "tls_ok_ewm_medium",
+        "tls_ok_ewm_fast",
+        "tls_ok_ewm_slow",
+        "tls_ok_sum_count",
+        "tls_ok_stddev",
+        "tls_ok",
+        "current_sum",
+        "count_factor",
+        "rolling_sum",
+        "dns_isp_blocked_ewm",
+        "dns_isp_blocked_mean",
+        "dns_isp_blocked_normalized",
+        "dns_isp_blocked_cusum_pos",
+        "dns_isp_blocked_cusum_neg",
+        "dns_isp_ok_ewm",
+        "dns_isp_ok_mean",
+        "dns_isp_ok_normalized",
+        "dns_isp_ok_cusum_pos",
+        "dns_isp_ok_cusum_neg",
+        "h_val",
+        "dns_isp_changepoint_detected",
+        "dns_other_blocked_ewm",
+        "dns_other_blocked_mean",
+        "dns_other_blocked_normalized",
+        "dns_other_blocked_cusum_pos",
+        "dns_other_blocked_cusum_neg",
+        "dns_other_ok_ewm",
+        "dns_other_ok_mean",
+        "dns_other_ok_normalized",
+        "dns_other_ok_cusum_pos",
+        "dns_other_ok_cusum_neg",
+        "h_val",
+        "dns_other_changepoint_detected",
+        "tcp_blocked_ewm",
+        "tcp_blocked_mean",
+        "tcp_blocked_normalized",
+        "tcp_blocked_cusum_pos",
+        "tcp_blocked_cusum_neg",
+        "tcp_ok_ewm",
+        "tcp_ok_mean",
+        "tcp_ok_normalized",
+        "tcp_ok_cusum_pos",
+        "tcp_ok_cusum_neg",
+        "h_val",
+        "tcp_changepoint_detected",
+        "tls_blocked_ewm",
+        "tls_blocked_mean",
+        "tls_blocked_normalized",
+        "tls_blocked_cusum_pos",
+        "tls_blocked_cusum_neg",
+        "tls_ok_ewm",
+        "tls_ok_mean",
+        "tls_ok_normalized",
+        "tls_ok_cusum_pos",
+        "tls_ok_cusum_neg",
+        "h_val",
+        "tls_changepoint_detected",
+        "rolling_sum_std",
+        "rolling_sum_qlow",
+        "rolling_sum_qmid",
+        "rolling_sum_qhigh",
+        "dns_isp_found_event",
+        "dns_other_found_event",
+        "tcp_found_event",
+        "tls_found_event",
+        "found_event",
+    ]
+
+    q = f"""
+    SELECT * FROM (
+        SELECT *,
+            {event_section}
+            {any_section} FROM (
+            SELECT
+            *,
+            {agg_ema_section}
+            varPop(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN {rolling_sum_hours} * 3600 PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_std,
+
+            quantile(0.25)(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_qlow,
+
+            quantile(0.5)(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_qmid,
+
+            quantile(0.75)(rolling_sum) OVER
+            (
+                PARTITION BY probe_cc, probe_asn, domain
+                ORDER BY ts
+                RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS rolling_sum_qhigh
+
+            FROM (
+                SELECT
+                {",".join(extra_cols.values())},
+                toUnixTimestamp(ts)/86400 as tst,
+                {ema_section}
+
+                sum(count) OVER (
+                    PARTITION BY probe_cc, probe_asn, domain
+                    ORDER BY ts
+                    RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) as current_sum,
+
+                quantile(0.75)(count) OVER (
+                    PARTITION BY probe_cc, probe_asn, domain
+                    ORDER BY ts
+                    RANGE BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                ) as count_factor,
+
+                sum(count) OVER (
+                    PARTITION BY probe_cc, probe_asn, domain
+                    ORDER BY ts
+                    RANGE BETWEEN {rolling_sum_hours} * 3600 PRECEDING AND CURRENT ROW
+                ) as rolling_sum
+
+                FROM (
+                    {inner_q}
+                )
+            )
+        )
+    ) WHERE found_event = 1
+    """
+    return q, list(extra_cols.keys()) + fixed_cols
 
 
 @router.get(
@@ -298,9 +705,6 @@ async def get_aggregation_analysis(
     since: SinceUntil = utc_30_days_ago(),
     until: SinceUntil = utc_today(),
     time_grain: Annotated[TimeGrains, Query()] = "day",
-    anomaly_sensitivity: Annotated[float, Query()] = 0.9,
-    format: Annotated[Literal["JSON", "CSV"], Query()] = "JSON",
-    download: Annotated[bool, Query()] = False,
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
     q_args = {}
@@ -366,41 +770,17 @@ async def get_aggregation_analysis(
         where += " WHERE "
         where += " AND ".join(and_clauses)
 
-    q = format_aggregate_query(extra_cols, where)
+    q, cols = format_aggregate_query(extra_cols, where)
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
     rows = db.execute(q, q_args)
 
-    fixed_cols = [
-        "probe_analysis",
-        "count",
-        "dns_blocked",
-        "dns_down",
-        "dns_ok",
-        "tls_blocked",
-        "tls_down",
-        "tls_ok",
-        "tcp_blocked",
-        "tcp_down",
-        "tcp_ok",
-        "dns_blocked_outcome",
-        "tcp_blocked_outcome",
-        "tls_blocked_outcome",
-        "likely_blocked_protocols",
-        "blocked_max_protocol",
-    ]
-
     results: List[AggregationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
+            d = dict(zip(cols, row))
             blocked_max_protocol = d["blocked_max_protocol"]
-
-            def nan_to_none(val):
-                if math.isnan(val):
-                    return None
-                return val
 
             loni = Loni(
                 dns_blocked=nan_to_none(d["dns_blocked"]),
@@ -447,3 +827,65 @@ async def get_aggregation_analysis(
         dimension_count=dimension_count,
         results=results,
     )
+
+
+@router.get(
+    "/v1/detector/events",
+    tags=["detector", "analysis"],
+    description=analysis_description,
+)
+@parse_probe_asn_to_int
+async def get_detector_events(
+    test_name: Annotated[Optional[str], Query()] = None,
+    domain: Annotated[Optional[str], Query()] = None,
+    probe_asn: Annotated[Union[int, str, None], Query()] = None,
+    probe_cc: Annotated[Optional[str], Query(min_length=2, max_length=2)] = None,
+    since: SinceUntil = utc_30_days_ago(),
+    until: SinceUntil = utc_today(),
+    db=Depends(get_clickhouse_session),
+):
+    q_args = {}
+    and_clauses = []
+    extra_cols = {"probe_cc": "probe_cc", "probe_asn": "probe_asn", "domain": "domain"}
+    if probe_asn is not None:
+        q_args["probe_asn"] = probe_asn
+        and_clauses.append("probe_asn = %(probe_asn)d")
+        extra_cols["probe_asn"] = "probe_asn"
+    if probe_cc is not None:
+        q_args["probe_cc"] = probe_cc
+        and_clauses.append("probe_cc = %(probe_cc)s")
+        extra_cols["probe_cc"] = "probe_cc"
+    if test_name is not None:
+        q_args["test_name"] = test_name
+        and_clauses.append("test_name = %(test_name)s")
+        extra_cols["test_name"] = "test_name"
+    if domain is not None:
+        q_args["domain"] = domain
+        and_clauses.append("domain = %(domain)s")
+        extra_cols["domain"] = "domain"
+
+    if since is not None:
+        q_args["since"] = since
+        and_clauses.append("measurement_start_time >= %(since)s")
+    if until is not None:
+        and_clauses.append("measurement_start_time <= %(until)s")
+        q_args["until"] = until
+
+    where = ""
+    if len(and_clauses) > 0:
+        where += " WHERE "
+        where += " AND ".join(and_clauses)
+
+    q, cols = format_event_detector_query(extra_cols, where)
+
+    t = time.perf_counter()
+    log.info(f"running query {q} with {q_args}")
+    rows = db.execute(q, q_args)
+
+    results = []
+    if rows and isinstance(rows, list):
+        for row in rows:
+            d = dict(zip(cols, row))
+            d = {k: nan_to_none(v) if isinstance(v, float) else v for k, v in d.items()}
+            results.append(d)
+    return {"results": results}
