@@ -555,7 +555,7 @@ class ListChangePointsResponse(BaseModel):
 @router.get(
     "/v1/detector/changepoints",
     tags=["detector"],
-    description="List changepoints detected by the event detector using the cusum algorithm",
+    description="List changepoints detected by the event detector using the cusum  algorithm",
     response_model=ListChangePointsResponse,
 )
 @parse_probe_asn_to_int
