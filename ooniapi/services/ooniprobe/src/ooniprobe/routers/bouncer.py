@@ -1,8 +1,9 @@
 import logging
 from typing import List, Optional, Any, Dict
+from json.decoder import JSONDecodeError
 
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import Field
+from fastapi import APIRouter, HTTPException, Request, Response
+from pydantic import Field, ValidationError
 
 from ooniprobe.common.utils import setnocacheresponse
 from ooniprobe.common.routers import BaseModel
@@ -50,14 +51,25 @@ class NetTestResponse(BaseModel):
 @router.post("/net-tests", tags=["bouncer"], response_model=NetTestResponse, response_model_exclude_unset=True)
 async def bouncer_net_tests(
     response: Response,
-    request: NetTestsRequest,
+    request: Request,
 ) -> Dict[str, List[NetTest]]:
 
     try:
-        name = request.nettests[0].name
-        version = request.nettests[0].version
+        j = await request.json()
+        m = NetTestsRequest(**j)
+    except ValidationError as e:
+        raise HTTPException(400, detail=e.errors())
+    except JSONDecodeError as e:
+        raise HTTPException(400, detail=str(e))
+    except Exception as e:
+        log.warning("Unexpected Exception:" + str(e))
+        raise HTTPException(400, detail=str(e))
+
+    try:
+        name = m.nettests[0].name
+        version = m.nettests[0].version
     except IndexError:
-        raise HTTPException(status_code=401, detail="invalid net-tests request")
+        raise HTTPException(status_code=400, detail="invalid net-tests request")
 
     # TODO: load this json from environment or filepath
     j = {
