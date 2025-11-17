@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from pydantic_settings import BaseSettings
 
 
@@ -42,3 +42,21 @@ class Settings(BaseSettings):
         ""  # for uploading reports that couldn't be sent to fastpath
     )
     tor_targets: str = "" # path to json file containing Tor bridges and DirAuth endpoints
+
+    # ooniprobe client configuration
+    collectors: List[Dict[str, str]] = [
+        {"address": "httpo://guegdifjy7bjpequ.onion", "type": "onion"},
+        {"address": "https://ams-pg.ooni.org:443", "type": "https"},
+        {
+            "address": "https://dkyhjv0wpi2dk.cloudfront.net",
+            "front": "dkyhjv0wpi2dk.cloudfront.net",
+            "type": "cloudfront",
+        },
+        {"address": "httpo://guegdifjy7bjpequ.onion", "type": "onion"},
+        {"address": "https://ams-pg.ooni.org:443", "type": "https"},
+        {
+            "address": "https://dkyhjv0wpi2dk.cloudfront.net",
+            "front": "dkyhjv0wpi2dk.cloudfront.net",
+            "type": "cloudfront",
+        },
+    ]
