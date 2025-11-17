@@ -116,7 +116,8 @@ def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_s
         clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server
+        fastpath_url=fastpath_server,
+        psiphon_conffile="./tests/fixtures/data/psiphon-config.json"
     )
 
 
