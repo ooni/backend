@@ -7,7 +7,7 @@
 set -eu
 export DEBIAN_FRONTEND=noninteractive
 
-echo 'deb http://deb.debian.org/debian bullseye-backports main' \
+echo 'deb http://deb.debian.org/debian trixie-backports main' \
   > /etc/apt/sources.list.d/backports.list
 
 # Install ca-certificates and gnupg first
