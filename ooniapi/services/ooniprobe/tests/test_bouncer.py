@@ -63,12 +63,12 @@ def test_bouncer_net_tests(client):
 
 def test_bouncer_net_tests_bad_request1(client):
     resp = client.post("/bouncer/net-tests")
-    # XXX: fastapi returns 422 Unprocessable Entity; expected result was 400 in old test
-    assert resp.status_code != 200
+    # XXX: returns status code 400 for backwards compatibility
+    assert resp.status_code == 400
 
 
 def test_bouncer_net_tests_bad_request2(client):
     j = {"net-tests": []}
     resp = client.post("/bouncer/net-tests", json=j)
-    # XXX: fastapi returns 422 Unprocessable Entity; expected result was 400 in old test
-    assert resp.status_code != 200
+    # XXX: returns status code 400 for backwards compatibility
+    assert resp.status_code == 400
