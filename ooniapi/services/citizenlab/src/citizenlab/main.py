@@ -67,8 +67,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(admin.router)
-app.include_router(v1.router)
+app.include_router(admin.router, prefix="/api")
+app.include_router(v1.router, prefix="/api")
 
 
 @app.get("/version")
