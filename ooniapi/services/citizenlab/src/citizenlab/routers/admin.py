@@ -7,12 +7,16 @@ from pydantic import Field
 from sqlalchemy import sql
 
 # Local imports
+from ..common.auth import get_account_id_or_raise
 from ..common.dependencies import role_required
 from ..common.errors import *
 from ..common.clickhouse_utils import query_click, query_click_one_row, insert_click
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
 from ..citizenlab import get_url_list_manager
+from ..dependencies import SettingsDep
+)
+
 
 router = APIRouter()
 
@@ -25,13 +29,6 @@ URL prioritization: uses the url_priorities table.
 It contains rules on category_code, cc, domain and url to assign priorities.
 Values can be wildcards "*". A citizenlab entry can match multiple rules.
 """
-
-
-#XXX TODO: write tests for each of the new methods
-#XXX TODO: move files so the api version paths  make sense?
-
-def get_account_id(request):
-    return request._account_id
 
 
 class TestListResponse(BaseModel):
@@ -47,12 +44,20 @@ class TestListResponse(BaseModel):
     tags=["citizenlab"],
     dependencies=[Depends(role_required(["admin", "user"]))],
 )
-async def get_test_list_meta(request: Request, country_code: str) -> TestListResponse:
+async def get_test_list_meta(
+    request: Request,
+    settings: SettingsDep,
+    country_code: str,
+    ) -> TestListResponse:
     """Fetch citizenlab URL list and additional metadata.
 
     - **country_code**: 2-letter country code or "global".
     """
-    account_id = get_account_id(request)
+
+    try:
+        account_id = get_account_id_or_raise(request.Header("authorization"), settings.jwt_encryption_key)
+    except Exception:
+        raise HTTPException(detail="Authentication required", status_code=401)
 
     try:
         ulm = get_url_list_manager(conf, account_id)
