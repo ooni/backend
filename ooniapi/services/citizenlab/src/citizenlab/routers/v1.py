@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import Field
 
 # Local imports
+from ..common.auth import get_account_id_or_raise
 from ..common.dependencies import role_required
 from ..common.errors import *
 from ..common.routers import BaseModel
@@ -43,11 +44,16 @@ async def post_propose_changes(request: Request, settings: SettingsDep) -> PullR
         description: Pull request url
         type: object
     """
-    log.info("submitting citizenlab changes")
-    account_id = await get_account_id(request)
-    ulm = await get_url_list_manager(settings, account_id)
 
     try:
+        account_id = get_account_id_or_raise(request.Header("authorization"), settings.jwt_encryption_key)
+    except Exception:
+        raise HTTPException(detail="Authentication required", status_code=401)
+
+    log.info("submitting citizenlab changes")
+
+    try:
+        ulm = await get_url_list_manager(settings, account_id)
         pr_id = await ulm.propose_changes(account_id)
         resp = PullRequestResponse(pr_id=pr_id)  # Return the model directly
         setnocacheresponse(resp)
@@ -81,7 +87,12 @@ async def url_submission_update_url(settings: SettingsDep, request: Request, upd
     be sent back as "old_entry" to check against race conditions.
     Empty old_entry means creating a new rule. Empty new_entry means deleting an existing rule.
     """
-    account_id = get_account_id(request)
+
+    try:
+        account_id = get_account_id_or_raise(request.Header("authorization"), settings.jwt_encryption_key)
+    except Exception:
+        raise HTTPException(detail="Authentication required", status_code=401)
+
     ulm = get_url_list_manager(settings, account_id)
 
     new = update.new_entry.dict()
