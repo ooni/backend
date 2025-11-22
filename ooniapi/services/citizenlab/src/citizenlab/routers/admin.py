@@ -15,7 +15,6 @@ from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
 from ..citizenlab import get_url_list_manager
 from ..dependencies import SettingsDep
-)
 
 
 router = APIRouter()
