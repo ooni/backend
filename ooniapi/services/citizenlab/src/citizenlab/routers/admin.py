@@ -47,7 +47,7 @@ async def get_test_list_meta(
     """
 
     try:
-        account_id = get_account_id_or_raise(request.Header("authorization"), settings.jwt_encryption_key)
+        account_id = get_account_id_or_raise(request.headers.get("Authorization"), settings.jwt_encryption_key)
     except Exception:
         raise HTTPException(detail="Authentication required", status_code=401)
 

@@ -33,7 +33,7 @@ async def post_propose_changes(request: Request, settings: SettingsDep) -> PullR
     """
 
     try:
-        account_id = get_account_id_or_raise(request.Header("authorization"), settings.jwt_encryption_key)
+        account_id = get_account_id_or_raise(request.headers.get("Authorization"), settings.jwt_encryption_key)
     except Exception:
         raise HTTPException(detail="Authentication required", status_code=401)
 
@@ -65,7 +65,7 @@ async def url_submission_update_url(settings: SettingsDep, request: Request, upd
     """
 
     try:
-        account_id = get_account_id_or_raise(request.Header("authorization"), settings.jwt_encryption_key)
+        account_id = get_account_id_or_raise(request.headers.get("Authorization"), settings.jwt_encryption_key)
     except Exception:
         raise HTTPException(detail="Authentication required", status_code=401)
 
