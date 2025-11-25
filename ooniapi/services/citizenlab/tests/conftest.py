@@ -1,5 +1,6 @@
 from tempfile import tempdir
 from pathlib import Path
+import jwt
 import pytest
 import shutil
 import os
