@@ -112,8 +112,8 @@ async def receive_measurement(
     empty_measurement = {}
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
-    except Exception:
-        log.info("Unexpected report_id %r", report_id[:200])
+    except Exception as e:
+        log.info(f"Unexpected report_id {report_id[:200]}. Error: {e}", )
         raise error("Incorrect format")
 
     # TODO validate the timestamp?
