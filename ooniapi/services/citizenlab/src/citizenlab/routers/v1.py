@@ -95,8 +95,8 @@ async def url_submission_update_url(settings: SettingsDep, request: Request, upd
 
     ulm = get_url_list_manager(settings, account_id)
 
-    new = update.new_entry.dict()
-    old = update.old_entry.dict()
+    new = update.new_entry.model_dump()
+    old = update.old_entry.model_dump()
 
     try:
         if new:
