@@ -103,13 +103,13 @@ def validate_entry(entry: Dict[str, str]) -> None:
         raise BadDate()
 
 
-def get_url_list_manager(conf, account_id):
+def get_url_list_manager(settings, account_id):
     return URLListManager(
-        working_dir=Path(conf["GITHUB_WORKDIR"]),
-        github_user=conf["GITHUB_USER"],
-        github_token=conf["GITHUB_TOKEN"],
-        origin_repo=conf["GITHUB_ORIGIN_REPO"],
-        push_repo=conf["GITHUB_PUSH_REPO"],
+        working_dir=Path(settings.working_dir),
+        github_user=settings.github_user,
+        github_token=settings.github_token,
+        origin_repo=settings.origin_repo,
+        push_repo=settings.push_repo,
         account_id=account_id,
     )
 
