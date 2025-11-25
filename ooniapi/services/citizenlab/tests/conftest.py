@@ -186,7 +186,7 @@ def client(clickhouse_server, test_settings):
 
 
 def create_jwt(payload: dict) -> str:
-    return jwt.encode(payload, "super_secure", algorithm="HS256")
+    return jwt.encode(payload, JWT_ENCRYPTION_KEY, algorithm="HS256")
 
 
 def create_session_token(account_id: str, role: str) -> str:
