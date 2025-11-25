@@ -124,8 +124,8 @@ async def receive_measurement(
 
     try:
         asn_i = int(asn)
-    except ValueError:
-        log.info("ASN value not parsable %r", asn)
+    except ValueError as e:
+        log.info(f"ASN value not parsable {asn}. Error: {e}")
         error("Incorrect format")
 
     if asn_i == 0:
@@ -144,8 +144,8 @@ async def receive_measurement(
             compressed_len = len(data)
             data = zstd.decompress(data)
             log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
-        except Exception:
-            log.info("Failed zstd decompression")
+        except Exception as e:
+            log.info(f"Failed zstd decompression. Error: {e}")
             error("Incorrect format")
 
     # Write the whole body of the measurement in a directory based on a 1-hour
