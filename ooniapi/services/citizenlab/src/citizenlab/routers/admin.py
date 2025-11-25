@@ -1,20 +1,21 @@
 import logging
 
-from typing import Any, Dict, List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import Field
 from sqlalchemy import sql
 
 # Local imports
-from ..common.auth import get_account_id_or_raise
-from ..common.dependencies import role_required
-from ..common.errors import *
-from ..common.clickhouse_utils import query_click, query_click_one_row, insert_click
-from ..common.routers import BaseModel
-from ..common.utils import setnocacheresponse
-from ..citizenlab import get_url_list_manager
-from ..dependencies import SettingsDep
+from citizenlab.common.auth import get_account_id_or_raise
+from citizenlab.common.dependencies import role_required
+from citizenlab.common.errors import *
+from citizenlab.common.clickhouse_utils import query_click, query_click_one_row, insert_click
+from citizenlab.common.routers import BaseModel
+from citizenlab.common.utils import setnocacheresponse
+from citizenlab.dependencies import SettingsDep
+from citizenlab.manager import get_url_list_manager
+from citizenlab.models import TestListResponse, UrlPriority, UpdateUrlPriorityRequest
 
 
 router = APIRouter()
@@ -28,14 +29,6 @@ URL prioritization: uses the url_priorities table.
 It contains rules on category_code, cc, domain and url to assign priorities.
 Values can be wildcards "*". A citizenlab entry can match multiple rules.
 """
-
-
-class TestListResponse(BaseModel):
-    test_list: Optional[Dict[str, Any]] = Field(None, description="The fetched test list.")
-    changes: Dict[str, Any] = Field(description="The changes related to the test list.")
-    state: str = Field(description="The current sync state.")
-    pr_url: Optional[str] = Field(None, description="The pull request URL, if applicable.")
-
 
 @router.get(
     "/_/url-submission/test-list/{country_code}",
@@ -84,15 +77,6 @@ async def get_test_list_meta(
         log.error(f"Unexpected error occurred: {e}")
         # Raise a generic HTTPException for unexpected errors
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
-
-
-# # Prioritization management # #
-class UrlPriority(BaseModel):
-    category_code: str = Field(..., description="The code representing the category of the URL")
-    cc: str = Field(..., description="Country code associated with the URL")
-    domain: str = Field(..., description="The domain of the URL")
-    url: str = Field(..., description="The full URL")
-    priority: int = Field(..., description="Priority level of the URL")
 
 
 @router.get(
@@ -223,19 +207,6 @@ def update_url_priority_click(old: dict, new: dict):
         log.info(f"Creating prioritization rule {rule}")
         r = insert_click(ins_sql, [rule])
         log.debug(f"Result: {r}")
-
-
-class UrlPriorityRule(BaseModel):
-    category_code: str = Field(..., description="The category code associated with the URL.")
-    cc: str = Field(..., description="Country code that the URL is relevant to.")
-    domain: str = Field(..., description="The domain of the URL.")
-    url: str = Field(..., description="The actual URL to be prioritized.")
-    priority: int = Field(..., description="The priority number for the URL. Higher numbers indicate higher priority.")
-
-
-class UpdateUrlPriorityRequest(BaseModel):
-    old_entry: UrlPriorityRule = Field(None, description="Existing URL priority rule to update.")
-    new_entry: UrlPriorityRule = Field(None, description="New URL priority rule to create or replace existing rule.")
 
 
 @router.post(
