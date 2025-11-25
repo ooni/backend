@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 import shutil
 import os
+import json
 from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
@@ -17,6 +18,7 @@ from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
 from ooniprobe.dependencies import get_postgresql_session
 from ooniprobe.models import OONIProbeManifest
+from ooniprobe.common.clickhouse_utils import insert_click
 
 
 def make_override_get_settings(**kw):
@@ -183,3 +185,20 @@ def is_fastpath_running(url: str) -> bool:
         return resp.status == 200
     except Exception:
         return False
+
+@pytest.fixture
+def load_url_priorities(clickhouse_db):
+    path = Path("tests/fixtures/data")
+    filename = "url_priorities_us.json"
+    file = Path(path, filename)
+
+    with file.open("r") as f:
+        j = json.load(f)
+
+    # 'sign' is created with default value 0, causing a db error.
+    # use 1 to prevent it
+    for row in j:
+        row["sign"] = 1
+
+    query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
+    insert_click(clickhouse_db, query, j)
