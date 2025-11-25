@@ -143,8 +143,7 @@ async def receive_measurement(
         try:
             compressed_len = len(data)
             data = zstd.decompress(data)
-            ratio = compressed_len / len(data)
-            log.debug(f"Zstd compression ratio {ratio}")
+            log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
         except Exception:
             log.info("Failed zstd decompression")
             error("Incorrect format")

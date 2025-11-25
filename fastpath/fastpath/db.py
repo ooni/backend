@@ -229,7 +229,7 @@ def clickhouse_upsert_summary(
     def tf(v: bool) -> str:
         return "t" if v else "f"
 
-    def s_or_n(x : Optional[Any]) -> Optional[str]:
+    def serialize_optional(x : Optional[Any]) -> Optional[str]:
         """Serialize to string if not None, return None otherwise"""
         return ujson.dumps(x) if x is not None else None
 
@@ -269,8 +269,8 @@ def clickhouse_upsert_summary(
         is_verified=tf(is_verified),
         nym=nym,
         zkp_request=zkp_request,
-        age_range=s_or_n(age_range),
-        msm_range=s_or_n(msm_range)
+        age_range=serialize_optional(age_range),
+        msm_range=serialize_optional(msm_range)
     )
 
     if buffer_writes:
