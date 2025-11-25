@@ -205,7 +205,6 @@ def create_session_token(account_id: str, role: str) -> str:
 
 @pytest.fixture
 def client_with_user_role(client):
-    client = TestClient(app)
     jwt_token = create_session_token("0" * 16, "user")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
@@ -213,7 +212,6 @@ def client_with_user_role(client):
 
 @pytest.fixture
 def client_with_admin_role(client):
-    client = TestClient(app)
     jwt_token = create_session_token("0" * 16, "admin")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
