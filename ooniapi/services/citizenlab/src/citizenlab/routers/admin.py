@@ -59,7 +59,7 @@ async def get_test_list_meta(
         raise HTTPException(detail="Authentication required", status_code=401)
 
     try:
-        ulm = get_url_list_manager(conf, account_id)
+        ulm = get_url_list_manager(settings, account_id)
         state = ulm.sync_state(account_id)
         pr_url = None
 
