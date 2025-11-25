@@ -1,5 +1,4 @@
 from tempfile import tempdir
-import pathlib
 from pathlib import Path
 import pytest
 import shutil
@@ -48,7 +47,7 @@ def alembic_migration(pg_url):
     from alembic.config import Config
 
     migrations_path = (
-        pathlib.Path(__file__).parent.parent
+        Path(__file__).parent.parent
         / "src"
         / "citizenlab"
         / "common"
