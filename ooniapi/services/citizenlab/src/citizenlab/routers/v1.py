@@ -1,34 +1,21 @@
 import logging
 
-from typing import Any, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import Field
 
 # Local imports
-from ..common.auth import get_account_id_or_raise
-from ..common.dependencies import role_required
-from ..common.errors import *
-from ..common.routers import BaseModel
-from ..common.utils import setnocacheresponse
-from ..citizenlab import validate_entry, get_url_list_manager
-from ..dependencies import SettingsDep
+from citizenlab.common.auth import get_account_id_or_raise
+from citizenlab.common.dependencies import role_required
+from citizenlab.common.errors import *
+from citizenlab.common.routers import BaseModel
+from citizenlab.common.utils import setnocacheresponse
+from citizenlab.dependencies import SettingsDep
+from citizenlab.manager import validate_entry, get_url_list_manager
+from citizenlab.models import UrlSubmissionUpdateRequest, UrlSubmissionResponse, PullRequestResponse
 
 router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
-
-
-class PullRequestResponse(BaseModel):
-    pr_id: str
-
-
-class Entry(BaseModel):
-    category_code: Optional[str] = Field(None, description="Category code of the URL entry.")
-    url: Optional[str] = Field(None, description="The URL to be submitted.")
-    date_added: Optional[str] = Field(None, description="Date when the entry was added.")
-    user: Optional[str] = Field(None, description="User who submitted the entry.")
-    notes: Optional[str] = Field(None, description="Any additional notes regarding the entry.")
 
 
 @router.post(
@@ -64,17 +51,6 @@ async def post_propose_changes(request: Request, settings: SettingsDep) -> PullR
     except Exception as e:
         log.error(f"Unexpected exception occurred: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-
-class UrlSubmissionUpdateRequest(BaseModel):
-    country_code: str = Field(..., description="The country code for the submission.")
-    comment: str = Field(..., description="Comment regarding the submission.")
-    old_entry: Optional[Entry] = Field(None, description="The old entry to validate against.")
-    new_entry: Optional[Entry] = Field(None, description="New entry to create or update.")
-
-
-class UrlSubmissionResponse(BaseModel):
-    updated_entry: Optional[Entry] = Field(None, description="The updated URL entry after processing.")
 
 
 @router.post(
