@@ -500,6 +500,7 @@ class ChangePointEntry(BaseModel):
     s_neg: float | None
     current_mean: float | None
     h: float | None
+    block_type: str
 
     @classmethod
     def from_row(cls, row: Dict[str, Any]) -> Self:
@@ -545,6 +546,7 @@ class ChangePointEntry(BaseModel):
             s_neg=nan_to_none(g("s_neg")),
             current_mean=nan_to_none(g("current_mean")),
             h=nan_to_none(g("h")),
+            block_type= g("block_type")
         )  # type: ignore
 
 

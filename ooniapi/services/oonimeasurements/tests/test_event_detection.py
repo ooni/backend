@@ -129,3 +129,8 @@ def test_changepoint_change_dir_values(client):
     )
 
     assert resp["results"][0]["change_dir"] == "up"  # this one has change_dir == 1
+
+def test_changepoint_field_present(client):
+
+    resp = getj(client, "/api/v1/detector/changepoints")
+    assert all('block_type' in r for r in resp['results'])
