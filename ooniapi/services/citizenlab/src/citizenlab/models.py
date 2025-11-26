@@ -36,8 +36,8 @@ class UrlSubmissionResponse(BaseModel):
 
 
 class UpdateUrlPriorityRequest(BaseModel):
-    old_entry: UrlPriority = Field(None, description="Existing URL priority rule to update.")
-    new_entry: UrlPriority = Field(None, description="New URL priority rule to create or replace existing rule.")
+    old_entry: Optional[UrlPriority] = Field(None, description="Existing URL priority rule to update.")
+    new_entry: Optional[UrlPriority] = Field(None, description="New URL priority rule to create or replace existing rule.")
 
 
 class TestListResponse(BaseModel):
