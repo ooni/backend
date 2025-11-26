@@ -5,6 +5,7 @@ from urllib.request import urlopen
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from fastapi_utils.tasks import repeat_every
 
@@ -21,6 +22,7 @@ from .common.config import Settings
 from .common.version import get_build_label
 from .common.metrics import mount_metrics
 from .common.clickhouse_utils import query_click
+from .common.errors import BaseOONIException
 from .__about__ import VERSION
 
 log = logging.getLogger(__name__)
@@ -54,6 +56,18 @@ async def setup_repeating_tasks(settings: Settings):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# add a custom exception handler that places the err_args and err_str keys in
+# the top level object for API compatibility with older versions
+@app.exception_handler(BaseOONIException)
+async def ooni_exception_handler(request, exc: BaseOONIException):
+    # NOTE: content is same as BaseOONIException.detail
+    content = {
+        "description": exc.description,
+        "err_args": exc.err_args,
+        "err_str": exc.err_str
+    }
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 instrumentor = Instrumentator().instrument(
     app, metric_namespace="ooniapi", metric_subsystem="citizenlab"
