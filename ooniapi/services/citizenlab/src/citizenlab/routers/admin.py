@@ -2,7 +2,7 @@ import logging
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
 from sqlalchemy import sql
 
@@ -38,6 +38,7 @@ Values can be wildcards "*". A citizenlab entry can match multiple rules.
 )
 async def get_test_list_meta(
     request: Request,
+    response: Response,
     settings: SettingsDep,
     country_code: str,
     ) -> TestListResponse:
@@ -68,7 +69,7 @@ async def get_test_list_meta(
 
         # Create the response object
         resp = TestListResponse(test_list=tl, changes=changes, state=state, pr_url=pr_url)
-        setnocacheresponse(resp)
+        setnocacheresponse(response)
         return resp
     except BaseOONIException as e:
         log.error(f"OONIException occurred: {e}")
