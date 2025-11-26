@@ -705,9 +705,19 @@ class SubmitMeasurementRequest(BaseModel):
         "personally identifiable information.\n"
         "The server will use the age range to validate in zero proof that the request came from a "
         "trusted probe. "
+        "Example: if probe age is 30 days, a valid answer is (25, 35)"
         "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
         )
-    probe_msm_range: Tuple[int,int]
+    probe_msm_range: Tuple[int,int] = Field(
+        description=
+        "A range representing an interval containing the how many measurements the probe has sent. "
+        "This is used for the anonymous credentials protocol to identify the probe without using "
+        "personally identifiable information.\n"
+        "The server will use the measurement count range to validate in zero proof that "
+        "the request came from a trusted probe. "
+        "Example: if the probe has sent 100 measurements, a valid answer is (90, 110)"
+        "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
+    )
     manifest_version: str
 
 class SubmitMeasurementResponse(BaseModel):
@@ -740,7 +750,10 @@ async def submit_measurement(
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
     """
     Submit measurement, using the anonymous credentials protocol to establish a confidence
-    layer over the incoming measurements
+    layer over the incoming measurements.
+
+    The anonmymous credentials protocol allows us to measure the trustworthiness of a probe without
+    revealing personally identifiable information.
     """
     setnocacheresponse(response)
     empty_measurement = {}
