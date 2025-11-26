@@ -259,7 +259,6 @@ def _test_checkout_update_submit(client_with_user_role, tmp_path):
 
     url = "https://example-bogus-1.org/"
     add_url(client_with_user_role, url, tmp_path)
-    import pdb;pdb.set_trace()
     assert get_state(client_with_user_role) == "IN_PROGRESS"
 
     csv = _read_us_csv_file(tmp_path)
