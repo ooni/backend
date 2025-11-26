@@ -71,8 +71,8 @@ async def url_submission_update_url(settings: SettingsDep, request: Request, upd
 
     ulm = get_url_list_manager(settings, account_id)
 
-    new = update.new_entry.model_dump()
-    old = update.old_entry.model_dump()
+    new = update.new_entry.model_dump() if update.new_entry is not None else None
+    old = update.old_entry.model_dump() if update.old_entry is not None else None
 
     try:
         if new:
