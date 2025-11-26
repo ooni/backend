@@ -106,8 +106,8 @@ def test_submission_basic(client):
         },
         "nym": submit_request.nym,
         "zkp_request": submit_request.request,
-        "age_range": [emission_day - 30, emission_day + 1],
-        "msm_range": [0, 100],
+        "probe_age_range": [emission_day - 30, emission_day + 1],
+        "probe_msm_range": [0, 100],
         "manifest_version": manifest_version
     }
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)

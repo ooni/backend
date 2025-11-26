@@ -15,7 +15,7 @@ from mypy_boto3_s3 import S3Client
 
 from .common.config import Settings
 from .common.dependencies import get_settings
-from .models import OONIProbeServerState, OONIProbeManifest
+from .models import OONIProbeManifest
 
 
 SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]

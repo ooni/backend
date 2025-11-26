@@ -692,15 +692,22 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
     )
 
 class SubmitMeasurementRequest(BaseModel):
-
     format: str
     content: Dict[str, Any]
     # -- < Anonymous Credentials > ----------------------
     # not post quantum, in the future we might want to use a hashed key for storage
     nym: str
     zkp_request: str
-    age_range: Tuple[int,int]
-    msm_range: Tuple[int,int]
+    probe_age_range: Tuple[int,int] = Field(
+        description=
+        "A range representing an interval containing the probe actual age. "
+        "This is used for the anonymous credentials protocol to identify the probe without using "
+        "personally identifiable information.\n"
+        "The server will use the age range to validate in zero proof that the request came from a "
+        "trusted probe. "
+        "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
+        )
+    probe_msm_range: Tuple[int,int]
     manifest_version: str
 
 class SubmitMeasurementResponse(BaseModel):
@@ -732,7 +739,8 @@ async def submit_measurement(
     content_encoding: str = Header(default=None),
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
     """
-    Submit measurement
+    Submit measurement, using the anonymous credentials protocol to establish a confidence
+    layer over the incoming measurements
     """
     setnocacheresponse(response)
     empty_measurement = {}
@@ -786,8 +794,8 @@ async def submit_measurement(
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
             submit_request.content["probe_asn"],
-            list(submit_request.age_range),
-            list(submit_request.msm_range),
+            list(submit_request.probe_age_range),
+            list(submit_request.probe_msm_range),
             )
         is_verified = True
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
@@ -817,7 +825,8 @@ async def submit_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
-    # Use exponential back off with jitter between retries
+    # Use exponential back off with jitter between retries to avoid choking the fastpath server
+    # with many retries at the same time when there's a temporary issue
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
