@@ -247,7 +247,7 @@ def mock_requests_closed(monkeypatch):
 def _read_us_csv_file(tmp_path):
     # read from user repo path: citizenlab.py get_user_repo_path
     account_id = "0" * 16
-    f = tmp_path / "gh" / "users" / account_id / "test-lists/lists/us.csv"
+    f = tmp_path / "users" / account_id / "test-lists/lists/us.csv"
     return f.read_text().splitlines()
 
 
