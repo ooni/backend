@@ -219,8 +219,6 @@ def client_with_admin_role(client):
 
 @pytest.fixture
 def test_settings(alembic_migration, clickhouse_server, fastpath_server, tmp_path):
-    workdir = tmp_path / "gh"
-    workdir.mkdir()
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
@@ -228,7 +226,7 @@ def test_settings(alembic_migration, clickhouse_server, fastpath_server, tmp_pat
         clickhouse_url=clickhouse_server,
         collector_id="1",
         fastpath_url=fastpath_server,
-        working_dir=str(workdir),
+        working_dir=str(tmp_path),
         github_user="fakeuser",
         github_token="faketoken",
         origin_repo="citizenlab/test-lists",
