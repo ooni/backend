@@ -10,25 +10,15 @@ from fastapi import HTTPException
 
 class BaseOONIException(HTTPException):
     """Custom exception class for OONI-related errors."""
+    status_code: int = 400
+    err_str: str = "err_generic_ooni_exception"
+    err_args: Optional[Dict[str, str]] = None
+    description: str = "Generic OONI error"
 
     def __init__(
         self,
-        description: Optional[str] = Field(
-            default="Generic OONI error",
-            description="Error description"
-        ),
-        err_args: Optional[Dict[str, str]] = Field(
-            default={},
-            description="Additional error arguments"
-        ),
-        err_str: str = Field(
-            default="err_generic_ooni_exception",
-            description="Error string"
-        ),
-        code: int = Field(
-            default=400,
-            description="Error code"
-        ),
+        description: Optional[str] = None,
+        err_args: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize the BaseOONIException.
@@ -36,13 +26,16 @@ class BaseOONIException(HTTPException):
         Args:
             description (Optional[str]): A description of the error.
             err_args (Optional[Dict[str, str]]): Additional arguments related to the error.
-            err_str (str): An error string identifier.
-            code (int): HTTP status code associated with the error.
         """
-        super().__init__(status_code=code, detail=description)
-        self.err_args = err_args
-        self.err_str = err_str
-        self.description = description
+        if description != None:
+            self.description = description
+        if err_args != None:
+            self.err_args = err_args
+
+        super().__init__(status_code=self.status_code,
+            detail={"description": self.description,
+                    "err_args": self.err_args,
+                    "err_str": self.err_str})
 
 
 class BadURL(BaseOONIException):
