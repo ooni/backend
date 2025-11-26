@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
 
 # Local imports
@@ -23,7 +23,11 @@ log = logging.getLogger(__name__)
     tags=["citizenlab"],
     dependencies=[Depends(role_required(["admin", "user"]))],
 )
-async def post_propose_changes(request: Request, settings: SettingsDep) -> PullRequestResponse:
+async def post_propose_changes(
+    request: Request,
+    response: Response,
+    settings: SettingsDep
+    ) -> PullRequestResponse:
     """Propose changes: open a Pull Request on GitHub
     ---
     responses:
@@ -43,7 +47,7 @@ async def post_propose_changes(request: Request, settings: SettingsDep) -> PullR
         ulm = await get_url_list_manager(settings, account_id)
         pr_id = await ulm.propose_changes(account_id)
         resp = PullRequestResponse(pr_id=pr_id)  # Return the model directly
-        setnocacheresponse(resp)
+        setnocacheresponse(response)
         return resp
     except BaseOONIException as e:
         log.error(f"Exception occurred: {e}")
@@ -58,7 +62,12 @@ async def post_propose_changes(request: Request, settings: SettingsDep) -> PullR
     tags=["citizenlab"],
     dependencies=[Depends(role_required(["admin", "user"]))],
 )
-async def url_submission_update_url(settings: SettingsDep, request: Request, update: UrlSubmissionUpdateRequest):
+async def url_submission_update_url(
+    settings: SettingsDep,
+    request: Request,
+    response: Response,
+    update: UrlSubmissionUpdateRequest
+    ) -> UrlSubmissionResponse:
     """Create/update/delete a CitizenLab URL entry. The current value must
     be sent back as "old_entry" to check against race conditions.
     Empty old_entry means creating a new rule. Empty new_entry means deleting an existing rule.
@@ -88,7 +97,7 @@ async def url_submission_update_url(settings: SettingsDep, request: Request, upd
             comment=update.comment,
         )
         resp = UrlSubmissionResponse(updated_entry=new)
-        setnocacheresponse(resp)
+        setnocacheresponse(response)
         return resp
     except BaseOONIException as e:
         log.error(f"OONIException occurred: {e}")
