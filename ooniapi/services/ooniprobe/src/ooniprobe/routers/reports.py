@@ -26,7 +26,6 @@ router = APIRouter()
 
 log = logging.getLogger(__name__)
 
-
 class OpenReportRequest(BaseModel):
     """
     Open report

@@ -126,6 +126,7 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
 def extract_probe_ipaddr(request: Request) -> str:
 
     real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
+
     for h in real_ip_headers:
         if h in request.headers:
             return request.headers.getlist(h)[0].rpartition(" ")[-1]

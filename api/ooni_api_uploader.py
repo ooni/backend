@@ -120,7 +120,7 @@ def fill_jsonl(measurements: List[PP], jsonlf: PP) -> List[Dict]:
                 msm = post.get("content", {})
             elif fmt == "yaml":
                 try:
-                    msm = yaml.load(msm, Loader=yaml.CLoader)
+                    msm = yaml.safe_load(msm, Loader=yaml.CLoader)
                 except Exception:
                     pass
 
