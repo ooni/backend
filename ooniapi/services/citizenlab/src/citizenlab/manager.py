@@ -133,7 +133,7 @@ class URLListManager:
         lockfile_f = lockfile_dir / "state.lock"
         lockfile_dir.mkdir(parents=True, exist_ok=True)  # no race cond. here
         self._lock_time = time.monotonic_ns()
-        self._lock = FileLock(lockfile_f, timeout=5)
+        self._lock = FileLock(lockfile_f, timeout=5, thread_local=False)
         self._lock.acquire()  # released on URLListManager destruction
 
     @timer(name="citizenlab_lock_time")
