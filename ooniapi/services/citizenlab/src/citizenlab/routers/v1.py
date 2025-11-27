@@ -44,8 +44,8 @@ async def post_propose_changes(
     log.info("submitting citizenlab changes")
 
     try:
-        ulm = await get_url_list_manager(settings, account_id)
-        pr_id = await ulm.propose_changes(account_id)
+        ulm = get_url_list_manager(settings, account_id)
+        pr_id = ulm.propose_changes(account_id)
         resp = PullRequestResponse(pr_id=pr_id)  # Return the model directly
         setnocacheresponse(response)
         return resp
