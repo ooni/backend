@@ -125,6 +125,7 @@ class URLListManager:
         self.repo_dir = self.working_dir / "test-lists"
         self.push_username = push_repo.split("/")[0]
         # lock before init repo
+        self.repo = None
         self.get_user_lock(account_id)
         self.repo = self._init_repo()
 
@@ -138,7 +139,14 @@ class URLListManager:
 
     @timer(name="citizenlab_lock_time")
     def __del__(self):
-        self._lock.release()
+        # try to close repo at teardown to fix hanging git processes
+        # https://github.com/gitpython-developers/GitPython/issues/1333
+        if self.repo is not None:
+            self.repo.close()
+        if self._lock.is_locked:
+            self._lock.release()
+        else:
+            raise Exception
         elapsed_ms = (time.monotonic_ns() - self._lock_time) / 1000_000
 
     @timer(name="citizenlab_repo_init")
