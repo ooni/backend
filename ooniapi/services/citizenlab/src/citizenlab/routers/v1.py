@@ -46,6 +46,7 @@ async def post_propose_changes(
     try:
         ulm = get_url_list_manager(settings, account_id)
         pr_id = ulm.propose_changes(account_id)
+        del ulm
         resp = PullRequestResponse(pr_id=pr_id)  # Return the model directly
         setnocacheresponse(response)
         return resp
@@ -96,6 +97,7 @@ async def url_submission_update_url(
             new_entry=new,
             comment=update.comment,
         )
+        del ulm
         resp = UrlSubmissionResponse(updated_entry=new)
         setnocacheresponse(response)
         return resp

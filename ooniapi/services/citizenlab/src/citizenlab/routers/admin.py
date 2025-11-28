@@ -72,6 +72,7 @@ async def get_test_list_meta(
         except CountryNotSupported:
             tl = None
 
+        del ulm
         # Create the response object
         resp = TestListResponse(test_list=tl, changes=changes, state=state, pr_url=pr_url)
         setnocacheresponse(response)
