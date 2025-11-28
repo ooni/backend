@@ -13,9 +13,14 @@ from citizenlab.common.errors import *
 from citizenlab.common.clickhouse_utils import query_click, query_click_one_row, insert_click
 from citizenlab.common.routers import BaseModel
 from citizenlab.common.utils import setnocacheresponse
-from citizenlab.dependencies import SettingsDep
+from citizenlab.dependencies import SettingsDep, ClickhouseDep
 from citizenlab.manager import get_url_list_manager
-from citizenlab.models import TestListResponse, UrlPriority, UpdateUrlPriorityRequest
+from citizenlab.models import (
+    TestListResponse,
+    UrlPriority,
+    UpdateUrlPriorityRequest,
+    ListUrlPriorityResponse
+)
 
 
 router = APIRouter()
@@ -83,9 +88,11 @@ async def get_test_list_meta(
 @router.get(
     "/_/url-priorities/list",
     tags=["citizenlab"],
-    response_model=List[UrlPriority],
+    response_model=ListUrlPriorityResponse,
 )
-def list_url_priorities() -> List[UrlPriority]:
+def list_url_priorities(
+    clickhouse: ClickhouseDep,
+) -> ListUrlPriorityResponse:
     """List URL priority rules."""
     log.debug("Listing URL priority rules")
 
@@ -95,13 +102,13 @@ def list_url_priorities() -> List[UrlPriority]:
 
     try:
         # Execute the SQL query and gather results
-        q = query_click(sql_text(query), {})
+        q = query_click(clickhouse, sql.text(query), {})
         rows = list(q)
 
         # Construct UrlPriority instances from the rows
         url_priorities = [UrlPriority(**row) for row in rows]
 
-        return url_priorities  # Return the list directly
+        return ListUrlPriorityResponse(rules=url_priorities)
         
     except BaseOONIException as e:
         log.error(f"An error occurred while fetching URL priorities: {e}")
@@ -181,7 +188,7 @@ def prepare_url_prio_rule_dict(d: dict):
     assert sorted(d.keys()) == ["category_code", "cc", "domain", "priority", "url"]
 
 
-def update_url_priority_click(old: dict, new: dict):
+def update_url_priority_click(clickhouse, old: dict, new: dict):
     # The url_priorities table is CollapsingMergeTree
     # Both old and new might be set
     ins_sql = """INSERT INTO url_priorities
@@ -206,7 +213,7 @@ def update_url_priority_click(old: dict, new: dict):
         rule = new.copy()
         rule["sign"] = 1
         log.info(f"Creating prioritization rule {rule}")
-        r = insert_click(ins_sql, [rule])
+        r = insert_click(clickhouse, ins_sql, [rule])
         log.debug(f"Result: {r}")
 
 
@@ -216,15 +223,19 @@ def update_url_priority_click(old: dict, new: dict):
     response_model=int,
     dependencies=[Depends(role_required(["admin"]))],
 )
-async def post_update_url_priority(request: UpdateUrlPriorityRequest) -> int:
+async def post_update_url_priority(
+    update: UpdateUrlPriorityRequest,
+    clickhouse: ClickhouseDep,
+) -> int:
     """Add/update/delete a URL priority rule. An empty old_entry creates a new rule.
     An empty new_entry deletes an existing rule. The current value needs to be sent
     back as "old_entry" to check against race conditions.
     """
     log.info("updating URL priority rule")
 
-    old = request.old_entry.dict()
-    new = request.new_entry.dict()
+    old = update.old_entry.model_dump() if update.old_entry is not None else None
+    new = update.new_entry.model_dump() if update.new_entry is not None else None
+
 
     if not old and not new:
         raise NoProposedChanges
@@ -236,7 +247,7 @@ async def post_update_url_priority(request: UpdateUrlPriorityRequest) -> int:
         prepare_url_prio_rule_dict(new)
 
     try:
-        update_url_priority_click(old, new)
+        update_url_priority_click(clickhouse, old, new)
         return 1  # Return an integer value
     except BaseOONIException as e:
         log.error(f"An error occurred while updating URL priorities: {e}")
