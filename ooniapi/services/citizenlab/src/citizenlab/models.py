@@ -24,6 +24,10 @@ class UrlPriority(BaseModel):
     priority: int = Field(..., description="The priority number for the URL. Higher numbers indicate higher priority.")
 
 
+class ListUrlPriorityResponse(BaseModel):
+    rules: List[UrlPriority] = Field(..., description="The list of UrlPriority items")
+
+
 class UrlSubmissionUpdateRequest(BaseModel):
     country_code: str = Field(..., description="The country code for the submission.")
     comment: str = Field(..., description="Comment regarding the submission.")

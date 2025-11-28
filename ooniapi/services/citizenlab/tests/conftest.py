@@ -1,6 +1,7 @@
 from tempfile import tempdir
 from pathlib import Path
 import jwt
+import logging
 import pytest
 import shutil
 import os
@@ -12,25 +13,26 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
 
+from citizenlab.common.clickhouse_utils import query_click, insert_click, optimize_table
 from citizenlab.common.config import Settings
 from citizenlab.common.dependencies import get_settings
 from citizenlab.dependencies import get_s3_client
 from citizenlab.main import app
 
+log = logging.getLogger(__name__)
 
 @pytest.fixture()
-def citizenlab_tblready(client, app):
+def citizenlab_tblready(clickhouse_db):
     # Ensure the citizenlab table is populated
-    r = app.click.execute("SELECT count() FROM citizenlab")[0][0]
-    assert r > 2
+    r = query_click(clickhouse_db, "SELECT count() FROM citizenlab", {})[0]
+    assert len(r) > 2
 
 
 @pytest.fixture
-def url_prio_tblready(app):
-    log = app.logger
+def url_prio_tblready(clickhouse_db):
     # Ensure the url_priorities table is populated
-    r = app.click.execute("SELECT count() FROM url_priorities")[0][0]
-    if r > 5:
+    r = query_click(clickhouse_db, "SELECT count() FROM url_priorities", {})[0]
+    if len(r) > 5:
         return
 
     rules = [
@@ -82,8 +84,8 @@ def url_prio_tblready(app):
         (sign, category_code, cc, domain, url, priority) VALUES
     """
     log.info("Populating url_priorities")
-    app.click.execute(query, rows)
-    app.click.execute("OPTIMIZE TABLE url_priorities FINAL")
+    insert_click(clickhouse_db, query, rows)
+    optimize_table(clickhouse_db, "url_priorities")
 
 
 def make_override_get_settings(**kw):
