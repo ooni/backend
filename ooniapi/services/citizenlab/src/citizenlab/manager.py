@@ -125,9 +125,8 @@ class URLListManager:
         self.repo_dir = self.working_dir / "test-lists"
         self.push_username = push_repo.split("/")[0]
         # lock before init repo
-        self.repo = None
         self.get_user_lock(account_id)
-        self.repo = self._init_repo()
+        self._init_repo()
 
     def get_user_lock(self, account_id: str):
         lockfile_dir = self.working_dir / "users" / account_id
@@ -141,8 +140,6 @@ class URLListManager:
     def __del__(self):
         # try to close repo at teardown to fix hanging git processes
         # https://github.com/gitpython-developers/GitPython/issues/1333
-        if self.repo is not None:
-            self.repo.close()
         if self._lock.is_locked:
             self._lock.release()
         else:
@@ -234,9 +231,11 @@ class URLListManager:
         repo_path = self._get_user_repo_path(account_id)
         if not os.path.exists(repo_path):
             log.info(f"creating {repo_path}")
-            self.repo.git.worktree(
-                "add", "-b", self._get_user_branchname(account_id), repo_path
-            )
+            with git.Repo(self.repo_dir) as repo:
+                repo.git.worktree(
+                    "add", "-b", self._get_user_branchname(account_id), repo_path
+                )
+                repo.close()
         return git.Repo(repo_path)
 
     def get_test_list(self, account_id, country_code) -> List[Dict[str, str]]:
@@ -278,7 +277,9 @@ class URLListManager:
 
     @timer(name="citizenlab_repo_pull")
     def _pull_origin_repo(self):
-        self.repo.remotes.origin.pull()
+        with git.Repo(self.repo_dir) as repo:
+            repo.remotes.origin.pull()
+            repo.close()
 
     @timer(name="citizenlab_sync_state")
     def sync_state(self, account_id) -> str:
@@ -293,8 +294,10 @@ class URLListManager:
             log.debug(f"Deleting {path}")
             try:
                 shutil.rmtree(path)
-                self.repo.git.worktree("prune")
-                self.repo.delete_head(bname, force=True)
+                with git.Repo(self.repo_dir) as repo:
+                    repo.git.worktree("prune")
+                    repo.delete_head(bname, force=True)
+                    repo.close()
                 self._maybe_delete_changes_log(account_id)
             except Exception as e:
                 log.info(f"Error deleting {path} {e}")
@@ -509,10 +512,12 @@ class URLListManager:
 
     def _push_to_repo(self, account_id):
         log.debug("pushing branch to GitHub")
-        self.repo.remotes.rworigin.push(
-            self._get_user_branchname(account_id),
-            force=True,
-        )
+        with git.Repo(self.repo_dir) as repo:
+            repo.remotes.rworigin.push(
+                self._get_user_branchname(account_id),
+                force=True,
+            )
+            repo.close()
 
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
