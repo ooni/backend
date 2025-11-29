@@ -34,8 +34,6 @@ def list_global(client_with_user_role):
 
 def test_list_unsupported_country(client_with_user_role):
     r = client_with_user_role.get("/api/_/url-submission/test-list/XY")
-    # XXX: why would this be 200 ?
-    print(r.json())
     assert r.status_code == 200
     assert r.json()["test_list"] == None
 
@@ -127,7 +125,6 @@ def test_update_url_nochange(client, client_with_user_role):
         "source": fe["source"],
         "notes": fe["notes"],
     }
-    print(old)
     new = old
     d = dict(country_code="it", old_entry=old, new_entry=new, comment="")
     r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d)
@@ -294,7 +291,6 @@ def test_checkout_update_submit(
     # Before getting the list URLListManager will check if the mock PR is done
     # (it is) and set the state to CLEAN
     r = list_global(client_with_user_role)
-    print(r)
     assert r["state"] == "CLEAN"
 
 
