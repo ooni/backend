@@ -154,9 +154,9 @@ class URLListManager:
             repo = git.Repo.clone_from(url, self.repo_dir, branch="master")
             url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
             repo.create_remote("rworigin", url)
-        repo = git.Repo(self.repo_dir)
-        repo.remotes.origin.pull()
-        return repo
+        with git.Repo(self.repo_dir) as repo:
+            repo.remotes.origin.pull()
+            repo.close()
 
     def _get_user_repo_path(self, account_id) -> Path:
         return self.working_dir / "users" / account_id / "test-lists"
