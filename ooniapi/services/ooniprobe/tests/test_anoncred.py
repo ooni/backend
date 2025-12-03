@@ -1,9 +1,29 @@
 from typing import Tuple
+from datetime import timedelta
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
+from ooniprobe.dependencies import PostgresSessionDep
 from ooniauth_py import UserState, ServerState
 from .utils import getj, postj
+import pytest
 
+@pytest.fixture(scope="function")
+def second_manifest(db: PostgresSessionDep):
+    recent_manifest = OONIProbeManifest.get_latest(db)
+    assert recent_manifest
+
+    new_server_state = OONIProbeServerState.make_new_state(db)
+    new_manifest = OONIProbeManifest(
+        server_state_id = new_server_state.id,
+        date_created = recent_manifest.date_created - timedelta(days=1)
+        )
+
+    db.add(new_manifest)
+    db.commit()
+    yield new_manifest
+    db.delete(new_manifest)
+    db.delete(new_server_state)
+    db.commit()
 
 def test_manifest_basic(client, db):
     latest = db.query(OONIProbeServerState).limit(1).one_or_none()
@@ -115,6 +135,11 @@ def test_submission_basic(client):
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
+
+def test_credential_update(client, second_manifest):
+    user, manifest_version, emission_day = setup_user(client)
+    old_server_state : OONIProbeServerState = second_manifest.server_state
+
 
 def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, emission day
     manifest = getj(client, "/api/v1/manifest")
