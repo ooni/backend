@@ -924,7 +924,7 @@ def _retrieve_manifest(session: PostgresSessionDep, version : str) -> OONIProbeM
     if manifest is None:
         raise HTTPException(detail=
             {"error" : "manifest_not_found",
-             "detail" : f"No manifest with version '{version}' was found"
+             "message" : f"No manifest with version '{version}' was found"
             },
             status_code=status.HTTP_404_NOT_FOUND)
 
