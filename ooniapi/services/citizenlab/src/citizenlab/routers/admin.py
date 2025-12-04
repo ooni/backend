@@ -197,7 +197,7 @@ def update_url_priority_click(clickhouse, old: dict, new: dict):
     """
     if old:
         rule = old.copy()
-        rule["sign"] = -1
+        rule["sign"] = -1 # XXX: sign is not part of the request model but is part of the database
         log.info(f"Deleting prioritization rule {rule}")
         r = insert_click(ins_sql, [rule])
         log.debug(f"Result: {r}")

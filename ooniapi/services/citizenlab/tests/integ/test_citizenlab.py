@@ -363,7 +363,8 @@ def test_url_priorities_crud(client_with_admin_role, url_prio_tblready):
     assert r.status_code == 400, r.json()
 
     # Create
-    xxx = dict(category_code="NEWS", priority=100, cc='', url="INTEG-TEST")
+    #xxx = dict(category_code="NEWS", priority=100, cc='', url="INTEG-TEST") # XXX: should cc be '' ? should domain be set?
+    xxx = dict(category_code="NEWS", priority=100, url="INTEG-TEST", domain="*", cc="*")
     d = dict(new_entry=xxx)
     r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json()
@@ -377,6 +378,7 @@ def test_url_priorities_crud(client_with_admin_role, url_prio_tblready):
     assert r.status_code == 400, r.json()
 
     # Update (change URL)
+    # XXX: what fields are required to do an update? how is the item keyed in the database? by URL?
     yyy = dict(category_code="NEWS", priority=100, url="INTEG-TEST2")
     d = dict(old_entry=xxx, new_entry=yyy)
     r = adminsession.post("/api/_/url-priorities/update", json=d)
