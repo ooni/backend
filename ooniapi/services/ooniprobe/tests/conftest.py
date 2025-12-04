@@ -1,3 +1,4 @@
+from datetime import timedelta
 import pathlib
 from pathlib import Path
 import pytest
@@ -14,12 +15,13 @@ from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
-from ooniprobe.dependencies import get_s3_client
+from ooniprobe.dependencies import PostgresSessionDep, get_s3_client
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
 from ooniprobe.dependencies import get_postgresql_session
-from ooniprobe.models import OONIProbeManifest
+from ooniprobe.models import OONIProbeManifest, OONIProbeServerState
 from ooniprobe.common.clickhouse_utils import insert_click
+from .utils import setup_user
 
 
 def make_override_get_settings(**kw):
@@ -204,3 +206,28 @@ def load_url_priorities(clickhouse_db):
 
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, j)
+
+@pytest.fixture(scope="function")
+def second_manifest(db: PostgresSessionDep, client_with_original_manifest):
+    # client_with_original_manifest is a dependency so that
+    # the client is created before the new manifest created
+    # by this function is added to the DB
+    recent_manifest = OONIProbeManifest.get_latest(db)
+    assert recent_manifest
+
+    new_server_state = OONIProbeServerState.make_new_state(db)
+    new_manifest = OONIProbeManifest(
+        server_state_id = new_server_state.id,
+        date_created = recent_manifest.date_created + timedelta(days=1)
+        )
+
+    db.add(new_manifest)
+    db.commit()
+    yield new_manifest
+    db.delete(new_manifest)
+    db.delete(new_server_state)
+    db.commit()
+
+@pytest.fixture(scope="function")
+def client_with_original_manifest(client):
+    return setup_user(client)

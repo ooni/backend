@@ -1,36 +1,8 @@
 from typing import Tuple
-from datetime import timedelta
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
-from ooniprobe.dependencies import PostgresSessionDep
 from ooniauth_py import UserState, ServerState
-from .utils import getj, postj
-import pytest
-
-@pytest.fixture(scope="function")
-def second_manifest(db: PostgresSessionDep, client_with_original_manifest):
-    # client_with_original_manifest is a dependency so that
-    # the client is created before the new manifest created
-    # by this function is added to the DB
-    recent_manifest = OONIProbeManifest.get_latest(db)
-    assert recent_manifest
-
-    new_server_state = OONIProbeServerState.make_new_state(db)
-    new_manifest = OONIProbeManifest(
-        server_state_id = new_server_state.id,
-        date_created = recent_manifest.date_created + timedelta(days=1)
-        )
-
-    db.add(new_manifest)
-    db.commit()
-    yield new_manifest
-    db.delete(new_manifest)
-    db.delete(new_server_state)
-    db.commit()
-
-@pytest.fixture(scope="function")
-def client_with_original_manifest(client):
-    return setup_user(client)
+from .utils import getj, postj, setup_user
 
 def test_manifest_basic(client, db):
     latest = db.query(OONIProbeServerState).limit(1).one_or_none()
@@ -155,16 +127,3 @@ def test_credential_update(client, client_with_original_manifest, second_manifes
     ))
     assert 'update_response' in result
     user.handle_credential_update_response(result['update_response']) # should not crash
-
-
-def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, emission day
-    manifest = getj(client, "/api/v1/manifest")
-    user = UserState(manifest['public_parameters'])
-    req = user.make_registration_request()
-    resp = postj(client, "/api/v1/sign_credential", json = {
-        "credential_sign_request" : req,
-        "manifest_version" : manifest['version']
-    })
-    user.handle_registration_response(resp['credential_sign_response'])
-
-    return (user, manifest['version'], resp['emission_day'])
