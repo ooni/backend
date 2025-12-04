@@ -151,9 +151,10 @@ class URLListManager:
         if not os.path.exists(self.repo_dir):
             log.info(f"cloning {self.origin_repo} repository")
             url = f"https://github.com/{self.origin_repo}.git"
-            repo = git.Repo.clone_from(url, self.repo_dir, branch="master")
-            url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
-            repo.create_remote("rworigin", url)
+            with git.Repo.clone_from(url, self.repo_dir, branch="master") as repo:
+                url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
+                repo.create_remote("rworigin", url)
+                repo.close()
         with git.Repo(self.repo_dir) as repo:
             repo.remotes.origin.pull()
             repo.close()
@@ -411,57 +412,59 @@ class URLListManager:
                 raise CannotClosePR()
             self._set_state(account_id, "IN_PROGRESS")
 
-        repo = self._get_user_repo(account_id)
-        csv_f = self._get_user_repo_path(account_id) / "lists" / f"{cc}.csv"
-        tmp_f = csv_f.with_suffix(".tmp")
+        with self._get_user_repo(account_id) as repo:
+            csv_f = self._get_user_repo_path(account_id) / "lists" / f"{cc}.csv"
+            tmp_f = csv_f.with_suffix(".tmp")
 
-        if new_entry:
-            # Check for collisions:
-            if not old_entry:
-                self._prevent_duplicate_url(account_id, cc, new_entry["url"])
+            if new_entry:
+                # Check for collisions:
+                if not old_entry:
+                    self._prevent_duplicate_url(account_id, cc, new_entry["url"])
 
-            elif old_entry and new_entry["url"] != old_entry["url"]:
-                # If the URL is being changed check for collisions
-                self._prevent_duplicate_url(account_id, cc, new_entry["url"])
+                elif old_entry and new_entry["url"] != old_entry["url"]:
+                    # If the URL is being changed check for collisions
+                    self._prevent_duplicate_url(account_id, cc, new_entry["url"])
 
-        with csv_f.open() as in_f, tmp_f.open("w") as out_f:
-            reader = csv.DictReader(in_f)
-            writer = csv.DictWriter(
-                out_f,
-                quoting=csv.QUOTE_MINIMAL,
-                lineterminator="\n",
-                fieldnames=CITIZENLAB_CSV_HEADER,
-            )
-            writer.writeheader()
+            with csv_f.open() as in_f, tmp_f.open("w") as out_f:
+                reader = csv.DictReader(in_f)
+                writer = csv.DictWriter(
+                    out_f,
+                    quoting=csv.QUOTE_MINIMAL,
+                    lineterminator="\n",
+                    fieldnames=CITIZENLAB_CSV_HEADER,
+                )
+                writer.writeheader()
 
-            done = False
-            for row in reader:
-                if row == old_entry:
-                    if new_entry:
-                        writer.writerow(new_entry)  # update entry
+                done = False
+                for row in reader:
+                    if row == old_entry:
+                        if new_entry:
+                            writer.writerow(new_entry)  # update entry
+                        else:
+                            pass  # delete entry
+                        done = True
+
                     else:
-                        pass  # delete entry
+                        writer.writerow(row)
+
+                if new_entry and not old_entry:
+                    writer.writerow(new_entry)  # add new entry at end
                     done = True
 
-                else:
-                    writer.writerow(row)
+            if not done:
+                tmp_f.unlink()
+                repo.close()
+                raise CannotUpdateList()
 
-            if new_entry and not old_entry:
-                writer.writerow(new_entry)  # add new entry at end
-                done = True
+            log.debug(f"Writing {csv_f.as_posix()}")
+            tmp_f.rename(csv_f)
+            repo.index.add([csv_f.as_posix()])
+            repo.index.commit(comment)
 
-        if not done:
-            tmp_f.unlink()
-            raise CannotUpdateList()
+            self.write_changes_log(account_id, cc, old_entry, new_entry)
 
-        log.debug(f"Writing {csv_f.as_posix()}")
-        tmp_f.rename(csv_f)
-        repo.index.add([csv_f.as_posix()])
-        repo.index.commit(comment)
-
-        self.write_changes_log(account_id, cc, old_entry, new_entry)
-
-        self._set_state(account_id, "IN_PROGRESS")
+            self._set_state(account_id, "IN_PROGRESS")
+            repo.close()
 
     @timer(name="citizenlab_open_pr")
     def _open_pr(self, branchname):
