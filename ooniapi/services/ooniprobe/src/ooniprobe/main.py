@@ -16,7 +16,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from . import models
 from .routers.v2 import vpn
 from .routers.v1 import probe_services
-from .routers import reports, bouncer, prio
+from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
 from .dependencies import get_postgresql_session, get_clickhouse_session, SettingsDep
@@ -81,7 +81,7 @@ app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
 app.include_router(reports.router)
 app.include_router(bouncer.router)
-app.include_router(prio.router, prefix="/api")
+app.include_router(prio_crud.router, prefix="/api")
 
 
 @app.get("/version")
