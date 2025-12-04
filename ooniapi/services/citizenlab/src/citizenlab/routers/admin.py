@@ -119,9 +119,9 @@ def list_url_priorities(
         raise HTTPException(status_code=500, detail="An error occurred while fetching URL priorities.")
 
 
-def initialize_url_priorities_if_needed():
+def initialize_url_priorities_if_needed(clickhouse):
     cntq = "SELECT count() AS cnt FROM url_priorities"
-    cnt = query_click_one_row(sql.text(cntq), {})
+    cnt = query_click_one_row(clickhouse, sql.text(cntq), {})
     if cnt["cnt"] > 0:
         return
 
@@ -206,7 +206,7 @@ def update_url_priority_click(clickhouse, old: dict, new: dict):
         q = """SELECT count() AS cnt FROM url_priorities FINAL WHERE sign = 1 AND
         category_code = :category_code AND cc = :cc AND domain = :domain
         AND url = :url"""
-        cnt = query_click_one_row(sql.text(q), new)
+        cnt = query_click_one_row(clickhouse, sql.text(q), new)
         if cnt and cnt["cnt"] > 0:
             log.info(f"Rejecting duplicate rule {new}")
             raise DuplicateRuleError(err_args=new)
