@@ -8,14 +8,17 @@ from .utils import getj, postj
 import pytest
 
 @pytest.fixture(scope="function")
-def second_manifest(db: PostgresSessionDep):
+def second_manifest(db: PostgresSessionDep, client_with_original_manifest):
+    # client_with_original_manifest is a dependency so that
+    # the client is created before the new manifest created
+    # by this function is added to the DB
     recent_manifest = OONIProbeManifest.get_latest(db)
     assert recent_manifest
 
     new_server_state = OONIProbeServerState.make_new_state(db)
     new_manifest = OONIProbeManifest(
         server_state_id = new_server_state.id,
-        date_created = recent_manifest.date_created - timedelta(days=1)
+        date_created = recent_manifest.date_created + timedelta(days=1)
         )
 
     db.add(new_manifest)
@@ -24,6 +27,10 @@ def second_manifest(db: PostgresSessionDep):
     db.delete(new_manifest)
     db.delete(new_server_state)
     db.commit()
+
+@pytest.fixture(scope="function")
+def client_with_original_manifest(client):
+    return setup_user(client)
 
 def test_manifest_basic(client, db):
     latest = db.query(OONIProbeServerState).limit(1).one_or_none()
@@ -136,9 +143,18 @@ def test_submission_basic(client):
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
 
-def test_credential_update(client, second_manifest):
-    user, manifest_version, emission_day = setup_user(client)
-    old_server_state : OONIProbeServerState = second_manifest.server_state
+def test_credential_update(client, client_with_original_manifest, second_manifest):
+
+    (user, manifest, _) = client_with_original_manifest
+    new_manifest = getj(client, "/api/v1/manifest")
+    user.set_public_params(new_manifest["public_parameters"])
+    result = postj(client, "/api/v1/update_credential", json=dict(
+        old_manifest_version = manifest,
+        manifest_version = new_manifest['version'],
+        update_request = user.make_credential_update_request()
+    ))
+    assert 'update_response' in result
+    user.handle_credential_update_response(result['update_response']) # should not crash
 
 
 def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, emission day
