@@ -1,3 +1,4 @@
+from typing import Any, Dict
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
 from ooniauth_py import UserState, ServerState
@@ -76,17 +77,7 @@ def test_registration_errors(client):
 
 def test_submission_basic(client):
     # open report
-    j = {
-        "data_format_version": "0.2.0",
-        "format": "json",
-        "probe_asn": "AS34245",
-        "probe_cc": "IE",
-        "software_name": "miniooni",
-        "software_version": "0.17.0-beta",
-        "test_name": "web_connectivity",
-        "test_start_time": "2020-09-09 14:11:11",
-        "test_version": "0.1.0",
-    }
+    j = make_report_request()
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
 
@@ -94,22 +85,11 @@ def test_submission_basic(client):
     user, manifest_version, emission_day = setup_user(client)
 
     submit_request = user.make_submit_request("IE", "AS34245", emission_day)
-    msm = {
-        "format": "json",
-        "content": {
-            "test_name": "web_connectivity",
-            "probe_asn": "AS34245",
-            "probe_cc": "IE",
-            "test_start_time": "2020-09-09 14:11:11",
-        },
-        "nym": submit_request.nym,
-        "zkp_request": submit_request.request,
-        "probe_age_range": [emission_day - 30, emission_day + 1],
-        "probe_msm_range": [0, 100],
-        "manifest_version": manifest_version
-    }
+
+    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c['is_verified'] == True  # noqa: E712
+    assert c['is_verified'] is True
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
@@ -126,3 +106,71 @@ def test_credential_update(client, client_with_original_manifest, second_manifes
     ))
     assert 'update_response' in result
     user.handle_credential_update_response(result['update_response']) # should not crash
+
+def test_credential_update_with_submission(client, client_with_original_manifest, second_manifest):
+    (user, manifest_version, emission_day) = client_with_original_manifest
+
+    # first submit: should just work out of the box
+    j = make_report_request()
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+
+    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+
+    assert c['is_verified'] is True
+
+    # second submit: should work after updating creds
+    new_manifest = getj(client, "/api/v1/manifest")
+    user.set_public_params(new_manifest['public_parameters'])
+    result = postj(client, "/api/v1/update_credential", json=dict(
+        old_manifest_version = manifest_version,
+        manifest_version=new_manifest['version'],
+        update_request = user.make_credential_update_request()
+    ))
+
+    assert 'update_response' in result
+    user.handle_credential_update_response(result['update_response']) # should not crash
+
+    j = make_report_request()
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+
+    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+
+
+def make_measurement(nym : str, zkp_request: str, emission_day: int, manifest_version: str, probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
+    return {
+        "format": "json",
+        "content": {
+            "test_name": "web_connectivity",
+            "probe_asn": probe_asn,
+            "probe_cc": probe_cc,
+            "test_start_time": "2020-09-09 14:11:11",
+        },
+        "nym": nym,
+        "zkp_request": zkp_request,
+        "probe_age_range": [emission_day - 30, emission_day + 1],
+        "probe_msm_range": [0, 100],
+        "manifest_version": manifest_version
+    }
+
+def make_report_request(probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
+    return {
+        "data_format_version": "0.2.0",
+        "format": "json",
+        "probe_asn": probe_asn,
+        "probe_cc": probe_cc,
+        "software_name": "miniooni",
+        "software_version": "0.17.0-beta",
+        "test_name": "web_connectivity",
+        "test_start_time": "2020-09-09 14:11:11",
+        "test_version": "0.1.0",
+    }
