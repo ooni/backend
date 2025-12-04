@@ -1,4 +1,3 @@
-from typing import Tuple
 from fastapi import status
 from ooniprobe.models import OONIProbeServerState, OONIProbeManifest
 from ooniauth_py import UserState, ServerState
