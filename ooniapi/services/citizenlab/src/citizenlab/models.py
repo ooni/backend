@@ -17,6 +17,10 @@ class Entry(BaseModel):
 
 
 class UrlPriority(BaseModel):
+    # XXX: it is unclear which fields are required to do an update
+    # XXX: it looks like only domain and URL and cc and category_code are part of the
+    # WHERE clause but the INTEG-TEST fields do not specifiy all of these fields
+    # so the validator fails
     category_code: str = Field(..., description="The category code associated with the URL.")
     cc: str = Field(..., description="Country code that the URL is relevant to.")
     domain: str = Field(..., description="The domain of the URL.")
