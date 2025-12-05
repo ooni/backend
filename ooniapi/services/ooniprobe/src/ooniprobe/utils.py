@@ -129,7 +129,7 @@ def extract_probe_ipaddr(request: Request) -> str:
 
     for h in real_ip_headers:
         if h in request.headers:
-            return request.headers.getlist(h)[0].rpartition(" ")[-1]
+            return get_first_ip(request.headers.getlist(h)[0])
 
     return request.client.host if request.client else ""
 
@@ -177,3 +177,13 @@ def compare_probe_msmt_cc_asn(
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
     except Exception:
         pass
+def get_first_ip(headers: str) -> str:
+    """
+    parse the first ip from a comma-separated list of ips encoded as a string
+
+    example:
+    in: '123.123.123, 1.1.1.1'
+    out: '123.123.123'
+    """
+
+    return headers.partition(',')[0]
