@@ -6,7 +6,7 @@ from fastapi import Depends
 import geoip2.database
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from clickhouse_driver import Client as Clickhouse
 
@@ -15,6 +15,7 @@ from mypy_boto3_s3 import S3Client
 
 from .common.config import Settings
 from .common.dependencies import get_settings
+from .models import OONIProbeManifest
 
 
 SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
@@ -23,12 +24,14 @@ SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
 def get_postgresql_session(settings: SettingsDep):
     engine = create_engine(settings.postgresql_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+PostgresSessionDep = Annotated[Session, Depends(get_postgresql_session)]
 
 
 def get_cc_reader(settings: SettingsDep):
@@ -64,3 +67,12 @@ def get_s3_client() -> S3Client:
 
 
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
+
+
+def get_latest_manifest(session: PostgresSessionDep) -> OONIProbeManifest:
+    manifest = OONIProbeManifest.get_latest(session)
+    assert manifest is not None, "Uninitialized `OONIProbeServerState` table"
+    return manifest
+
+
+LatestManifestDep = Annotated[OONIProbeManifest, Depends(get_latest_manifest)]

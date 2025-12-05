@@ -1,9 +1,10 @@
-from tempfile import tempdir
+from datetime import timedelta
 import pathlib
 from pathlib import Path
 import pytest
 import shutil
 import os
+import json
 import time
 from urllib.request import urlopen
 
@@ -14,9 +15,13 @@ from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
-from ooniprobe.dependencies import get_s3_client
+from ooniprobe.dependencies import PostgresSessionDep, get_s3_client
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
+from ooniprobe.dependencies import get_postgresql_session
+from ooniprobe.models import OONIProbeManifest, OONIProbeServerState
+from ooniprobe.common.clickhouse_utils import insert_click
+from .utils import setup_user
 
 
 def make_override_get_settings(**kw):
@@ -101,6 +106,13 @@ def geoip_db_dir(fixture_path):
 def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
+
+    # Initialize server state
+    db = get_postgresql_session(test_settings())
+    session = next(db)
+    OONIProbeManifest.init_table(session)
+    next(db, None)
+
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
@@ -175,5 +187,47 @@ def is_fastpath_running(url: str) -> bool:
     try:
         resp = urlopen(url)
         return resp.status == 200
-    except:
+    except Exception:
         return False
+
+@pytest.fixture
+def load_url_priorities(clickhouse_db):
+    path = Path("tests/fixtures/data")
+    filename = "url_priorities_us.json"
+    file = Path(path, filename)
+
+    with file.open("r") as f:
+        j = json.load(f)
+
+    # 'sign' is created with default value 0, causing a db error.
+    # use 1 to prevent it
+    for row in j:
+        row["sign"] = 1
+
+    query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
+    insert_click(clickhouse_db, query, j)
+
+@pytest.fixture(scope="function")
+def second_manifest(db: PostgresSessionDep, client_with_original_manifest):
+    # client_with_original_manifest is a dependency so that
+    # the client is created before the new manifest created
+    # by this function is added to the DB
+    recent_manifest = OONIProbeManifest.get_latest(db)
+    assert recent_manifest
+
+    new_server_state = OONIProbeServerState.make_new_state(db)
+    new_manifest = OONIProbeManifest(
+        server_state_id = new_server_state.id,
+        date_created = recent_manifest.date_created + timedelta(days=1)
+        )
+
+    db.add(new_manifest)
+    db.commit()
+    yield new_manifest
+    db.delete(new_manifest)
+    db.delete(new_server_state)
+    db.commit()
+
+@pytest.fixture(scope="function")
+def client_with_original_manifest(client):
+    return setup_user(client)

@@ -1,25 +1,18 @@
-from typing import List, Annotated, Dict, Any
+from typing import List, Dict, Any
 import asyncio
-from pathlib import Path
 import logging
 from hashlib import sha512
-from urllib.request import urlopen
 from datetime import datetime, timezone
 import io
 import random
 
-from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
+from fastapi import Request, Response, APIRouter, Header
 import httpx
 from pydantic import Field
-from prometheus_client import Counter
 import zstd
 
-from ..utils import (
-    generate_report_id,
-    extract_probe_ipaddr,
-    lookup_probe_cc,
-    lookup_probe_network,
-)
+from ..utils import generate_report_id, error, compare_probe_msmt_cc_asn
+from ..metrics import Metrics
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
@@ -28,49 +21,6 @@ from ..common.metrics import timer
 router = APIRouter()
 
 log = logging.getLogger(__name__)
-
-
-class Metrics:
-    MSMNT_DISCARD_ASN0 = Counter(
-        "receive_measurement_discard_asn_0",
-        "How many measurements were discarded due to probe_asn == ASN0",
-    )
-
-    MSMNT_DISCARD_CC_ZZ = Counter(
-        "receive_measurement_discard_cc_zz",
-        "How many measurements were discarded due to probe_cc == ZZ",
-    )
-
-    MSMNT_RECEIVED_CNT = Counter(
-        "receive_measurement_count",
-        "Count of incomming measurements",
-    )
-
-    PROBE_CC_ASN_MATCH = Counter(
-        "probe_cc_asn_match",
-        "How many matches between reported and observed probe_cc and asn",
-    )
-
-    PROBE_CC_ASN_NO_MATCH = Counter(
-        "probe_cc_asn_nomatch",
-        "How many mismatches between reported and observed probe_cc and asn",
-        labelnames=["mismatch", "reported", "detected"],
-    )
-
-    MISSED_MSMNTS = Counter(
-        "missed_msmnts", "Measurements that failed to be sent to the fast path."
-    )
-
-    SEND_FASTPATH_FAILURE = Counter(
-        "measurement_fastpath_send_failure_count",
-        "How many times ooniprobe failed to send a measurement to fastpath",
-    )
-
-    SEND_S3_FAILURE = Counter(
-        "measurement_s3_upload_failure_count",
-        "How many times ooniprobe failed to send a measurement to s3. "
-        "Measurements are sent to s3 when they can't be sent to the fastpath",
-    )
 
 
 class OpenReportRequest(BaseModel):
@@ -158,8 +108,10 @@ async def receive_measurement(
     empty_measurement = {}
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
-    except Exception:
-        log.info("Unexpected report_id %r", report_id[:200])
+    except Exception as e:
+        log.info(
+            f"Unexpected report_id {report_id[:200]}. Error: {e}",
+        )
         raise error("Incorrect format")
 
     # TODO validate the timestamp?
@@ -170,8 +122,8 @@ async def receive_measurement(
 
     try:
         asn_i = int(asn)
-    except ValueError:
-        log.info("ASN value not parsable %r", asn)
+    except ValueError as e:
+        log.info(f"ASN value not parsable {asn}. Error: {e}")
         error("Incorrect format")
 
     if asn_i == 0:
@@ -187,11 +139,11 @@ async def receive_measurement(
     data = await request.body()
     if content_encoding == "zstd":
         try:
+            compressed_len = len(data)
             data = zstd.decompress(data)
-            ratio = len(data) / len(data)
-            log.debug(f"Zstd compression ratio {ratio}")
+            log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
         except Exception as e:
-            log.info("Failed zstd decompression")
+            log.info(f"Failed zstd decompression. Error: {e}")
             error("Incorrect format")
 
     # Write the whole body of the measurement in a directory based on a 1-hour
@@ -221,7 +173,7 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
@@ -247,34 +199,3 @@ def close_report(report_id):
     Close a report
     """
     return {}
-
-
-def error(msg: str, status_code: int = 400):
-    raise HTTPException(status_code=status_code, detail=msg)
-
-
-def compare_probe_msmt_cc_asn(
-    cc: str,
-    asn: str,
-    request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
-):
-    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
-    Generates a metric.
-    """
-    try:
-        cc = cc.upper()
-        ipaddr = extract_probe_ipaddr(request)
-        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
-        if db_asn.startswith("AS"):
-            db_asn = db_asn[2:]
-        if db_probe_cc == cc and db_asn == asn:
-            Metrics.PROBE_CC_ASN_MATCH.inc()
-        elif db_probe_cc != cc:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc", reported=cc, detected=db_probe_cc).inc()
-        elif db_asn != asn:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn", reported=asn, detected=db_asn).inc()
-    except Exception:
-        pass

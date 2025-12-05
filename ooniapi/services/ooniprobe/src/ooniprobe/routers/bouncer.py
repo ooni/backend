@@ -48,7 +48,12 @@ class NetTestResponse(BaseModel):
     nettests: List[NetTest] = Field(alias="net-tests")
 
 
-@router.post("/net-tests", tags=["bouncer"], response_model=NetTestResponse, response_model_exclude_unset=True)
+@router.post(
+    "/net-tests",
+    tags=["bouncer"],
+    response_model=NetTestResponse,
+    response_model_exclude_unset=True,
+)
 async def bouncer_net_tests(
     response: Response,
     request: Request,
