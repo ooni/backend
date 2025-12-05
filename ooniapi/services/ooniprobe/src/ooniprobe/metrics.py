@@ -1,5 +1,6 @@
 from prometheus_client import Counter, Info, Gauge
 
+
 class Metrics:
     # -- < Measurement submission > ------------------------------------
     MSMNT_DISCARD_ASN0 = Counter(

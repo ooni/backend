@@ -11,11 +11,7 @@ import httpx
 from pydantic import Field
 import zstd
 
-from ..utils import (
-    generate_report_id,
-    error,
-    compare_probe_msmt_cc_asn
-)
+from ..utils import generate_report_id, error, compare_probe_msmt_cc_asn
 from ..metrics import Metrics
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..common.routers import BaseModel
@@ -25,6 +21,7 @@ from ..common.metrics import timer
 router = APIRouter()
 
 log = logging.getLogger(__name__)
+
 
 class OpenReportRequest(BaseModel):
     """
@@ -112,7 +109,9 @@ async def receive_measurement(
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
     except Exception as e:
-        log.info(f"Unexpected report_id {report_id[:200]}. Error: {e}", )
+        log.info(
+            f"Unexpected report_id {report_id[:200]}. Error: {e}",
+        )
         raise error("Incorrect format")
 
     # TODO validate the timestamp?
@@ -174,7 +173,7 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()

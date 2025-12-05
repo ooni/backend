@@ -21,10 +21,18 @@ from ...utils import (
     lookup_probe_cc,
     lookup_probe_network,
     error,
-    compare_probe_msmt_cc_asn
+    compare_probe_msmt_cc_asn,
 )
 
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, LatestManifestDep, PostgresSessionDep, S3ClientDep
+from ...dependencies import (
+    CCReaderDep,
+    ASNReaderDep,
+    ClickhouseDep,
+    SettingsDep,
+    LatestManifestDep,
+    PostgresSessionDep,
+    S3ClientDep,
+)
 from ..reports import Metrics
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -563,6 +571,7 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
         out.append({"address": th_addr, "type": "https"})
     return out
 
+
 class GeoLookupResult(BaseModel):
     cc: str = Field(description="Country Code")
     asn: str = Field(description="Autonomous System Number (ASN)")
@@ -570,20 +579,24 @@ class GeoLookupResult(BaseModel):
 
 
 class GeoLookupRequest(BaseModel):
-    addresses: List[IPvAnyAddress] = Field(description="list of IPv4 or IPv6 address to geolookup")
+    addresses: List[IPvAnyAddress] = Field(
+        description="list of IPv4 or IPv6 address to geolookup"
+    )
 
 
 class GeoLookupResponse(BaseModel):
     v: int = Field(description="response format version", default=1)
-    geolocation: Dict[IPvAnyAddress, GeoLookupResult] = Field(description="Dict of IP addresses to GeoLookupResult")
+    geolocation: Dict[IPvAnyAddress, GeoLookupResult] = Field(
+        description="Dict of IP addresses to GeoLookupResult"
+    )
 
 
 @router.post("/geolookup", tags=["ooniprobe"])
 async def geolookup(
-        data: GeoLookupRequest,
-        response: Response,
-        cc_reader: CCReaderDep,
-        asn_reader: ASNReaderDep,
+    data: GeoLookupRequest,
+    response: Response,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
 ) -> GeoLookupResponse:
 
     # initial values probe_geoip compares with
@@ -596,8 +609,11 @@ async def geolookup(
         # call probe_geoip() and map the keys to the geolookup v1 API
         resp, _, _ = probe_geoip(str(ipaddr), probe_cc, asn, cc_reader, asn_reader)
         # it doesn't seem possible to have separate aliases for (de)serialization
-        geolocation[ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
-            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
+        geolocation[ipaddr] = GeoLookupResult(
+            cc=resp["probe_cc"],
+            asn=resp["probe_asn"],
+            as_name=resp["probe_network_name"],
+        )
 
     setnocacheresponse(response)
     return GeoLookupResponse(geolocation=geolocation)
@@ -609,10 +625,11 @@ class CollectorEntry(BaseModel):
     front: Optional[str] = Field(default=None, description="Fronted domain")
     type: Optional[str] = Field(default=None, description="Type of collector")
 
+
 @router.get("/collectors", tags=["ooniprobe"])
 def list_collectors(
     settings: SettingsDep,
-    ) -> List[CollectorEntry]:
+) -> List[CollectorEntry]:
     config_collectors = settings.collectors
     collectors_response = []
     for entry in config_collectors:
@@ -620,7 +637,9 @@ def list_collectors(
         collectors_response.append(collector)
     return collectors_response
 
+
 # -- <Anonymous Credentials> ------------------------------------
+
 
 class ManifestResponse(BaseModel):
     nym_scope: str
@@ -628,61 +647,67 @@ class ManifestResponse(BaseModel):
     submission_policy: Dict[str, Any]
     version: str
 
+
 @router.get("/manifest", tags=["anonymous_credentials"])
-def manifest(manifest : LatestManifestDep) -> ManifestResponse:
+def manifest(manifest: LatestManifestDep) -> ManifestResponse:
     return ManifestResponse(
         nym_scope="ooni.org/{probe_cc}/{probe_asn}",
         public_parameters=manifest.server_state.public_parameters,
         submission_policy={},
-        version=manifest.version
-        )
+        version=manifest.version,
+    )
+
 
 class RegisterRequest(BaseModel):
     manifest_version: str
     credential_sign_request: str
 
+
 class RegisterResponse(BaseModel):
     credential_sign_response: str
     emission_day: int
 
+
 # TODO: choose a better name for this endpoint
 @router.post("/sign_credential", tags=["anonymous_credentials"])
-def sign_credential(register_request: RegisterRequest, session : PostgresSessionDep):
+def sign_credential(register_request: RegisterRequest, session: PostgresSessionDep):
 
     manifest = _retrieve_manifest(session, register_request.manifest_version)
     state: OONIProbeServerState = manifest.server_state
     protocol_state = state.to_protocol()
 
     try:
-        resp = protocol_state.handle_registration_request(register_request.credential_sign_request)
+        resp = protocol_state.handle_registration_request(
+            register_request.credential_sign_request
+        )
     except (ProtocolError, CredentialError, DeserializationFailed) as e:
         raise to_http_exception(e)
 
     return RegisterResponse(
-        credential_sign_response=resp,
-        emission_day=protocol_state.today()
+        credential_sign_response=resp, emission_day=protocol_state.today()
     )
 
 
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
 
     type_to_str = {
-        ProtocolError : "protocol_error",
-        DeserializationFailed : "deserialization_failed",
-        CredentialError : "credential_error"
+        ProtocolError: "protocol_error",
+        DeserializationFailed: "deserialization_failed",
+        CredentialError: "credential_error",
     }
     type_str = type_to_str[type(error)]
 
     assert isinstance(error, (ProtocolError, CredentialError, DeserializationFailed))
-    status_code = status.HTTP_400_BAD_REQUEST if isinstance(error, DeserializationFailed) else status.HTTP_403_FORBIDDEN
+    status_code = (
+        status.HTTP_400_BAD_REQUEST
+        if isinstance(error, DeserializationFailed)
+        else status.HTTP_403_FORBIDDEN
+    )
 
     return HTTPException(
-        status_code=status_code,
-        detail={
-            "error" : type_str,
-            "message" : str(error)
-        }
+        status_code=status_code, detail={"error": type_str, "message": str(error)}
     )
+
 
 class SubmitMeasurementRequest(BaseModel):
     format: str
@@ -691,19 +716,17 @@ class SubmitMeasurementRequest(BaseModel):
     # not post quantum, in the future we might want to use a hashed key for storage
     nym: str
     zkp_request: str
-    probe_age_range: Tuple[int,int] = Field(
-        description=
-        "A range representing an interval containing the probe actual age. "
+    probe_age_range: Tuple[int, int] = Field(
+        description="A range representing an interval containing the probe actual age. "
         "This is used for the anonymous credentials protocol to identify the probe without using "
         "personally identifiable information.\n"
         "The server will use the age range to validate in zero proof that the request came from a "
         "trusted probe. "
         "Example: if probe age is 30 days, a valid answer is (25, 35)"
         "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
-        )
-    probe_msm_range: Tuple[int,int] = Field(
-        description=
-        "A range representing an interval containing the how many measurements the probe has sent. "
+    )
+    probe_msm_range: Tuple[int, int] = Field(
+        description="A range representing an interval containing the how many measurements the probe has sent. "
         "This is used for the anonymous credentials protocol to identify the probe without using "
         "personally identifiable information.\n"
         "The server will use the measurement count range to validate in zero proof that "
@@ -713,6 +736,7 @@ class SubmitMeasurementRequest(BaseModel):
     )
     manifest_version: str
 
+
 class SubmitMeasurementResponse(BaseModel):
     """
     Acknowledge
@@ -721,12 +745,11 @@ class SubmitMeasurementResponse(BaseModel):
     measurement_uid: str | None = Field(
         examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
     )
-    is_verified: bool = Field(
-        description="if the ZKP was able to verify this request"
-    )
+    is_verified: bool = Field(description="if the ZKP was able to verify this request")
     submit_response: str | None = Field(
         description="Anonymous credential verification response. Null if verification failed"
     )
+
 
 @router.post("/submit_measurement/{report_id}")
 async def submit_measurement(
@@ -784,8 +807,12 @@ async def submit_measurement(
 
     # Run verification
     assert manifest
-    assert "probe_cc" in submit_request.content and isinstance(submit_request.content['probe_cc'], str)
-    assert "probe_asn" in submit_request.content and isinstance(submit_request.content['probe_asn'], str)
+    assert "probe_cc" in submit_request.content and isinstance(
+        submit_request.content["probe_cc"], str
+    )
+    assert "probe_asn" in submit_request.content and isinstance(
+        submit_request.content["probe_asn"], str
+    )
 
     state: OONIProbeServerState = manifest.server_state
     protocol_state = state.to_protocol()
@@ -798,7 +825,7 @@ async def submit_measurement(
             submit_request.content["probe_asn"],
             list(submit_request.probe_age_range),
             list(submit_request.probe_msm_range),
-            )
+        )
         is_verified = True
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         # proof failed
@@ -810,7 +837,7 @@ async def submit_measurement(
     data = submit_request.model_dump()
 
     # Add verification-related data.
-    data['is_verified'] = is_verified
+    data["is_verified"] = is_verified
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
     ujson.dump(data, stream)
@@ -838,13 +865,17 @@ async def submit_measurement(
                 resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
-            return SubmitMeasurementResponse(measurement_uid=msmt_uid, is_verified=is_verified, submit_response=submit_response)
+            return SubmitMeasurementResponse(
+                measurement_uid=msmt_uid,
+                is_verified=is_verified,
+                submit_response=submit_response,
+            )
 
         except Exception as exc:
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
@@ -862,30 +893,35 @@ async def submit_measurement(
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
 
+
 class CredentialUpdateRequest(BaseModel):
-    old_manifest_version: str = Field(description=
-            "The original manifest version you are trying to update from"
-        )
-    manifest_version: str = Field(description=
-            "The up-to-date version of the manifest you used to generate the update request"
-            )
-    update_request: str = Field(description=
-            "The ZKP request generated by the anonymous credentials library. "
-            "Note that you need to generate this with the new server credentials, "
-            "so you might want to update your manifest version to the most recent one"
-        )
+    old_manifest_version: str = Field(
+        description="The original manifest version you are trying to update from"
+    )
+    manifest_version: str = Field(
+        description="The up-to-date version of the manifest you used to generate the update request"
+    )
+    update_request: str = Field(
+        description="The ZKP request generated by the anonymous credentials library. "
+        "Note that you need to generate this with the new server credentials, "
+        "so you might want to update your manifest version to the most recent one"
+    )
+
 
 class CredentialUpdateResponse(BaseModel):
-    update_response: str = Field(description=
-            "The ZKP response generated by the anonymous credentials library"
-        )
+    update_response: str = Field(
+        description="The ZKP response generated by the anonymous credentials library"
+    )
 
 
-@router.post("/update_credential", response_model=CredentialUpdateResponse, tags=["anonymous_credentials"])
+@router.post(
+    "/update_credential",
+    response_model=CredentialUpdateResponse,
+    tags=["anonymous_credentials"],
+)
 async def credential_update(
-    update_request: CredentialUpdateRequest,
-    session : PostgresSessionDep
-    ) -> CredentialUpdateResponse:
+    update_request: CredentialUpdateRequest, session: PostgresSessionDep
+) -> CredentialUpdateResponse:
     """
     Update your credentials from an older version to a new version.
     This might be necessary when the manifest is updated and our keys are rotated.
@@ -895,9 +931,11 @@ async def credential_update(
 
     if update_request.old_manifest_version == update_request.manifest_version:
         error(
-            {"error":"credential_already_updated",
-             "detail":"old manifest and current manifest are the same"
-            })
+            {
+                "error": "credential_already_updated",
+                "detail": "old manifest and current manifest are the same",
+            }
+        )
 
     # TODO check that the new manifest is a valid one
     old_manifest = _retrieve_manifest(session, update_request.old_manifest_version)
@@ -912,20 +950,23 @@ async def credential_update(
         response = protocol_state.handle_update_request(
             update_request.update_request,
             old_state.public_parameters,
-            old_state.secret_key
-            )
+            old_state.secret_key,
+        )
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         raise to_http_exception(e)
 
     return CredentialUpdateResponse(update_response=response)
 
-def _retrieve_manifest(session: PostgresSessionDep, version : str) -> OONIProbeManifest:
+
+def _retrieve_manifest(session: PostgresSessionDep, version: str) -> OONIProbeManifest:
     manifest = OONIProbeManifest.get_by_version(session, version)
     if manifest is None:
-        raise HTTPException(detail=
-            {"error" : "manifest_not_found",
-             "message" : f"No manifest with version '{version}' was found"
+        raise HTTPException(
+            detail={
+                "error": "manifest_not_found",
+                "message": f"No manifest with version '{version}' was found",
             },
-            status_code=status.HTTP_404_NOT_FOUND)
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
 
     return manifest

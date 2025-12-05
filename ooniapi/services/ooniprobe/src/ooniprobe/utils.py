@@ -177,6 +177,8 @@ def compare_probe_msmt_cc_asn(
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
     except Exception:
         pass
+
+
 def get_first_ip(headers: str) -> str:
     """
     parse the first ip from a comma-separated list of ips encoded as a string
@@ -186,4 +188,4 @@ def get_first_ip(headers: str) -> str:
     out: '123.123.123'
     """
 
-    return headers.partition(',')[0]
+    return headers.partition(",")[0]

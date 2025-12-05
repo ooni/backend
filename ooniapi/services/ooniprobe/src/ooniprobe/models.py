@@ -8,6 +8,7 @@ from sqlalchemy.orm import mapped_column, relationship, Session, joinedload
 from sqlalchemy import desc
 from ooniauth_py import ServerState
 import logging
+
 log = logging.getLogger(__name__)
 
 
@@ -75,7 +76,7 @@ class OONIProbeServerState(Base):
     public_parameters: Mapped[str] = mapped_column()
 
     @classmethod
-    def make_new_state(cls, session: Session, state : ServerState | None = None) -> Self:
+    def make_new_state(cls, session: Session, state: ServerState | None = None) -> Self:
         """
         Creates a new state, saving it to db
         If no state value is provided, create a default one with random values
@@ -85,8 +86,8 @@ class OONIProbeServerState(Base):
 
         new = cls(
             secret_key=state.get_secret_key(),
-            public_parameters = state.get_public_parameters()
-            )
+            public_parameters=state.get_public_parameters(),
+        )
         session.add(new)
         session.commit()
         session.refresh(new)
@@ -137,8 +138,7 @@ class OONIProbeManifest(Base):
     @classmethod
     def get_latest(cls, session: Session) -> Self | None:
         return (
-            session
-            .query(cls)
+            session.query(cls)
             .options(joinedload(cls.server_state))
             .order_by(desc(cls.version))
             .limit(1)
@@ -148,8 +148,7 @@ class OONIProbeManifest(Base):
     @classmethod
     def get_by_version(cls, session: Session, version: str) -> Self | None:
         return (
-            session
-            .query(cls)
+            session.query(cls)
             .options(joinedload(cls.server_state))
             .where(cls.version == version)
             .one_or_none()
@@ -166,7 +165,12 @@ class OONIProbeManifest(Base):
 
             # Make sure there's a server state
             OONIProbeServerState.init_table(session)
-            state = session.query(OONIProbeServerState).order_by(desc(OONIProbeServerState.date_created)).limit(1).one()
+            state = (
+                session.query(OONIProbeServerState)
+                .order_by(desc(OONIProbeServerState.date_created))
+                .limit(1)
+                .one()
+            )
             entry = cls(server_state_id=state.id)
             session.add(entry)
             session.commit()

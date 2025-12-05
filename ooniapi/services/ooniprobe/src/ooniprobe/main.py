@@ -51,7 +51,7 @@ async def lifespan(
     db = get_postgresql_session(settings)
     session = next(db)
     models.OONIProbeManifest.init_table(session)
-    next(db, None) # closes the connection
+    next(db, None)  # closes the connection
 
     yield
 
@@ -151,7 +151,7 @@ async def health(
     except Exception as exc:
         log.error("Error trying to retrieve server state")
         log.error(exc)
-        pass # Database error already reported above
+        pass  # Database error already reported above
 
     status = "ok"
     if len(errors) > 0:

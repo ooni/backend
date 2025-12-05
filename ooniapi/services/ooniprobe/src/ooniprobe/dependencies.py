@@ -30,7 +30,9 @@ def get_postgresql_session(settings: SettingsDep):
     finally:
         db.close()
 
+
 PostgresSessionDep = Annotated[Session, Depends(get_postgresql_session)]
+
 
 def get_cc_reader(settings: SettingsDep):
     db_path = Path(settings.geoip_db_dir, "cc.mmdb")
@@ -67,9 +69,10 @@ def get_s3_client() -> S3Client:
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
 
 
-def get_latest_manifest(session : PostgresSessionDep) -> OONIProbeManifest:
+def get_latest_manifest(session: PostgresSessionDep) -> OONIProbeManifest:
     manifest = OONIProbeManifest.get_latest(session)
     assert manifest is not None, "Uninitialized `OONIProbeServerState` table"
     return manifest
+
 
 LatestManifestDep = Annotated[OONIProbeManifest, Depends(get_latest_manifest)]

@@ -26,10 +26,15 @@ class PrioritizationType(BaseModel):
     url: Optional[str] = Field("URL or wildcard (*)")
 
 
-@router.get("/_/show_countries_prioritization", tags=["prioritization"], response_model=None)
-def show_countries_prioritization(clickhouse: ClickhouseDep,
-    format: Optional[str] = Query(default="JSON", description="Format of response, CSV or JSON")
-    ) -> List[PrioritizationType]:
+@router.get(
+    "/_/show_countries_prioritization", tags=["prioritization"], response_model=None
+)
+def show_countries_prioritization(
+    clickhouse: ClickhouseDep,
+    format: Optional[str] = Query(
+        default="JSON", description="Format of response, CSV or JSON"
+    ),
+) -> List[PrioritizationType]:
     sql = """
     SELECT domain, url, cc, category_code, msmt_cnt, anomaly_perc
     FROM citizenlab
@@ -54,7 +59,7 @@ def show_countries_prioritization(clickhouse: ClickhouseDep,
 
     li = sorted(li, key=lambda x: (x["cc"], -x["priority"]))
 
-    if len(li)== 0:
+    if len(li) == 0:
         raise HTTPException(status_code=400, detail="no data")
 
     if format.upper() == "CSV":
@@ -71,17 +76,24 @@ class DebugPrioritization(BaseModel):
     prio_rules: Tuple
 
 
-@router.get("/_/debug_prioritization", tags=["prioritization"], response_model=DebugPrioritization)
+@router.get(
+    "/_/debug_prioritization",
+    tags=["prioritization"],
+    response_model=DebugPrioritization,
+)
 def debug_prioritization(
     clickhouse: ClickhouseDep,
     probe_cc: Optional[str] = Query(description="2-letter Country-Code", default="ZZ"),
-    category_codes: str = Query(description="Comma separated list of uppercase URL categories"),
+    category_codes: str = Query(
+        description="Comma separated list of uppercase URL categories"
+    ),
     probe_asn: int = Query(description="Probe ASN"),
-    limit: Optional[int] = Query(description="Maximum number of URLs to return", default=-1),
-    ) -> DebugPrioritization:
+    limit: Optional[int] = Query(
+        description="Maximum number of URLs to return", default=-1
+    ),
+) -> DebugPrioritization:
 
-    test_items, entries, prio_rules = generate_test_list(clickhouse,
-        probe_cc, category_codes, probe_asn, limit, True
+    test_items, entries, prio_rules = generate_test_list(
+        clickhouse, probe_cc, category_codes, probe_asn, limit, True
     )
     return {"test_items": test_items, "entries": entries, "prio_rules": prio_rules}
-
