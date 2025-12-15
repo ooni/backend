@@ -9,9 +9,11 @@ from os import urandom
 from datetime import datetime, timezone
 import itertools
 import logging
-from typing import Dict, List, Mapping, TypedDict, Tuple
+from typing import List, TypedDict, Tuple
+import io
 
 from fastapi import Request
+from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
 import pem
 import httpx
@@ -146,6 +148,7 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
         resp.autonomous_system_organization or "0",
     )
 
+
 def get_first_ip(headers: str) -> str:
     """
     parse the first ip from a comma-separated list of ips encoded as a string
@@ -156,3 +159,14 @@ def get_first_ip(headers: str) -> str:
     """
 
     return headers.partition(',')[0]
+
+
+def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
+    """
+    Reads the content of `file` within `bucket` into a  string
+
+    Useful for reading config files from the s3 bucket
+    """
+    buff = io.BytesIO()
+    s3_client.download_fileobj(bucket, file, buff)
+    return buff.getvalue().decode()
