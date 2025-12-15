@@ -16,8 +16,10 @@ from ...utils import (
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
+    read_file,
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
+from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, S3ClientDep
+
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
@@ -660,6 +662,7 @@ class TorTarget(BaseModel):
 def list_tor_targets(
     request: Request,
     settings: SettingsDep,
+    s3client: S3ClientDep,
     ) -> Dict[str, TorTarget]:
 
     token = request.headers.get("Authorization")
@@ -667,7 +670,7 @@ def list_tor_targets(
         # XXX not actually validated
         pass
     try:
-        with open(settings.tor_targets, 'r') as f:
+        with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
             resp = ujson.load(f)
         return resp
     except ujson.JSONDecodeError:
