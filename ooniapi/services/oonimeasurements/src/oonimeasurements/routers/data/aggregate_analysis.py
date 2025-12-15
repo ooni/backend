@@ -1,15 +1,17 @@
+from enum import Enum
 import time
 import math
 from datetime import datetime
-from typing import List, Literal, Optional, Tuple, Union, Dict
+from ...common.clickhouse_utils import query_click
+from typing import Any, List, Literal, Optional, Self, Tuple, Dict
 from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import sqlalchemy as sql
 
 from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int
-from ...dependencies import (
-    get_clickhouse_session,
-)
+from ...utils.api import ProbeCCOrNone, ProbeASNOrNone
+from ...dependencies import get_clickhouse_session, ClickhouseDep
 from .list_analysis import (
     SinceUntil,
     utc_30_days_ago,
@@ -279,6 +281,10 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     )
     """
 
+def nan_to_none(val):
+    if math.isnan(val):
+        return None
+    return val
 
 @router.get(
     "/v1/aggregation/analysis",
@@ -292,8 +298,8 @@ async def get_aggregation_analysis(
     test_name: Annotated[Optional[str], Query()] = None,
     domain: Annotated[Optional[str], Query()] = None,
     input: Annotated[Optional[str], Query()] = None,
-    probe_asn: Annotated[Union[int, str, None], Query()] = None,
-    probe_cc: Annotated[Optional[str], Query(min_length=2, max_length=2)] = None,
+    probe_asn: ProbeASNOrNone = None,
+    probe_cc: ProbeCCOrNone = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
     since: SinceUntil = utc_30_days_ago(),
     until: SinceUntil = utc_today(),
@@ -397,10 +403,6 @@ async def get_aggregation_analysis(
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
             blocked_max_protocol = d["blocked_max_protocol"]
 
-            def nan_to_none(val):
-                if math.isnan(val):
-                    return None
-                return val
 
             loni = Loni(
                 dns_blocked=nan_to_none(d["dns_blocked"]),
@@ -447,3 +449,154 @@ async def get_aggregation_analysis(
         dimension_count=dimension_count,
         results=results,
     )
+
+
+class ChangeDir(str, Enum):
+    up = "up"
+    down = "down"
+
+    @classmethod
+    def from_n_or_i(cls, i: int | None) -> Self | None:
+        if i is None:
+            return None
+
+        return cls("down") if i == -1 else cls("up")
+
+
+class ChangePointEntry(BaseModel):
+    # TODO Double check which fields are actually necessary
+    probe_asn: int
+    probe_cc: str
+    domain: str
+    start_time: datetime  # TODO double check the naming of these datetime fields
+    end_time: datetime
+    count_isp_resolver: int
+    count_other_resolver: int
+    count: int
+    dns_isp_blocked: float | None
+    dns_other_blocked: float | None
+    tcp_blocked: float | None
+    tls_blocked: float | None
+    dns_isp_blocked_obs_w_sum: float | None
+    dns_isp_blocked_w_sum: float | None
+    dns_isp_blocked_s_pos: float | None
+    dns_isp_blocked_s_neg: float | None
+    dns_other_blocked_obs_w_sum: float | None
+    dns_other_blocked_w_sum: float | None
+    dns_other_blocked_s_pos: float | None
+    dns_other_blocked_s_neg: float | None
+    tcp_blocked_obs_w_sum: float | None
+    tcp_blocked_w_sum: float | None
+    tcp_blocked_s_pos: float | None
+    tcp_blocked_s_neg: float | None
+    tls_blocked_obs_w_sum: float | None
+    tls_blocked_w_sum: float | None
+    tls_blocked_s_pos: float | None
+    tls_blocked_s_neg: float | None
+    change_dir: ChangeDir | None = Field(
+        description="If blocking behaviour goes up or down"
+    )
+    s_pos: float | None
+    s_neg: float | None
+    current_mean: float | None
+    h: float | None
+    block_type: str
+
+    @classmethod
+    def from_row(cls, row: Dict[str, Any]) -> Self:
+        """
+        Takes a row as it comes from the clickhouse table 'event_detector_changepoints'
+        and converts it to a changepoint entry
+        """
+
+        def g(s : str) -> Any | None:
+            return row.get(s)
+
+        return ChangePointEntry(
+            probe_asn=g("probe_asn"),
+            probe_cc=g("probe_cc"),
+            domain=g("domain"),
+            start_time=g("ts"),
+            end_time=g("last_ts"),
+            count_isp_resolver=g("count_isp_resolver"),
+            count_other_resolver=g("count_other_resolver"),
+            count=g("count"),
+            dns_isp_blocked= nan_to_none(g("dns_isp_blocked")),
+            dns_other_blocked=nan_to_none(g("dns_other_blocked")),
+            tcp_blocked=nan_to_none(g("tcp_blocked")),
+            tls_blocked=nan_to_none(g("tls_blocked")),
+            dns_isp_blocked_obs_w_sum=nan_to_none(g("dns_isp_blocked_obs_w_sum")),
+            dns_isp_blocked_w_sum=nan_to_none(g("dns_isp_blocked_w_sum")),
+            dns_isp_blocked_s_pos=nan_to_none(g("dns_isp_blocked_s_pos")),
+            dns_isp_blocked_s_neg=nan_to_none(g("dns_isp_blocked_s_neg")),
+            dns_other_blocked_obs_w_sum=nan_to_none(g("dns_other_blocked_obs_w_sum")),
+            dns_other_blocked_w_sum=nan_to_none(g("dns_other_blocked_w_sum")),
+            dns_other_blocked_s_pos=nan_to_none(g("dns_other_blocked_s_pos")),
+            dns_other_blocked_s_neg=nan_to_none(g("dns_other_blocked_s_neg")),
+            tcp_blocked_obs_w_sum=nan_to_none(g("tcp_blocked_obs_w_sum")),
+            tcp_blocked_w_sum=nan_to_none(g("tcp_blocked_w_sum")),
+            tcp_blocked_s_pos=nan_to_none(g("tcp_blocked_s_pos")),
+            tcp_blocked_s_neg=nan_to_none(g("tcp_blocked_s_neg")),
+            tls_blocked_obs_w_sum=nan_to_none(g("tls_blocked_obs_w_sum")),
+            tls_blocked_w_sum=nan_to_none(g("tls_blocked_w_sum")),
+            tls_blocked_s_pos=nan_to_none(g("tls_blocked_s_pos")),
+            tls_blocked_s_neg=nan_to_none(g("tls_blocked_s_neg")),
+            change_dir=ChangeDir.from_n_or_i(g("change_dir")),
+            s_pos=nan_to_none(g("s_pos")),
+            s_neg=nan_to_none(g("s_neg")),
+            current_mean=nan_to_none(g("current_mean")),
+            h=nan_to_none(g("h")),
+            block_type= g("block_type")
+        )  # type: ignore
+
+
+class ListChangePointsResponse(BaseModel):
+    results: List[ChangePointEntry]
+
+
+@router.get(
+    "/v1/detector/changepoints",
+    tags=["detector"],
+    description="List changepoints detected by the event detector using the cusum  algorithm",
+    response_model=ListChangePointsResponse,
+)
+@parse_probe_asn_to_int
+async def list_changepoints(
+    clickhouse: ClickhouseDep,
+    probe_asn: ProbeASNOrNone = None,
+    probe_cc: ProbeCCOrNone = None,
+    domain: str | None = Query(default=None),
+    since: SinceUntil = utc_30_days_ago(),
+    until: SinceUntil = utc_today(),
+) -> ListChangePointsResponse:
+    conditions = []
+    query_params = {}
+
+    if probe_asn:
+        conditions.append(sql.text("probe_asn = :probe_asn"))
+        query_params["probe_asn"] = probe_asn
+
+    if probe_cc:
+        conditions.append(sql.text("probe_cc = :probe_cc"))
+        query_params["probe_cc"] = probe_cc
+
+    if domain:
+        conditions.append(
+            sql.text("domain = :domain")
+        )  # TODO should this be 'like %domain%'?
+        query_params["domain"] = domain
+
+    conditions.append(sql.text("ts >= :since"))
+    query_params["since"] = since
+
+    conditions.append(sql.text("ts <= :until"))
+    query_params["until"] = until
+
+    changepoints = sql.table("event_detector_changepoints")
+    q = sql.select("*").select_from(changepoints).where(sql.and_(*conditions))
+
+    query_result = query_click(clickhouse, q, query_params)
+
+    results = [ChangePointEntry.from_row(entry) for entry in query_result]
+
+    return ListChangePointsResponse(results=results)
