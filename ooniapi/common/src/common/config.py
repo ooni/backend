@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     vpn_credential_refresh_hours: int = 24
 
+    # Bucket used to store configuration files
+    config_bucket: str = ""
+
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
     # Ooniprobe only
