@@ -130,7 +130,7 @@ def extract_probe_ipaddr(request: Request) -> str:
 
     for h in real_ip_headers:
         if h in request.headers:
-            return request.headers.getlist(h)[0].rpartition(" ")[-1]
+            return get_first_ip(request.headers.getlist(h)[0])
 
     return request.client.host if request.client else ""
 
@@ -147,6 +147,16 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
         "AS{}".format(resp.autonomous_system_number),
         resp.autonomous_system_organization or "0",
     )
+  
+def get_first_ip(headers: str) -> str:
+    """
+    parse the first ip from a comma-separated list of ips encoded as a string
+
+    example:
+    in: '123.123.123, 1.1.1.1'
+    out: '123.123.123'
+    """
+    return headers.partition(',')[0]
 
 def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
     """
