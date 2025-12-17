@@ -11,6 +11,14 @@ from prometheus_client import Counter, Info, Gauge
 from pydantic import Field, IPvAnyAddress
 import ujson
 
+from ...dependencies import (
+    ASNReaderDep,
+    CCReaderDep,
+    ClickhouseDep,
+    S3ClientDep,
+    SettingsDep,
+    TorTargetsDep,
+)
 from ...utils import (
     generate_report_id,
     extract_probe_ipaddr,
@@ -18,8 +26,6 @@ from ...utils import (
     lookup_probe_network,
     read_file,
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep, S3ClientDep
-
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
@@ -663,20 +669,15 @@ class TorTarget(BaseModel):
 @router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
 def list_tor_targets(
     request: Request,
-    settings: SettingsDep,
-    s3client: S3ClientDep,
+    targets: TorTargetsDep,
     ) -> Dict[str, TorTarget]:
 
     token = request.headers.get("Authorization")
     if token == None:
         # XXX not actually validated
         pass
-    try:
-        with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
-            resp = ujson.load(f)
-        return resp
-    except ujson.JSONDecodeError:
-        log.info("tor-targets: failed to parse json")
-    except FileNotFoundError:
-         log.info("tor-targets: failed to open json")
+
+    if targets is not None:
+        return targets
+    log.info("tor-targets: failed to receive tor-targets from s3")
     raise HTTPException(status_code=401, detail="Invalid tor-targets")

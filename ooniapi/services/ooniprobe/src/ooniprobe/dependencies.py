@@ -1,4 +1,6 @@
-from typing import Annotated, TypeAlias
+import io
+from functools import lru_cache
+from typing import Annotated, TypeAlias, Dict, Any
 from pathlib import Path
 
 from fastapi import Depends
@@ -64,3 +66,23 @@ def get_s3_client() -> S3Client:
 
 
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
+
+
+@lru_cache
+def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
+    """
+    Reads the content of `file` within `bucket` into a  string
+
+    Useful for reading config files from the s3 bucket
+    """
+    buff = io.BytesIO()
+    s3_client.download_fileobj(bucket, file, buff)
+    return buff.getvalue().decode()
+
+
+async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep) -> Dict[str, Any]:
+    with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
+        resp = ujson.load(f)
+    yield resp
+
+TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
