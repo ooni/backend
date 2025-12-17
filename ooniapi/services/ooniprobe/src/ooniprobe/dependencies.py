@@ -1,18 +1,14 @@
 import io
 from functools import lru_cache
-from typing import Annotated, TypeAlias, Dict, Any
 from pathlib import Path
-
-from fastapi import Depends
-
-import geoip2.database
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from clickhouse_driver import Client as Clickhouse
+from typing import Annotated, TypeAlias, Dict, Any
 
 import boto3
+import geoip2.database
+from clickhouse_driver import Client as Clickhouse
+from fastapi import Depends
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from mypy_boto3_s3 import S3Client
 
 from .common.config import Settings

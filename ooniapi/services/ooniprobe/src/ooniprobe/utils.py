@@ -4,23 +4,23 @@ VPN Services
 Insert VPN credentials into database.
 """
 
-from base64 import b64encode
-from os import urandom
-from datetime import datetime, timezone
 import itertools
 import logging
-from typing import List, TypedDict, Tuple
 import io
+from base64 import b64encode
+from datetime import datetime, timezone
+from os import urandom
+from typing import List, TypedDict, Tuple
 
+import httpx
+import pem
 from fastapi import Request
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
-import pem
-import httpx
 
 from .common.config import Settings
-from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 from .dependencies import CCReaderDep, ASNReaderDep
+from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"

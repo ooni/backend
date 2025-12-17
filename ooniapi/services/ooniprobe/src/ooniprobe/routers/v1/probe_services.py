@@ -1,21 +1,22 @@
 import logging
-from datetime import datetime, timezone, timedelta
-import time
-from typing import List, Optional, Any, Dict, Tuple, Optional
 import random
+import time
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Any, Dict, Tuple
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field, IPvAnyAddress
-import ujson
 
+from ...common.auth import create_jwt, decode_jwt, jwt
+from ...common.routers import BaseModel
+from ...common.utils import setnocacheresponse
 from ...dependencies import (
     ASNReaderDep,
     CCReaderDep,
     ClickhouseDep,
-    S3ClientDep,
     SettingsDep,
     TorTargetsDep,
 )
@@ -24,12 +25,7 @@ from ...utils import (
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
-    read_file,
 )
-from ...common.routers import BaseModel
-from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.config import Settings
-from ...common.utils import setnocacheresponse
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
