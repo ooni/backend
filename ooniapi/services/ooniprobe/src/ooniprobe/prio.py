@@ -21,14 +21,14 @@ blockdiag {
 ```
 """
 
-from typing import List, Tuple
 import logging
+from typing import List, Tuple
+
+import sqlalchemy as sa
+from clickhouse_driver import Client as Clickhouse
 
 from .common.clickhouse_utils import query_click
 from .common.metrics import timer
-
-from clickhouse_driver import Client as Clickhouse
-import sqlalchemy as sa
 
 log = logging.getLogger(__name__)
 

@@ -1,29 +1,27 @@
-from typing import List, Annotated, Dict, Any
 import asyncio
-from pathlib import Path
-import logging
-from hashlib import sha512
-from urllib.request import urlopen
-from datetime import datetime, timezone
 import io
+import logging
 import random
+from datetime import datetime, timezone
+from hashlib import sha512
+from typing import List, Dict, Any
 
-from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
 import httpx
+from fastapi import Request, Response, APIRouter, HTTPException, Header
 from pydantic import Field
 from prometheus_client import Counter
 import zstd
 
+from ..common.metrics import timer
+from ..common.routers import BaseModel
+from ..common.utils import setnocacheresponse
+from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..utils import (
     generate_report_id,
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
 )
-from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
-from ..common.routers import BaseModel
-from ..common.utils import setnocacheresponse
-from ..common.metrics import timer
 
 router = APIRouter()
 
