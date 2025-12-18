@@ -269,12 +269,14 @@ def test_msm_meta_probe_asn_int(client, monkeypatch):
     j = resp.json()
     assert isinstance(j["probe_asn"], int), "probe_asn should be int"
 
+
 def test_no_report_id_msm_uid_400(client):
     """
     measurement_meta should return 400 if neither report_id nor measurement_uid are provided
     """
     resp = client.get("/api/v1/measurement_meta")
     assert resp.status_code == 400
+
 
 def test_fix_msm_date_parsing(client):
 
@@ -316,7 +318,7 @@ def test_get_measurement_meta_basic(client):
 
     # You can also query by measurment uid
     uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
-    response = client.get("/api/v1/measurement_meta", params={'measurement_uid' : uid})
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": uid})
     assert response.status_code == 200, response.status_code
 
 
@@ -383,12 +385,17 @@ def test_get_measurement_meta_full(client, monkeypatch):
     }
     assert raw_msm
 
+
 def test_bad_report_id_wont_validate(client):
 
-    resp = client.get("/api/v1/measurement_meta", params={
-        "report_id" : "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds#$%" # bad suffix
-    })
+    resp = client.get(
+        "/api/v1/measurement_meta",
+        params={
+            "report_id": "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds#$%"  # bad suffix
+        },
+    )
     assert resp.status_code == 422, resp.json()
+
 
 def test_no_measurements_before_30_days(client):
     """

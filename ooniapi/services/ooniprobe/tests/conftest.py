@@ -5,6 +5,7 @@ import pytest
 import shutil
 import os
 import json
+import time
 from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
@@ -111,15 +112,12 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(
-    alembic_migration, docker_ip, docker_services, geoip_db_dir, fastpath_server
-):
-    port = docker_services.port_for("clickhouse", 9000)
+def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_server):
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",
-        clickhouse_url=f"clickhouse://test:test@{docker_ip}:{port}",
+        clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
         fastpath_url=fastpath_server,
@@ -132,6 +130,8 @@ def jwt_encryption_key():
 
 
 def is_clickhouse_running(url):
+    # using ClickhouseClient as probe spams WARN messages with logger in clickhouse_driver
+    time.sleep(2)
     try:
         with ClickhouseClient.from_url(url) as client:
             client.execute("SELECT 1")
@@ -146,7 +146,7 @@ def clickhouse_server(docker_ip, docker_services):
     # See password in docker compose
     url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
     docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.1, check=lambda: is_clickhouse_running(url)
+        timeout=30.0, pause=1.0, check=lambda: is_clickhouse_running(url)
     )
     yield url
 

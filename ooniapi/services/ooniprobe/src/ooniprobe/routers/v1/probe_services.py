@@ -8,7 +8,7 @@ import geoip2
 import geoip2.errors
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, Request
 from prometheus_client import Counter, Info, Gauge
-from pydantic import Field
+from pydantic import Field, IPvAnyAddress
 
 from ...utils import (
     generate_report_id,
@@ -17,7 +17,6 @@ from ...utils import (
     lookup_probe_network,
 )
 from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
-from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.config import Settings
@@ -85,7 +84,7 @@ class ProbeLoginResponse(BaseModel):
 def probe_login_post(
     probe_login: ProbeLogin,
     response: Response,
-    settings: Settings = Depends(get_settings),
+    settings: SettingsDep,
 ) -> ProbeLoginResponse:
 
     if probe_login.username is None or probe_login.password is None:
@@ -155,7 +154,7 @@ class ProbeRegisterResponse(BaseModel):
 def probe_register_post(
     probe_register: ProbeRegister,
     response: Response,
-    settings: Settings = Depends(get_settings),
+    settings: SettingsDep,
 ) -> ProbeRegisterResponse:
     """Probe Services: Register
 
@@ -353,9 +352,9 @@ def check_in(
     probe_asn = check_in.probe_asn
     software_name = check_in.software_name
     software_version = check_in.software_version
-
+    ipaddr = extract_probe_ipaddr(request)
     resp, probe_cc, asn_i = probe_geoip(
-        request,
+        ipaddr,
         probe_cc,
         probe_asn,
         cc_reader,
@@ -478,7 +477,7 @@ def check_in(
 
 
 def probe_geoip(
-    request: Request,
+    ipaddr: str,
     probe_cc: str,
     asn: str,
     cc_reader: CCReaderDep,
@@ -491,7 +490,6 @@ def probe_geoip(
     db_asn = "AS0"
     db_probe_network_name = None
     try:
-        ipaddr = extract_probe_ipaddr(request)
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
@@ -684,3 +682,61 @@ def list_test_urls(
     )
     setcacheresponse("1s", response)
     return out
+
+
+class GeoLookupResult(BaseModel):
+    cc: str = Field(description="Country Code")
+    asn: str = Field(description="Autonomous System Number (ASN)")
+    as_name: str = Field(description="Autonomous System Name")
+
+
+class GeoLookupRequest(BaseModel):
+    addresses: List[IPvAnyAddress] = Field(description="list of IPv4 or IPv6 address to geolookup")
+
+
+class GeoLookupResponse(BaseModel):
+    v: int = Field(description="response format version", default="1")
+    geolocation: Dict[IPvAnyAddress, GeoLookupResult] = Field(description="Dict of IP addresses to GeoLookupResult")
+
+
+@router.post("/geolookup", tags=["ooniprobe"])
+async def geolookup(
+        data: GeoLookupRequest,
+        response: Response,
+        cc_reader: CCReaderDep,
+        asn_reader: ASNReaderDep,
+) -> GeoLookupResponse:
+
+    # initial values probe_geoip compares with
+    probe_cc = "ZZ"
+    asn = "AS0"
+    geolookup_resp = {"geolocation": {}}
+
+    # for each address provided, call probe_geoip and add the data to our response
+    for ipaddr in data.addresses:
+        # call probe_geoip() and map the keys to the geolookup v1 API
+        resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
+        # it doesn't seem possible to have separate aliases for (de)serialization
+        geolookup_resp["geolocation"][ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
+            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
+
+    setnocacheresponse(response)
+    return geolookup_resp
+
+
+class CollectorEntry(BaseModel):
+    # not actually used but necessary to be compliant with the old API schema
+    address: str = Field(description="Address of collector")
+    front: Optional[str] = Field(default=None, description="Fronted domain")
+    type: Optional[str] = Field(default=None, description="Type of collector")
+
+@router.get("/collectors", tags=["ooniprobe"])
+def list_collectors(
+    settings: SettingsDep,
+    ) -> List[CollectorEntry]:
+    config_collectors = settings.collectors
+    collectors_response = []
+    for entry in config_collectors:
+        collector = CollectorEntry(**entry)
+        collectors_response.append(collector)
+    return collectors_response
