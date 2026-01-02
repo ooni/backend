@@ -63,8 +63,12 @@ def get_s3_client() -> S3Client:
 
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
 
+__cache__ = dict()
 
-@lru_cache
+def get_cache(): return __cache__
+
+CacheDep = Annotated[Dict[str, Any], Depends(get_cache)]
+
 def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
     """
     Reads the content of `file` within `bucket` into a  string
@@ -76,9 +80,13 @@ def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
     return buff.getvalue().decode()
 
 
-async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep) -> Dict[str, Any]:
-    with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
-        resp = ujson.load(f)
+async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep) -> Dict[str, Any]:
+    cacheKey = Path(settings.config_bucket, settings.tor_targets)
+    resp = cache.get(cacheKey)
+    if resp is None:
+        with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
+            resp = ujson.load(f)
+            cache[cacheKey] = resp
     yield resp
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
