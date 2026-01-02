@@ -390,7 +390,7 @@ def test_url_priorities_crud(client_with_admin_role, url_prio_tblready):
     d = dict(old_entry=yyy)
     r = adminsession.post("/api/_/url-priorities/update", json=d)
     assert r.status_code == 200, r.json()
-    assert r.json == 1
+    assert r.json() == 1
 
     assert match("INTEG-TEST") == 0
     assert match("INTEG-TEST2") == 0
