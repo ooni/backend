@@ -1,16 +1,14 @@
-from typing import Annotated, TypeAlias
+import io
+from functools import lru_cache
 from pathlib import Path
-
-from fastapi import Depends
-
-import geoip2.database
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from clickhouse_driver import Client as Clickhouse
+from typing import Annotated, TypeAlias, Dict, Any
 
 import boto3
+import geoip2.database
+from clickhouse_driver import Client as Clickhouse
+from fastapi import Depends
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from mypy_boto3_s3 import S3Client
 
 from .common.config import Settings
@@ -64,3 +62,31 @@ def get_s3_client() -> S3Client:
 
 
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
+
+__cache__ = dict()
+
+def get_cache(): return __cache__
+
+CacheDep = Annotated[Dict[str, Any], Depends(get_cache)]
+
+def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
+    """
+    Reads the content of `file` within `bucket` into a  string
+
+    Useful for reading config files from the s3 bucket
+    """
+    buff = io.BytesIO()
+    s3_client.download_fileobj(bucket, file, buff)
+    return buff.getvalue().decode()
+
+
+async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep) -> Dict[str, Any]:
+    cacheKey = Path(settings.config_bucket, settings.tor_targets)
+    resp = cache.get(cacheKey)
+    if resp is None:
+        with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
+            resp = ujson.load(f)
+            cache[cacheKey] = resp
+    yield resp
+
+TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
