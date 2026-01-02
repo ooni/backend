@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
+from typing import Optional
 
 # Local imports
 from citizenlab.common.auth import get_account_id_or_raise
@@ -11,11 +12,26 @@ from citizenlab.common.routers import BaseModel
 from citizenlab.common.utils import setnocacheresponse
 from citizenlab.dependencies import SettingsDep
 from citizenlab.manager import validate_entry, get_url_list_manager
-from citizenlab.models import UrlSubmissionUpdateRequest, UrlSubmissionResponse, PullRequestResponse
+from citizenlab.routers.admin import Entry
 
 router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
+
+
+class PullRequestResponse(BaseModel):
+    pr_id: str
+
+
+class UrlSubmissionUpdateRequest(BaseModel):
+    country_code: str = Field(..., description="The country code for the submission.")
+    comment: str = Field(..., description="Comment regarding the submission.")
+    old_entry: Optional[Entry] = Field(None, description="The old entry to validate against.")
+    new_entry: Optional[Entry] = Field(None, description="New entry to create or update.")
+
+
+class UrlSubmissionResponse(BaseModel):
+    updated_entry: Optional[Entry] = Field(None, description="The updated URL entry after processing.")
 
 
 @router.post(

@@ -1,6 +1,6 @@
 import logging
 
-from typing import List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
@@ -15,12 +15,6 @@ from citizenlab.common.routers import BaseModel
 from citizenlab.common.utils import setnocacheresponse
 from citizenlab.dependencies import SettingsDep, ClickhouseDep
 from citizenlab.manager import get_url_list_manager
-from citizenlab.models import (
-    TestListResponse,
-    UrlPriority,
-    UpdateUrlPriorityRequest,
-    ListUrlPriorityResponse
-)
 
 
 router = APIRouter()
@@ -34,6 +28,43 @@ URL prioritization: uses the url_priorities table.
 It contains rules on category_code, cc, domain and url to assign priorities.
 Values can be wildcards "*". A citizenlab entry can match multiple rules.
 """
+
+
+class Entry(BaseModel):
+    category_code: str = Field(description="Category code of the URL entry.")
+    url: Optional[str] = Field("", description="The URL to be submitted.")
+    date_added: str = Field(description="Date when the entry was added.")
+    notes: str = Field(description="Any additional notes regarding the entry.")
+    source: str = Field(description="Any additional notes regarding the entry.")
+
+
+class UrlPriority(BaseModel):
+    # XXX: it is unclear which fields are required to do an update
+    # XXX: it looks like only domain and URL and cc and category_code are part of the
+    # WHERE clause but the INTEG-TEST fields do not specifiy all of these fields
+    # so the validator fails
+    category_code: Optional[str] = Field("", description="The category code associated with the URL.")
+    cc: Optional[str] = Field("", description="Country code that the URL is relevant to.")
+    domain: Optional[str] = Field("", description="The domain of the URL.")
+    url: Optional[str] = Field("", description="The actual URL to be prioritized.")
+    priority: int = Field(..., description="The priority number for the URL. Higher numbers indicate higher priority.")
+
+
+class ListUrlPriorityResponse(BaseModel):
+    rules: List[UrlPriority] = Field(..., description="The list of UrlPriority items")
+
+
+class UpdateUrlPriorityRequest(BaseModel):
+    old_entry: Optional[UrlPriority] = Field(None, description="Existing URL priority rule to update.")
+    new_entry: Optional[UrlPriority] = Field(None, description="New URL priority rule to create or replace existing rule.")
+
+
+class TestListResponse(BaseModel):
+    test_list: Optional[List[Dict[str, Any]]] = Field(None, description="The fetched test list.")
+    changes: Dict[str, Any] = Field(description="The changes related to the test list.")
+    state: str = Field(description="The current sync state.")
+    pr_url: Optional[str] = Field(None, description="The pull request URL, if applicable.")
+
 
 @router.get(
     "/_/url-submission/test-list/{country_code}",
