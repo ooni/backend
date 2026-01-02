@@ -205,7 +205,7 @@ def initialize_url_priorities_if_needed(clickhouse):
         (sign, category_code, cc, domain, url, priority) VALUES
     """
     log.info("Populating url_priorities")
-    r = insert_click(query, rows)
+    r = insert_click(clickhouse, query, rows)
     return r
 
 
@@ -230,7 +230,7 @@ def update_url_priority_click(clickhouse, old: dict, new: dict):
         rule = old.copy()
         rule["sign"] = -1 # XXX: sign is not part of the request model but is part of the database
         log.info(f"Deleting prioritization rule {rule}")
-        r = insert_click(ins_sql, [rule])
+        r = insert_click(clickhouse, ins_sql, [rule])
         log.debug(f"Result: {r}")
 
     if new:
