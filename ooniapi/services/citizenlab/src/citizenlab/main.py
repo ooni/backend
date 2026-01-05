@@ -52,7 +52,7 @@ async def lifespan(
 async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start
     # See: https://fastapi-utils.davidmontague.xyz/user-guide/repeated-tasks/
-    await update_geoip_task()
+    pass
 
 
 app = FastAPI(lifespan=lifespan)
