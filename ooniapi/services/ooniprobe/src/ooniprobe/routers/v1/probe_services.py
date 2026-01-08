@@ -1,26 +1,31 @@
 import logging
-from datetime import datetime, timezone, timedelta
-import time
-from typing import List, Optional, Any, Dict, Tuple, Optional
 import random
+import time
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Any, Dict, Tuple
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, HTTPException, Response, Request
 from prometheus_client import Counter, Info, Gauge
 from pydantic import Field, IPvAnyAddress
 
+from ...common.auth import create_jwt, decode_jwt, jwt
+from ...common.routers import BaseModel
+from ...common.utils import setnocacheresponse
+from ...dependencies import (
+    ASNReaderDep,
+    CCReaderDep,
+    ClickhouseDep,
+    SettingsDep,
+    TorTargetsDep,
+)
 from ...utils import (
     generate_report_id,
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
 )
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
-from ...common.routers import BaseModel
-from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.config import Settings
-from ...common.utils import setnocacheresponse
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
@@ -636,6 +641,7 @@ class CollectorEntry(BaseModel):
     front: Optional[str] = Field(default=None, description="Fronted domain")
     type: Optional[str] = Field(default=None, description="Type of collector")
 
+
 @router.get("/collectors", tags=["ooniprobe"])
 def list_collectors(
     settings: SettingsDep,
@@ -646,3 +652,28 @@ def list_collectors(
         collector = CollectorEntry(**entry)
         collectors_response.append(collector)
     return collectors_response
+
+
+class TorTarget(BaseModel):
+    address: str
+    fingerprint: str
+    name: Optional[str] = ''
+    protocol: str
+    params: Optional[Dict[str, List[str]]] = None
+
+
+@router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
+def list_tor_targets(
+    request: Request,
+    targets: TorTargetsDep,
+    ) -> Dict[str, TorTarget]:
+
+    token = request.headers.get("Authorization")
+    if token == None:
+        # XXX not actually validated
+        pass
+
+    if targets is not None:
+        return targets
+    log.info("tor-targets: failed to receive tor-targets from s3")
+    raise HTTPException(status_code=401, detail="Invalid tor-targets")

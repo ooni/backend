@@ -5,6 +5,7 @@ import pytest
 import shutil
 import os
 import time
+from typing import Dict
 from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
@@ -12,11 +13,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
 
+import ujson
+
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
-from ooniprobe.dependencies import get_s3_client
+from ooniprobe.dependencies import get_s3_client, get_tor_targets_from_s3
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
+from ooniprobe.routers.v1.probe_services import TorTarget
 
 
 def make_override_get_settings(**kw):
@@ -101,6 +105,7 @@ def geoip_db_dir(fixture_path):
 def client(clickhouse_server, test_settings, geoip_db_dir):
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
+    app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
@@ -116,7 +121,8 @@ def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_s
         clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server
+        fastpath_url=fastpath_server,
+        tor_targets="./tests/fixtures/data/tor-targets.json"
     )
 
 
@@ -161,6 +167,10 @@ class S3ClientMock:
 
 def get_s3_client_mock() -> S3ClientMock:
     return S3ClientMock()
+
+def get_tor_targets_from_s3_mock() -> Dict[str, TorTarget]:
+    with open("./tests/fixtures/data/tor-targets.json", "r") as f:
+        yield ujson.load(f)
 
 @pytest.fixture(scope="session")
 def fastpath_server(docker_ip, docker_services):
