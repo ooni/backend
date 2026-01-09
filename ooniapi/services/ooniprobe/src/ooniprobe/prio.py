@@ -26,15 +26,15 @@ import random
 from typing import Annotated, Dict, List, Tuple
 import logging
 
+import sqlalchemy as sa
+from clickhouse_driver import Client as Clickhouse
+
 from fastapi import Depends
 from pydantic import BaseModel
 
 from .common.clickhouse_utils import query_click
 from .common.metrics import timer
 from .dependencies import ClickhouseDep
-
-from clickhouse_driver import Client as Clickhouse
-import sqlalchemy as sa
 
 log = logging.getLogger(__name__)
 
