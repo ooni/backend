@@ -1,14 +1,15 @@
-from tempfile import tempdir
 import pathlib
 from pathlib import Path
 import pytest
 import shutil
 import os
+import json
 import time
-from typing import Dict
+from typing import Dict, Any
 from urllib.request import urlopen
 
 from fastapi.testclient import TestClient
+from pytest_docker.plugin import Services
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
@@ -16,6 +17,7 @@ from clickhouse_driver import Client as ClickhouseClient
 import ujson
 
 from ooniprobe.common.config import Settings
+from ooniprobe.common.clickhouse_utils import insert_click
 from ooniprobe.common.dependencies import get_settings
 from ooniprobe.dependencies import get_s3_client, get_tor_targets_from_s3
 from ooniprobe.main import app
@@ -36,7 +38,7 @@ def pg_url(postgresql):
 
 
 @pytest.fixture
-def db(pg_url):
+def db(pg_url: str):
     engine = create_engine(pg_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -48,7 +50,7 @@ def db(pg_url):
 
 
 @pytest.fixture
-def alembic_migration(pg_url):
+def alembic_migration(pg_url: str):
     from alembic import command
     from alembic.config import Config
 
@@ -80,6 +82,7 @@ def client_with_bad_settings():
 
 JWT_ENCRYPTION_KEY = "super_secure"
 
+
 @pytest.fixture(scope="session")
 def fixture_path():
     """
@@ -95,14 +98,15 @@ def fixture_path():
     except FileNotFoundError:
         pass
 
+
 @pytest.fixture()
-def geoip_db_dir(fixture_path):
+def geoip_db_dir(fixture_path: Path):
     ooni_tempdir = fixture_path / "geoip"
     return str(ooni_tempdir)
 
 
 @pytest.fixture
-def client(clickhouse_server, test_settings, geoip_db_dir):
+def client(clickhouse_server: str, test_settings: Any, geoip_db_dir: str):
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
     app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
@@ -113,7 +117,7 @@ def client(clickhouse_server, test_settings, geoip_db_dir):
 
 
 @pytest.fixture
-def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_server):
+def test_settings(alembic_migration: Any, geoip_db_dir: str, clickhouse_server: str, fastpath_server: str):
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
@@ -143,7 +147,7 @@ def is_clickhouse_running(url):
 
 
 @pytest.fixture(scope="session")
-def clickhouse_server(docker_ip, docker_services):
+def clickhouse_server(docker_ip: str | Any, docker_services: Services):
     port = docker_services.port_for("clickhouse", 9000)
     # See password in docker compose
     url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
@@ -154,8 +158,9 @@ def clickhouse_server(docker_ip, docker_services):
 
 
 @pytest.fixture(scope="session")
-def clickhouse_db(clickhouse_server):
+def clickhouse_db(clickhouse_server: str):
     yield ClickhouseClient.from_url(clickhouse_server)
+
 
 class S3ClientMock:
 
@@ -165,6 +170,7 @@ class S3ClientMock:
     def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
         self.files.append(f"{Bucket}/{Key}")
 
+
 def get_s3_client_mock() -> S3ClientMock:
     return S3ClientMock()
 
@@ -173,7 +179,7 @@ def get_tor_targets_from_s3_mock() -> Dict[str, TorTarget]:
         yield ujson.load(f)
 
 @pytest.fixture(scope="session")
-def fastpath_server(docker_ip, docker_services):
+def fastpath_server(docker_ip: str | Any, docker_services: Services):
     port = docker_services.port_for("fakepath", 80)
     url = f"http://{docker_ip}:{port}"
     docker_services.wait_until_responsive(
@@ -185,5 +191,23 @@ def is_fastpath_running(url: str) -> bool:
     try:
         resp = urlopen(url)
         return resp.status == 200
-    except:
+    except Exception:
         return False
+
+
+@pytest.fixture
+def load_url_priorities(clickhouse_db: ClickhouseClient):
+    path = Path("tests/fixtures/data")
+    filename = "url_priorities_us.json"
+    file = Path(path, filename)
+
+    with file.open("r") as f:
+        j = json.load(f)
+
+    # 'sign' is created with default value 0, causing a db error.
+    # use 1 to prevent it
+    for row in j:
+        row["sign"] = 1
+
+    query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
+    insert_click(clickhouse_db, query, j)

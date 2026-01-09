@@ -6,17 +6,18 @@ Insert VPN credentials into database.
 
 import itertools
 import logging
-import io
-from base64 import b64encode
-from datetime import datetime, timezone
-from os import urandom
 from typing import List, TypedDict, Tuple
+import io
 
-import httpx
-import pem
 from fastapi import Request
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
+import pem
+from base64 import b64encode
+from datetime import datetime, timezone
+from os import urandom
+
+import httpx
 
 from .common.config import Settings
 from .dependencies import CCReaderDep, ASNReaderDep
@@ -148,7 +149,6 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
         resp.autonomous_system_organization or "0",
     )
 
-  
 def get_first_ip(headers: str) -> str:
     """
     parse the first ip from a comma-separated list of ips encoded as a string
@@ -158,7 +158,6 @@ def get_first_ip(headers: str) -> str:
     out: '123.123.123'
     """
     return headers.partition(',')[0]
-
 
 def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
     """
