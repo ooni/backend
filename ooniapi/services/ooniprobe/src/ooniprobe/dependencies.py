@@ -84,8 +84,8 @@ async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep, 
     cacheKey = str(Path(settings.config_bucket, settings.tor_targets))
     resp = cache.get(cacheKey)
     if resp is None:
-        s = read_file(s3client, settings.config_bucket, settings.tor_targets)
-        resp = ujson.loads(s)
+        targetstr = read_file(s3client, settings.config_bucket, settings.tor_targets)
+        resp = ujson.loads(targetstr)
         cache[cacheKey] = resp
     yield resp
 
