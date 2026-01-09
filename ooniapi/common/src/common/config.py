@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     vpn_credential_refresh_hours: int = 24
 
+    # Bucket used to store configuration files
+    config_bucket: str = ""
+
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
     # Ooniprobe only
@@ -41,6 +44,7 @@ class Settings(BaseSettings):
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
+    tor_targets: str = "" # filename of json containing Tor bridges and DirAuth endpoints
 
     # ooniprobe client configuration
     collectors: List[Dict[str, str]] = [

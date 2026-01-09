@@ -1,29 +1,27 @@
-from typing import List, Annotated, Dict, Any
 import asyncio
-from pathlib import Path
-import logging
-from hashlib import sha512
-from urllib.request import urlopen
-from datetime import datetime, timezone
 import io
+import logging
 import random
+from datetime import datetime, timezone
+from hashlib import sha512
+from typing import List, Dict, Any
 
-from fastapi import Request, Response, APIRouter, HTTPException, Header, Body
 import httpx
+from fastapi import Request, Response, APIRouter, HTTPException, Header
 from pydantic import Field
 from prometheus_client import Counter
 import zstd
 
+from ..common.metrics import timer
+from ..common.routers import BaseModel
+from ..common.utils import setnocacheresponse
+from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..utils import (
     generate_report_id,
     extract_probe_ipaddr,
     lookup_probe_cc,
     lookup_probe_network,
 )
-from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
-from ..common.routers import BaseModel
-from ..common.utils import setnocacheresponse
-from ..common.metrics import timer
 
 router = APIRouter()
 
@@ -190,7 +188,7 @@ async def receive_measurement(
             data = zstd.decompress(data)
             ratio = len(data) / len(data)
             log.debug(f"Zstd compression ratio {ratio}")
-        except Exception as e:
+        except Exception:
             log.info("Failed zstd decompression")
             error("Incorrect format")
 
@@ -221,7 +219,7 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2 ** t))
+            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
@@ -274,9 +272,13 @@ def compare_probe_msmt_cc_asn(
             Metrics.PROBE_CC_ASN_MATCH.inc()
         elif db_probe_cc != cc:
             log.error(f"db_cc != cc: {db_probe_cc} != {cc}")
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc", reported=cc, detected=db_probe_cc).inc()
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(
+                mismatch="cc", reported=cc, detected=db_probe_cc
+            ).inc()
         elif db_asn != asn:
             log.error(f"db_asn != asn: {db_asn} != {asn}")
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn", reported=asn, detected=db_asn).inc()
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(
+                mismatch="asn", reported=asn, detected=db_asn
+            ).inc()
     except Exception:
         pass
