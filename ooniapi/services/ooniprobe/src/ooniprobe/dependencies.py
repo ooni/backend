@@ -1,9 +1,9 @@
 import io
-from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, TypeAlias, Dict, Any
 
 import boto3
+import ujson
 import geoip2.database
 from clickhouse_driver import Client as Clickhouse
 from fastapi import Depends
@@ -81,12 +81,12 @@ def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
 
 
 async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep) -> Dict[str, Any]:
-    cacheKey = Path(settings.config_bucket, settings.tor_targets)
+    cacheKey = str(Path(settings.config_bucket, settings.tor_targets))
     resp = cache.get(cacheKey)
     if resp is None:
-        with read_file(s3client, settings.config_bucket, settings.tor_targets) as f:
-            resp = ujson.load(f)
-            cache[cacheKey] = resp
+        s = read_file(s3client, settings.config_bucket, settings.tor_targets)
+        resp = ujson.loads(s)
+        cache[cacheKey] = resp
     yield resp
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
