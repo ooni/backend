@@ -693,7 +693,7 @@ def list_test_urls(
 class GeoLookupResult(BaseModel):
     cc: str = Field(description="Country Code")
     asn: str = Field(description="Autonomous System Number (ASN)")
-    as_name: str = Field(description="Autonomous System Name")
+    as_name: Optional[str] = Field("", description="Autonomous System Name")
 
 
 class GeoLookupRequest(BaseModel):
@@ -723,6 +723,8 @@ async def geolookup(
         # call probe_geoip() and map the keys to the geolookup v1 API
         resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
         # it doesn't seem possible to have separate aliases for (de)serialization
+        if resp["probe_network_name"] == None:
+            resp["probe_network_name"] = ""
         geolookup_resp["geolocation"][ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
             asn=resp["probe_asn"], as_name=resp["probe_network_name"])
 
