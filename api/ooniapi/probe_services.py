@@ -527,11 +527,11 @@ def round_robin_web_test_helpers() -> List[Dict]:
     if q < 10:
         shift = 0
     else:
-        shift = q % 4 + 1
+        shift = q % 3 + 1
 
     out = []
-    for n in range(5):
-        n = (n + shift) % 5
+    for n in range(4):
+        n = (n + shift) % 4
         out.append({"address": f"https://{n}.th.ooni.org", "type": "https"})
 
     return out
