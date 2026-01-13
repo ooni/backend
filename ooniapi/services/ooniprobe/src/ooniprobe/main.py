@@ -48,13 +48,7 @@ async def lifespan(
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
 
-    db = get_postgresql_session(settings)
-    session = next(db)
-    models.OONIProbeManifest.init_table(session)
-    next(db, None)  # closes the connection
-
     yield
-
 
 async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start
@@ -139,19 +133,6 @@ async def health(
 
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
-
-    # check that we have at least one server state object for credentials validation
-    try:
-        state = db.query(models.OONIProbeManifest).limit(1).one_or_none()
-        if state is None:
-            errors.append("no_server_state_entry")
-        manifest = models.OONIProbeManifest.get_latest(db)
-        if manifest == None:
-            errors.append("no_manifest_entry")
-    except Exception as exc:
-        log.error("Error trying to retrieve server state")
-        log.error(exc)
-        pass  # Database error already reported above
 
     status = "ok"
     if len(errors) > 0:

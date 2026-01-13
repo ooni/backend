@@ -121,4 +121,4 @@ def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
 def _get_manifest(s3: S3ClientDep, settings : SettingsDep) -> ManifestResponse:
     return get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
 
-ManifestDep = Annotated[ManifestResponse, _get_manifest]
+ManifestDep = Annotated[ManifestResponse, Depends(_get_manifest)]

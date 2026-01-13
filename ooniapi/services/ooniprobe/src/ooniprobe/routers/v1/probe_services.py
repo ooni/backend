@@ -12,7 +12,7 @@ import geoip2
 import geoip2.errors
 from fastapi import APIRouter, HTTPException, Response, Request, status, Header
 from pydantic import Field, IPvAnyAddress
-from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed
+from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed, ServerState
 import httpx
 
 from ...utils import (
@@ -38,7 +38,6 @@ from ..reports import Metrics
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.utils import setnocacheresponse, setcacheresponse
-from ...models import OONIProbeManifest, OONIProbeServerState
 from ...prio import generate_test_list
 
 router = APIRouter(prefix="/v1")
@@ -643,7 +642,6 @@ def list_collectors(
 
 @router.get("/manifest", tags=["anonymous_credentials"])
 def manifest(manifest: ManifestDep, response: Response) -> ManifestResponse:
-
     # Cache for 1 minute
     setcacheresponse('1m', response)
     return manifest
@@ -661,11 +659,12 @@ class RegisterResponse(BaseModel):
 
 # TODO: choose a better name for this endpoint
 @router.post("/sign_credential", tags=["anonymous_credentials"])
-def sign_credential(register_request: RegisterRequest, session: PostgresSessionDep):
+def sign_credential(register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep):
 
-    manifest = _retrieve_manifest(session, register_request.manifest_version)
-    state: OONIProbeServerState = manifest.server_state
-    protocol_state = state.to_protocol()
+    protocol_state = ServerState.from_creds(
+        manifest.manifest.public_parameters,
+        settings.anonc_secret_key
+        )
 
     try:
         resp = protocol_state.handle_registration_request(
@@ -753,6 +752,7 @@ async def submit_measurement(
     settings: SettingsDep,
     s3_client: S3ClientDep,
     session: PostgresSessionDep,
+    manifest: ManifestDep,
     content_encoding: str = Header(default=None),
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
     """
@@ -761,6 +761,8 @@ async def submit_measurement(
 
     The anonmymous credentials protocol allows us to measure the trustworthiness of a probe without
     revealing personally identifiable information.
+
+    An error will be returned if using a deprecated manifest version
     """
     setnocacheresponse(response)
     empty_measurement = {}
@@ -792,36 +794,37 @@ async def submit_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
-    # Retrieve manifest known by the client
-    # TODO Check that the specified manifest is still valid
-    manifest = _retrieve_manifest(session, submit_request.manifest_version)
-
     # Run verification
-    assert manifest
     assert "probe_cc" in submit_request.content and isinstance(
         submit_request.content["probe_cc"], str
     )
     assert "probe_asn" in submit_request.content and isinstance(
         submit_request.content["probe_asn"], str
     )
-
-    state: OONIProbeServerState = manifest.server_state
-    protocol_state = state.to_protocol()
-
-    try:
-        submit_response = protocol_state.handle_submit_request(
-            submit_request.nym,
-            submit_request.zkp_request,
-            submit_request.content["probe_cc"],
-            submit_request.content["probe_asn"],
-            list(submit_request.probe_age_range),
-            list(submit_request.probe_msm_range),
+    protocol_state = ServerState.from_creds(
+        manifest.manifest.public_parameters,
+        settings.anonc_secret_key
         )
-        is_verified = True
-    except (DeserializationFailed, ProtocolError, CredentialError) as e:
-        # proof failed
-        # TODO Q: should we add a "why not verified" field to the measurement?
-        log.error(f"ZKP Failed: {e}")
+
+    if submit_request.manifest_version == manifest.meta.version:
+        try:
+            submit_response = protocol_state.handle_submit_request(
+                submit_request.nym,
+                submit_request.zkp_request,
+                submit_request.content["probe_cc"],
+                submit_request.content["probe_asn"],
+                list(submit_request.probe_age_range),
+                list(submit_request.probe_msm_range),
+            )
+            is_verified = True
+        except (DeserializationFailed, ProtocolError, CredentialError) as e:
+            # proof failed
+            # TODO Q: should we add a "why not verified" field to the measurement?
+            log.error(f"ZKP Failed: {e}")
+            is_verified = False
+            submit_response = None
+    else:
+        log.error(f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'")
         is_verified = False
         submit_response = None
 
@@ -905,11 +908,11 @@ class CredentialUpdateResponse(BaseModel):
     )
 
 
-@router.post(
-    "/update_credential",
-    response_model=CredentialUpdateResponse,
-    tags=["anonymous_credentials"],
-)
+# @router.post(
+#     "/update_credential",
+#     response_model=CredentialUpdateResponse,
+#     tags=["anonymous_credentials"],
+# )
 async def credential_update(
     update_request: CredentialUpdateRequest, session: PostgresSessionDep
 ) -> CredentialUpdateResponse:
@@ -920,44 +923,5 @@ async def credential_update(
     by calling `/api/v1/manifest`
     """
 
-    if update_request.old_manifest_version == update_request.manifest_version:
-        error(
-            {
-                "error": "credential_already_updated",
-                "detail": "old manifest and current manifest are the same",
-            }
-        )
-
-    # TODO check that the new manifest is a valid one
-    old_manifest = _retrieve_manifest(session, update_request.old_manifest_version)
-    new_manifest = _retrieve_manifest(session, update_request.manifest_version)
-
-    old_state: OONIProbeServerState = old_manifest.server_state
-    new_state: OONIProbeServerState = new_manifest.server_state
-
-    protocol_state = new_state.to_protocol()
-
-    try:
-        response = protocol_state.handle_update_request(
-            update_request.update_request,
-            old_state.public_parameters,
-            old_state.secret_key,
-        )
-    except (DeserializationFailed, ProtocolError, CredentialError) as e:
-        raise to_http_exception(e)
-
-    return CredentialUpdateResponse(update_response=response)
-
-
-def _retrieve_manifest(session: PostgresSessionDep, version: str) -> OONIProbeManifest:
-    manifest = OONIProbeManifest.get_by_version(session, version)
-    if manifest is None:
-        raise HTTPException(
-            detail={
-                "error": "manifest_not_found",
-                "message": f"No manifest with version '{version}' was found",
-            },
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-
-    return manifest
+    # TODO we need to find a way to keep track of older private keys to support this endpoint
+    raise NotImplementedError("Credential Update is not yet implemented")

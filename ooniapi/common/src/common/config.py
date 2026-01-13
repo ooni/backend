@@ -52,6 +52,10 @@ class Settings(BaseSettings):
         default="",
         description="Name of the manifest file within the public bucket to use for ZKP verification"
         )
+    anonc_secret_key: str = Field(
+        default="",
+        description="Secret key matching the specified manifest file"
+        )
 
     # ooniprobe client configuration
     collectors: List[Dict[str, str]] = [
