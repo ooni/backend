@@ -1,5 +1,6 @@
 from typing import List, Dict
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -35,12 +36,22 @@ class Settings(BaseSettings):
 
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
-    # Ooniprobe only
+    # -- < Ooniprobe only > -------------------------------------------------------------
     msmt_spool_dir: str = ""
     fastpath_url: str = ""  # example: http://123.123.123.123:8472
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
+
+    # Used to store history of all manifests and retrieve next manifest to use
+    anonc_manifest_bucket: str = Field(
+        default="",
+        description="Name of public bucket where anonymous credentials manifests are stored"
+        )
+    anonc_manifest_file: str = Field(
+        default="",
+        description="Name of the manifest file within the public bucket to use for ZKP verification"
+        )
 
     # ooniprobe client configuration
     collectors: List[Dict[str, str]] = [
