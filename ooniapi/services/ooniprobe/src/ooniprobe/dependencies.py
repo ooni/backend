@@ -121,11 +121,14 @@ def get_manifest(s3: S3ClientDep, bucket : str, file : str) -> Tuple[Manifest, M
 __cache__ = dict()
 
 def _get_manifest(s3: S3ClientDep, settings: SettingsDep) -> Tuple[Manifest, ManifestMeta]:
+    # Cache the manifest in local memory for up to 1 minute to avoid doing too many s3
+    # read operations
+
     key = (settings.anonc_manifest_bucket, settings.anonc_manifest_file)
 
     tup = __cache__.get(key)
     now = time.time()
-    if tup is None or (tup[1] - now) > 60: # Non-existent or older than one minute
+    if tup is None or (now - tup[1]) > 60: # Non-existent or older than one minute
         val, _ = __cache__[key] = (get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file), time.time())
 
     return val
