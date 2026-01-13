@@ -45,15 +45,15 @@ class Settings(BaseSettings):
 
     # Used to store history of all manifests and retrieve next manifest to use
     anonc_manifest_bucket: str = Field(
-        default="",
+        default="CHANGEME",
         description="Name of public bucket where anonymous credentials manifests are stored"
         )
     anonc_manifest_file: str = Field(
-        default="",
+        default="CHANGEME",
         description="Name of the manifest file within the public bucket to use for ZKP verification"
         )
     anonc_secret_key: str = Field(
-        default="",
+        default="CHANGEME",
         description="Secret key matching the specified manifest file"
         )
 
