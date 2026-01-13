@@ -29,14 +29,15 @@ from ...dependencies import (
     ASNReaderDep,
     ClickhouseDep,
     SettingsDep,
-    LatestManifestDep,
+    ManifestDep,
+    ManifestResponse,
     PostgresSessionDep,
     S3ClientDep,
 )
 from ..reports import Metrics
 from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.utils import setnocacheresponse
+from ...common.utils import setnocacheresponse, setcacheresponse
 from ...models import OONIProbeManifest, OONIProbeServerState
 from ...prio import generate_test_list
 
@@ -640,22 +641,12 @@ def list_collectors(
 
 # -- <Anonymous Credentials> ------------------------------------
 
-
-class ManifestResponse(BaseModel):
-    nym_scope: str
-    public_parameters: str
-    submission_policy: Dict[str, Any]
-    version: str
-
-
 @router.get("/manifest", tags=["anonymous_credentials"])
-def manifest(manifest: LatestManifestDep) -> ManifestResponse:
-    return ManifestResponse(
-        nym_scope="ooni.org/{probe_cc}/{probe_asn}",
-        public_parameters=manifest.server_state.public_parameters,
-        submission_policy={},
-        version=manifest.version,
-    )
+def manifest(manifest: ManifestDep, response: Response) -> ManifestResponse:
+
+    # Cache for 1 minute
+    setcacheresponse('1m', response)
+    return manifest
 
 
 class RegisterRequest(BaseModel):

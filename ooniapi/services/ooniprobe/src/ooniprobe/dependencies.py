@@ -68,9 +68,7 @@ def get_s3_client() -> S3Client:
     s3 = boto3.client("s3")
     return s3
 
-
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
-
 
 class Manifest(BaseModel):
     """
@@ -88,9 +86,11 @@ class ManifestMeta(BaseModel):
     last_modification_date: datetime
     manifest_url: str = Field(description="URL pointing to the AWS public record of this manifest")
 
+class ManifestResponse(BaseModel):
+    manifest: Manifest
+    meta: ManifestMeta
 
-def get_manifest(s3: S3ClientDep, bucket : str, file : str) -> Tuple[Manifest, ManifestMeta]:
-
+def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
     # Get version & metadata
     resp = s3.list_object_versions(
         Bucket=bucket,
@@ -115,23 +115,10 @@ def get_manifest(s3: S3ClientDep, bucket : str, file : str) -> Tuple[Manifest, M
     # Get Object
     manifest_resp = s3.get_object(Bucket=bucket, Key=file)
     manifest_json = ujson.load(manifest_resp['Body'])
+    manifest = Manifest(**manifest_json)
+    return ManifestResponse(manifest=manifest, meta = meta)
 
-    return Manifest(**manifest_json), meta
+def _get_manifest(s3: S3ClientDep, settings : SettingsDep) -> ManifestResponse:
+    return get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
 
-__cache__ = dict()
-
-def _get_manifest(s3: S3ClientDep, settings: SettingsDep) -> Tuple[Manifest, ManifestMeta]:
-    # Cache the manifest in local memory for up to 1 minute to avoid doing too many s3
-    # read operations
-
-    key = (settings.anonc_manifest_bucket, settings.anonc_manifest_file)
-
-    tup = __cache__.get(key)
-    now = time.time()
-    if tup is None or (now - tup[1]) > 60: # Non-existent or older than one minute
-        val, _ = __cache__[key] = (get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file), time.time())
-
-    return val
-
-
-LatestManifestDep = Annotated[Manifest, Depends(_get_manifest)]
+ManifestDep = Annotated[ManifestResponse, _get_manifest]
