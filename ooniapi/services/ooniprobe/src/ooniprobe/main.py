@@ -20,7 +20,7 @@ from .routers.v1 import probe_services
 from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
-from .dependencies import get_manifest, get_postgresql_session, get_clickhouse_session, SettingsDep
+from .dependencies import S3ClientDep, get_manifest, get_postgresql_session, get_clickhouse_session, SettingsDep
 from .common.dependencies import get_settings
 from .common.config import Settings
 from .common.version import get_build_label
@@ -99,6 +99,7 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings: SettingsDep,
+    s3: S3ClientDep,
     db=Depends(get_postgresql_session),
     clickhouse=Depends(get_clickhouse_session),
 ):
@@ -146,7 +147,6 @@ async def health(
 
     # Check that you can retrieve the manifest
     try:
-        s3 = boto3.client("s3")
         get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
     except Exception as e:
         errors.append("anonc_manifest_unreachable")

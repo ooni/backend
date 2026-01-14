@@ -1,11 +1,27 @@
 import pytest
 
+from datetime import datetime
 import httpx
 from fastapi.testclient import TestClient
 from ooniprobe.main import lifespan, app
+from ooniprobe.dependencies import Manifest, ManifestResponse, ManifestMeta
+import ooniprobe.main as m
 
+def fake_get_manifest(s3, bucket, key):
+    return ManifestResponse(
+        manifest=Manifest(
+            submission_policy={"*/*" : "*"},
+            public_parameters="public parameters"
+            ),
+        meta = ManifestMeta(
+            version="1",
+            last_modification_date=datetime.now(),
+            manifest_url="https://ooni.mock/manifest"
+            )
+    )
 
-def test_health_good(client):
+def test_health_good(client, monkeypatch):
+    monkeypatch.setattr(m, "get_manifest", fake_get_manifest)
     r = client.get("health")
     j = r.json()
     assert j["status"] == "ok", j
