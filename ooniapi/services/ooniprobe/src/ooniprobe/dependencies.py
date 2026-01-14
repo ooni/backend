@@ -1,22 +1,17 @@
 import io
 from pathlib import Path
-from typing import Annotated, TypeAlias, Dict, Any
+from typing import Annotated, Dict, Any
 
 import boto3
 import ujson
 import geoip2.database
-from clickhouse_driver import Client as Clickhouse
 from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from mypy_boto3_s3 import S3Client
 
-from .common.config import Settings
-from .common.dependencies import get_settings
-
-
-SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
-
+from ooniprobe.common.dependencies import SettingsDep
 
 def get_postgresql_session(settings: SettingsDep):
     engine = create_engine(settings.postgresql_url)
@@ -43,17 +38,6 @@ def get_asn_reader(settings: SettingsDep):
 
 
 ASNReaderDep = Annotated[geoip2.database.Reader, Depends(get_asn_reader)]
-
-
-def get_clickhouse_session(settings: SettingsDep):
-    db = Clickhouse.from_url(settings.clickhouse_url)
-    try:
-        yield db
-    finally:
-        db.disconnect()
-
-
-ClickhouseDep = Annotated[Clickhouse, Depends(get_clickhouse_session)]
 
 
 def get_s3_client() -> S3Client:

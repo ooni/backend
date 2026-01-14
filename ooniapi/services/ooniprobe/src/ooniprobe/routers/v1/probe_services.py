@@ -13,10 +13,10 @@ from pydantic import Field, IPvAnyAddress
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.routers import BaseModel
 from ...common.utils import setnocacheresponse
+from ...common.dependencies import ClickhouseDep
 from ...dependencies import (
     ASNReaderDep,
     CCReaderDep,
-    ClickhouseDep,
     SettingsDep,
     TorTargetsDep,
 )
@@ -27,7 +27,7 @@ from ...utils import (
     lookup_probe_network,
 )
 from ...common.utils import setcacheresponse
-from ...prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
+from ...common.prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 router = APIRouter(prefix="/v1")
 

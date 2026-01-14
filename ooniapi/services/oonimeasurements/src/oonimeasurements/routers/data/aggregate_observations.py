@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 
-from ...dependencies import get_clickhouse_session
+from ...common.dependencies import get_clickhouse_session
 from .utils import (
     SinceUntil,
     get_measurement_start_day_agg,

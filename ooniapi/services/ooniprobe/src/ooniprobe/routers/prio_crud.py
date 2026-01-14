@@ -6,8 +6,8 @@ from fastapi import Response, APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import sql as sa
 
-from ooniprobe.prio import compute_priorities, generate_test_list
-from ooniprobe.dependencies import ClickhouseDep
+from ooniprobe.common.prio import compute_priorities, generate_test_list
+from ooniprobe.common.dependencies import ClickhouseDep
 from ooniprobe.common.clickhouse_utils import query_click
 from ooniprobe.common.utils import convert_to_csv
 

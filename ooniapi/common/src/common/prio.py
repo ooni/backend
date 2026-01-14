@@ -33,8 +33,8 @@ from clickhouse_driver import Client as Clickhouse
 from fastapi import Depends
 from pydantic import BaseModel
 
-from .common.clickhouse_utils import query_click
-from .common.metrics import timer
+from .clickhouse_utils import query_click
+from .metrics import timer
 from .dependencies import ClickhouseDep
 
 log = logging.getLogger(__name__)

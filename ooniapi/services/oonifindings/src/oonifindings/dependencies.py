@@ -1,7 +1,4 @@
 from typing import Annotated
-
-from clickhouse_driver import Client as Clickhouse
-
 from fastapi import Depends
 
 from sqlalchemy import create_engine
@@ -20,11 +17,3 @@ def get_postgresql_session(settings: Annotated[Settings, Depends(get_settings)])
         yield db
     finally:
         db.close()
-
-
-def get_clickhouse_session(settings: Annotated[Settings, Depends(get_settings)]):
-    db = Clickhouse.from_url(settings.clickhouse_url)
-    try:
-        yield db
-    finally:
-        db.disconnect()
