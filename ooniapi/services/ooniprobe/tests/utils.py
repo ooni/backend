@@ -25,12 +25,12 @@ def post(client : Client, url, data=None, headers=None):
 
 def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, emission day
     manifest = getj(client, "/api/v1/manifest")
-    user = UserState(manifest['public_parameters'])
+    user = UserState(manifest['manifest']['public_parameters'])
     req = user.make_registration_request()
     resp = postj(client, "/api/v1/sign_credential", json = {
         "credential_sign_request" : req,
-        "manifest_version" : manifest['version']
+        "manifest_version" : manifest['meta']['version']
     })
     user.handle_registration_response(resp['credential_sign_response'])
 
-    return (user, manifest['version'], resp['emission_day'])
+    return (user, manifest['meta']['version'], resp['emission_day'])

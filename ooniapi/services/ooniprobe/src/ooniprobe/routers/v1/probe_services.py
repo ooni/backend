@@ -661,6 +661,9 @@ class RegisterResponse(BaseModel):
 @router.post("/sign_credential", tags=["anonymous_credentials"])
 def sign_credential(register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep):
 
+    if register_request.manifest_version != manifest.meta.version:
+        _raise_manifest_not_found(register_request.manifest_version)
+
     protocol_state = ServerState.from_creds(
         manifest.manifest.public_parameters,
         settings.anonc_secret_key
@@ -751,7 +754,6 @@ async def submit_measurement(
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
     s3_client: S3ClientDep,
-    session: PostgresSessionDep,
     manifest: ManifestDep,
     content_encoding: str = Header(default=None),
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
@@ -825,8 +827,7 @@ async def submit_measurement(
             submit_response = None
     else:
         log.error(f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'")
-        is_verified = False
-        submit_response = None
+        _raise_manifest_not_found(submit_request.manifest_version)
 
     data = submit_request.model_dump()
 
@@ -908,6 +909,7 @@ class CredentialUpdateResponse(BaseModel):
     )
 
 
+# TODO implement credential update
 # @router.post(
 #     "/update_credential",
 #     response_model=CredentialUpdateResponse,
@@ -925,3 +927,12 @@ async def credential_update(
 
     # TODO we need to find a way to keep track of older private keys to support this endpoint
     raise NotImplementedError("Credential Update is not yet implemented")
+
+def _raise_manifest_not_found(version: str):
+        raise HTTPException(
+            detail={
+                "error": "manifest_not_found",
+                "message": f"No manifest with version '{version}' was found",
+            },
+            status_code=status.HTTP_404_NOT_FOUND,
+        )

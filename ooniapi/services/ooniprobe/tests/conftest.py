@@ -6,8 +6,10 @@ import shutil
 import os
 import json
 import time
+from datetime import datetime
 from urllib.request import urlopen
 
+from ooniauth_py import ServerState
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -15,11 +17,10 @@ from clickhouse_driver import Client as ClickhouseClient
 
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
-from ooniprobe.dependencies import PostgresSessionDep, get_s3_client
+from ooniprobe.dependencies import get_s3_client, _get_manifest, ManifestResponse, ManifestMeta, Manifest
 from ooniprobe.main import app
 from ooniprobe.download_geoip import try_update
 from ooniprobe.dependencies import get_postgresql_session
-from ooniprobe.models import OONIProbeManifest, OONIProbeServerState
 from ooniprobe.common.clickhouse_utils import insert_click
 from .utils import setup_user
 
@@ -101,26 +102,51 @@ def geoip_db_dir(fixture_path):
     ooni_tempdir = fixture_path / "geoip"
     return str(ooni_tempdir)
 
+def make_manifest_mock_fn(public_params : str):
+    def get_manifest_mock():
+
+        return ManifestResponse(
+            manifest=Manifest(
+                submission_policy={"*/*" : "*"},
+                public_parameters=public_params
+                ),
+            meta = ManifestMeta(
+                version="1",
+                last_modification_date=datetime.now(),
+                manifest_url="https://ooni.mock/manifest"
+                )
+        )
+
+    return get_manifest_mock
 
 @pytest.fixture
-def client(clickhouse_server, test_settings, geoip_db_dir):
+def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
+    _, public_key = test_creds
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
-
-    # Initialize server state
-    db = get_postgresql_session(test_settings())
-    session = next(db)
-    OONIProbeManifest.init_table(session)
-    next(db, None)
+    app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
 
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
     client = TestClient(app)
     yield client
 
+@pytest.fixture
+def test_creds():
+    """
+    Example credentials used for anonymous credentials
+    """
+
+    # (Secret key, public key)
+    return (
+        "ASAAAAAAAAAAXgJT5699LDE/QjmzDjsHcVP+EOxPO/aS4grULhSZqAsgAAAAAAAAAEf1WUPkxSb1cCAUAPvwqqtsOSiLd0m/BpY5HAZLvGQFAwAAAAAAAAAgAAAAAAAAABjrB0p6whCfu/5mDCtrZ/DSaPy+dC3LFL08taNMZ10KIAAAAAAAAAAC8BjxPSqTTnYT1IrWSFkHWvE3e/dstCrLo6GvN6+FAyAAAAAAAAAAyxD+iRjtKEHwRj1AwpDt0Sj4WI8pSDfoxB29G/8eYQ0=",
+        "ASAAAAAAAAAA0Dfe5U+8tRO3siBVVp+zEoC309fhfhtsVJIv2zpeD1cBIAAAAAAAAAAw/LnzUbQepSaQzI29yCH31/Q2Awq9NuTfgW4BQzorGwMAAAAAAAAAIAAAAAAAAABgspiZ6jNoM11fBO/JJ82Ry+QJ6S2mpOpCOmu2KsxGfiAAAAAAAAAACltCp9TukC2mNw0YYAAjqhXH2fsOYoz5FwcjE1bZoD0gAAAAAAAAAN4hyN9hpFgmOU37ynNgoIBLnSg+dObJ/yWRwt5/uYhh"
+        )
+
 
 @pytest.fixture
-def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_server):
+def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_server, test_creds):
+    (secret_key, _) = test_creds
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
@@ -128,7 +154,10 @@ def test_settings(alembic_migration, geoip_db_dir, clickhouse_server, fastpath_s
         clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server
+        fastpath_url=fastpath_server,
+        anonc_manifest_bucket="test-bucket",
+        anonc_manifest_file = "manifest.json",
+        anonc_secret_key = secret_key
     )
 
 
@@ -206,27 +235,6 @@ def load_url_priorities(clickhouse_db):
 
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, j)
-
-@pytest.fixture(scope="function")
-def second_manifest(db: PostgresSessionDep, client_with_original_manifest):
-    # client_with_original_manifest is a dependency so that
-    # the client is created before the new manifest created
-    # by this function is added to the DB
-    recent_manifest = OONIProbeManifest.get_latest(db)
-    assert recent_manifest
-
-    new_server_state = OONIProbeServerState.make_new_state(db)
-    new_manifest = OONIProbeManifest(
-        server_state_id = new_server_state.id,
-        date_created = recent_manifest.date_created + timedelta(days=1)
-        )
-
-    db.add(new_manifest)
-    db.commit()
-    yield new_manifest
-    db.delete(new_manifest)
-    db.delete(new_server_state)
-    db.commit()
 
 @pytest.fixture(scope="function")
 def client_with_original_manifest(client):
