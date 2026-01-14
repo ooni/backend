@@ -1,26 +1,33 @@
-from base64 import b64encode
-from os import urandom
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Optional, Any, Dict, Tuple, Annotated, TypeAlias, Optional
+from typing import Annotated, List, Optional, Any, Dict, Tuple
 import random
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
+from fastapi import APIRouter, HTTPException, Query, Response, Request
 from prometheus_client import Counter, Info, Gauge
-from enum import Enum
-import sqlalchemy as sa
-from clickhouse_driver import Client as Clickhouse
+from pydantic import Field, IPvAnyAddress
 
-from ...dependencies import CCReaderDep, ASNReaderDep, ClickhouseDep, SettingsDep
-from ...common.dependencies import get_settings
-from ...common.routers import BaseModel
 from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.config import Settings
+from ...common.routers import BaseModel
 from ...common.utils import setnocacheresponse
-from ...common.prio import generate_test_list
+from ...dependencies import (
+    ASNReaderDep,
+    CCReaderDep,
+    ClickhouseDep,
+    SettingsDep,
+    TorTargetsDep,
+)
+from ...utils import (
+    generate_report_id,
+    extract_probe_ipaddr,
+    lookup_probe_cc,
+    lookup_probe_network,
+)
+from ...common.utils import setcacheresponse
+from ...prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 router = APIRouter(prefix="/v1")
 
@@ -61,6 +68,10 @@ class Metrics:
         "geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN"
     )
 
+    TEST_LIST_URLS_COUNT = Gauge(
+        "test_list_urls_count", "How many urls were generated for a test list"
+    )
+
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -79,7 +90,7 @@ class ProbeLoginResponse(BaseModel):
 def probe_login_post(
     probe_login: ProbeLogin,
     response: Response,
-    settings: Settings = Depends(get_settings),
+    settings: SettingsDep,
 ) -> ProbeLoginResponse:
 
     if probe_login.username is None or probe_login.password is None:
@@ -149,7 +160,7 @@ class ProbeRegisterResponse(BaseModel):
 def probe_register_post(
     probe_register: ProbeRegister,
     response: Response,
-    settings: Settings = Depends(get_settings),
+    settings: SettingsDep,
 ) -> ProbeRegisterResponse:
     """Probe Services: Register
 
@@ -301,6 +312,34 @@ class CheckInResponse(BaseModel):
     tests: Dict[str, Any]
 
 
+class TestHelperEntry(BaseModel):
+    address: str
+    type: str
+    front: Optional[str] = None
+
+
+class ListTestHelpersResponse(BaseModel):
+    dns: List[TestHelperEntry]
+    http_return_json_headers: List[TestHelperEntry] = Field(
+        alias="http-return-json-headers"
+    )
+    ssl: List[TestHelperEntry]
+    tcp_echo: List[TestHelperEntry] = Field(alias="tcp-echo")
+    traceroute: List[TestHelperEntry]
+    web_connectivity: List[TestHelperEntry] = Field(alias="web-connectivity")
+
+
+@router.get("/test-helpers", tags=["ooniprobe"])
+def list_test_helpers(response: Response):
+    setnocacheresponse(response)
+    conf = generate_test_helpers_conf()
+    conf_typed = {}
+    for key, value in conf.items():
+        conf_typed[key] = [TestHelperEntry(**e) for e in value]
+
+    return ListTestHelpersResponse.model_validate(conf_typed)
+
+
 @router.post("/check-in", tags=["ooniprobe"])
 def check_in(
     request: Request,
@@ -319,9 +358,9 @@ def check_in(
     probe_asn = check_in.probe_asn
     software_name = check_in.software_name
     software_version = check_in.software_version
-
+    ipaddr = extract_probe_ipaddr(request)
     resp, probe_cc, asn_i = probe_geoip(
-        request,
+        ipaddr,
         probe_cc,
         probe_asn,
         cc_reader,
@@ -444,7 +483,7 @@ def check_in(
 
 
 def probe_geoip(
-    request: Request,
+    ipaddr: str,
     probe_cc: str,
     asn: str,
     cc_reader: CCReaderDep,
@@ -457,7 +496,6 @@ def probe_geoip(
     db_asn = "AS0"
     db_probe_network_name = None
     try:
-        ipaddr = extract_probe_ipaddr(request)
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
@@ -495,30 +533,6 @@ def probe_geoip(
     assert len(probe_cc) == 2
 
     return resp, probe_cc, asn_int
-
-
-def extract_probe_ipaddr(request: Request) -> str:
-
-    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
-    for h in real_ip_headers:
-        if h in request.headers:
-            return request.headers.getlist(h)[0].rpartition(" ")[-1]
-
-    return request.client.host if request.client else ""
-
-
-def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    resp = asn_reader.asn(ipaddr)
-
-    return (
-        "AS{}".format(resp.autonomous_system_number),
-        resp.autonomous_system_organization or "0",
-    )
-
-
-def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    resp = cc_reader.country(ipaddr)
-    return resp.country.iso_code or "ZZ"
 
 
 def generate_test_helpers_conf() -> Dict:
@@ -586,10 +600,176 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     return out
 
 
-def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    cid = settings.collector_id
-    rand = b64encode(urandom(12), b"oo").decode()
-    stn = test_name.replace("_", "")
-    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
-    return rid
+class TestListUrlsMeta(BaseModel):
+    count: int
+    current_page: int
+    limit: int
+    next_url: str
+    pages: int
+
+
+class TestListUrlsResult(BaseModel):
+    category_code: str
+    country_code: str
+    url: str
+
+
+class TestListUrlsResponse(BaseModel):
+    """
+    URL test list
+    """
+
+    metadata: TestListUrlsMeta
+    results: List[TestListUrlsResult]
+
+
+@router.get("/test-list/urls")
+def list_test_urls(
+    clickhouse: ClickhouseDep,
+    failover_test_items: FailoverTestListDep,
+    response: Response,
+    category_codes: Annotated[
+        str | None,
+        Query(
+            description="Comma separated list of URL categories, all uppercase",
+            pattern=r"[A-Z,]*",
+        ),
+    ] = None,
+    country_code: Annotated[
+        str,
+        Query(
+            description="Two letter, uppercase country code",
+            min_length=2,
+            max_length=2,
+            alias="probe_cc",
+        ),
+    ] = "ZZ",
+    limit: Annotated[
+        int, Query(description="Maximum number of URLs to return", le=9999)
+    ] = -1,
+    debug: Annotated[
+        bool,
+        Query(
+            description="Include measurement counts and priority",
+        ),
+    ] = False,
+) -> TestListUrlsResponse | Dict[str, Any]:
+    """
+    Generate test URL list with prioritization
+    """
+    try:
+        country_code = country_code.upper()
+        category_codes_list = category_codes.split(",") if category_codes else None
+        if limit == -1:
+            limit = 9999
+    except Exception as e:
+        log.error(e, exc_info=True)
+        setnocacheresponse(response)
+        return {}
+
+    try:
+        test_items, _1, _2 = generate_test_list(
+            clickhouse, country_code, category_codes_list, 0, limit, debug
+        )
+    except Exception as e:
+        log.error(e, exc_info=True)
+        # failover_generate_test_list runs without any database interaction
+        test_items = failover_generate_test_list(
+            failover_test_items, category_codes_list, limit
+        )
+
+    # TODO: remove current_page / next_url / pages ?
+    Metrics.TEST_LIST_URLS_COUNT.set(len(test_items))
+    out = TestListUrlsResponse(
+        metadata=TestListUrlsMeta(
+            count=len(test_items), current_page=-1, limit=-1, next_url="", pages=1
+        ),
+        results=[TestListUrlsResult(**item) for item in test_items],
+    )
+    setcacheresponse("1s", response)
+    return out
+
+
+class GeoLookupResult(BaseModel):
+    cc: str = Field(description="Country Code")
+    asn: str = Field(description="Autonomous System Number (ASN)")
+    as_name: Optional[str] = Field("", description="Autonomous System Name")
+
+
+class GeoLookupRequest(BaseModel):
+    addresses: List[IPvAnyAddress] = Field(description="list of IPv4 or IPv6 address to geolookup")
+
+
+class GeoLookupResponse(BaseModel):
+    v: int = Field(description="response format version", default=1)
+    geolocation: Dict[IPvAnyAddress, GeoLookupResult] = Field(description="Dict of IP addresses to GeoLookupResult")
+
+
+@router.post("/geolookup", tags=["ooniprobe"])
+async def geolookup(
+        data: GeoLookupRequest,
+        response: Response,
+        cc_reader: CCReaderDep,
+        asn_reader: ASNReaderDep,
+) -> GeoLookupResponse:
+
+    # initial values probe_geoip compares with
+    probe_cc = "ZZ"
+    asn = "AS0"
+    geolookup_resp = {"geolocation": {}}
+
+    # for each address provided, call probe_geoip and add the data to our response
+    for ipaddr in data.addresses:
+        # call probe_geoip() and map the keys to the geolookup v1 API
+        resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
+        # it doesn't seem possible to have separate aliases for (de)serialization
+        if resp["probe_network_name"] == None:
+            resp["probe_network_name"] = ""
+        geolookup_resp["geolocation"][ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
+            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
+
+    setnocacheresponse(response)
+    return geolookup_resp
+
+
+class CollectorEntry(BaseModel):
+    # not actually used but necessary to be compliant with the old API schema
+    address: str = Field(description="Address of collector")
+    front: Optional[str] = Field(default=None, description="Fronted domain")
+    type: Optional[str] = Field(default=None, description="Type of collector")
+
+@router.get("/collectors", tags=["ooniprobe"])
+def list_collectors(
+    settings: SettingsDep,
+    ) -> List[CollectorEntry]:
+    config_collectors = settings.collectors
+    collectors_response = []
+    for entry in config_collectors:
+        collector = CollectorEntry(**entry)
+        collectors_response.append(collector)
+    return collectors_response
+
+
+class TorTarget(BaseModel):
+    address: str
+    fingerprint: str
+    name: Optional[str] = ''
+    protocol: str
+    params: Optional[Dict[str, List[str]]] = None
+
+
+@router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
+def list_tor_targets(
+    request: Request,
+    targets: TorTargetsDep,
+    ) -> Dict[str, TorTarget]:
+
+    token = request.headers.get("Authorization")
+    if token is None:
+        # XXX not actually validated
+        pass
+
+    if targets is not None:
+        return targets
+    log.info("tor-targets: failed to receive tor-targets from s3")
+    raise HTTPException(status_code=401, detail="Invalid tor-targets")

@@ -1,4 +1,3 @@
-version: '2'
 services:
   clickhouse:
     image: "clickhouse/clickhouse-server"
@@ -10,3 +9,10 @@ services:
     environment: 
       CLICKHOUSE_USER: test
       CLICKHOUSE_PASSWORD: test
+
+  fakepath: # A mock version of the fastpath
+    build: 
+      context: "./fakepath"
+      dockerfile: "Dockerfile"
+    ports: 
+      - "80"

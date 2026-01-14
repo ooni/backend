@@ -1,23 +1,13 @@
-from pathlib import Path
-import json
-import pytest
-
-
-from ooniprobe.common.clickhouse_utils import insert_click
-
-
 def getjson(client, url):
     response = client.get(url)
     assert response.status_code == 200
-    assert response.is_json
-    return response.json
+    return response.json()
 
 
 def getjsonh(client, url, headers=None):
     response = client.get(url, headers=headers)
     assert response.status_code == 200
-    assert response.is_json
-    return response.json
+    return response.json()
 
 
 def post(client, url, data):
@@ -30,25 +20,6 @@ def postj(client, url, **kw):
     response = client.post(url, json=kw)
     assert response.status_code == 200
     return response.json()
-
-
-## Fixtures
-@pytest.fixture
-def load_url_priorities(clickhouse_db):
-    path = Path("tests/fixtures/data")
-    filename = "url_priorities_us.json"
-    file = Path(path, filename)
-
-    with file.open("r") as f:
-        j = json.load(f)
-
-    # 'sign' is created with default value 0, causing a db error.
-    # use 1 to prevent it
-    for row in j:
-        row["sign"] = 1
-
-    query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
-    insert_click(clickhouse_db, query, j)
 
 
 ## Tests
@@ -108,3 +79,8 @@ def test_check_in_url_category_news(client):
     assert int(asn_i) == 0
     assert stn == "webconnectivity"
     assert cc == "ZZ"
+
+
+def test_test_helpers(client):
+    c = getjson(client, "/api/v1/test-helpers")
+    assert len(c) == 6

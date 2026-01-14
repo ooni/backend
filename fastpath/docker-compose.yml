@@ -1,0 +1,42 @@
+services:
+  fastpath:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ooni-fastpath 
+    ports:
+      - "5000:5000"
+      - "8472:8472"
+    volumes:
+      - .:/app
+    working_dir: /app
+    profiles:
+      - default
+      - all
+
+  # This service is used only for testing, in prod we use the actual clickhouse db
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse-server
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=default
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+      - "9009:9009"
+    volumes:
+       - ./clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "select 1;"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s
+    profiles:
+      - all
+      - clickhouse 
+
+volumes:
+  clickhouse-data:

@@ -4,7 +4,7 @@ on: pull_request
 jobs:
   build_deb_packages:
     runs-on: "ubuntu-24.04"
-    container: debian:11
+    container: debian:13
     steps:
       - name: Change Owner of Container Working Directory
         run: chown root:root .
@@ -21,7 +21,6 @@ jobs:
 
       - name: Install depedencies
         run: |
-          echo "deb http://deb.debian.org/debian bullseye-backports main" > /etc/apt/sources.list.d/backports.list
           apt-get update -q
           apt-get install -y --no-install-recommends git python3 python3-requests python3-gnupg s3cmd wget
 
