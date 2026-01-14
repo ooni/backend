@@ -2,6 +2,7 @@ import secrets
 
 from typing import Annotated, Optional
 import timeit
+from functools import partial, wraps
 
 from fastapi import FastAPI, Response, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -51,7 +52,7 @@ FUNCTION_TIME = Histogram(
 )
 
 
-def timer(func, timer_name: Optional[str] = None):
+def timer(func=None, name: Optional[str] = None):
     """Measure function execution time in seconds.
 
     Metric will include execution status (error or success) and function name, you
@@ -69,8 +70,12 @@ def timer(func, timer_name: Optional[str] = None):
         not provided. Defaults to None.
     """
 
-    name = timer_name or func.__name__
+    if func is None:
+        return partial(timer, name=name)
 
+    name = name or func.__name__
+
+    @wraps(func)
     def timed_function(*args, **kwargs):
 
         start_time = timeit.default_timer()

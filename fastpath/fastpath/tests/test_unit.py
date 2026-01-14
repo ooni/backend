@@ -175,6 +175,11 @@ def test_match_fingerprints_b64_hdr(fprints):
     msm = loadj("web_connectivity_b64_hdr.json")
     assert fp.match_fingerprints(msm) == []
 
+def test_match_id_fingerprint(fprints):
+    msm = loadj("20250527233111.802678_ID_webconnectivity_5a37ec909dbf14e3.json")
+    res = fp.match_fingerprints(msm)
+    print(res)
+    assert res != []
 
 def test_score_web_connectivity_dns_ir_fingerprint(fprints):
     msm = loadj("web_connectivity_ir_fp")

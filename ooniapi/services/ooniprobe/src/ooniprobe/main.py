@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 from contextlib import asynccontextmanager
+from urllib.request import urlopen
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,10 +16,15 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from . import models
 from .routers.v2 import vpn
 from .routers.v1 import probe_services
+from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
-from .dependencies import get_postgresql_session, get_clickhouse_session
-from .common.dependencies import get_settings
+from .common.dependencies import (
+    get_settings,
+    get_postgresql_session,
+    get_clickhouse_session,
+    SettingsDep
+)
 from .common.config import Settings
 from .common.version import get_build_label
 from .common.metrics import mount_metrics
@@ -69,7 +75,7 @@ instrumentor = Instrumentator().instrument(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
+    allow_origin_regex=r"^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,6 +83,9 @@ app.add_middleware(
 
 app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
+app.include_router(reports.router)
+app.include_router(bouncer.router)
+app.include_router(prio_crud.router, prefix="/api")
 
 
 @app.get("/version")
@@ -93,7 +102,7 @@ class HealthStatus(BaseModel):
 
 @app.get("/health")
 async def health(
-    settings=Depends(get_settings),
+    settings: SettingsDep,
     db=Depends(get_postgresql_session),
     clickhouse=Depends(get_clickhouse_session),
 ):
@@ -108,6 +117,15 @@ async def health(
     except Exception as e:
         errors.append("clickhouse_error")
         log.error(e)
+
+    try:
+        response = urlopen(settings.fastpath_url)
+        assert (
+            response.status == 200
+        ), "Unexpected status trying to connect to fastpath: " + str(response.status)
+    except Exception as exc:
+        log.error(str(exc))
+        errors.append("fastpath_connection_error")
 
     try:
         db.query(models.OONIProbeVPNProvider).limit(1).all()

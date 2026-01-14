@@ -112,19 +112,7 @@ def role_required(roles):
                 # catches ExpiredSignatureError
                 return jerror("Authentication required", 401)
 
-            # check for session expunge
-            # TODO: cache query?
-            query = """SELECT threshold
-                FROM session_expunge
-                WHERE account_id = :account_id """
             account_id = tok["account_id"]
-            query_params = dict(account_id=account_id)
-            row = query_click_one_row(sql.text(query), query_params)
-            if row:
-                threshold = row["threshold"]
-                iat = datetime.utcfromtimestamp(tok["iat"])
-                if iat < threshold:
-                    return jerror("Authentication token expired", 401)
 
             # If needed we can add here a 2-tier expiration time: long for
             # /api/v1/user_refresh_token and short for everything else
@@ -395,7 +383,6 @@ def user_refresh_token() -> Response:
     """
     log = current_app.logger
     tok = get_client_token()
-    # @role_required already checked for expunged tokens
     if not tok:
         return jerror("Invalid credentials", code=401)
     newtoken = _create_session_token(tok["account_id"], tok["role"], tok["login_time"])
@@ -413,13 +400,6 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 GRANT SELECT ON TABLE accounts TO amsapi;
 GRANT SELECT ON TABLE accounts TO readonly;
-
-CREATE TABLE IF NOT EXISTS session_expunge (
-    account_id text PRIMARY KEY,
-    threshold timestamp without time zone NOT NULL
-);
-GRANT SELECT ON TABLE public.session_expunge TO amsapi;
-GRANT SELECT ON TABLE public.session_expunge TO readonly;
 """
 
 
@@ -551,66 +531,3 @@ def get_account_role(email_address) -> Response:
 
     log.info(f"Getting account {account_id} role: {role}")
     return nocachejson(role=role)
-
-
-@auth_blueprint.route("/api/v1/set_session_expunge", methods=["POST"])
-@role_required("admin")
-def set_session_expunge() -> Response:
-    """Force refreshing all session tokens for a given account.
-    Only for admins.
-    ---
-    security:
-      cookieAuth:
-        type: JWT
-        in: cookie
-        name: ooni
-    parameters:
-      - in: body
-        name: email address
-        description: data as HTML form or JSON
-        required: true
-        schema:
-          type: object
-          properties:
-            email_address:
-              type: string
-    responses:
-      200:
-        description: Confirmation
-    """
-    log = current_app.logger
-    req = request.json if request.is_json else request.form
-    assert req
-    email_address = req.get("email_address", "").strip().lower()
-    if EMAIL_RE.fullmatch(email_address) is None:
-        return jerror("Invalid email address")
-    account_id = hash_email_address(email_address)
-    log.info(f"Setting expunge for account {account_id}")
-    # If an entry is already in place update the threshold as the new
-    # value is going to be safer
-    # 'session_expunge' is on RocksDB (ACID key-value database)
-    log.info("Inserting into Clickhouse session_expunge")
-    query = "INSERT INTO session_expunge (account_id) VALUES"
-    query_params: Any = dict(account_id=account_id)
-    # the `threshold` column defaults to the current time
-    insert_click(query, [query_params])
-    return nocachejson()
-
-
-def _remove_from_session_expunge(email_address: str) -> None:
-    # Used by integ test
-    log = current_app.logger
-    account_id = hash_email_address(email_address)
-    query_params: Dict[str, Any] = dict(account_id=account_id)
-    # 'session_expunge' is on RocksDB (ACID key-value database)
-    q1 = "SELECT * FROM session_expunge WHERE account_id = :account_id"
-    row = query_click_one_row(sql.text(q1), query_params)
-    # https://github.com/ClickHouse/ClickHouse/issues/20546
-    if row:
-        log.info("Resetting expunge in Clickhouse session_expunge")
-        query = "INSERT INTO session_expunge (account_id, threshold) VALUES"
-        query_params["threshold"] = 0
-        insert_click(query, [query_params])
-
-
-# TODO: purge session_expunge

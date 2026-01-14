@@ -140,7 +140,6 @@ def test_user_register_non_valid_redirect(client, mocksmtp):
 
 
 def _register_and_login(client, email_address):
-    ooniapi.auth._remove_from_session_expunge(email_address)
     # # return cookie header for further use
     d = dict(email_address=email_address, redirect_to="https://explorer.ooni.org")
     r = client.post("/api/v1/user_register", json=d)
@@ -247,23 +246,6 @@ def test_role_set_multiple(client, mocksmtp, integtest_admin):
     assert r.status_code == 200
 
 
-@pytest.mark.skip("FIXME not deterministic, see auth.py  _delete_account_data")
-def test_role_set_with_expunged_token(client, mocksmtp, integtest_admin):
-    h = _register_and_login(client, admin_e)
-
-    d = dict(email_address="BOGUS_EMAIL_ADDR", role="admin")
-    r = client.post("/api/v1/set_session_expunge", json=d)
-    assert r.status_code == 400, r.json
-
-    # As admin, I expunge my own session token
-    d = dict(email_address=admin_e, role="admin")
-    r = client.post("/api/v1/set_session_expunge", json=d)
-    assert r.status_code == 200
-
-    r = client.get("/api/v1/get_account_role/" + admin_e)
-    assert r.status_code == 401
-
-
 def decode_token(header):
     # mimics auth.py:get_client_token()
     assert isinstance(header, dict)
@@ -279,7 +261,6 @@ def test_session_refresh_and_expire(client, mocksmtp, integtest_admin):
     # SESSION_EXPIRY_DAYS = 2
     # LOGIN_EXPIRY_DAYS = 7
     with freeze_time("2012-01-14"):
-        ooniapi.auth._remove_from_session_expunge(admin_e)
         h = _register_and_login(client, admin_e)
         tok = decode_token(h)
         assert tok == {

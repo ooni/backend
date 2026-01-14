@@ -33,6 +33,7 @@ class Metrics:
         "geoip_download_time", "How long it takes to download the DB"
     )
 
+
 log = logging.getLogger("ooni_download_geoip")
 
 log.addHandler(logging.StreamHandler(sys.stdout))
@@ -46,7 +47,7 @@ def get_request(url):
     return urlopen(req)
 
 
-def is_already_updated(db_dir: Path, ts : str) -> bool:
+def is_already_updated(db_dir: Path, ts: str) -> bool:
     try:
         with (db_dir / "geoipdbts").open() as in_file:
             current_ts = in_file.read()
@@ -108,14 +109,14 @@ def download_geoip(db_dir: Path, url: str, filename: str) -> None:
     except Exception as exc:
         log.error(f"consistenty check on the geoip DB failed: {exc}")
         Metrics.GEOIP_CHECKFAIL.inc()
-        raise 
+        raise
 
     tmp_out.rename(db_dir / filename)
     endtime = timeit.default_timer()  # End timer
     Metrics.GEOIP_DOWNLOAD_TIME.observe(endtime - start_time)
 
 
-def update_geoip(db_dir: Path, ts : str, asn_url : str, cc_url : str) -> None:
+def update_geoip(db_dir: Path, ts: str, asn_url: str, cc_url: str) -> None:
     db_dir.mkdir(parents=True, exist_ok=True)
     download_geoip(db_dir, asn_url, "asn.mmdb")
     download_geoip(db_dir, cc_url, "cc.mmdb")

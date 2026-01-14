@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 
-from ...dependencies import get_clickhouse_session
+from ...common.dependencies import get_clickhouse_session
 from .utils import (
     SinceUntil,
     get_measurement_start_day_agg,
@@ -121,32 +121,43 @@ async def get_aggregation_observations(
         order_by = ["timestamp"] + order_by
 
     if "failure" in group_by:
+        # We exclude observations that are only HTTP/HTTPS
+        # since some older versions of the engine
+        # don't allow us to properly connect them to the relevant address.
+        # This means that if we were to present them here, we would be
+        # double-counting some observations and for some we do not know if the failure
+        # ocurred at TCP, TLS or HTTP levels.
+        # We do this by filtering by observations that lead to a failure on dns
+        # or have an IP value.
+        and_list.append("(dns_failure IS NOT NULL OR ip IS NOT NULL)")
+
+        # An important assumption about observations is made here.
+        # This assumption is that if something fails at DNS, then it will fail
+        # at TCP, which if it fails at TCP, it will fail at TLS and if it fails
+        # at TLS it will fail at HTTP.
+        # This assumption is in line with how web_connectivity currently works,
+        # but may not be the case in the future.
         columns.append(
             f"""multiIf(
-dns_failure IS NOT NULL,
-CONCAT('dns_', dns_failure),
-tcp_failure IS NOT NULL,
-CONCAT('tcp_', tcp_failure),
-multiIf(
-tls_handshake_last_operation = 'write_1',
-CONCAT('tls_', tls_failure, '_after_CH'),
-tls_failure IS NULL AND tls_server_name IS NOT NULL,
-'none',
-CONCAT('tls_', tls_failure)
-)
+    dns_failure IS NOT NULL,
+    IF(resolver_asn = probe_asn,
+       CONCAT('dns_isp.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure)),
+       CONCAT('dns_other.', IF(startsWith(dns_failure, 'unknown_failure'), 'unknown_failure', dns_failure))
+    ),
+    tcp_failure IS NOT NULL,
+    CONCAT('tcp.', IF(startsWith(tcp_failure, 'unknown_failure'), 'unknown_failure', tcp_failure)),
+    tls_failure IS NOT NULL,
+    CONCAT('tls.', IF(startsWith(tls_failure, 'unknown_failure'), 'unknown_failure', tls_failure)),
+    http_failure IS NOT NULL,
+    CONCAT(
+        IF(startsWith(http_request_url, 'https://'), 'https.', 'http.'),
+        IF(startsWith(http_failure, 'unknown_failure'), 'unknown_failure', http_failure)
+    ),
+    'none'
 ) as failure
 """
         )
         column_keys.append("failure")
-        and_list.append(
-            # We exclude observations where we only have the HTTP/HTTPS observations
-            """(dns_failure IS NOT NULL
-OR tcp_failure IS NOT NULL
-OR tls_failure IS NOT NULL
-OR tls_server_name IS NOT NULL
-)
-"""
-        )
 
     for column in group_by:
         if column not in column_keys:

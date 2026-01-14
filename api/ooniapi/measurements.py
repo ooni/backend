@@ -665,7 +665,6 @@ def list_measurements() -> Response:
         type: string
         description: 'By which key the results should be ordered by (default: `null`)'
         enum:
-          - test_start_time
           - measurement_start_time
           - input
           - probe_cc
@@ -760,6 +759,22 @@ def list_measurements() -> Response:
 
     if order.lower() not in ("asc", "desc"):
         raise BadRequest("Invalid order")
+
+    # Cap limit to the range 0 to 100
+    if limit > 100:
+        raise BadRequest("`limit` is only allowed up to 100")
+
+    # Validate order_by fields
+    valid_order_fields = [
+        "measurement_start_time",
+        "input",
+        "probe_cc",
+        "probe_asn",
+        "test_name"
+    ]
+    if order_by and order_by.lower() not in valid_order_fields:
+        raise BadRequest("Invalid field for ordering: " + order_by + 
+                         ". Valid options: " + str(valid_order_fields))
 
     # # Perform query
 

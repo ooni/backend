@@ -62,6 +62,7 @@ def parse_probe_asn_to_int(func):
         if isinstance(probe_asn, str):
             if probe_asn.startswith("AS"):
                 probe_asn = probe_asn[2:]
-            kwargs['probe_asn'] = int(probe_asn)
+            kwargs["probe_asn"] = int(probe_asn)
         return await func(*args, **kwargs)
+
     return wrapper

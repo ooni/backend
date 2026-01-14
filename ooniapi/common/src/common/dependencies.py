@@ -1,8 +1,13 @@
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, TypeAlias
+
+from clickhouse_driver import Client as Clickhouse
 
 from fastapi import Depends
 from fastapi import HTTPException, Header
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+
 from .auth import get_client_token
 from .config import Settings
 
@@ -11,6 +16,7 @@ from .config import Settings
 def get_settings() -> Settings:
     return Settings()
 
+SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
 
 def role_required(roles: list[str]):
     """Wrapped function requiring user to be logged in and have the right role."""
@@ -29,27 +35,37 @@ def role_required(roles: list[str]):
             tok = get_client_token(authorization, settings.jwt_encryption_key)
         except:
             raise HTTPException(detail="Authentication required", status_code=401)
-        
+
         if not tok:
             raise HTTPException(detail="Authentication required", status_code=401)
         if tok["role"] not in roles:
             raise HTTPException(detail="Role not authorized", status_code=401)
 
         return tok
-        # TODO(art): we don't check for the session_expunge table yet. It's empty so the impact is none
-        # query = """SELECT threshold
-        #    FROM session_expunge
-        #    WHERE account_id = :account_id """
-        # account_id = tok["account_id"]
-        # query_params = dict(account_id=account_id)
-        # row = query_click_one_row(sql.text(query), query_params)
-        # if row:
-        #    threshold = row["threshold"]
-        #    iat = datetime.utcfromtimestamp(tok["iat"])
-        #    if iat < threshold:
-        #        return jerror("Authentication token expired", 401)
-
-        # If needed we can add here a 2-tier expiration time: long for
-        # /api/v1/user_refresh_token and short for everything else
-
+    
     return verify_jwt
+
+
+def get_clickhouse_session(settings: SettingsDep):
+    db = Clickhouse.from_url(settings.clickhouse_url)
+    try:
+        yield db
+    finally:
+        db.disconnect()
+
+
+ClickhouseDep = Annotated[Clickhouse, Depends(get_clickhouse_session)]
+
+
+def get_postgresql_session(settings: SettingsDep):
+    engine = create_engine(settings.postgresql_url)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+PostgresDep = Annotated[Session, Depends(get_postgresql_session)]

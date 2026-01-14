@@ -4,6 +4,10 @@ Source for https://api.ooni.io/
 
 File bugs with the API inside of: https://github.com/ooni/backend/issues/new
 
+## Deprecation Warning
+
+This API is deprecated, you really should be looking at https://github.com/ooni/backend/tree/master/ooniapi
+
 ## Local development
 
 You can run the OONI API locally in a development environment using `docker`
