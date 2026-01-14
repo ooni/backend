@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from clickhouse_driver import Client as ClickhouseClient
 
 from oonimeasurements.common.config import Settings
-from oonimeasurements.dependencies import get_settings
+from oonimeasurements.common.dependencies import get_settings
 from oonimeasurements.main import app
 
 THIS_DIR = Path(__file__).parent.resolve()

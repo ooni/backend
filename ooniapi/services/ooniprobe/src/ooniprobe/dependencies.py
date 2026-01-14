@@ -6,22 +6,10 @@ import boto3
 import ujson
 import geoip2.database
 from fastapi import Depends
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from mypy_boto3_s3 import S3Client
 
 from ooniprobe.common.dependencies import SettingsDep
-
-def get_postgresql_session(settings: SettingsDep):
-    engine = create_engine(settings.postgresql_url)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def get_cc_reader(settings: SettingsDep):

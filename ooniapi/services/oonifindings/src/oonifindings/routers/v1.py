@@ -23,7 +23,7 @@ from ..common.auth import (
     get_client_role,
 )
 from ..common.utils import setnocacheresponse, generate_random_intuid
-from ..dependencies import get_postgresql_session
+from ..common.dependencies import SettingsDep, PostgresDep
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +128,8 @@ class OONIFindingIncidents(BaseModel):
 )
 def list_oonifindings(
     response: Response,
+    db: PostgresDep,
+    settings: SettingsDep,
     only_mine: Annotated[bool, Query(description="show only owned items")] = False,
     theme: Annotated[
         list[str] | None,
@@ -146,8 +148,6 @@ def list_oonifindings(
         Query(description="The domain to filter by"),
     ] = None,
     authorization: str = Header("authorization"),
-    db=Depends(get_postgresql_session),
-    settings=Depends(get_settings),
 ):
     """
     Search and list incidents
@@ -227,9 +227,9 @@ def list_oonifindings(
 def get_oonifinding_by_id(
     finding_id: str,
     response: Response,
+    db: PostgresDep,
+    settings: SettingsDep,
     authorization: str = Header("authorization"),
-    db=Depends(get_postgresql_session),
-    settings=Depends(get_settings),
 ):
     """
     Returns an incident
@@ -323,10 +323,10 @@ def generate_finding_slug(create_time: datetime, title: str):
 def create_oonifinding(
     create_request: OONIFindingCreateUpdate,
     response: Response,
+    db: PostgresDep,
+    settings: SettingsDep,
     authorization: str = Header("authorization"),
     token=Depends(role_required(["admin"])),
-    db=Depends(get_postgresql_session),
-    settings=Depends(get_settings),
 ):
     """
     Create an incident
@@ -388,7 +388,7 @@ def create_oonifinding(
 def update_oonifinding(
     update_request: OONIFindingCreateUpdate,
     response: Response,
-    db=Depends(get_postgresql_session),
+    db: PostgresDep,
     token=Depends(role_required(["admin", "user"])),
 ):
     """
@@ -457,8 +457,8 @@ def update_oonifinding(
 def delete_oonifinding(
     delete_request: OONIFindingWithMail,
     response: Response,
+    db: PostgresDep,
     token=Depends(role_required(["admin", "user"])),
-    db=Depends(get_postgresql_session),
 ):
     """
     Delete an incident
@@ -503,7 +503,7 @@ def update_oonifinding_publish_status(
     action: str,
     publish_request: OONIFindingId,
     response: Response,
-    db=Depends(get_postgresql_session),
+    db: PostgresDep,
 ):
     """
     Publish/Unpublish an incident.

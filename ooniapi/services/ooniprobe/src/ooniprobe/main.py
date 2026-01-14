@@ -19,8 +19,12 @@ from .routers.v1 import probe_services
 from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
-from .dependencies import get_postgresql_session
-from .common.dependencies import get_settings, get_clickhouse_session, SettingsDep
+from .common.dependencies import (
+    get_settings,
+    get_postgresql_session,
+    get_clickhouse_session,
+    SettingsDep
+)
 from .common.config import Settings
 from .common.version import get_build_label
 from .common.metrics import mount_metrics

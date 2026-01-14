@@ -12,7 +12,7 @@ from . import models
 from .routers import v1
 
 
-from .dependencies import get_settings, get_postgresql_session
+from .common.dependencies import get_settings, get_postgresql_session
 from .common.version import get_build_label, get_pkg_version
 from .common.metrics import mount_metrics
 
