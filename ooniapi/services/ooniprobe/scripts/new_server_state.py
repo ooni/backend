@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Use this script to generate a new server state for the anonymous credentials protocol
 
