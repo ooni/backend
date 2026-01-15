@@ -1,5 +1,4 @@
 import csv
-import git  # debdeps: python3-git
 import logging
 import os
 import json
@@ -9,6 +8,7 @@ import shutil
 import time
 from typing import Dict, List
 from datetime import datetime
+from dulwich import porcelain as git
 from filelock import FileLock  # debdeps: python3-filelock
 from pathlib import Path
 from urllib.parse import urlparse
@@ -149,15 +149,17 @@ class URLListManager:
     @timer(name="citizenlab_repo_init")
     def _init_repo(self):
         if not os.path.exists(self.repo_dir):
-            log.info(f"cloning {self.origin_repo} repository")
+            log.info(f"Cloning {self.origin_repo} repository")
             url = f"https://github.com/{self.origin_repo}.git"
-            with git.Repo.clone_from(url, self.repo_dir, branch="master") as repo:
-                url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
-                repo.create_remote("rworigin", url)
-                repo.close()
-        with git.Repo(self.repo_dir) as repo:
-            repo.remotes.origin.pull()
-            repo.close()
+            git.clone(url, self.repo_dir, branch="master")
+
+            # Create a remote for push access
+            remote_url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
+            git.remote_add(self.repo_dir, "rworigin", remote_url)
+
+        # Pull the latest changes
+        repo = git.Repo(self.repo_dir)
+        git.pull(repo, 'origin', 'master')
 
     def _get_user_repo_path(self, account_id) -> Path:
         return self.working_dir / "users" / account_id / "test-lists"
@@ -233,10 +235,7 @@ class URLListManager:
         if not os.path.exists(repo_path):
             log.info(f"creating {repo_path}")
             with git.Repo(self.repo_dir) as repo:
-                repo.git.worktree(
-                    "add", "-b", self._get_user_branchname(account_id), repo_path
-                )
-                repo.close()
+                git.worktree_add(repo, path=repo_path, branch=self._get_user_branchname(account_id))
         return git.Repo(repo_path)
 
     def get_test_list(self, account_id, country_code) -> List[Dict[str, str]]:
@@ -279,8 +278,7 @@ class URLListManager:
     @timer(name="citizenlab_repo_pull")
     def _pull_origin_repo(self):
         with git.Repo(self.repo_dir) as repo:
-            repo.remotes.origin.pull()
-            repo.close()
+            git.pull(repo, 'origin', 'master')
 
     @timer(name="citizenlab_sync_state")
     def sync_state(self, account_id) -> str:
@@ -296,9 +294,8 @@ class URLListManager:
             try:
                 shutil.rmtree(path)
                 with git.Repo(self.repo_dir) as repo:
-                    repo.git.worktree("prune")
-                    repo.delete_head(bname, force=True)
-                    repo.close()
+                    git.worktree_prune(repo)
+                    git.branch_delete(repo, bname)
                 self._maybe_delete_changes_log(account_id)
             except Exception as e:
                 log.info(f"Error deleting {path} {e}")
@@ -453,18 +450,15 @@ class URLListManager:
 
             if not done:
                 tmp_f.unlink()
-                repo.close()
                 raise CannotUpdateList()
 
             log.debug(f"Writing {csv_f.as_posix()}")
             tmp_f.rename(csv_f)
-            repo.index.add([csv_f.as_posix()])
-            repo.index.commit(comment)
-
+            git.add(repo=repo, paths=[csv_f.as_posix()])
+            git.commit(repo, message=comment)
             self.write_changes_log(account_id, cc, old_entry, new_entry)
 
             self._set_state(account_id, "IN_PROGRESS")
-            repo.close()
 
     @timer(name="citizenlab_open_pr")
     def _open_pr(self, branchname):
@@ -516,11 +510,7 @@ class URLListManager:
     def _push_to_repo(self, account_id):
         log.debug("pushing branch to GitHub")
         with git.Repo(self.repo_dir) as repo:
-            repo.remotes.rworigin.push(
-                self._get_user_branchname(account_id),
-                force=True,
-            )
-            repo.close()
+            git.push(repo, "rworigin", self._get_user_branchname(account_id), force=True)
 
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
@@ -530,5 +520,3 @@ class URLListManager:
         self._set_pr_id(account_id, pr_id)
         self._set_state(account_id, "PR_OPEN")
         return pr_id
-
-
