@@ -1,4 +1,5 @@
 import logging
+import gc
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
@@ -63,6 +64,8 @@ async def post_propose_changes(
         ulm = get_url_list_manager(settings, account_id)
         pr_id = ulm.propose_changes(account_id)
         del ulm
+        log.info("Forcing GC to unlock URLListManager immediately")
+        gc.collect() # force gc to clean up and clear FileLock
         resp = PullRequestResponse(pr_id=pr_id)  # Return the model directly
         setnocacheresponse(response)
         return resp
