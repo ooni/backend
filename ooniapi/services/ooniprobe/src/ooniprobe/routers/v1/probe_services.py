@@ -744,7 +744,7 @@ class SubmitMeasurementResponse(BaseModel):
     )
 
 
-@router.post("/submit_measurement/{report_id}")
+@router.post("/submit_measurement/{report_id}", tags=["anonymous_credentials"])
 async def submit_measurement(
     report_id: str,
     request: Request,
