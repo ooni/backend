@@ -17,7 +17,6 @@ state = ooniauth_py.ServerState()
 secret_key = state.get_secret_key()
 public_params = state.get_public_parameters()
 
-
 print(
     f"""
 Secret Key:
