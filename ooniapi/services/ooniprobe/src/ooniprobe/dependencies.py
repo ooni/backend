@@ -118,7 +118,22 @@ def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
     manifest = Manifest(**manifest_json)
     return ManifestResponse(manifest=manifest, meta = meta)
 
+__cache__ = dict()
+def get_manifest_cached(s3: S3ClientDep, bucket: str, file: str, cache_time_seconds : float = 60) -> ManifestResponse:
+    """
+    Fetch the manifest and cache the result for `cache_time_seconds`
+
+    Following calls will try to fetch the result from cache
+    """
+    val = __cache__.get((bucket, file))
+    now = time.time()
+
+    if val is None or (now - val[1]) > cache_time_seconds:
+        val = __cache__[(bucket, file)] = (get_manifest(s3, bucket, file), now)
+
+    return val[0]
+
 def _get_manifest(s3: S3ClientDep, settings : SettingsDep) -> ManifestResponse:
-    return get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
+    return get_manifest_cached(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
 
 ManifestDep = Annotated[ManifestResponse, Depends(_get_manifest)]
