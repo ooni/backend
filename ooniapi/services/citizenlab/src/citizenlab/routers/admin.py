@@ -1,4 +1,5 @@
 import logging
+import gc
 
 from typing import Any, Dict, List, Optional
 
@@ -104,6 +105,8 @@ async def get_test_list_meta(
             tl = None
 
         del ulm
+        log.info("Forcing GC to unlock URLListManager immediately")
+        gc.collect() # force gc to clean up and clear FileLock
         # Create the response object
         resp = TestListResponse(test_list=tl, changes=changes, state=state, pr_url=pr_url)
         setnocacheresponse(response)
