@@ -31,28 +31,28 @@ def getjson(client, url):
     response = client.get(url)
     assert response.status_code == 200
     assert response.is_json
-    return response.json
+    return response.get_json()
 
 
 def getjsonh(client, url, headers=None):
     response = client.get(url, headers=headers)
     assert response.status_code == 200
     assert response.is_json
-    return response.json
+    return response.get_json()
 
 
 def post(client, url, data):
     response = client.post(url, data=data)
     assert response.status_code == 200
     assert response.is_json
-    return response.json
+    return response.get_json()
 
 
 def postj(client, url, **kw):
     response = client.post(url, json=kw)
     assert response.status_code == 200
     assert response.is_json
-    return response.json
+    return response.get_json()
 
 
 def test_index(client):
