@@ -231,17 +231,19 @@ def test_register(client):
     assert len(c["client_id"]) == 132
 
 
-def test_register_then_login(client):
+def test_register_then_login(client, app):
     pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
     c = _register(client)
     assert "client_id" in c
     assert len(c["client_id"]) == 132
-    tok = ooniapi.auth.decode_jwt(c["client_id"], audience="probe_login")
+    with app.app_context():
+        tok = ooniapi.auth.decode_jwt(c["client_id"], audience="probe_login")
 
     client_id = c["client_id"]
     c = postj(client, "/api/v1/login", username=client_id, password=pwd)
-    tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
-    assert tok["registration_time"] is not None
+    with app.app_context():
+        tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
+        assert tok["registration_time"] is not None
 
     # Login with a bogus client id emulating probes before 2022
     client_id = "BOGUSBOGUS"
@@ -249,8 +251,10 @@ def test_register_then_login(client):
     r = client.post("/api/v1/login", json=j)
     assert r.status_code == 200
     token = r.json["token"]
-    tok = ooniapi.auth.decode_jwt(token, audience="probe_token")
-    assert tok["registration_time"] is None  # we don't know the reg. time
+
+    with app.app_context():
+        tok = ooniapi.auth.decode_jwt(token, audience="probe_token")
+        assert tok["registration_time"] is None  # we don't know the reg. time
 
     # Expect failed login
     resp = client.post("/api/v1/login", json=dict())
@@ -263,15 +267,16 @@ def test_test_helpers(client):
 
 
 @patch("ooniapi.probe_services._load_json")
-def test_psiphon(mock_load_json, client):
+def test_psiphon(mock_load_json, client, app):
 
     # register and login
     pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
     client_id = _register(client)["client_id"]
 
     c = postj(client, "/api/v1/login", username=client_id, password=pwd)
-    tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
-    assert tok["registration_time"] is not None
+    with app.app_context():
+        tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
+        assert tok["registration_time"] is not None
 
     url = "/api/v1/test-list/psiphon-config"
     # broken token
@@ -289,14 +294,15 @@ def test_psiphon(mock_load_json, client):
 
 
 @patch("ooniapi.probe_services._load_json")
-def test_tor_targets(mock_load_json, client):
+def test_tor_targets(mock_load_json, client, app):
     # register and login
     pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
     client_id = _register(client)["client_id"]
 
     c = postj(client, "/api/v1/login", username=client_id, password=pwd)
-    tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
-    assert tok["registration_time"] is not None
+    with app.app_context():
+        tok = ooniapi.auth.decode_jwt(c["token"], audience="probe_token")
+        assert tok["registration_time"] is not None
 
     url = "/api/v1/test-list/tor-targets"
     # broken token
