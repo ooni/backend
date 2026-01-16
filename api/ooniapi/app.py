@@ -2,12 +2,13 @@ from __future__ import absolute_import
 
 import datetime
 import logging
+import json
 import os
 import re
 import sys
 from collections import deque
 
-from flask import Flask, json
+from flask import Flask
 
 from flask_cors import CORS  # debdeps: python3-flask-cors
 
