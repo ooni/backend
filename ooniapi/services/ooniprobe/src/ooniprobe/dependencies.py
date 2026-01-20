@@ -1,4 +1,4 @@
-from typing import Annotated, Tuple, TypeAlias, Any, Dict
+from typing import Annotated, TypeAlias, Any, Dict
 from datetime import datetime
 import time
 from pathlib import Path
@@ -13,6 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from clickhouse_driver import Client as Clickhouse
+import io
 
 import boto3
 from mypy_boto3_s3 import S3Client
@@ -70,6 +71,12 @@ def get_s3_client() -> S3Client:
 
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
 
+__cache__ = dict()
+
+def get_cache(): return __cache__
+
+CacheDep = Annotated[Dict[str, Any], Depends(get_cache)]
+
 class Manifest(BaseModel):
     """
     Manifest used for ZKP verification
@@ -118,22 +125,44 @@ def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
     manifest = Manifest(**manifest_json)
     return ManifestResponse(manifest=manifest, meta = meta)
 
-__cache__ = dict()
-def get_manifest_cached(s3: S3ClientDep, bucket: str, file: str, cache_time_seconds : float = 60) -> ManifestResponse:
+def get_manifest_cached(s3: S3ClientDep, bucket: str, file: str, cache: CacheDep, cache_time_seconds : float = 60) -> ManifestResponse:
     """
     Fetch the manifest and cache the result for `cache_time_seconds`
 
     Following calls will try to fetch the result from cache
     """
-    val = __cache__.get((bucket, file))
+    key = str((bucket, file))
+    val = cache.get(key)
     now = time.time()
 
     if val is None or (now - val[1]) > cache_time_seconds:
-        val = __cache__[(bucket, file)] = (get_manifest(s3, bucket, file), now)
+        val = __cache__[key] = (get_manifest(s3, bucket, file), now)
 
     return val[0]
 
-def _get_manifest(s3: S3ClientDep, settings : SettingsDep) -> ManifestResponse:
-    return get_manifest_cached(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
+def _get_manifest(s3: S3ClientDep, settings : SettingsDep, cache: CacheDep) -> ManifestResponse:
+    return get_manifest_cached(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file, cache)
 
 ManifestDep = Annotated[ManifestResponse, Depends(_get_manifest)]
+
+def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
+    """
+    Reads the content of `file` within `bucket` into a  string
+
+    Useful for reading config files from the s3 bucket
+    """
+    buff = io.BytesIO()
+    s3_client.download_fileobj(bucket, file, buff)
+    return buff.getvalue().decode()
+
+
+async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep) -> Dict[str, Any]:
+    cacheKey = str(Path(settings.config_bucket, settings.tor_targets))
+    resp = cache.get(cacheKey)
+    if resp is None:
+        targetstr = read_file(s3client, settings.config_bucket, settings.tor_targets)
+        resp = ujson.loads(targetstr)
+        cache[cacheKey] = resp
+    yield resp
+
+TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]

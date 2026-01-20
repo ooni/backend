@@ -4,22 +4,27 @@ VPN Services
 Insert VPN credentials into database.
 """
 
-from base64 import b64encode
-from os import urandom
-from datetime import datetime, timezone
 import itertools
 import logging
 from typing import Dict, List, TypedDict, Tuple, Any
 
 from fastapi import Request, HTTPException
+from typing import List, TypedDict, Tuple
+import io
+
+from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
 import pem
+from base64 import b64encode
+from datetime import datetime, timezone
+from os import urandom
+
 import httpx
 
 from .metrics import Metrics
 from .common.config import Settings
-from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 from .dependencies import CCReaderDep, ASNReaderDep
+from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"
@@ -187,5 +192,14 @@ def get_first_ip(headers: str) -> str:
     in: '123.123.123, 1.1.1.1'
     out: '123.123.123'
     """
+    return headers.partition(',')[0]
 
-    return headers.partition(",")[0]
+def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
+    """
+    Reads the content of `file` within `bucket` into a  string
+
+    Useful for reading config files from the s3 bucket
+    """
+    buff = io.BytesIO()
+    s3_client.download_fileobj(bucket, file, buff)
+    return buff.getvalue().decode()

@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Any, Dict, Tuple, Optional
+from typing import List, Any, Dict, Tuple, Optional, Annotated
 import random
 import ujson
 from hashlib import sha512
@@ -10,11 +10,21 @@ import io
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, HTTPException, Response, Request, status, Header
+from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
 from pydantic import Field, IPvAnyAddress
 from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed, ServerState
 import httpx
 
+from ...common.auth import create_jwt, decode_jwt, jwt
+from ...common.routers import BaseModel
+from ...common.utils import setnocacheresponse
+from ...dependencies import (
+    ASNReaderDep,
+    CCReaderDep,
+    ClickhouseDep,
+    SettingsDep,
+    TorTargetsDep,
+)
 from ...utils import (
     generate_report_id,
     extract_probe_ipaddr,
@@ -25,20 +35,14 @@ from ...utils import (
 )
 
 from ...dependencies import (
-    CCReaderDep,
-    ASNReaderDep,
-    ClickhouseDep,
-    SettingsDep,
     ManifestDep,
     ManifestResponse,
     PostgresSessionDep,
     S3ClientDep,
 )
 from ..reports import Metrics
-from ...common.routers import BaseModel
-from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.utils import setnocacheresponse, setcacheresponse
-from ...prio import generate_test_list
+from ...common.utils import setcacheresponse
+from ...prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 router = APIRouter(prefix="/v1")
 
@@ -572,10 +576,100 @@ def random_web_test_helpers(th_list: List[str]) -> List[Dict]:
     return out
 
 
+class TestListUrlsMeta(BaseModel):
+    count: int
+    current_page: int
+    limit: int
+    next_url: str
+    pages: int
+
+
+class TestListUrlsResult(BaseModel):
+    category_code: str
+    country_code: str
+    url: str
+
+
+class TestListUrlsResponse(BaseModel):
+    """
+    URL test list
+    """
+
+    metadata: TestListUrlsMeta
+    results: List[TestListUrlsResult]
+
+
+@router.get("/test-list/urls")
+def list_test_urls(
+    clickhouse: ClickhouseDep,
+    failover_test_items: FailoverTestListDep,
+    response: Response,
+    category_codes: Annotated[
+        str | None,
+        Query(
+            description="Comma separated list of URL categories, all uppercase",
+            pattern=r"[A-Z,]*",
+        ),
+    ] = None,
+    country_code: Annotated[
+        str,
+        Query(
+            description="Two letter, uppercase country code",
+            min_length=2,
+            max_length=2,
+            alias="probe_cc",
+        ),
+    ] = "ZZ",
+    limit: Annotated[
+        int, Query(description="Maximum number of URLs to return", le=9999)
+    ] = -1,
+    debug: Annotated[
+        bool,
+        Query(
+            description="Include measurement counts and priority",
+        ),
+    ] = False,
+) -> TestListUrlsResponse | Dict[str, Any]:
+    """
+    Generate test URL list with prioritization
+    """
+    try:
+        country_code = country_code.upper()
+        category_codes_list = category_codes.split(",") if category_codes else None
+        if limit == -1:
+            limit = 9999
+    except Exception as e:
+        log.error(e, exc_info=True)
+        setnocacheresponse(response)
+        return {}
+
+    try:
+        test_items, _1, _2 = generate_test_list(
+            clickhouse, country_code, category_codes_list, 0, limit, debug
+        )
+    except Exception as e:
+        log.error(e, exc_info=True)
+        # failover_generate_test_list runs without any database interaction
+        test_items = failover_generate_test_list(
+            failover_test_items, category_codes_list, limit
+        )
+
+    # TODO: remove current_page / next_url / pages ?
+    Metrics.TEST_LIST_URLS_COUNT.set(len(test_items))
+    out = TestListUrlsResponse(
+        metadata=TestListUrlsMeta(
+            count=len(test_items), current_page=-1, limit=-1, next_url="", pages=1
+        ),
+        results=[TestListUrlsResult(**item) for item in test_items],
+    )
+    setcacheresponse("1s", response)
+    return out
+
+
 class GeoLookupResult(BaseModel):
     cc: str = Field(description="Country Code")
     asn: str = Field(description="Autonomous System Number (ASN)")
-    as_name: str = Field(description="Autonomous System Name")
+    as_name: Optional[str] = Field("", description="Autonomous System Name")
 
 
 class GeoLookupRequest(BaseModel):
@@ -593,30 +687,29 @@ class GeoLookupResponse(BaseModel):
 
 @router.post("/geolookup", tags=["ooniprobe"])
 async def geolookup(
-    data: GeoLookupRequest,
-    response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+        data: GeoLookupRequest,
+        response: Response,
+        cc_reader: CCReaderDep,
+        asn_reader: ASNReaderDep,
 ) -> GeoLookupResponse:
 
     # initial values probe_geoip compares with
     probe_cc = "ZZ"
     asn = "AS0"
-    geolocation = {}
+    geolocation = dict()
 
     # for each address provided, call probe_geoip and add the data to our response
     for ipaddr in data.addresses:
         # call probe_geoip() and map the keys to the geolookup v1 API
-        resp, _, _ = probe_geoip(str(ipaddr), probe_cc, asn, cc_reader, asn_reader)
+        resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
         # it doesn't seem possible to have separate aliases for (de)serialization
-        geolocation[ipaddr] = GeoLookupResult(
-            cc=resp["probe_cc"],
-            asn=resp["probe_asn"],
-            as_name=resp["probe_network_name"],
-        )
+        if resp["probe_network_name"] is None:
+            resp["probe_network_name"] = ""
+        geolocation[ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
+            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
 
     setnocacheresponse(response)
-    return GeoLookupResponse(geolocation=geolocation)
+    return GeoLookupResponse(geolocation = geolocation)
 
 
 class CollectorEntry(BaseModel):
@@ -936,3 +1029,26 @@ def _raise_manifest_not_found(version: str):
             },
             status_code=status.HTTP_404_NOT_FOUND,
         )
+class TorTarget(BaseModel):
+    address: str
+    fingerprint: str
+    name: Optional[str] = ''
+    protocol: str
+    params: Optional[Dict[str, List[str]]] = None
+
+
+@router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
+def list_tor_targets(
+    request: Request,
+    targets: TorTargetsDep,
+    ) -> Dict[str, TorTarget]:
+
+    token = request.headers.get("Authorization")
+    if token is None:
+        # XXX not actually validated
+        pass
+
+    if targets is not None:
+        return targets
+    log.info("tor-targets: failed to receive tor-targets from s3")
+    raise HTTPException(status_code=401, detail="Invalid tor-targets")

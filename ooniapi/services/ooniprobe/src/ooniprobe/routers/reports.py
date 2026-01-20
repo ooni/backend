@@ -17,7 +17,6 @@ from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
 from ..common.metrics import timer
-
 router = APIRouter()
 
 log = logging.getLogger(__name__)

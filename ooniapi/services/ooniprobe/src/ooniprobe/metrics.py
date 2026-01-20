@@ -77,3 +77,7 @@ class Metrics:
     GEOIP_ASN_DIFFERS = Counter(
         "geoip_asn_differs", "There's a mismatch between reported ASN and observed ASN"
     )
+
+    TEST_LIST_URLS_COUNT = Gauge(
+        "test_list_urls_count", "Size of reported test list"
+    )
