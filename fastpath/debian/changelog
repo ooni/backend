@@ -1,3 +1,9 @@
+fastpath (0.89) unstable; urgency=medium
+
+  * Add support for new anonymous credentials database fields
+
+ -- Luis Diaz <luis@openobservatory.org> Tue, 15 Sep 2026 16:25:00 +0100
+
 fastpath (0.88) unstable; urgency=medium
 
   * Remove fingerprints bytes metrics

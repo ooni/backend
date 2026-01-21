@@ -65,6 +65,11 @@ ENGINE = MergeTree
 ORDER BY (report_id, input)
 SETTINGS index_granularity = 8192;
 
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` Int8;
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
 CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
 (
     `probe_asn` UInt32,

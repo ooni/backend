@@ -3,6 +3,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.request import urlopen
 
+import boto3
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,7 +20,7 @@ from .routers.v1 import probe_services
 from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
-from .dependencies import get_postgresql_session, get_clickhouse_session, SettingsDep
+from .dependencies import S3ClientDep, get_manifest, get_postgresql_session, get_clickhouse_session, SettingsDep
 from .common.dependencies import get_settings
 from .common.config import Settings
 from .common.version import get_build_label
@@ -49,7 +50,6 @@ async def lifespan(
         await setup_repeating_tasks(settings)
 
     yield
-
 
 async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start
@@ -99,6 +99,7 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings: SettingsDep,
+    s3: S3ClientDep,
     db=Depends(get_postgresql_session),
     clickhouse=Depends(get_clickhouse_session),
 ):
@@ -134,6 +135,22 @@ async def health(
 
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
+
+    if settings.anonc_manifest_bucket == "CHANGEME":
+        errors.append("bad_manifest_bucket")
+
+    if settings.anonc_manifest_file == "CHANGEME":
+        errors.append("bad_manifest_file")
+
+    if settings.anonc_secret_key == "CHANGEME":
+        errors.append("bad_anonc_secret_key")
+
+    # Check that you can retrieve the manifest
+    try:
+        get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
+    except Exception as e:
+        errors.append("anonc_manifest_unreachable")
+        log.error(f"Error retrieving manifest: {e}")
 
     status = "ok"
     if len(errors) > 0:

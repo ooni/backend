@@ -6,10 +6,12 @@ Insert VPN credentials into database.
 
 import itertools
 import logging
+from typing import Dict, List, TypedDict, Tuple, Any
+
+from fastapi import Request, HTTPException
 from typing import List, TypedDict, Tuple
 import io
 
-from fastapi import Request
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
 import pem
@@ -19,6 +21,7 @@ from os import urandom
 
 import httpx
 
+from .metrics import Metrics
 from .common.config import Settings
 from .dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
@@ -148,6 +151,38 @@ def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, st
         "AS{}".format(resp.autonomous_system_number),
         resp.autonomous_system_organization or "0",
     )
+
+
+def error(msg: str | Dict[str, Any], status_code: int = 400):
+    raise HTTPException(status_code=status_code, detail=msg)
+
+
+def compare_probe_msmt_cc_asn(
+    cc: str,
+    asn: str,
+    request: Request,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+):
+    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
+    Generates a metric.
+    """
+    try:
+        cc = cc.upper()
+        ipaddr = extract_probe_ipaddr(request)
+        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
+        db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
+        if db_asn.startswith("AS"):
+            db_asn = db_asn[2:]
+        if db_probe_cc == cc and db_asn == asn:
+            Metrics.PROBE_CC_ASN_MATCH.inc()
+        elif db_probe_cc != cc:
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
+        elif db_asn != asn:
+            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+    except Exception:
+        pass
+
 
 def get_first_ip(headers: str) -> str:
     """
