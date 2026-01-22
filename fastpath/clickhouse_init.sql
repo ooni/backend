@@ -199,7 +199,3 @@ CREATE TABLE IF NOT EXISTS default.fingerprints_http
 )
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY name;
-<<<<<<< HEAD
-
-=======
->>>>>>> master
