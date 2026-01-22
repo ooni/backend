@@ -11,12 +11,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from . import models
 from .routers import v2
 
-from .dependencies import (
-    DependsPostgresSession,
-    DependsClickhouseClient,
-    DependsSettings,
-)
-from .common.dependencies import get_settings
+from .common.dependencies import get_settings, SettingsDep, ClickhouseDep, PostgresDep
 from .common.version import get_build_label, get_pkg_version
 from .common.version import get_build_label, get_pkg_version
 from .common.metrics import mount_metrics
@@ -46,7 +41,7 @@ instrumentor = Instrumentator().instrument(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
+    allow_origin_regex=r"^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,9 +64,9 @@ class HealthStatus(BaseModel):
 
 @app.get("/health")
 async def health(
-    settings: DependsSettings,
-    db: DependsPostgresSession,
-    clickhouse: DependsClickhouseClient,
+    settings: SettingsDep,
+    db: PostgresDep,
+    clickhouse: ClickhouseDep,
 ):
     errors = []
 

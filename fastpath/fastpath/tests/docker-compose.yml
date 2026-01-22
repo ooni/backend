@@ -1,0 +1,30 @@
+services:
+  fastpath:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    ports:
+      - "5000"
+      - "8472"
+    working_dir: /app
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=default
+    ports:
+      - "9000"
+      - "8123"
+      - "9009"
+    volumes:
+       - ../../clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "select 1;"]
+      interval: 30s
+      retries: 3
+      start_period: 60s
+      timeout: 10s

@@ -17,8 +17,7 @@ from .routers.data import (
     aggregate_analysis,
 )
 
-from .dependencies import get_clickhouse_session
-from .common.dependencies import get_settings
+from .common.dependencies import get_settings, get_clickhouse_session
 from .common.version import get_build_label, get_pkg_version
 from .common.clickhouse_utils import query_click
 from .common.metrics import mount_metrics
@@ -50,7 +49,7 @@ app.add_middleware(
     CORSMiddleware,
     # allow from observable notebooks
     allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
-    #allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
+    # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

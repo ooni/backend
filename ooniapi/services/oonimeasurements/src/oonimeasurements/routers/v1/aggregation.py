@@ -18,7 +18,7 @@ from sqlalchemy.sql.expression import text as sql_text
 
 from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
 from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
-from ...dependencies import get_clickhouse_session
+from oonimeasurements.common.dependencies import get_clickhouse_session
 from ...common.routers import BaseModel
 
 router = APIRouter()
@@ -120,7 +120,7 @@ class AggregationResult(BaseModel):
     domain: Optional[str] = None
     input: Optional[str] = None
     probe_cc: Optional[str] = None
-    probe_asn: Optional[str] = None
+    probe_asn: Optional[int] = None
     test_name: Optional[str] = None
 
 

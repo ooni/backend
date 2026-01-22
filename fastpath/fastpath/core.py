@@ -11,12 +11,14 @@ See README.adoc
 # Compatible with Python3.6 and 3.7 - linted with Black
 # debdeps: python3-setuptools
 
+from datetime import datetime, timezone
 from argparse import ArgumentParser, Namespace
 from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, TypedDict
+from hashlib import sha512
 import binascii
 import logging
 import multiprocessing as mp
@@ -25,7 +27,7 @@ import sys
 import time
 import yaml
 
-from pkg_resources import parse_version
+from packaging.version import Version
 import ujson  # debdeps: python3-ujson
 
 try:
@@ -125,6 +127,8 @@ def setup() -> None:
     ap.add_argument("--ccs", help="Filter comma-separated CCs when feeding from S3")
     h = "Filter comma-separated test names when feeding from S3 (without underscores)"
     ap.add_argument("--testnames", help=h)
+    h = "Allow writing measurements to spool dir, see: https://github.com/ooni/backend/pull/971"
+    ap.add_argument("--write-to-disk", action="store_true", help=h)
 
     conf = ap.parse_args()
 
@@ -154,6 +158,12 @@ def setup() -> None:
         log.info("collectors: %s", conf.collector_hostnames)
         conf.s3_access_key = cp["DEFAULT"]["s3_access_key"].strip()
         conf.s3_secret_key = cp["DEFAULT"]["s3_secret_key"].strip()
+
+        if conf.write_to_disk:
+            # msmt_spool_dir is only used with write_to_disk
+            conf.msmt_spool_dir = cp["DEFAULT"]["msmt_spool_dir"].strip()
+            log.info(f"writing measurements to disk at path {conf.msmt_spool_dir}")
+
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
 
@@ -348,7 +358,8 @@ def match_http_body_fingerprints(resp, matches) -> None:
             # Used for statistics
             metrics.gauge("fingerprint_body_match_location", idx)
 
-        per_s("fingerprints_bytes", len(body), tb)
+        # This metric is generating too much data
+        # per_s("fingerprints_bytes", len(body), tb)
 
 
 def match_http_headers_fingerprints(resp, matches) -> None:
@@ -362,7 +373,7 @@ def match_http_headers_fingerprints(resp, matches) -> None:
         if not loc_found.startswith("header."):
             continue
         pat_type = fp["pattern_type"]
-        hname = loc_found[8:]
+        hname = loc_found[7:]
         if pat_type == "full":
             if headers.get(hname) == fp["pattern"]:
                 matches.append(minifp(fp))
@@ -1367,14 +1378,14 @@ def score_signal(msm: dict) -> dict:
             scores["accuracy"] = 0.0
             return scores
 
-        if parse_version(tv) <= parse_version("0.2.3") and start_time >= datetime(
+        if Version(tv) <= Version("0.2.3") and start_time >= datetime(
             2023, 11, 7
         ):
             # https://github.com/ooni/probe/issues/2627
             scores["accuracy"] = 0.0
             return scores
 
-        if parse_version(tv) < parse_version("0.2.2") and start_time >= datetime(
+        if Version(tv) < Version("0.2.2") and start_time >= datetime(
             2022, 10, 19
         ):
             scores["accuracy"] = 0.0
@@ -1384,7 +1395,7 @@ def score_signal(msm: dict) -> dict:
         # engine_version < 3.17.2 and measurement_start_time > 2023-05-02
         annot = g_or(msm, "annotations", {})
         ev = g_or(annot, "engine_version", "0.0.0")
-        if parse_version(ev) < parse_version("3.17.2") and start_time >= datetime(
+        if Version(ev) < Version("3.17.2") and start_time >= datetime(
             2023, 5, 2
         ):
             scores["accuracy"] = 0.0
@@ -1577,6 +1588,9 @@ def msm_processor(queue):
             log.info("Worker with PID %d exiting", os.getpid())
             return
 
+        if conf.write_to_disk:
+            write_measurement_to_disk(msm_tup)
+
         process_measurement(msm_tup)
         update_fingerprints_if_needed()
 
@@ -1601,6 +1615,31 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
         scores["accuracy"] = 0.0
         scores["msg"] = "Measurement start time too old"
 
+def write_measurement_to_disk(msm_tup) -> None:
+    """Write this measurement to disk so that it can be 
+    processed by the measurement uploader
+
+    Args:
+        msm_tup: Measurement tuple as it comes from the work queue
+    """
+
+    # msmt_uid is a unique id based on upload time, cc, testname and hash
+    data, measurement, msmt_uid = msm_tup
+    ts, cc, test_name, h = msmt_uid.split("_")
+
+    hour = ts[:10] #only take until the hour
+    dirname = f"{hour}_{cc}_{test_name}"
+    spooldir = Path(conf.msmt_spool_dir)
+    msmtdir = spooldir / "incoming" / dirname
+    msmtdir.mkdir(parents=True, exist_ok=True)
+
+    try: 
+        msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
+        msmt_f_tmp.write_bytes(data)
+        msmt_f = msmtdir / f"{msmt_uid}.post"
+        msmt_f_tmp.rename(msmt_f)
+    except Exception as exc:
+        log.error(f"Failed to upload measurement {msmt_uid}. Error: {exc}")
 
 @metrics.timer("full_run")
 def process_measurement(msm_tup, buffer_writes=False) -> None:

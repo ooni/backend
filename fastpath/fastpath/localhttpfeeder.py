@@ -40,5 +40,5 @@ def start_http_api(queue):
         start_response("200 OK", [])
         return [b""]
 
-    options = {"bind": f"127.0.0.1:{API_PORT}"}
+    options = {"bind": f"0.0.0.0:{API_PORT}"}
     MsmtFeeder(handler_app, options).run()

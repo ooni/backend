@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from pydantic_settings import BaseSettings
 
 
@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     clickhouse_url: str = "clickhouse://localhost"
     postgresql_url: str = "postgresql://oonidb:oonidb@localhost/oonidb"
     log_level: str = "info"
-    s3_bucket_name: str = "oonidata-eufra"
+    # Prod bucket: "ooni-data-eu-fra"
+    s3_bucket_name: str = "ooni-data-eu-fra-test"
     other_collectors: List[str] = []
     statsd_host: str = "localhost"
     statsd_port: int = 8125
@@ -32,5 +33,33 @@ class Settings(BaseSettings):
 
     vpn_credential_refresh_hours: int = 24
 
+    # Bucket used to store configuration files
+    config_bucket: str = ""
+
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
+    # Ooniprobe only
+    msmt_spool_dir: str = ""
+    fastpath_url: str = ""  # example: http://123.123.123.123:8472
+    failed_reports_bucket: str = (
+        ""  # for uploading reports that couldn't be sent to fastpath
+    )
+    tor_targets: str = "" # filename of json containing Tor bridges and DirAuth endpoints
+
+    # ooniprobe client configuration
+    collectors: List[Dict[str, str]] = [
+        {"address": "httpo://guegdifjy7bjpequ.onion", "type": "onion"},
+        {"address": "https://ams-pg.ooni.org:443", "type": "https"},
+        {
+            "address": "https://dkyhjv0wpi2dk.cloudfront.net",
+            "front": "dkyhjv0wpi2dk.cloudfront.net",
+            "type": "cloudfront",
+        },
+        {"address": "httpo://guegdifjy7bjpequ.onion", "type": "onion"},
+        {"address": "https://ams-pg.ooni.org:443", "type": "https"},
+        {
+            "address": "https://dkyhjv0wpi2dk.cloudfront.net",
+            "front": "dkyhjv0wpi2dk.cloudfront.net",
+            "type": "cloudfront",
+        },
+    ]
