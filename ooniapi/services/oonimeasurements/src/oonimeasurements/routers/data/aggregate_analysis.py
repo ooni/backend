@@ -20,7 +20,6 @@ from .list_analysis import (
 
 import logging
 
-from fastapi import APIRouter
 
 router = APIRouter()
 

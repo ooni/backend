@@ -7,8 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
-from ...common.dependencies import get_settings
-from ...dependencies import get_clickhouse_session
+from ...common.dependencies import get_settings, get_clickhouse_session
 from .utils import parse_probe_asn_to_int
 
 from fastapi import APIRouter

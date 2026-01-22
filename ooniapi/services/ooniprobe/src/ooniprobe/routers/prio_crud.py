@@ -6,10 +6,10 @@ from fastapi import Response, APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import sql as sa
 
-from ooniprobe.prio import compute_priorities, generate_test_list
-from ooniprobe.dependencies import ClickhouseDep
-from ooniprobe.common.clickhouse_utils import query_click
-from ooniprobe.common.utils import convert_to_csv
+from ooniprobe.common.prio import compute_priorities, generate_test_list
+from ooniprobe.common.dependencies import ClickhouseDep
+from ..common.clickhouse_utils import query_click
+from ..common.utils import convert_to_csv
 
 router = APIRouter()
 
@@ -22,8 +22,8 @@ class PrioritizationType(BaseModel):
     cc: Optional[str] = Field(description="Country Code")
     domain: Optional[str] = Field(description="Domain or wildcard (*)")
     msmt_cnt: Optional[int] = Field(description="msmt_cnt")
-    priority: Optional[int] = Field("Priority weight")
-    url: Optional[str] = Field("URL or wildcard (*)")
+    priority: Optional[int] = Field(description="Priority weight")
+    url: Optional[str] = Field(description="URL or wildcard (*)")
 
 
 @router.get(
@@ -34,7 +34,7 @@ def show_countries_prioritization(
     format: Optional[str] = Query(
         default="JSON", description="Format of response, CSV or JSON"
     ),
-) -> List[PrioritizationType]:
+) -> List[PrioritizationType] | Response:
     sql = """
     SELECT domain, url, cc, category_code, msmt_cnt, anomaly_perc
     FROM citizenlab
@@ -62,7 +62,7 @@ def show_countries_prioritization(
     if len(li) == 0:
         raise HTTPException(status_code=400, detail="no data")
 
-    if format.upper() == "CSV":
+    if format and format.upper() == "CSV":
         csv_data = convert_to_csv(li)
         response = Response(content=csv_data, media_type="text/csv")
         return response
@@ -93,7 +93,17 @@ def debug_prioritization(
     ),
 ) -> DebugPrioritization:
 
+
+    if isinstance(category_codes, str):
+        category_codes_list = category_codes.split(",")
+    else:
+        category_codes_list = category_codes
+
     test_items, entries, prio_rules = generate_test_list(
-        clickhouse, probe_cc, category_codes, probe_asn, limit, True
+        clickhouse, probe_cc or "ZZ", category_codes_list, probe_asn, limit or -1, True
     )
-    return {"test_items": test_items, "entries": entries, "prio_rules": prio_rules}
+    return DebugPrioritization(
+        test_items=test_items,
+        entries=entries,
+        prio_rules=prio_rules
+        )

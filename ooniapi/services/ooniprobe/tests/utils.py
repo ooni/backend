@@ -1,6 +1,7 @@
 from httpx import Client
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 from fastapi import status
+from typing import Tuple
 from ooniauth_py import UserState
 
 def getj(client : Client, url: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:

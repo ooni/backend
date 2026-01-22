@@ -1,26 +1,29 @@
-from typing import List, Dict, Any
 import asyncio
-import logging
-from hashlib import sha512
-from datetime import datetime, timezone
 import io
+import logging
 import random
+from datetime import datetime, timezone
+from hashlib import sha512
+from typing import List, Dict, Any
 
-from fastapi import Request, Response, APIRouter, Header
 import httpx
+from fastapi import Request, Response, APIRouter, Header
 from pydantic import Field
 import zstd
 
-from ..utils import generate_report_id, error, compare_probe_msmt_cc_asn
-from ..metrics import Metrics
-from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
+from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..common.metrics import timer
+from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
+from ..utils import (
+    generate_report_id,
+)
+
+from ..utils import error, compare_probe_msmt_cc_asn
+from ..metrics import Metrics
 router = APIRouter()
 
 log = logging.getLogger(__name__)
-
 
 class OpenReportRequest(BaseModel):
     """

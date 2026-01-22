@@ -16,8 +16,7 @@ from ...utils import (
     upsert_endpoints,
 )
 from ...common.routers import BaseModel
-from ...common.dependencies import get_settings
-from ...dependencies import get_postgresql_session
+from ...common.dependencies import get_settings, get_postgresql_session
 
 router = APIRouter(prefix="/v2")
 

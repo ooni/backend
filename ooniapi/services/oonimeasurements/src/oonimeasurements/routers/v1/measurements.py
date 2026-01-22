@@ -46,7 +46,7 @@ from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.utils import setcacheresponse, commasplit, setnocacheresponse
 from ...common.clickhouse_utils import query_click, query_click_one_row
-from ...dependencies import get_clickhouse_session
+from ...common.dependencies import get_clickhouse_session
 
 log = logging.getLogger(__name__)
 

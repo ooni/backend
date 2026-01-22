@@ -1,8 +1,13 @@
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, TypeAlias
+
+from clickhouse_driver import Client as Clickhouse
 
 from fastapi import Depends
 from fastapi import HTTPException, Header
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+
 from .auth import get_client_token
 from .config import Settings
 
@@ -11,6 +16,7 @@ from .config import Settings
 def get_settings() -> Settings:
     return Settings()
 
+SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
 
 def role_required(roles: list[str]):
     """Wrapped function requiring user to be logged in and have the right role."""
@@ -38,3 +44,28 @@ def role_required(roles: list[str]):
         return tok
     
     return verify_jwt
+
+
+def get_clickhouse_session(settings: SettingsDep):
+    db = Clickhouse.from_url(settings.clickhouse_url)
+    try:
+        yield db
+    finally:
+        db.disconnect()
+
+
+ClickhouseDep = Annotated[Clickhouse, Depends(get_clickhouse_session)]
+
+
+def get_postgresql_session(settings: SettingsDep):
+    engine = create_engine(settings.postgresql_url)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+PostgresDep = Annotated[Session, Depends(get_postgresql_session)]

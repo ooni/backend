@@ -17,8 +17,7 @@ from .routers.data import (
     aggregate_analysis,
 )
 
-from .dependencies import get_clickhouse_session
-from .common.dependencies import get_settings
+from .common.dependencies import get_settings, get_clickhouse_session
 from .common.version import get_build_label, get_pkg_version
 from .common.clickhouse_utils import query_click
 from .common.metrics import mount_metrics
