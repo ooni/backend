@@ -528,14 +528,12 @@ def test_oonirun_revisions(client, client_with_user_role):
     j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_two}", json=j)
 
     ## Fetch anonymously and check it's got the new revision
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}")
-    j = r.json()
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}")
     assert j["revision"] == "3", "revision is 3"
 
-    r = client_with_user_role.get(f"/api/v2/oonirun/links")
     j = get(client_with_user_role, "/api/v2/oonirun/links")
     descs = j["oonirun_links"]
-    assert len(descs) == 2, r.json()
+    assert len(descs) == 2, j
 
     ## Fetch latest revision number
     j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/latest")
