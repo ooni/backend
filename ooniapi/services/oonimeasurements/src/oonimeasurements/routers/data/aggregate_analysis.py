@@ -11,7 +11,7 @@ import sqlalchemy as sql
 
 from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int
 from ...utils.api import ProbeCCOrNone, ProbeASNOrNone
-from ...common.dependencies import get_clickhouse_session, ClickhouseDep
+from ...dependencies import get_clickhouse_session, ClickhouseDep
 from .list_analysis import (
     SinceUntil,
     utc_30_days_ago,
@@ -20,7 +20,6 @@ from .list_analysis import (
 
 import logging
 
-from fastapi import APIRouter
 
 router = APIRouter()
 

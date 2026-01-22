@@ -10,7 +10,7 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 from datetime import datetime
 from textwrap import dedent
 from urllib.parse import urlparse
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 import logging
 
 try:
@@ -209,6 +209,11 @@ def clickhouse_upsert_summary(
     test_helper_address: str,
     test_helper_type: str,
     ooni_run_link_id: Optional[int],
+    is_verified: bool,
+    zkp_request: Optional[str],
+    nym: Optional[str],
+    age_range: Optional[Tuple[int, int]],
+    msm_range: Optional[Tuple[int, int]],
     buffer_writes=False,
 ) -> None:
     """Insert a row in the fastpath table. Overwrite an existing one."""
@@ -223,6 +228,10 @@ def clickhouse_upsert_summary(
 
     def tf(v: bool) -> str:
         return "t" if v else "f"
+
+    def serialize_optional(x : Optional[Any]) -> Optional[str]:
+        """Serialize to string if not None, return None otherwise"""
+        return ujson.dumps(x) if x is not None else None
 
     test_name = msm.get("test_name", None) or ""
     input_, domain = extract_input_domain(msm, test_name)
@@ -257,6 +266,11 @@ def clickhouse_upsert_summary(
         test_helper_address=test_helper_address,
         test_helper_type=test_helper_type,
         ooni_run_link_id=ooni_run_link_id,
+        is_verified=tf(is_verified),
+        nym=nym,
+        zkp_request=zkp_request,
+        age_range=serialize_optional(age_range),
+        msm_range=serialize_optional(msm_range)
     )
 
     if buffer_writes:

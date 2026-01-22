@@ -5,6 +5,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .common.models import UtcDateTime
 from .common.postgresql import Base
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class OONIProbeVPNProvider(Base):

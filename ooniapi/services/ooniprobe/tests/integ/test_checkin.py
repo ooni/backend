@@ -1,39 +1,17 @@
-def getjson(client, url):
-    response = client.get(url)
-    assert response.status_code == 200
-    return response.json()
-
-
-def getjsonh(client, url, headers=None):
-    response = client.get(url, headers=headers)
-    assert response.status_code == 200
-    return response.json()
-
-
-def post(client, url, data):
-    response = client.post(url, data=data)
-    assert response.status_code == 200
-    return response.json()
-
-
-def postj(client, url, **kw):
-    response = client.post(url, json=kw)
-    assert response.status_code == 200
-    return response.json()
-
+from ..utils import getj, postj
 
 ## Tests
-
-
 def test_check_in_geoip(client):
     j = dict(
         on_wifi=True,
         charging=False,
     )
-    headers = [
-        ("X-Forwarded-For", "192.33.4.12")  # The IP address of c.root-servers.net
-    ]
-    c = client.post("/api/v1/check-in", json=j, headers=headers).json()
+    headers = {
+        "X-Forwarded-For":"192.33.4.12"  # The IP address of c.root-servers.net
+    }
+
+    c = postj(client, "/api/v1/check-in", json=j, headers=headers)
+
     assert c["probe_cc"] == "US"
     assert c["probe_asn"] == "AS2149"
     assert c["probe_network_name"] is not None
@@ -46,7 +24,7 @@ def test_check_in_basic(client, load_url_priorities):
         on_wifi=True,
         charging=False,
     )
-    c = postj(client, "/api/v1/check-in", **j)
+    c = postj(client, "/api/v1/check-in", j)
 
     assert c["v"] == 1
     urls = c["tests"]["web_connectivity"]["urls"]
@@ -67,7 +45,7 @@ def test_check_in_url_category_news(client):
         charging=True,
         web_connectivity=dict(category_codes=["NEWS"]),
     )
-    c = postj(client, "/api/v1/check-in", **j)
+    c = postj(client, "/api/v1/check-in", j)
     assert c["v"] == 1
     urls = c["tests"]["web_connectivity"]["urls"]
     assert len(urls), urls
@@ -82,5 +60,5 @@ def test_check_in_url_category_news(client):
 
 
 def test_test_helpers(client):
-    c = getjson(client, "/api/v1/test-helpers")
+    c = getj(client, "/api/v1/test-helpers")
     assert len(c) == 6

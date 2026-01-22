@@ -80,18 +80,18 @@ docker:
 
 # Runs docker in foreground, useful for checking errors in the image before it runs
 docker-fg:
-	docker compose --profile default up --build 
+	docker compose --profile default up --build
 
-# Runs both fastpath and the testing clickhous. 
+# Runs both fastpath and the testing clickhous.
 # Mind the fastpath configuration in fastpath.conf
 docker-all: docker-clickhouse
 	echo "Waiting for clickhouse..."
-	sleep 4 
-	docker compose --profile default up --build -d 
+	sleep 4
+	docker compose --profile default up --build -d
 
 # Turns off every service
 docker-down:
-	docker compose --profile all down 
+	docker compose --profile all down
 
 # If you need to test the fastpath locally you can use this rule to spawn the clickhouse database
 # locally and then use `make docker` or `make docker-fg` to start the fastpath container. Ex:
@@ -109,15 +109,15 @@ docker-login:
 
 # Get logs from the fastpath docker service
 docker-logs:
-	docker compose logs fastpath -f 
+	docker compose logs fastpath -f
 
-# Get logs for a specified service. Example: 
+# Get logs for a specified service. Example:
 # `make docker-logs-for args="clickhouse-server"`
 docker-logs-for:
-	docker compose logs $(args) -f 
+	docker compose logs $(args) -f
 
 # Used for actually building the fastpath docker image
-docker-build: 
+docker-build:
 # We need to use tar -czh to resolve the common dir symlink
 	tar -czh . | docker build \
 		--build-arg BUILD_LABEL=${BUILD_LABEL} \

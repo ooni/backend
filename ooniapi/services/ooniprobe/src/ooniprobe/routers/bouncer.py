@@ -48,11 +48,61 @@ class NetTestResponse(BaseModel):
     nettests: List[NetTest] = Field(alias="net-tests")
 
 
-@router.post("/net-tests", tags=["bouncer"], response_model=NetTestResponse, response_model_exclude_unset=True)
+@router.post(
+    "/net-tests",
+    tags=["bouncer"],
+    response_model=NetTestResponse,
+    response_model_exclude_unset=True,
+)
 async def bouncer_net_tests(
     response: Response,
     request: Request,
 ) -> Dict[str, List[NetTest]]:
+    """
+    Returns the net-tests collectors and helpers for the name and version requested.
+
+    The request body should contain a JSON object that follows the
+    `NetTestsRequest` schema:
+
+    - **net-tests**: A list of net test specifications.
+        - Each net test specification is represented by the `NetTestRequest` schema which includes:
+            - **name** (str): The name of the net test.
+            - **version** (str): The version of the net test.
+
+    Example of a valid request body:
+
+    ```json
+    {
+      "net-tests": [
+        {
+          "name": "Test1",
+          "version": "1.0"
+        },
+        {
+          "name": "Test2",
+          "version": "2.0"
+        }
+      ]
+    }
+    ```
+
+    Returns a `NetTestResponse` containing the results of the net tests.
+
+    The response is a JSON object that follows the `NetTestResponse` schema:
+
+    - **net-tests**: A list of net tests results.
+        - Each net test result is represented by the `NetTest` schema which includes:
+            - **name** (str): The name of the net test.
+            - **collector** (str): Information about the collector used.
+            - **collector-alternate** (List[CollectorEntry]): Optional alternate collectors.
+            - **input-hashes** (Optional[Any]): Optional hash values associated with the input.
+            - **test-helpers** (Dict[str, str]): Mapping of helper information for the test.
+            - **test-helpers-alternate** (Dict[str, List[TestHelperEntry]]): Optional alternate test helpers.
+            - **version** (str): The version of the net test.
+
+    Raises:
+        HTTPException: 400 if the input is invalid or any unexpected error occurs.
+    """
 
     try:
         j = await request.json()

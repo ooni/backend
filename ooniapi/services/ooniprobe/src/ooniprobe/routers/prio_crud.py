@@ -8,8 +8,8 @@ from sqlalchemy import sql as sa
 
 from ooniprobe.common.prio import compute_priorities, generate_test_list
 from ooniprobe.common.dependencies import ClickhouseDep
-from ooniprobe.common.clickhouse_utils import query_click
-from ooniprobe.common.utils import convert_to_csv
+from ..common.clickhouse_utils import query_click
+from ..common.utils import convert_to_csv
 
 router = APIRouter()
 
@@ -22,14 +22,19 @@ class PrioritizationType(BaseModel):
     cc: Optional[str] = Field(description="Country Code")
     domain: Optional[str] = Field(description="Domain or wildcard (*)")
     msmt_cnt: Optional[int] = Field(description="msmt_cnt")
-    priority: Optional[int] = Field("Priority weight")
-    url: Optional[str] = Field("URL or wildcard (*)")
+    priority: Optional[int] = Field(description="Priority weight")
+    url: Optional[str] = Field(description="URL or wildcard (*)")
 
 
-@router.get("/_/show_countries_prioritization", tags=["prioritization"], response_model=None)
-def show_countries_prioritization(clickhouse: ClickhouseDep,
-    format: Optional[str] = Query(default="JSON", description="Format of response, CSV or JSON")
-    ) -> List[PrioritizationType]:
+@router.get(
+    "/_/show_countries_prioritization", tags=["prioritization"], response_model=None
+)
+def show_countries_prioritization(
+    clickhouse: ClickhouseDep,
+    format: Optional[str] = Query(
+        default="JSON", description="Format of response, CSV or JSON"
+    ),
+) -> List[PrioritizationType] | Response:
     sql = """
     SELECT domain, url, cc, category_code, msmt_cnt, anomaly_perc
     FROM citizenlab
@@ -54,10 +59,10 @@ def show_countries_prioritization(clickhouse: ClickhouseDep,
 
     li = sorted(li, key=lambda x: (x["cc"], -x["priority"]))
 
-    if len(li)== 0:
+    if len(li) == 0:
         raise HTTPException(status_code=400, detail="no data")
 
-    if format.upper() == "CSV":
+    if format and format.upper() == "CSV":
         csv_data = convert_to_csv(li)
         response = Response(content=csv_data, media_type="text/csv")
         return response
@@ -71,17 +76,34 @@ class DebugPrioritization(BaseModel):
     prio_rules: Tuple
 
 
-@router.get("/_/debug_prioritization", tags=["prioritization"], response_model=DebugPrioritization)
+@router.get(
+    "/_/debug_prioritization",
+    tags=["prioritization"],
+    response_model=DebugPrioritization,
+)
 def debug_prioritization(
     clickhouse: ClickhouseDep,
     probe_cc: Optional[str] = Query(description="2-letter Country-Code", default="ZZ"),
-    category_codes: str = Query(description="Comma separated list of uppercase URL categories"),
+    category_codes: str = Query(
+        description="Comma separated list of uppercase URL categories"
+    ),
     probe_asn: int = Query(description="Probe ASN"),
-    limit: Optional[int] = Query(description="Maximum number of URLs to return", default=-1),
-    ) -> DebugPrioritization:
+    limit: Optional[int] = Query(
+        description="Maximum number of URLs to return", default=-1
+    ),
+) -> DebugPrioritization:
 
-    test_items, entries, prio_rules = generate_test_list(clickhouse,
-        probe_cc, category_codes, probe_asn, limit, True
+
+    if isinstance(category_codes, str):
+        category_codes_list = category_codes.split(",")
+    else:
+        category_codes_list = category_codes
+
+    test_items, entries, prio_rules = generate_test_list(
+        clickhouse, probe_cc or "ZZ", category_codes_list, probe_asn, limit or -1, True
     )
-    return {"test_items": test_items, "entries": entries, "prio_rules": prio_rules}
-
+    return DebugPrioritization(
+        test_items=test_items,
+        entries=entries,
+        prio_rules=prio_rules
+        )

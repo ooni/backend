@@ -1616,7 +1616,7 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
         scores["msg"] = "Measurement start time too old"
 
 def write_measurement_to_disk(msm_tup) -> None:
-    """Write this measurement to disk so that it can be 
+    """Write this measurement to disk so that it can be
     processed by the measurement uploader
 
     Args:
@@ -1633,7 +1633,7 @@ def write_measurement_to_disk(msm_tup) -> None:
     msmtdir = spooldir / "incoming" / dirname
     msmtdir.mkdir(parents=True, exist_ok=True)
 
-    try: 
+    try:
         msmt_f_tmp = msmtdir / f"{msmt_uid}.post.tmp"
         msmt_f_tmp.write_bytes(data)
         msmt_f = msmtdir / f"{msmt_uid}.post"
@@ -1654,7 +1654,14 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         assert msmt_uid
         if measurement is None:
             measurement = ujson.loads(msm_jstr)
-        if sorted(measurement.keys()) == ["content", "format"]:
+
+        is_verified = g(measurement, 'is_verified', False)
+        nym = g(measurement, 'nym')
+        zkp_request = g(measurement, 'zkp_request')
+        age_range = g(measurement, 'age_range')
+        msm_range = g(measurement, 'msm_range')
+
+        if "content" in measurement and "format" in measurement:
             measurement = unwrap_msmt(measurement)
         rid = measurement.get("report_id")
         inp = measurement.get("input")
@@ -1742,6 +1749,11 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             test_helper_address,
             test_helper_type,
             ooni_run_link_id,
+            is_verified,
+            nym,
+            zkp_request,
+            age_range,
+            msm_range,
             buffer_writes=buffer_writes,
         )
 

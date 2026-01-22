@@ -1,6 +1,5 @@
-from typing import Dict, Tuple
+from typing import Tuple
 import ooniprobe.routers.v1.probe_services as ps
-from ooniprobe.utils import lookup_probe_cc, lookup_probe_network
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
 
 def fake_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
