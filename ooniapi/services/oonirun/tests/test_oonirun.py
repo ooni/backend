@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import time
 
 from oonirun.routers.v2 import utcnow_seconds, NETWORK_TYPES
+from .utils import put, get, post
 
 
 SAMPLE_OONIRUN = {
@@ -495,54 +496,36 @@ def test_oonirun_revisions(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     ### Create descriptor as user
     z["name"] = "first descriptor"
-    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-    assert r.status_code == 200, r.json()
-    j = r.json()
+    j = post(client_with_user_role, "/api/v2/oonirun/links", json = z)
     oonirun_link_id_one = j["oonirun_link_id"]
 
     ## Create two new revisions
     j["nettests"][0]["inputs"].append("https://foo.net/")
-    r = client_with_user_role.put(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}", json=j
-    )
-    assert r.status_code == 200, r.json()
-    j = r.json()
+    j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
     first_date_created = j["date_created"]
 
     time.sleep(1)
+
     j["nettests"][0]["inputs"].append("https://foo2.net/")
-    r = client_with_user_role.put(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}", json=j
-    )
-    assert r.status_code == 200, r.json()
-    j = r.json()
+    j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
     second_date_created = j["date_created"]
 
     ## Fetch first revision
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/1")
-    j = r.json()
-    assert r.status_code == 200, r.json()
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/1")
     assert j["date_created"] == first_date_created
 
     ## Fetch second revision
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
-    j = r.json()
-    assert r.status_code == 200, r.json()
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
     assert j["date_created"] == second_date_created
 
     ### Create another descriptor as user
     z["name"] = "second descriptor"
-    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
-    assert r.status_code == 200, r.json()
-    j = r.json()
+    j = post(client_with_user_role, "/api/v2/oonirun/links", json=z)
     oonirun_link_id_two = j["oonirun_link_id"]
 
     ## Create new revision
     j["nettests"][0]["inputs"].append("https://foo.net/")
-    r = client_with_user_role.put(
-        f"/api/v2/oonirun/links/{oonirun_link_id_two}", json=j
-    )
-    assert r.status_code == 200, r.json()
+    j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_two}", json=j)
 
     ## Fetch anonymously and check it's got the new revision
     r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}")
@@ -550,38 +533,27 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert j["revision"] == "3", "revision is 3"
 
     r = client_with_user_role.get(f"/api/v2/oonirun/links")
-    j = r.json()
-    assert r.status_code == 200, r.json()
+    j = get(client_with_user_role, "/api/v2/oonirun/links")
     descs = j["oonirun_links"]
     assert len(descs) == 2, r.json()
 
     ## Fetch latest revision number
-    r = client.get(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/latest"
-    )
-    j = r.json()
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/latest")
     assert j["revision"] == "3", "revision is 3"
     lastest_nettests = j["nettests"]
     latest_date_created = j["date_created"]
 
     ## Fetch specific revision number
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
-    j = r.json()
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
     assert j["revision"] == "2", "revision is 2"
 
     ## Get revision list
-    r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id_one}/revisions")
-    j = r.json()
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/revisions")
     assert len(j["revisions"]) == 3, "there are 2 revisions"
     assert j["revisions"][0] == "3", "the latest one is 3"
 
     ## Fetch nettests for latest
-    r = client.post(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest",
-        json=SAMPLE_META,
-    )
-    assert r.status_code == 200, r.json()
-    j_latest = r.json()
+    j_latest = post(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest", json=SAMPLE_META)
     assert j_latest["revision"] == "3", "revision is 3"
 
     # The engine-descriptor returns a list along with targets name on reading
@@ -591,11 +563,8 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
     ## Should match latest
-    r = client.post(
-        f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3",
-        json=SAMPLE_META,
-    )
-    assert j_latest == r.json()
+    j1 = post(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json=SAMPLE_META)
+    assert j_latest == j1
 
     ## Fetch invalid revision number
     r = client.get(
@@ -605,17 +574,10 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code != 200, r.json()
 
     ## Get not-existing revision
-    r = client.get(f"/api/v2/oonirun/links/404/revisions")
-    j = r.json()
-    assert r.status_code == 404, r.json()
+    j = get(client, "/api/v2/oonirun/links/404/revisions", expected_code=404)
 
     ## Get not-existing engine descriptor
-    r = client.post(
-        f"/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META
-    )
-    j = r.json()
-    assert r.status_code == 404, r.json()
-
+    j = post(client, "/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META, expected_code=404)
 
 def test_inputs_extra_length(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
@@ -725,7 +687,7 @@ def test_inputs_and_targets_name(client_with_user_role):
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 422, r.json()
 
-    # Both targets and inputs_extra = error 
+    # Both targets and inputs_extra = error
     z["nettests"] = [
         {
             "targets_name": "example_name",
