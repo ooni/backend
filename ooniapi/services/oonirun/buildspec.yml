@@ -8,6 +8,8 @@ phases:
   install:
     runtime-versions:
       python: 3.11
+    commands:
+      - pip install hatch
 
   pre_build:
     commands:
