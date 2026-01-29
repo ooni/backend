@@ -98,9 +98,9 @@ async def health(
         status = "fail"
 
     return {
-        "status": status,
-        "errors": errors,
-        "version": pkg_version,
+        "status":   status,
+        "errors":   errors,
+        "version":  pkg_version,
         "build_label": build_label,
     }
 
