@@ -1,32 +1,17 @@
-"""
-Rate limiter and quota system.
-
-Framework-independent rate limiting mechanism that provides:
-    * IP address and token-based accounting
-    * customizable quotas based on IP address and token
-    * late limiting based on resource usage (time spent on API calls)
-    * bucketing based on day, week, month
-    * statistics
-    * metrics
-    * fast in-memory storage
-
-Also provides a connector for Flask
-
-"""
-
-# TODO: add token-based limiting
-
 import ipaddress
-import struct
 import time
 from typing import Dict, List, Optional, Tuple, Union, Set
 from sys import maxsize
 
-import lmdb  # debdeps: python3-lmdb
+import redis
 
-from ooniapi.config import metrics
+from starlette.datastructures import Headers, MutableHeaders
 
-LMDB_DIR = "/var/lib/ooniapi/lmdb"
+from starlette.responses import PlaintextResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+REDIS_URL = "redis://localhost:6379/0"
+REDIS_KEY_PREFIX = "ooniapi:ratelimit:"
 
 IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 IpAddrBucket = Dict[IpAddress, float]
@@ -35,91 +20,133 @@ TokenBucket = Dict[str, float]
 TokenBuckets = Tuple[TokenBucket, TokenBucket, TokenBucket]
 StrBytes = Union[bytes, str]
 
-
-def lm_ipa_to_b(ipaddr: IpAddress) -> bytes:
-    return ipaddr.packed
-
-def lm_sec_to_b(v: Union[float, int]) -> bytes:
-    return struct.pack("I", int(v * 1000))
-
-def lm_b_to_sec(raw: bytes) -> float:
-    return struct.unpack("I", raw)[0] / 1000.0
-
-def lm_b_to_str_ipa(raw_ipa: bytes) -> str:
-    if len(raw_ipa) == 4:
-        return str(ipaddress.IPv4Address(raw_ipa))
-    return str(ipaddress.IPv6Address(raw_ipa))
+def ipa_to_key(label: str, ipaddr: str) -> str:
+    """Convert IP address to Redis key"""
+    return f"{REDIS_KEY_PREFIX}{label}:{ipaddr}"
 
 
-class LMDB:
-    def __init__(self, dbnames: tuple):
-        self._env = lmdb.open(LMDB_DIR, metasync=False, max_dbs=10)
-        dbnames2 = list(dbnames)
-        dbnames2.append("meta")
-        self._dbnames = dbnames2
-        self._dbs: Dict[str, lmdb._Database] = {}
-        for dbname in dbnames2:
-            self._dbs[dbname] = self._env.open_db(dbname.encode())
+def key_to_ipa(key: str) -> str:
+    """Extract IP address string from Redis key"""
+    # Key format: ooniapi:ratelimit:<label>:<ipaddr>
+    return key.rsplit(":", 1)[-1]
+
+class RedisStore:
+    def __init__(self, dbnames: tuple, redis_url: str = REDIS_URL):
+        self._redis = redis.from_url(redis_url, decode_responses=True)
+        self._dbnames = list(dbnames)
 
     def purge_databases(self):
         """Used for testing"""
         for dbname in self._dbnames:
-            self._dbs[dbname] = self._env.open_db(dbname.encode())
-            with self._env.begin(db=self._dbs[dbname], write=True) as txn:
-                txn.drop(self._dbs[dbname], delete=False)
+            pattern = f"{REDIS_KEY_PREFIX}{dbname}:*"
+            cursor = 0
+            while True:
+                cursor, keys = self._redis.scan(cursor, match=pattern, count=1000)
+                if keys:
+                    self._redis.delete(*keys)
+                if cursor == 0:
+                    break
 
-    def consume_quota(self, dbname: str, ipa: bytes, used_s: float, limit_s: int):
-        db = self._dbs[dbname]
-        with self._env.begin(db=db, write=True) as txn:
-            raw_val = txn.get(ipa)
-            if raw_val is not None:
-                v = lm_b_to_sec(raw_val)
-            else:
-                v = float(limit_s)
+    def consume_quota(self, dbname: str, ipaddr: str, used_s: float, limit_s: int) -> float:
+        """Atomically consume quota and return remaining value"""
+        key = ipa_to_key(dbname, ipaddr)
 
-            v -= used_s
-            if v < 0.0:
-                v = 0.0
-            txn.put(ipa, lm_sec_to_b(v))
+        # Use a Lua script for atomic read-modify-write
+        lua_script = """
+        local key = KEYS[1]
+        local used_s = tonumber(ARGV[1])
+        local limit_s = tonumber(ARGV[2])
 
-        return v
+        local v = redis.call('GET', key)
+        if v == false then
+            v = limit_s
+        else
+            v = tonumber(v)
+        end
 
-    def write_tnx(self, dbname="", db=None):
-        if dbname:
-            db = self._dbs[dbname]
-        return self._env.begin(db=db, write=True)
+        v = v - used_s
+        if v < 0 then
+            v = 0
+        end
+
+        redis.call('SET', key, v)
+        return tostring(v)
+        """
+        result = self._redis.eval(lua_script, 1, key, used_s, limit_s)
+        return float(result)
+
+    def get_value(self, dbname: str, ipaddr: str) -> Optional[float]:
+        """Get current quota value for an IP address"""
+        key = ipa_to_key(dbname, ipaddr)
+        val = self._redis.get(key)
+        if val is None:
+            return None
+        return float(val)
+
+    def set_value(self, dbname: str, ipaddr: str, value: float):
+        """Set quota value for an IP address"""
+        key = ipa_to_key(dbname, ipaddr)
+        self._redis.set(key, value)
+
+    def delete_key(self, dbname: str, ipaddr: str):
+        """Delete a key (reset to default)"""
+        key = ipa_to_key(dbname, ipaddr)
+        self._redis.delete(key)
+
+    def scan_keys(self, dbname: str):
+        """Iterate over all keys for a given bucket"""
+        pattern = f"{REDIS_KEY_PREFIX}{dbname}:*"
+        cursor = 0
+        while True:
+            cursor, keys = self._redis.scan(cursor, match=pattern, count=1000)
+            for key in keys:
+                yield key
+            if cursor == 0:
+                break
+
+    def increment_all_quotas(self, dbname: str, vdelta_s: float, limit_s: float):
+        """Increment quota counters for all tracked IPs in a bucket.
+        When they exceed the limit, delete the key (reset to default)."""
+        lua_script = """
+        local key = KEYS[1]
+        local vdelta_s = tonumber(ARGV[1])
+        local limit_s = tonumber(ARGV[2])
+
+        local v = redis.call('GET', key)
+        if v == false then
+            return 0
+        end
+
+        v = tonumber(v) + vdelta_s
+        if v >= limit_s then
+            redis.call('DEL', key)
+            return 1
+        else
+            redis.call('SET', key, v)
+            return 0
+        end
+        """
+        for key in self.scan_keys(dbname):
+            self._redis.eval(lua_script, 1, key, vdelta_s, limit_s)
 
 
 class Limiter:
     def __init__(
         self,
         limits: dict,
-        token_check_callback=None,
-        ipaddr_methods=["X-Real-Ip", "socket"],
-        whitelisted_ipaddrs=Optional[List[str]],
-        unmetered_pages=Optional[List[str]],
+        redis_url: str = REDIS_URL,
     ):
         # Bucket sequence: month, week, day
         labels = ("ipaddr_per_month", "ipaddr_per_week", "ipaddr_per_day")
         self._hours = [30 * 24, 7 * 24, 1 * 24]
         self._labels = labels
-        self._ipaddr_limits = [limits.get(x, None) for x in labels]
-        self._token_limits = [limits.get(x, None) for x in labels]
-        self._lmdb = LMDB(dbnames=labels)
-        self._token_buckets = ({}, {}, {})  # type: TokenBuckets
-        self._token_check_callback = token_check_callback
-        self._ipaddr_extraction_methods = ipaddr_methods
+        self._ipaddr_limits = [limits.get(x, 0.0) for x in labels]
+        self._token_limits = [limits.get(x, 0.0) for x in labels]
+        self._store = RedisStore(dbnames=labels, redis_url=redis_url)
         self._last_quota_update_time = time.monotonic()
         self._whitelisted_ipaddrs: Set[IpAddress] = set()
-        self._unmetered_pages_globs: Set[IpAddress] = set()
-        self._unmetered_pages: Set[IpAddress] = set()
-        for p in unmetered_pages:
-            if p.endswith("*"):
-                self._unmetered_pages_globs.add(p.rstrip("*"))
-            else:
-                self._unmetered_pages.add(p)
-        for ipa in whitelisted_ipaddrs or []:
-            self._whitelisted_ipaddrs.add(ipaddress.ip_address(ipa))
+        self._unmetered_pages_globs: Set[str] = set()
+        self._unmetered_pages: Set[str] = set()
 
         self.increment_quota_counters(1.0)
         self.increment_quota_counters_if_needed()
@@ -130,18 +157,11 @@ class Limiter:
         if tdelta_s <= 0:
             return
 
-        iterable = zip(self._hours, self._ipaddr_limits, self.ipaddr_buckets)
-        for hours, limit, db in iterable:
+        iterable = zip(self._hours, self._ipaddr_limits, self._labels)
+        for hours, limit, label in iterable:
             # limit, vdelta are in seconds
             vdelta_s = tdelta_s * limit / hours / 3600
-            with self._lmdb._env.begin(db=db, write=True) as txn:
-                i = txn.cursor().iternext()
-                for raw_ipa, raw_val in i:
-                    v = lm_b_to_sec(raw_val) + vdelta_s
-                    if v >= limit:
-                        txn.pop(raw_ipa)  # drop from DB: go back to default
-                    else:
-                        txn.put(raw_ipa, lm_sec_to_b(v))
+            self._store.increment_all_quotas(label, vdelta_s, limit)
 
     def increment_quota_counters_if_needed(self):
         t = time.monotonic()
@@ -151,7 +171,7 @@ class Limiter:
             self._last_quota_update_time = t
 
     def consume_quota(
-        self, elapsed_s: float, ipaddr: Optional[IpAddress] = None, token=None
+        self, elapsed_s: float, ipaddr: Optional[str] = None, token=None
     ) -> float:
         """Consume quota in seconds. Return the lowest remaining value in
         seconds"""
@@ -162,21 +182,19 @@ class Limiter:
         remaining: float = maxsize
         z = zip(self._ipaddr_limits, self._labels)
         for limit_s, dbname in z:
-            ipa = lm_ipa_to_b(ipaddr)
-            v = self._lmdb.consume_quota(dbname, ipa, elapsed_s, limit_s)
+            v = self._store.consume_quota(dbname, ipaddr, elapsed_s, limit_s)
             if v < remaining:
                 remaining = v
 
         return remaining
 
-    def is_quota_available(self, ipaddr=None, token=None) -> bool:
+    def is_quota_available(self, ipaddr) -> bool:
         """Checks if all quota buckets for an ipaddr/token are > 0"""
-        for db in self.ipaddr_buckets:
-            with self._lmdb._env.begin(db=db, write=False) as txn:
-                raw_val = txn.get(lm_ipa_to_b(ipaddr))
-            if raw_val is None:
+        for label in self._labels:
+            val = self._store.get_value(label, ipaddr)
+            if val is None:
                 continue
-            if lm_b_to_sec(raw_val) <= 0:
+            if val <= 0:
                 return False
 
         return True
@@ -195,132 +213,80 @@ class Limiter:
 
     def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[str, float]]:
         """Returns a summary of daily quotas with the lowest values"""
-        db = self._lmdb._dbs["ipaddr_per_day"]
         tmp = []
-        with self._lmdb._env.begin(db=db, write=False) as txn:
-            i = txn.cursor().iternext()
-            for raw_ipa, raw_val in i:
-                val = lm_b_to_sec(raw_val)
-                ipa = lm_b_to_str_ipa(raw_ipa)
-                tmp.append((val, ipa))
+        for key in self._store.scan_keys("ipaddr_per_day"):
+            val = self._store._redis.get(key)
+            if val is not None:
+                ipa = key_to_ipa(key)
+                tmp.append((float(val), ipa))
 
         tmp.sort()
         tmp = tmp[:n]
         return [(ipa, val) for val, ipa in tmp]
 
-    @property
-    def ipaddr_buckets(self):
-        return [self._lmdb._dbs[lab] for lab in self._labels]
 
-
-# # Flask-specific code # #
-
-from flask import request, current_app
-import flask
-
-
-class FlaskLimiter:
-    def _get_client_ipaddr(self) -> IpAddress:
-        # https://github.com/alisaifee/flask-limiter/issues/41
-        for m in self._limiter._ipaddr_extraction_methods:
-            if m == "X-Forwarded-For":
-                raise NotImplementedError("X-Forwarded-For ")
-
-            elif m == "X-Real-Ip":
-                ipaddr = request.headers.get("X-Real-Ip", None)
-                if ipaddr:
-                    return ipaddress.ip_address(ipaddr)
-
-            elif m == "socket":
-                ipaddr = request.remote_addr
-                if ipaddr:
-                    return ipaddress.ip_address(ipaddr)
-
-            else:
-                raise NotImplementedError(f"IP address method {m} is unknown")
-
-        methods = ",".join(self._limiter._ipaddr_extraction_methods)
-        raise Exception(f"Unable to detect IP address using {methods}")
-
-    def _check_limits_callback(self):
-        """Check rate limits before processing a request
-        Refresh quota counters when needed
-        """
-        if self._disabled:  # used in integration tests
-            return
-
-        metrics.incr("busy_workers_count")
-        self._request_start_time = time.monotonic()
-
-        ipaddr = self._get_client_ipaddr()
-        if self._limiter.is_ipaddr_whitelisted(ipaddr):
-            return
-
-        if self._limiter.is_page_unmetered(request.path):
-            return
-
-        self._limiter.increment_quota_counters_if_needed()
-        # token = request.headers.get("Token", None)
-        # if token:
-        # check token validity
-        if not self._limiter.is_quota_available(ipaddr=ipaddr):
-            return "429 error", 429
-
-    def _after_request_callback(self, response):
-        """Consumes quota and injects HTTP headers when responding to a request
-        """
-        if self._disabled:  # used in integration tests
-            return response
-
-        log = current_app.logger
-        try:
-            tdelta = time.monotonic() - self._request_start_time
-            # TODO: implement API call timing metrics
-            # timer_path = request.path.split("?", 1)[0]
-            # timer_path = "apicall_" + timer_path.replace("/", "__")
-            # metrics.timing(timer_path, int(tdelta * 1000))  # ms
-
-            ipaddr = self._get_client_ipaddr()
-            if self._limiter.is_ipaddr_whitelisted(ipaddr):
-                return response
-
-            if self._limiter.is_page_unmetered(request.path):
-                return
-
-            remaining = self._limiter.consume_quota(tdelta, ipaddr=ipaddr)
-            response.headers.add("X-RateLimit-Remaining", int(remaining))
-            metrics.decr("busy_workers_count")
-
-        except Exception as e:
-            log.error(str(e), exc_info=True)
-
-        finally:
-            return response
-
-    def __init__(
-        self,
-        app,
-        limits: dict,
-        token_check_callback=None,
-        ipaddr_methods=["X-Real-Ip", "socket"],
-        whitelisted_ipaddrs=None,
-        unmetered_pages=None,
+class RateLimiterMiddleware:
+    def __init__(self,
+        app: ASGIApp,
+        redis_url: str,
+        whitelisted_ipaddrs=Optional[List[str]],
+        unmetered_pages=Optional[List[str]]
     ):
-        """"""
-        self._limiter = Limiter(
-            limits,
-            token_check_callback=token_check_callback,
-            ipaddr_methods=ipaddr_methods,
-            whitelisted_ipaddrs=whitelisted_ipaddrs,
-            unmetered_pages=unmetered_pages,
+        limits = dict(
+            ipaddr_per_month=60000,
+            ipaddr_per_week=20000,
+            ipaddr_per_day=4000,
         )
-        if app.extensions.get("limiter"):
-            raise Exception("The Flask app already has an extension named 'limiter'")
+        self.app = app
+        self.unmetered_pages = unmetered_pages
+        self.whitelisted_ipaddrs = whitelisted_ipaddrs
+        self.limiter = Limiter(limits=limits, redis_url=redis_url)
 
-        app.before_request(self._check_limits_callback)
-        app.after_request(self._after_request_callback)
-        app.extensions["limiter"] = self
-        self._disabled = False
+    def get_client_ipaddr(self, scope: Scope) -> str:
+        headers = Headers(scope=scope)
+        return headers.get("X-Forwarded-For").split(",")[0].strip()
 
-    def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[str, float]]:
-        return self._limiter.get_lowest_daily_quotas_summary(n)
+    def is_unmetered_page(self, path: str) -> bool:
+        if self.unmetered_pages is None:
+            return False
+
+        return path in self.unmetered_pages
+
+    def is_ip_whitelisted(self, ipaddr: str) -> bool:
+        if self.whitelisted_ipaddrs is None:
+            return False
+
+        return ipaddr in self.whitelisted_ipaddrs
+
+    def should_ratelimit(self, scope: Scope) -> bool:
+        if self.is_ip_whitelisted(self.get_client_ipaddr(scope)):
+            return False
+
+        if self.is_unmetered_page(scope["path"]):
+            return False
+
+        return True
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":  # pragma: no cover
+            return await self.app(scope, receive, send)
+
+        if not self.should_ratelimit(scope):
+            return await self.app(scope, receive, send)
+
+        ipaddr = self.get_client_ipaddr(scope)
+        request_start = time.perf_counter()
+
+        self.limiter.increment_quota_counters_if_needed()
+        if not self.limiter.is_quota_available(ipaddr=ipaddr):
+            response = PlaintextResponse("Quota exceeded", 429)
+            return await response(scope, receive, send)
+
+        async def wrapped_send(message: Message) -> None:
+            tdelta = time.perf_counter() - request_start
+            remaining = self.limiter.consume_quota(tdelta, ipaddr=ipaddr)
+            headers = MutableHeaders(scope=message)
+            headers.append("X-Remaining", int(remaining))
+            await send(message)
+
+        await self.app(scope, receive, wrapped_send)

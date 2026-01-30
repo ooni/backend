@@ -24,6 +24,8 @@ dependencies = [
   "alembic ~= 1.13.1",
   "prometheus-fastapi-instrumentator ~= 6.1.0",
   "prometheus-client",
+  "starlette",
+  "redis",
 ]
 
 readme = "README.md"
