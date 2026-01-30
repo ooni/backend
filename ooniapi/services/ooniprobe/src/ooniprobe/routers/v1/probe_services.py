@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import List, Any, Dict, Tuple, Optional, Annotated
+from typing import Annotated, List, Optional, Any, Dict, Tuple, List, Any, Dict, Tuple, Optional, Annotated
 import random
 import ujson
 from hashlib import sha512
@@ -10,6 +10,9 @@ import io
 
 import geoip2
 import geoip2.errors
+from fastapi import APIRouter, HTTPException, Query, Response, Request
+from prometheus_client import Counter, Info, Gauge
+from pydantic import Field, IPvAnyAddress
 from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
 from pydantic import Field, IPvAnyAddress
 from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed, ServerState
@@ -18,10 +21,12 @@ import httpx
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.routers import BaseModel
 from ...common.utils import setnocacheresponse
+from ...common.dependencies import ClickhouseDep
 from ...dependencies import (
     ASNReaderDep,
     CCReaderDep,
-    ClickhouseDep,
+    ASNReaderDep,
+    CCReaderDep,
     SettingsDep,
     TorTargetsDep,
 )
@@ -33,6 +38,8 @@ from ...utils import (
     error,
     compare_probe_msmt_cc_asn,
 )
+from ...common.utils import setcacheresponse
+from ...common.prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 from ...dependencies import (
     ManifestDep,
@@ -42,7 +49,6 @@ from ...dependencies import (
 )
 from ..reports import Metrics
 from ...common.utils import setcacheresponse
-from ...prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
 
 router = APIRouter(prefix="/v1")
 

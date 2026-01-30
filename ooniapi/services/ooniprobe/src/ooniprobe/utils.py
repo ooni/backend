@@ -6,11 +6,13 @@ Insert VPN credentials into database.
 
 import itertools
 import logging
-from typing import Dict, List, TypedDict, Tuple, Any
-
-from fastapi import Request, HTTPException
 from typing import List, TypedDict, Tuple
 import io
+
+from fastapi import Request
+from typing import Dict, Any
+
+from fastapi import HTTPException
 
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session

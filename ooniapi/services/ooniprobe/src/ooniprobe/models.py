@@ -1,9 +1,10 @@
 from datetime import datetime
+
+from sqlalchemy import ForeignKey, Sequence, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from .common.models import UtcDateTime
 from .common.postgresql import Base
-from sqlalchemy import ForeignKey, Sequence, String
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column, relationship
 import logging
 
 log = logging.getLogger(__name__)

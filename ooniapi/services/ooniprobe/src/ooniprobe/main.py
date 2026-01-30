@@ -3,7 +3,6 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.request import urlopen
 
-import boto3
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,8 +19,12 @@ from .routers.v1 import probe_services
 from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
-from .dependencies import S3ClientDep, get_manifest, get_postgresql_session, get_clickhouse_session, SettingsDep
-from .common.dependencies import get_settings
+from .common.dependencies import (
+    get_settings,
+    SettingsDep
+)
+from .dependencies import get_manifest, S3ClientDep, PostgresSessionDep
+from .common.dependencies import ClickhouseDep
 from .common.config import Settings
 from .common.version import get_build_label
 from .common.metrics import mount_metrics
@@ -100,8 +103,8 @@ class HealthStatus(BaseModel):
 async def health(
     settings: SettingsDep,
     s3: S3ClientDep,
-    db=Depends(get_postgresql_session),
-    clickhouse=Depends(get_clickhouse_session),
+    db: PostgresSessionDep,
+    clickhouse: ClickhouseDep,
 ):
     errors = []
     try:
