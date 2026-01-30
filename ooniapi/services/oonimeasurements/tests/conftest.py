@@ -1,12 +1,12 @@
-from pathlib import Path
-import pytest
-
-import requests
 import time
-import jwt
+from pathlib import Path
 
-from fastapi.testclient import TestClient
+import jwt
+import pytest
+import redis
+import requests
 from clickhouse_driver import Client as ClickhouseClient
+from fastapi.testclient import TestClient
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
@@ -56,6 +56,29 @@ def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     url = "clickhouse://test:test@{}:{}".format(docker_ip, port)
     docker_services.wait_until_responsive(
         timeout=30.0, pause=1.0, check=lambda: is_clickhouse_running(url)
+    )
+    yield url
+
+
+def is_redis_running(url):
+    time.sleep(2)
+    try:
+        conn = redis.Redis.from_url(url)
+        conn.ping()
+        return True
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+def redis_server(docker_ip, docker_services):
+    port = docker_services.port_for("redis", 6379)
+    url = f"redis://localhost:{port}/0"
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=1.0, check=lambda: is_redis_running(url)
+    )
+    app.dependency_overrides[get_settings] = make_override_get_settings(
+        redis_url=url,
     )
     yield url
 

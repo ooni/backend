@@ -1,24 +1,17 @@
 import ipaddress
 import time
-from typing import Dict, List, Optional, Tuple, Union, Set
 from sys import maxsize
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import redis
-
 from starlette.datastructures import Headers, MutableHeaders
-
-from starlette.responses import PlaintextResponse
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 REDIS_URL = "redis://localhost:6379/0"
 REDIS_KEY_PREFIX = "ooniapi:ratelimit:"
 
-IpAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-IpAddrBucket = Dict[IpAddress, float]
-IpAddrBuckets = Tuple[IpAddrBucket, IpAddrBucket, IpAddrBucket]
-TokenBucket = Dict[str, float]
-TokenBuckets = Tuple[TokenBucket, TokenBucket, TokenBucket]
-StrBytes = Union[bytes, str]
 
 def ipa_to_key(label: str, ipaddr: str) -> str:
     """Convert IP address to Redis key"""
@@ -29,6 +22,7 @@ def key_to_ipa(key: str) -> str:
     """Extract IP address string from Redis key"""
     # Key format: ooniapi:ratelimit:<label>:<ipaddr>
     return key.rsplit(":", 1)[-1]
+
 
 class RedisStore:
     def __init__(self, dbnames: tuple, redis_url: str = REDIS_URL):
@@ -47,7 +41,9 @@ class RedisStore:
                 if cursor == 0:
                     break
 
-    def consume_quota(self, dbname: str, ipaddr: str, used_s: float, limit_s: int) -> float:
+    def consume_quota(
+        self, dbname: str, ipaddr: str, used_s: float, limit_s: int
+    ) -> float:
         """Atomically consume quota and return remaining value"""
         key = ipa_to_key(dbname, ipaddr)
 
@@ -141,12 +137,8 @@ class Limiter:
         self._hours = [30 * 24, 7 * 24, 1 * 24]
         self._labels = labels
         self._ipaddr_limits = [limits.get(x, 0.0) for x in labels]
-        self._token_limits = [limits.get(x, 0.0) for x in labels]
         self._store = RedisStore(dbnames=labels, redis_url=redis_url)
         self._last_quota_update_time = time.monotonic()
-        self._whitelisted_ipaddrs: Set[IpAddress] = set()
-        self._unmetered_pages_globs: Set[str] = set()
-        self._unmetered_pages: Set[str] = set()
 
         self.increment_quota_counters(1.0)
         self.increment_quota_counters_if_needed()
@@ -170,15 +162,9 @@ class Limiter:
             self.increment_quota_counters(tdelta_s)
             self._last_quota_update_time = t
 
-    def consume_quota(
-        self, elapsed_s: float, ipaddr: Optional[str] = None, token=None
-    ) -> float:
+    def consume_quota(self, elapsed_s: float, ipaddr: str) -> float:
         """Consume quota in seconds. Return the lowest remaining value in
         seconds"""
-        assert ipaddr or token
-        if not ipaddr:
-            raise NotImplementedError()
-
         remaining: float = maxsize
         z = zip(self._ipaddr_limits, self._labels)
         for limit_s, dbname in z:
@@ -199,18 +185,6 @@ class Limiter:
 
         return True
 
-    def is_ipaddr_whitelisted(self, ipaddr: IpAddress) -> bool:
-        return ipaddr in self._whitelisted_ipaddrs
-
-    def is_page_unmetered(self, path) -> bool:
-        if path in self._unmetered_pages:
-            return True
-        for u in self._unmetered_pages_globs:
-            if path.startswith(u):
-                return True
-
-        return False
-
     def get_lowest_daily_quotas_summary(self, n=20) -> List[Tuple[str, float]]:
         """Returns a summary of daily quotas with the lowest values"""
         tmp = []
@@ -226,11 +200,13 @@ class Limiter:
 
 
 class RateLimiterMiddleware:
-    def __init__(self,
+    def __init__(
+        self,
         app: ASGIApp,
         redis_url: str,
-        whitelisted_ipaddrs=Optional[List[str]],
-        unmetered_pages=Optional[List[str]]
+        whitelisted_ipaddrs: Optional[List[str]] = None,
+        unmetered_pages: Optional[List[str]] = None,
+        quotatest_pages: Optional[List[str]] = None,
     ):
         limits = dict(
             ipaddr_per_month=60000,
@@ -240,11 +216,18 @@ class RateLimiterMiddleware:
         self.app = app
         self.unmetered_pages = unmetered_pages
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
+        self.quotatest_pages = quotatest_pages
         self.limiter = Limiter(limits=limits, redis_url=redis_url)
 
-    def get_client_ipaddr(self, scope: Scope) -> str:
+    def get_client_ipaddr(self, scope: Scope, receive: Receive) -> str:
+        request = Request(scope, receive)
+
         headers = Headers(scope=scope)
-        return headers.get("X-Forwarded-For").split(",")[0].strip()
+        x_forwarded_for = headers.get("X-Forwarded-For")
+        if x_forwarded_for:
+            return x_forwarded_for.split(",")[0].strip()
+
+        return request.client.host
 
     def is_unmetered_page(self, path: str) -> bool:
         if self.unmetered_pages is None:
@@ -258,8 +241,8 @@ class RateLimiterMiddleware:
 
         return ipaddr in self.whitelisted_ipaddrs
 
-    def should_ratelimit(self, scope: Scope) -> bool:
-        if self.is_ip_whitelisted(self.get_client_ipaddr(scope)):
+    def should_ratelimit(self, scope: Scope, ipaddr: str) -> bool:
+        if self.is_ip_whitelisted(ipaddr):
             return False
 
         if self.is_unmetered_page(scope["path"]):
@@ -271,22 +254,26 @@ class RateLimiterMiddleware:
         if scope["type"] != "http":  # pragma: no cover
             return await self.app(scope, receive, send)
 
-        if not self.should_ratelimit(scope):
+        ipaddr = self.get_client_ipaddr(scope, receive)
+
+        if not self.should_ratelimit(scope, ipaddr):
             return await self.app(scope, receive, send)
 
-        ipaddr = self.get_client_ipaddr(scope)
         request_start = time.perf_counter()
 
         self.limiter.increment_quota_counters_if_needed()
         if not self.limiter.is_quota_available(ipaddr=ipaddr):
-            response = PlaintextResponse("Quota exceeded", 429)
+            response = PlainTextResponse("Quota exceeded", 429)
             return await response(scope, receive, send)
 
         async def wrapped_send(message: Message) -> None:
-            tdelta = time.perf_counter() - request_start
-            remaining = self.limiter.consume_quota(tdelta, ipaddr=ipaddr)
-            headers = MutableHeaders(scope=message)
-            headers.append("X-Remaining", int(remaining))
+            if message["type"] == "http.response.start":
+                tdelta = time.perf_counter() - request_start
+                if scope["path"] in self.quotatest_pages:
+                    tdelta = 42
+                remaining = self.limiter.consume_quota(tdelta, ipaddr=ipaddr)
+                headers = MutableHeaders(scope=message)
+                headers.append("X-RateLimit-Remaining", str(int(remaining)))
             await send(message)
 
         await self.app(scope, receive, wrapped_send)

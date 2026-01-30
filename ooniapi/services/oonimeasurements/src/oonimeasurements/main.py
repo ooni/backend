@@ -3,25 +3,21 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
-from .routers.v1 import aggregation
-from .routers.v1 import measurements
+from .common.clickhouse_utils import query_click
+from .common.dependencies import get_clickhouse_session, get_settings
+from .common.metrics import mount_metrics
+from .common.rate_limit_quotas import RateLimiterMiddleware
+from .common.version import get_build_label, get_pkg_version
 from .routers.data import (
+    aggregate_analysis,
+    aggregate_observations,
     list_analysis,
     list_observations,
-    aggregate_observations,
-    aggregate_analysis,
 )
-
-from .common.dependencies import get_settings, get_clickhouse_session
-from .common.version import get_build_label, get_pkg_version
-from .common.clickhouse_utils import query_click
-from .common.metrics import mount_metrics
-
+from .routers.v1 import aggregation, measurements
 
 pkg_name = "oonimeasurements"
 
@@ -35,6 +31,7 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     settings = get_settings()
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
+    app.add_middleware(RateLimiterMiddleware, redis_url=settings.redis_url)
     mount_metrics(app, instrumentor.registry)
     yield
 
