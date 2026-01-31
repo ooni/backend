@@ -1,8 +1,6 @@
-import pytest
-
 import httpx
+import pytest
 from fastapi.testclient import TestClient
-from oonimeasurements.main import lifespan, app
 
 
 def test_health_good(client):
@@ -20,17 +18,11 @@ def test_health_bad(client_with_bad_settings):
     assert r.status_code == 200
 
 
-def test_metrics(client):
+def test_metrics(app):
+    client = TestClient(app)
     r = client.get("/metrics")
+    assert r.status_code == 401
 
-
-@pytest.mark.asyncio
-async def test_lifecycle():
-    async with lifespan(app):
-        client = TestClient(app)
-        r = client.get("/metrics")
-        assert r.status_code == 401
-
-        auth = httpx.BasicAuth(username="prom", password="super_secure")
-        r = client.get("/metrics", auth=auth)
-        assert r.status_code == 200, r.text
+    auth = httpx.BasicAuth(username="prom", password="super_secure")
+    r = client.get("/metrics", auth=auth)
+    assert r.status_code == 200, r.text

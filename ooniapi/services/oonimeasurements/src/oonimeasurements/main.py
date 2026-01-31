@@ -1,27 +1,22 @@
 import logging
-from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
-from .routers.v1 import aggregation
-from .routers.v1 import measurements
+from .common.clickhouse_utils import query_click
+from .common.dependencies import get_clickhouse_session, get_settings
+from .common.metrics import mount_metrics
+from .common.rate_limit_quotas import RateLimiterMiddleware
+from .common.version import get_build_label, get_pkg_version
 from .routers.data import (
+    aggregate_analysis,
+    aggregate_observations,
     list_analysis,
     list_observations,
-    aggregate_observations,
-    aggregate_analysis,
 )
-
-from .common.dependencies import get_settings, get_clickhouse_session
-from .common.version import get_build_label, get_pkg_version
-from .common.clickhouse_utils import query_click
-from .common.metrics import mount_metrics
-
+from .routers.v1 import aggregation, measurements
 
 pkg_name = "oonimeasurements"
 
@@ -31,29 +26,42 @@ build_label = get_build_label(pkg_name)
 log = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def create_app() -> FastAPI:
     settings = get_settings()
+
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
+
+    app = FastAPI()
+
+    instrumentor = Instrumentator().instrument(
+        app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"
+    )
     mount_metrics(app, instrumentor.registry)
-    yield
+
+    app.add_middleware(
+        CORSMiddleware,
+        # allow from observable notebooks
+        allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+        # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    return app
 
 
-app = FastAPI(lifespan=lifespan)
+app = create_app()
 
-instrumentor = Instrumentator().instrument(
-    app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"
-)
+app.add_middleware(RateLimiterMiddleware, redis_url=get_settings().redis_url)
 
-app.add_middleware(
-    CORSMiddleware,
-    # allow from observable notebooks
-    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
-    # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+class HealthStatus(BaseModel):
+    status: str
+    errors: list[str] = []
+    version: str
+    build_label: str
+
 
 app.include_router(measurements.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")
@@ -66,13 +74,6 @@ app.include_router(aggregate_analysis.router, prefix="/api")
 @app.get("/version")
 async def version():
     return {"version": pkg_version, "build_label": build_label}
-
-
-class HealthStatus(BaseModel):
-    status: str
-    errors: list[str] = []
-    version: str
-    build_label: str
 
 
 # TODO(decfox): Add minimal health check functionality
