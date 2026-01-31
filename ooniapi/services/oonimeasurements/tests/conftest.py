@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import jwt
 import pytest
@@ -10,9 +11,15 @@ from fastapi.testclient import TestClient
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
-from oonimeasurements.main import app
+from oonimeasurements.main import create_app
 
 THIS_DIR = Path(__file__).parent.resolve()
+
+
+@pytest.fixture
+def app():
+    app = create_app()
+    return app
 
 
 def get_file_path(file_path: str):
@@ -77,10 +84,10 @@ def redis_server(docker_ip, docker_services):
     docker_services.wait_until_responsive(
         timeout=30.0, pause=1.0, check=lambda: is_redis_running(url)
     )
-    app.dependency_overrides[get_settings] = make_override_get_settings(
-        redis_url=url,
-    )
-    yield url
+
+    with patch("oonimeasurements.common.dependencies.get_settings") as mocked_gs:
+        mocked_gs.return_value = make_override_get_settings(redis_url=url)()
+        yield url
 
 
 def run_migration(path: Path, click: ClickhouseClient):
@@ -125,6 +132,7 @@ def make_override_get_settings(**kw):
 
 @pytest.fixture
 def client_with_bad_settings():
+    app = create_app()
     app.dependency_overrides[get_settings] = make_override_get_settings(
         clickhouse_url="clickhouse://badhost:9000"
     )
@@ -135,6 +143,7 @@ def client_with_bad_settings():
 
 @pytest.fixture
 def client(db):
+    app = create_app()
     app.dependency_overrides[get_settings] = make_override_get_settings(
         clickhouse_url=db,
         jwt_encryption_key="super_secure",
@@ -166,7 +175,6 @@ def create_session_token(account_id: str, role: str) -> str:
 
 @pytest.fixture
 def client_with_user_role(client):
-    client = TestClient(app)
     jwt_token = create_session_token("0" * 16, "user")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
@@ -174,7 +182,6 @@ def client_with_user_role(client):
 
 @pytest.fixture
 def client_with_admin_role(client):
-    client = TestClient(app)
     jwt_token = create_session_token("0" * 16, "admin")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client

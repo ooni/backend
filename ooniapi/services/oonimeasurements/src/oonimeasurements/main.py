@@ -1,5 +1,4 @@
 import logging
-from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,30 +26,42 @@ build_label = get_build_label(pkg_name)
 log = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def create_app() -> FastAPI:
     settings = get_settings()
+
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
-    app.add_middleware(RateLimiterMiddleware, redis_url=settings.redis_url)
+
+    app = FastAPI()
+
+    instrumentor = Instrumentator().instrument(
+        app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"
+    )
     mount_metrics(app, instrumentor.registry)
-    yield
+
+    app.add_middleware(
+        CORSMiddleware,
+        # allow from observable notebooks
+        allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+        # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    return app
 
 
-app = FastAPI(lifespan=lifespan)
+app = create_app()
 
-instrumentor = Instrumentator().instrument(
-    app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"
-)
+app.add_middleware(RateLimiterMiddleware, redis_url=get_settings().redis_url)
 
-app.add_middleware(
-    CORSMiddleware,
-    # allow from observable notebooks
-    allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
-    # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+class HealthStatus(BaseModel):
+    status: str
+    errors: list[str] = []
+    version: str
+    build_label: str
+
 
 app.include_router(measurements.router, prefix="/api")
 app.include_router(aggregation.router, prefix="/api")
@@ -63,13 +74,6 @@ app.include_router(aggregate_analysis.router, prefix="/api")
 @app.get("/version")
 async def version():
     return {"version": pkg_version, "build_label": build_label}
-
-
-class HealthStatus(BaseModel):
-    status: str
-    errors: list[str] = []
-    version: str
-    build_label: str
 
 
 # TODO(decfox): Add minimal health check functionality

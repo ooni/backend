@@ -204,9 +204,8 @@ class RateLimiterMiddleware:
         self,
         app: ASGIApp,
         redis_url: str,
-        whitelisted_ipaddrs: Optional[List[str]] = None,
-        unmetered_pages: Optional[List[str]] = None,
-        quotatest_pages: Optional[List[str]] = None,
+        whitelisted_ipaddrs: List[str] = [],
+        unmetered_pages: List[str] = [],
     ):
         limits = dict(
             ipaddr_per_month=60000,
@@ -216,7 +215,6 @@ class RateLimiterMiddleware:
         self.app = app
         self.unmetered_pages = unmetered_pages
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
-        self.quotatest_pages = quotatest_pages
         self.limiter = Limiter(limits=limits, redis_url=redis_url)
 
     def get_client_ipaddr(self, scope: Scope, receive: Receive) -> str:
@@ -269,8 +267,6 @@ class RateLimiterMiddleware:
         async def wrapped_send(message: Message) -> None:
             if message["type"] == "http.response.start":
                 tdelta = time.perf_counter() - request_start
-                if scope["path"] in self.quotatest_pages:
-                    tdelta = 42
                 remaining = self.limiter.consume_quota(tdelta, ipaddr=ipaddr)
                 headers = MutableHeaders(scope=message)
                 headers.append("X-RateLimit-Remaining", str(int(remaining)))
