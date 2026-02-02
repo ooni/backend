@@ -17,8 +17,16 @@ THIS_DIR = Path(__file__).parent.resolve()
 
 
 @pytest.fixture
-def app():
+def app(db):
     app = create_app()
+
+    app.dependency_overrides[get_settings] = make_override_get_settings(
+        clickhouse_url=db,
+        jwt_encryption_key="super_secure",
+        prometheus_metrics_password="super_secure",
+        account_id_hashing_key="super_secure",
+    )
+
     setup_router(app)
     return app
 
@@ -132,8 +140,7 @@ def make_override_get_settings(**kw):
 
 
 @pytest.fixture
-def client_with_bad_settings():
-    app = create_app()
+def client_with_bad_settings(app):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         clickhouse_url="clickhouse://badhost:9000"
     )
@@ -143,15 +150,7 @@ def client_with_bad_settings():
 
 
 @pytest.fixture
-def client(db):
-    app = create_app()
-    app.dependency_overrides[get_settings] = make_override_get_settings(
-        clickhouse_url=db,
-        jwt_encryption_key="super_secure",
-        prometheus_metrics_password="super_secure",
-        account_id_hashing_key="super_secure",
-    )
-
+def client(app):
     client = TestClient(app)
     yield client
 
