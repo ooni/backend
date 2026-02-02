@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
-from oonimeasurements.main import create_app
+from oonimeasurements.main import create_app, setup_router
 
 THIS_DIR = Path(__file__).parent.resolve()
 
@@ -19,6 +19,7 @@ THIS_DIR = Path(__file__).parent.resolve()
 @pytest.fixture
 def app():
     app = create_app()
+    setup_router(app)
     return app
 
 
