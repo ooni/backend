@@ -3,7 +3,7 @@ import time
 from typing import List
 
 from limits import parse_many as parse_many_limits
-from limits.aio.storage import RedisStorage
+from limits.aio.storage import MemoryStorage, RedisStorage
 from limits.aio.strategies import MovingWindowRateLimiter
 from prometheus_client import Counter, Histogram
 from starlette.datastructures import Headers, MutableHeaders
@@ -56,7 +56,10 @@ class RateLimiterMiddleware:
                 self._unmetered_pages.add(p)
 
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
-        self.limits_storage = RedisStorage(f"async+{valkey_url}")
+        if valkey_url.startswith("memory://"):
+            self.limits_storage = MemoryStorage()
+        else:
+            self.limits_storage = RedisStorage(f"async+{valkey_url}")
         self.limiter = MovingWindowRateLimiter(self.limits_storage)
         self.rate_limits = parse_many_limits(rate_limits)
         self.hashing_key = hashing_key
