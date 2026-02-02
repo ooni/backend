@@ -33,7 +33,7 @@ REQUEST_DURATION = Histogram(
 def hash_ipaddr(ipaddr: str, key: str) -> str:
     return hashlib.blake2b(
         ipaddr.encode(), key=key.encode("utf-8"), digest_size=8
-    ).digest()
+    ).hexdigest()
 
 
 class RateLimiterMiddleware:

@@ -11,7 +11,7 @@ async def test_endpoint_limit(valkey_server, app):
     app.add_middleware(
         RateLimiterMiddleware,
         valkey_url=valkey_server,
-        limits="10000/day;13000/7day",
+        rate_limits="10000/day;13000/7day",
         unmetered_pages=[r"/version"],
     )
 
