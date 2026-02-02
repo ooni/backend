@@ -20,6 +20,8 @@ cleanup() {
 }
 
 echo "[+] Running smoketest of ${IMAGE}"
+docker run -d --name valkey valkey/valkey -p 6379:6379
+sleep 2
 docker run -d --name $CONTAINER_NAME -p $PORT:80 ${IMAGE}
 
 trap cleanup INT TERM EXIT
