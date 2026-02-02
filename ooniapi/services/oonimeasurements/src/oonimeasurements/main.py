@@ -116,4 +116,4 @@ def setup_router(app: FastAPI):
 
 app = create_app()
 setup_router(app)
-app.add_middleware(RateLimiterMiddleware, redis_url=get_settings().redis_url)
+app.add_middleware(RateLimiterMiddleware, valkey_url=get_settings().valkey_url)

@@ -10,7 +10,7 @@ services:
     environment:
       CLICKHOUSE_PASSWORD: test
       CLICKHOUSE_USER: test
-  redis:
-    image: "redis"
+  valkey:
+    image: "valkey/valkey"
     ports:
       - "6379"

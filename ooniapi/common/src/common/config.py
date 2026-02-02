@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "OONI Data API"
     base_url: str = "https://api.ooni.io"
     clickhouse_url: str = "clickhouse://localhost"
-    redis_url: str = "redis://localhost:6379/0"
+    valkey_url: str = "valkey://localhost:6379"
     postgresql_url: str = "postgresql://oonidb:oonidb@localhost/oonidb"
     log_level: str = "info"
     # Prod bucket: "ooni-data-eu-fra"

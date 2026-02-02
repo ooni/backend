@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, patch
 
 import jwt
 import pytest
-import redis
 import requests
+import valkey
 from clickhouse_driver import Client as ClickhouseClient
 from fastapi.testclient import TestClient
 
@@ -76,10 +76,10 @@ def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     yield url
 
 
-def is_redis_running(url):
+def is_valkey_running(url):
     time.sleep(2)
     try:
-        conn = redis.Redis.from_url(url)
+        conn = valkey.from_url(url)
         conn.ping()
         return True
     except Exception:
@@ -87,15 +87,15 @@ def is_redis_running(url):
 
 
 @pytest.fixture(scope="session")
-def redis_server(docker_ip, docker_services):
-    port = docker_services.port_for("redis", 6379)
-    url = f"redis://localhost:{port}/0"
+def valkey_server(docker_ip, docker_services):
+    port = docker_services.port_for("valkey", 6379)
+    url = f"valkey://localhost:{port}"
     docker_services.wait_until_responsive(
-        timeout=30.0, pause=1.0, check=lambda: is_redis_running(url)
+        timeout=30.0, pause=1.0, check=lambda: is_valkey_running(url)
     )
 
     with patch("oonimeasurements.common.dependencies.get_settings") as mocked_gs:
-        mocked_gs.return_value = make_override_get_settings(redis_url=url)()
+        mocked_gs.return_value = make_override_get_settings(valkey_url=url)()
         yield url
 
 

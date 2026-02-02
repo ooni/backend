@@ -7,10 +7,10 @@ from oonimeasurements.common.rate_limit_quotas import RateLimiterMiddleware
 
 
 @pytest.mark.asyncio
-async def test_endpoint_limit(redis_server, app):
+async def test_endpoint_limit(valkey_server, app):
     app.add_middleware(
         RateLimiterMiddleware,
-        redis_url=redis_server,
+        valkey_url=valkey_server,
         limits="10000/day;13000/7day",
         unmetered_pages=[r"/version"],
     )
@@ -41,7 +41,6 @@ async def test_endpoint_limit(redis_server, app):
                 resp = await client.get(
                     "/quotatest", headers={"X-Forwarded-For": "127.0.0.1"}
                 )
-                print(resp.headers["X-RateLimit-Remaining"])
                 assert int(resp.headers["X-RateLimit-Remaining"]) < initial_quota
                 assert resp.status_code == 200
 

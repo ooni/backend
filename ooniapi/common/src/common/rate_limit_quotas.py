@@ -22,7 +22,7 @@ class RateLimiterMiddleware:
     def __init__(
         self,
         app: ASGIApp,
-        redis_url: str,
+        valkey_url: str,
         limits: str = DEFAULT_LIMITS,
         whitelisted_ipaddrs: List[str] = [],
         unmetered_pages: List[str] = [],
@@ -37,9 +37,7 @@ class RateLimiterMiddleware:
                 self._unmetered_pages.add(p)
 
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
-        self.limits_storage = RedisStorage(
-            f"async+{redis_url}", implementation="redispy"
-        )
+        self.limits_storage = RedisStorage(f"async+{valkey_url}")
         self.limiter = MovingWindowRateLimiter(self.limits_storage)
         self.rate_limits = parse_many_limits(limits)
 
