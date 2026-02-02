@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     collector_id: str = "CHANGEME"
     session_expiry_days: int = 10
     login_expiry_days: int = 10
+    rate_limits: str = "10/minute;400000/day;200000/7day"
 
     admin_emails: List[str] = [
         "admin@ooni.org",

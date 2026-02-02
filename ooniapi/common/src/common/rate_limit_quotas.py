@@ -1,6 +1,6 @@
+import hashlib
 import time
-from sys import maxsize
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import List
 
 from limits import parse_many as parse_many_limits
 from limits.aio.storage import RedisStorage
@@ -30,12 +30,19 @@ REQUEST_DURATION = Histogram(
 )
 
 
+def hash_ipaddr(ipaddr: str, key: str) -> str:
+    return hashlib.blake2b(
+        ipaddr.encode(), key=key.encode("utf-8"), digest_size=8
+    ).digest()
+
+
 class RateLimiterMiddleware:
     def __init__(
         self,
         app: ASGIApp,
         valkey_url: str,
-        limits: str = DEFAULT_LIMITS,
+        hashing_key: str = "CHANGEME",
+        rate_limits: str = DEFAULT_LIMITS,
         whitelisted_ipaddrs: List[str] = [],
         unmetered_pages: List[str] = [],
     ):
@@ -51,7 +58,8 @@ class RateLimiterMiddleware:
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
         self.limits_storage = RedisStorage(f"async+{valkey_url}")
         self.limiter = MovingWindowRateLimiter(self.limits_storage)
-        self.rate_limits = parse_many_limits(limits)
+        self.rate_limits = parse_many_limits(rate_limits)
+        self.hashing_key = hashing_key
 
     def get_client_ipaddr(self, scope: Scope, receive: Receive) -> str:
         request = Request(scope, receive)
@@ -110,7 +118,8 @@ class RateLimiterMiddleware:
 
         request_start = time.perf_counter()
 
-        remaining = await self.get_min_available_quota(ipaddr)
+        hashed_ipaddr = hash_ipaddr(ipaddr, self.hashing_key)
+        remaining = await self.get_min_available_quota(hashed_ipaddr)
         if remaining <= 0:
             RATE_LIMIT_HITS.inc()
             response = PlainTextResponse("Quota exceeded", 429)
@@ -125,7 +134,7 @@ class RateLimiterMiddleware:
                 # Cost is calculated by assuming 10ms of request time is 1 unit
                 # rounded to 1 when it's less than 10ms
                 cost = max([int(tdelta * 100), 1])
-                await self.consume_rate_limits(ipaddr, cost=cost)
+                await self.consume_rate_limits(hashed_ipaddr, cost=cost)
                 headers = MutableHeaders(scope=message)
                 headers.append("X-RateLimit-Remaining", str(max([remaining - cost, 0])))
             await send(message)
