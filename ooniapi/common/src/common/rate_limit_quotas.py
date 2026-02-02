@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 from limits import parse_many as parse_many_limits
 from limits.aio.storage import RedisStorage
 from limits.aio.strategies import MovingWindowRateLimiter
+from prometheus_client import Counter, Histogram
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -16,6 +17,17 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 # ipaddr_per_day=4000,
 
 DEFAULT_LIMITS = "10/minute;400000/day;200000/7day"
+
+## Metrics
+RATE_LIMIT_HITS = Counter(
+    "rate_limit_hits",
+    "The number of requests that triggered a rate limit",
+)
+
+REQUEST_DURATION = Histogram(
+    "rate_limit_request_duration",
+    "The duration of requests not triggered by a rate limit",
+)
 
 
 class RateLimiterMiddleware:
@@ -100,6 +112,7 @@ class RateLimiterMiddleware:
 
         remaining = await self.get_min_available_quota(ipaddr)
         if remaining <= 0:
+            RATE_LIMIT_HITS.inc()
             response = PlainTextResponse("Quota exceeded", 429)
             headers = MutableHeaders(scope=scope)
             headers.append("X-RateLimit-Remaining", "0")
@@ -108,10 +121,10 @@ class RateLimiterMiddleware:
         async def wrapped_send(message: Message) -> None:
             if message["type"] == "http.response.start":
                 tdelta = time.perf_counter() - request_start
+                REQUEST_DURATION.observe(tdelta)
                 # Cost is calculated by assuming 10ms of request time is 1 unit
                 # rounded to 1 when it's less than 10ms
                 cost = max([int(tdelta * 100), 1])
-                print(f"cost is {cost}, {tdelta}")
                 await self.consume_rate_limits(ipaddr, cost=cost)
                 headers = MutableHeaders(scope=message)
                 headers.append("X-RateLimit-Remaining", str(max([remaining - cost, 0])))
