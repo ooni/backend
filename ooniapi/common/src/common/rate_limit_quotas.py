@@ -56,7 +56,7 @@ class RateLimiterMiddleware:
                 self._unmetered_pages.add(p)
 
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
-        if valkey_url.startswith("memory://"):
+        if valkey_url.startswith("memory"):
             self.limits_storage = MemoryStorage()
         else:
             self.limits_storage = RedisStorage(f"async+{valkey_url}")
