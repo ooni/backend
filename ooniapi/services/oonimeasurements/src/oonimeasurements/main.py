@@ -118,9 +118,9 @@ settings = get_settings()
 
 app = create_app()
 setup_router(app)
-app.add_middleware(
-    RateLimiterMiddleware,
-    valkey_url=settings.valkey_url,
-    hashing_key=settings.account_id_hashing_key,
-    rate_limits=settings.rate_limits,
-)
+# app.add_middleware(
+#     RateLimiterMiddleware,
+#     valkey_url=settings.valkey_url,
+#     hashing_key=settings.account_id_hashing_key,
+#     rate_limits=settings.rate_limits,
+# )
