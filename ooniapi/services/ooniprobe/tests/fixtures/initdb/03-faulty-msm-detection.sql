@@ -12,4 +12,9 @@ CREATE TABLE IF NOT EXISTS default.geoip_mismatch
     `actual_asn` UInt32
 )
 ENGINE = ReplacingMergeTree
-ORDER BY (measurement_uid);
+ORDER BY (measurement_uid)
+SETTINGS
+    -- These settings will buffer inserts and return without verifying that they reached disk
+    -- See: https://clickhouse.com/docs/best-practices/selecting-an-insert-strategy#asynchronous-inserts
+    async_insert=1,
+    wait_for_async_insert=0;
