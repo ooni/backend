@@ -8,7 +8,7 @@ from limits.aio.strategies import MovingWindowRateLimiter
 from prometheus_client import Counter, Histogram
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 ## We convert the previous limits by multiplying by 100, since they were previously expressed as seconds of runtime per period. Now we are expressing cost as the number of 10ms.
@@ -125,9 +125,9 @@ class RateLimiterMiddleware:
         remaining = await self.get_min_available_quota(hashed_ipaddr)
         if remaining <= 0:
             RATE_LIMIT_HITS.inc()
-            response = PlainTextResponse("Quota exceeded", 429)
             headers = MutableHeaders(scope=scope)
             headers.append("X-RateLimit-Remaining", "0")
+            response = JSONResponse({"error": "quota exceeded"}, 429, headers=headers)
             return await response(scope, receive, send)
 
         async def wrapped_send(message: Message) -> None:
