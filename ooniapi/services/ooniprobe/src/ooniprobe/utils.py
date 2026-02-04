@@ -11,6 +11,7 @@ import io
 
 from fastapi import Request
 from typing import Dict, Any
+from clickhouse_driver import Client as Clickhouse
 
 from fastapi import HTTPException
 
@@ -25,6 +26,7 @@ import httpx
 
 from .metrics import Metrics
 from .common.config import Settings
+from .common.clickhouse_utils import insert_click
 from .dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
@@ -160,11 +162,13 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
 
 
 def compare_probe_msmt_cc_asn(
+    measurement_uid : str,
     cc: str,
     asn: str,
     request: Request,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
+    clickhouse: Clickhouse
 ):
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
     Generates a metric.
@@ -172,18 +176,28 @@ def compare_probe_msmt_cc_asn(
     try:
         cc = cc.upper()
         ipaddr = extract_probe_ipaddr(request)
-        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
+        db_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
+
         if db_asn.startswith("AS"):
             db_asn = db_asn[2:]
-        if db_probe_cc == cc and db_asn == asn:
+        if db_cc == cc and db_asn == asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
-        elif db_probe_cc != cc:
+        if db_cc != cc:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        elif db_asn != asn:
+        if db_asn != asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
-    except Exception:
-        pass
+
+        if db_asn != asn or db_cc != cc:
+            insert_click(
+                clickhouse,
+                "INSERT INTO geoip_mismatch (measurement_uid, probe_cc, probe_asn, probe_cc, actual_cc, actual_asn) VALUES",
+                [(measurement_uid, cc, asn, db_cc, db_asn)],
+                max_execution_time=5
+                )
+
+    except Exception as e:
+        log.error(f"Error comparing msm cc and asn: {e}" )
 
 
 def get_first_ip(headers: str) -> str:
