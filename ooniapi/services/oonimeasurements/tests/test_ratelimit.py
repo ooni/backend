@@ -2,7 +2,6 @@ import asyncio
 from unittest.mock import patch
 
 import pytest
-from coredis.commands.function import LibraryBytesT
 from httpx import ASGITransport, AsyncClient
 from limits.aio.storage import RedisStorage
 
