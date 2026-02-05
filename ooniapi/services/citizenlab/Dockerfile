@@ -29,5 +29,5 @@ COPY --from=builder /build/src/citizenlab/common/alembic/ /app/alembic/
 COPY --from=builder /build/src/citizenlab/common/alembic.ini /app/
 RUN rm -rf /app/alembic/__pycache__
 
-CMD ["uvicorn", "citizenlab.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "citizenlab.main:app", "--host", "0.0.0.0", "--port", "8000"]
 EXPOSE 80
