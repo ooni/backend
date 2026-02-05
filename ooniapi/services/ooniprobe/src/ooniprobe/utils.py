@@ -8,6 +8,7 @@ import itertools
 import logging
 from typing import List, TypedDict, Tuple
 import io
+import json
 
 from fastapi import Request
 from typing import Dict, Any
@@ -188,11 +189,16 @@ def compare_probe_msmt_cc_asn(
         if db_asn != asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
-        if db_asn != asn or db_cc != cc: 
+        if db_asn != asn or db_cc != cc:
+            details = json.dumps({
+                    "submission_cc": cc,
+                    "submission_asn": int(asn),
+                })
+
             insert_click(
                 clickhouse,
-                "INSERT INTO geoip_mismatch (measurement_uid, probe_cc, probe_asn, actual_cc, actual_asn) VALUES",
-                [(measurement_uid, cc, int(asn), db_cc, int(db_asn))],
+                "INSERT INTO faulty_measurements (measurement_uid, type, probe_cc, probe_asn, details) VALUES",
+                [(measurement_uid, "geoip", db_cc, int(db_asn), details)],
                 max_execution_time=5,
             )
 

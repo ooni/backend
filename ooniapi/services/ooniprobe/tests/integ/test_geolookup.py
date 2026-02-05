@@ -1,8 +1,9 @@
 from typing import Tuple
+import json
 import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
-from ooniprobe.common.clickhouse_utils import query_click, query_click_one_row
+from ooniprobe.common.clickhouse_utils import query_click_one_row
 from clickhouse_driver import Client as Clickhouse
 from ..utils import postj
 
@@ -96,7 +97,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     rid = c["report_id"]
 
     # Clear table before starting
-    clickhouse_db.execute("TRUNCATE TABLE geoip_mismatch")
+    clickhouse_db.execute("TRUNCATE TABLE faulty_measurements")
 
     body = {"format": "json", "content": {}}
 
@@ -109,7 +110,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     )
     r = query_click_one_row(
         clickhouse_db,
-        "SELECT count(*) as total FROM geoip_mismatch",
+        "SELECT count(*) as total FROM faulty_measurements",
         {},
     )
 
@@ -124,7 +125,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     )
     r = query_click_one_row(
         clickhouse_db,
-        "SELECT count(*) as total FROM geoip_mismatch",
+        "SELECT count(*) as total FROM faulty_measurements",
         {},
     )
     assert r and r["total"] == 1, r
@@ -139,7 +140,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     )
     r = query_click_one_row(
         clickhouse_db,
-        "SELECT count(*) as total FROM geoip_mismatch",
+        "SELECT count(*) as total FROM faulty_measurements",
         {},
     )
     assert r and r["total"] == 2, r
@@ -154,7 +155,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     )
     r = query_click_one_row(
         clickhouse_db,
-        "SELECT count(*) as total FROM geoip_mismatch",
+        "SELECT count(*) as total FROM faulty_measurements",
         {},
     )
     assert r and r["total"] == 3, r
@@ -162,8 +163,8 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
 
 def check_mismatch(
     clickhouse_db : Clickhouse,
-    probe_cc: str,
-    probe_asn: int,
+    submission_cc: str,
+    submission_asn: int,
     actual_cc: str,
     actual_asn: int,
 ):
@@ -171,14 +172,16 @@ def check_mismatch(
         clickhouse_db,
         """
         SELECT *
-        FROM geoip_mismatch
+        FROM faulty_measurements
         ORDER BY time DESC
         LIMIT 1
         """,
         {},
     )
     assert row is not None
-    assert row["probe_cc"] == probe_cc
-    assert row["probe_asn"] == probe_asn
-    assert row["actual_cc"] == actual_cc
-    assert row["actual_asn"] == actual_asn
+    assert row["type"] == "geoip"
+    assert row["probe_cc"] == actual_cc
+    assert row["probe_asn"] == actual_asn
+    details = json.loads(row["details"])
+    assert details["submission_cc"] == submission_cc
+    assert details["submission_asn"] == submission_asn
