@@ -17,18 +17,22 @@ THIS_DIR = Path(__file__).parent.resolve()
 
 
 @pytest.fixture
-def app(db):
+def app(db, valkey_server):
     app = create_app()
 
-    app.dependency_overrides[get_settings] = make_override_get_settings(
+    settings_override = make_override_get_settings(
+        valkey_url=valkey_server,
         clickhouse_url=db,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
         account_id_hashing_key="super_secure",
     )
+    with patch("oonimeasurements.common.dependencies.get_settings") as mocked_gs:
+        mocked_gs.return_value = settings_override()
+        app.dependency_overrides[get_settings] = settings_override
 
-    setup_router(app)
-    return app
+        setup_router(app)
+        yield app
 
 
 def get_file_path(file_path: str):
@@ -93,10 +97,7 @@ def valkey_server(docker_ip, docker_services):
     docker_services.wait_until_responsive(
         timeout=30.0, pause=1.0, check=lambda: is_valkey_running(url)
     )
-
-    with patch("oonimeasurements.common.dependencies.get_settings") as mocked_gs:
-        mocked_gs.return_value = make_override_get_settings(valkey_url=url)()
-        yield url
+    yield url
 
 
 def run_migration(path: Path, click: ClickhouseClient):
