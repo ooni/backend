@@ -3,6 +3,7 @@ import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.common.clickhouse_utils import query_click, query_click_one_row
+from clickhouse_driver import Client as Clickhouse
 from ..utils import postj
 
 def fake_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
@@ -62,10 +63,10 @@ def patched_lookup_probe_cc(ipaddr: str, cc_reader) -> str:
 
 def patched_lookup_probe_network(ipaddr: str, asn_reader) -> Tuple[str, str]:
     d = {
-        "123.123.123.123": ("AS65550", "Testing Networks"),
-        "123.123.123.124": ("AS65550", "Testing Networks"),
-        "123.123.123.125": ("AS65551", "Testing Networks"),
-        "123.123.123.126": ("AS65551", "Testing Networks"),
+        "123.123.123.123": ("AS65550", "Testing VE"),
+        "123.123.123.124": ("AS65550", "Testing VE 2"),
+        "123.123.123.125": ("AS65551", "Testing US"),
+        "123.123.123.126": ("AS65551", "Testing US 2"),
     }
 
     return d.get(ipaddr, ("AS0", ""))
@@ -97,11 +98,13 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     # Clear table before starting
     clickhouse_db.execute("TRUNCATE TABLE geoip_mismatch")
 
+    body = {"format": "json", "content": {}}
+
     # matching cc and asn
     postj(
         client,
         f"/report/{rid}",
-        {"format": "json", "content": {}},
+        body,
         headers={"X-Forwarded-For": "123.123.123.123"},
     )
     r = query_click_one_row(
@@ -116,7 +119,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     postj(
         client,
         f"/report/{rid}",
-        {"format": "json", "content": {}},
+        body,
         headers={"X-Forwarded-For": "123.123.123.124"},
     )
     r = query_click_one_row(
@@ -125,12 +128,13 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         {},
     )
     assert r and r["total"] == 1, r
+    check_mismatch(clickhouse_db, "VE", 65550, "US", 65550)
 
     # ASN mismatch only
     postj(
         client,
         f"/report/{rid}",
-        {"format": "json", "content": {}},
+        body,
         headers={"X-Forwarded-For": "123.123.123.125"},
     )
     r = query_click_one_row(
@@ -139,12 +143,13 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         {},
     )
     assert r and r["total"] == 2, r
+    check_mismatch(clickhouse_db, "VE", 65550, "VE", 65551)
 
     # both cc and ASN mismatch
     postj(
         client,
         f"/report/{rid}",
-        {"format": "json", "content": {}},
+        body,
         headers={"X-Forwarded-For": "123.123.123.126"},
     )
     r = query_click_one_row(
@@ -153,3 +158,27 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         {},
     )
     assert r and r["total"] == 3, r
+    check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
+
+def check_mismatch(
+    clickhouse_db : Clickhouse,
+    probe_cc: str,
+    probe_asn: int,
+    actual_cc: str,
+    actual_asn: int,
+):
+    row = query_click_one_row(
+        clickhouse_db,
+        """
+        SELECT *
+        FROM geoip_mismatch
+        ORDER BY time DESC
+        LIMIT 1
+        """,
+        {},
+    )
+    assert row is not None
+    assert row["probe_cc"] == probe_cc
+    assert row["probe_asn"] == probe_asn
+    assert row["actual_cc"] == actual_cc
+    assert row["actual_asn"] == actual_asn

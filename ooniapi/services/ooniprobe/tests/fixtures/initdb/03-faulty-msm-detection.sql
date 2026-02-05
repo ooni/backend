@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS default.geoip_mismatch
     `probe_asn` UInt32,
     -- geoip lookup result
     `actual_cc` String,
-    `actual_asn` UInt32
+    `actual_asn` UInt32,
+    `time` DateTime DEFAULT now()
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_uid)
