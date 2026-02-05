@@ -4,13 +4,13 @@
 CREATE TABLE IF NOT EXISTS default.geoip_mismatch
 (
     `measurement_uid` String,
+    `time` DateTime DEFAULT now(),
     -- reported by the probe
     `probe_cc` String,
     `probe_asn` UInt32,
     -- geoip lookup result
     `actual_cc` String,
-    `actual_asn` UInt32,
-    `time` DateTime DEFAULT now()
+    `actual_asn` UInt32
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_uid)
