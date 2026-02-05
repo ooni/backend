@@ -1,18 +1,38 @@
-from pathlib import Path
-import pytest
-
-import requests
 import time
-import jwt
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
+import jwt
+import pytest
+import requests
+import valkey
 from clickhouse_driver import Client as ClickhouseClient
+from fastapi.testclient import TestClient
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
-from oonimeasurements.main import app
+from oonimeasurements.main import create_app, setup_router
 
 THIS_DIR = Path(__file__).parent.resolve()
+
+
+@pytest.fixture
+def app(db, valkey_server):
+    app = create_app()
+
+    settings_override = make_override_get_settings(
+        valkey_url=valkey_server,
+        clickhouse_url=db,
+        jwt_encryption_key="super_secure",
+        prometheus_metrics_password="super_secure",
+        account_id_hashing_key="super_secure",
+    )
+    with patch("oonimeasurements.common.dependencies.get_settings") as mocked_gs:
+        mocked_gs.return_value = settings_override()
+        app.dependency_overrides[get_settings] = settings_override
+
+        setup_router(app)
+        yield app
 
 
 def get_file_path(file_path: str):
@@ -60,6 +80,26 @@ def clickhouse_server(maybe_download_fixtures, docker_ip, docker_services):
     yield url
 
 
+def is_valkey_running(url):
+    time.sleep(2)
+    try:
+        conn = valkey.from_url(url)
+        conn.ping()
+        return True
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+def valkey_server(docker_ip, docker_services):
+    port = docker_services.port_for("valkey", 6379)
+    url = f"valkey://localhost:{port}"
+    docker_services.wait_until_responsive(
+        timeout=30.0, pause=1.0, check=lambda: is_valkey_running(url)
+    )
+    yield url
+
+
 def run_migration(path: Path, click: ClickhouseClient):
     sql_no_comment = "\n".join(
         filter(lambda x: not x.startswith("--"), path.read_text().split("\n"))
@@ -101,7 +141,7 @@ def make_override_get_settings(**kw):
 
 
 @pytest.fixture
-def client_with_bad_settings():
+def client_with_bad_settings(app):
     app.dependency_overrides[get_settings] = make_override_get_settings(
         clickhouse_url="clickhouse://badhost:9000"
     )
@@ -111,14 +151,7 @@ def client_with_bad_settings():
 
 
 @pytest.fixture
-def client(db):
-    app.dependency_overrides[get_settings] = make_override_get_settings(
-        clickhouse_url=db,
-        jwt_encryption_key="super_secure",
-        prometheus_metrics_password="super_secure",
-        account_id_hashing_key="super_secure",
-    )
-
+def client(app):
     client = TestClient(app)
     yield client
 
@@ -143,7 +176,6 @@ def create_session_token(account_id: str, role: str) -> str:
 
 @pytest.fixture
 def client_with_user_role(client):
-    client = TestClient(app)
     jwt_token = create_session_token("0" * 16, "user")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
@@ -151,7 +183,6 @@ def client_with_user_role(client):
 
 @pytest.fixture
 def client_with_admin_role(client):
-    client = TestClient(app)
     jwt_token = create_session_token("0" * 16, "admin")
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
