@@ -188,13 +188,13 @@ def compare_probe_msmt_cc_asn(
         if db_asn != asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
-        if db_asn != asn or db_cc != cc:
+        if db_asn != asn or db_cc != cc: 
             insert_click(
                 clickhouse,
-                "INSERT INTO geoip_mismatch (measurement_uid, probe_cc, probe_asn, probe_cc, actual_cc, actual_asn) VALUES",
-                [(measurement_uid, cc, asn, db_cc, db_asn)],
-                max_execution_time=5
-                )
+                "INSERT INTO geoip_mismatch (measurement_uid, probe_cc, probe_asn, actual_cc, actual_asn) VALUES",
+                [(measurement_uid, cc, int(asn), db_cc, int(db_asn))],
+                max_execution_time=5,
+            )
 
     except Exception as e:
         log.error(f"Error comparing msm cc and asn: {e}" )
