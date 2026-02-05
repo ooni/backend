@@ -160,7 +160,6 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    compare_probe_msmt_cc_asn(msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse)
 
     # Use exponential back off with jitter between retries
     N_RETRIES = 3
@@ -172,6 +171,8 @@ async def receive_measurement(
                 resp = await client.post(url, content=data, timeout=59)
 
             assert resp.status_code == 200, resp.content
+
+            compare_probe_msmt_cc_asn(msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse)
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
