@@ -67,6 +67,7 @@ async def test_10_per_minute(valkey_server, app):
         RateLimiterMiddleware,
         valkey_url=valkey_server,
         rate_limits="10/minute;10000/day;13000/7day",
+        whitelisted_ipaddrs=["123.45.6.7"],
     )
 
     @app.get("/slow_response")
@@ -78,7 +79,7 @@ async def test_10_per_minute(valkey_server, app):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         prev_quota = 10
-        for i in range(3):
+        for _ in range(3):
             resp = await client.get(
                 "/slow_response", headers={"X-Forwarded-For": "127.0.0.1"}
             )
@@ -86,3 +87,11 @@ async def test_10_per_minute(valkey_server, app):
             assert (prev_quota - limit_remaining) > 1
             assert resp.status_code == 200
             prev_quota = limit_remaining
+
+        for _ in range(5):
+            resp = await client.get(
+                "/version", headers={"X-Forwarded-For": "123.45.6.7"}
+            )
+            # no rate limit, no header
+            assert "x-ratelimit-remaining" not in resp.headers.keys()
+            assert resp.status_code == 200
