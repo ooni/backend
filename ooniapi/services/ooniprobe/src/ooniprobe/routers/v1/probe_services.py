@@ -854,6 +854,7 @@ async def submit_measurement(
     settings: SettingsDep,
     s3_client: S3ClientDep,
     manifest: ManifestDep,
+    clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
     """
@@ -947,7 +948,6 @@ async def submit_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
     N_RETRIES = 3
@@ -959,6 +959,8 @@ async def submit_measurement(
                 resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
+
+            compare_probe_msmt_cc_asn(msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse)
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
                 is_verified=is_verified,
