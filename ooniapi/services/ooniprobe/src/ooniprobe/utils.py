@@ -193,12 +193,13 @@ def compare_probe_msmt_cc_asn(
             details = json.dumps({
                     "submission_cc": cc,
                     "submission_asn": int(asn),
+                    "measurement_uid": measurement_uid,
                 })
 
             insert_click(
                 clickhouse,
-                "INSERT INTO faulty_measurements (measurement_uid, type, probe_cc, probe_asn, details) VALUES",
-                [(measurement_uid, "geoip", db_cc, int(db_asn), details)],
+                "insert into faulty_measurements (type, probe_cc, probe_asn, details) values",
+                [("geoip", db_cc, int(db_asn), details)],
                 max_execution_time=5,
             )
 
