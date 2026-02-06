@@ -123,4 +123,6 @@ app.add_middleware(
     valkey_url=settings.valkey_url,
     hashing_key=settings.account_id_hashing_key,
     rate_limits=settings.rate_limits,
+    whitelisted_ipaddrs=settings.rate_limits_whitelisted_ipaddrs,
+    unmetered_pages=settings.rate_limits_unmetered_pages,
 )

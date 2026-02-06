@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     session_expiry_days: int = 10
     login_expiry_days: int = 10
     rate_limits: str = "10/minute;400000/day;200000/7day"
+    rate_limits_whitelisted_ipaddrs: List[str] = []
+    rate_limits_unmetered_pages: List[str] = []
 
     admin_emails: List[str] = [
         "admin@ooni.org",
