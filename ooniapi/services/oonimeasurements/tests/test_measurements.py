@@ -220,13 +220,13 @@ def test_measurements_order_by_invalid_value_422(client):
     Tests that invalid `order_by` values return 422 status code,
     and valid `order_by` values return 200 status code
     """
-    invalid_values = ["invalid_field", "random_field", "test_start_time", "nonexistent"]
+    invalid_values = ["probe_cc", "probe_asn", "test_start_time", "nonexistent"]
 
     for invalid_value in invalid_values:
         resp = client.get("/api/v1/measurements", params={"order_by": invalid_value, "since": SINCE})
         assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
 
-    valid_values = ["measurement_start_time"]
+    valid_values = ["measurement_start_time", "measurement_uid"]
 
     for valid_value in valid_values:
         resp = client.get("/api/v1/measurements", params={"order_by": valid_value, "since": SINCE})
