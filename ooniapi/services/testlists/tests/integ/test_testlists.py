@@ -15,7 +15,7 @@ import pytest
 
 # debdeps: python3-pytest-mock
 
-import citizenlab.manager
+import testlists.manager
 
 
 def test_no_auth(client):
@@ -217,10 +217,10 @@ def mock_requests_open(monkeypatch):
         print(kw)
         return MKOpen()
 
-    monkeypatch.setattr(citizenlab.manager.URLListManager, "_push_to_repo", push)
-    monkeypatch.setattr(citizenlab.manager.requests, "post", req)
-    monkeypatch.setattr(citizenlab.manager.requests, "patch", req)
-    monkeypatch.setattr(citizenlab.manager.requests, "get", req)
+    monkeypatch.setattr(testlists.manager.URLListManager, "_push_to_repo", push)
+    monkeypatch.setattr(testlists.manager.requests, "post", req)
+    monkeypatch.setattr(testlists.manager.requests, "patch", req)
+    monkeypatch.setattr(testlists.manager.requests, "get", req)
 
 
 @pytest.fixture
@@ -235,14 +235,14 @@ def mock_requests_closed(monkeypatch):
         print(kw)
         return MKClosed()
 
-    monkeypatch.setattr(citizenlab.manager.URLListManager, "_push_to_repo", push)
-    monkeypatch.setattr(citizenlab.manager.requests, "post", req)
-    monkeypatch.setattr(citizenlab.manager.requests, "patch", req)
-    monkeypatch.setattr(citizenlab.manager.requests, "get", req)
+    monkeypatch.setattr(testlists.manager.URLListManager, "_push_to_repo", push)
+    monkeypatch.setattr(testlists.manager.requests, "post", req)
+    monkeypatch.setattr(testlists.manager.requests, "patch", req)
+    monkeypatch.setattr(testlists.manager.requests, "get", req)
 
 
 def _read_us_csv_file(tmp_path):
-    # read from user repo path: citizenlab.py get_user_repo_path
+    # read from user repo path: testlists.py get_user_repo_path
     account_id = "0" * 16
     f = tmp_path / "users" / account_id / "test-lists/lists/us.csv"
     return f.read_text().splitlines()

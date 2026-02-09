@@ -8,14 +8,14 @@ from pydantic import Field
 from sqlalchemy import sql
 
 # Local imports
-from citizenlab.common.auth import get_account_id_or_raise
-from citizenlab.common.dependencies import role_required
-from citizenlab.common.errors import *
-from citizenlab.common.clickhouse_utils import query_click, query_click_one_row, insert_click
-from citizenlab.common.routers import BaseModel
-from citizenlab.common.utils import setnocacheresponse
-from citizenlab.dependencies import SettingsDep, ClickhouseDep
-from citizenlab.manager import get_url_list_manager
+from testlists.common.auth import get_account_id_or_raise
+from testlists.common.dependencies import role_required
+from testlists.common.errors import *
+from testlists.common.clickhouse_utils import query_click, query_click_one_row, insert_click
+from testlists.common.routers import BaseModel
+from testlists.common.utils import setnocacheresponse
+from testlists.dependencies import SettingsDep, ClickhouseDep
+from testlists.manager import get_url_list_manager
 
 
 router = APIRouter()
@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 
 URL prioritization: uses the url_priorities table.
 It contains rules on category_code, cc, domain and url to assign priorities.
-Values can be wildcards "*". A citizenlab entry can match multiple rules.
+Values can be wildcards "*". A testlists entry can match multiple rules.
 """
 
 
@@ -70,7 +70,7 @@ class TestListResponse(BaseModel):
 @router.get(
     "/_/url-submission/test-list/{country_code}",
     response_model=TestListResponse,
-    tags=["citizenlab"],
+    tags=["testlists"],
     dependencies=[Depends(role_required(["admin", "user"]))],
 )
 async def get_test_list_meta(
@@ -79,7 +79,7 @@ async def get_test_list_meta(
     settings: SettingsDep,
     country_code: str,
     ) -> TestListResponse:
-    """Fetch citizenlab URL list and additional metadata.
+    """Fetch testlists URL list and additional metadata.
 
     - **country_code**: 2-letter country code or "global".
     """
@@ -122,7 +122,7 @@ async def get_test_list_meta(
 
 @router.get(
     "/_/url-priorities/list",
-    tags=["citizenlab"],
+    tags=["testlists"],
     response_model=ListUrlPriorityResponse,
 )
 def list_url_priorities(
@@ -254,7 +254,7 @@ def update_url_priority_click(clickhouse, old: dict, new: dict):
 
 @router.post(
     "/_/url-priorities/update",
-    tags=["citizenlab"],
+    tags=["testlists"],
     response_model=int,
     dependencies=[Depends(role_required(["admin"]))],
 )

@@ -6,14 +6,14 @@ from pydantic import Field
 from typing import Optional
 
 # Local imports
-from citizenlab.common.auth import get_account_id_or_raise
-from citizenlab.common.dependencies import role_required
-from citizenlab.common.errors import *
-from citizenlab.common.routers import BaseModel
-from citizenlab.common.utils import setnocacheresponse
-from citizenlab.dependencies import SettingsDep
-from citizenlab.manager import validate_entry, get_url_list_manager
-from citizenlab.routers.admin import Entry
+from testlists.common.auth import get_account_id_or_raise
+from testlists.common.dependencies import role_required
+from testlists.common.errors import *
+from testlists.common.routers import BaseModel
+from testlists.common.utils import setnocacheresponse
+from testlists.dependencies import SettingsDep
+from testlists.manager import validate_entry, get_url_list_manager
+from testlists.routers.admin import Entry
 
 router = APIRouter(prefix="/v1")
 
@@ -37,7 +37,7 @@ class UrlSubmissionResponse(BaseModel):
 
 @router.post(
     "/url-submission/submit",
-    tags=["citizenlab"],
+    tags=["testlists"],
     dependencies=[Depends(role_required(["admin", "user"]))],
 )
 async def post_propose_changes(
@@ -58,7 +58,7 @@ async def post_propose_changes(
     except Exception:
         raise HTTPException(detail="Authentication required", status_code=401)
 
-    log.info("submitting citizenlab changes")
+    log.info("submitting testlists changes")
 
     try:
         ulm = get_url_list_manager(settings, account_id)
@@ -79,7 +79,7 @@ async def post_propose_changes(
 
 @router.post(
     "/url-submission/update-url",
-    tags=["citizenlab"],
+    tags=["testlists"],
     dependencies=[Depends(role_required(["admin", "user"]))],
 )
 async def url_submission_update_url(

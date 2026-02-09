@@ -1,4 +1,4 @@
-SERVICE_NAME ?= citizenlab
+SERVICE_NAME ?= testlists
 
 ECS_CONTAINER_NAME ?= ooniapi-service-$(SERVICE_NAME)
 IMAGE_NAME ?= ooni/api-$(SERVICE_NAME)

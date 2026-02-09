@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "citizenlab"
+name = "testlists"
 description = ''
 dynamic = ["version"]
 
@@ -57,13 +57,13 @@ Issues = "https://github.com/ooni/backend/issues"
 Source = "https://github.com/ooni/backend"
 
 [tool.hatch.version]
-path = "src/citizenlab/__about__.py"
+path = "src/testlists/__about__.py"
 
 [tool.hatch.build.targets.sdist]
 include = ["BUILD_LABEL"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/citizenlab"]
+packages = ["src/testlists"]
 artifacts = ["BUILD_LABEL"]
 
 [tool.hatch.envs.default]
@@ -92,11 +92,11 @@ addopts = ["--import-mode=importlib"]
 [tool.coverage.run]
 branch = true
 parallel = true
-source_pkgs = ["citizenlab", "tests"]
-omit = ["src/citizenlab/common/*", "src/citizenlab/__about__.py"]
+source_pkgs = ["testlists", "tests"]
+omit = ["src/testlists/common/*", "src/testlists/__about__.py"]
 
 [tool.coverage.paths]
-citizenlab = ["src/citizenlab"]
+testlists = ["src/testlists"]
 tests = ["tests"]
 
 [tool.coverage.report]

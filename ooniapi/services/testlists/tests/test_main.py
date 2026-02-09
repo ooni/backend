@@ -2,7 +2,7 @@ import pytest
 
 import httpx
 from fastapi.testclient import TestClient
-from citizenlab.main import lifespan, app
+from testlists.main import lifespan, app
 
 
 def test_health_good(client):

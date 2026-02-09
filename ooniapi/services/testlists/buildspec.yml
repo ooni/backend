@@ -1,7 +1,7 @@
 version: 0.2
 env:
   variables:
-    OONI_CODE_PATH: ooniapi/services/citizenlab
+    OONI_CODE_PATH: ooniapi/services/testlists
     DOCKERHUB_SECRET_ID: oonidevops/dockerhub/access_token
 
 phases:

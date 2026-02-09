@@ -13,18 +13,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from clickhouse_driver import Client as ClickhouseClient
 
-from citizenlab.common.clickhouse_utils import query_click, insert_click, optimize_table
-from citizenlab.common.config import Settings
-from citizenlab.common.dependencies import get_settings
-from citizenlab.dependencies import get_s3_client
-from citizenlab.main import app
+from testlists.common.clickhouse_utils import query_click, insert_click, optimize_table
+from testlists.common.config import Settings
+from testlists.common.dependencies import get_settings
+from testlists.dependencies import get_s3_client
+from testlists.main import app
 
 log = logging.getLogger(__name__)
 
 @pytest.fixture()
-def citizenlab_tblready(clickhouse_db):
-    # Ensure the citizenlab table is populated
-    r = query_click(clickhouse_db, "SELECT count() FROM citizenlab", {})[0]
+def testlists_tblready(clickhouse_db):
+    # Ensure the testlists table is populated
+    r = query_click(clickhouse_db, "SELECT count() FROM testlists", {})[0]
     assert len(r) > 2
 
 
@@ -137,7 +137,7 @@ def alembic_migration(pg_url):
     migrations_path = (
         Path(__file__).parent.parent
         / "src"
-        / "citizenlab"
+        / "testlists"
         / "common"
         / "alembic"
     ).resolve()

@@ -27,7 +27,7 @@ from .__about__ import VERSION
 
 log = logging.getLogger(__name__)
 
-pkg_name = "citizenlab"
+pkg_name = "testlists"
 
 build_label = get_build_label(pkg_name)
 
@@ -70,7 +70,7 @@ async def ooni_exception_handler(request, exc: BaseOONIException):
     return JSONResponse(status_code=exc.status_code, content=content)
 
 instrumentor = Instrumentator().instrument(
-    app, metric_namespace="ooniapi", metric_subsystem="citizenlab"
+    app, metric_namespace="ooniapi", metric_subsystem="testlists"
 )
 
 app.add_middleware(
@@ -146,4 +146,4 @@ async def health(
 async def root():
     # TODO(art): fix this redirect by pointing health monitoring to /health
     # return RedirectResponse("/docs")
-    return {"msg": "hello from citizenlab"}
+    return {"msg": "hello from testlists"}
