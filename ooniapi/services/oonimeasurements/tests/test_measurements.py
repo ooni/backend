@@ -215,6 +215,24 @@ def test_measurements_order_by_test_start_time_forbidden(client):
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
 
 
+def test_measurements_order_by_invalid_value_422(client):
+    """
+    Tests that invalid `order_by` values return 422 status code,
+    and valid `order_by` values return 200 status code
+    """
+    invalid_values = ["invalid_field", "random_field", "test_start_time", "nonexistent"]
+
+    for invalid_value in invalid_values:
+        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value, "since": SINCE})
+        assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
+
+    valid_values = ["measurement_start_time"]
+
+    for valid_value in valid_values:
+        resp = client.get("/api/v1/measurements", params={"order_by": valid_value, "since": SINCE})
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}. Response: {resp.json()}"
+
+
 def test_measurements_limit_hard_capped(client):
     """
     Tests that the `limit` field in oonimeasurements is hard capped to 1_000_000
