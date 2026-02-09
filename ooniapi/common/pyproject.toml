@@ -21,6 +21,9 @@ dependencies = [
   "httpx ~= 0.26.0",
   "pyjwt ~= 2.8.0",
   "alembic ~= 1.13.1",
+  "limits[async-valkey]",
+  "valkey",
+  "starlette",
 ]
 readme = "README.md"
 requires-python = ">=3.8"
