@@ -226,7 +226,7 @@ def test_measurements_order_by_invalid_value_422(client):
         resp = client.get("/api/v1/measurements", params={"order_by": invalid_value, "since": SINCE})
         assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
 
-    valid_values = ["measurement_start_time", "measurement_uid"]
+    valid_values = ["measurement_start_time"]
 
     for valid_value in valid_values:
         resp = client.get("/api/v1/measurements", params={"order_by": valid_value, "since": SINCE})

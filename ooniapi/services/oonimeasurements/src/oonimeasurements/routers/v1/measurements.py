@@ -564,7 +564,6 @@ def genurl(base_url: str, path: str, **kw) -> str:
 
 class OrderBy(str, Enum):
     measurement_start_time = "measurement_start_time"
-    measurement_uid = "measurement_uid"
 
 
 @router.get("/v1/measurements")
