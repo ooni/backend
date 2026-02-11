@@ -1,5 +1,6 @@
 from typing import Tuple
 import json
+import time
 import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
@@ -108,6 +109,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         body,
         headers={"X-Forwarded-For": "123.123.123.123"},
     )
+    time.sleep(0.1)  # Allow async insert to complete
     r = query_click_one_row(
         clickhouse_db,
         "SELECT count(*) as total FROM faulty_measurements",
@@ -123,6 +125,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         body,
         headers={"X-Forwarded-For": "123.123.123.124"},
     )
+    time.sleep(0.1)  # Allow async insert to complete
     r = query_click_one_row(
         clickhouse_db,
         "SELECT count(*) as total FROM faulty_measurements",
@@ -138,6 +141,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         body,
         headers={"X-Forwarded-For": "123.123.123.125"},
     )
+    time.sleep(0.1)  # Allow async insert to complete
     r = query_click_one_row(
         clickhouse_db,
         "SELECT count(*) as total FROM faulty_measurements",
@@ -153,6 +157,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         body,
         headers={"X-Forwarded-For": "123.123.123.126"},
     )
+    time.sleep(0.1)  # Allow async insert to complete
     r = query_click_one_row(
         clickhouse_db,
         "SELECT count(*) as total FROM faulty_measurements",
