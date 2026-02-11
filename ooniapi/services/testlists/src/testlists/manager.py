@@ -154,6 +154,7 @@ class URLListManager:
             git.clone(url, self.repo_dir, branch="master")
 
             # Create a remote for push access
+            log.info(f"Adding {self.push_repo} repository")
             remote_url = f"https://{self.github_user}:{self.github_token}@github.com/{self.push_repo}.git"
             git.remote_add(self.repo_dir, "rworigin", remote_url)
 
@@ -508,9 +509,11 @@ class URLListManager:
         return j["state"] != "open"
 
     def _push_to_repo(self, account_id):
-        log.debug("pushing branch to GitHub")
         with git.Repo(self.repo_dir) as repo:
-            git.push(repo, "rworigin", self._get_user_branchname(account_id), force=True)
+            branch_name = self._get_user_branchname(account_id)
+            log.debug(f"pushing {branch_name} to GitHub")
+            refspec = f"refs/heads/{branch_name}:refs/heads/{branch_name}"
+            git.push(repo, "rworigin", refspecs=[refspec], force=True)
 
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
