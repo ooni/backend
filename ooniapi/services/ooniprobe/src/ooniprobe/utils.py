@@ -198,7 +198,13 @@ def compare_probe_msmt_cc_asn(
 
             insert_click(
                 clickhouse,
-                "insert into faulty_measurements (type, probe_cc, probe_asn, details) values",
+                """
+                INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
+                SETTINGS
+                    async_insert=1,
+                    wait_for_async_insert=0
+                VALUES
+                """,
                 [("geoip", db_cc, int(db_asn), details)],
                 max_execution_time=5,
             )
