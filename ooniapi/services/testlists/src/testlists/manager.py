@@ -515,8 +515,21 @@ class URLListManager:
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
         log.debug("proposing changes")
-        self._push_to_repo(account_id)
-        pr_id = self._open_pr(self._get_user_branchname(account_id))
+        try:
+            self._push_to_repo(account_id)
+        except Exception as e:
+            log.error(f"Failed to push to repo {e}")
+            return ""
+        try:
+            branch_name = self._get_user_branchname(account_id)
+        except Exception as e:
+            log error(f"Failed to get branch name {e}")
+            return ""
+        try:
+            pr_id = self._open_pr(branch_name)
+        except Exception as e:
+            log error(f"Failed to open pr for {branch_name} {e}")
+            return ""
         self._set_pr_id(account_id, pr_id)
         self._set_state(account_id, "PR_OPEN")
         return pr_id
