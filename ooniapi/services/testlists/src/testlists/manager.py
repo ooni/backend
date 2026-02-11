@@ -523,12 +523,12 @@ class URLListManager:
         try:
             branch_name = self._get_user_branchname(account_id)
         except Exception as e:
-            log error(f"Failed to get branch name {e}")
+            log.error(f"Failed to get branch name {e}")
             return ""
         try:
             pr_id = self._open_pr(branch_name)
         except Exception as e:
-            log error(f"Failed to open pr for {branch_name} {e}")
+            log.error(f"Failed to open pr for {branch_name} {e}")
             return ""
         self._set_pr_id(account_id, pr_id)
         self._set_state(account_id, "PR_OPEN")
