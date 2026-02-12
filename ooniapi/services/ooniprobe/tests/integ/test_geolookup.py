@@ -178,7 +178,7 @@ def check_mismatch(
         """
         SELECT *
         FROM faulty_measurements
-        ORDER BY time DESC
+        ORDER BY ts DESC
         LIMIT 1
         """,
         {},
