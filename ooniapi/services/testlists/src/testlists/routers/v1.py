@@ -13,7 +13,6 @@ from testlists.common.routers import BaseModel
 from testlists.common.utils import setnocacheresponse
 from testlists.dependencies import SettingsDep
 from testlists.manager import validate_entry, get_url_list_manager
-from testlists.routers.admin import Entry
 
 router = APIRouter(prefix="/v1")
 
@@ -22,17 +21,6 @@ log = logging.getLogger(__name__)
 
 class PullRequestResponse(BaseModel):
     pr_id: str
-
-
-class UrlSubmissionUpdateRequest(BaseModel):
-    country_code: str = Field(..., description="The country code for the submission.")
-    comment: str = Field(..., description="Comment regarding the submission.")
-    old_entry: Optional[Entry] = Field(None, description="The old entry to validate against.")
-    new_entry: Optional[Entry] = Field(None, description="New entry to create or update.")
-
-
-class UrlSubmissionResponse(BaseModel):
-    updated_entry: Optional[Entry] = Field(None, description="The updated URL entry after processing.")
 
 
 @router.post(
@@ -75,6 +63,25 @@ async def post_propose_changes(
     except Exception as e:
         log.error(f"Unexpected exception occurred: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+class Entry(BaseModel):
+    category_code: str = Field(description="Category code of the URL entry.")
+    url: Optional[str] = Field("", description="The URL to be submitted.")
+    date_added: str = Field(description="Date when the entry was added.")
+    notes: str = Field(description="Any additional notes regarding the entry.")
+    source: str = Field(description="Any additional notes regarding the entry.")
+
+
+class UrlSubmissionUpdateRequest(BaseModel):
+    country_code: str = Field(..., description="The country code for the submission.")
+    comment: str = Field(..., description="Comment regarding the submission.")
+    old_entry: Optional[Entry] = Field(None, description="The old entry to validate against.")
+    new_entry: Optional[Entry] = Field(None, description="New entry to create or update.")
+
+
+class UrlSubmissionResponse(BaseModel):
+    updated_entry: Optional[Entry] = Field(None, description="The updated URL entry after processing.")
 
 
 @router.post(
