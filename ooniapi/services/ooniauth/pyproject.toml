@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
   "fastapi ~= 0.108.0",
+  "boto3 ~= 1.39.3",
   "clickhouse-driver ~= 0.2.6",
   "sqlalchemy ~= 2.0.27",
   "ujson ~= 5.9.0",
