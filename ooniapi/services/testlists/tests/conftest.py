@@ -16,7 +16,6 @@ from clickhouse_driver import Client as ClickhouseClient
 from testlists.common.clickhouse_utils import query_click, insert_click, optimize_table
 from testlists.common.config import Settings
 from testlists.common.dependencies import get_settings
-from testlists.dependencies import get_s3_client
 from testlists.main import app
 
 log = logging.getLogger(__name__)
@@ -181,7 +180,6 @@ def fixture_path():
 @pytest.fixture
 def client(clickhouse_server, test_settings):
     app.dependency_overrides[get_settings] = test_settings
-    app.dependency_overrides[get_s3_client] = get_s3_client_mock
     # lifespan won't run so do this here to have the DB
     client = TestClient(app)
     yield client
@@ -276,8 +274,6 @@ class S3ClientMock:
     def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
         self.files.append(f"{Bucket}/{Key}")
 
-def get_s3_client_mock() -> S3ClientMock:
-    return S3ClientMock()
 
 @pytest.fixture(scope="session")
 def fastpath_server(docker_ip, docker_services):
