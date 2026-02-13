@@ -32,6 +32,7 @@ dependencies = [
   "zstd ~= 1.5.7.2",
   "boto3 ~= 1.39.3",
   "boto3-stubs[s3] ~= 1.39.3"
+  "mypy-boto3-s3 ~= 1.39.5",
 ]
 
 readme = "README.md"
