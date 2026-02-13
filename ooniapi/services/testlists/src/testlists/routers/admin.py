@@ -9,12 +9,11 @@ from sqlalchemy import sql
 
 # Local imports
 from testlists.common.auth import get_account_id_or_raise
-from testlists.common.dependencies import role_required
+from testlists.common.dependencies import role_required, SettingsDep, ClickhouseDep
 from testlists.common.errors import *
 from testlists.common.clickhouse_utils import query_click, query_click_one_row, insert_click
 from testlists.common.routers import BaseModel
 from testlists.common.utils import setnocacheresponse
-from testlists.dependencies import SettingsDep, ClickhouseDep
 from testlists.manager import get_url_list_manager
 
 
@@ -140,7 +139,7 @@ def list_url_priorities(
         raise HTTPException(status_code=500, detail="An error occurred while fetching URL priorities.")
 
 
-def initialize_url_priorities_if_needed(clickhouse):
+def initialize_url_priorities_if_needed(clickhouse: ClickhouseDep):
     cntq = "SELECT count() AS cnt FROM url_priorities"
     cnt = query_click_one_row(clickhouse, sql.text(cntq), {})
     if cnt["cnt"] > 0:
@@ -210,7 +209,7 @@ def prepare_url_prio_rule_dict(d: dict):
     assert sorted(d.keys()) == ["category_code", "cc", "domain", "priority", "url"]
 
 
-def update_url_priority_click(clickhouse, old: dict, new: dict):
+def update_url_priority_click(clickhouse: ClickhouseDep, old: dict, new: dict):
     # The url_priorities table is CollapsingMergeTree
     # Both old and new might be set
     ins_sql = """INSERT INTO url_priorities

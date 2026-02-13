@@ -7,11 +7,10 @@ from typing import Optional
 
 # Local imports
 from testlists.common.auth import get_account_id_or_raise
-from testlists.common.dependencies import role_required
+from testlists.common.dependencies import role_required, SettingsDep
 from testlists.common.errors import *
 from testlists.common.routers import BaseModel
 from testlists.common.utils import setnocacheresponse
-from testlists.dependencies import SettingsDep
 from testlists.manager import validate_entry, get_url_list_manager
 
 router = APIRouter(prefix="/v1")
