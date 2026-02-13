@@ -15,7 +15,7 @@ jobs:
         run: pip install hatch
 
       - name: Run all tests
-        run: make test-cov
+        run: make test test-cov
         working-directory: ./ooniapi/services/oonirun/
 
       - name: Upload coverage to codecov
