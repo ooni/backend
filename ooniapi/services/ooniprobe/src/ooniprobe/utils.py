@@ -163,13 +163,13 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
 
 
 def compare_probe_msmt_cc_asn(
-    measurement_uid : str,
+    measurement_uid: str,
     cc: str,
     asn: str,
     request: Request,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
-    clickhouse: Clickhouse
+    clickhouse: Clickhouse,
 ):
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
     Generates a metric.
@@ -190,11 +190,13 @@ def compare_probe_msmt_cc_asn(
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
         if db_asn != asn or db_cc != cc:
-            details = json.dumps({
+            details = json.dumps(
+                {
                     "submission_cc": cc,
                     "submission_asn": int(asn),
                     "measurement_uid": measurement_uid,
-                })
+                }
+            )
 
             insert_click(
                 clickhouse,
@@ -210,7 +212,7 @@ def compare_probe_msmt_cc_asn(
             )
 
     except Exception as e:
-        log.error(f"Error comparing msm cc and asn: {e}" )
+        log.error(f"Error comparing msm cc and asn: {e}")
 
 
 def get_first_ip(headers: str) -> str:
@@ -221,9 +223,10 @@ def get_first_ip(headers: str) -> str:
     in: '123.123.123, 1.1.1.1'
     out: '123.123.123'
     """
-    return headers.partition(',')[0]
+    return headers.partition(",")[0]
 
-def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
+
+def read_file(s3_client: S3Client, bucket: str, file: str) -> str:
     """
     Reads the content of `file` within `bucket` into a  string
 

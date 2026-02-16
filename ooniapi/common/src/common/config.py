@@ -45,21 +45,23 @@ class Settings(BaseSettings):
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
-    tor_targets: str = "" # filename of json containing Tor bridges and DirAuth endpoints
+    tor_targets: str = (
+        ""  # filename of json containing Tor bridges and DirAuth endpoints
+    )
 
     # Used to store history of all manifests and retrieve next manifest to use
     anonc_manifest_bucket: str = Field(
         default="CHANGEME",
-        description="Name of public bucket where anonymous credentials manifests are stored"
-        )
+        description="Name of public bucket where anonymous credentials manifests are stored",
+    )
     anonc_manifest_file: str = Field(
         default="CHANGEME",
-        description="Name of the manifest file within the public bucket to use for ZKP verification"
-        )
+        description="Name of the manifest file within the public bucket to use for ZKP verification",
+    )
     anonc_secret_key: str = Field(
         default="CHANGEME",
-        description="Secret key matching the specified manifest file"
-        )
+        description="Secret key matching the specified manifest file",
+    )
 
     # ooniprobe client configuration
     collectors: List[Dict[str, str]] = [

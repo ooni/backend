@@ -1,7 +1,20 @@
 import logging
 from datetime import datetime, timezone, timedelta
 import time
-from typing import Annotated, List, Optional, Any, Dict, Tuple, List, Any, Dict, Tuple, Optional, Annotated
+from typing import (
+    Annotated,
+    List,
+    Optional,
+    Any,
+    Dict,
+    Tuple,
+    List,
+    Any,
+    Dict,
+    Tuple,
+    Optional,
+    Annotated,
+)
 import random
 import ujson
 from hashlib import sha512
@@ -15,7 +28,12 @@ from prometheus_client import Counter, Info, Gauge
 from pydantic import Field, IPvAnyAddress
 from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
 from pydantic import Field, IPvAnyAddress
-from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed, ServerState
+from ooniauth_py import (
+    ProtocolError,
+    CredentialError,
+    DeserializationFailed,
+    ServerState,
+)
 import httpx
 
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -39,7 +57,11 @@ from ...utils import (
     compare_probe_msmt_cc_asn,
 )
 from ...common.utils import setcacheresponse
-from ...common.prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
+from ...common.prio import (
+    FailoverTestListDep,
+    failover_generate_test_list,
+    generate_test_list,
+)
 
 from ...dependencies import (
     ManifestDep,
@@ -693,10 +715,10 @@ class GeoLookupResponse(BaseModel):
 
 @router.post("/geolookup", tags=["ooniprobe"])
 async def geolookup(
-        data: GeoLookupRequest,
-        response: Response,
-        cc_reader: CCReaderDep,
-        asn_reader: ASNReaderDep,
+    data: GeoLookupRequest,
+    response: Response,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
 ) -> GeoLookupResponse:
 
     # initial values probe_geoip compares with
@@ -711,11 +733,14 @@ async def geolookup(
         # it doesn't seem possible to have separate aliases for (de)serialization
         if resp["probe_network_name"] is None:
             resp["probe_network_name"] = ""
-        geolocation[ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
-            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
+        geolocation[ipaddr] = GeoLookupResult(
+            cc=resp["probe_cc"],
+            asn=resp["probe_asn"],
+            as_name=resp["probe_network_name"],
+        )
 
     setnocacheresponse(response)
-    return GeoLookupResponse(geolocation = geolocation)
+    return GeoLookupResponse(geolocation=geolocation)
 
 
 class CollectorEntry(BaseModel):
@@ -739,10 +764,11 @@ def list_collectors(
 
 # -- <Anonymous Credentials> ------------------------------------
 
+
 @router.get("/manifest", tags=["anonymous_credentials"])
 def manifest(manifest: ManifestDep, response: Response) -> ManifestResponse:
     # Cache for 1 minute
-    setcacheresponse('1m', response)
+    setcacheresponse("1m", response)
     return manifest
 
 
@@ -758,15 +784,16 @@ class RegisterResponse(BaseModel):
 
 # TODO: choose a better name for this endpoint
 @router.post("/sign_credential", tags=["anonymous_credentials"])
-def sign_credential(register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep):
+def sign_credential(
+    register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep
+):
 
     if register_request.manifest_version != manifest.meta.version:
         _raise_manifest_not_found(register_request.manifest_version)
 
     protocol_state = ServerState.from_creds(
-        manifest.manifest.public_parameters,
-        settings.anonc_secret_key
-        )
+        manifest.manifest.public_parameters, settings.anonc_secret_key
+    )
 
     try:
         resp = protocol_state.handle_registration_request(
@@ -904,9 +931,8 @@ async def submit_measurement(
         submit_request.content["probe_asn"], str
     )
     protocol_state = ServerState.from_creds(
-        manifest.manifest.public_parameters,
-        settings.anonc_secret_key
-        )
+        manifest.manifest.public_parameters, settings.anonc_secret_key
+    )
 
     if submit_request.manifest_version == manifest.meta.version:
         try:
@@ -926,7 +952,9 @@ async def submit_measurement(
             is_verified = False
             submit_response = None
     else:
-        log.error(f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'")
+        log.error(
+            f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'"
+        )
         _raise_manifest_not_found(submit_request.manifest_version)
 
     data = submit_request.model_dump()
@@ -960,7 +988,9 @@ async def submit_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse)
+            compare_probe_msmt_cc_asn(
+                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            )
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
                 is_verified=is_verified,
@@ -1029,27 +1059,32 @@ async def credential_update(
     # TODO we need to find a way to keep track of older private keys to support this endpoint
     raise NotImplementedError("Credential Update is not yet implemented")
 
+
 def _raise_manifest_not_found(version: str):
-        raise HTTPException(
-            detail={
-                "error": "manifest_not_found",
-                "message": f"No manifest with version '{version}' was found",
-            },
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    raise HTTPException(
+        detail={
+            "error": "manifest_not_found",
+            "message": f"No manifest with version '{version}' was found",
+        },
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
 class TorTarget(BaseModel):
     address: str
     fingerprint: str
-    name: Optional[str] = ''
+    name: Optional[str] = ""
     protocol: str
     params: Optional[Dict[str, List[str]]] = None
 
 
-@router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
+@router.get(
+    "/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget]
+)
 def list_tor_targets(
     request: Request,
     targets: TorTargetsDep,
-    ) -> Dict[str, TorTarget]:
+) -> Dict[str, TorTarget]:
 
     token = request.headers.get("Authorization")
     if token is None:

@@ -47,7 +47,12 @@ def query_click_one_row(
     return None
 
 
-def insert_click(db: clickhouse_driver.Client, query: Query, rows: list, max_execution_time: int = 300) -> int:
+def insert_click(
+    db: clickhouse_driver.Client,
+    query: Query,
+    rows: list,
+    max_execution_time: int = 300,
+) -> int:
     assert isinstance(rows, list)
     settings = {"priority": 1, "max_execution_time": max_execution_time}  # query_prio
     return db.execute(query, rows, types_check=True, settings=settings)  # type: ignore

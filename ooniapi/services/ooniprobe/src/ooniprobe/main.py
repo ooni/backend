@@ -19,10 +19,7 @@ from .routers.v1 import probe_services
 from .routers import reports, bouncer, prio_crud
 
 from .download_geoip import try_update
-from .common.dependencies import (
-    get_settings,
-    SettingsDep
-)
+from .common.dependencies import get_settings, SettingsDep
 from .dependencies import get_manifest, S3ClientDep, PostgresSessionDep
 from .common.dependencies import ClickhouseDep
 from .common.config import Settings
@@ -53,6 +50,7 @@ async def lifespan(
         await setup_repeating_tasks(settings)
 
     yield
+
 
 async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start

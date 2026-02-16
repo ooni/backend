@@ -22,9 +22,11 @@ from ..utils import (
 
 from ..utils import error, compare_probe_msmt_cc_asn
 from ..metrics import Metrics
+
 router = APIRouter()
 
 log = logging.getLogger(__name__)
+
 
 class OpenReportRequest(BaseModel):
     """
@@ -160,7 +162,6 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-
     # Use exponential back off with jitter between retries
     N_RETRIES = 3
     for t in range(N_RETRIES):
@@ -172,7 +173,9 @@ async def receive_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse)
+            compare_probe_msmt_cc_asn(
+                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
