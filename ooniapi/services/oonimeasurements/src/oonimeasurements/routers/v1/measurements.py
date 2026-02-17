@@ -284,7 +284,6 @@ class MeasurementMeta(BaseModel):
     probe_asn: Optional[str | int] = None
     probe_cc: Optional[str] = None
     scores: Optional[str] = None
-    category_code: Optional[str] = None
     anomaly: Optional[bool] = None
     confirmed: Optional[bool] = None
     failure: Optional[bool] = None
@@ -565,10 +564,6 @@ def genurl(base_url: str, path: str, **kw) -> str:
 
 class OrderBy(str, Enum):
     measurement_start_time = "measurement_start_time"
-    input = "input"
-    probe_cc = "probe_cc"
-    probe_asn = "probe_asn"
-    test_name = "test_name"
 
 
 @router.get("/v1/measurements")

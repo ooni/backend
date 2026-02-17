@@ -786,7 +786,7 @@ class RegisterResponse(BaseModel):
 @router.post("/sign_credential", tags=["anonymous_credentials"])
 def sign_credential(
     register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep
-):
+) -> RegisterResponse:
 
     if register_request.manifest_version != manifest.meta.version:
         _raise_manifest_not_found(register_request.manifest_version)

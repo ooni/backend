@@ -1,12 +1,14 @@
-from typing import List, Dict
-from pydantic_settings import BaseSettings
+from typing import Dict, List
+
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     app_name: str = "OONI Data API"
     base_url: str = "https://api.ooni.io"
     clickhouse_url: str = "clickhouse://localhost"
+    valkey_url: str = "valkey://localhost:6379"
     postgresql_url: str = "postgresql://oonidb:oonidb@localhost/oonidb"
     log_level: str = "info"
     # Prod bucket: "ooni-data-eu-fra"
@@ -21,6 +23,9 @@ class Settings(BaseSettings):
     collector_id: str = "CHANGEME"
     session_expiry_days: int = 10
     login_expiry_days: int = 10
+    rate_limits: str = "10/minute;400000/day;200000/7day"
+    rate_limits_whitelisted_ipaddrs: List[str] = []
+    rate_limits_unmetered_pages: List[str] = []
 
     admin_emails: List[str] = [
         "admin@ooni.org",
