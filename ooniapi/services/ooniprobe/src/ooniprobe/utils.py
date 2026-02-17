@@ -12,7 +12,6 @@ import json
 
 from fastapi import Request
 from typing import Dict, Any
-from clickhouse_driver import Client as Clickhouse
 
 from fastapi import HTTPException
 
@@ -28,6 +27,7 @@ import httpx
 from .metrics import Metrics
 from .common.config import Settings
 from .common.clickhouse_utils import insert_click
+from .common.dependencies import ClickhouseDep
 from .dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
@@ -169,7 +169,7 @@ def compare_probe_msmt_cc_asn(
     request: Request,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
-    clickhouse: Clickhouse,
+    clickhouse: ClickhouseDep,
 ):
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
     Generates a metric.
