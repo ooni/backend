@@ -1,13 +1,13 @@
 import logging
-
 from typing import List, Optional, Tuple
 
-from fastapi import Response, APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import sql as sa
 
-from ooniprobe.common.prio import compute_priorities, generate_test_list
 from ooniprobe.common.dependencies import ClickhouseDep
+from ooniprobe.common.prio import compute_priorities, generate_test_list
+
 from ..common.clickhouse_utils import query_click
 from ..common.utils import convert_to_csv
 
@@ -92,18 +92,11 @@ def debug_prioritization(
         description="Maximum number of URLs to return", default=-1
     ),
 ) -> DebugPrioritization:
-
-
-    if isinstance(category_codes, str):
-        category_codes_list = category_codes.split(",")
-    else:
-        category_codes_list = category_codes
+    category_codes_list = category_codes.split(",")
 
     test_items, entries, prio_rules = generate_test_list(
         clickhouse, probe_cc or "ZZ", category_codes_list, probe_asn, limit or -1, True
     )
     return DebugPrioritization(
-        test_items=test_items,
-        entries=entries,
-        prio_rules=prio_rules
-        )
+        test_items=test_items, entries=entries, prio_rules=prio_rules
+    )

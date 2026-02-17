@@ -1,54 +1,54 @@
-import logging
-from datetime import datetime, timezone, timedelta
-import time
-from typing import Annotated, List, Optional, Any, Dict, Tuple, List, Any, Dict, Tuple, Optional, Annotated
-import random
-import ujson
-from hashlib import sha512
 import asyncio
 import io
+import logging
+import random
+import time
+from datetime import datetime, timedelta, timezone
+from hashlib import sha512
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, HTTPException, Query, Response, Request
-from prometheus_client import Counter, Info, Gauge
-from pydantic import Field, IPvAnyAddress
-from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
-from pydantic import Field, IPvAnyAddress
-from ooniauth_py import ProtocolError, CredentialError, DeserializationFailed, ServerState
 import httpx
+import ujson
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
+from ooniauth_py import (
+    CredentialError,
+    DeserializationFailed,
+    ProtocolError,
+    ServerState,
+)
+from prometheus_client import Counter, Gauge, Info
+from pydantic import Field, IPvAnyAddress
 
 from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.routers import BaseModel
-from ...common.utils import setnocacheresponse
 from ...common.dependencies import ClickhouseDep
+from ...common.prio import (
+    FailoverTestListDep,
+    failover_generate_test_list,
+    generate_test_list,
+)
+from ...common.routers import BaseModel
+from ...common.utils import setcacheresponse, setnocacheresponse
 from ...dependencies import (
     ASNReaderDep,
     CCReaderDep,
-    ASNReaderDep,
-    CCReaderDep,
-    SettingsDep,
-    TorTargetsDep,
-)
-from ...utils import (
-    generate_report_id,
-    extract_probe_ipaddr,
-    lookup_probe_cc,
-    lookup_probe_network,
-    error,
-    compare_probe_msmt_cc_asn,
-)
-from ...common.utils import setcacheresponse
-from ...common.prio import FailoverTestListDep, failover_generate_test_list, generate_test_list
-
-from ...dependencies import (
     ManifestDep,
     ManifestResponse,
     PostgresSessionDep,
     S3ClientDep,
+    SettingsDep,
+    TorTargetsDep,
+)
+from ...utils import (
+    compare_probe_msmt_cc_asn,
+    error,
+    extract_probe_ipaddr,
+    generate_report_id,
+    lookup_probe_cc,
+    lookup_probe_network,
 )
 from ..reports import Metrics
-from ...common.utils import setcacheresponse
 
 router = APIRouter(prefix="/v1")
 
@@ -74,7 +74,6 @@ def probe_login_post(
     response: Response,
     settings: SettingsDep,
 ) -> ProbeLoginResponse:
-
     if probe_login.username is None or probe_login.password is None:
         raise HTTPException(status_code=401, detail="Missing credentials")
 
@@ -332,7 +331,6 @@ def check_in(
     clickhouse: ClickhouseDep,
     settings: SettingsDep,
 ) -> CheckInResponse:
-
     # TODO: Implement throttling
     run_type = check_in.run_type
     charging = check_in.charging
@@ -693,12 +691,11 @@ class GeoLookupResponse(BaseModel):
 
 @router.post("/geolookup", tags=["ooniprobe"])
 async def geolookup(
-        data: GeoLookupRequest,
-        response: Response,
-        cc_reader: CCReaderDep,
-        asn_reader: ASNReaderDep,
+    data: GeoLookupRequest,
+    response: Response,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
 ) -> GeoLookupResponse:
-
     # initial values probe_geoip compares with
     probe_cc = "ZZ"
     asn = "AS0"
@@ -718,7 +715,7 @@ async def geolookup(
         )
 
     setnocacheresponse(response)
-    return GeoLookupResponse(geolocation = geolocation)
+    return GeoLookupResponse(geolocation=geolocation)
 
 
 class CollectorEntry(BaseModel):
@@ -747,10 +744,11 @@ def list_collectors(
 
 # -- <Anonymous Credentials> ------------------------------------
 
+
 @router.get("/manifest", tags=["anonymous_credentials"])
 def manifest(manifest: ManifestDep, response: Response) -> ManifestResponse:
     # Cache for 1 minute
-    setcacheresponse('1m', response)
+    setcacheresponse("1m", response)
     return manifest
 
 
@@ -766,15 +764,15 @@ class RegisterResponse(BaseModel):
 
 # TODO: choose a better name for this endpoint
 @router.post("/sign_credential", tags=["anonymous_credentials"])
-def sign_credential(register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep) -> RegisterResponse:
-
+def sign_credential(
+    register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep
+) -> RegisterResponse:
     if register_request.manifest_version != manifest.meta.version:
         _raise_manifest_not_found(register_request.manifest_version)
 
     protocol_state = ServerState.from_creds(
-        manifest.manifest.public_parameters,
-        settings.anonc_secret_key
-        )
+        manifest.manifest.public_parameters, settings.anonc_secret_key
+    )
 
     try:
         resp = protocol_state.handle_registration_request(
@@ -789,7 +787,6 @@ def sign_credential(register_request: RegisterRequest, manifest: ManifestDep, se
 
 
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
-
     type_to_str = {
         ProtocolError: "protocol_error",
         DeserializationFailed: "deserialization_failed",
@@ -911,9 +908,8 @@ async def submit_measurement(
         submit_request.content["probe_asn"], str
     )
     protocol_state = ServerState.from_creds(
-        manifest.manifest.public_parameters,
-        settings.anonc_secret_key
-        )
+        manifest.manifest.public_parameters, settings.anonc_secret_key
+    )
 
     if submit_request.manifest_version == manifest.meta.version:
         try:
@@ -933,7 +929,9 @@ async def submit_measurement(
             is_verified = False
             submit_response = None
     else:
-        log.error(f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'")
+        log.error(
+            f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'"
+        )
         _raise_manifest_not_found(submit_request.manifest_version)
 
     data = submit_request.model_dump()
@@ -975,7 +973,7 @@ async def submit_measurement(
 
         except Exception as exc:
             log.error(
-                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
@@ -1035,28 +1033,32 @@ async def credential_update(
     # TODO we need to find a way to keep track of older private keys to support this endpoint
     raise NotImplementedError("Credential Update is not yet implemented")
 
+
 def _raise_manifest_not_found(version: str):
-        raise HTTPException(
-            detail={
-                "error": "manifest_not_found",
-                "message": f"No manifest with version '{version}' was found",
-            },
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
+    raise HTTPException(
+        detail={
+            "error": "manifest_not_found",
+            "message": f"No manifest with version '{version}' was found",
+        },
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
 class TorTarget(BaseModel):
     address: str
     fingerprint: str
-    name: Optional[str] = ''
+    name: Optional[str] = ""
     protocol: str
     params: Optional[Dict[str, List[str]]] = None
 
 
-@router.get("/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget])
+@router.get(
+    "/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget]
+)
 def list_tor_targets(
     request: Request,
     targets: TorTargetsDep,
-    ) -> Dict[str, TorTarget]:
-
+) -> Dict[str, TorTarget]:
     token = request.headers.get("Authorization")
     if token is None:
         # XXX not actually validated
