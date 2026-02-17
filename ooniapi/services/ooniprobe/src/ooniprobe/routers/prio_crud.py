@@ -93,7 +93,6 @@ def debug_prioritization(
     ),
 ) -> DebugPrioritization:
 
-
     if isinstance(category_codes, str):
         category_codes_list = category_codes.split(",")
     else:
@@ -103,7 +102,5 @@ def debug_prioritization(
         clickhouse, probe_cc or "ZZ", category_codes_list, probe_asn, limit or -1, True
     )
     return DebugPrioritization(
-        test_items=test_items,
-        entries=entries,
-        prio_rules=prio_rules
-        )
+        test_items=test_items, entries=entries, prio_rules=prio_rules
+    )
