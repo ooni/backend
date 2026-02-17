@@ -728,10 +728,15 @@ class CollectorEntry(BaseModel):
     type: Optional[str] = Field(default=None, description="Type of collector")
 
 
-@router.get("/collectors", tags=["ooniprobe"])
+@router.get(
+    "/collectors",
+    response_model_exclude_none=True,
+    response_model=List[CollectorEntry],
+    tags=["ooniprobe"],
+)
 def list_collectors(
     settings: SettingsDep,
-) -> List[CollectorEntry]:
+):
     config_collectors = settings.collectors
     collectors_response = []
     for entry in config_collectors:
