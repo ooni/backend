@@ -55,81 +55,63 @@ def get_s3_client() -> S3Client:
     s3 = boto3.client("s3")
     return s3
 
-
 S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
 
 __cache__ = dict()
 
-
-def get_cache():
-    return __cache__
-
+def get_cache(): return __cache__
 
 CacheDep = Annotated[Dict[str, Any], Depends(get_cache)]
-
 
 class Manifest(BaseModel):
     """
     Manifest used for ZKP verification
     """
-
     nym_scope: str = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy: Dict[str, Any] = dict()
     public_parameters: str
-
 
 class ManifestMeta(BaseModel):
     """
     Manifest metadata
     """
-
     version: str
     last_modification_date: datetime
-    manifest_url: str = Field(
-        description="URL pointing to the AWS public record of this manifest"
-    )
-
+    manifest_url: str = Field(description="URL pointing to the AWS public record of this manifest")
 
 class ManifestResponse(BaseModel):
     manifest: Manifest
     meta: ManifestMeta
 
-
 def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
     # Get version & metadata
     resp = s3.list_object_versions(
-        Bucket=bucket, Prefix=file  # Only get versions of the specified file
-    )
+        Bucket=bucket,
+        Prefix=file # Only get versions of the specified file
+        )
 
     versions = resp.get("Versions")
     assert versions, "Couldn't find versions for the specified manifest"
 
-    latest = next((x for x in versions if x.get("IsLatest")), None)
+    latest = next((x for x in versions if x.get('IsLatest')), None)
 
     assert latest, "Couldn't find latest manifest version. Is versioning activated?"
-    assert "VersionId" in latest, "Manifest version not provided"
-    assert "LastModified" in latest, "Last modification date not provided"
+    assert 'VersionId' in latest, "Manifest version not provided"
+    assert 'LastModified' in latest, "Last modification date not provided"
 
     meta = ManifestMeta(
-        version=latest["VersionId"],
-        last_modification_date=latest["LastModified"],
+        version=latest['VersionId'],
+        last_modification_date=latest['LastModified'],
         manifest_url=f"https://{bucket}.s3.amazonaws.com/{file}",
-    )
+        )
 
     # Get Object
     manifest_resp = s3.get_object(Bucket=bucket, Key=file)
-    manifest_json = ujson.load(manifest_resp["Body"])
+    manifest_json = ujson.load(manifest_resp['Body'])
     manifest = Manifest(**manifest_json)
-    return ManifestResponse(manifest=manifest, meta=meta)
+    return ManifestResponse(manifest=manifest, meta = meta)
 
-
-def get_manifest_cached(
-    s3: S3ClientDep,
-    bucket: str,
-    file: str,
-    cache: CacheDep,
-    cache_time_seconds: float = 60,
-) -> ManifestResponse:
+def get_manifest_cached(s3: S3ClientDep, bucket: str, file: str, cache: CacheDep, cache_time_seconds : float = 60) -> ManifestResponse:
     """
     Fetch the manifest and cache the result for `cache_time_seconds`
 
@@ -144,19 +126,12 @@ def get_manifest_cached(
 
     return val[0]
 
-
-def _get_manifest(
-    s3: S3ClientDep, settings: SettingsDep, cache: CacheDep
-) -> ManifestResponse:
-    return get_manifest_cached(
-        s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file, cache
-    )
-
+def _get_manifest(s3: S3ClientDep, settings : SettingsDep, cache: CacheDep) -> ManifestResponse:
+    return get_manifest_cached(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file, cache)
 
 ManifestDep = Annotated[ManifestResponse, Depends(_get_manifest)]
 
-
-def read_file(s3_client: S3ClientDep, bucket: str, file: str) -> str:
+def read_file(s3_client : S3ClientDep, bucket: str, file : str) -> str:
     """
     Reads the content of `file` within `bucket` into a  string
 
@@ -167,9 +142,7 @@ def read_file(s3_client: S3ClientDep, bucket: str, file: str) -> str:
     return buff.getvalue().decode()
 
 
-async def get_tor_targets_from_s3(
-    settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep
-) -> Dict[str, Any]:
+async def get_tor_targets_from_s3(settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep) -> Dict[str, Any]:
     cacheKey = str(Path(settings.config_bucket, settings.tor_targets))
     resp = cache.get(cacheKey)
     if resp is None:
@@ -177,6 +150,5 @@ async def get_tor_targets_from_s3(
         resp = ujson.loads(targetstr)
         cache[cacheKey] = resp
     yield resp
-
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
