@@ -674,7 +674,7 @@ def list_test_urls(
 
 class GeoLookupResult(BaseModel):
     cc: str = Field(description="Country Code")
-    asn: str = Field(description="Autonomous System Number (ASN)")
+    asn: int = Field(description="Autonomous System Number (ASN)")
     as_name: Optional[str] = Field("", description="Autonomous System Name")
 
 
@@ -711,8 +711,11 @@ async def geolookup(
         # it doesn't seem possible to have separate aliases for (de)serialization
         if resp["probe_network_name"] is None:
             resp["probe_network_name"] = ""
-        geolocation[ipaddr] = GeoLookupResult(cc=resp["probe_cc"],
-            asn=resp["probe_asn"], as_name=resp["probe_network_name"])
+        geolocation[ipaddr] = GeoLookupResult(
+            cc=resp["probe_cc"],
+            asn=int(resp["probe_asn"][2:]),
+            as_name=resp["probe_network_name"],
+        )
 
     setnocacheresponse(response)
     return GeoLookupResponse(geolocation = geolocation)
