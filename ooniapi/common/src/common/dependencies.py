@@ -16,7 +16,9 @@ from .config import Settings
 def get_settings() -> Settings:
     return Settings()
 
+
 SettingsDep: TypeAlias = Annotated[Settings, Depends(get_settings)]
+
 
 def role_required(roles: list[str]):
     """Wrapped function requiring user to be logged in and have the right role."""
@@ -42,7 +44,7 @@ def role_required(roles: list[str]):
             raise HTTPException(detail="Role not authorized", status_code=401)
 
         return tok
-    
+
     return verify_jwt
 
 
