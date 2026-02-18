@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS default.faulty_measurements
 (
     `ts` DateTime64(3, 'UTC'),
     `type` String,
+    `uid` UUID DEFAULT generateUUIDv4(),
     -- geoip lookup result for the probe IP
     `probe_cc` String,
     `probe_asn` UInt32,
@@ -12,7 +13,7 @@ CREATE TABLE IF NOT EXISTS default.faulty_measurements
     `details` String
 )
 ENGINE = ReplacingMergeTree
-ORDER BY (ts, type, probe_cc, probe_asn)
+ORDER BY (ts, type, probe_cc, probe_asn, uid)
 SETTINGS
     -- These settings will buffer inserts and return without verifying that they reached disk
     -- See: https://clickhouse.com/docs/best-practices/selecting-an-insert-strategy#asynchronous-inserts
