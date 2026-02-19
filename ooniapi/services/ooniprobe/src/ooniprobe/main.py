@@ -54,9 +54,11 @@ async def lifespan(
 
     yield
 
+
 def init_ooniauth():
     # Creating a server state from scratch initializes the underlying crypto library
     ServerState()
+
 
 async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start
@@ -182,6 +184,7 @@ async def root():
     # TODO(art): fix this redirect by pointing health monitoring to /health
     # return RedirectResponse("/docs")
     return {"msg": "hello from ooniprobe"}
+
 
 def check_ooniauth_health():
     """
