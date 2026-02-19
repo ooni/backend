@@ -20,7 +20,7 @@ cleanup() {
 }
 
 echo "[+] Running smoketest of ${IMAGE}"
-docker run -d --name $CONTAINER_NAME -p $PORT:8000 ${IMAGE}
+docker run -d --name $CONTAINER_NAME -p $PORT:80 ${IMAGE}
 
 trap cleanup INT TERM EXIT
 
