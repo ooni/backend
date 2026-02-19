@@ -29,6 +29,5 @@ COPY --from=builder /build/src/testlists/common/alembic/ /app/alembic/
 COPY --from=builder /build/src/testlists/common/alembic.ini /app/
 RUN rm -rf /app/alembic/__pycache__
 
-# Listen on 8000 so not to conflict with nginx
 CMD ["uvicorn", "testlists.main:app", "--host", "0.0.0.0", "--port", "80"]
-EXPOSE 8000
+EXPOSE 80
