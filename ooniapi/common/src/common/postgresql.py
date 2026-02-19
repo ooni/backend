@@ -9,5 +9,5 @@ class Base(DeclarativeBase):
         Dict[str, Any]: sa.JSON,
         List[str]: sa.JSON,
         Dict[str, str]: sa.JSON,
-        List[Dict[str, Any]] : sa.ARRAY(sa.JSON())
+        List[Dict[str, Any]]: sa.ARRAY(sa.JSON()),
     }

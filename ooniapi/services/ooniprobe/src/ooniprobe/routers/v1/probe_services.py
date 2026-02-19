@@ -1,6 +1,22 @@
 import asyncio
 import io
 import logging
+from datetime import datetime, timezone, timedelta
+import time
+from typing import (
+    Annotated,
+    List,
+    Optional,
+    Any,
+    Dict,
+    Tuple,
+    List,
+    Any,
+    Dict,
+    Tuple,
+    Optional,
+    Annotated,
+)
 import random
 import time
 from datetime import datetime, timedelta, timezone
@@ -9,6 +25,17 @@ from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import geoip2
 import geoip2.errors
+from fastapi import APIRouter, HTTPException, Query, Response, Request
+from prometheus_client import Counter, Info, Gauge
+from pydantic import Field, IPvAnyAddress
+from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
+from pydantic import Field, IPvAnyAddress
+from ooniauth_py import (
+    ProtocolError,
+    CredentialError,
+    DeserializationFailed,
+    ServerState,
+)
 import httpx
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
@@ -47,6 +74,21 @@ from ...utils import (
     generate_report_id,
     lookup_probe_cc,
     lookup_probe_network,
+    error,
+    compare_probe_msmt_cc_asn,
+)
+from ...common.utils import setcacheresponse
+from ...common.prio import (
+    FailoverTestListDep,
+    failover_generate_test_list,
+    generate_test_list,
+)
+
+from ...dependencies import (
+    ManifestDep,
+    ManifestResponse,
+    PostgresSessionDep,
+    S3ClientDep,
 )
 from ..reports import Metrics
 
@@ -859,6 +901,7 @@ async def submit_measurement(
     settings: SettingsDep,
     s3_client: S3ClientDep,
     manifest: ManifestDep,
+    clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
 ) -> SubmitMeasurementResponse | Dict[str, Any]:
     """
@@ -953,7 +996,6 @@ async def submit_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
     N_RETRIES = 3
@@ -965,6 +1007,10 @@ async def submit_measurement(
                 resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
+
+            compare_probe_msmt_cc_asn(
+                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            )
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
                 is_verified=is_verified,
