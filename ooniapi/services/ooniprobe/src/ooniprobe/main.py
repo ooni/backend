@@ -27,6 +27,7 @@ from .common.version import get_build_label
 from .common.metrics import mount_metrics
 from .common.clickhouse_utils import query_click
 from .__about__ import VERSION
+from ooniauth_py import ServerState
 
 log = logging.getLogger(__name__)
 
@@ -46,11 +47,16 @@ async def lifespan(
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
 
+    init_userauth()
+
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
 
     yield
 
+def init_userauth():
+    # Creating a server state from scratch initializes the underlying crypto library
+    ServerState()
 
 async def setup_repeating_tasks(settings: Settings):
     # Call all repeating tasks here to make them start
