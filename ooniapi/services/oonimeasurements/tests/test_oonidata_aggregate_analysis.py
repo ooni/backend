@@ -91,7 +91,12 @@ def test_oonidata_aggregation_analysis_with_axis_x(
     assert len(json["results"]) > 0
     for result in json["results"]:
         assert result[field] is not None, result
-
+        if result["loni"]["tcp_blocked_outcome"] != "":
+            assert result["loni"]["tcp_blocked"] != 0.0, result["loni"]
+        if result["loni"]["tls_blocked_outcome"] != "":
+            assert result["loni"]["tls_blocked"] != 0.0, result["loni"]
+        if result["loni"]["dns_blocked_outcome"] != "got_answer":
+            assert result["loni"]["dns_blocked"] != 0.0, result["loni"]
 
 @pytest.mark.parametrize(
     "field",
