@@ -31,7 +31,7 @@ def get_time(row):
 # Freeze time to 2020-08-01 so that 2020-01-01 is within 6 months (actually 7 months, but close enough)
 SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 # Freeze datetime to this date in tests that use SINCE
-FROZEN_TIME = "2020-08-01T00:00:00Z"
+FROZEN_TIME = "2025-07-09T00:00:00Z"
 
 
 @freeze_time(FROZEN_TIME)
@@ -116,7 +116,6 @@ def test_list_measurements_with_multiple_values_to_filters(
 ):
     params = {}
     params[filter_param] = filter_value
-    params["since"] = SINCE
     filter_value_list = filter_value.split(",")
     if filter_param == "probe_asn":
         filter_value_list = list(map(normalize_probe_asn, filter_value_list))
@@ -130,10 +129,13 @@ def test_list_measurements_with_multiple_values_to_filters(
         assert result[filter_param] in filter_value_list, result
 
 
-@freeze_time(FROZEN_TIME)
-def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
+@freeze_time("2024-02-01T00:00:00Z")
+def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client, clickhouse_server):
     domainCollection = "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1"
-    params = {"domain": domainCollection, "since": SINCE}
+    params = {
+        "domain": domainCollection,
+        "since" : datetime.now(timezone.utc) - timedelta(days=30 * 5.5)
+    }
 
     response = client.get(route, params=params)
 
@@ -141,8 +143,13 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
     domain_list = domainCollection.split(", ")
+
     for result in json["results"]:
         assert any(domain in result["input"] for domain in domain_list), result
+
+    # Make sure all domains show up
+    for domain in map(str.strip, domainCollection.split(',')):
+        assert any(domain in r['input'] for r in json['results'])
 
 
 def test_failure_format(db):
@@ -267,7 +274,7 @@ def test_measurements_desc_default(client):
 
     resp = client.get(
         "/api/v1/measurements",
-        params={"order_by": "measurement_start_time", "since": SINCE},
+        params={"order_by": "measurement_start_time"},
     )
     assert (
         resp.status_code == 200

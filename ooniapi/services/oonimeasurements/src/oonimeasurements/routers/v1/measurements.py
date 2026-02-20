@@ -840,7 +840,7 @@ async def list_measurements(
     elif domain or category_code:
         # both domain and category_code can be set at the same time
         if domain:
-            domain_list = domain.split(",")
+            domain_list = [s.strip() for s in domain.split(",")]
             query_params["domain"] = domain_list
             fpwhere.append(sql.text("domain IN :domain"))
 
