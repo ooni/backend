@@ -1,3 +1,5 @@
+import asyncio
+import io
 import logging
 from datetime import datetime, timezone, timedelta
 import time
@@ -16,10 +18,10 @@ from typing import (
     Annotated,
 )
 import random
-import ujson
+import time
+from datetime import datetime, timedelta, timezone
 from hashlib import sha512
-import asyncio
-import io
+from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import geoip2
 import geoip2.errors
@@ -35,22 +37,41 @@ from ooniauth_py import (
     ServerState,
 )
 import httpx
+import ujson
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
+from ooniauth_py import (
+    CredentialError,
+    DeserializationFailed,
+    ProtocolError,
+    ServerState,
+)
+from prometheus_client import Counter, Gauge, Info
+from pydantic import Field, IPvAnyAddress
 
 from ...common.auth import create_jwt, decode_jwt, jwt
-from ...common.routers import BaseModel
-from ...common.utils import setnocacheresponse
 from ...common.dependencies import ClickhouseDep
+from ...common.prio import (
+    FailoverTestListDep,
+    failover_generate_test_list,
+    generate_test_list,
+)
+from ...common.routers import BaseModel
+from ...common.utils import setcacheresponse, setnocacheresponse
 from ...dependencies import (
     ASNReaderDep,
     CCReaderDep,
-    ASNReaderDep,
-    CCReaderDep,
+    ManifestDep,
+    ManifestResponse,
+    PostgresSessionDep,
+    S3ClientDep,
     SettingsDep,
     TorTargetsDep,
 )
 from ...utils import (
-    generate_report_id,
+    compare_probe_msmt_cc_asn,
+    error,
     extract_probe_ipaddr,
+    generate_report_id,
     lookup_probe_cc,
     lookup_probe_network,
     error,
@@ -70,7 +91,6 @@ from ...dependencies import (
     S3ClientDep,
 )
 from ..reports import Metrics
-from ...common.utils import setcacheresponse
 
 router = APIRouter(prefix="/v1")
 
@@ -96,7 +116,6 @@ def probe_login_post(
     response: Response,
     settings: SettingsDep,
 ) -> ProbeLoginResponse:
-
     if probe_login.username is None or probe_login.password is None:
         raise HTTPException(status_code=401, detail="Missing credentials")
 
@@ -354,7 +373,6 @@ def check_in(
     clickhouse: ClickhouseDep,
     settings: SettingsDep,
 ) -> CheckInResponse:
-
     # TODO: Implement throttling
     run_type = check_in.run_type
     charging = check_in.charging
@@ -696,7 +714,7 @@ def list_test_urls(
 
 class GeoLookupResult(BaseModel):
     cc: str = Field(description="Country Code")
-    asn: str = Field(description="Autonomous System Number (ASN)")
+    asn: int = Field(description="Autonomous System Number (ASN)")
     as_name: Optional[str] = Field("", description="Autonomous System Name")
 
 
@@ -720,7 +738,6 @@ async def geolookup(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
 ) -> GeoLookupResponse:
-
     # initial values probe_geoip compares with
     probe_cc = "ZZ"
     asn = "AS0"
@@ -735,7 +752,7 @@ async def geolookup(
             resp["probe_network_name"] = ""
         geolocation[ipaddr] = GeoLookupResult(
             cc=resp["probe_cc"],
-            asn=resp["probe_asn"],
+            asn=int(resp["probe_asn"][2:]),
             as_name=resp["probe_network_name"],
         )
 
@@ -750,10 +767,15 @@ class CollectorEntry(BaseModel):
     type: Optional[str] = Field(default=None, description="Type of collector")
 
 
-@router.get("/collectors", tags=["ooniprobe"])
+@router.get(
+    "/collectors",
+    response_model_exclude_none=True,
+    response_model=List[CollectorEntry],
+    tags=["ooniprobe"],
+)
 def list_collectors(
     settings: SettingsDep,
-) -> List[CollectorEntry]:
+):
     config_collectors = settings.collectors
     collectors_response = []
     for entry in config_collectors:
@@ -787,7 +809,6 @@ class RegisterResponse(BaseModel):
 def sign_credential(
     register_request: RegisterRequest, manifest: ManifestDep, settings: SettingsDep
 ) -> RegisterResponse:
-
     if register_request.manifest_version != manifest.meta.version:
         _raise_manifest_not_found(register_request.manifest_version)
 
@@ -808,7 +829,6 @@ def sign_credential(
 
 
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
-
     type_to_str = {
         ProtocolError: "protocol_error",
         DeserializationFailed: "deserialization_failed",
@@ -999,7 +1019,7 @@ async def submit_measurement(
 
         except Exception as exc:
             log.error(
-                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
@@ -1085,7 +1105,6 @@ def list_tor_targets(
     request: Request,
     targets: TorTargetsDep,
 ) -> Dict[str, TorTarget]:
-
     token = request.headers.get("Authorization")
     if token is None:
         # XXX not actually validated
