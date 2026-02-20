@@ -407,12 +407,12 @@ async def get_aggregation_analysis(
                 dns_blocked=nan_to_none(d["dns_blocked"]),
                 dns_down=nan_to_none(d["dns_down"]),
                 dns_ok=nan_to_none(d["dns_ok"]),
-                tls_blocked=nan_to_none(d["tls_blocked"]),
-                tls_down=nan_to_none(d["tls_down"]),
-                tls_ok=nan_to_none(d["tls_ok"]),
                 tcp_blocked=nan_to_none(d["tcp_blocked"]),
                 tcp_down=nan_to_none(d["tcp_down"]),
                 tcp_ok=nan_to_none(d["tcp_ok"]),
+                tls_blocked=nan_to_none(d["tls_blocked"]),
+                tls_down=nan_to_none(d["tls_down"]),
+                tls_ok=nan_to_none(d["tls_ok"]),
                 likely_blocked_protocols=d["likely_blocked_protocols"],
                 blocked_max_outcome=(
                     blocked_max_protocol[0] if blocked_max_protocol else ""
