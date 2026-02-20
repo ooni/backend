@@ -849,6 +849,7 @@ async def list_measurements(
     # Assemble the "external" query. Run a final order by followed by limit and
     # offset
     query = fp_query.offset(offset).limit(limit)
+    log.debug(f"list measurements: {query}")
     query_params["param_1"] = limit
     query_params["param_2"] = offset
 
