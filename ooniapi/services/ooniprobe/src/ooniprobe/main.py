@@ -27,6 +27,7 @@ from .common.version import get_build_label
 from .common.metrics import mount_metrics
 from .common.clickhouse_utils import query_click
 from .__about__ import VERSION
+from ooniauth_py import ServerState
 
 log = logging.getLogger(__name__)
 
@@ -46,10 +47,17 @@ async def lifespan(
     logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
     mount_metrics(app, instrumentor.registry)
 
+    init_ooniauth()
+
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
 
     yield
+
+
+def init_ooniauth():
+    # Creating a server state from scratch initializes the underlying crypto library
+    ServerState()
 
 
 async def setup_repeating_tasks(settings: Settings):
@@ -131,6 +139,12 @@ async def health(
         print(exc)
         errors.append("db_error")
 
+    try:
+        check_ooniauth_health()
+    except BaseException as exc:
+        log.error(f"Usertauth health error: {exc}")
+        errors.append("bad_ooniauth_heatlh")
+
     if settings.jwt_encryption_key == "CHANGEME":
         errors.append("bad_jwt_secret")
 
@@ -170,3 +184,18 @@ async def root():
     # TODO(art): fix this redirect by pointing health monitoring to /health
     # return RedirectResponse("/docs")
     return {"msg": "hello from ooniprobe"}
+
+
+def check_ooniauth_health():
+    """
+    Raise an error if there's an error with the ooniauth library
+    """
+    # should be able to handle a credential sign request when restoring from hard-coded credentials
+
+    # These keys are innocuous, just created to test this
+    secret_key = "ASAAAAAAAAAAnRLPQN8ob4XuuyS26QmvtE5yDOVbDz7wgfeoxGk99AcgAAAAAAAAAOhrJeXjwKfUY0HLwR4pMg0g3QSdyHvM1IvutqnnMksMAwAAAAAAAAAgAAAAAAAAAOR570uB89vTt0o77JCgQ5YXQpu5WpDOWBwVxhW17rAOIAAAAAAAAADrzYyr7wxWft6wiSSlYsH6HJLFhWMsM4N/Stn6ReqAASAAAAAAAAAA0wTZILAyR9U4zl1O8hZAILKaxfNDKQ3RbmPHnjjFiAs="
+    public_parameters = "ASAAAAAAAAAAAvJtNWTwFzdhbrl8v6JB18ReQyndy8/K1w2U8i2Yg30BIAAAAAAAAAAguFDwcr38wUVt2rlLXB2/8yFhniOjNYqIl4ojiAuyMwMAAAAAAAAAIAAAAAAAAAAAe1Xz7jZ5Sunow6X1wBcQgydjCp9NpYkHdBaJyUuCUSAAAAAAAAAAtKLWocJ4JqqNf6iX1HzPzQUVJaXlj7iL52bVxgeLhWwgAAAAAAAAAEZjgujZgU+k0ro0pZHd1JhoxRvRSVaPH1nHyjD8U7lG"
+    sign_request = "IAAAAAAAAABIGoRkdnwwlTAeKECF7DBNXmqdTMlhr+HsANap/DkQaWAAAAAAAAAADHgP2bLRdUt8AgWPdXdTXCl2/vnGZ9gW5yGtmDfXgyMKzTXS04EBASlz5wIVZSrLaykSAIcMM7EUwaK0Yqps0QJfoj0i3Y9Mc8yVlP0z3/kSuHTKpmq4GOEIaGFXTH6k"
+
+    server = ServerState.from_creds(public_parameters, secret_key)
+    server.handle_registration_request(sign_request)
