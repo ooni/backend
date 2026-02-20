@@ -718,10 +718,17 @@ async def list_measurements(
     ### Prepare query parameters
     if until is None and report_id is None:
         t = datetime.now(timezone.utc) + timedelta(days=1)
-        until = datetime(t.year, t.month, t.day)
+        until = datetime(t.year, t.month, t.day, tzinfo=timezone.utc)
 
     if since is None and report_id is None and until is not None:
         since = until - timedelta(days=30)
+
+    # 'since' before than 6 months ago?
+    if since and since < (datetime.now(timezone.utc) - timedelta(days = 30 * 6)):
+        raise HTTPException(
+            status_code = 400,
+            detail = f"'since' is limited to 6 months ago. Given date: {since}"
+            )
 
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
