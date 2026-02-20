@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, timezone, timedelta
+from freezegun import freeze_time
 from clickhouse_driver import Client as Clickhouse
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
@@ -26,9 +27,14 @@ def get_time(row):
     ).replace(tzinfo=timezone.utc)
 
 
+# Use a fixed date from fixtures. Tests will freeze time to make this valid
+# Freeze time to 2020-08-01 so that 2020-01-01 is within 6 months (actually 7 months, but close enough)
 SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
+# Freeze datetime to this date in tests that use SINCE
+FROZEN_TIME = "2020-08-01T00:00:00Z"
 
 
+@freeze_time(FROZEN_TIME)
 def test_list_measurements(client):
     response = client.get(route, params={"since": SINCE})
     json = response.json()
@@ -37,6 +43,7 @@ def test_list_measurements(client):
     assert len(json["results"]) == 100
 
 
+@freeze_time(FROZEN_TIME)
 def test_list_measurements_with_since_and_until(client):
     params = {
         "since": "2024-01-01",
@@ -59,6 +66,7 @@ def test_list_measurements_with_since_and_until(client):
         ("probe_asn", "30722"),
     ],
 )
+@freeze_time(FROZEN_TIME)
 def test_list_measurements_with_one_value_to_filters(
     client, filter_param, filter_value
 ):
@@ -80,6 +88,7 @@ def test_list_measurements_with_one_value_to_filters(
         assert result[filter_param] == filter_value, result
 
 
+@freeze_time(FROZEN_TIME)
 def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(client):
     domain = "cloudflare-dns.com"
     params = {"domain": domain, "since": SINCE}
@@ -101,6 +110,7 @@ def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(c
         ("probe_asn", "AS30722,3269,7738,55430"),
     ],
 )
+@freeze_time(FROZEN_TIME)
 def test_list_measurements_with_multiple_values_to_filters(
     client, filter_param, filter_value
 ):
@@ -120,6 +130,7 @@ def test_list_measurements_with_multiple_values_to_filters(
         assert result[filter_param] in filter_value_list, result
 
 
+@freeze_time(FROZEN_TIME)
 def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
     domainCollection = "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1"
     params = {"domain": domainCollection, "since": SINCE}
@@ -215,6 +226,7 @@ def test_measurements_order_by_test_start_time_forbidden(client):
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
 
 
+@freeze_time(FROZEN_TIME)
 def test_measurements_order_by_invalid_value_422(client):
     """
     Tests that invalid `order_by` values return 422 status code,
@@ -223,13 +235,13 @@ def test_measurements_order_by_invalid_value_422(client):
     invalid_values = ["probe_cc", "probe_asn", "test_start_time", "nonexistent"]
 
     for invalid_value in invalid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value, "since": SINCE})
+        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value})
         assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
 
     valid_values = ["measurement_start_time"]
 
     for valid_value in valid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": valid_value, "since": SINCE})
+        resp = client.get("/api/v1/measurements", params={"order_by": valid_value})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}. Response: {resp.json()}"
 
 
@@ -247,6 +259,7 @@ def test_measurements_limit_hard_capped(client):
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
 
 
+@freeze_time(FROZEN_TIME)
 def test_measurements_desc_default(client):
     """
     Test that the default ordering is descending by default
@@ -415,6 +428,7 @@ def test_bad_report_id_wont_validate(client):
     assert resp.status_code == 422, resp.json()
 
 
+@freeze_time(FROZEN_TIME)
 def test_no_measurements_before_30_days(client):
     """
     The default filtering should not retrieve measurements older than 30 days since tomorrow
@@ -434,6 +448,7 @@ def test_asn_to_int():
     assert measurements.asn_to_int("1234") == 1234
 
 
+@freeze_time(FROZEN_TIME)
 def test_measurements_since_6_months_validation(client):
     """
     Tests that requesting measurements with 'since' date validates the 6 months limit:
