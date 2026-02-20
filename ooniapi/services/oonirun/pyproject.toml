@@ -9,6 +9,8 @@ dynamic = ["version"]
 
 dependencies = [
   "fastapi ~= 0.108.0",
+  "boto3 ~= 1.39.3",
+  "mypy-boto3-s3 ~= 1.39.5",
   "clickhouse-driver ~= 0.2.6",
   "sqlalchemy ~= 2.0.27",
   "ujson ~= 5.9.0",

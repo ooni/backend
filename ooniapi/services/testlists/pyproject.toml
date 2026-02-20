@@ -3,36 +3,43 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "oonifindings"
-dynamic = ["version"]
+name = "testlists"
 description = ''
+dynamic = ["version"]
 
 dependencies = [
   "fastapi ~= 0.108.0",
-  "boto3 ~= 1.39.3",
-  "mypy-boto3-s3 ~= 1.39.5",
+  "filelock ~= 3.20.0",
   "clickhouse-driver ~= 0.2.6",
   "sqlalchemy ~= 2.0.27",
-  "pydantic-settings ~= 2.1.0", 
-  "uvicorn ~= 0.25.0",
+  "dulwich~=0.25.2",
+  "ujson ~= 5.9.0",
+  "urllib3 ~= 2.6.3",
+  "python-dateutil ~= 2.8.2",
+  "gitpython ~= 3.1.45",
+  "pydantic-settings ~= 2.1.0",
   "statsd ~= 4.0.1",
   "uvicorn ~= 0.25.0",
-  "httpx ~= 0.26.0",
   "psycopg2 ~= 2.9.9",
+  "httpx ~= 0.26.0",
   "pyjwt ~= 2.8.0",
   "alembic ~= 1.13.1",
-  "python-dateutil ~= 2.9.0",
   "prometheus-fastapi-instrumentator ~= 6.1.0",
   "prometheus-client",
+  "pem ~= 23.1.0",
+  "geoip2 ~= 5.0.1",
+  "fastapi-utils[all] ~= 0.8.0",
+  "zstd ~= 1.5.7.2",
+  "boto3 ~= 1.39.3",
+  "boto3-stubs[s3] ~= 1.39.3",
+  "mypy-boto3-s3 ~= 1.39.5",
 ]
 
 readme = "README.md"
 requires-python = ">=3.11"
-license = "BSD-3-Clause"
+license = "MPL-2.0"
 keywords = []
-authors = [
-  { name = "OONI", email = "contact@ooni.org" },
-]
+authors = [{ name = "OONI", email = "contact@ooni.org" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -46,18 +53,18 @@ classifiers = [
 ]
 
 [project.urls]
-Documentation = "https://docs.ooni.org"
+Documentation = "https://github.com/ooni/backend"
 Issues = "https://github.com/ooni/backend/issues"
 Source = "https://github.com/ooni/backend"
 
 [tool.hatch.version]
-path = "src/oonifindings/__about__.py"
+path = "src/testlists/__about__.py"
 
 [tool.hatch.build.targets.sdist]
 include = ["BUILD_LABEL"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/oonifindings"]
+packages = ["src/testlists"]
 artifacts = ["BUILD_LABEL"]
 
 [tool.hatch.envs.default]
@@ -66,10 +73,11 @@ dependencies = [
   "pytest-cov",
   "click",
   "black",
-  "pytest-asyncio",
   "pytest-postgresql",
-  "pytest-docker",
-  "requests"
+  "pytest-asyncio",
+  "freezegun",
+  "pytest-docker==3.2.3",
+  "pytest-container",
 ]
 path = ".venv/"
 
@@ -79,28 +87,18 @@ test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --s
 cov-report = ["coverage report"]
 cov = ["test-cov", "cov-report"]
 
-[[tool.hatch.envs.all.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
-
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
 
 [tool.coverage.run]
-source_pkgs = ["oonifindings", "tests"]
 branch = true
 parallel = true
-omit = [
-  "src/oonifindings/common/*",
-  "src/oonifindings/__about__.py"
-]
+source_pkgs = ["testlists", "tests"]
+omit = ["src/testlists/common/*", "src/testlists/__about__.py"]
 
 [tool.coverage.paths]
-oonifindings = ["src/oonifindings", "*/oonifindings/src/oonifindings"]
-tests = ["tests", "*/oonifindings/tests"]
+testlists = ["src/testlists"]
+tests = ["tests"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
