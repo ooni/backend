@@ -723,12 +723,18 @@ async def list_measurements(
     if since is None and report_id is None and until is not None:
         since = until - timedelta(days=30)
 
+    # Normalize datetimes to UTC for consistent comparison
+    if since:
+        since = normalize_datetime(since)
+    if until:
+        until = normalize_datetime(until)
+
     # 'since' before than 6 months ago?
-    if since and since < (datetime.now(timezone.utc) - timedelta(days = 30 * 6)):
+    if since and since < datetime.now(timezone.utc) - timedelta(days=30 * 6):
         raise HTTPException(
-            status_code = 400,
-            detail = f"'since' is limited to 6 months ago. Given date: {since}"
-            )
+            status_code=400,
+            detail=f"'since' is limited to 6 months ago. Given date: {since}",
+        )
 
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
@@ -1032,3 +1038,15 @@ def is_in_charset(s: str, charset: str, error_msg: str):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg
             )
+
+def normalize_datetime(dt: datetime) -> datetime:
+    """
+    Normalize a datetime to UTC timezone.
+
+    If the datetime already has timezone information, it remains unchanged.
+
+    Otherwise, UTC timezone is added, assuming the datetime is already in UTC.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
