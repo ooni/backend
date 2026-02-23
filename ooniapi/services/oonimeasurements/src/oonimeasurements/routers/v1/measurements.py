@@ -604,7 +604,7 @@ async def list_measurements(
     since: Annotated[
         Optional[datetime],
         Query(
-            description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
+            description='Start date of when measurements were run (ex. "2016-10-20T10:30:00"). It can\'t be earlier than 6 months ago'
         ),
     ] = None,
     until: Annotated[
