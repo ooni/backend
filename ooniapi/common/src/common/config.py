@@ -85,3 +85,17 @@ class Settings(BaseSettings):
             "type": "cloudfront",
         },
     ]
+
+    # tcp-echo test helper configuration
+    tcp_echo_port: int = Field(default=8000, description="tcp-echo listening port")
+
+    # daphn3 test helper configuration
+    daphn3_port: int = Field(default=8001, description="daphn3 listening port")
+    daphn3_yaml_file: str = Field(
+        default="",
+        description="daphn3steps yaml file"
+    )
+    daphn3_pcap_file: str = Field(
+        default="",
+        description="daphn3steps pcap file"
+    )

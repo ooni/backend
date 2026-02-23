@@ -1,0 +1,118 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "oonihelpers"
+description = ''
+dynamic = ["version"]
+
+dependencies = [
+  "annotated-doc ~= 0.0.4",
+  "annotated-types ~= 0.7.0",
+  "anyio ~= 4.12.1",
+  "attrs ~= 25.4.0",
+  "Automat ~= 25.4.16",
+  "cffi ~= 2.0.0",
+  "clickhouse-driver ~= 0.2.10",
+  "constantly ~= 23.10.4",
+  "cryptography ~= 46.0.5",
+  "fastapi ~= 0.129.0",
+  "greenlet ~= 3.3.1",
+  "hyperlink ~= 21.0.0",
+  "idna ~= 3.11",
+  "Incremental ~= 24.11.0",
+  "jwt ~= 1.4.0",
+  "packaging ~= 26.0",
+  "pycparser ~= 3.0",
+  "pydantic ~= 2.12.5",
+  "pydantic-settings ~= 2.13.1",
+  "pydantic_core ~= 2.41.5",
+  "python-dotenv ~= 1.2.1",
+  "pytz ~= 2025.2",
+  "PyYAML ~= 6.0.3",
+  "scapy ~= 2.7.0,",
+  "SQLAlchemy ~= 2.0.46",
+  "starlette ~= 0.52.1",
+  "Twisted ~= 25.5.0",
+  "typing-inspection ~= 0.4.2",
+  "typing_extensions ~= 4.15.0",
+  "tzlocal ~= 5.3.1",
+  "zope.interface ~= 8.2",
+]
+
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MPL-2.0"
+keywords = []
+authors = [{ name = "OONI", email = "contact@ooni.org" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+Documentation = "https://github.com/ooni/backend"
+Issues = "https://github.com/ooni/backend/issues"
+Source = "https://github.com/ooni/backend"
+
+[tool.hatch.version]
+path = "src/oonihelpers/__about__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["BUILD_LABEL"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/oonihelpers"]
+artifacts = ["BUILD_LABEL"]
+
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "click",
+  "black",
+  "pytest-postgresql",
+  "pytest-asyncio",
+  "freezegun",
+  "pytest-docker",
+]
+path = ".venv/"
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
+cov-report = ["coverage report"]
+cov = ["test-cov", "cov-report"]
+
+# Allows specifyng dependencies as a direct reference like an URL
+# or a file path.
+# Required by ooniauth-py
+# See: https://hatch.pypa.io/1.13/config/metadata/#allowing-direct-references
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+source_pkgs = ["oonihelpers", "tests"]
+omit = ["src/oonihelpers/common/*", "src/oonihelpers/__about__.py"]
+
+[tool.coverage.paths]
+oonihelpers = ["src/oonihelpers"]
+tests = ["tests"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
