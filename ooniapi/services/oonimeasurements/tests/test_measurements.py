@@ -88,10 +88,10 @@ def test_list_measurements_with_one_value_to_filters(
         assert result[filter_param] == filter_value, result
 
 
-@freeze_time(FROZEN_TIME)
+@freeze_time("2024-02-01T00:00:00Z")
 def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(client):
     domain = "cloudflare-dns.com"
-    params = {"domain": domain, "since": SINCE}
+    params = {"domain": domain, "since": datetime.now(timezone.utc) - timedelta(days=30 * 5.5)}
 
     response = client.get(route, params=params)
 
