@@ -66,13 +66,13 @@ def test_list_measurements_with_since_and_until(client):
         ("probe_asn", "30722"),
     ],
 )
-@freeze_time(FROZEN_TIME)
+@freeze_time("2024-02-01T00:00:00Z")
 def test_list_measurements_with_one_value_to_filters(
     client, filter_param, filter_value
 ):
     params = {}
     params[filter_param] = filter_value
-    params["since"] = SINCE
+    params["since"] = datetime.now(timezone.utc) - timedelta(days=30 * 5.5)
 
     response = client.get(route, params=params)
 
