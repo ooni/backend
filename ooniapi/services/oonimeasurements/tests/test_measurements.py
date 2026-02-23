@@ -34,16 +34,18 @@ SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
 FROZEN_TIME = "2025-07-09T00:00:00Z"
 
 
-@freeze_time(FROZEN_TIME)
+@freeze_time("2024-01-30T00:00:00Z")
 def test_list_measurements(client):
-    response = client.get(route, params={"since": SINCE})
+    response = client.get(route)
+    assert response.status_code == 200
+
     json = response.json()
 
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
 
 
-@freeze_time(FROZEN_TIME)
+@freeze_time("2024-03-01T00:00:00Z")
 def test_list_measurements_with_since_and_until(client):
     params = {
         "since": "2024-01-01",
@@ -51,6 +53,7 @@ def test_list_measurements_with_since_and_until(client):
     }
 
     response = client.get(route, params=params)
+    assert response.status_code == 200
     json = response.json()
 
     assert isinstance(json["results"], list), json
