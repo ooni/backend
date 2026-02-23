@@ -110,11 +110,14 @@ def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(c
         ("probe_asn", "AS30722,3269,7738,55430"),
     ],
 )
-@freeze_time(FROZEN_TIME)
+@freeze_time("2024-02-01T00:00:00Z")
 def test_list_measurements_with_multiple_values_to_filters(
     client, filter_param, filter_value
 ):
-    params = {}
+    params = {
+        "since": datetime.now(timezone.utc) - timedelta(days=30 * 5.5)
+    }
+
     params[filter_param] = filter_value
     filter_value_list = filter_value.split(",")
     if filter_param == "probe_asn":
