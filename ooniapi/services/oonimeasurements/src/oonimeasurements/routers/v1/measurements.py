@@ -42,6 +42,7 @@ from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
 from ...common.config import Settings
+from ...utils.api import normalize_datetime
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.utils import setcacheresponse, commasplit, setnocacheresponse
@@ -1038,15 +1039,3 @@ def is_in_charset(s: str, charset: str, error_msg: str):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error_msg
             )
-
-def normalize_datetime(dt: datetime) -> datetime:
-    """
-    Normalize a datetime to UTC timezone.
-
-    If the datetime already has timezone information, it remains unchanged.
-
-    Otherwise, UTC timezone is added, assuming the datetime is already in UTC.
-    """
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt

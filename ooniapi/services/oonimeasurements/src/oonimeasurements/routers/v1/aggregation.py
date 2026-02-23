@@ -19,6 +19,7 @@ from oonimeasurements.common.clickhouse_utils import query_click, query_click_on
 from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
 from oonimeasurements.common.dependencies import get_clickhouse_session
 from ...common.routers import BaseModel
+from ...utils.api import normalize_datetime
 
 router = APIRouter()
 
@@ -273,6 +274,9 @@ async def get_measurements(
         until = datetime.combine(until, datetime.min.time())
     else:
         until = now
+
+    since = normalize_datetime(since)
+    until = normalize_datetime(until)
 
     inp = input or ""
     try:
