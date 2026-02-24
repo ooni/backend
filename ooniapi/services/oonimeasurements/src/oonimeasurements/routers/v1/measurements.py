@@ -604,13 +604,17 @@ async def list_measurements(
     since: Annotated[
         Optional[datetime],
         Query(
-            description='Start date of when measurements were run (ex. "2016-10-20T10:30:00"). It can\'t be earlier than 6 months ago'
+            description=
+            "Start date of when measurements were run (ex. '2016-10-20T10:30:00'). Note that " +
+            "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     until: Annotated[
         Optional[datetime],
         Query(
-            description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
+            description=
+            "End date of when measurement were run (ex. '2016-10-20T10:30:00'). Note that " +
+            "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     confirmed: Annotated[
@@ -731,11 +735,14 @@ async def list_measurements(
         until = normalize_datetime(until)
 
     # 'since' before than 6 months ago?
-    if since and since < datetime.now(timezone.utc) - timedelta(days=30 * 6):
-        raise HTTPException(
-            status_code=400,
-            detail=f"'since' is limited to 6 months ago. Given date: {since}",
-        )
+    if until and since:
+        days_diff = (until - since).days
+        MAX_DAYS = 30 * 6
+        if days_diff > MAX_DAYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Time range must not exceed 6 months. Requested: {days_diff} days (limit: {MAX_DAYS} days).",
+            )
 
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
