@@ -461,26 +461,16 @@ def test_asn_to_int():
     assert measurements.asn_to_int("1234") == 1234
 
 
-@freeze_time(FROZEN_TIME)
-def test_measurements_since_6_months_validation(client):
+def test_measurements_date_range_6_months_limit(client):
     """
-    Tests that requesting measurements with 'since' date validates the 6 months limit:
-    - Returns 400 status code when 'since' is more than 6 months ago
-    - Returns 200 status code when 'since' is within the last 6 months
+    Tests that the /measurements endpoint enforces a 6-month date range limit.
     """
-    # Date more than 6 months ago should return 400
-    more_than_six_months_ago = datetime.now(timezone.utc) - timedelta(days=200)
-    since_date_old = more_than_six_months_ago.strftime("%Y-%m-%d")
-
-    resp = client.get("/api/v1/measurements", params={"since": since_date_old})
-    assert resp.status_code == 400, f"Expected 400, got {resp.status_code}. Response: {resp.json()}"
-
+    # Range exceeding 6 months should return 400
+    resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-07-20"})
+    assert resp.status_code == 400, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
     error_detail = resp.json()["detail"]
-    assert "6 months ago" in error_detail.lower(), f"Error message should mention 6 months. Got: {error_detail}"
+    assert "time range must not exceed" in error_detail.lower(), f"Unexpected error message: {error_detail}"
 
-    # Date within the last 6 months should return 200
-    three_months_ago = datetime.now(timezone.utc) - timedelta(days=90)
-    since_date_recent = three_months_ago.strftime("%Y-%m-%d")
-
-    resp = client.get("/api/v1/measurements", params={"since": since_date_recent})
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}. Response: {resp.json()}"
+    # Range within 6 months should return 200
+    resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-04-01"})
+    assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
