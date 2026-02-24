@@ -98,14 +98,6 @@ CREATE TABLE accounts
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY account_id;
 
-CREATE TABLE session_expunge
-(
-    `account_id` FixedString(32),
-    `threshold` DateTime DEFAULT now()
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id;
-
 -- Materialized views
 
 CREATE MATERIALIZED VIEW default.counters_test_list
@@ -258,3 +250,9 @@ CREATE TABLE IF NOT EXISTS default.oonirun
 ENGINE = ReplacingMergeTree(translation_creation_time)
 ORDER BY (ooni_run_link_id, descriptor_creation_time)
 SETTINGS index_granularity = 1;
+
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` Int8;
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
