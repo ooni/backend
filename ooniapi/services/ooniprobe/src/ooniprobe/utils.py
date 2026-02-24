@@ -8,6 +8,7 @@ import itertools
 import logging
 from typing import List, TypedDict, Tuple
 import io
+import json
 
 from fastapi import Request
 from typing import Dict, Any
@@ -25,6 +26,8 @@ import httpx
 
 from .metrics import Metrics
 from .common.config import Settings
+from .common.clickhouse_utils import insert_click
+from .common.dependencies import ClickhouseDep
 from .dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
@@ -160,11 +163,13 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
 
 
 def compare_probe_msmt_cc_asn(
+    measurement_uid: str,
     cc: str,
     asn: str,
     request: Request,
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
+    clickhouse: ClickhouseDep,
 ):
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
     Generates a metric.
@@ -172,18 +177,42 @@ def compare_probe_msmt_cc_asn(
     try:
         cc = cc.upper()
         ipaddr = extract_probe_ipaddr(request)
-        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
+        db_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
+
         if db_asn.startswith("AS"):
             db_asn = db_asn[2:]
-        if db_probe_cc == cc and db_asn == asn:
+        if db_cc == cc and db_asn == asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
-        elif db_probe_cc != cc:
+        if db_cc != cc:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        elif db_asn != asn:
+        if db_asn != asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
-    except Exception:
-        pass
+
+        if db_asn != asn or db_cc != cc:
+            details = json.dumps(
+                {
+                    "submission_cc": cc,
+                    "submission_asn": int(asn),
+                    "measurement_uid": measurement_uid,
+                }
+            )
+
+            insert_click(
+                clickhouse,
+                """
+                INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
+                SETTINGS
+                    async_insert=1,
+                    wait_for_async_insert=0
+                VALUES
+                """,
+                [("geoip", db_cc, int(db_asn), details)],
+                max_execution_time=5,
+            )
+
+    except Exception as e:
+        log.error(f"Error comparing msm cc and asn: {e}")
 
 
 def get_first_ip(headers: str) -> str:
@@ -194,9 +223,10 @@ def get_first_ip(headers: str) -> str:
     in: '123.123.123, 1.1.1.1'
     out: '123.123.123'
     """
-    return headers.partition(',')[0]
+    return headers.partition(",")[0]
 
-def read_file(s3_client : S3Client, bucket: str, file : str) -> str:
+
+def read_file(s3_client: S3Client, bucket: str, file: str) -> str:
     """
     Reads the content of `file` within `bucket` into a  string
 

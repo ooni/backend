@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, timezone, timedelta
+from freezegun import freeze_time
 from clickhouse_driver import Client as Clickhouse
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
@@ -26,17 +27,25 @@ def get_time(row):
     ).replace(tzinfo=timezone.utc)
 
 
+# Use a fixed date from fixtures. Tests will freeze time to make this valid
+# Freeze time to 2020-08-01 so that 2020-01-01 is within 6 months (actually 7 months, but close enough)
 SINCE = datetime.strftime(datetime(2020, 1, 1), "%Y-%m-%dT%H:%M:%S.%fZ")
+# Freeze datetime to this date in tests that use SINCE
+FROZEN_TIME = "2025-07-09T00:00:00Z"
 
 
+@freeze_time("2024-01-30T00:00:00Z")
 def test_list_measurements(client):
-    response = client.get(route, params={"since": SINCE})
+    response = client.get(route)
+    assert response.status_code == 200
+
     json = response.json()
 
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
 
 
+@freeze_time("2024-03-01T00:00:00Z")
 def test_list_measurements_with_since_and_until(client):
     params = {
         "since": "2024-01-01",
@@ -44,6 +53,7 @@ def test_list_measurements_with_since_and_until(client):
     }
 
     response = client.get(route, params=params)
+    assert response.status_code == 200
     json = response.json()
 
     assert isinstance(json["results"], list), json
@@ -59,12 +69,13 @@ def test_list_measurements_with_since_and_until(client):
         ("probe_asn", "30722"),
     ],
 )
+@freeze_time("2024-02-01T00:00:00Z")
 def test_list_measurements_with_one_value_to_filters(
     client, filter_param, filter_value
 ):
     params = {}
     params[filter_param] = filter_value
-    params["since"] = SINCE
+    params["since"] = datetime.now(timezone.utc) - timedelta(days=30 * 5.5)
 
     response = client.get(route, params=params)
 
@@ -80,9 +91,10 @@ def test_list_measurements_with_one_value_to_filters(
         assert result[filter_param] == filter_value, result
 
 
+@freeze_time("2024-02-01T00:00:00Z")
 def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(client):
     domain = "cloudflare-dns.com"
-    params = {"domain": domain, "since": SINCE}
+    params = {"domain": domain, "since": datetime.now(timezone.utc) - timedelta(days=30 * 5.5)}
 
     response = client.get(route, params=params)
 
@@ -101,12 +113,15 @@ def test_list_measurements_with_one_value_to_filters_not_present_in_the_result(c
         ("probe_asn", "AS30722,3269,7738,55430"),
     ],
 )
+@freeze_time("2024-02-01T00:00:00Z")
 def test_list_measurements_with_multiple_values_to_filters(
     client, filter_param, filter_value
 ):
-    params = {}
+    params = {
+        "since": datetime.now(timezone.utc) - timedelta(days=30 * 5.5)
+    }
+
     params[filter_param] = filter_value
-    params["since"] = SINCE
     filter_value_list = filter_value.split(",")
     if filter_param == "probe_asn":
         filter_value_list = list(map(normalize_probe_asn, filter_value_list))
@@ -120,9 +135,13 @@ def test_list_measurements_with_multiple_values_to_filters(
         assert result[filter_param] in filter_value_list, result
 
 
-def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client):
+@freeze_time("2024-02-01T00:00:00Z")
+def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(client, clickhouse_server):
     domainCollection = "cloudflare-dns.com, adblock.doh.mullvad.net, 1.1.1.1"
-    params = {"domain": domainCollection, "since": SINCE}
+    params = {
+        "domain": domainCollection,
+        "since" : datetime.now(timezone.utc) - timedelta(days=30 * 5.5)
+    }
 
     response = client.get(route, params=params)
 
@@ -130,8 +149,13 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
     domain_list = domainCollection.split(", ")
+
     for result in json["results"]:
         assert any(domain in result["input"] for domain in domain_list), result
+
+    # Make sure all domains show up
+    for domain in map(str.strip, domainCollection.split(',')):
+        assert any(domain in r['input'] for r in json['results'])
 
 
 def test_failure_format(db):
@@ -215,6 +239,7 @@ def test_measurements_order_by_test_start_time_forbidden(client):
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
 
 
+@freeze_time(FROZEN_TIME)
 def test_measurements_order_by_invalid_value_422(client):
     """
     Tests that invalid `order_by` values return 422 status code,
@@ -223,13 +248,13 @@ def test_measurements_order_by_invalid_value_422(client):
     invalid_values = ["probe_cc", "probe_asn", "test_start_time", "nonexistent"]
 
     for invalid_value in invalid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value, "since": SINCE})
+        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value})
         assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
 
     valid_values = ["measurement_start_time"]
 
     for valid_value in valid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": valid_value, "since": SINCE})
+        resp = client.get("/api/v1/measurements", params={"order_by": valid_value})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}. Response: {resp.json()}"
 
 
@@ -247,6 +272,7 @@ def test_measurements_limit_hard_capped(client):
     assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
 
 
+@freeze_time(FROZEN_TIME)
 def test_measurements_desc_default(client):
     """
     Test that the default ordering is descending by default
@@ -254,7 +280,7 @@ def test_measurements_desc_default(client):
 
     resp = client.get(
         "/api/v1/measurements",
-        params={"order_by": "measurement_start_time", "since": SINCE},
+        params={"order_by": "measurement_start_time"},
     )
     assert (
         resp.status_code == 200
@@ -415,6 +441,7 @@ def test_bad_report_id_wont_validate(client):
     assert resp.status_code == 422, resp.json()
 
 
+@freeze_time(FROZEN_TIME)
 def test_no_measurements_before_30_days(client):
     """
     The default filtering should not retrieve measurements older than 30 days since tomorrow
@@ -432,3 +459,18 @@ def test_no_measurements_before_30_days(client):
 def test_asn_to_int():
     assert measurements.asn_to_int("AS1234") == 1234
     assert measurements.asn_to_int("1234") == 1234
+
+
+def test_measurements_date_range_6_months_limit(client):
+    """
+    Tests that the /measurements endpoint enforces a 6-month date range limit.
+    """
+    # Range exceeding 6 months should return 400
+    resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-07-20"})
+    assert resp.status_code == 400, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
+    error_detail = resp.json()["detail"]
+    assert "time range must not exceed" in error_detail.lower(), f"Unexpected error message: {error_detail}"
+
+    # Range within 6 months should return 200
+    resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-04-01"})
+    assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"

@@ -1,34 +1,37 @@
-import pathlib
-from pathlib import Path
-import pytest
-import shutil
-import os
 import json
+import os
+import pathlib
+import shutil
 import time
 from datetime import datetime
-from typing import Dict, Any
+from pathlib import Path
+from typing import Any, Dict
 from urllib.request import urlopen
 
+import pytest
+import ujson
+from clickhouse_driver import Client as ClickhouseClient
 from fastapi.testclient import TestClient
 from pytest_docker.plugin import Services
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from clickhouse_driver import Client as ClickhouseClient
 
-import ujson
-
+from ooniprobe.common.clickhouse_utils import insert_click
 from ooniprobe.common.config import Settings
-from ooniprobe.common.clickhouse_utils import insert_click
 from ooniprobe.common.dependencies import get_settings
-from ooniprobe.dependencies import get_s3_client, _get_manifest, ManifestResponse, ManifestMeta, Manifest
-from ooniprobe.main import app
+from ooniprobe.dependencies import (
+    Manifest,
+    ManifestMeta,
+    ManifestResponse,
+    _get_manifest,
+    get_s3_client,
+    get_tor_targets_from_s3,
+)
 from ooniprobe.download_geoip import try_update
-from ooniprobe.common.clickhouse_utils import insert_click
-from .utils import setup_user
-from ooniprobe.dependencies import get_s3_client, get_tor_targets_from_s3
 from ooniprobe.main import app
-from ooniprobe.download_geoip import try_update
 from ooniprobe.routers.v1.probe_services import TorTarget
+
+from .utils import setup_user
 
 
 def make_override_get_settings(**kw):
@@ -110,22 +113,22 @@ def geoip_db_dir(fixture_path: Path):
     ooni_tempdir = fixture_path / "geoip"
     return str(ooni_tempdir)
 
-def make_manifest_mock_fn(public_params : str):
-    def get_manifest_mock():
 
+def make_manifest_mock_fn(public_params: str):
+    def get_manifest_mock():
         return ManifestResponse(
             manifest=Manifest(
-                submission_policy={"*/*" : "*"},
-                public_parameters=public_params
-                ),
-            meta = ManifestMeta(
+                submission_policy={"*/*": "*"}, public_parameters=public_params
+            ),
+            meta=ManifestMeta(
                 version="1",
                 last_modification_date=datetime.now(),
-                manifest_url="https://ooni.mock/manifest"
-                )
+                manifest_url="https://ooni.mock/manifest",
+            ),
         )
 
     return get_manifest_mock
+
 
 @pytest.fixture
 def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
@@ -139,6 +142,7 @@ def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     client = TestClient(app)
     yield client
 
+
 @pytest.fixture
 def test_creds():
     """
@@ -148,12 +152,18 @@ def test_creds():
     # (Secret key, public key)
     return (
         "ASAAAAAAAAAAXgJT5699LDE/QjmzDjsHcVP+EOxPO/aS4grULhSZqAsgAAAAAAAAAEf1WUPkxSb1cCAUAPvwqqtsOSiLd0m/BpY5HAZLvGQFAwAAAAAAAAAgAAAAAAAAABjrB0p6whCfu/5mDCtrZ/DSaPy+dC3LFL08taNMZ10KIAAAAAAAAAAC8BjxPSqTTnYT1IrWSFkHWvE3e/dstCrLo6GvN6+FAyAAAAAAAAAAyxD+iRjtKEHwRj1AwpDt0Sj4WI8pSDfoxB29G/8eYQ0=",
-        "ASAAAAAAAAAA0Dfe5U+8tRO3siBVVp+zEoC309fhfhtsVJIv2zpeD1cBIAAAAAAAAAAw/LnzUbQepSaQzI29yCH31/Q2Awq9NuTfgW4BQzorGwMAAAAAAAAAIAAAAAAAAABgspiZ6jNoM11fBO/JJ82Ry+QJ6S2mpOpCOmu2KsxGfiAAAAAAAAAACltCp9TukC2mNw0YYAAjqhXH2fsOYoz5FwcjE1bZoD0gAAAAAAAAAN4hyN9hpFgmOU37ynNgoIBLnSg+dObJ/yWRwt5/uYhh"
-        )
+        "ASAAAAAAAAAA0Dfe5U+8tRO3siBVVp+zEoC309fhfhtsVJIv2zpeD1cBIAAAAAAAAAAw/LnzUbQepSaQzI29yCH31/Q2Awq9NuTfgW4BQzorGwMAAAAAAAAAIAAAAAAAAABgspiZ6jNoM11fBO/JJ82Ry+QJ6S2mpOpCOmu2KsxGfiAAAAAAAAAACltCp9TukC2mNw0YYAAjqhXH2fsOYoz5FwcjE1bZoD0gAAAAAAAAAN4hyN9hpFgmOU37ynNgoIBLnSg+dObJ/yWRwt5/uYhh",
+    )
 
 
 @pytest.fixture
-def test_settings(alembic_migration: Any, geoip_db_dir: str, clickhouse_server: str, fastpath_server: str, test_creds):
+def test_settings(
+    alembic_migration: Any,
+    geoip_db_dir: str,
+    clickhouse_server: str,
+    fastpath_server: str,
+    test_creds,
+):
     (secret_key, _) = test_creds
     yield make_override_get_settings(
         postgresql_url=alembic_migration,
@@ -164,9 +174,9 @@ def test_settings(alembic_migration: Any, geoip_db_dir: str, clickhouse_server: 
         collector_id="1",
         fastpath_url=fastpath_server,
         anonc_manifest_bucket="test-bucket",
-        anonc_manifest_file = "manifest.json",
-        anonc_secret_key = secret_key,
-        tor_targets="./tests/fixtures/data/tor-targets.json"
+        anonc_manifest_file="manifest.json",
+        anonc_secret_key=secret_key,
+        tor_targets="./tests/fixtures/data/tor-targets.json",
     )
 
 
@@ -203,7 +213,6 @@ def clickhouse_db(clickhouse_server: str):
 
 
 class S3ClientMock:
-
     def __init__(self) -> None:
         self.files = []
 
@@ -214,9 +223,11 @@ class S3ClientMock:
 def get_s3_client_mock() -> S3ClientMock:
     return S3ClientMock()
 
+
 def get_tor_targets_from_s3_mock() -> Dict[str, TorTarget]:
     with open("./tests/fixtures/data/tor-targets.json", "r") as f:
         yield ujson.load(f)
+
 
 @pytest.fixture(scope="session")
 def fastpath_server(docker_ip: str | Any, docker_services: Services):
@@ -226,6 +237,7 @@ def fastpath_server(docker_ip: str | Any, docker_services: Services):
         timeout=30.0, pause=0.1, check=lambda: is_fastpath_running(url)
     )
     yield url
+
 
 def is_fastpath_running(url: str) -> bool:
     try:
@@ -251,6 +263,7 @@ def load_url_priorities(clickhouse_db: ClickhouseClient):
 
     query = "INSERT INTO url_priorities (sign, category_code, cc, domain, url, priority) VALUES"
     insert_click(clickhouse_db, query, j)
+
 
 @pytest.fixture(scope="function")
 def client_with_original_manifest(client):

@@ -148,6 +148,7 @@ def test_compute_priorities_country_list():
         }
     ]
 
+
 def test_show_countries_prioritization(client):
     c = client.get("/api/_/show_countries_prioritization").json()
     assert len(c) > 10
@@ -168,7 +169,14 @@ def test_show_countries_prioritization_csv(client):
     assert resp.status_code == 200
     assert resp.headers["content-type"] != "application/json"
 
+
 def test_debug_prioritization(client):
-    resp = client.get("/api/_/debug_prioritization?probe_cc=ZZ&category_codes=GOVT&probe_asn=4242")
+    resp = client.get(
+        "/api/_/debug_prioritization?probe_cc=ZZ&category_codes=GOVT&probe_asn=4242"
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    resp = client.get("/api/_/debug_prioritization")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/json"

@@ -14,6 +14,7 @@ import zstd
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
+from ..common.dependencies import ClickhouseDep
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..utils import (
     generate_report_id,
@@ -21,9 +22,11 @@ from ..utils import (
 
 from ..utils import error, compare_probe_msmt_cc_asn
 from ..metrics import Metrics
+
 router = APIRouter()
 
 log = logging.getLogger(__name__)
+
 
 class OpenReportRequest(BaseModel):
     """
@@ -101,6 +104,7 @@ async def receive_measurement(
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
     s3_client: S3ClientDep,
+    clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
 ) -> ReceiveMeasurementResponse | Dict[str, Any]:
     """
@@ -158,7 +162,6 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    compare_probe_msmt_cc_asn(cc, asn, request, cc_reader, asn_reader)
     # Use exponential back off with jitter between retries
     N_RETRIES = 3
     for t in range(N_RETRIES):
@@ -169,6 +172,10 @@ async def receive_measurement(
                 resp = await client.post(url, content=data, timeout=59)
 
             assert resp.status_code == 200, resp.content
+
+            compare_probe_msmt_cc_asn(
+                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
