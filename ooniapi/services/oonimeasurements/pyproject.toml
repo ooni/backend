@@ -74,6 +74,7 @@ dependencies = [
   "black",
   "pytest-asyncio",
   "pytest-docker",
+  "freezegun",
 ]
 path = ".venv/"
 

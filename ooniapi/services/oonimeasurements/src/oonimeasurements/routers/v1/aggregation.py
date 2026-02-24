@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
 from typing_extensions import Annotated
 
-from clickhouse_driver import Client as ClickhouseClient
 
 from sqlalchemy.sql.expression import and_, select, column
 from sqlalchemy.sql.expression import table as sql_table
@@ -20,6 +19,7 @@ from oonimeasurements.common.clickhouse_utils import query_click, query_click_on
 from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
 from oonimeasurements.common.dependencies import get_clickhouse_session
 from ...common.routers import BaseModel
+from ...utils.api import normalize_datetime
 
 router = APIRouter()
 
@@ -186,13 +186,21 @@ async def get_measurements(
     since: Annotated[
         Optional[date],
         Query(
-            description="""The start date of when measurements were run (ex. "2016-10-20T10:30:00")"""
+            description="""
+            The start date of when measurements were run (ex. "2016-10-20T10:30:00")
+
+            If not provided, defaults to "6 months ago"
+            """,
         ),
     ] = None,
     until: Annotated[
         Optional[date],
         Query(
-            description="""The end date of when measurement were run (ex. "2016-10-20T10:30:00")"""
+            description="""
+            The end date of when measurement were run (ex. "2016-10-20T10:30:00")
+
+            If not provided, defaults to "now"
+            """
         ),
     ] = None,
     time_grain: Annotated[
@@ -254,10 +262,21 @@ async def get_measurements(
     if probe_cc:
         probe_cc_s = commasplit(probe_cc)
 
+    now = datetime.now(timezone.utc)
+    six_months_ago = now - timedelta(days = 30 * 6)
+
     if since:
         since = datetime.combine(since, datetime.min.time())
+    else:
+        since = six_months_ago
+
     if until:
         until = datetime.combine(until, datetime.min.time())
+    else:
+        until = now
+
+    since = normalize_datetime(since)
+    until = normalize_datetime(until)
 
     inp = input or ""
     try:
@@ -272,7 +291,7 @@ async def get_measurements(
         return jerror(str(e), v=0, code=200)
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
-    cacheable = until and until < datetime.now() - timedelta(hours=72)
+    cacheable = until and until < datetime.now(timezone.utc) - timedelta(hours=72)
     cacheable = False  # FIXME
 
     # Assemble query
@@ -370,6 +389,7 @@ async def get_measurements(
 
     where_expr = and_(*where)
     query = select(*cols).where(where_expr).select_from(table)
+    log.debug(f"aggregations query: {query}")
 
     # Add group-by
     for g in group_by:

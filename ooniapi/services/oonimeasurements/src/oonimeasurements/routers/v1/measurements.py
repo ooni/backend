@@ -42,6 +42,7 @@ from urllib.request import urlopen
 from urllib.parse import urljoin, urlencode
 
 from ...common.config import Settings
+from ...utils.api import normalize_datetime
 from ...common.dependencies import get_settings
 from ...common.routers import BaseModel
 from ...common.utils import setcacheresponse, commasplit, setnocacheresponse
@@ -603,13 +604,17 @@ async def list_measurements(
     since: Annotated[
         Optional[datetime],
         Query(
-            description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
+            description=
+            "Start date of when measurements were run (ex. '2016-10-20T10:30:00'). Note that " +
+            "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     until: Annotated[
         Optional[datetime],
         Query(
-            description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
+            description=
+            "End date of when measurement were run (ex. '2016-10-20T10:30:00'). Note that " +
+            "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     confirmed: Annotated[
@@ -718,10 +723,26 @@ async def list_measurements(
     ### Prepare query parameters
     if until is None and report_id is None:
         t = datetime.now(timezone.utc) + timedelta(days=1)
-        until = datetime(t.year, t.month, t.day)
+        until = datetime(t.year, t.month, t.day, tzinfo=timezone.utc)
 
     if since is None and report_id is None and until is not None:
         since = until - timedelta(days=30)
+
+    # Normalize datetimes to UTC for consistent comparison
+    if since:
+        since = normalize_datetime(since)
+    if until:
+        until = normalize_datetime(until)
+
+    # 'since' before than 6 months ago?
+    if until and since:
+        days_diff = (until - since).days
+        MAX_DAYS = 30 * 6
+        if days_diff > MAX_DAYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Time range must not exceed 6 months. Requested: {days_diff} days (limit: {MAX_DAYS} days).",
+            )
 
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
@@ -827,7 +848,7 @@ async def list_measurements(
     elif domain or category_code:
         # both domain and category_code can be set at the same time
         if domain:
-            domain_list = domain.split(",")
+            domain_list = [s.strip() for s in domain.split(",")]
             query_params["domain"] = domain_list
             fpwhere.append(sql.text("domain IN :domain"))
 
@@ -849,6 +870,7 @@ async def list_measurements(
     # Assemble the "external" query. Run a final order by followed by limit and
     # offset
     query = fp_query.offset(offset).limit(limit)
+    log.debug(f"list measurements: {query}")
     query_params["param_1"] = limit
     query_params["param_2"] = offset
 
