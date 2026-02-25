@@ -281,7 +281,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     """
 
 
-def nan_to_none(val):
+def nan_to_none(val: Optional[float]):
     if val is None:
         return None
     if math.isnan(val):
