@@ -378,68 +378,52 @@ async def get_aggregation_analysis(
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
-    rows = db.execute(q, q_args)
-
-    fixed_cols = [
-        "probe_analysis",
-        "count",
-        "dns_blocked",
-        "dns_down",
-        "dns_ok",
-        "tls_blocked",
-        "tls_down",
-        "tls_ok",
-        "tcp_blocked",
-        "tcp_down",
-        "tcp_ok",
-        "dns_blocked_outcome",
-        "tcp_blocked_outcome",
-        "tls_blocked_outcome",
-        "likely_blocked_protocols",
-        "blocked_max_protocol",
-    ]
+    rows, columns = db.execute(
+        q,
+        params=q_args,
+        with_column_types=True,
+    )
 
     results: List[AggregationEntry] = []
-    if rows and isinstance(rows, list):
-        for row in rows:
-            d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
-            blocked_max_protocol = d["blocked_max_protocol"]
+    cols: List[str] = [name for name, _ in columns]
+    for row in rows:
+        d = dict(zip(cols, row))
 
-            loni = Loni(
-                dns_blocked=nan_to_none(d["dns_blocked"]),
-                dns_down=nan_to_none(d["dns_down"]),
-                dns_ok=nan_to_none(d["dns_ok"]),
-                tls_blocked=nan_to_none(d["tls_blocked"]),
-                tls_down=nan_to_none(d["tls_down"]),
-                tls_ok=nan_to_none(d["tls_ok"]),
-                tcp_blocked=nan_to_none(d["tcp_blocked"]),
-                tcp_down=nan_to_none(d["tcp_down"]),
-                tcp_ok=nan_to_none(d["tcp_ok"]),
-                likely_blocked_protocols=d["likely_blocked_protocols"],
-                blocked_max_outcome=(
-                    blocked_max_protocol[0] if blocked_max_protocol else ""
-                ),
-                blocked_max=(
-                    nan_to_none(blocked_max_protocol[1])
-                    if blocked_max_protocol
-                    else 0.0
-                ),
-                dns_blocked_outcome=d["dns_blocked_outcome"],
-                tcp_blocked_outcome=d["tcp_blocked_outcome"],
-                tls_blocked_outcome=d["tls_blocked_outcome"],
-            )
+        blocked_max_protocol = d["blocked_max_protocol"]
 
-            entry = AggregationEntry(
-                count=d["count"],
-                measurement_start_day=d.get("measurement_start_day"),
-                loni=loni,
-                domain=d.get("domain"),
-                probe_cc=d.get("probe_cc"),
-                probe_asn=d.get("probe_asn"),
-                test_name=d.get("test_name"),
-                input=d.get("input"),
-            )
-            results.append(entry)
+        loni = Loni(
+            dns_blocked=nan_to_none(d["dns_blocked"]),
+            dns_down=nan_to_none(d["dns_down"]),
+            dns_ok=nan_to_none(d["dns_ok"]),
+            tls_blocked=nan_to_none(d["tls_blocked"]),
+            tls_down=nan_to_none(d["tls_down"]),
+            tls_ok=nan_to_none(d["tls_ok"]),
+            tcp_blocked=nan_to_none(d["tcp_blocked"]),
+            tcp_down=nan_to_none(d["tcp_down"]),
+            tcp_ok=nan_to_none(d["tcp_ok"]),
+            likely_blocked_protocols=d["likely_blocked_protocols"],
+            blocked_max_outcome=(
+                blocked_max_protocol[0] if blocked_max_protocol else ""
+            ),
+            blocked_max=(
+                nan_to_none(blocked_max_protocol[1]) if blocked_max_protocol else 0.0
+            ),
+            dns_blocked_outcome=d["dns_blocked_outcome"],
+            tcp_blocked_outcome=d["tcp_blocked_outcome"],
+            tls_blocked_outcome=d["tls_blocked_outcome"],
+        )
+
+        entry = AggregationEntry(
+            count=d["count"],
+            measurement_start_day=d.get("measurement_start_day"),
+            loni=loni,
+            domain=d.get("domain"),
+            probe_cc=d.get("probe_cc"),
+            probe_asn=d.get("probe_asn"),
+            test_name=d.get("test_name"),
+            input=d.get("input"),
+        )
+        results.append(entry)
     return AggregationResponse(
         db_stats=DBStats(
             bytes=-1,
