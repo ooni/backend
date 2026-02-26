@@ -4,7 +4,7 @@ ARG BUILD_LABEL=docker
 
 WORKDIR /build
 
-RUN python -m pip install hatch
+RUN python -m pip install "hatch>=1.13" "virtualenv<21"
 
 COPY . /build
 
