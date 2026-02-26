@@ -470,7 +470,6 @@ class ChangePointEntry(BaseModel):
     probe_cc: str
     domain: str
     start_time: datetime  # TODO double check the naming of these datetime fields
-    end_time: datetime
     count_isp_resolver: int
     count_other_resolver: int
     count: int
