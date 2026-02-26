@@ -83,7 +83,6 @@ CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
     `dns_other_blocked` Nullable(Float32),
     `tcp_blocked` Nullable(Float32),
     `tls_blocked` Nullable(Float32),
-    `last_ts` DateTime64(3, 'UTC'),
     `dns_isp_blocked_current_state` String DEFAULT 'ok',
     `dns_isp_blocked_s_pos` Nullable(Float32),
     `dns_isp_blocked_s_neg` Nullable(Float32),
