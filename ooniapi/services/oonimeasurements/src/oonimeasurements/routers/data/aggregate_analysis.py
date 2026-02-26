@@ -513,7 +513,6 @@ class ChangePointEntry(BaseModel):
             probe_cc=g("probe_cc"),
             domain=g("domain"),
             start_time=g("ts"),
-            end_time=g("last_ts"),
             count_isp_resolver=g("count_isp_resolver"),
             count_other_resolver=g("count_other_resolver"),
             count=g("count"),
