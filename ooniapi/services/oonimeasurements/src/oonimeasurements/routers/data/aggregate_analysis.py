@@ -1,25 +1,24 @@
-from enum import Enum
-import time
+import logging
 import math
+import time
 from datetime import datetime
-from ...common.clickhouse_utils import query_click
-from typing import Any, List, Literal, Optional, Self, Tuple, Dict
-from typing_extensions import Annotated
+from enum import Enum
+from typing import Any, Dict, List, Literal, Optional, Self, Tuple
+
+import sqlalchemy as sql
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-import sqlalchemy as sql
+from typing_extensions import Annotated
 
-from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int
-from ...utils.api import ProbeCCOrNone, ProbeASNOrNone
-from ...dependencies import get_clickhouse_session, ClickhouseDep
+from ...common.clickhouse_utils import query_click
+from ...dependencies import ClickhouseDep, get_clickhouse_session
+from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
     utc_30_days_ago,
     utc_today,
 )
-
-import logging
-
+from .utils import TimeGrains, get_measurement_start_day_agg, parse_probe_asn_to_int
 
 router = APIRouter()
 
@@ -406,7 +405,6 @@ async def get_aggregation_analysis(
             d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
             blocked_max_protocol = d["blocked_max_protocol"]
 
-
             loni = Loni(
                 dns_blocked=nan_to_none(d["dns_blocked"]),
                 dns_down=nan_to_none(d["dns_down"]),
@@ -480,20 +478,16 @@ class ChangePointEntry(BaseModel):
     dns_other_blocked: float | None
     tcp_blocked: float | None
     tls_blocked: float | None
-    dns_isp_blocked_obs_w_sum: float | None
-    dns_isp_blocked_w_sum: float | None
+    dns_isp_blocked_current_state: str | None
     dns_isp_blocked_s_pos: float | None
     dns_isp_blocked_s_neg: float | None
-    dns_other_blocked_obs_w_sum: float | None
-    dns_other_blocked_w_sum: float | None
+    dns_other_blocked_current_state: str | None
     dns_other_blocked_s_pos: float | None
     dns_other_blocked_s_neg: float | None
-    tcp_blocked_obs_w_sum: float | None
-    tcp_blocked_w_sum: float | None
+    tcp_blocked_current_state: str | None
     tcp_blocked_s_pos: float | None
     tcp_blocked_s_neg: float | None
-    tls_blocked_obs_w_sum: float | None
-    tls_blocked_w_sum: float | None
+    tls_blocked_current_state: str | None
     tls_blocked_s_pos: float | None
     tls_blocked_s_neg: float | None
     change_dir: ChangeDir | None = Field(
@@ -501,7 +495,6 @@ class ChangePointEntry(BaseModel):
     )
     s_pos: float | None
     s_neg: float | None
-    current_mean: float | None
     h: float | None
     block_type: str
 
@@ -512,7 +505,7 @@ class ChangePointEntry(BaseModel):
         and converts it to a changepoint entry
         """
 
-        def g(s : str) -> Any | None:
+        def g(s: str) -> Any | None:
             return row.get(s)
 
         return ChangePointEntry(
@@ -524,32 +517,31 @@ class ChangePointEntry(BaseModel):
             count_isp_resolver=g("count_isp_resolver"),
             count_other_resolver=g("count_other_resolver"),
             count=g("count"),
-            dns_isp_blocked= nan_to_none(g("dns_isp_blocked")),
+            dns_isp_blocked=nan_to_none(g("dns_isp_blocked")),
             dns_other_blocked=nan_to_none(g("dns_other_blocked")),
             tcp_blocked=nan_to_none(g("tcp_blocked")),
             tls_blocked=nan_to_none(g("tls_blocked")),
-            dns_isp_blocked_obs_w_sum=nan_to_none(g("dns_isp_blocked_obs_w_sum")),
-            dns_isp_blocked_w_sum=nan_to_none(g("dns_isp_blocked_w_sum")),
+            dns_isp_blocked_current_state=nan_to_none(
+                g("dns_isp_blocked_current_state")
+            ),
             dns_isp_blocked_s_pos=nan_to_none(g("dns_isp_blocked_s_pos")),
             dns_isp_blocked_s_neg=nan_to_none(g("dns_isp_blocked_s_neg")),
-            dns_other_blocked_obs_w_sum=nan_to_none(g("dns_other_blocked_obs_w_sum")),
-            dns_other_blocked_w_sum=nan_to_none(g("dns_other_blocked_w_sum")),
+            dns_other_blocked_current_state=nan_to_none(
+                g("dns_other_blocked_current_state")
+            ),
             dns_other_blocked_s_pos=nan_to_none(g("dns_other_blocked_s_pos")),
             dns_other_blocked_s_neg=nan_to_none(g("dns_other_blocked_s_neg")),
-            tcp_blocked_obs_w_sum=nan_to_none(g("tcp_blocked_obs_w_sum")),
-            tcp_blocked_w_sum=nan_to_none(g("tcp_blocked_w_sum")),
+            tcp_blocked_current_state=nan_to_none(g("tcp_blocked_current_state")),
             tcp_blocked_s_pos=nan_to_none(g("tcp_blocked_s_pos")),
             tcp_blocked_s_neg=nan_to_none(g("tcp_blocked_s_neg")),
-            tls_blocked_obs_w_sum=nan_to_none(g("tls_blocked_obs_w_sum")),
-            tls_blocked_w_sum=nan_to_none(g("tls_blocked_w_sum")),
+            tls_blocked_current_state=nan_to_none(g("tls_blocked_current_state")),
             tls_blocked_s_pos=nan_to_none(g("tls_blocked_s_pos")),
             tls_blocked_s_neg=nan_to_none(g("tls_blocked_s_neg")),
             change_dir=ChangeDir.from_n_or_i(g("change_dir")),
             s_pos=nan_to_none(g("s_pos")),
             s_neg=nan_to_none(g("s_neg")),
-            current_mean=nan_to_none(g("current_mean")),
             h=nan_to_none(g("h")),
-            block_type= g("block_type")
+            block_type=g("block_type"),
         )  # type: ignore
 
 
