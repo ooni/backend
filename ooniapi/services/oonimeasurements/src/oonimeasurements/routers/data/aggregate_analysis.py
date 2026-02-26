@@ -465,11 +465,10 @@ class ChangeDir(str, Enum):
 
 
 class ChangePointEntry(BaseModel):
-    # TODO Double check which fields are actually necessary
     probe_asn: int
     probe_cc: str
     domain: str
-    start_time: datetime  # TODO double check the naming of these datetime fields
+    start_time: datetime
     count_isp_resolver: int
     count_other_resolver: int
     count: int
@@ -477,70 +476,57 @@ class ChangePointEntry(BaseModel):
     dns_other_blocked: float | None
     tcp_blocked: float | None
     tls_blocked: float | None
-    dns_isp_blocked_current_state: str | None
-    dns_isp_blocked_s_pos: float | None
-    dns_isp_blocked_s_neg: float | None
-    dns_other_blocked_current_state: str | None
-    dns_other_blocked_s_pos: float | None
-    dns_other_blocked_s_neg: float | None
-    tcp_blocked_current_state: str | None
-    tcp_blocked_s_pos: float | None
-    tcp_blocked_s_neg: float | None
-    tls_blocked_current_state: str | None
-    tls_blocked_s_pos: float | None
-    tls_blocked_s_neg: float | None
     change_dir: ChangeDir | None = Field(
         description="If blocking behaviour goes up or down"
     )
+    current_state: str | None
     s_pos: float | None
     s_neg: float | None
     h: float | None
     block_type: str
 
+    table = sql.table(
+        "event_detector_changepoints",
+        sql.column("probe_asn"),
+        sql.column("probe_cc"),
+        sql.column("domain"),
+        sql.column("ts"),
+        sql.column("count_isp_resolver"),
+        sql.column("count_other_resolver"),
+        sql.column("count"),
+        sql.column("dns_isp_blocked"),
+        sql.column("dns_other_blocked"),
+        sql.column("tcp_blocked"),
+        sql.column("tls_blocked"),
+        sql.column("change_dir"),
+        sql.column("current_state"),
+        sql.column("s_pos"),
+        sql.column("s_neg"),
+        sql.column("h"),
+        sql.column("block_type"),
+    )
+
     @classmethod
     def from_row(cls, row: Dict[str, Any]) -> Self:
-        """
-        Takes a row as it comes from the clickhouse table 'event_detector_changepoints'
-        and converts it to a changepoint entry
-        """
-
-        def g(s: str) -> Any | None:
-            return row.get(s)
-
-        return ChangePointEntry(
-            probe_asn=g("probe_asn"),
-            probe_cc=g("probe_cc"),
-            domain=g("domain"),
-            start_time=g("ts"),
-            count_isp_resolver=g("count_isp_resolver"),
-            count_other_resolver=g("count_other_resolver"),
-            count=g("count"),
-            dns_isp_blocked=nan_to_none(g("dns_isp_blocked")),
-            dns_other_blocked=nan_to_none(g("dns_other_blocked")),
-            tcp_blocked=nan_to_none(g("tcp_blocked")),
-            tls_blocked=nan_to_none(g("tls_blocked")),
-            dns_isp_blocked_current_state=nan_to_none(
-                g("dns_isp_blocked_current_state")
-            ),
-            dns_isp_blocked_s_pos=nan_to_none(g("dns_isp_blocked_s_pos")),
-            dns_isp_blocked_s_neg=nan_to_none(g("dns_isp_blocked_s_neg")),
-            dns_other_blocked_current_state=nan_to_none(
-                g("dns_other_blocked_current_state")
-            ),
-            dns_other_blocked_s_pos=nan_to_none(g("dns_other_blocked_s_pos")),
-            dns_other_blocked_s_neg=nan_to_none(g("dns_other_blocked_s_neg")),
-            tcp_blocked_current_state=nan_to_none(g("tcp_blocked_current_state")),
-            tcp_blocked_s_pos=nan_to_none(g("tcp_blocked_s_pos")),
-            tcp_blocked_s_neg=nan_to_none(g("tcp_blocked_s_neg")),
-            tls_blocked_current_state=nan_to_none(g("tls_blocked_current_state")),
-            tls_blocked_s_pos=nan_to_none(g("tls_blocked_s_pos")),
-            tls_blocked_s_neg=nan_to_none(g("tls_blocked_s_neg")),
-            change_dir=ChangeDir.from_n_or_i(g("change_dir")),
-            s_pos=nan_to_none(g("s_pos")),
-            s_neg=nan_to_none(g("s_neg")),
-            h=nan_to_none(g("h")),
-            block_type=g("block_type"),
-        )  # type: ignore
+        return cls(
+            probe_asn=row["probe_asn"],
+            probe_cc=row["probe_cc"],
+            domain=row["domain"],
+            start_time=row["ts"],
+            count_isp_resolver=row["count_isp_resolver"],
+            count_other_resolver=row["count_other_resolver"],
+            count=row["count"],
+            dns_isp_blocked=nan_to_none(row.get("dns_isp_blocked")),
+            dns_other_blocked=nan_to_none(row.get("dns_other_blocked")),
+            tcp_blocked=nan_to_none(row.get("tcp_blocked")),
+            tls_blocked=nan_to_none(row.get("tls_blocked")),
+            change_dir=ChangeDir.from_n_or_i(row.get("change_dir")),
+            current_state=row.get("current_state"),
+            s_pos=nan_to_none(row.get("s_pos")),
+            s_neg=nan_to_none(row.get("s_neg")),
+            h=nan_to_none(row.get("h")),
+            block_type=row["block_type"],
+        )
 
 
 class ListChangePointsResponse(BaseModel):
@@ -585,11 +571,9 @@ async def list_changepoints(
     conditions.append(sql.text("ts <= :until"))
     query_params["until"] = until
 
-    changepoints = sql.table("event_detector_changepoints")
-    q = sql.select("*").select_from(changepoints).where(sql.and_(*conditions))
-
-    query_result = query_click(clickhouse, q, query_params)
-
-    results = [ChangePointEntry.from_row(entry) for entry in query_result]
-
+    q = sql.select(ChangePointEntry.table).where(sql.and_(*conditions))
+    results = [
+        ChangePointEntry.from_row(row)
+        for row in query_click(clickhouse, q, query_params)
+    ]
     return ListChangePointsResponse(results=results)
