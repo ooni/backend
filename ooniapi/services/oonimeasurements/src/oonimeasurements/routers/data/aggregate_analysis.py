@@ -3,7 +3,7 @@ import math
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Self, Tuple
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Self, Tuple
 
 import sqlalchemy as sql
 from fastapi import APIRouter, Depends, Query
@@ -485,7 +485,7 @@ class ChangePointEntry(BaseModel):
     h: float | None
     block_type: str
 
-    table = sql.table(
+    table: ClassVar[sql.TableClause] = sql.table(
         "event_detector_changepoints",
         sql.column("probe_asn"),
         sql.column("probe_cc"),
