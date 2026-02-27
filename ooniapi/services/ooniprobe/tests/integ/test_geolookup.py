@@ -193,3 +193,7 @@ def check_mismatch(
     details = json.loads(row["details"])
     assert details["submission_cc"] == submission_cc
     assert details["submission_asn"] == submission_asn
+    assert "measurement_uid" in details
+    assert "software_name" in details
+    assert "software_version" in details
+    assert "platform" in details
