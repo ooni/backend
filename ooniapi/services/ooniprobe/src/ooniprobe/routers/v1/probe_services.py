@@ -1035,19 +1035,22 @@ def _check_and_register_geoip_anomaly(
     software_name: str,
     software_version: str,
 ) -> None:
-    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-    if actual_cc != cc or normalize_asn(actual_asn) != asn:
-        register_geoip_anomaly(
-            cc,
-            actual_cc,
-            asn,
-            actual_asn,
-            clickhouse,
-            msmt_uid,
-            platform,
-            software_name,
-            software_version,
-        )
+    try:
+        actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+        if actual_cc != cc or normalize_asn(actual_asn) != asn:
+            register_geoip_anomaly(
+                cc,
+                actual_cc,
+                asn,
+                actual_asn,
+                clickhouse,
+                msmt_uid,
+                platform,
+                software_name,
+                software_version,
+            )
+    except Exception as e:
+        log.error(f"Error checking for geoip anomalies: {e}")
 
 class CredentialUpdateRequest(BaseModel):
     old_manifest_version: str = Field(

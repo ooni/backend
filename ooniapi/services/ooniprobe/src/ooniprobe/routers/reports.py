@@ -222,21 +222,24 @@ def _check_and_register_geoip_anomaly(
     data: bytes,
 ) -> None:
     # check for geoip anomalies
-    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-    if actual_cc != cc or normalize_asn(actual_asn) != asn:
-        # expensive: parses measurement body and sends anomaly to clickhouse
-        platform, software_name, software_version = _parse_metadata(data)
-        register_geoip_anomaly(
-            cc,
-            actual_cc,
-            asn,
-            actual_asn,
-            clickhouse,
-            msmt_uid,
-            platform,
-            software_name,
-            software_version,
-        )
+    try:
+        actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+        if actual_cc != cc or normalize_asn(actual_asn) != asn:
+            # expensive: parses measurement body and sends anomaly to clickhouse
+            platform, software_name, software_version = _parse_metadata(data)
+            register_geoip_anomaly(
+                cc,
+                actual_cc,
+                asn,
+                actual_asn,
+                clickhouse,
+                msmt_uid,
+                platform,
+                software_name,
+                software_version,
+            )
+    except Exception as e:
+        log.error(f"Error checking for geoip anomalies: {e}")
 
 
 def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
