@@ -1,25 +1,24 @@
-from enum import Enum
-import time
+import logging
 import math
+import time
 from datetime import datetime
-from ...common.clickhouse_utils import query_click
-from typing import Any, List, Literal, Optional, Self, Tuple, Dict
-from typing_extensions import Annotated
+from enum import Enum
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Self, Tuple
+
+import sqlalchemy as sql
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-import sqlalchemy as sql
+from typing_extensions import Annotated
 
-from .utils import get_measurement_start_day_agg, TimeGrains, parse_probe_asn_to_int
-from ...utils.api import ProbeCCOrNone, ProbeASNOrNone
-from ...dependencies import get_clickhouse_session, ClickhouseDep
+from ...common.clickhouse_utils import query_click
+from ...dependencies import ClickhouseDep, get_clickhouse_session
+from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
     utc_30_days_ago,
     utc_today,
 )
-
-import logging
-
+from .utils import TimeGrains, get_measurement_start_day_agg, parse_probe_asn_to_int
 
 router = APIRouter()
 
@@ -379,69 +378,44 @@ async def get_aggregation_analysis(
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
-    rows = db.execute(q, q_args)
-
-    fixed_cols = [
-        "probe_analysis",
-        "count",
-        "dns_blocked",
-        "dns_down",
-        "dns_ok",
-        "tls_blocked",
-        "tls_down",
-        "tls_ok",
-        "tcp_blocked",
-        "tcp_down",
-        "tcp_ok",
-        "dns_blocked_outcome",
-        "tcp_blocked_outcome",
-        "tls_blocked_outcome",
-        "likely_blocked_protocols",
-        "blocked_max_protocol",
-    ]
 
     results: List[AggregationEntry] = []
-    if rows and isinstance(rows, list):
-        for row in rows:
-            d = dict(zip(list(extra_cols.keys()) + fixed_cols, row))
-            blocked_max_protocol = d["blocked_max_protocol"]
+    for d in query_click(db, q, q_args):
+        blocked_max_protocol = d["blocked_max_protocol"]
 
+        loni = Loni(
+            dns_blocked=nan_to_none(d["dns_blocked"]),
+            dns_down=nan_to_none(d["dns_down"]),
+            dns_ok=nan_to_none(d["dns_ok"]),
+            tls_blocked=nan_to_none(d["tls_blocked"]),
+            tls_down=nan_to_none(d["tls_down"]),
+            tls_ok=nan_to_none(d["tls_ok"]),
+            tcp_blocked=nan_to_none(d["tcp_blocked"]),
+            tcp_down=nan_to_none(d["tcp_down"]),
+            tcp_ok=nan_to_none(d["tcp_ok"]),
+            likely_blocked_protocols=d["likely_blocked_protocols"],
+            blocked_max_outcome=(
+                blocked_max_protocol[0] if blocked_max_protocol else ""
+            ),
+            blocked_max=(
+                nan_to_none(blocked_max_protocol[1]) if blocked_max_protocol else 0.0
+            ),
+            dns_blocked_outcome=d["dns_blocked_outcome"],
+            tcp_blocked_outcome=d["tcp_blocked_outcome"],
+            tls_blocked_outcome=d["tls_blocked_outcome"],
+        )
 
-            loni = Loni(
-                dns_blocked=nan_to_none(d["dns_blocked"]),
-                dns_down=nan_to_none(d["dns_down"]),
-                dns_ok=nan_to_none(d["dns_ok"]),
-                tls_blocked=nan_to_none(d["tls_blocked"]),
-                tls_down=nan_to_none(d["tls_down"]),
-                tls_ok=nan_to_none(d["tls_ok"]),
-                tcp_blocked=nan_to_none(d["tcp_blocked"]),
-                tcp_down=nan_to_none(d["tcp_down"]),
-                tcp_ok=nan_to_none(d["tcp_ok"]),
-                likely_blocked_protocols=d["likely_blocked_protocols"],
-                blocked_max_outcome=(
-                    blocked_max_protocol[0] if blocked_max_protocol else ""
-                ),
-                blocked_max=(
-                    nan_to_none(blocked_max_protocol[1])
-                    if blocked_max_protocol
-                    else 0.0
-                ),
-                dns_blocked_outcome=d["dns_blocked_outcome"],
-                tcp_blocked_outcome=d["tcp_blocked_outcome"],
-                tls_blocked_outcome=d["tls_blocked_outcome"],
-            )
-
-            entry = AggregationEntry(
-                count=d["count"],
-                measurement_start_day=d.get("measurement_start_day"),
-                loni=loni,
-                domain=d.get("domain"),
-                probe_cc=d.get("probe_cc"),
-                probe_asn=d.get("probe_asn"),
-                test_name=d.get("test_name"),
-                input=d.get("input"),
-            )
-            results.append(entry)
+        entry = AggregationEntry(
+            count=d["count"],
+            measurement_start_day=d.get("measurement_start_day"),
+            loni=loni,
+            domain=d.get("domain"),
+            probe_cc=d.get("probe_cc"),
+            probe_asn=d.get("probe_asn"),
+            test_name=d.get("test_name"),
+            input=d.get("input"),
+        )
+        results.append(entry)
     return AggregationResponse(
         db_stats=DBStats(
             bytes=-1,
@@ -467,12 +441,10 @@ class ChangeDir(str, Enum):
 
 
 class ChangePointEntry(BaseModel):
-    # TODO Double check which fields are actually necessary
     probe_asn: int
     probe_cc: str
     domain: str
-    start_time: datetime  # TODO double check the naming of these datetime fields
-    end_time: datetime
+    start_time: datetime
     count_isp_resolver: int
     count_other_resolver: int
     count: int
@@ -480,77 +452,57 @@ class ChangePointEntry(BaseModel):
     dns_other_blocked: float | None
     tcp_blocked: float | None
     tls_blocked: float | None
-    dns_isp_blocked_obs_w_sum: float | None
-    dns_isp_blocked_w_sum: float | None
-    dns_isp_blocked_s_pos: float | None
-    dns_isp_blocked_s_neg: float | None
-    dns_other_blocked_obs_w_sum: float | None
-    dns_other_blocked_w_sum: float | None
-    dns_other_blocked_s_pos: float | None
-    dns_other_blocked_s_neg: float | None
-    tcp_blocked_obs_w_sum: float | None
-    tcp_blocked_w_sum: float | None
-    tcp_blocked_s_pos: float | None
-    tcp_blocked_s_neg: float | None
-    tls_blocked_obs_w_sum: float | None
-    tls_blocked_w_sum: float | None
-    tls_blocked_s_pos: float | None
-    tls_blocked_s_neg: float | None
     change_dir: ChangeDir | None = Field(
         description="If blocking behaviour goes up or down"
     )
+    current_state: str | None
     s_pos: float | None
     s_neg: float | None
-    current_mean: float | None
     h: float | None
     block_type: str
 
+    table: ClassVar[sql.TableClause] = sql.table(
+        "event_detector_changepoints",
+        sql.column("probe_asn"),
+        sql.column("probe_cc"),
+        sql.column("domain"),
+        sql.column("ts"),
+        sql.column("count_isp_resolver"),
+        sql.column("count_other_resolver"),
+        sql.column("count"),
+        sql.column("dns_isp_blocked"),
+        sql.column("dns_other_blocked"),
+        sql.column("tcp_blocked"),
+        sql.column("tls_blocked"),
+        sql.column("change_dir"),
+        sql.column("current_state"),
+        sql.column("s_pos"),
+        sql.column("s_neg"),
+        sql.column("h"),
+        sql.column("block_type"),
+    )
+
     @classmethod
     def from_row(cls, row: Dict[str, Any]) -> Self:
-        """
-        Takes a row as it comes from the clickhouse table 'event_detector_changepoints'
-        and converts it to a changepoint entry
-        """
-
-        def g(s : str) -> Any | None:
-            return row.get(s)
-
-        return ChangePointEntry(
-            probe_asn=g("probe_asn"),
-            probe_cc=g("probe_cc"),
-            domain=g("domain"),
-            start_time=g("ts"),
-            end_time=g("last_ts"),
-            count_isp_resolver=g("count_isp_resolver"),
-            count_other_resolver=g("count_other_resolver"),
-            count=g("count"),
-            dns_isp_blocked= nan_to_none(g("dns_isp_blocked")),
-            dns_other_blocked=nan_to_none(g("dns_other_blocked")),
-            tcp_blocked=nan_to_none(g("tcp_blocked")),
-            tls_blocked=nan_to_none(g("tls_blocked")),
-            dns_isp_blocked_obs_w_sum=nan_to_none(g("dns_isp_blocked_obs_w_sum")),
-            dns_isp_blocked_w_sum=nan_to_none(g("dns_isp_blocked_w_sum")),
-            dns_isp_blocked_s_pos=nan_to_none(g("dns_isp_blocked_s_pos")),
-            dns_isp_blocked_s_neg=nan_to_none(g("dns_isp_blocked_s_neg")),
-            dns_other_blocked_obs_w_sum=nan_to_none(g("dns_other_blocked_obs_w_sum")),
-            dns_other_blocked_w_sum=nan_to_none(g("dns_other_blocked_w_sum")),
-            dns_other_blocked_s_pos=nan_to_none(g("dns_other_blocked_s_pos")),
-            dns_other_blocked_s_neg=nan_to_none(g("dns_other_blocked_s_neg")),
-            tcp_blocked_obs_w_sum=nan_to_none(g("tcp_blocked_obs_w_sum")),
-            tcp_blocked_w_sum=nan_to_none(g("tcp_blocked_w_sum")),
-            tcp_blocked_s_pos=nan_to_none(g("tcp_blocked_s_pos")),
-            tcp_blocked_s_neg=nan_to_none(g("tcp_blocked_s_neg")),
-            tls_blocked_obs_w_sum=nan_to_none(g("tls_blocked_obs_w_sum")),
-            tls_blocked_w_sum=nan_to_none(g("tls_blocked_w_sum")),
-            tls_blocked_s_pos=nan_to_none(g("tls_blocked_s_pos")),
-            tls_blocked_s_neg=nan_to_none(g("tls_blocked_s_neg")),
-            change_dir=ChangeDir.from_n_or_i(g("change_dir")),
-            s_pos=nan_to_none(g("s_pos")),
-            s_neg=nan_to_none(g("s_neg")),
-            current_mean=nan_to_none(g("current_mean")),
-            h=nan_to_none(g("h")),
-            block_type= g("block_type")
-        )  # type: ignore
+        return cls(
+            probe_asn=row["probe_asn"],
+            probe_cc=row["probe_cc"],
+            domain=row["domain"],
+            start_time=row["ts"],
+            count_isp_resolver=row["count_isp_resolver"],
+            count_other_resolver=row["count_other_resolver"],
+            count=row["count"],
+            dns_isp_blocked=nan_to_none(row.get("dns_isp_blocked")),
+            dns_other_blocked=nan_to_none(row.get("dns_other_blocked")),
+            tcp_blocked=nan_to_none(row.get("tcp_blocked")),
+            tls_blocked=nan_to_none(row.get("tls_blocked")),
+            change_dir=ChangeDir.from_n_or_i(row.get("change_dir")),
+            current_state=row.get("current_state"),
+            s_pos=nan_to_none(row.get("s_pos")),
+            s_neg=nan_to_none(row.get("s_neg")),
+            h=nan_to_none(row.get("h")),
+            block_type=row["block_type"],
+        )
 
 
 class ListChangePointsResponse(BaseModel):
@@ -595,11 +547,9 @@ async def list_changepoints(
     conditions.append(sql.text("ts <= :until"))
     query_params["until"] = until
 
-    changepoints = sql.table("event_detector_changepoints")
-    q = sql.select("*").select_from(changepoints).where(sql.and_(*conditions))
-
-    query_result = query_click(clickhouse, q, query_params)
-
-    results = [ChangePointEntry.from_row(entry) for entry in query_result]
-
+    q = sql.select(ChangePointEntry.table).where(sql.and_(*conditions))
+    results = [
+        ChangePointEntry.from_row(row)
+        for row in query_click(clickhouse, q, query_params)
+    ]
     return ListChangePointsResponse(results=results)

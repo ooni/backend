@@ -9,7 +9,7 @@ phases:
     runtime-versions:
       python: 3.11
     commands:
-      - pip install hatch
+      - pip install "hatch>=1.13" "virtualenv<21"
 
   pre_build:
     commands:
