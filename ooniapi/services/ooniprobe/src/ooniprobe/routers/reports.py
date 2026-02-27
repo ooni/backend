@@ -187,9 +187,6 @@ async def receive_measurement(
                 data=data,
             )
 
-            # compare_probe_msmt_cc_asn(
-            #     msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
-            # )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
