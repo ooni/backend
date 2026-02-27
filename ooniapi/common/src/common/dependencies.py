@@ -3,8 +3,10 @@ from typing import Annotated, TypeAlias
 
 from clickhouse_driver import Client as Clickhouse
 
+import boto3
 from fastapi import Depends
 from fastapi import HTTPException, Header
+from mypy_boto3_s3 import S3Client
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -71,3 +73,11 @@ def get_postgresql_session(settings: SettingsDep):
 
 
 PostgresDep = Annotated[Session, Depends(get_postgresql_session)]
+
+
+def get_s3_client() -> S3Client:
+    s3 = boto3.client("s3")
+    return s3
+
+
+S3ClientDep = Annotated[S3Client, Depends(get_s3_client)]
