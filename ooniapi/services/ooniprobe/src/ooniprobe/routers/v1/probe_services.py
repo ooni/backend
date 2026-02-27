@@ -4,12 +4,6 @@ import logging
 from datetime import datetime, timezone, timedelta
 import time
 from typing import (
-    Annotated,
-    List,
-    Optional,
-    Any,
-    Dict,
-    Tuple,
     List,
     Any,
     Dict,
@@ -18,18 +12,13 @@ from typing import (
     Annotated,
 )
 import random
-import time
-from datetime import datetime, timedelta, timezone
 from hashlib import sha512
-from typing import Annotated, Any, Dict, List, Optional, Tuple
 
 import geoip2
 import geoip2.errors
 from fastapi import APIRouter, HTTPException, Query, Response, Request
-from prometheus_client import Counter, Info, Gauge
 from pydantic import Field, IPvAnyAddress
-from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
-from pydantic import Field, IPvAnyAddress
+from fastapi import status, Header
 from ooniauth_py import (
     ProtocolError,
     CredentialError,
@@ -38,15 +27,6 @@ from ooniauth_py import (
 )
 import httpx
 import ujson
-from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
-from ooniauth_py import (
-    CredentialError,
-    DeserializationFailed,
-    ProtocolError,
-    ServerState,
-)
-from prometheus_client import Counter, Gauge, Info
-from pydantic import Field, IPvAnyAddress
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
@@ -68,28 +48,16 @@ from ...dependencies import (
     TorTargetsDep,
 )
 from ...utils import (
-    compare_probe_msmt_cc_asn,
     error,
     extract_probe_ipaddr,
     generate_report_id,
+    get_cc_asn,
     lookup_probe_cc,
     lookup_probe_network,
-    error,
-    compare_probe_msmt_cc_asn,
-)
-from ...common.utils import setcacheresponse
-from ...common.prio import (
-    FailoverTestListDep,
-    failover_generate_test_list,
-    generate_test_list,
+    normalize_asn,
+    register_geoip_anomaly,
 )
 
-from ...dependencies import (
-    ManifestDep,
-    ManifestResponse,
-    PostgresSessionDep,
-    S3ClientDep,
-)
 from ..reports import Metrics
 
 router = APIRouter(prefix="/v1")
@@ -977,6 +945,10 @@ async def submit_measurement(
         )
         _raise_manifest_not_found(submit_request.manifest_version)
 
+    platform = submit_request.content.get("platform") or ""
+    software_name = submit_request.content.get("software_name") or ""
+    software_version = submit_request.content.get("software_version") or ""
+
     data = submit_request.model_dump()
 
     # Add verification-related data.
@@ -1008,9 +980,20 @@ async def submit_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            # Check for geoip anomalies
+            _check_and_register_geoip_anomaly(
+                request=request,
+                cc_reader=cc_reader,
+                asn_reader=asn_reader,
+                clickhouse=clickhouse,
+                cc=cc,
+                asn=asn,
+                msmt_uid=msmt_uid,
+                platform=platform,
+                software_name=software_name,
+                software_version=software_version,
             )
+
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
                 is_verified=is_verified,
@@ -1039,6 +1022,32 @@ async def submit_measurement(
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
 
+
+def _check_and_register_geoip_anomaly(
+    request: Request,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    clickhouse: ClickhouseDep,
+    cc: str,
+    asn: str,
+    msmt_uid: str,
+    platform: str,
+    software_name: str,
+    software_version: str,
+) -> None:
+    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != asn:
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
 
 class CredentialUpdateRequest(BaseModel):
     old_manifest_version: str = Field(

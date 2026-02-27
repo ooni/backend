@@ -4,7 +4,8 @@ import logging
 import random
 from datetime import datetime, timezone
 from hashlib import sha512
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+import ujson
 
 import httpx
 from fastapi import Request, Response, APIRouter, Header
@@ -17,10 +18,12 @@ from ..common.utils import setnocacheresponse
 from ..common.dependencies import ClickhouseDep
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..utils import (
+    error,
     generate_report_id,
+    get_cc_asn,
+    normalize_asn,
+    register_geoip_anomaly,
 )
-
-from ..utils import error, compare_probe_msmt_cc_asn
 from ..metrics import Metrics
 
 router = APIRouter()
@@ -173,9 +176,20 @@ async def receive_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            _check_and_register_geoip_anomaly(
+                request=request,
+                cc_reader=cc_reader,
+                asn_reader=asn_reader,
+                clickhouse=clickhouse,
+                cc=cc,
+                asn=asn,
+                msmt_uid=msmt_uid,
+                data=data,
             )
+
+            # compare_probe_msmt_cc_asn(
+            #     msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            # )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
@@ -199,6 +213,50 @@ async def receive_measurement(
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
+
+def _check_and_register_geoip_anomaly(
+    request: Request,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    clickhouse: ClickhouseDep,
+    cc: str,
+    asn: str,
+    msmt_uid: str,
+    data: bytes,
+) -> None:
+    # check for geoip anomalies
+    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != asn:
+        # expensive: parses measurement body and sends anomaly to clickhouse
+        platform, software_name, software_version = _parse_metadata(data)
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+
+
+def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
+    """
+    Parse measurement body, and return the following metadata:
+
+    platform, software_name, software_version
+    """
+    try:
+        body = ujson.loads(data.decode("utf-8"))
+    except Exception:
+        return ("", "", "")
+    content = body.get("content") or {}
+    platform = content.get("platform") or ""
+    software_name = content.get("software_name") or ""
+    software_version = content.get("software_version") or ""
+    return (platform, software_name, software_version)
 
 
 @timer(name="close_report")
