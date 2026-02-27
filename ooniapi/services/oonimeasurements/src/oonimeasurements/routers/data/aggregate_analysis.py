@@ -378,17 +378,9 @@ async def get_aggregation_analysis(
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
-    rows, columns = db.execute(
-        q,
-        params=q_args,
-        with_column_types=True,
-    )
 
     results: List[AggregationEntry] = []
-    cols: List[str] = [name for name, _ in columns]
-    for row in rows:
-        d = dict(zip(cols, row))
-
+    for d in query_click(db, q, q_args):
         blocked_max_protocol = d["blocked_max_protocol"]
 
         loni = Loni(
