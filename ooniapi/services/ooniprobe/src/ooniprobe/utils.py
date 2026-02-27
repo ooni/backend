@@ -162,10 +162,14 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
     raise HTTPException(status_code=status_code, detail=msg)
 
 
-def normalize_asn(asn: str) -> str:
-    """Return ASN as numeric string (strip 'AS' prefix if present)."""
+def normalize_asn(asn: str) -> int:
+    """Return ASN as int (strip 'AS' prefix if present). Invalid values return 0."""
     s = str(asn).strip()
-    return s[2:] if s.startswith("AS") else s
+    s = s[2:] if s.startswith("AS") else s
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        return 0
 
 
 def get_cc_asn(
@@ -196,24 +200,25 @@ def compare_probe_msmt_cc_asn(
         cc = cc.upper()
         ipaddr = extract_probe_ipaddr(request)
         db_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
-        db_asn = normalize_asn(db_asn)
-        if db_cc == cc and db_asn == asn:
+        db_asn_raw, _ = lookup_probe_network(ipaddr, asn_reader)
+        norm_db_asn = normalize_asn(db_asn_raw)
+        norm_sub_asn = normalize_asn(asn)
+        if db_cc == cc and norm_db_asn == norm_sub_asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
         if db_cc != cc:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        if db_asn != asn:
+        if norm_db_asn != norm_sub_asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
-        if db_asn != asn or db_cc != cc:
+        if norm_db_asn != norm_sub_asn or db_cc != cc:
             details = ujson.dumps(
                 {
                     "submission_cc": cc,
-                    "submission_asn": int(asn),
+                    "submission_asn": norm_sub_asn,
                     "measurement_uid": measurement_uid,
                     "software_name": software_name,
                     "software_version": software_version,
-                    "platform" : platform
+                    "platform": platform,
                 }
             )
 
@@ -226,7 +231,7 @@ def compare_probe_msmt_cc_asn(
                     wait_for_async_insert=0
                 VALUES
                 """,
-                [("geoip", db_cc, int(db_asn), details)],
+                [("geoip", db_cc, norm_db_asn, details)],
                 max_execution_time=5,
             )
 
@@ -245,19 +250,18 @@ def register_geoip_anomaly(
     software_name: str,
     software_version: str,
 ) -> None:
-    """Record a geoip mismatch in faulty_measurements (same shape as compare_probe_msmt_cc_asn)."""
-    try:
-        asn_int = int(normalize_asn(actual_asn))
-    except (ValueError, TypeError):
-        asn_int = 0
-    try:
-        sub_asn_int = int(normalize_asn(asn))
-    except (ValueError, TypeError):
-        sub_asn_int = 0
+    """Record a geoip mismatch in faulty_measurements."""
+    norm_actual_asn = normalize_asn(actual_asn)
+    norm_sub_asn = normalize_asn(asn)
+    if actual_cc != cc:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
+    if norm_actual_asn != norm_sub_asn:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+
     details = ujson.dumps(
         {
             "submission_cc": cc.upper(),
-            "submission_asn": sub_asn_int,
+            "submission_asn": norm_sub_asn,
             "measurement_uid": measurement_uid,
             "software_name": software_name,
             "software_version": software_version,
@@ -273,7 +277,7 @@ def register_geoip_anomaly(
             wait_for_async_insert=0
         VALUES
         """,
-        [("geoip", actual_cc, asn_int, details)],
+        [("geoip", actual_cc, norm_actual_asn, details)],
         max_execution_time=5,
     )
 

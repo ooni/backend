@@ -224,7 +224,7 @@ def _check_and_register_geoip_anomaly(
     # check for geoip anomalies
     try:
         actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-        if actual_cc != cc or normalize_asn(actual_asn) != asn:
+        if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
             # expensive: parses measurement body and sends anomaly to clickhouse
             platform, software_name, software_version = _parse_metadata(data)
             register_geoip_anomaly(
@@ -238,6 +238,8 @@ def _check_and_register_geoip_anomaly(
                 software_name,
                 software_version,
             )
+        else:
+            Metrics.PROBE_CC_ASN_MATCH.inc()
     except Exception as e:
         log.error(f"Error checking for geoip anomalies: {e}")
 
