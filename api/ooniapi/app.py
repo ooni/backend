@@ -3,12 +3,11 @@ from __future__ import absolute_import
 import datetime
 import logging
 import os
-import json
 import re
 import sys
 from collections import deque
 
-from flask import Flask
+from flask import Flask, json
 
 from flask_cors import CORS  # debdeps: python3-flask-cors
 
@@ -33,7 +32,7 @@ from ooniapi.database import init_clickhouse_db
 APP_DIR = os.path.dirname(__file__)
 
 
-class JSONEncoderWithDates(json.JSONEncoder):
+class FlaskJSONEncoder(json.JSONEncoder):
     # Special JSON encoder that handles dates
     def default(self, o):
         if isinstance(o, datetime.datetime):
@@ -177,7 +176,7 @@ def create_app(*args, testmode=False, **kw):
     from ooniapi import views
 
     app = Flask(__name__)
-    app.json_encoder = JSONEncoderWithDates
+    app.json_encoder = FlaskJSONEncoder
 
     # Order matters
     init_app(app, testmode=testmode)
