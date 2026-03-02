@@ -168,7 +168,8 @@ def normalize_asn(asn: str) -> int:
     s = s[2:] if s.startswith("AS") else s
     try:
         return int(s)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        log.error(f"Invalid asn: {e}")
         return 0
 
 
@@ -200,21 +201,20 @@ def compare_probe_msmt_cc_asn(
         cc = cc.upper()
         ipaddr = extract_probe_ipaddr(request)
         db_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn_raw, _ = lookup_probe_network(ipaddr, asn_reader)
-        norm_db_asn = normalize_asn(db_asn_raw)
-        norm_sub_asn = normalize_asn(asn)
-        if db_cc == cc and norm_db_asn == norm_sub_asn:
+        db_asn = normalize_asn(lookup_probe_network(ipaddr, asn_reader)[0])
+        sub_asn = normalize_asn(asn)
+        if db_cc == cc and db_asn == sub_asn:
             Metrics.PROBE_CC_ASN_MATCH.inc()
         if db_cc != cc:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        if norm_db_asn != norm_sub_asn:
+        if db_asn != sub_asn:
             Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
-        if norm_db_asn != norm_sub_asn or db_cc != cc:
+        if db_asn != sub_asn or db_cc != cc:
             details = ujson.dumps(
                 {
                     "submission_cc": cc,
-                    "submission_asn": norm_sub_asn,
+                    "submission_asn": sub_asn,
                     "measurement_uid": measurement_uid,
                     "software_name": software_name,
                     "software_version": software_version,
@@ -231,7 +231,7 @@ def compare_probe_msmt_cc_asn(
                     wait_for_async_insert=0
                 VALUES
                 """,
-                [("geoip", db_cc, norm_db_asn, details)],
+                [("geoip", db_cc, db_asn, details)],
                 max_execution_time=5,
             )
 
@@ -251,17 +251,17 @@ def register_geoip_anomaly(
     software_version: str,
 ) -> None:
     """Record a geoip mismatch in faulty_measurements."""
-    norm_actual_asn = normalize_asn(actual_asn)
-    norm_sub_asn = normalize_asn(asn)
+    sub_asn = normalize_asn(asn)
+    actual_asn_int = normalize_asn(actual_asn)
     if actual_cc != cc:
         Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-    if norm_actual_asn != norm_sub_asn:
+    if actual_asn_int != sub_asn:
         Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
     details = ujson.dumps(
         {
             "submission_cc": cc.upper(),
-            "submission_asn": norm_sub_asn,
+            "submission_asn": sub_asn,
             "measurement_uid": measurement_uid,
             "software_name": software_name,
             "software_version": software_version,
@@ -277,7 +277,7 @@ def register_geoip_anomaly(
             wait_for_async_insert=0
         VALUES
         """,
-        [("geoip", actual_cc, norm_actual_asn, details)],
+        [("geoip", actual_cc, actual_asn_int, details)],
         max_execution_time=5,
     )
 
