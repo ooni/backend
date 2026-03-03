@@ -176,16 +176,19 @@ async def receive_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            _check_and_register_geoip_anomaly(
-                request=request,
-                cc_reader=cc_reader,
-                asn_reader=asn_reader,
-                clickhouse=clickhouse,
-                cc=cc,
-                asn=asn,
-                msmt_uid=msmt_uid,
-                data=data,
-            )
+            try: # Make sure an error in this function won't trigger a retry
+                _check_and_register_geoip_anomaly(
+                    request=request,
+                    cc_reader=cc_reader,
+                    asn_reader=asn_reader,
+                    clickhouse=clickhouse,
+                    cc=cc,
+                    asn=asn,
+                    msmt_uid=msmt_uid,
+                    data=data,
+                )
+            except Exception as e:
+                log.error(f"Error checking for geoip anomalies: {e}")
 
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
@@ -222,26 +225,23 @@ def _check_and_register_geoip_anomaly(
     data: bytes,
 ) -> None:
     # check for geoip anomalies
-    try:
-        actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-        if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
-            # expensive: parses measurement body and sends anomaly to clickhouse
-            platform, software_name, software_version = _parse_metadata(data)
-            register_geoip_anomaly(
-                cc,
-                actual_cc,
-                asn,
-                actual_asn,
-                clickhouse,
-                msmt_uid,
-                platform,
-                software_name,
-                software_version,
-            )
-        else:
-            Metrics.PROBE_CC_ASN_MATCH.inc()
-    except Exception as e:
-        log.error(f"Error checking for geoip anomalies: {e}")
+    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        # expensive: parses measurement body and sends anomaly to clickhouse
+        platform, software_name, software_version = _parse_metadata(data)
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+    else:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
 
 
 def _parse_metadata(data: bytes) -> Tuple[str, str, str]:

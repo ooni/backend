@@ -980,18 +980,22 @@ async def submit_measurement(
             assert resp.status_code == 200, resp.content
 
             # Check for geoip anomalies
-            _check_and_register_geoip_anomaly(
-                request=request,
-                cc_reader=cc_reader,
-                asn_reader=asn_reader,
-                clickhouse=clickhouse,
-                cc=cc,
-                asn=asn,
-                msmt_uid=msmt_uid,
-                platform=platform,
-                software_name=software_name,
-                software_version=software_version,
-            )
+
+            try: # Make sure an exception in this function will not trigger a retry
+                _check_and_register_geoip_anomaly(
+                    request=request,
+                    cc_reader=cc_reader,
+                    asn_reader=asn_reader,
+                    clickhouse=clickhouse,
+                    cc=cc,
+                    asn=asn,
+                    msmt_uid=msmt_uid,
+                    platform=platform,
+                    software_name=software_name,
+                    software_version=software_version,
+                )
+            except Exception as e:
+                log.error(f"Error checking for geoip anomalies: {e}")
 
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
@@ -1034,24 +1038,21 @@ def _check_and_register_geoip_anomaly(
     software_name: str,
     software_version: str,
 ) -> None:
-    try:
-        actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-        if actual_cc != cc or actual_asn != asn:
-            register_geoip_anomaly(
-                cc,
-                actual_cc,
-                asn,
-                actual_asn,
-                clickhouse,
-                msmt_uid,
-                platform,
-                software_name,
-                software_version,
-            )
-        else:
-            Metrics.PROBE_CC_ASN_MATCH.inc()
-    except Exception as e:
-        log.error(f"Error checking for geoip anomalies: {e}")
+    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    if actual_cc != cc or actual_asn != asn:
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+    else:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
 
 class CredentialUpdateRequest(BaseModel):
     old_manifest_version: str = Field(
