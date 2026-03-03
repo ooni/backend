@@ -21,7 +21,6 @@ from ..utils import (
     error,
     generate_report_id,
     get_cc_asn,
-    normalize_asn,
     register_geoip_anomaly,
 )
 from ..metrics import Metrics
@@ -224,7 +223,7 @@ def _check_and_register_geoip_anomaly(
     # check for geoip anomalies
     try:
         actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-        if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        if actual_cc != cc or actual_asn != asn:
             # expensive: parses measurement body and sends anomaly to clickhouse
             platform, software_name, software_version = _parse_metadata(data)
             register_geoip_anomaly(
