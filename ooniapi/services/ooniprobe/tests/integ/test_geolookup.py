@@ -170,14 +170,14 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
 
 def check_mismatch(
-    clickhouse_db : Clickhouse,
+    clickhouse : Clickhouse,
     submission_cc: str,
     submission_asn: int,
     actual_cc: str,
     actual_asn: int,
 ):
     row = query_click_one_row(
-        clickhouse_db,
+        clickhouse,
         """
         SELECT *
         FROM faulty_measurements
