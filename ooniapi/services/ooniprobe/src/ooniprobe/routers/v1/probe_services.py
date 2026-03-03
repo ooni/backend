@@ -54,7 +54,6 @@ from ...utils import (
     get_cc_asn,
     lookup_probe_cc,
     lookup_probe_network,
-    normalize_asn,
     register_geoip_anomaly,
 )
 
@@ -1037,7 +1036,7 @@ def _check_and_register_geoip_anomaly(
 ) -> None:
     try:
         actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-        if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        if actual_cc != cc or actual_asn != asn:
             register_geoip_anomaly(
                 cc,
                 actual_cc,

@@ -174,8 +174,7 @@ def normalize_asn(asn: str) -> int:
 
 
 def get_cc_asn(
-    request: Request, cc_reader: CCReaderDep, asn_reader: ASNReaderDep
-) -> Tuple[str, str]:
+    request: Request, cc_reader: CCReaderDep, asn_reader: ASNReaderDep) -> Tuple[str, str]:
     ipaddr = extract_probe_ipaddr(request)
     cc = lookup_probe_cc(ipaddr, cc_reader)
     asn, _ = lookup_probe_network(ipaddr, asn_reader)
