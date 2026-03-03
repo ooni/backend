@@ -970,6 +970,7 @@ async def submit_measurement(
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
     N_RETRIES = 3
+    success = False
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
@@ -979,29 +980,8 @@ async def submit_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            # Check for geoip anomalies
-
-            try: # Make sure an exception in this function will not trigger a retry
-                _check_and_register_geoip_anomaly(
-                    request=request,
-                    cc_reader=cc_reader,
-                    asn_reader=asn_reader,
-                    clickhouse=clickhouse,
-                    cc=cc,
-                    asn=asn,
-                    msmt_uid=msmt_uid,
-                    platform=platform,
-                    software_name=software_name,
-                    software_version=software_version,
-                )
-            except Exception as e:
-                log.error(f"Error checking for geoip anomalies: {e}")
-
-            return SubmitMeasurementResponse(
-                measurement_uid=msmt_uid,
-                is_verified=is_verified,
-                submit_response=submit_response,
-            )
+            success = True
+            break
 
         except Exception as exc:
             log.error(
@@ -1009,6 +989,29 @@ async def submit_measurement(
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
+
+    if success:
+        try: # Make sure an exception in this function will not trigger a retry
+            _check_and_register_geoip_anomaly(
+                request=request,
+                cc_reader=cc_reader,
+                asn_reader=asn_reader,
+                clickhouse=clickhouse,
+                cc=cc,
+                asn=asn,
+                msmt_uid=msmt_uid,
+                platform=platform,
+                software_name=software_name,
+                software_version=software_version,
+            )
+        except Exception as e:
+            log.error(f"Error checking for geoip anomalies: {e}")
+
+        return SubmitMeasurementResponse(
+                measurement_uid=msmt_uid,
+                is_verified=is_verified,
+                submit_response=submit_response,
+            )
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
 

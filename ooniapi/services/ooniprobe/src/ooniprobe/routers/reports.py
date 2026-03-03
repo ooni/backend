@@ -167,6 +167,7 @@ async def receive_measurement(
 
     # Use exponential back off with jitter between retries
     N_RETRIES = 3
+    success = False
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
@@ -176,21 +177,8 @@ async def receive_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            try: # Make sure an error in this function won't trigger a retry
-                _check_and_register_geoip_anomaly(
-                    request=request,
-                    cc_reader=cc_reader,
-                    asn_reader=asn_reader,
-                    clickhouse=clickhouse,
-                    cc=cc,
-                    asn=asn,
-                    msmt_uid=msmt_uid,
-                    data=data,
-                )
-            except Exception as e:
-                log.error(f"Error checking for geoip anomalies: {e}")
-
-            return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+            success = True
+            break
 
         except Exception as exc:
             log.error(
@@ -198,6 +186,23 @@ async def receive_measurement(
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
+
+    if success:
+        try: # Make sure an error in this function won't trigger a retry
+            _check_and_register_geoip_anomaly(
+                request=request,
+                cc_reader=cc_reader,
+                asn_reader=asn_reader,
+                clickhouse=clickhouse,
+                cc=cc,
+                asn=asn,
+                msmt_uid=msmt_uid,
+                data=data,
+            )
+        except Exception as e:
+            log.error(f"Error checking for geoip anomalies: {e}")
+
+        return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
