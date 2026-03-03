@@ -170,14 +170,14 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
 
 def check_mismatch(
-    clickhouse_db : Clickhouse,
+    clickhouse : Clickhouse,
     submission_cc: str,
     submission_asn: int,
     actual_cc: str,
     actual_asn: int,
 ):
     row = query_click_one_row(
-        clickhouse_db,
+        clickhouse,
         """
         SELECT *
         FROM faulty_measurements
@@ -193,3 +193,7 @@ def check_mismatch(
     details = json.loads(row["details"])
     assert details["submission_cc"] == submission_cc
     assert details["submission_asn"] == submission_asn
+    assert "measurement_uid" in details
+    assert "software_name" in details
+    assert "software_version" in details
+    assert "platform" in details

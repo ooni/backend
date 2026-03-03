@@ -4,7 +4,8 @@ import logging
 import random
 from datetime import datetime, timezone
 from hashlib import sha512
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+import ujson
 
 import httpx
 from fastapi import Request, Response, APIRouter, Header
@@ -17,10 +18,12 @@ from ..common.utils import setnocacheresponse
 from ..common.dependencies import ClickhouseDep
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..utils import (
+    error,
     generate_report_id,
+    get_cc_asn,
+    normalize_asn,
+    register_geoip_anomaly,
 )
-
-from ..utils import error, compare_probe_msmt_cc_asn
 from ..metrics import Metrics
 
 router = APIRouter()
@@ -164,6 +167,7 @@ async def receive_measurement(
 
     # Use exponential back off with jitter between retries
     N_RETRIES = 3
+    success = False
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
@@ -173,10 +177,8 @@ async def receive_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
-            )
-            return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+            success = True
+            break
 
         except Exception as exc:
             log.error(
@@ -184,6 +186,23 @@ async def receive_measurement(
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
+
+    if success:
+        try: # Make sure an error in this function won't trigger a retry
+            _check_and_register_geoip_anomaly(
+                request=request,
+                cc_reader=cc_reader,
+                asn_reader=asn_reader,
+                clickhouse=clickhouse,
+                cc=cc,
+                asn=asn,
+                msmt_uid=msmt_uid,
+                data=data,
+            )
+        except Exception as e:
+            log.error(f"Error checking for geoip anomalies: {e}")
+
+        return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
@@ -199,6 +218,52 @@ async def receive_measurement(
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
+
+def _check_and_register_geoip_anomaly(
+    request: Request,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    clickhouse: ClickhouseDep,
+    cc: str,
+    asn: str,
+    msmt_uid: str,
+    data: bytes,
+) -> None:
+    # check for geoip anomalies
+    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        # expensive: parses measurement body and sends anomaly to clickhouse
+        platform, software_name, software_version = _parse_metadata(data)
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+    else:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
+
+
+def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
+    """
+    Parse measurement body, and return the following metadata:
+
+    platform, software_name, software_version
+    """
+    try:
+        body = ujson.loads(data.decode("utf-8"))
+    except Exception:
+        return ("", "", "")
+    content = body.get("content") or {}
+    platform = content.get("platform") or ""
+    software_name = content.get("software_name") or ""
+    software_version = content.get("software_version") or ""
+    return (platform, software_name, software_version)
 
 
 @timer(name="close_report")
