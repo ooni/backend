@@ -182,63 +182,6 @@ def get_cc_asn(
 
     return cc, asn
 
-def compare_probe_msmt_cc_asn(
-    measurement_uid: str,
-    cc: str,
-    asn: str,
-    platform: str,
-    software_name: str,
-    software_version: str,
-    request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
-    clickhouse: ClickhouseDep,
-):
-    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
-    Generates a metric.
-    """
-    try:
-        cc = cc.upper()
-        ipaddr = extract_probe_ipaddr(request)
-        db_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn = normalize_asn(lookup_probe_network(ipaddr, asn_reader)[0])
-        sub_asn = normalize_asn(asn)
-        if db_cc == cc and db_asn == sub_asn:
-            Metrics.PROBE_CC_ASN_MATCH.inc()
-        if db_cc != cc:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        if db_asn != sub_asn:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
-
-        if db_asn != sub_asn or db_cc != cc:
-            details = ujson.dumps(
-                {
-                    "submission_cc": cc,
-                    "submission_asn": sub_asn,
-                    "measurement_uid": measurement_uid,
-                    "software_name": software_name,
-                    "software_version": software_version,
-                    "platform": platform,
-                }
-            )
-
-            insert_click(
-                clickhouse,
-                """
-                INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
-                SETTINGS
-                    async_insert=1,
-                    wait_for_async_insert=0
-                VALUES
-                """,
-                [("geoip", db_cc, db_asn, details)],
-                max_execution_time=5,
-            )
-
-    except Exception as e:
-        log.error(f"Error comparing msm cc and asn: {e}")
-
-
 def register_geoip_anomaly(
     cc: str,
     actual_cc: str,
