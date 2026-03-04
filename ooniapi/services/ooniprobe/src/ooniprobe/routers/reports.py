@@ -260,7 +260,8 @@ def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
     except Exception:
         return ("", "", "")
     content = body.get("content") or {}
-    platform = content.get("platform") or ""
+    annotations = content.get("annotations") or {}
+    platform = annotations.get("platform") or ""
     software_name = content.get("software_name") or ""
     software_version = content.get("software_version") or ""
     return (platform, software_name, software_version)
