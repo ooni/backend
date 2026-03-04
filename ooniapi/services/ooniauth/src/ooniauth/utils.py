@@ -11,6 +11,7 @@ from .common.auth import create_jwt
 VALID_REDIRECT_TO_FQDN = (
     "explorer.ooni.org",
     "explorer.test.ooni.org",
+    "explorer.dev.ooni.org",
     "run.ooni.io",
     "run.ooni.org",
     "run.test.ooni.org",
