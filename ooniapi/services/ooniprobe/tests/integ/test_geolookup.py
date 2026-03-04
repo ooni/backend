@@ -6,7 +6,9 @@ from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.common.clickhouse_utils import query_click_one_row
 from clickhouse_driver import Client as Clickhouse
-from ..utils import postj
+from ..utils import postj, setup_user
+from ..test_anoncred import make_measurement, make_report_request
+
 
 def fake_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
     return ("AS4242", "Testing Networks")
@@ -76,7 +78,8 @@ def patched_lookup_probe_network(ipaddr: str, asn_reader) -> Tuple[str, str]:
 
     return d.get(ipaddr, ("AS0", ""))
 
-def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
+
+def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
 
     monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
     monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)
@@ -114,9 +117,6 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     )
     rid = c["report_id"]
 
-    # Clear table before starting
-    clickhouse_db.execute("TRUNCATE TABLE faulty_measurements")
-
     # matching cc and asn
     postj(
         client,
@@ -125,13 +125,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         headers={"X-Forwarded-For": "123.123.123.123"},
     )
     time.sleep(0.1)  # Allow async insert to complete
-    r = query_click_one_row(
-        clickhouse_db,
-        "SELECT count(*) as total FROM faulty_measurements",
-        {},
-    )
-
-    assert r and r["total"] == 0, r
+    _check_fm_count(clickhouse_db, 0)
 
     # cc mismatch only
     postj(
@@ -141,13 +135,8 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         headers={"X-Forwarded-For": "123.123.123.124"},
     )
     time.sleep(0.1)  # Allow async insert to complete
-    r = query_click_one_row(
-        clickhouse_db,
-        "SELECT count(*) as total FROM faulty_measurements",
-        {},
-    )
-    assert r and r["total"] == 1, r
-    check_mismatch(clickhouse_db, "VE", 65550, "US", 65550)
+    _check_fm_count(clickhouse_db, 1)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65550)
 
     # ASN mismatch only
     postj(
@@ -157,13 +146,8 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         headers={"X-Forwarded-For": "123.123.123.125"},
     )
     time.sleep(0.1)  # Allow async insert to complete
-    r = query_click_one_row(
-        clickhouse_db,
-        "SELECT count(*) as total FROM faulty_measurements",
-        {},
-    )
-    assert r and r["total"] == 2, r
-    check_mismatch(clickhouse_db, "VE", 65550, "VE", 65551)
+    _check_fm_count(clickhouse_db, 2)
+    _check_mismatch(clickhouse_db, "VE", 65550, "VE", 65551)
 
     # both cc and ASN mismatch
     postj(
@@ -173,15 +157,83 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         headers={"X-Forwarded-For": "123.123.123.126"},
     )
     time.sleep(0.1)  # Allow async insert to complete
-    r = query_click_one_row(
-        clickhouse_db,
-        "SELECT count(*) as total FROM faulty_measurements",
-        {},
-    )
-    assert r and r["total"] == 3, r
-    check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
+    _check_fm_count(clickhouse_db, 3)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
 
-def check_mismatch(
+
+def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
+    # Use the same patched geoip lookup to force mismatches
+    monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
+    monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)
+
+    # Open a report for the anoncred submit endpoint
+    report_req = make_report_request(probe_cc="VE", probe_asn="AS65550")
+    c = postj(client, "/report", report_req)
+    rid = c["report_id"]
+
+    # Create anoncred user and submit_request
+    user, manifest_version, emission_day = setup_user(client)
+    submit_request = user.make_submit_request("VE", "AS65550", emission_day)
+
+    # Build measurement body used by /api/v1/submit_measurement/{rid}
+    msm = make_measurement(
+        submit_request.nym,
+        submit_request.request,
+        emission_day,
+        manifest_version,
+        probe_cc="VE",
+        probe_asn="AS65550",
+    )
+    msm_content = msm.setdefault("content", {})
+    msm_content["software_name"] = "ooni-integ-test"
+    msm_content["software_version"] = "0.0.0"
+    msm_content["annotations"] = {"platform": "linux"}
+
+
+    # matching cc and asn
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.123"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 0)
+
+    # cc mismatch only
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.124"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 1)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65550)
+
+    # ASN mismatch only
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.125"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 2)
+    _check_mismatch(clickhouse_db, "VE", 65550, "VE", 65551)
+
+    # both cc and ASN mismatch
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.126"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 3)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
+
+def _check_mismatch(
     clickhouse : Clickhouse,
     submission_cc: str,
     submission_asn: int,
@@ -209,3 +261,15 @@ def check_mismatch(
     assert "software_name" in details and details['software_name']
     assert "software_version" in details and details['software_version']
     assert "platform" in details and details['platform']
+
+def _check_fm_count(clickhouse_db: Clickhouse, expected: int) -> None:
+    """
+    Checks that there are exactly `expected` faulty measurements entries
+    """
+
+    r = query_click_one_row(
+        clickhouse_db,
+        "SELECT count(*) as total FROM faulty_measurements",
+        {},
+    )
+    assert r and r["total"] == expected, r

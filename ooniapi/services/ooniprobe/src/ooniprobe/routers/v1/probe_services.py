@@ -54,6 +54,7 @@ from ...utils import (
     get_cc_asn,
     lookup_probe_cc,
     lookup_probe_network,
+    normalize_asn,
     register_geoip_anomaly,
 )
 
@@ -944,7 +945,8 @@ async def submit_measurement(
         )
         _raise_manifest_not_found(submit_request.manifest_version)
 
-    platform = submit_request.content.get("platform") or ""
+    annotations = submit_request.content.get("annotations") or {}
+    platform = annotations.get("platform") or ""
     software_name = submit_request.content.get("software_name") or ""
     software_version = submit_request.content.get("software_version") or ""
 
@@ -1042,7 +1044,7 @@ def _check_and_register_geoip_anomaly(
     software_version: str,
 ) -> None:
     actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
-    if actual_cc != cc or actual_asn != asn:
+    if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
         register_geoip_anomaly(
             cc,
             actual_cc,
