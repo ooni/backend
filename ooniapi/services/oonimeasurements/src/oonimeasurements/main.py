@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         # allow from observable notebooks
-        allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+        allow_origin_regex="^https://[-A-Za-z0-9]+(\.(test|dev))?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
         # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
         allow_credentials=True,
         allow_methods=["*"],
