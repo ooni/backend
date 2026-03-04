@@ -257,7 +257,8 @@ def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
     """
     try:
         body = ujson.loads(data.decode("utf-8"))
-    except Exception:
+    except Exception as e:
+        log.error(f"Couldn't parse json body: {e}")
         return ("", "", "")
     content = body.get("content") or {}
     annotations = content.get("annotations") or {}
