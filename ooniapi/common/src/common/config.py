@@ -54,6 +54,11 @@ class Settings(BaseSettings):
         ""  # filename of json containing Tor bridges and DirAuth endpoints
     )
 
+    geoip_metadata_active: bool = Field(
+        default=False,
+        description="Activates extra metadata collection for geoip anomalies"
+    )
+
     # Used to store history of all manifests and retrieve next manifest to use
     anonc_manifest_bucket: str = Field(
         default="CHANGEME",

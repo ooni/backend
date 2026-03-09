@@ -15,7 +15,7 @@ import zstd
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..common.dependencies import ClickhouseDep
+from ..common.dependencies import ClickhouseDep, Settings
 from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
 from ..utils import (
     error,
@@ -198,6 +198,7 @@ async def receive_measurement(
                 asn=asn,
                 msmt_uid=msmt_uid,
                 data=data,
+                settings=settings
             )
         except Exception as e:
             log.error(f"Error checking for geoip anomalies: {e}")
@@ -228,12 +229,18 @@ def _check_and_register_geoip_anomaly(
     asn: str,
     msmt_uid: str,
     data: bytes,
+    settings: Settings
 ) -> None:
-    # check for geoip anomalies
+
     actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
     if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+
         # expensive: parses measurement body and sends anomaly to clickhouse
-        platform, software_name, software_version = _parse_metadata(data)
+        if settings.geoip_metadata_active:
+            platform, software_name, software_version = _parse_metadata(data)
+        else:
+            platform, software_name, software_version = "", "", ""
+
         register_geoip_anomaly(
             cc,
             actual_cc,
