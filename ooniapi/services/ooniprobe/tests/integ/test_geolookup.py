@@ -81,7 +81,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
     monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)
 
-    report_req = {
+    j = {
         "data_format_version": "0.2.0",
         "format": "json",
         "probe_asn": "AS65550",
@@ -93,35 +93,23 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
         "test_version": "0.1.0",
     }
 
-    report_body = {
-        "format": "json",
-        "content": {
-            "probe_asn": "AS65550",
-            "probe_cc": "VE",
-            "software_name": "ooni-integ-test",
-            "software_version": "0.0.0",
-            "annotations": {"platform": "linux"},
-            "test_name": "web_connectivity",
-            "test_start_time": "2020-09-09 14:11:11",
-            "test_version": "0.1.0",
-        },
-    }
-
     c = postj(
         client,
         "/report",
-        report_req,
+        j,
     )
     rid = c["report_id"]
 
     # Clear table before starting
     clickhouse_db.execute("TRUNCATE TABLE faulty_measurements")
 
+    body = {"format": "json", "content": {}}
+
     # matching cc and asn
     postj(
         client,
         f"/report/{rid}",
-        report_body,
+        body,
         headers={"X-Forwarded-For": "123.123.123.123"},
     )
     time.sleep(0.1)  # Allow async insert to complete
@@ -137,7 +125,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     postj(
         client,
         f"/report/{rid}",
-        report_body,
+        body,
         headers={"X-Forwarded-For": "123.123.123.124"},
     )
     time.sleep(0.1)  # Allow async insert to complete
@@ -153,7 +141,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     postj(
         client,
         f"/report/{rid}",
-        report_body,
+        body,
         headers={"X-Forwarded-For": "123.123.123.125"},
     )
     time.sleep(0.1)  # Allow async insert to complete
@@ -169,7 +157,7 @@ def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
     postj(
         client,
         f"/report/{rid}",
-        report_body,
+        body,
         headers={"X-Forwarded-For": "123.123.123.126"},
     )
     time.sleep(0.1)  # Allow async insert to complete
@@ -205,7 +193,7 @@ def check_mismatch(
     details = json.loads(row["details"])
     assert details["submission_cc"] == submission_cc
     assert details["submission_asn"] == submission_asn
-    assert "measurement_uid" in details and details['measurement_uid']
-    assert "software_name" in details and details['software_name']
-    assert "software_version" in details and details['software_version']
-    assert "platform" in details and details['platform']
+    assert "measurement_uid" in details
+    assert "software_name" in details
+    assert "software_version" in details
+    assert "platform" in details
