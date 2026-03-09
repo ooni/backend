@@ -1,7 +1,6 @@
 from typing import Tuple
 import json
 import time
-import pytest
 import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
@@ -77,7 +76,6 @@ def patched_lookup_probe_network(ipaddr: str, asn_reader) -> Tuple[str, str]:
 
     return d.get(ipaddr, ("AS0", ""))
 
-@pytest.mark.skip
 def test_geoip_mismatch(client, clickhouse_db, monkeypatch):
 
     monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
