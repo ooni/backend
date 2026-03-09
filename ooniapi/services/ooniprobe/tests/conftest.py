@@ -212,6 +212,15 @@ def clickhouse_db(clickhouse_server: str):
     yield ClickhouseClient.from_url(clickhouse_server)
 
 
+@pytest.fixture(scope="function")
+def clean_faulty_measurements(clickhouse_db: ClickhouseClient):
+    """
+    Ensure faulty_measurements is empty after each test
+    """
+    yield
+    clickhouse_db.execute("TRUNCATE TABLE faulty_measurements")
+
+
 class S3ClientMock:
     def __init__(self) -> None:
         self.files = []
