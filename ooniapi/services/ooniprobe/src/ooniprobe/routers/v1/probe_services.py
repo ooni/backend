@@ -998,13 +998,13 @@ async def submit_measurement(
 
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
+    client = request.app.state.fastpath_client
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data_bin, timeout=59)
+            resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
 
