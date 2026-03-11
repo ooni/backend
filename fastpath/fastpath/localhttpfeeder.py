@@ -10,8 +10,9 @@ from logging import getLogger
 
 log = getLogger(__file__)
 
-API_PORT = 8472
-
+API_PORT = int(os.environ.get("FASTPATH_API_PORT", 8472))
+QUEUE_PUT_TIMEOUT = int(os.environ.get("FASTPATH_QUEUE_PUT_TIMEOUT", 5))
+WORKER_TIMEOUT = int(os.environ.get("FASTPATH_WORKER_TIMEOUT", 30))
 
 class MsmtFeeder(BaseApplication):
     def __init__(self, app, conf):
@@ -40,12 +41,15 @@ def start_http_api(queue):
                 log.debug(f"Read measurement uid: {msmt_uid}")
                 data = environ["wsgi.input"].read()
                 msm_tup = (data, None, msmt_uid)
-                queue.put(msm_tup, block=True, timeout=5)
+                queue.put(msm_tup, block=True, timeout=QUEUE_PUT_TIMEOUT)
             except Exception as e:
                 log.error(f"Error trying to read request {msmt_uid}: {e}")
 
         start_response("200 OK", [])
         return [b""]
 
-    options = {"bind": f"0.0.0.0:{API_PORT}"}
+    options = {
+        "bind": f"0.0.0.0:{API_PORT}",
+        "worker_timeout": WORKER_TIMEOUT,
+    }
     MsmtFeeder(handler_app, options).run()
