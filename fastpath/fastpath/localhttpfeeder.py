@@ -4,7 +4,7 @@
 """
 Receive measurements by listening on localhost
 """
-
+import os
 from gunicorn.app.base import BaseApplication
 from logging import getLogger
 
