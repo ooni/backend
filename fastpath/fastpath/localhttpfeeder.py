@@ -40,7 +40,7 @@ def start_http_api(queue):
                 log.debug(f"Read measurement uid: {msmt_uid}")
                 data = environ["wsgi.input"].read()
                 msm_tup = (data, None, msmt_uid)
-                queue.put(msm_tup, block=False, timeout=10)
+                queue.put(msm_tup, block=True, timeout=5)
             except Exception as e:
                 log.error(f"Error trying to read request {msmt_uid}: {e}")
 
