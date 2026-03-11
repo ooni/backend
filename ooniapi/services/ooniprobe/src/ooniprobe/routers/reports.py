@@ -173,7 +173,7 @@ async def receive_measurement(
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
             async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data, timeout=59)
+                resp = await client.post(url, content=data, timeout=5)
 
             assert resp.status_code == 200, resp.content
 
