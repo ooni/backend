@@ -1,7 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
 from typing import Optional
-from urllib.request import urlopen
 
 import boto3
 import httpx

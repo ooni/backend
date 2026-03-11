@@ -24,7 +24,7 @@ docker run -d --name $CONTAINER_NAME -p $PORT:80 ${IMAGE}
 
 trap cleanup INT TERM EXIT
 
-sleep 2
+sleep 4
 response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT/health)
 if [ "${response}" -eq 200 ]; then
   echo "Smoke test passed: Received 200 OK from /health endpoint."

@@ -972,8 +972,15 @@ async def submit_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            await run_in_threadpool(
+                compare_probe_msmt_cc_asn,
+                msmt_uid,
+                cc,
+                asn,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
             )
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
