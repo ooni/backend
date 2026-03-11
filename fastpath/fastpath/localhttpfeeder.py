@@ -6,6 +6,9 @@ Receive measurements by listening on localhost
 """
 
 from gunicorn.app.base import BaseApplication
+from logging import getLogger
+
+log = getLogger(__file__)
 
 API_PORT = 8472
 
@@ -33,9 +36,13 @@ def start_http_api(queue):
             path = environ["PATH_INFO"]
             assert path.startswith("/2")
             msmt_uid = path[1:]
-            data = environ["wsgi.input"].read()
-            msm_tup = (data, None, msmt_uid)
-            queue.put(msm_tup, block=True)
+            try:
+                log.debug(f"Read measurement uid: {msmt_uid}")
+                data = environ["wsgi.input"].read()
+                msm_tup = (data, None, msmt_uid)
+                queue.put(msm_tup, block=False, timeout=10)
+            except Exception as e:
+                log.error(f"Error trying to read request {msmt_uid}: {e}")
 
         start_response("200 OK", [])
         return [b""]
