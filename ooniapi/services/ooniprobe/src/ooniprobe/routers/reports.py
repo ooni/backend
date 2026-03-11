@@ -184,7 +184,7 @@ async def receive_measurement(
             log.error(
                 f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
+            sleep_time = random.uniform(1, 2**(t+1))
             await asyncio.sleep(sleep_time)
 
     if success:
