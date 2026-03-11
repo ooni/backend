@@ -863,7 +863,6 @@ async def submit_measurement(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
-    s3_client: S3ClientDep,
     manifest: ManifestDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
@@ -991,9 +990,13 @@ async def submit_measurement(
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
+    data_buff.seek(0)
     try:
-        s3_client.upload_fileobj(
-            data_buff, Bucket=settings.failed_reports_bucket, Key=report_id
+        await run_in_threadpool(
+            request.app.state.s3_client.upload_fileobj,
+            data_buff,
+            Bucket=settings.failed_reports_bucket,
+            Key=report_id,
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")

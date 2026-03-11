@@ -50,6 +50,7 @@ async def lifespan(
     app.state.fastpath_client = httpx.AsyncClient(
         timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
     )
+    app.state.s3_client = boto3.client("s3")
 
     yield
 
