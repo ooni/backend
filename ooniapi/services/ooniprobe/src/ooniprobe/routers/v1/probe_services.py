@@ -947,6 +947,7 @@ async def submit_measurement(
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
     ujson.dump(data, stream)
+    stream.flush()
     data_bin = data_buff.getvalue()
 
     # Write the whole body of the measurement in a directory based on a 1-hour
