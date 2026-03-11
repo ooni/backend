@@ -169,7 +169,7 @@ async def receive_measurement(
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
             async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data, timeout=5)
+                resp = await client.post(url, content=data, timeout=30)
 
             assert resp.status_code == 200, resp.content
 
@@ -180,7 +180,7 @@ async def receive_measurement(
 
         except Exception as exc:
             log.error(
-                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
+                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
             sleep_time = random.uniform(1, 2**(t+1))
             await asyncio.sleep(sleep_time)
