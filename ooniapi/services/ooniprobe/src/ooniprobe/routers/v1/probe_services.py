@@ -1,42 +1,21 @@
 import asyncio
 import io
 import logging
-from datetime import datetime, timezone, timedelta
-import time
-from typing import (
-    Annotated,
-    List,
-    Optional,
-    Any,
-    Dict,
-    Tuple,
-    List,
-    Any,
-    Dict,
-    Tuple,
-    Optional,
-    Annotated,
-)
 import random
 import time
 from datetime import datetime, timedelta, timezone
 from hashlib import sha512
-from typing import Annotated, Any, Dict, List, Optional, Tuple
+from typing import (
+    Annotated,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, HTTPException, Query, Response, Request
-from prometheus_client import Counter, Info, Gauge
-from pydantic import Field, IPvAnyAddress
-from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
-from pydantic import Field, IPvAnyAddress
-from ooniauth_py import (
-    ProtocolError,
-    CredentialError,
-    DeserializationFailed,
-    ServerState,
-)
-import httpx
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from ooniauth_py import (
@@ -45,8 +24,8 @@ from ooniauth_py import (
     ProtocolError,
     ServerState,
 )
-from prometheus_client import Counter, Gauge, Info
 from pydantic import Field, IPvAnyAddress
+from starlette.concurrency import run_in_threadpool
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
@@ -74,21 +53,6 @@ from ...utils import (
     generate_report_id,
     lookup_probe_cc,
     lookup_probe_network,
-    error,
-    compare_probe_msmt_cc_asn,
-)
-from ...common.utils import setcacheresponse
-from ...common.prio import (
-    FailoverTestListDep,
-    failover_generate_test_list,
-    generate_test_list,
-)
-
-from ...dependencies import (
-    ManifestDep,
-    ManifestResponse,
-    PostgresSessionDep,
-    S3ClientDep,
 )
 from ..reports import Metrics
 
