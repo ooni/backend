@@ -5,7 +5,7 @@ from urllib.request import urlopen
 
 import boto3
 import httpx
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
@@ -109,6 +109,7 @@ class HealthStatus(BaseModel):
 
 @app.get("/health")
 async def health(
+    request: Request,
     settings: SettingsDep,
     s3: S3ClientDep,
     db: PostgresSessionDep,
@@ -127,9 +128,9 @@ async def health(
         log.error(e)
 
     try:
-        response = urlopen(settings.fastpath_url)
-        assert response.status == 200, (
-            "Unexpected status trying to connect to fastpath: " + str(response.status)
+        resp = await app.state.fastpath_client.get(settings.fastpath_url)
+        assert resp.status_code == 200, (
+            "Unexpected status trying to connect to fastpath: " + str(resp.status_code)
         )
     except Exception as exc:
         log.error(str(exc))
