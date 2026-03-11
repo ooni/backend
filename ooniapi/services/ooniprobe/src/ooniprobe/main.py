@@ -3,6 +3,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.request import urlopen
 
+import httpx
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -51,8 +52,13 @@ async def lifespan(
 
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
+    app.state.fastpath_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+    )
 
     yield
+
+    await app.state.fastpath_client.aclose()
 
 
 def init_ooniauth():
