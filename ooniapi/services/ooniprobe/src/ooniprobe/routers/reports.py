@@ -10,6 +10,7 @@ import httpx
 from fastapi import Request, Response, APIRouter, Header
 from pydantic import Field
 import zstd
+from starlette.concurrency import run_in_threadpool
 
 from ..common.metrics import timer
 from ..common.routers import BaseModel
@@ -163,18 +164,25 @@ async def receive_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     # Use exponential back off with jitter between retries
+    client = request.app.state.fastpath_client
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data, timeout=30)
+            resp = await client.post(url, content=data)
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            run_in_threadpool(
+                compare_probe_msmt_cc_asn,
+                msmt_uid,
+                cc,
+                asn,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
             )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
@@ -189,8 +197,11 @@ async def receive_measurement(
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     try:
-        s3_client.upload_fileobj(
-            io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id
+        await run_in_threadpool(
+            request.app.state.s3_client.upload_fileobj,
+            io.BytesIO(data),
+            Bucket=settings.failed_reports_bucket,
+            Key=report_id,
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
