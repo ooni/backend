@@ -188,9 +188,9 @@ async def receive_measurement(
 
         except Exception as exc:
             log.error(
-                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
-            sleep_time = random.uniform(1, 2**(t+1))
+            sleep_time = random.uniform(0.3, 2 ** (t + 1))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
