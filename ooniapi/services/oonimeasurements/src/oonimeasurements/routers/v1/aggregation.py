@@ -2,22 +2,21 @@
 Aggregation API
 """
 
-from datetime import datetime, timedelta, date, timezone
-from typing import List, Any, Dict, Optional, Union
 import logging
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from typing_extensions import Annotated
-
-
-from sqlalchemy.sql.expression import and_, select, column
+from sqlalchemy.sql.expression import and_, column, select
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
+from typing_extensions import Annotated
 
 from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
-from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
 from oonimeasurements.common.dependencies import get_clickhouse_session
+from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
+
 from ...common.routers import BaseModel
 from ...utils.api import normalize_datetime
 
@@ -263,7 +262,7 @@ async def get_measurements(
         probe_cc_s = commasplit(probe_cc)
 
     now = datetime.now(timezone.utc)
-    six_months_ago = now - timedelta(days = 30 * 6)
+    six_months_ago = now - timedelta(days=30 * 6)
 
     if since:
         since = datetime.combine(since, datetime.min.time())

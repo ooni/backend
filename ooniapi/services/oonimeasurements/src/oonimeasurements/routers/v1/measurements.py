@@ -604,17 +604,15 @@ async def list_measurements(
     since: Annotated[
         Optional[datetime],
         Query(
-            description=
-            "Start date of when measurements were run (ex. '2016-10-20T10:30:00'). Note that " +
-            "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
+            description="Start date of when measurements were run (ex. '2016-10-20T10:30:00'). Note that "
+            + "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     until: Annotated[
         Optional[datetime],
         Query(
-            description=
-            "End date of when measurement were run (ex. '2016-10-20T10:30:00'). Note that " +
-            "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
+            description="End date of when measurement were run (ex. '2016-10-20T10:30:00'). Note that "
+            + "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     confirmed: Annotated[
