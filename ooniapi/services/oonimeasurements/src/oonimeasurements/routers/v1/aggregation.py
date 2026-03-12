@@ -13,7 +13,10 @@ from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
 from typing_extensions import Annotated
 
-from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
+from oonimeasurements.common.clickhouse_utils import (
+    async_query_click,
+    async_query_click_one_row,
+)
 from oonimeasurements.common.dependencies import get_clickhouse_session
 from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
 
@@ -400,7 +403,8 @@ async def get_measurements(
             if time_grain == "hour":
                 str_format = "%Y-%m-%dT%H:%M:%SZ"
             r: Any = []
-            for row in query_click(db, query, query_params, query_prio=4):
+            res = await async_query_click(db, query, query_params, query_prio=4)
+            for row in res:
                 ## Handle the difference in formatting between hourly and daily measurement_start_day
                 if "measurement_start_day" in row:
                     row["measurement_start_day"] = row[
@@ -408,7 +412,7 @@ async def get_measurements(
                     ].strftime(str_format)
                 r.append(row)
         else:
-            r = query_click_one_row(db, query, query_params, query_prio=4)
+            r = await async_query_click_one_row(db, query, query_params, query_prio=4)
 
         pq = db.last_query
         assert pq

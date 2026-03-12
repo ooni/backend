@@ -2,52 +2,47 @@
 Measurements API
 """
 
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import List, Optional, Any, Dict, Union
 import gzip
 import json
 import logging
 import math
-import time
 import string
+import time
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlencode, urljoin
+from urllib.request import urlopen
 
 import ujson
 import urllib3
-
+from clickhouse_driver import Client as ClickhouseClient
 from fastapi import (
     APIRouter,
     Depends,
-    Query,
-    HTTPException,
     Header,
-    Response,
+    HTTPException,
+    Query,
     Request,
+    Response,
     status,
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from psycopg2.extensions import QueryCanceledError
+from pydantic import Field, field_serializer, field_validator
+from sqlalchemy import sql
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.sql.expression import and_, column, select, text
+from starlette.concurrency import run_in_threadpool
 from typing_extensions import Annotated
 
-from pydantic import Field, field_serializer, field_validator
-
-from sqlalchemy import sql
-from sqlalchemy.sql.expression import and_, text, select, column
-from sqlalchemy.exc import OperationalError
-from psycopg2.extensions import QueryCanceledError
-
-from clickhouse_driver import Client as ClickhouseClient
-
-from urllib.request import urlopen
-from urllib.parse import urljoin, urlencode
-
+from ...common.clickhouse_utils import async_query_click, query_click_one_row
 from ...common.config import Settings
-from ...utils.api import normalize_datetime
-from ...common.dependencies import get_settings
+from ...common.dependencies import get_clickhouse_session, get_settings
 from ...common.routers import BaseModel
-from ...common.utils import setcacheresponse, commasplit, setnocacheresponse
-from ...common.clickhouse_utils import query_click, query_click_one_row
-from ...common.dependencies import get_clickhouse_session
+from ...common.utils import commasplit, setcacheresponse, setnocacheresponse
+from ...utils.api import normalize_datetime
 
 log = logging.getLogger(__name__)
 
@@ -498,11 +493,13 @@ async def get_measurement_meta(
 
     if request.measurement_uid:
         log.info(f"get_measurement_meta {request.measurement_uid}")
-        msmt_meta = _get_measurement_meta_by_uid(db, request.measurement_uid)
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_by_uid, db, request.measurement_uid
+        )
     elif request.report_id:
         log.info(f"get_measurement_meta {request.report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(
-            db, request.report_id, request.input
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_clickhouse, db, request.report_id, request.input
         )
     else:
         raise HTTPException(
@@ -525,8 +522,12 @@ async def get_measurement_meta(
     try:
         # TODO: uid_cleanup
         assert msmt_meta.report_id is not None
-        msmt_meta.raw_measurement = _fetch_measurement_body(
-            db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
+        msmt_meta.raw_measurement = await run_in_threadpool(
+            _fetch_measurement_body,
+            db,
+            settings,
+            msmt_meta.report_id,
+            msmt_meta.measurement_uid,
         )
     except Exception as e:
         log.error(e, exc_info=True)
@@ -876,7 +877,7 @@ async def list_measurements(
     iter_start_time = time.time()
 
     try:
-        rows = query_click(db, query, query_params)
+        rows = await async_query_click(db, query, query_params)
         results = []
         for row in rows:
             msmt_uid = row["measurement_uid"]
@@ -1014,7 +1015,7 @@ async def get_torsf_stats(
     query = query.order_by(column("measurement_start_day"), column("probe_cc"))
 
     try:
-        q = query_click(db, query, query_params)
+        q = await async_query_click(db, query, query_params)
         result = []
         for row in q:
             row = dict(row)
