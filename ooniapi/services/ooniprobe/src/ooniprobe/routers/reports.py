@@ -4,25 +4,24 @@ import logging
 import random
 from datetime import datetime, timezone
 from hashlib import sha512
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-import httpx
-from fastapi import Request, Response, APIRouter, Header
-from pydantic import Field
 import zstd
+from fastapi import APIRouter, Header, Request, Response
+from pydantic import Field
 from starlette.concurrency import run_in_threadpool
 
+from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..common.dependencies import ClickhouseDep
-from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
+from ..dependencies import ASNReaderDep, CCReaderDep, S3ClientDep, SettingsDep
+from ..metrics import Metrics
 from ..utils import (
+    compare_probe_msmt_cc_asn,
+    error,
     generate_report_id,
 )
-
-from ..utils import error, compare_probe_msmt_cc_asn
-from ..metrics import Metrics
 
 router = APIRouter()
 
@@ -104,7 +103,6 @@ async def receive_measurement(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
-    s3_client: S3ClientDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
 ) -> ReceiveMeasurementResponse | Dict[str, Any]:
