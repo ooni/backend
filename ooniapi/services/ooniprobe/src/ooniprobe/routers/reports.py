@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 
 import httpx
 from fastapi import Request, Response, APIRouter, Header
+from starlette.requests import ClientDisconnect
 from pydantic import Field
 import zstd
 
@@ -142,7 +143,16 @@ async def receive_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
-    data = await request.body()
+    try:
+        data = await request.body()
+    except ClientDisconnect:
+        log.info(f"Client disconnected mid-upload")
+        Metrics.CLIENT_DISCONNECT.inc()
+        return empty_measurement
+    except Exception as e:
+        log.error(f"Uncaught exception {e}")
+        return empty_measurement
+
     if content_encoding == "zstd":
         try:
             compressed_len = len(data)

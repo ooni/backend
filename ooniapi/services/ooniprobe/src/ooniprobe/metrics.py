@@ -79,3 +79,7 @@ class Metrics:
     )
 
     TEST_LIST_URLS_COUNT = Gauge("test_list_urls_count", "Size of reported test list")
+
+    CLIENT_DISCONNECT = Counter(
+        "client_upload_disconnect", "Client disconnected while awaiting report"
+    )
