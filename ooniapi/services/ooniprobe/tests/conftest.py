@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import pathlib
@@ -28,7 +29,7 @@ from ooniprobe.dependencies import (
     get_tor_targets_from_s3,
 )
 from ooniprobe.download_geoip import try_update
-from ooniprobe.main import app
+from ooniprobe.main import app, lifespan
 from ooniprobe.routers.v1.probe_services import TorTarget
 
 from .utils import setup_user
@@ -131,7 +132,7 @@ def make_manifest_mock_fn(public_params: str):
 
 
 @pytest.fixture
-def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
+async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     _, public_key = test_creds
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
@@ -139,6 +140,13 @@ def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
+    loop = asyncio.get_event_loop()
+
+    async def run_lifespan():
+        async with lifespan(app, test_settings, repeating_tasks_active=False):
+            pass
+
+    loop.run_until_complete(run_lifespan())
     client = TestClient(app)
     yield client
 
