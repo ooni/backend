@@ -172,7 +172,7 @@ async def receive_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            run_in_threadpool(
+            await run_in_threadpool(
                 compare_probe_msmt_cc_asn,
                 msmt_uid,
                 cc,
