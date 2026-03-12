@@ -96,6 +96,7 @@ app.include_router(prio_crud.router, prefix="/api")
 
 @app.get("/version")
 async def version():
+    log.info("Hello from a dev branch")
     return {"version": VERSION, "build_label": build_label}
 
 
