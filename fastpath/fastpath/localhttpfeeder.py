@@ -6,9 +6,7 @@ Receive measurements by listening on localhost
 """
 import os
 from gunicorn.app.base import BaseApplication
-from logging import getLogger
 
-log = getLogger(__file__)
 
 API_PORT = int(os.environ.get("FASTPATH_API_PORT", 8472))
 QUEUE_PUT_TIMEOUT = int(os.environ.get("FASTPATH_QUEUE_PUT_TIMEOUT", 5))
@@ -37,7 +35,6 @@ def start_http_api(queue):
             path = environ["PATH_INFO"]
             assert path.startswith("/2")
             msmt_uid = path[1:]
-            log.debug(f"Read measurement uid: {msmt_uid}")
             data = environ["wsgi.input"].read()
             msm_tup = (data, None, msmt_uid)
             queue.put(msm_tup, block=True, timeout=QUEUE_PUT_TIMEOUT)
