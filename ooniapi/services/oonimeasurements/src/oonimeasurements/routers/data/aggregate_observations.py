@@ -1,20 +1,19 @@
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Dict
-from typing_extensions import Annotated
+from typing import Any, Dict, List, Literal, Optional
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from typing_extensions import Annotated
 
-
+from ...common.clickhouse_utils import async_query_click
 from ...common.dependencies import get_clickhouse_session
 from .utils import (
     SinceUntil,
-    get_measurement_start_day_agg,
     TimeGrains,
+    get_measurement_start_day_agg,
     utc_30_days_ago,
     utc_today,
 )
-
-from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -182,7 +181,8 @@ AND measurement_start_time < %(until)s
 {order_by_str}
 """
     entries = []
-    for row in db.execute_iter(query, params_filter):
+    res = await async_query_click(db, query, params_filter)
+    for row in res:
         d = dict(zip(column_keys, row))
         entries.append(AggregationEntry(**d))
     return AggregationResponse(results=entries)

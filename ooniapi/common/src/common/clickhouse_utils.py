@@ -1,11 +1,12 @@
 import logging
 from typing import Dict, List, Optional, Union
+
 import clickhouse_driver
 import clickhouse_driver.errors
-
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.sql.selectable import Select
+from starlette.concurrency import run_in_threadpool
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +38,12 @@ def query_click(
     return [dict(zip(colnames, row)) for row in rows]  # type: ignore
 
 
+async def async_query_click(
+    db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=3
+) -> List[Dict]:
+    return run_in_threadpool(query_click, db, query, query_params, query_prio)
+
+
 def query_click_one_row(
     db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=3
 ) -> Optional[dict]:
@@ -45,6 +52,12 @@ def query_click_one_row(
         return dict(zip(colnames, row))  # type: ignore
 
     return None
+
+
+async def async_query_click_one_row(
+    db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=3
+) -> Optional[dict]:
+    return run_in_threadpool(query_click_one_row, db, query, query_params, query_prio)
 
 
 def insert_click(

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
-from ...common.clickhouse_utils import query_click
+from ...common.clickhouse_utils import async_query_click
 from ...dependencies import ClickhouseDep, get_clickhouse_session
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
@@ -380,7 +380,8 @@ async def get_aggregation_analysis(
     log.info(f"running query {q} with {q_args}")
 
     results: List[AggregationEntry] = []
-    for d in query_click(db, q, q_args):
+    res = await async_query_click(db, q, q_args)
+    for d in res:
         blocked_max_protocol = d["blocked_max_protocol"]
 
         loni = Loni(
@@ -548,8 +549,6 @@ async def list_changepoints(
     query_params["until"] = until
 
     q = sql.select(ChangePointEntry.table).where(sql.and_(*conditions))
-    results = [
-        ChangePointEntry.from_row(row)
-        for row in query_click(clickhouse, q, query_params)
-    ]
+    res = await async_query_click(clickhouse, q, query_params)
+    results = [ChangePointEntry.from_row(row) for row in res]
     return ListChangePointsResponse(results=results)
