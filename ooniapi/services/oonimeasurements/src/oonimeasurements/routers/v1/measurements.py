@@ -392,10 +392,15 @@ async def get_raw_measurement(
     # This is used by Explorer to let users download msmts
     if measurement_uid:
         log.info(f"get_raw_measurement {measurement_uid}")
-        msmt_meta = _get_measurement_meta_by_uid(db, measurement_uid)
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_by_uid, db, measurement_uid
+        )
+
     elif report_id:
         log.info(f"get_raw_measurement {report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_clickhouse, db, report_id, input
+        )
     else:
         raise HTTPException(
             status_code=400,
@@ -403,8 +408,12 @@ async def get_raw_measurement(
         )
 
     if msmt_meta.report_id:
-        body = _fetch_measurement_body(
-            db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
+        body = await run_in_threadpool(
+            _fetch_measurement_body,
+            db,
+            settings,
+            msmt_meta.report_id,
+            msmt_meta.measurement_uid,
         )
     else:
         body = "{}"
