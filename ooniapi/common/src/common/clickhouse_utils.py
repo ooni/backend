@@ -41,7 +41,8 @@ def query_click(
 async def async_query_click(
     db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=3
 ) -> List[Dict]:
-    return run_in_threadpool(query_click, db, query, query_params, query_prio)
+    res = await run_in_threadpool(query_click, db, query, query_params, query_prio)
+    return res
 
 
 def query_click_one_row(
@@ -57,7 +58,10 @@ def query_click_one_row(
 async def async_query_click_one_row(
     db: clickhouse_driver.Client, query: Query, query_params: dict, query_prio=3
 ) -> Optional[dict]:
-    return run_in_threadpool(query_click_one_row, db, query, query_params, query_prio)
+    res = await run_in_threadpool(
+        query_click_one_row, db, query, query_params, query_prio
+    )
+    return res
 
 
 def insert_click(
