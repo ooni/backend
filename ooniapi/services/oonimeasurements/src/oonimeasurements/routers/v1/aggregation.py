@@ -2,22 +2,24 @@
 Aggregation API
 """
 
-from datetime import datetime, timedelta, date, timezone
-from typing import List, Any, Dict, Optional, Union
 import logging
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from typing_extensions import Annotated
-
-
-from sqlalchemy.sql.expression import and_, select, column
+from sqlalchemy.sql.expression import and_, column, select
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
+from typing_extensions import Annotated
 
-from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
-from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
+from oonimeasurements.common.clickhouse_utils import (
+    async_query_click,
+    async_query_click_one_row,
+)
 from oonimeasurements.common.dependencies import get_clickhouse_session
+from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
+
 from ...common.routers import BaseModel
 from ...utils.api import normalize_datetime
 
@@ -263,7 +265,7 @@ async def get_measurements(
         probe_cc_s = commasplit(probe_cc)
 
     now = datetime.now(timezone.utc)
-    six_months_ago = now - timedelta(days = 30 * 6)
+    six_months_ago = now - timedelta(days=30 * 6)
 
     if since:
         since = datetime.combine(since, datetime.min.time())
@@ -401,7 +403,8 @@ async def get_measurements(
             if time_grain == "hour":
                 str_format = "%Y-%m-%dT%H:%M:%SZ"
             r: Any = []
-            for row in query_click(db, query, query_params, query_prio=4):
+            res = await async_query_click(db, query, query_params, query_prio=4)
+            for row in res:
                 ## Handle the difference in formatting between hourly and daily measurement_start_day
                 if "measurement_start_day" in row:
                     row["measurement_start_day"] = row[
@@ -409,7 +412,7 @@ async def get_measurements(
                     ].strftime(str_format)
                 r.append(row)
         else:
-            r = query_click_one_row(db, query, query_params, query_prio=4)
+            r = await async_query_click_one_row(db, query, query_params, query_prio=4)
 
         pq = db.last_query
         assert pq

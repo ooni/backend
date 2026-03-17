@@ -1,12 +1,14 @@
-from datetime import datetime
 import logging
 import math
 import time
+from datetime import datetime
 from typing import List, Literal, Optional, Union
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
+from ...common.clickhouse_utils import async_query_click
 from ...common.dependencies import get_settings
 from ...dependencies import get_clickhouse_session
 from .utils import (
@@ -124,7 +126,7 @@ async def list_measurements(
 
     t = time.perf_counter()
     log.info(f"running query {q} with {q_args}")
-    rows = db.execute(q, q_args)
+    rows = await async_query_click(db, q, q_args)
 
     results: List[AnalysisEntry] = []
     if rows and isinstance(rows, list):
