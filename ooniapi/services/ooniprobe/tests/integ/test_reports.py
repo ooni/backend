@@ -37,13 +37,15 @@ async def test_collector_open_report(client):
     assert len(rid) == 61, rid
 
 
-def test_collector_upload_msmt_bogus(client):
+@pytest.mark.asyncio
+async def test_collector_upload_msmt_bogus(client):
     j = dict(format="json", content=dict(test_keys={}))
     resp = client.post("/report/bogus", json=j)
     assert resp.status_code == 400, resp
 
 
-def test_collector_upload_msmt_valid(client):
+@pytest.mark.asyncio
+async def test_collector_upload_msmt_valid(client):
     # open report, upload
     j = {
         "data_format_version": "0.2.0",
@@ -72,7 +74,8 @@ def test_collector_upload_msmt_valid(client):
     assert c == {}, c
 
 
-def test_collector_upload_msmt_valid_zstd(client):
+@pytest.mark.asyncio
+async def test_collector_upload_msmt_valid_zstd(client):
     rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
     msmt = json.dumps(dict(test_keys={})).encode()
     zmsmt = zstd.compress(msmt)

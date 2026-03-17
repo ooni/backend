@@ -1,7 +1,10 @@
 from ..utils import getj, postj
 
+import pytest
+
 ## Tests
-def test_check_in_geoip(client):
+@pytest.mark.asyncio
+async def test_check_in_geoip(client):
     j = dict(
         on_wifi=True,
         charging=False,
@@ -17,7 +20,8 @@ def test_check_in_geoip(client):
     assert c["probe_network_name"] is not None
 
 
-def test_check_in_basic(client, load_url_priorities):
+@pytest.mark.asyncio
+async def test_check_in_basic(client, load_url_priorities):
     j = dict(
         probe_cc="US",
         probe_asn="AS1234",
@@ -39,7 +43,8 @@ def test_check_in_basic(client, load_url_priorities):
     assert sorted(c["conf"]) == ["features", "test_helpers"]
 
 
-def test_check_in_url_category_news(client):
+@pytest.mark.asyncio
+async def test_check_in_url_category_news(client):
     j = dict(
         on_wifi=True,
         charging=True,
@@ -59,6 +64,7 @@ def test_check_in_url_category_news(client):
     assert cc == "ZZ"
 
 
-def test_test_helpers(client):
+@pytest.mark.asyncio
+async def test_test_helpers(client):
     c = getj(client, "/api/v1/test-helpers")
     assert len(c) == 6
