@@ -4,12 +4,14 @@ from fastapi import status
 from ooniauth_py import UserState, ServerState
 from .utils import getj, postj, setup_user
 
-def test_manifest_basic(client, db):
+@pytest.mark.asyncio
+async def test_manifest_basic(client, db):
     # Should not crash
     getj(client, "/api/v1/manifest")
 
 
-def test_registration_basic(client):
+@pytest.mark.asyncio
+async def test_registration_basic(client):
 
     manifest = getj(client, "/api/v1/manifest")
 
@@ -26,7 +28,8 @@ def test_registration_basic(client):
     # should be able to verify this credential
     user_state.handle_registration_response(resp['credential_sign_response']) # should not crash
 
-def test_registration_errors(client):
+@pytest.mark.asyncio
+async def test_registration_errors(client):
 
     bad_version = "999"
     resp = client.post("/api/v1/sign_credential",
@@ -69,7 +72,8 @@ def test_registration_errors(client):
     j = resp.json()
     assert j['detail']['error'] == 'deserialization_failed', j
 
-def test_submission_basic(client):
+@pytest.mark.asyncio
+async def test_submission_basic(client):
     # open report
     j = make_report_request()
     resp = postj(client, "/report", json=j)
@@ -90,7 +94,8 @@ def test_submission_basic(client):
 
 # TODO implement credential update
 @pytest.mark.skip
-def test_credential_update(client, client_with_original_manifest, second_manifest):
+@pytest.mark.asyncio
+async def test_credential_update(client, client_with_original_manifest, second_manifest):
 
     (user, manifest, _) = client_with_original_manifest
     new_manifest = getj(client, "/api/v1/manifest")
@@ -105,7 +110,8 @@ def test_credential_update(client, client_with_original_manifest, second_manifes
 
 # TODO implement credential update
 @pytest.mark.skip
-def test_credential_update_with_submission(client, client_with_original_manifest, second_manifest):
+@pytest.mark.asyncio
+async def test_credential_update_with_submission(client, client_with_original_manifest, second_manifest):
     (user, manifest_version, emission_day) = client_with_original_manifest
 
     # first submit: should just work out of the box

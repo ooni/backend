@@ -1,15 +1,18 @@
 from typing import Dict, Any
 from ooniprobe.common import auth
 from fastapi.testclient import TestClient
+import pytest
 
 
-def test_register(client):
+@pytest.mark.asyncio
+async def test_register(client):
     c = _register(client)
     assert "client_id" in c
     assert len(c["client_id"]) == 132
 
 
-def test_register_then_login(client, jwt_encryption_key):
+@pytest.mark.asyncio
+async def test_register_then_login(client, jwt_encryption_key):
     pwd = "HLdywVhzVCNqLvHCfmnMhIXqGmUFMTuYjmuGZhNlRTeIyvxeQTnjVJsiRkutHCSw"
     c = _register(client)
     assert "client_id" in c
@@ -38,7 +41,8 @@ def test_register_then_login(client, jwt_encryption_key):
     assert resp.status_code == 401
 
 
-def test_update(client: TestClient, jwt_encryption_key):
+@pytest.mark.asyncio
+async def test_update(client: TestClient, jwt_encryption_key):
     # Update will just say ok to anything you send, no matter
     # the data
 
