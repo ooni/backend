@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import pathlib
@@ -141,10 +140,10 @@ async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
-
-    client = TestClient(app)
-
-    yield client
+    settings = test_settings()
+    async with lifespan(app, settings, repeating_tasks_active=False):
+        with TestClient(app) as client:
+            yield client
 
 
 @pytest.fixture
