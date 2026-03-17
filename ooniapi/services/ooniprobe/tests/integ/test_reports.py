@@ -1,6 +1,6 @@
 import json
 import zstd
-
+import pytest
 
 def postj(client, url, json):
     response = client.post(url, json=json)
@@ -14,7 +14,8 @@ def post(client, url, data, headers=None):
     return response.json()
 
 
-def test_collector_open_report(client):
+@pytest.mark.asyncio
+async def test_collector_open_report(client):
     j = {
         "data_format_version": "0.2.0",
         "format": "json",
