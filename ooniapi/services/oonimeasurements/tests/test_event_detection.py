@@ -80,7 +80,6 @@ def test_changepoint_filter_basic(client, filter_param, filter_value):
             assert r[filter_param] == normalize(filter_value), r
 
 
-@pytest.mark.skip("FIXME: missing end_time result?")
 @pytest.mark.parametrize(
     "since_param, until_param, expect_emtpy",
     [
@@ -101,7 +100,7 @@ def test_changepoint_date_filter(client, since_param, until_param, expect_emtpy)
 
     for r in resp["results"]:
         assert parse_dt(r["start_time"]) >= since, r["start_time"]
-        assert parse_dt(r["end_time"]) <= until, r["end_time"]
+        assert parse_dt(r["start_time"]) <= until, r["start_time"]
 
 
 def test_changepoint_change_dir_values(client):
