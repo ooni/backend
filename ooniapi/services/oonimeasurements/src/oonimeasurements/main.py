@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
-from .common.clickhouse_utils import query_click
+from .common.clickhouse_utils import async_query_click
 from .common.dependencies import get_clickhouse_session, get_settings
 from .common.metrics import mount_metrics
 from .common.rate_limit_quotas import RateLimiterMiddleware
@@ -83,7 +83,7 @@ def setup_router(app: FastAPI):
             FROM fastpath
             WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
             """
-            query_click(db=db, query=query, query_params={})
+            await async_query_click(db=db, query=query, query_params={})
         except Exception as exc:
             log.error(exc)
             errors.append("db_error")
