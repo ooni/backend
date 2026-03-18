@@ -2,8 +2,11 @@
 Integration test for OONIProbe API
 """
 
+import pytest
 
-def test_get_bouncer_nettests(client):
+
+@pytest.mark.asyncio
+async def test_get_bouncer_nettests(client):
     version = "1"
 
     r = client.post("/bouncer/net-tests", json={"net-tests": [{"name": "foo", "version": version}]})
@@ -13,7 +16,8 @@ def test_get_bouncer_nettests(client):
         for x in ["collector", "input-hashes", "name", "test-helpers", "test-helpers-alternate", "version"]:
             assert x in v
 
-def test_bouncer_net_tests(client):
+@pytest.mark.asyncio
+async def test_bouncer_net_tests(client):
     j = {
         "net-tests": [
             {
@@ -61,13 +65,15 @@ def test_bouncer_net_tests(client):
     assert c.json() == expected
 
 
-def test_bouncer_net_tests_bad_request1(client):
+@pytest.mark.asyncio
+async def test_bouncer_net_tests_bad_request1(client):
     resp = client.post("/bouncer/net-tests")
     # XXX: returns status code 400 for backwards compatibility
     assert resp.status_code == 400
 
 
-def test_bouncer_net_tests_bad_request2(client):
+@pytest.mark.asyncio
+async def test_bouncer_net_tests_bad_request2(client):
     j = {"net-tests": []}
     resp = client.post("/bouncer/net-tests", json=j)
     # XXX: returns status code 400 for backwards compatibility
