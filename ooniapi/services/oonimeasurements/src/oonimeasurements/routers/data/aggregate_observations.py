@@ -73,7 +73,7 @@ async def get_aggregation_observations(
     column_keys = ["observation_count"]
     columns = []
     and_list = []
-    order_by = ["obs_count"]
+    order_by = ["observation_count"]
     params_filter: Dict[str, Any] = {"since": since, "until": until}
     selected_columns = ""
     group_by_str = ""
@@ -171,7 +171,7 @@ async def get_aggregation_observations(
 
     query = f"""
     SELECT
-COUNT() as obs_count,
+COUNT() as observation_count,
 {selected_columns}
 FROM obs_web
 WHERE measurement_start_time > %(since)s
@@ -183,6 +183,5 @@ AND measurement_start_time < %(until)s
     entries = []
     res = await async_query_click(db, query, params_filter)
     for row in res:
-        d = dict(zip(column_keys, row))
-        entries.append(AggregationEntry(**d))
+        entries.append(AggregationEntry(**row))
     return AggregationResponse(results=entries)
