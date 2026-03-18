@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
     `tls_blocked_s_pos` Nullable(Float32),
     `tls_blocked_s_neg` Nullable(Float32),
     `change_dir` Nullable(Int8),
+    `current_state` String DEFAULT 'ok',
     `s_pos` Nullable(Float32),
     `s_neg` Nullable(Float32),
     `h` Nullable(Float32),

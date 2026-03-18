@@ -252,8 +252,7 @@ async def list_observations(
     results: List[ObservationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            d = dict(zip(cols, row))
-            results.append(WebObservationEntry(**d))
+            results.append(WebObservationEntry(**row))
 
     response = ListObservationsResponse(
         metadata=ResponseMetadata(

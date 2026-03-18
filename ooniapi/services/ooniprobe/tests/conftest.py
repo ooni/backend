@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import pathlib
@@ -14,6 +13,7 @@ import ujson
 from clickhouse_driver import Client as ClickhouseClient
 from fastapi.testclient import TestClient
 from pytest_docker.plugin import Services
+import pytest_asyncio
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -131,7 +131,7 @@ def make_manifest_mock_fn(public_params: str):
     return get_manifest_mock
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     _, public_key = test_creds
     app.dependency_overrides[get_settings] = test_settings
@@ -140,15 +140,10 @@ async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
-    loop = asyncio.get_event_loop()
-
-    async def run_lifespan():
-        async with lifespan(app, test_settings, repeating_tasks_active=False):
-            pass
-
-    loop.run_until_complete(run_lifespan())
-    client = TestClient(app)
-    yield client
+    settings = test_settings()
+    async with lifespan(app, settings, repeating_tasks_active=False):
+        with TestClient(app) as client:
+            yield client
 
 
 @pytest.fixture
