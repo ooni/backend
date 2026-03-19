@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import shutil
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -94,23 +95,16 @@ JWT_ENCRYPTION_KEY = "super_secure"
 
 
 @pytest.fixture(scope="session")
-def fixture_path():
+def fixture_path(tmp_path_factory):
     """
     Directory for this fixtures used to store temporary data, will be
     deleted after the tests are finished
     """
-    FIXTURE_PATH = Path(os.path.dirname(os.path.realpath(__file__))) / "data"
-
-    yield FIXTURE_PATH
-
-    try:
-        shutil.rmtree(FIXTURE_PATH)
-    except FileNotFoundError:
-        pass
+    yield tmp_path_factory.mktemp("fixtures")
 
 
 @pytest.fixture()
-def geoip_db_dir(fixture_path: Path):
+def geoip_db_dir(fixture_path):
     ooni_tempdir = fixture_path / "geoip"
     return str(ooni_tempdir)
 
