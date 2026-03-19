@@ -21,7 +21,7 @@ def fake_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
 
 
 def missing_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep):
-    return ("AS0", None)
+    return (None, None)
 
 
 def missing_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
@@ -58,8 +58,8 @@ async def test_missing_geolookup(client, monkeypatch):
 
     for ip in j["addresses"]:
         assert g[ip]["cc"] == "ZZ"
-        assert g[ip]["asn"] == 0
-        assert g[ip]["as_name"] == ""
+        assert g[ip]["asn"] == None
+        assert g[ip]["as_name"] == None
 
 def patched_lookup_probe_cc(ipaddr: str, cc_reader) -> str:
     d = {
