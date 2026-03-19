@@ -677,9 +677,9 @@ def list_test_urls(
 
 
 class GeoLookupResult(BaseModel):
-    cc: str = Field(description="Country Code")
-    asn: Optional[int] = Field(description="Autonomous System Number (ASN)")
-    as_name: Optional[str] = Field(description="Autonomous System Name")
+    cc: Optional[str] = Field(default=None, description="Country Code")
+    asn: Optional[int] = Field(default=None, description="Autonomous System Number (ASN)")
+    as_name: Optional[str] = Field(default=None, description="Autonomous System Name")
 
 
 class GeoLookupRequest(BaseModel):
@@ -711,7 +711,9 @@ async def geolookup(
         except geoip2.errors.AddressNotFoundError:
             cc = None
         try:
-            asn, as_name = db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
+            asn, as_name = lookup_probe_network(ipaddr, asn_reader)
+            if asn is not None and asn.startswith("AS"):
+                asn = int(asn[2:])
         except geoip2.errors.AddressNotFoundError:
             asn = as_name = None
 
