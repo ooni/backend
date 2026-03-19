@@ -712,6 +712,7 @@ async def geolookup(
             cc = None
         try:
             asn, as_name = lookup_probe_network(ipaddr, asn_reader)
+            # make asn int unless it is None
             if asn is not None and asn.startswith("AS"):
                 asn = int(asn[2:])
         except geoip2.errors.AddressNotFoundError:
