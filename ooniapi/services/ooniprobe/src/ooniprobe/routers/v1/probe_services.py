@@ -45,6 +45,7 @@ from ...dependencies import (
     S3ClientDep,
     SettingsDep,
     TorTargetsDep,
+    PsiphonConfigDep
 )
 from ...utils import (
     compare_probe_msmt_cc_asn,
@@ -1091,3 +1092,41 @@ def list_tor_targets(
         return targets
     log.info("tor-targets: failed to receive tor-targets from s3")
     raise HTTPException(status_code=401, detail="Invalid tor-targets")
+
+
+class PsiphonServer(BaseModel):
+    OnlyAfterAttempts: int
+    SkipVerify: bool
+    URL: str
+
+
+class PsiphonConfig(BaseModel):
+    ClientPlatform: str
+    ClientVersion: str
+    EstablishTunnelTimeoutSeconds: int
+    LocalHttpProxyPort: int
+    LocalSocksProxyPort: int
+    PropagationChannelId: str
+    RemoteServerListDownloadFilename: str
+    RemoteServerListSignaturePublicKey: str
+    RemoteServerListURLs: List[PsiphonServer] = []
+    SponsorId: str
+    TargetApiProtocol: str
+    UseIndistinguishableTLS: bool
+
+
+@router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
+def psiphon_config(
+    request: Request,
+    settings: SettingsDep,
+    config: PsiphonConfigDep
+    ) -> PsiphonConfig:
+
+    token = request.headers.get("Authorization")
+    if token == None:
+        # XXX not actually validated
+        pass
+    if config is not None:
+        return config
+    log.info("psiphon-config: failed to receive psiphon-config from s3")
+    raise HTTPException(status_code=401, detail="Invalid psiphon-config")
