@@ -27,6 +27,7 @@ from ooniprobe.dependencies import (
     _get_manifest,
     get_s3_client,
     get_tor_targets_from_s3,
+    get_psiphon_config_from_s3,
 )
 from ooniprobe.download_geoip import try_update
 from ooniprobe.main import app, lifespan
@@ -94,23 +95,16 @@ JWT_ENCRYPTION_KEY = "super_secure"
 
 
 @pytest.fixture(scope="session")
-def fixture_path():
+def fixture_path(tmp_path_factory):
     """
     Directory for this fixtures used to store temporary data, will be
     deleted after the tests are finished
     """
-    FIXTURE_PATH = Path(os.path.dirname(os.path.realpath(__file__))) / "data"
-
-    yield FIXTURE_PATH
-
-    try:
-        shutil.rmtree(FIXTURE_PATH)
-    except FileNotFoundError:
-        pass
+    yield tmp_path_factory.mktemp("fixtures")
 
 
 @pytest.fixture()
-def geoip_db_dir(fixture_path: Path):
+def geoip_db_dir(fixture_path):
     ooni_tempdir = fixture_path / "geoip"
     return str(ooni_tempdir)
 
@@ -137,6 +131,7 @@ async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     app.dependency_overrides[get_settings] = test_settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
     app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
+    app.dependency_overrides[get_psiphon_config_from_s3] = get_psiphon_config_from_s3_mock
     app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
     # lifespan won't run so do this here to have the DB
     try_update(geoip_db_dir)
@@ -180,6 +175,7 @@ def test_settings(
         anonc_manifest_file="manifest.json",
         anonc_secret_key=secret_key,
         tor_targets="./tests/fixtures/data/tor-targets.json",
+        psiphon_config="./tests/fixtures/data/psiphon-config.json"
     )
 
 
@@ -240,6 +236,9 @@ def get_tor_targets_from_s3_mock() -> Dict[str, TorTarget]:
     with open("./tests/fixtures/data/tor-targets.json", "r") as f:
         yield ujson.load(f)
 
+def get_psiphon_config_from_s3_mock() -> Dict[str, TorTarget]:
+    with open("./tests/fixtures/data/psiphon-config.json", "r") as f:
+        yield ujson.load(f)
 
 @pytest.fixture(scope="session")
 def fastpath_server(docker_ip: str | Any, docker_services: Services):

@@ -51,7 +51,10 @@ class Settings(BaseSettings):
         ""  # for uploading reports that couldn't be sent to fastpath
     )
     tor_targets: str = (
-        ""  # filename of json containing Tor bridges and DirAuth endpoints
+        ""  # filename of json containing Tor bridges and DirAuth endpoints (in s3 config_bucket)
+    )
+    psiphon_config : str = (
+        ""  # filename of json containing Psiphon config (in s3 config_bucket)
     )
 
     # Used to store history of all manifests and retrieve next manifest to use
