@@ -2,51 +2,47 @@
 Measurements API
 """
 
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import List, Optional, Any, Dict, Union
 import gzip
 import json
 import logging
 import math
-import time
 import string
+import time
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlencode, urljoin
+from urllib.request import urlopen
 
 import ujson
 import urllib3
-
+from clickhouse_driver import Client as ClickhouseClient
 from fastapi import (
     APIRouter,
     Depends,
-    Query,
-    HTTPException,
     Header,
-    Response,
+    HTTPException,
+    Query,
     Request,
+    Response,
     status,
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from psycopg2.extensions import QueryCanceledError
+from pydantic import Field, field_serializer, field_validator
+from sqlalchemy import sql
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.sql.expression import and_, column, select, text
+from starlette.concurrency import run_in_threadpool
 from typing_extensions import Annotated
 
-from pydantic import Field, field_serializer, field_validator
-
-from sqlalchemy import sql
-from sqlalchemy.sql.expression import and_, text, select, column
-from sqlalchemy.exc import OperationalError
-from psycopg2.extensions import QueryCanceledError
-
-from clickhouse_driver import Client as ClickhouseClient
-
-from urllib.request import urlopen
-from urllib.parse import urljoin, urlencode
-
+from ...common.clickhouse_utils import async_query_click, query_click_one_row
 from ...common.config import Settings
-from ...common.dependencies import get_settings
+from ...common.dependencies import get_clickhouse_session, get_settings
 from ...common.routers import BaseModel
-from ...common.utils import setcacheresponse, commasplit, setnocacheresponse
-from ...common.clickhouse_utils import query_click, query_click_one_row
-from ...common.dependencies import get_clickhouse_session
+from ...common.utils import commasplit, setcacheresponse, setnocacheresponse
+from ...utils.api import normalize_datetime
 
 log = logging.getLogger(__name__)
 
@@ -396,10 +392,15 @@ async def get_raw_measurement(
     # This is used by Explorer to let users download msmts
     if measurement_uid:
         log.info(f"get_raw_measurement {measurement_uid}")
-        msmt_meta = _get_measurement_meta_by_uid(db, measurement_uid)
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_by_uid, db, measurement_uid
+        )
+
     elif report_id:
         log.info(f"get_raw_measurement {report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(db, report_id, input)
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_clickhouse, db, report_id, input
+        )
     else:
         raise HTTPException(
             status_code=400,
@@ -407,8 +408,12 @@ async def get_raw_measurement(
         )
 
     if msmt_meta.report_id:
-        body = _fetch_measurement_body(
-            db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
+        body = await run_in_threadpool(
+            _fetch_measurement_body,
+            db,
+            settings,
+            msmt_meta.report_id,
+            msmt_meta.measurement_uid,
         )
     else:
         body = "{}"
@@ -497,11 +502,13 @@ async def get_measurement_meta(
 
     if request.measurement_uid:
         log.info(f"get_measurement_meta {request.measurement_uid}")
-        msmt_meta = _get_measurement_meta_by_uid(db, request.measurement_uid)
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_by_uid, db, request.measurement_uid
+        )
     elif request.report_id:
         log.info(f"get_measurement_meta {request.report_id} {input}")
-        msmt_meta = _get_measurement_meta_clickhouse(
-            db, request.report_id, request.input
+        msmt_meta = await run_in_threadpool(
+            _get_measurement_meta_clickhouse, db, request.report_id, request.input
         )
     else:
         raise HTTPException(
@@ -524,8 +531,12 @@ async def get_measurement_meta(
     try:
         # TODO: uid_cleanup
         assert msmt_meta.report_id is not None
-        msmt_meta.raw_measurement = _fetch_measurement_body(
-            db, settings, msmt_meta.report_id, msmt_meta.measurement_uid
+        msmt_meta.raw_measurement = await run_in_threadpool(
+            _fetch_measurement_body,
+            db,
+            settings,
+            msmt_meta.report_id,
+            msmt_meta.measurement_uid,
         )
     except Exception as e:
         log.error(e, exc_info=True)
@@ -603,13 +614,15 @@ async def list_measurements(
     since: Annotated[
         Optional[datetime],
         Query(
-            description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
+            description="Start date of when measurements were run (ex. '2016-10-20T10:30:00'). Note that "
+            + "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     until: Annotated[
         Optional[datetime],
         Query(
-            description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
+            description="End date of when measurement were run (ex. '2016-10-20T10:30:00'). Note that "
+            + "the interval between `since` and `until` can't be greater than 180 days (~6 months)"
         ),
     ] = None,
     confirmed: Annotated[
@@ -718,10 +731,26 @@ async def list_measurements(
     ### Prepare query parameters
     if until is None and report_id is None:
         t = datetime.now(timezone.utc) + timedelta(days=1)
-        until = datetime(t.year, t.month, t.day)
+        until = datetime(t.year, t.month, t.day, tzinfo=timezone.utc)
 
     if since is None and report_id is None and until is not None:
         since = until - timedelta(days=30)
+
+    # Normalize datetimes to UTC for consistent comparison
+    if since:
+        since = normalize_datetime(since)
+    if until:
+        until = normalize_datetime(until)
+
+    # 'since' before than 6 months ago?
+    if until and since:
+        days_diff = (until - since).days
+        MAX_DAYS = 30 * 6
+        if days_diff > MAX_DAYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Time range must not exceed 6 months. Requested: {days_diff} days (limit: {MAX_DAYS} days).",
+            )
 
     if order.lower() not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="Invalid order parameter")
@@ -827,7 +856,7 @@ async def list_measurements(
     elif domain or category_code:
         # both domain and category_code can be set at the same time
         if domain:
-            domain_list = domain.split(",")
+            domain_list = [s.strip() for s in domain.split(",")]
             query_params["domain"] = domain_list
             fpwhere.append(sql.text("domain IN :domain"))
 
@@ -849,6 +878,7 @@ async def list_measurements(
     # Assemble the "external" query. Run a final order by followed by limit and
     # offset
     query = fp_query.offset(offset).limit(limit)
+    log.debug(f"list measurements: {query}")
     query_params["param_1"] = limit
     query_params["param_2"] = offset
 
@@ -856,7 +886,7 @@ async def list_measurements(
     iter_start_time = time.time()
 
     try:
-        rows = query_click(db, query, query_params)
+        rows = await async_query_click(db, query, query_params)
         results = []
         for row in rows:
             msmt_uid = row["measurement_uid"]
@@ -994,7 +1024,7 @@ async def get_torsf_stats(
     query = query.order_by(column("measurement_start_day"), column("probe_cc"))
 
     try:
-        q = query_click(db, query, query_params)
+        q = await async_query_click(db, query, query_params)
         result = []
         for row in q:
             row = dict(row)

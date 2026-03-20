@@ -4,11 +4,13 @@
 """
 Receive measurements by listening on localhost
 """
-
+import os
 from gunicorn.app.base import BaseApplication
 
-API_PORT = 8472
 
+API_PORT = int(os.environ.get("FASTPATH_API_PORT", 8472))
+QUEUE_PUT_TIMEOUT = int(os.environ.get("FASTPATH_QUEUE_PUT_TIMEOUT", 5))
+WORKER_TIMEOUT = int(os.environ.get("FASTPATH_WORKER_TIMEOUT", 30))
 
 class MsmtFeeder(BaseApplication):
     def __init__(self, app, conf):
@@ -35,10 +37,13 @@ def start_http_api(queue):
             msmt_uid = path[1:]
             data = environ["wsgi.input"].read()
             msm_tup = (data, None, msmt_uid)
-            queue.put(msm_tup, block=True)
+            queue.put(msm_tup, block=True, timeout=QUEUE_PUT_TIMEOUT)
 
         start_response("200 OK", [])
         return [b""]
 
-    options = {"bind": f"0.0.0.0:{API_PORT}"}
+    options = {
+        "bind": f"0.0.0.0:{API_PORT}",
+        "worker_timeout": WORKER_TIMEOUT,
+    }
     MsmtFeeder(handler_app, options).run()

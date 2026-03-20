@@ -1,0 +1,18 @@
+services:
+  clickhouse:
+    image: "clickhouse/clickhouse-server"
+    ports:
+      - "9000"
+    volumes:
+        - ./fixtures:/fixtures
+        - ./fixtures/initdb:/docker-entrypoint-initdb.d/
+    environment: 
+      CLICKHOUSE_USER: test
+      CLICKHOUSE_PASSWORD: test
+
+  fakepath: # A mock version of the fastpath
+    build: 
+      context: "./fakepath"
+      dockerfile: "Dockerfile"
+    ports: 
+      - "80"

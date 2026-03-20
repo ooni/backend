@@ -12,7 +12,7 @@ jobs:
           python-version: 3.11
 
       - name: Install hatch
-        run: pip install hatch
+        run: pip install "hatch>=1.13" "virtualenv<21"
 
       - name: Run all tests
         run: make test-cov

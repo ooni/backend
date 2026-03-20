@@ -1,20 +1,19 @@
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Dict
-from typing_extensions import Annotated
+from typing import Any, Dict, List, Literal, Optional
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from typing_extensions import Annotated
 
-
+from ...common.clickhouse_utils import async_query_click
 from ...common.dependencies import get_clickhouse_session
 from .utils import (
     SinceUntil,
-    get_measurement_start_day_agg,
     TimeGrains,
+    get_measurement_start_day_agg,
     utc_30_days_ago,
     utc_today,
 )
-
-from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -74,7 +73,7 @@ async def get_aggregation_observations(
     column_keys = ["observation_count"]
     columns = []
     and_list = []
-    order_by = ["obs_count"]
+    order_by = ["observation_count"]
     params_filter: Dict[str, Any] = {"since": since, "until": until}
     selected_columns = ""
     group_by_str = ""
@@ -172,7 +171,7 @@ async def get_aggregation_observations(
 
     query = f"""
     SELECT
-COUNT() as obs_count,
+COUNT() as observation_count,
 {selected_columns}
 FROM obs_web
 WHERE measurement_start_time > %(since)s
@@ -182,7 +181,7 @@ AND measurement_start_time < %(until)s
 {order_by_str}
 """
     entries = []
-    for row in db.execute_iter(query, params_filter):
-        d = dict(zip(column_keys, row))
-        entries.append(AggregationEntry(**d))
+    res = await async_query_click(db, query, params_filter)
+    for row in res:
+        entries.append(AggregationEntry(**row))
     return AggregationResponse(results=entries)

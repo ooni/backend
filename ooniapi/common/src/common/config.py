@@ -85,3 +85,10 @@ class Settings(BaseSettings):
             "type": "cloudfront",
         },
     ]
+
+    # citizenlab github configuration
+    working_dir: str = ""
+    github_user: str = ""
+    github_token: str = ""
+    origin_repo: str = ""
+    push_repo: str = ""

@@ -1,33 +1,28 @@
 import logging
-from typing import Optional
 from contextlib import asynccontextmanager
-from urllib.request import urlopen
+from typing import Optional
 
-from fastapi import Depends, FastAPI
+import boto3
+import httpx
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
 from fastapi_utils.tasks import repeat_every
-
+from ooniauth_py import ServerState
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
-
 from . import models
-from .routers.v2 import vpn
-from .routers.v1 import probe_services
-from .routers import reports, bouncer, prio_crud
-
-from .download_geoip import try_update
-from .common.dependencies import get_settings, SettingsDep
-from .dependencies import get_manifest, S3ClientDep, PostgresSessionDep
-from .common.dependencies import ClickhouseDep
-from .common.config import Settings
-from .common.version import get_build_label
-from .common.metrics import mount_metrics
-from .common.clickhouse_utils import query_click
 from .__about__ import VERSION
-from ooniauth_py import ServerState
+from .common.clickhouse_utils import query_click
+from .common.config import Settings
+from .common.dependencies import ClickhouseDep, SettingsDep, get_settings
+from .common.metrics import mount_metrics
+from .common.version import get_build_label
+from .dependencies import PostgresSessionDep, S3ClientDep, get_manifest
+from .download_geoip import try_update
+from .routers import bouncer, prio_crud, reports
+from .routers.v1 import probe_services
+from .routers.v2 import vpn
 
 log = logging.getLogger(__name__)
 
@@ -51,8 +46,14 @@ async def lifespan(
 
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
+    app.state.fastpath_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+    )
+    app.state.s3_client = boto3.client("s3")
 
     yield
+
+    await app.state.fastpath_client.aclose()
 
 
 def init_ooniauth():
@@ -107,6 +108,7 @@ class HealthStatus(BaseModel):
 
 @app.get("/health")
 async def health(
+    request: Request,
     settings: SettingsDep,
     s3: S3ClientDep,
     db: PostgresSessionDep,
@@ -125,10 +127,10 @@ async def health(
         log.error(e)
 
     try:
-        response = urlopen(settings.fastpath_url)
-        assert (
-            response.status == 200
-        ), "Unexpected status trying to connect to fastpath: " + str(response.status)
+        resp = await app.state.fastpath_client.get(settings.fastpath_url)
+        assert resp.status_code == 200, (
+            "Unexpected status trying to connect to fastpath: " + str(resp.status_code)
+        )
     except Exception as exc:
         log.error(str(exc))
         errors.append("fastpath_connection_error")

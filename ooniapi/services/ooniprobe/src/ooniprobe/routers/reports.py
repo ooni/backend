@@ -4,24 +4,24 @@ import logging
 import random
 from datetime import datetime, timezone
 from hashlib import sha512
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-import httpx
-from fastapi import Request, Response, APIRouter, Header
-from pydantic import Field
 import zstd
+from fastapi import APIRouter, Header, Request, Response
+from pydantic import Field
+from starlette.concurrency import run_in_threadpool
 
+from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..common.dependencies import ClickhouseDep
-from ..dependencies import SettingsDep, ASNReaderDep, CCReaderDep, S3ClientDep
+from ..dependencies import ASNReaderDep, CCReaderDep, S3ClientDep, SettingsDep
+from ..metrics import Metrics
 from ..utils import (
+    compare_probe_msmt_cc_asn,
+    error,
     generate_report_id,
 )
-
-from ..utils import error, compare_probe_msmt_cc_asn
-from ..metrics import Metrics
 
 router = APIRouter()
 
@@ -103,7 +103,6 @@ async def receive_measurement(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
-    s3_client: S3ClientDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
 ) -> ReceiveMeasurementResponse | Dict[str, Any]:
@@ -163,34 +162,44 @@ async def receive_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     # Use exponential back off with jitter between retries
+    client = request.app.state.fastpath_client
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data, timeout=59)
+            resp = await client.post(url, content=data)
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            await run_in_threadpool(
+                compare_probe_msmt_cc_asn,
+                msmt_uid,
+                cc,
+                asn,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
             )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception as exc:
             log.error(
-                f"[Try {t+1}/{N_RETRIES}] Error trying to send measurement to the fastpath. Error: {exc}"
+                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
             )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
+            sleep_time = random.uniform(0.3, 2 ** (t + 1))
             await asyncio.sleep(sleep_time)
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     try:
-        s3_client.upload_fileobj(
-            io.BytesIO(data), Bucket=settings.failed_reports_bucket, Key=report_id
+        await run_in_threadpool(
+            request.app.state.s3_client.upload_fileobj,
+            io.BytesIO(data),
+            Bucket=settings.failed_reports_bucket,
+            Key=report_id,
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")

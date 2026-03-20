@@ -2,24 +2,26 @@
 Aggregation API
 """
 
-from datetime import datetime, timedelta, date, timezone
-from typing import List, Any, Dict, Optional, Union
 import logging
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from typing_extensions import Annotated
-
-from clickhouse_driver import Client as ClickhouseClient
-
-from sqlalchemy.sql.expression import and_, select, column
+from sqlalchemy.sql.expression import and_, column, select
 from sqlalchemy.sql.expression import table as sql_table
 from sqlalchemy.sql.expression import text as sql_text
+from typing_extensions import Annotated
 
-from oonimeasurements.common.clickhouse_utils import query_click, query_click_one_row
-from oonimeasurements.common.utils import jerror, commasplit, convert_to_csv
+from oonimeasurements.common.clickhouse_utils import (
+    async_query_click,
+    async_query_click_one_row,
+)
 from oonimeasurements.common.dependencies import get_clickhouse_session
+from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
+
 from ...common.routers import BaseModel
+from ...utils.api import normalize_datetime
 
 router = APIRouter()
 
@@ -186,13 +188,21 @@ async def get_measurements(
     since: Annotated[
         Optional[date],
         Query(
-            description="""The start date of when measurements were run (ex. "2016-10-20T10:30:00")"""
+            description="""
+            The start date of when measurements were run (ex. "2016-10-20T10:30:00")
+
+            If not provided, defaults to "6 months ago"
+            """,
         ),
     ] = None,
     until: Annotated[
         Optional[date],
         Query(
-            description="""The end date of when measurement were run (ex. "2016-10-20T10:30:00")"""
+            description="""
+            The end date of when measurement were run (ex. "2016-10-20T10:30:00")
+
+            If not provided, defaults to "now"
+            """
         ),
     ] = None,
     time_grain: Annotated[
@@ -254,10 +264,21 @@ async def get_measurements(
     if probe_cc:
         probe_cc_s = commasplit(probe_cc)
 
+    now = datetime.now(timezone.utc)
+    six_months_ago = now - timedelta(days=30 * 6)
+
     if since:
         since = datetime.combine(since, datetime.min.time())
+    else:
+        since = six_months_ago
+
     if until:
         until = datetime.combine(until, datetime.min.time())
+    else:
+        until = now
+
+    since = normalize_datetime(since)
+    until = normalize_datetime(until)
 
     inp = input or ""
     try:
@@ -272,7 +293,7 @@ async def get_measurements(
         return jerror(str(e), v=0, code=200)
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
-    cacheable = until and until < datetime.now() - timedelta(hours=72)
+    cacheable = until and until < datetime.now(timezone.utc) - timedelta(hours=72)
     cacheable = False  # FIXME
 
     # Assemble query
@@ -370,6 +391,7 @@ async def get_measurements(
 
     where_expr = and_(*where)
     query = select(*cols).where(where_expr).select_from(table)
+    log.debug(f"aggregations query: {query}")
 
     # Add group-by
     for g in group_by:
@@ -381,7 +403,8 @@ async def get_measurements(
             if time_grain == "hour":
                 str_format = "%Y-%m-%dT%H:%M:%SZ"
             r: Any = []
-            for row in query_click(db, query, query_params, query_prio=4):
+            res = await async_query_click(db, query, query_params, query_prio=4)
+            for row in res:
                 ## Handle the difference in formatting between hourly and daily measurement_start_day
                 if "measurement_start_day" in row:
                     row["measurement_start_day"] = row[
@@ -389,7 +412,7 @@ async def get_measurements(
                     ].strftime(str_format)
                 r.append(row)
         else:
-            r = query_click_one_row(db, query, query_params, query_prio=4)
+            r = await async_query_click_one_row(db, query, query_params, query_prio=4)
 
         pq = db.last_query
         assert pq

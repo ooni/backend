@@ -1,16 +1,16 @@
 import dataclasses
+import math
 import time
 from datetime import date, datetime, timedelta
-import math
 from typing import List, Literal, Optional, Union
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
-from ...common.dependencies import get_settings, get_clickhouse_session
+from ...common.clickhouse_utils import async_query_click
+from ...common.dependencies import get_clickhouse_session, get_settings
 from .utils import parse_probe_asn_to_int
-
-from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -247,20 +247,19 @@ async def list_observations(
     q += f" ORDER BY {order_by} {order} LIMIT {limit} OFFSET {offset}"
 
     t = time.perf_counter()
-    rows = db.execute(q, q_args)
+    rows = await async_query_click(db, q, q_args)
 
     results: List[ObservationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            d = dict(zip(cols, row))
-            results.append(WebObservationEntry(**d))
+            results.append(WebObservationEntry(**row))
 
     response = ListObservationsResponse(
         metadata=ResponseMetadata(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
             limit=limit,
-            next_url=f"{settings.base_url}/api/v1/observations?offset={offset+limit}&limit={limit}",
+            next_url=f"{settings.base_url}/api/v1/observations?offset={offset + limit}&limit={limit}",
             offset=offset,
             pages=-1,
             query_time=time.perf_counter() - t,

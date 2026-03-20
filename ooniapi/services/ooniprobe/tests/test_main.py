@@ -20,7 +20,8 @@ def fake_get_manifest(s3, bucket, key):
             )
     )
 
-def test_health_good(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_health_good(client, monkeypatch):
     monkeypatch.setattr(m, "get_manifest", fake_get_manifest)
     r = client.get("health")
     j = r.json()
@@ -35,7 +36,8 @@ def test_health_bad(client_with_bad_settings):
     assert len(j["errors"]) > 0, j
 
 
-def test_metrics(client):
+@pytest.mark.asyncio
+async def test_metrics(client):
     r = client.get("/metrics")
 
 

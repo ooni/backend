@@ -1,42 +1,21 @@
 import asyncio
 import io
 import logging
-from datetime import datetime, timezone, timedelta
-import time
-from typing import (
-    Annotated,
-    List,
-    Optional,
-    Any,
-    Dict,
-    Tuple,
-    List,
-    Any,
-    Dict,
-    Tuple,
-    Optional,
-    Annotated,
-)
 import random
 import time
 from datetime import datetime, timedelta, timezone
 from hashlib import sha512
-from typing import Annotated, Any, Dict, List, Optional, Tuple
+from typing import (
+    Annotated,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 import geoip2
 import geoip2.errors
-from fastapi import APIRouter, HTTPException, Query, Response, Request
-from prometheus_client import Counter, Info, Gauge
-from pydantic import Field, IPvAnyAddress
-from fastapi import APIRouter, HTTPException, Response, Request, status, Header, Query
-from pydantic import Field, IPvAnyAddress
-from ooniauth_py import (
-    ProtocolError,
-    CredentialError,
-    DeserializationFailed,
-    ServerState,
-)
-import httpx
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from ooniauth_py import (
@@ -45,8 +24,8 @@ from ooniauth_py import (
     ProtocolError,
     ServerState,
 )
-from prometheus_client import Counter, Gauge, Info
 from pydantic import Field, IPvAnyAddress
+from starlette.concurrency import run_in_threadpool
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
@@ -74,21 +53,6 @@ from ...utils import (
     generate_report_id,
     lookup_probe_cc,
     lookup_probe_network,
-    error,
-    compare_probe_msmt_cc_asn,
-)
-from ...common.utils import setcacheresponse
-from ...common.prio import (
-    FailoverTestListDep,
-    failover_generate_test_list,
-    generate_test_list,
-)
-
-from ...dependencies import (
-    ManifestDep,
-    ManifestResponse,
-    PostgresSessionDep,
-    S3ClientDep,
 )
 from ..reports import Metrics
 
@@ -899,7 +863,6 @@ async def submit_measurement(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
     settings: SettingsDep,
-    s3_client: S3ClientDep,
     manifest: ManifestDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
@@ -984,6 +947,7 @@ async def submit_measurement(
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
     ujson.dump(data, stream)
+    stream.flush()
     data_bin = data_buff.getvalue()
 
     # Write the whole body of the measurement in a directory based on a 1-hour
@@ -998,18 +962,25 @@ async def submit_measurement(
 
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
+    client = request.app.state.fastpath_client
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, content=data_bin, timeout=59)
+            resp = await client.post(url, content=data_bin, timeout=59)
 
             assert resp.status_code == 200, resp.content
 
-            compare_probe_msmt_cc_asn(
-                msmt_uid, cc, asn, request, cc_reader, asn_reader, clickhouse
+            await run_in_threadpool(
+                compare_probe_msmt_cc_asn,
+                msmt_uid,
+                cc,
+                asn,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
             )
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
@@ -1027,9 +998,13 @@ async def submit_measurement(
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
+    data_buff.seek(0)
     try:
-        s3_client.upload_fileobj(
-            data_buff, Bucket=settings.failed_reports_bucket, Key=report_id
+        await run_in_threadpool(
+            request.app.state.s3_client.upload_fileobj,
+            data_buff,
+            Bucket=settings.failed_reports_bucket,
+            Key=report_id,
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
