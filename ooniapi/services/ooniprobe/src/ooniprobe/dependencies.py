@@ -180,3 +180,17 @@ async def get_tor_targets_from_s3(
 
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
+
+async def get_psiphon_config_from_s3(
+    settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep
+) -> Dict[str, Any]:
+    cacheKey = str(Path(settings.config_bucket, settings.psiphon_config))
+    resp = cache.get(cacheKey)
+    if resp is None:
+        psiphon_config_str = read_file(s3client, settings.config_bucket, settings.psiphon_config)
+        resp = ujson.loads(psiphon_config_str)
+        cache[cacheKey] = resp
+    yield resp
+
+
+PsiphonConfigDep = Annotated[Dict, Depends(get_psiphon_config_from_s3)]

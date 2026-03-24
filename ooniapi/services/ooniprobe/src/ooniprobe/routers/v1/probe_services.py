@@ -45,6 +45,7 @@ from ...dependencies import (
     S3ClientDep,
     SettingsDep,
     TorTargetsDep,
+    PsiphonConfigDep
 )
 from ...utils import (
     compare_probe_msmt_cc_asn,
@@ -677,9 +678,9 @@ def list_test_urls(
 
 
 class GeoLookupResult(BaseModel):
-    cc: str = Field(description="Country Code")
-    asn: int = Field(description="Autonomous System Number (ASN)")
-    as_name: Optional[str] = Field("", description="Autonomous System Name")
+    cc: Optional[str] = Field(default=None, description="Country Code")
+    asn: Optional[int] = Field(default=None, description="Autonomous System Number (ASN)")
+    as_name: Optional[str] = Field(default=None, description="Autonomous System Name")
 
 
 class GeoLookupRequest(BaseModel):
@@ -702,22 +703,24 @@ async def geolookup(
     cc_reader: CCReaderDep,
     asn_reader: ASNReaderDep,
 ) -> GeoLookupResponse:
-    # initial values probe_geoip compares with
-    probe_cc = "ZZ"
-    asn = "AS0"
     geolocation = dict()
 
     # for each address provided, call probe_geoip and add the data to our response
     for ipaddr in data.addresses:
-        # call probe_geoip() and map the keys to the geolookup v1 API
-        resp, _, _ = probe_geoip(ipaddr, probe_cc, asn, cc_reader, asn_reader)
-        # it doesn't seem possible to have separate aliases for (de)serialization
-        if resp["probe_network_name"] is None:
-            resp["probe_network_name"] = ""
+        try:
+            cc = lookup_probe_cc(ipaddr, cc_reader)
+        except geoip2.errors.AddressNotFoundError:
+            cc = None
+        try:
+            asn, as_name = lookup_probe_network(ipaddr, asn_reader)
+            # make asn int unless it is None
+            if asn is not None and asn.startswith("AS"):
+                asn = int(asn[2:])
+        except geoip2.errors.AddressNotFoundError:
+            asn = as_name = None
+
         geolocation[ipaddr] = GeoLookupResult(
-            cc=resp["probe_cc"],
-            asn=int(resp["probe_asn"][2:]),
-            as_name=resp["probe_network_name"],
+            cc=cc, asn=asn, as_name=as_name
         )
 
     setnocacheresponse(response)
@@ -1089,3 +1092,41 @@ def list_tor_targets(
         return targets
     log.info("tor-targets: failed to receive tor-targets from s3")
     raise HTTPException(status_code=401, detail="Invalid tor-targets")
+
+
+class PsiphonServer(BaseModel):
+    OnlyAfterAttempts: int
+    SkipVerify: bool
+    URL: str
+
+
+class PsiphonConfig(BaseModel):
+    ClientPlatform: str
+    ClientVersion: str
+    EstablishTunnelTimeoutSeconds: int
+    LocalHttpProxyPort: int
+    LocalSocksProxyPort: int
+    PropagationChannelId: str
+    RemoteServerListDownloadFilename: str
+    RemoteServerListSignaturePublicKey: str
+    RemoteServerListURLs: List[PsiphonServer] = []
+    SponsorId: str
+    TargetApiProtocol: str
+    UseIndistinguishableTLS: bool
+
+
+@router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
+def psiphon_config(
+    request: Request,
+    settings: SettingsDep,
+    config: PsiphonConfigDep
+    ) -> PsiphonConfig:
+
+    token = request.headers.get("Authorization")
+    if token == None:
+        # XXX not actually validated
+        pass
+    if config is not None:
+        return config
+    log.info("psiphon-config: failed to receive psiphon-config from s3")
+    raise HTTPException(status_code=401, detail="Invalid psiphon-config")
