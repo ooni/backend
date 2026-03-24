@@ -8,7 +8,7 @@ import itertools
 import logging
 from typing import List, TypedDict, Tuple
 import io
-import json
+import ujson
 
 from fastapi import Request
 from typing import Dict, Any
@@ -162,57 +162,66 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
     raise HTTPException(status_code=status_code, detail=msg)
 
 
-def compare_probe_msmt_cc_asn(
-    measurement_uid: str,
-    cc: str,
-    asn: str,
-    request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
-    clickhouse: ClickhouseDep,
-):
-    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
-    Generates a metric.
-    """
+def normalize_asn(asn: str) -> int:
+    """Return ASN as int (strip 'AS' prefix if present). Invalid values return 0."""
+    s = str(asn).strip()
+    s = s[2:] if s.startswith("AS") else s
     try:
-        cc = cc.upper()
-        ipaddr = extract_probe_ipaddr(request)
-        db_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
+        return int(s)
+    except (ValueError, TypeError) as e:
+        log.error(f"Invalid asn: {e}")
+        return 0
 
-        if db_asn.startswith("AS"):
-            db_asn = db_asn[2:]
-        if db_cc == cc and db_asn == asn:
-            Metrics.PROBE_CC_ASN_MATCH.inc()
-        if db_cc != cc:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        if db_asn != asn:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
-        if db_asn != asn or db_cc != cc:
-            details = json.dumps(
-                {
-                    "submission_cc": cc,
-                    "submission_asn": int(asn),
-                    "measurement_uid": measurement_uid,
-                }
-            )
+def get_cc_asn(
+    request: Request, cc_reader: CCReaderDep, asn_reader: ASNReaderDep) -> Tuple[str, str]:
+    ipaddr = extract_probe_ipaddr(request)
+    cc = lookup_probe_cc(ipaddr, cc_reader)
+    asn, _ = lookup_probe_network(ipaddr, asn_reader)
 
-            insert_click(
-                clickhouse,
-                """
-                INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
-                SETTINGS
-                    async_insert=1,
-                    wait_for_async_insert=0
-                VALUES
-                """,
-                [("geoip", db_cc, int(db_asn), details)],
-                max_execution_time=5,
-            )
+    return cc, asn
 
-    except Exception as e:
-        log.error(f"Error comparing msm cc and asn: {e}")
+def register_geoip_anomaly(
+    cc: str,
+    actual_cc: str,
+    asn: str,
+    actual_asn: str,
+    clickhouse: ClickhouseDep,
+    measurement_uid: str,
+    platform: str,
+    software_name: str,
+    software_version: str,
+) -> None:
+    """Record a geoip mismatch in faulty_measurements."""
+    sub_asn = normalize_asn(asn)
+    actual_asn_int = normalize_asn(actual_asn)
+    if actual_cc != cc:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
+    if actual_asn_int != sub_asn:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+
+    details = ujson.dumps(
+        {
+            "submission_cc": cc.upper(),
+            "submission_asn": sub_asn,
+            "measurement_uid": measurement_uid,
+            "software_name": software_name,
+            "software_version": software_version,
+            "platform": platform,
+        }
+    )
+    insert_click(
+        clickhouse,
+        """
+        INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
+        SETTINGS
+            async_insert=1,
+            wait_for_async_insert=0
+        VALUES
+        """,
+        [("geoip", actual_cc, actual_asn_int, details)],
+        max_execution_time=5,
+    )
 
 
 def get_first_ip(headers: str) -> str:

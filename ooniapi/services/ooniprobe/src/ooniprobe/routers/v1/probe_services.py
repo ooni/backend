@@ -1,31 +1,32 @@
 import asyncio
 import io
 import logging
-import random
+from datetime import datetime, timezone, timedelta
 import time
-from datetime import datetime, timedelta, timezone
-from hashlib import sha512
 from typing import (
-    Annotated,
+    List,
     Any,
     Dict,
-    List,
-    Optional,
     Tuple,
+    Optional,
+    Annotated,
 )
+import random
+from hashlib import sha512
 
 import geoip2
 import geoip2.errors
-import ujson
-from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, Request
+from pydantic import Field, IPvAnyAddress
+from fastapi import status, Header
 from ooniauth_py import (
+    ProtocolError,
     CredentialError,
     DeserializationFailed,
-    ProtocolError,
     ServerState,
 )
-from pydantic import Field, IPvAnyAddress
 from starlette.concurrency import run_in_threadpool
+import ujson
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
@@ -42,19 +43,21 @@ from ...dependencies import (
     ManifestDep,
     ManifestResponse,
     PostgresSessionDep,
-    S3ClientDep,
     SettingsDep,
     TorTargetsDep,
     PsiphonConfigDep
 )
 from ...utils import (
-    compare_probe_msmt_cc_asn,
     error,
     extract_probe_ipaddr,
     generate_report_id,
+    get_cc_asn,
     lookup_probe_cc,
     lookup_probe_network,
+    normalize_asn,
+    register_geoip_anomaly,
 )
+
 from ..reports import Metrics
 
 router = APIRouter(prefix="/v1")
@@ -236,7 +239,6 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
 
 class CheckIn(BaseModel):
     run_type: str = "timed"
-    charging: bool = True
     probe_cc: str = "ZZ"
     probe_asn: str = "AS0"
     on_wifi: bool = False
@@ -943,6 +945,11 @@ async def submit_measurement(
         )
         _raise_manifest_not_found(submit_request.manifest_version)
 
+    annotations = submit_request.content.get("annotations") or {}
+    platform = annotations.get("platform") or ""
+    software_name = submit_request.content.get("software_name") or ""
+    software_version = submit_request.content.get("software_version") or ""
+
     data = submit_request.model_dump()
 
     # Add verification-related data.
@@ -967,6 +974,7 @@ async def submit_measurement(
     # with many retries at the same time when there's a temporary issue
     client = request.app.state.fastpath_client
     N_RETRIES = 3
+    success = False
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
@@ -975,21 +983,8 @@ async def submit_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            await run_in_threadpool(
-                compare_probe_msmt_cc_asn,
-                msmt_uid,
-                cc,
-                asn,
-                request,
-                cc_reader,
-                asn_reader,
-                clickhouse,
-            )
-            return SubmitMeasurementResponse(
-                measurement_uid=msmt_uid,
-                is_verified=is_verified,
-                submit_response=submit_response,
-            )
+            success = True
+            break
 
         except Exception as exc:
             log.error(
@@ -997,6 +992,30 @@ async def submit_measurement(
             )
             sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
             await asyncio.sleep(sleep_time)
+
+    if success:
+        try: # Make sure an exception in this function will not trigger a retry
+            await run_in_threadpool(
+                _check_and_register_geoip_anomaly,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
+                cc,
+                asn,
+                msmt_uid,
+                platform,
+                software_name,
+                software_version,
+            )
+        except Exception as e:
+            log.error(f"Error checking for geoip anomalies: {e}")
+
+        return SubmitMeasurementResponse(
+                measurement_uid=msmt_uid,
+                is_verified=is_verified,
+                submit_response=submit_response,
+            )
 
     Metrics.SEND_FASTPATH_FAILURE.inc()
 
@@ -1017,6 +1036,34 @@ async def submit_measurement(
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
 
+
+def _check_and_register_geoip_anomaly(
+    request: Request,
+    cc_reader: CCReaderDep,
+    asn_reader: ASNReaderDep,
+    clickhouse: ClickhouseDep,
+    cc: str,
+    asn: str,
+    msmt_uid: str,
+    platform: str,
+    software_name: str,
+    software_version: str,
+) -> None:
+    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+    else:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
 
 class CredentialUpdateRequest(BaseModel):
     old_manifest_version: str = Field(
@@ -1118,15 +1165,15 @@ class PsiphonConfig(BaseModel):
 @router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
 def psiphon_config(
     request: Request,
-    settings: SettingsDep,
-    config: PsiphonConfigDep
+    config: PsiphonConfigDep | None
     ) -> PsiphonConfig:
 
     token = request.headers.get("Authorization")
-    if token == None:
+    if token is None:
         # XXX not actually validated
         pass
     if config is not None:
         return config
+
     log.info("psiphon-config: failed to receive psiphon-config from s3")
     raise HTTPException(status_code=401, detail="Invalid psiphon-config")
