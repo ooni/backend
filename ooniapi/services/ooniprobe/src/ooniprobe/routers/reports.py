@@ -146,10 +146,10 @@ async def receive_measurement(
     except ClientDisconnect:
         log.info(f"Client disconnected mid-upload")
         Metrics.CLIENT_DISCONNECT.inc()
-        return empty_measurement
+        error("Client disconnect")
     except Exception as e:
         log.error(f"Uncaught exception {e}")
-        return empty_measurement
+        error("Server error", status_code=500)
 
     if content_encoding == "zstd":
         try:
