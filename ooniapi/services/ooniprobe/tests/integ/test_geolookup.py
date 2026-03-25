@@ -58,8 +58,8 @@ async def test_missing_geolookup(client, monkeypatch):
 
     for ip in j["addresses"]:
         assert g[ip]["cc"] == "ZZ"
-        assert g[ip]["asn"] == None
-        assert g[ip]["as_name"] == None
+        assert g[ip]["asn"] is None
+        assert g[ip]["as_name"] is None
 
 def patched_lookup_probe_cc(ipaddr: str, cc_reader) -> str:
     d = {
