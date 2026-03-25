@@ -167,7 +167,7 @@ def read_file(s3_client: S3ClientDep, bucket: str, file: str) -> str:
     return buff.getvalue().decode()
 
 
-async def get_tor_targets_from_s3(
+def get_tor_targets_from_s3(
     settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep
 ) -> Dict[str, Any]:
     cacheKey = str(Path(settings.config_bucket, settings.tor_targets))
@@ -181,7 +181,7 @@ async def get_tor_targets_from_s3(
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
 
-async def get_psiphon_config_from_s3(
+def get_psiphon_config_from_s3(
     settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep
 ) -> Dict[str, Any]:
     cacheKey = str(Path(settings.config_bucket, settings.psiphon_config))
@@ -193,4 +193,4 @@ async def get_psiphon_config_from_s3(
     yield resp
 
 
-PsiphonConfigDep = Annotated[Dict, Depends(get_psiphon_config_from_s3)]
+PsiphonConfigDep = Annotated[Dict | None, Depends(get_psiphon_config_from_s3)]

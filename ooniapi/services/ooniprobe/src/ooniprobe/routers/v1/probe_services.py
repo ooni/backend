@@ -1165,7 +1165,7 @@ class PsiphonConfig(BaseModel):
 @router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
 def psiphon_config(
     request: Request,
-    config: PsiphonConfigDep | None
+    config: PsiphonConfigDep
     ) -> PsiphonConfig:
 
     token = request.headers.get("Authorization")
