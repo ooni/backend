@@ -268,7 +268,7 @@ def _check_mismatch(
     assert "software_version" in details and details['software_version']
     assert "platform" in details and details['platform']
 
-def _check_fm_count(clickhouse_db: Clickhouse, expected: int) -> None:
+def _check_fm_count(clickhouse_db: Clickhouse, expected: int):
     """
     Checks that there are exactly `expected` faulty measurements entries
     """
