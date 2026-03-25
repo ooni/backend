@@ -176,7 +176,7 @@ def get_tor_targets_from_s3(
         targetstr = read_file(s3client, settings.config_bucket, settings.tor_targets)
         resp = ujson.loads(targetstr)
         cache[cacheKey] = resp
-    yield resp
+    return resp
 
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
@@ -190,7 +190,7 @@ def get_psiphon_config_from_s3(
         psiphon_config_str = read_file(s3client, settings.config_bucket, settings.psiphon_config)
         resp = ujson.loads(psiphon_config_str)
         cache[cacheKey] = resp
-    yield resp
+    return resp
 
 
 PsiphonConfigDep = Annotated[Dict | None, Depends(get_psiphon_config_from_s3)]
