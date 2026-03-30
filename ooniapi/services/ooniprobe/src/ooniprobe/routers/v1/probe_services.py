@@ -401,7 +401,7 @@ def check_in(
             # TODO(https://github.com/ooni/probe-cli/pull/1522): we disable torsf until we have
             # addressed the issue with the fast.ly based rendezvous method being broken
             "torsf_enabled": False,
-            "vanilla_tor_enabled": True,
+            "vanilla_tor_enabled": False,
             "openvpn_enabled": False,
         }
     )
