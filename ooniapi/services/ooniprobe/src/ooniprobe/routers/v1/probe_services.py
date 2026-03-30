@@ -25,6 +25,7 @@ from ooniauth_py import (
     ServerState,
 )
 from pydantic import Field, IPvAnyAddress
+from pydantic_extra_types.country import CountryAlpha2
 from starlette.concurrency import run_in_threadpool
 
 from ...common.auth import create_jwt, decode_jwt, jwt
@@ -235,15 +236,14 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
 
 
 class CheckIn(BaseModel):
-    run_type: str = "timed"
-    charging: bool = True
-    probe_cc: str = "ZZ"
-    probe_asn: str = "AS0"
-    on_wifi: bool = False
-    charging: bool = False
-    software_name: str = ""
-    software_version: str = ""
-    web_connectivity: Optional[Dict[str, Any]] = None
+    run_type: str = Field("timed")
+    charging: bool = Field(True)
+    probe_cc: CountryAlpha2 = Field("ZZ")
+    probe_asn: str = Field("AS0")
+    on_wifi: bool = Field(False)
+    software_name: str = Field("")
+    software_version: str = Field("")
+    web_connectivity: Optional[Dict[str, Any]] = Field(None)
 
 
 class CheckInResponse(BaseModel):
