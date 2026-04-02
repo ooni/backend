@@ -44,6 +44,6 @@ def start_http_api(queue):
 
     options = {
         "bind": f"0.0.0.0:{API_PORT}",
-        "worker_timeout": WORKER_TIMEOUT,
+        "timeout": WORKER_TIMEOUT,
     }
     MsmtFeeder(handler_app, options).run()
