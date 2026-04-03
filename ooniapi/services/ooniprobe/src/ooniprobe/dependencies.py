@@ -92,6 +92,9 @@ class ManifestMeta(BaseModel):
     library_version: str = Field(
         description="Version of the Python library implementing the anonymous credentials protocol"
     )
+    protocol_version: str = Field(
+        description="Anonymous credentials protocol implementation version"
+    )
 
 
 class ManifestResponse(BaseModel):
@@ -118,6 +121,8 @@ def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
         version=latest["VersionId"],
         last_modification_date=latest["LastModified"],
         manifest_url=f"https://{bucket}.s3.amazonaws.com/{file}",
+        library_version=ooniauth_py.__version__,
+        protocol_version=ooniauth_py.get_protocol_version()
     )
 
     # Get Object
