@@ -1,13 +1,12 @@
 import json
-import os
 import pathlib
-import shutil
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 from urllib.request import urlopen
 
+import ooniauth_py
 import pytest
 import ujson
 from clickhouse_driver import Client as ClickhouseClient
@@ -119,6 +118,8 @@ def make_manifest_mock_fn(public_params: str):
                 version="1",
                 last_modification_date=datetime.now(),
                 manifest_url="https://ooni.mock/manifest",
+                library_version=ooniauth_py.__version__,
+                protocol_version=ooniauth_py.get_protocol_version(),
             ),
         )
 
