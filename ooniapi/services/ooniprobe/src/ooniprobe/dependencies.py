@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import boto3
+import ooniauth_py
 import ujson
 import geoip2.database
 from fastapi import Depends
@@ -87,6 +88,9 @@ class ManifestMeta(BaseModel):
     last_modification_date: datetime
     manifest_url: str = Field(
         description="URL pointing to the AWS public record of this manifest"
+    )
+    library_version: str = Field(
+        description="Version of the Python library implementing the anonymous credentials protocol"
     )
 
 
