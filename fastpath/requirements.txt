@@ -4,7 +4,7 @@ lz4
 # pip install --global-option='--with-libyaml' pyyaml
 pyyaml
 boto3
-gunicorn
+gunicorn == 25.1.0
 psycopg2-binary
 # systemd <- This is an optional requirement on linux
 clickhouse-driver

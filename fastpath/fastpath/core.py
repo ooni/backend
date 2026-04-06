@@ -1652,10 +1652,11 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
     try:
         msm_jstr, measurement, msmt_uid = msm_tup
         assert msmt_uid
+
         if measurement is None:
             measurement = ujson.loads(msm_jstr)
 
-        is_verified = g(measurement, 'is_verified', False)
+        is_verified = g(measurement, 'is_verified', default=False)
         nym = g(measurement, 'nym')
         zkp_request = g(measurement, 'zkp_request')
         age_range = g(measurement, 'age_range')
