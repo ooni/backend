@@ -884,6 +884,12 @@ async def submit_measurement(
     revealing personally identifiable information.
 
     An error will be returned if using a deprecated manifest version
+
+    Note that even if `error` is not null in the response, the measurement might still be processed.
+
+    Assume that:
+    - status code 2xx: The measurement was processed and stored, even if not verified
+    - status code 4xx or 5xx: the measurement was not processed nor stored
     """
     setnocacheresponse(response)
     try:
@@ -910,12 +916,12 @@ async def submit_measurement(
     if asn_i == 0:
         log.info("Discarding ASN == 0")
         Metrics.MSMNT_DISCARD_ASN0.inc()
-        return SubmitMeasurementResponse(error="discarded_asn0", is_verified=False, submit_response=None)
+        raise HTTPException(400, detail = {"error" : "asn_0", "message" : "Measurement discarded, ASN == 0"})
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
-        return SubmitMeasurementResponse(error="discarded_cc_zz", is_verified=False, submit_response=None)
+        raise HTTPException(400, detail = {"error" : "cc_zz", "message" : "Measurement discarded, CC == ZZ"})
 
     is_verified = False
     submit_response = None
