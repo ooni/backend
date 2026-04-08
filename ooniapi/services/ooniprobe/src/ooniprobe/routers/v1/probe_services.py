@@ -889,20 +889,23 @@ async def submit_measurement(
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
     except Exception:
-        log.info("Unexpected report_id %r", report_id[:200])
-        raise error("Incorrect format")
+        err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
+        log.info(err_msg)
+        error(err_msg)
 
     # TODO validate the timestamp?
     good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
     if not good:
-        log.info("Unexpected report_id %r", report_id[:200])
-        error("Incorrect format")
+        err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
+        log.info(err_msg)
+        error(err_msg)
 
     try:
         asn_i = int(asn)
     except ValueError:
-        log.info("ASN value not parsable %r", asn)
-        error("Incorrect format")
+        err_msg = f"Incorrect format: ASN value not parsable {asn}"
+        log.info(err_msg)
+        error(err_msg)
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
