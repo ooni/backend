@@ -82,7 +82,7 @@ async def test_submission_basic(client):
     # Create user
     user, manifest_version, emission_day = setup_user(client)
 
-    submit_request = make_submit_request(user, "IE", "34245")
+    submit_request = make_submit_request(user, "IE", "AS34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 

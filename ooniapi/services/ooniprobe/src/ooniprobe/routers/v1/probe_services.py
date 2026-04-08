@@ -825,7 +825,8 @@ class SubmitMeasurementRequest(BaseModel):
     zkp_request: str | None = Field(description=
         "zkp request computed by the ooniauth-core library, base-64 encoded as a string. "
         "Note that this has to be computed with the ASN in the format: 1234 (without AS prefix), "
-        "the same one used in the report_id argument in the function handler."
+        "the same one used in the report_id argument in the function handler.",
+        default = None
     )
     manifest_version: str | None = None
     protocol_version: str | None = None
@@ -920,6 +921,8 @@ async def submit_measurement(
             assert submit_request.nym is not None
             assert submit_request.zkp_request is not None
             assert submit_request.manifest_version is not None
+            assert 'probe_cc' in submit_request.content
+            assert 'probe_asn' in submit_request.content
 
             if submit_request.manifest_version != manifest.meta.version:
                 submit_error = "manifest_not_found" # TODO support for older manifests
@@ -933,8 +936,8 @@ async def submit_measurement(
             submit_response = protocol_state.handle_submit_request(
                 submit_request.nym,
                 submit_request.zkp_request,
-                cc,
-                asn,
+                submit_request.content['probe_cc'],
+                submit_request.content['probe_asn'],
                 [2461109, 2826139], # TODO lookup these ranges from the manifest
                 [0, 1100100100]
             )
