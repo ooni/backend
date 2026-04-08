@@ -2,7 +2,7 @@ from typing import Any, Dict
 import pytest
 from fastapi import status
 from ooniauth_py import UserState, ServerState
-from .utils import getj, postj, setup_user
+from .utils import getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
 async def test_manifest_basic(client, db):
@@ -82,15 +82,38 @@ async def test_submission_basic(client):
     # Create user
     user, manifest_version, emission_day = setup_user(client)
 
-    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    submit_request = make_submit_request(user, "IE", "AS34245")
 
-    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
     assert c['is_verified'] is True
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
+    assert c["error"] is None
+
+
+@pytest.mark.asyncio
+async def test_submission_without_anoncred_fields(client):
+    j = make_report_request()
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    msm = {
+        "format": "json",
+        "content": {
+            "test_name": "web_connectivity",
+            "probe_asn": "AS34245",
+            "probe_cc": "IE",
+            "test_start_time": "2020-09-09 14:11:11",
+        },
+    }
+
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["is_verified"] is False
+    assert c["submit_response"] is None
+    assert c["error"] is None
 
 # TODO implement credential update
 @pytest.mark.skip
@@ -119,9 +142,9 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
 
-    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    submit_request = make_submit_request(user, "IE", "AS34245", emission_day)
 
-    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
 
@@ -143,14 +166,14 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
 
-    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    submit_request = make_submit_request(user, "IE", "AS34245", emission_day)
 
-    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
 
 
-def make_measurement(nym : str, zkp_request: str, emission_day: int, manifest_version: str, probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
+def make_measurement(nym : str, zkp_request: str, manifest_version: str, probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
     return {
         "format": "json",
         "content": {
@@ -161,8 +184,6 @@ def make_measurement(nym : str, zkp_request: str, emission_day: int, manifest_ve
         },
         "nym": nym,
         "zkp_request": zkp_request,
-        "probe_age_range": [emission_day - 30, emission_day + 1],
-        "probe_msm_range": [0, 100],
         "manifest_version": manifest_version
     }
 

@@ -16,6 +16,7 @@ from typing import (
 
 import geoip2
 import geoip2.errors
+import ooniauth_py
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from ooniauth_py import (
@@ -820,27 +821,10 @@ class SubmitMeasurementRequest(BaseModel):
     content: Dict[str, Any]
     # -- < Anonymous Credentials > ----------------------
     # not post quantum, in the future we might want to use a hashed key for storage
-    nym: str
-    zkp_request: str
-    probe_age_range: Tuple[int, int] = Field(
-        description="A range representing an interval containing the probe actual age. "
-        "This is used for the anonymous credentials protocol to identify the probe without using "
-        "personally identifiable information.\n"
-        "The server will use the age range to validate in zero proof that the request came from a "
-        "trusted probe. "
-        "Example: if probe age is 30 days, a valid answer is (25, 35)"
-        "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
-    )
-    probe_msm_range: Tuple[int, int] = Field(
-        description="A range representing an interval containing the how many measurements the probe has sent. "
-        "This is used for the anonymous credentials protocol to identify the probe without using "
-        "personally identifiable information.\n"
-        "The server will use the measurement count range to validate in zero proof that "
-        "the request came from a trusted probe. "
-        "Example: if the probe has sent 100 measurements, a valid answer is (90, 110)"
-        "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
-    )
-    manifest_version: str
+    nym: str | None = None
+    zkp_request: str | None = None
+    manifest_version: str | None = None
+    protocol_version: str | None = None
 
 
 class SubmitMeasurementResponse(BaseModel):
@@ -854,6 +838,16 @@ class SubmitMeasurementResponse(BaseModel):
     is_verified: bool = Field(description="if the ZKP was able to verify this request")
     submit_response: str | None = Field(
         description="Anonymous credential verification response. Null if verification failed"
+    )
+    protocol_version: str = Field(
+        description="Protocol version used by the backend: current `ooniauth-core` version",
+        default=ooniauth_py.get_protocol_version(),
+    )
+    error: str | None = Field(
+        description="If there was an error accepting this measurement. Note that if the status code is 2xx, "
+        "the measurement was saved, even with this error present. "
+        "Null if no errors.",
+        default=None,
     )
 
 
@@ -869,7 +863,7 @@ async def submit_measurement(
     manifest: ManifestDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
-) -> SubmitMeasurementResponse | Dict[str, Any]:
+) -> SubmitMeasurementResponse:
     """
     Submit measurement, using the anonymous credentials protocol to establish a confidence
     layer over the incoming measurements.
@@ -880,7 +874,6 @@ async def submit_measurement(
     An error will be returned if using a deprecated manifest version
     """
     setnocacheresponse(response)
-    empty_measurement = {}
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
     except Exception:
@@ -902,46 +895,58 @@ async def submit_measurement(
     if asn_i == 0:
         log.info("Discarding ASN == 0")
         Metrics.MSMNT_DISCARD_ASN0.inc()
-        return empty_measurement
+        return SubmitMeasurementResponse(error="discarded_asn0", is_verified=False, submit_response=None)
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
-        return empty_measurement
+        return SubmitMeasurementResponse(error="discarded_cc_zz", is_verified=False, submit_response=None)
 
-    # Run verification
-    assert "probe_cc" in submit_request.content and isinstance(
-        submit_request.content["probe_cc"], str
-    )
-    assert "probe_asn" in submit_request.content and isinstance(
-        submit_request.content["probe_asn"], str
-    )
-    protocol_state = ServerState.from_creds(
-        manifest.manifest.public_parameters, settings.anonc_secret_key
-    )
+    is_verified = False
+    submit_response = None
+    submit_error = None
 
-    if submit_request.manifest_version == manifest.meta.version:
+    # Run anoncred verification only if anoncred fields are provided.
+    if (
+        submit_request.nym is not None
+        or submit_request.zkp_request is not None
+        or submit_request.manifest_version is not None
+    ):
         try:
+            assert submit_request.nym is not None
+            assert submit_request.zkp_request is not None
+            assert submit_request.manifest_version is not None
+
+            if submit_request.manifest_version != manifest.meta.version:
+                submit_error = "manifest_not_found" # TODO support for older manifests
+                raise ValueError(
+                    f"No manifest with version '{submit_request.manifest_version}' was found"
+                )
+
+            protocol_state = ServerState.from_creds(
+                manifest.manifest.public_parameters, settings.anonc_secret_key
+            )
             submit_response = protocol_state.handle_submit_request(
                 submit_request.nym,
                 submit_request.zkp_request,
-                submit_request.content["probe_cc"],
-                submit_request.content["probe_asn"],
-                list(submit_request.probe_age_range),
-                list(submit_request.probe_msm_range),
+                cc,
+                asn,
+                [2461109, 2826139], # TODO lookup these ranges from the manifest
+                [0, 1100100100]
             )
             is_verified = True
-        except (DeserializationFailed, ProtocolError, CredentialError) as e:
-            # proof failed
-            # TODO Q: should we add a "why not verified" field to the measurement?
+        except AssertionError:
+            submit_error = "incomplete_anonc_fields"
+            log.error("ZKP skipped due to incomplete anonymous credentials fields")
+        except ValueError as e:
             log.error(f"ZKP Failed: {e}")
-            is_verified = False
-            submit_response = None
-    else:
-        log.error(
-            f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'"
-        )
-        _raise_manifest_not_found(submit_request.manifest_version)
+        except (DeserializationFailed, ProtocolError, CredentialError) as e:
+            log.error(f"ZKP Failed: {e}")
+            submit_error = {
+                ProtocolError: "protocol_error",
+                DeserializationFailed: "deserialization_failed",
+                CredentialError: "credential_error",
+            }[type(e)]
 
     data = submit_request.model_dump()
 
@@ -989,6 +994,7 @@ async def submit_measurement(
                 measurement_uid=msmt_uid,
                 is_verified=is_verified,
                 submit_response=submit_response,
+                error=submit_error,
             )
 
         except Exception as exc:
@@ -1015,7 +1021,12 @@ async def submit_measurement(
 
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
-    return empty_measurement
+    return SubmitMeasurementResponse(
+        measurement_uid=msmt_uid,
+        is_verified=is_verified,
+        submit_response=submit_response,
+        error=submit_error or "submission_delivery_failed",
+    )
 
 
 class CredentialUpdateRequest(BaseModel):
