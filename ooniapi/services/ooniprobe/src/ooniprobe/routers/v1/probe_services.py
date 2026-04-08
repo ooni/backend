@@ -824,8 +824,8 @@ class SubmitMeasurementRequest(BaseModel):
     nym: str | None = None
     zkp_request: str | None = Field(description=
         "zkp request computed by the ooniauth-core library, base-64 encoded as a string. "
-        "Note that this has to be computed with the ASN in the format: 1234 (without AS prefix), "
-        "the same one used in the report_id argument in the function handler.",
+        "Note that this has to be computed with the ASN in the same format as the `probe_asn` in "
+        "the measurement body (`content` key)",
         default = None
     )
     manifest_version: str | None = None
