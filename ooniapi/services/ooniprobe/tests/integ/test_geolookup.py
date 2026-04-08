@@ -163,7 +163,7 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
 
     # Create anoncred user and submit_request
     user, manifest_version, emission_day = setup_user(client)
-    submit_request = make_submit_request(user, "VE", "AS65550", emission_day)
+    submit_request = make_submit_request(user, "VE", "AS65550")
 
     # Build measurement body used by /api/v1/submit_measurement/{rid}
     msm = make_measurement(

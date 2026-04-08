@@ -75,14 +75,14 @@ async def test_registration_errors(client):
 @pytest.mark.asyncio
 async def test_submission_basic(client):
     # open report
-    j = make_report_request()
+    j = make_report_request("IE", "AS34245")
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
 
     # Create user
     user, manifest_version, emission_day = setup_user(client)
 
-    submit_request = make_submit_request(user, "IE", "AS34245")
+    submit_request = make_submit_request(user, "IE", "34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 

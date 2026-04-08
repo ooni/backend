@@ -822,7 +822,11 @@ class SubmitMeasurementRequest(BaseModel):
     # -- < Anonymous Credentials > ----------------------
     # not post quantum, in the future we might want to use a hashed key for storage
     nym: str | None = None
-    zkp_request: str | None = None
+    zkp_request: str | None = Field(description=
+        "zkp request computed by the ooniauth-core library, base-64 encoded as a string. "
+        "Note that this has to be computed with the ASN in the format: 1234 (without AS prefix), "
+        "the same one used in the report_id argument in the function handler."
+    )
     manifest_version: str | None = None
     protocol_version: str | None = None
 
