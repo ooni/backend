@@ -1657,10 +1657,6 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             measurement = ujson.loads(msm_jstr)
 
         is_verified = g(measurement, 'is_verified', default=False)
-        nym = g(measurement, 'nym')
-        zkp_request = g(measurement, 'zkp_request')
-        age_range = g(measurement, 'age_range')
-        msm_range = g(measurement, 'msm_range')
 
         if "content" in measurement and "format" in measurement:
             measurement = unwrap_msmt(measurement)
@@ -1751,10 +1747,6 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             test_helper_type,
             ooni_run_link_id,
             is_verified,
-            nym,
-            zkp_request,
-            age_range,
-            msm_range,
             buffer_writes=buffer_writes,
         )
 
