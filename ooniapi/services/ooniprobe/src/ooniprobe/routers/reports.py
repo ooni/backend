@@ -141,7 +141,16 @@ async def receive_measurement(
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         return empty_measurement
 
-    data = await request.body()
+    try:
+        data = await request.body()
+    except ClientDisconnect:
+        log.info(f"Client disconnected mid-upload")
+        Metrics.CLIENT_DISCONNECT.inc()
+        error("Client disconnect")
+    except Exception as e:
+        log.error(f"Uncaught exception {e}")
+        error("Server error", status_code=500)
+
     if content_encoding == "zstd":
         try:
             compressed_len = len(data)
