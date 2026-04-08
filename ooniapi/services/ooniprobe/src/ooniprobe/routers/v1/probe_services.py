@@ -796,13 +796,20 @@ def sign_credential(
     )
 
 
-def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+def _anonc_exc_to_str(error: ProtocolError | CredentialError | DeserializationFailed) -> str:
+    """
+    returns a short error string depending on the error type
+    """
     type_to_str = {
         ProtocolError: "protocol_error",
         DeserializationFailed: "deserialization_failed",
         CredentialError: "credential_error",
     }
-    type_str = type_to_str[type(error)]
+    return type_to_str[type(error)]
+
+
+def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+    type_str = _anonc_exc_to_str(error)
 
     assert isinstance(error, (ProtocolError, CredentialError, DeserializationFailed))
     status_code = (
@@ -949,11 +956,7 @@ async def submit_measurement(
             log.error(f"ZKP Failed: {e}")
         except (DeserializationFailed, ProtocolError, CredentialError) as e:
             log.error(f"ZKP Failed: {e}")
-            submit_error = {
-                ProtocolError: "protocol_error",
-                DeserializationFailed: "deserialization_failed",
-                CredentialError: "credential_error",
-            }[type(e)]
+            submit_error = _anonc_exc_to_str(e)
 
     data = submit_request.model_dump()
 
