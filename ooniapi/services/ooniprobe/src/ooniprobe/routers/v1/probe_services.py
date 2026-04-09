@@ -1079,7 +1079,7 @@ def _verify_submit(
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
             submit_request.content["probe_asn"],
-            list(age_range),  # TODO lookup these ranges from the manifest
+            list(age_range),
             list(count_range),
         )
         return (True, None, submit_response)
