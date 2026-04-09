@@ -95,7 +95,10 @@ async def test_submission_basic(client):
 
 
 @pytest.mark.asyncio
-async def test_submission_without_anoncred_fields(client):
+async def test_submission_non_verified(client):
+    """
+    
+    """
     j = make_report_request()
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
@@ -110,10 +113,27 @@ async def test_submission_without_anoncred_fields(client):
         },
     }
 
+    # no anoncred fields -> processed but not verified, no error
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
     assert c["is_verified"] is False
     assert c["submit_response"] is None
     assert c["error"] is None
+
+    # unknown manifest -> processed but not verified, manifest error
+    msm["manifest_version"] = "does-not-exist"
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["is_verified"] is False
+    assert c["submit_response"] is None
+    assert c["error"] == "manifest_not_found"
+
+    # incomplete anoncred fields -> processed but not verified, incomplete-fields error
+    _, manifest_version, _ = setup_user(client)
+    msm["nym"] = "dummy-nym"
+    msm["manifest_version"] = manifest_version
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["is_verified"] is False
+    assert c["submit_response"] is None
+    assert c["error"] == "incomplete_anonc_fields"
 
 # TODO implement credential update
 @pytest.mark.skip
