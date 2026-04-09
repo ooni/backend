@@ -1066,6 +1066,8 @@ def _verify_submit(
         )
         return False, "invalid_protocol_version", None
 
+    # Get the limits in age range and measurement count for this request
+    age_range, count_range = get_ranges_from_policy(manifest.manifest.submission_policy, submit_request.content['probe_cc'], submit_request.content['probe_asn'])
 
     # Run verification
     try:
@@ -1077,8 +1079,8 @@ def _verify_submit(
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
             submit_request.content["probe_asn"],
-            [2461109, 2464789],  # TODO lookup these ranges from the manifest
-            [0, 1100100100],
+            list(age_range),  # TODO lookup these ranges from the manifest
+            list(count_range),
         )
         return (True, None, submit_response)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
@@ -1088,6 +1090,55 @@ def _verify_submit(
 
 def _parse_version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(n) for n in version.split("."))
+
+def get_ranges_from_policy(policy : Dict[str, Any], probe_cc : str, probe_asn : str) -> Tuple[Tuple[int,int], Tuple[int,int]]:
+    """
+    Gets the age and measurement count ranges from the specified policy.
+
+    Matching order, match the most strict first:
+
+    probe_cc/probe_asn
+    probe_cc/*
+    */probe_asn
+    */*
+    *
+
+    returns:
+    age_range, msm_range
+    """
+
+    keys = [
+        f"{probe_cc}/{probe_asn}",
+        f"{probe_cc}/*",
+        f"*/{probe_asn}",
+        "*/*",
+        "*", # use this as shortcut
+        ]
+
+    for k in keys:
+        if (d := policy.get(k)) is not None:
+            break
+
+    def_age_range, def_msm_range = get_default_ranges()
+    if d is None:
+        return def_age_range, def_msm_range
+
+    age_range = tuple(d.get('age', def_age_range))
+    msm_range = tuple(d.get('measurement_count', def_msm_range))
+
+    return age_range, msm_range
+
+
+def get_default_ranges() -> Tuple[Tuple[int,int], Tuple[int,int]]:
+    """
+    returns:
+    age_range, msm_range
+    """
+    #TODO Agree on good default ranges
+    return (
+        (2461110, 2826140),
+        (0, 10000000)
+    )
 
 
 class CredentialUpdateRequest(BaseModel):
