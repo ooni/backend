@@ -1064,6 +1064,7 @@ def _verify_submit(
         log.error(f"Unable to parse version string. probe version = {submit_request.protocol_version}, "
         f"minimum protocol version = {settings.minimum_anonc_protocol_version}. Error: {e}"
         )
+        return False, "invalid_protocol_version", None
 
 
     # Run verification
