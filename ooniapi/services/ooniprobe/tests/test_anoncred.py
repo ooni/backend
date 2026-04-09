@@ -3,6 +3,7 @@ import ooniauth_py
 import pytest
 from fastapi import status
 from ooniauth_py import UserState, ServerState
+from ooniprobe.routers.v1.probe_services import get_default_ranges, get_ranges_from_policy
 from .utils import getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
@@ -153,6 +154,60 @@ async def test_submission_non_verified(client):
     assert c["is_verified"] is False
     assert c["submit_response"] is None
     assert c["error"] == "invalid_protocol_version"
+
+
+def test_get_ranges_from_policy_match_precedence():
+    policy = {
+        "*": {"age": [1, 2], "measurement_count": [10, 20]},
+        "*/*": {"age": [3, 4], "measurement_count": [30, 40]},
+        "*/AS15704": {"age": [5, 6], "measurement_count": [50, 60]},
+        "ES/*": {"age": [7, 8], "measurement_count": [70, 80]},
+        "ES/AS15704": {"age": [9, 10], "measurement_count": [90, 100]},
+        "VE/AS8048": {} # Means default
+    }
+
+    age_range, msm_range = get_ranges_from_policy(policy, "ES", "AS15704")
+    assert age_range == (9, 10)
+    assert msm_range == (90, 100)
+
+    age_range, msm_range = get_ranges_from_policy(policy, "ES", "AS99999")
+    assert age_range == (7, 8)
+    assert msm_range == (70, 80)
+
+    age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS15704")
+    assert age_range == (5, 6)
+    assert msm_range == (50, 60)
+
+    age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS99999")
+    assert age_range == (3, 4)
+    assert msm_range == (30, 40)
+
+    age_range, msm_range = get_ranges_from_policy(policy, "VE", "AS8048")
+    def_age, def_msm = get_default_ranges()
+    assert age_range == def_age
+    assert msm_range == def_msm
+
+
+def test_get_ranges_from_policy_uses_star_shortcut_when_no_slash_match():
+    policy = {
+        "*": {"age": [11, 12], "measurement_count": [110, 120]},
+    }
+    age_range, msm_range = get_ranges_from_policy(policy, "BR", "AS28573")
+    assert age_range == (11, 12)
+    assert msm_range == (110, 120)
+
+
+def test_get_ranges_from_policy_uses_defaults_when_missing_policy_or_fields():
+    def_age_range, def_msm_range = get_default_ranges()
+
+    age_range, msm_range = get_ranges_from_policy({}, "FR", "AS3215")
+    assert age_range == def_age_range
+    assert msm_range == def_msm_range
+
+    policy = {"FR/*": {"age": [21, 22]}}
+    age_range, msm_range = get_ranges_from_policy(policy, "FR", "AS3215")
+    assert age_range == (21, 22)
+    assert msm_range == def_msm_range
 
 # TODO implement credential update
 @pytest.mark.skip
