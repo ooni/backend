@@ -888,7 +888,10 @@ class SubmitMeasurementRequest(BaseModel):
         default = None
     )
     manifest_version: str | None = None
-    protocol_version: str | None = None
+    protocol_version: str | None = Field(description =
+        "`ooniauth-core` version used by the **probe** sending this request",
+        default = None
+        )
 
 
 class SubmitMeasurementResponse(BaseModel):
