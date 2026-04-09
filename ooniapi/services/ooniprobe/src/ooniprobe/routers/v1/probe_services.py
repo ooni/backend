@@ -1037,7 +1037,6 @@ def _verify_submit(
         return False, "manifest_not_found", None
 
 
-
     # Check anonymous credentials fields are complete
     if (
         submit_request.nym is None
