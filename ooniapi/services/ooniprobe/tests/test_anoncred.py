@@ -1,4 +1,5 @@
 from typing import Any, Dict
+import ooniauth_py
 import pytest
 from fastapi import status
 from ooniauth_py import UserState, ServerState
@@ -97,7 +98,7 @@ async def test_submission_basic(client):
 @pytest.mark.asyncio
 async def test_submission_non_verified(client):
     """
-    
+
     """
     j = make_report_request()
     resp = postj(client, "/report", json=j)
@@ -127,13 +128,24 @@ async def test_submission_non_verified(client):
     assert c["error"] == "manifest_not_found"
 
     # incomplete anoncred fields -> processed but not verified, incomplete-fields error
-    _, manifest_version, _ = setup_user(client)
+    user, manifest_version, _ = setup_user(client)
     msm["nym"] = "dummy-nym"
     msm["manifest_version"] = manifest_version
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
     assert c["is_verified"] is False
     assert c["submit_response"] is None
     assert c["error"] == "incomplete_anonc_fields"
+
+    # old protocol version -> protocol-version error
+    submit_request = make_submit_request(user, "IE", "AS34245")
+    msm["nym"] = submit_request.nym
+    msm["zkp_request"] = submit_request.request
+    msm["manifest_version"] = manifest_version
+    msm["protocol_version"] = "0.0.1"
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["is_verified"] is False
+    assert c["submit_response"] is None
+    assert c["error"] == "protocol_version_too_old"
 
 # TODO implement credential update
 @pytest.mark.skip
@@ -193,7 +205,14 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
 
 
-def make_measurement(nym : str, zkp_request: str, manifest_version: str, probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
+def make_measurement(
+    nym: str,
+    zkp_request: str,
+    manifest_version: str,
+    probe_cc: str = "IE",
+    probe_asn: str = "AS34245",
+    protocol_version: str = ooniauth_py.get_protocol_version(),
+) -> Dict[str, Any]:
     return {
         "format": "json",
         "content": {
@@ -204,7 +223,8 @@ def make_measurement(nym : str, zkp_request: str, manifest_version: str, probe_c
         },
         "nym": nym,
         "zkp_request": zkp_request,
-        "manifest_version": manifest_version
+        "manifest_version": manifest_version,
+        "protocol_version": protocol_version,
     }
 
 def make_report_request(probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
