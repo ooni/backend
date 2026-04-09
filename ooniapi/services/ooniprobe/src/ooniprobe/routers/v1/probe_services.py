@@ -823,6 +823,58 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
     )
 
 
+def _verify_submit(
+    submit_request: "SubmitMeasurementRequest",
+    manifest: ManifestDep,
+    settings: SettingsDep,
+) -> tuple[bool, str | None, str | None]:
+    """
+    Run the anonymous credentials verification when the relevant fields are present.
+
+    Returns (is_verified, submit_error, submit_response).
+    """
+    if not (
+        submit_request.nym is not None
+        or submit_request.zkp_request is not None
+        or submit_request.manifest_version is not None
+    ):
+        return (False, None, None)
+
+    try:
+        assert submit_request.nym is not None
+        assert submit_request.zkp_request is not None
+        assert submit_request.manifest_version is not None
+        assert "probe_cc" in submit_request.content
+        assert "probe_asn" in submit_request.content
+
+        if submit_request.manifest_version != manifest.meta.version:
+            raise ValueError(
+                f"No manifest with version '{submit_request.manifest_version}' was found"
+            )
+
+        protocol_state = ServerState.from_creds(
+            manifest.manifest.public_parameters, settings.anonc_secret_key
+        )
+        submit_response = protocol_state.handle_submit_request(
+            submit_request.nym,
+            submit_request.zkp_request,
+            submit_request.content["probe_cc"],
+            submit_request.content["probe_asn"],
+            [2461109, 2464789],  # TODO lookup these ranges from the manifest
+            [0, 1100100100],
+        )
+        return (True, None, submit_response)
+    except AssertionError:
+        log.error("ZKP skipped due to incomplete anonymous credentials fields")
+        return (False, "incomplete_anonc_fields", None)
+    except ValueError as e:
+        log.error(f"ZKP Failed: {e}")
+        return (False, "manifest_not_found", None)
+    except (DeserializationFailed, ProtocolError, CredentialError) as e:
+        log.error(f"ZKP Failed: {e}")
+        return (False, _anonc_exc_to_str(e), None)
+
+
 class SubmitMeasurementRequest(BaseModel):
     format: str
     content: Dict[str, Any]
@@ -927,45 +979,10 @@ async def submit_measurement(
     submit_response = None
     submit_error = None
 
-    # Run anoncred verification only if anoncred fields are provided.
-    if (
-        submit_request.nym is not None
-        or submit_request.zkp_request is not None
-        or submit_request.manifest_version is not None
-    ):
-        try:
-            assert submit_request.nym is not None
-            assert submit_request.zkp_request is not None
-            assert submit_request.manifest_version is not None
-            assert 'probe_cc' in submit_request.content
-            assert 'probe_asn' in submit_request.content
-
-            if submit_request.manifest_version != manifest.meta.version:
-                submit_error = "manifest_not_found" # TODO support for older manifests
-                raise ValueError(
-                    f"No manifest with version '{submit_request.manifest_version}' was found"
-                )
-
-            protocol_state = ServerState.from_creds(
-                manifest.manifest.public_parameters, settings.anonc_secret_key
-            )
-            submit_response = protocol_state.handle_submit_request(
-                submit_request.nym,
-                submit_request.zkp_request,
-                submit_request.content['probe_cc'],
-                submit_request.content['probe_asn'],
-                [2461109, 2826139], # TODO lookup these ranges from the manifest
-                [0, 1100100100]
-            )
-            is_verified = True
-        except AssertionError:
-            submit_error = "incomplete_anonc_fields"
-            log.error("ZKP skipped due to incomplete anonymous credentials fields")
-        except ValueError as e:
-            log.error(f"ZKP Failed: {e}")
-        except (DeserializationFailed, ProtocolError, CredentialError) as e:
-            log.error(f"ZKP Failed: {e}")
-            submit_error = _anonc_exc_to_str(e)
+    # Anonymous credentials verification
+    is_verified, submit_error, submit_response = _verify_submit(
+        submit_request, manifest, settings
+    )
 
     data = submit_request.model_dump()
 

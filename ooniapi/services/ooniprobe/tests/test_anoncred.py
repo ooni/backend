@@ -142,7 +142,7 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
 
-    submit_request = make_submit_request(user, "IE", "AS34245", emission_day)
+    submit_request = make_submit_request(user, "IE", "AS34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
@@ -166,7 +166,7 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     resp = postj(client, "/report", json=j)
     rid = resp.pop("report_id")
 
-    submit_request = make_submit_request(user, "IE", "AS34245", emission_day)
+    submit_request = make_submit_request(user, "IE", "AS34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 

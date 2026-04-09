@@ -41,6 +41,6 @@ def make_submit_request(user: UserState, probe_cc: str, probe_asn: str):
     return user.make_submit_request(
         probe_cc,
         probe_asn,
-        (2461109, 2826139),
+        (2461109, 2464789),
         (0, 1100100100),
     )
