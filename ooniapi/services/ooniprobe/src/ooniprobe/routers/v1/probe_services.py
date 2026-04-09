@@ -833,25 +833,34 @@ def _verify_submit(
 
     Returns (is_verified, submit_error, submit_response).
     """
-    if not (
-        submit_request.nym is not None
-        or submit_request.zkp_request is not None
-        or submit_request.manifest_version is not None
+    # Not intended to be verified: not an error but not verified
+    if (
+        submit_request.nym is None
+        and submit_request.zkp_request is None
+        and submit_request.manifest_version is None
     ):
         return (False, None, None)
 
+    # Check manifest version
+    if submit_request.manifest_version != manifest.meta.version:
+        # TODO We should validate if this is an old manifest or an unknown manifest, for now
+        # we treat them as the same error (unknown manifest)
+        log.error("Old or unknown manifest in submission request")
+        return False, "manifest_not_found", None
+
+    # Check anonymous credentials fields are complete
+    if (
+        submit_request.nym is None
+        or submit_request.zkp_request is None
+        or submit_request.manifest_version is None
+        or "probe_cc" not in submit_request.content
+        or "probe_asn" not in submit_request.content
+    ):
+        log.error("Incomplete anonymous credentials fields in submission request")
+        return False, "incomplete_anonc_fields", None
+
+    # Run verification
     try:
-        assert submit_request.nym is not None
-        assert submit_request.zkp_request is not None
-        assert submit_request.manifest_version is not None
-        assert "probe_cc" in submit_request.content
-        assert "probe_asn" in submit_request.content
-
-        if submit_request.manifest_version != manifest.meta.version:
-            raise ValueError(
-                f"No manifest with version '{submit_request.manifest_version}' was found"
-            )
-
         protocol_state = ServerState.from_creds(
             manifest.manifest.public_parameters, settings.anonc_secret_key
         )
@@ -864,12 +873,6 @@ def _verify_submit(
             [0, 1100100100],
         )
         return (True, None, submit_response)
-    except AssertionError:
-        log.error("ZKP skipped due to incomplete anonymous credentials fields")
-        return (False, "incomplete_anonc_fields", None)
-    except ValueError as e:
-        log.error(f"ZKP Failed: {e}")
-        return (False, "manifest_not_found", None)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         log.error(f"ZKP Failed: {e}")
         return (False, _anonc_exc_to_str(e), None)
@@ -977,10 +980,6 @@ async def submit_measurement(
         log.info("Discarding CC == ZZ")
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
         raise HTTPException(400, detail = {"error" : "cc_zz", "message" : "Measurement discarded, CC == ZZ"})
-
-    is_verified = False
-    submit_response = None
-    submit_error = None
 
     # Anonymous credentials verification
     is_verified, submit_error, submit_response = _verify_submit(
