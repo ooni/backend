@@ -72,7 +72,8 @@ class Settings(BaseSettings):
     )
     minimum_anonc_protocol_version: str = Field(description=
         "Minimum `ooniauth-core` version supported by the backend. If a measurement is signed with "
-        "a version older than this, an error will be returned to the probe",
+        "a version older than this, an error will be returned to the probe. "
+        "Expected format: x.y.z",
         default="0.1.0"
     )
 

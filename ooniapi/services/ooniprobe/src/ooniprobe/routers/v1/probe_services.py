@@ -823,61 +823,6 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
     )
 
 
-def _verify_submit(
-    submit_request: "SubmitMeasurementRequest",
-    manifest: ManifestDep,
-    settings: SettingsDep,
-) -> tuple[bool, str | None, str | None]:
-    """
-    Run the anonymous credentials verification when the relevant fields are present.
-
-    Returns (is_verified, submit_error, submit_response).
-    """
-    # Not intended to be verified: not an error but not verified
-    if (
-        submit_request.nym is None
-        and submit_request.zkp_request is None
-        and submit_request.manifest_version is None
-    ):
-        return (False, None, None)
-
-    # Check manifest version
-    if submit_request.manifest_version != manifest.meta.version:
-        # TODO We should validate if this is an old manifest or an unknown manifest, for now
-        # we treat them as the same error (unknown manifest)
-        log.error("Old or unknown manifest in submission request")
-        return False, "manifest_not_found", None
-
-    # Check anonymous credentials fields are complete
-    if (
-        submit_request.nym is None
-        or submit_request.zkp_request is None
-        or submit_request.manifest_version is None
-        or "probe_cc" not in submit_request.content
-        or "probe_asn" not in submit_request.content
-    ):
-        log.error("Incomplete anonymous credentials fields in submission request")
-        return False, "incomplete_anonc_fields", None
-
-    # Run verification
-    try:
-        protocol_state = ServerState.from_creds(
-            manifest.manifest.public_parameters, settings.anonc_secret_key
-        )
-        submit_response = protocol_state.handle_submit_request(
-            submit_request.nym,
-            submit_request.zkp_request,
-            submit_request.content["probe_cc"],
-            submit_request.content["probe_asn"],
-            [2461109, 2464789],  # TODO lookup these ranges from the manifest
-            [0, 1100100100],
-        )
-        return (True, None, submit_response)
-    except (DeserializationFailed, ProtocolError, CredentialError) as e:
-        log.error(f"ZKP Failed: {e}")
-        return (False, _anonc_exc_to_str(e), None)
-
-
 class SubmitMeasurementRequest(BaseModel):
     format: str
     content: Dict[str, Any]
@@ -1065,6 +1010,85 @@ async def submit_measurement(
         submit_response=submit_response,
         error=submit_error or "submission_delivery_failed",
     )
+
+def _verify_submit(
+    submit_request: SubmitMeasurementRequest,
+    manifest: ManifestDep,
+    settings: SettingsDep,
+) -> tuple[bool, str | None, str | None]:
+    """
+    Run the anonymous credentials verification when the relevant fields are present.
+
+    Returns (is_verified, submit_error, submit_response).
+    """
+    # Not intended to be verified: not an error but not verified
+    if (
+        submit_request.nym is None
+        and submit_request.zkp_request is None
+        and submit_request.manifest_version is None
+        and submit_request.protocol_version is None
+    ):
+        return (False, None, None)
+
+    # Check manifest version
+    if submit_request.manifest_version != manifest.meta.version:
+        # TODO We should validate if this is an old manifest or an unknown manifest, for now
+        # we treat them as the same error (unknown manifest)
+        log.error("Old or unknown manifest in submission request")
+        return False, "manifest_not_found", None
+
+
+
+    # Check anonymous credentials fields are complete
+    if (
+        submit_request.nym is None
+        or submit_request.zkp_request is None
+        or submit_request.manifest_version is None
+        or submit_request.protocol_version is None
+        or "probe_cc" not in submit_request.content
+        or "probe_asn" not in submit_request.content
+    ):
+        log.error("Incomplete anonymous credentials fields in submission request")
+        return False, "incomplete_anonc_fields", None
+
+    # Check protocol version
+    try:
+        probe_version_tup = _parse_version_tuple(submit_request.protocol_version)
+        min_version_tup = _parse_version_tuple(
+            settings.minimum_anonc_protocol_version
+        )
+
+        if probe_version_tup < min_version_tup:
+            log.error(f"Probe version too old: {submit_request.protocol_version} < {settings.minimum_anonc_protocol_version}")
+            return False, "protocol_version_too_old", None
+
+    except Exception as e:
+        log.error(f"Unable to parse version string. probe version = {submit_request.protocol_version}, "
+        f"minimum protocol version = {settings.minimum_anonc_protocol_version}. Error: {e}"
+        )
+
+
+    # Run verification
+    try:
+        protocol_state = ServerState.from_creds(
+            manifest.manifest.public_parameters, settings.anonc_secret_key
+        )
+        submit_response = protocol_state.handle_submit_request(
+            submit_request.nym,
+            submit_request.zkp_request,
+            submit_request.content["probe_cc"],
+            submit_request.content["probe_asn"],
+            [2461109, 2464789],  # TODO lookup these ranges from the manifest
+            [0, 1100100100],
+        )
+        return (True, None, submit_response)
+    except (DeserializationFailed, ProtocolError, CredentialError) as e:
+        log.error(f"ZKP Failed: {e}")
+        return (False, _anonc_exc_to_str(e), None)
+
+
+def _parse_version_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in version.split("."))
 
 
 class CredentialUpdateRequest(BaseModel):
