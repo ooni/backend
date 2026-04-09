@@ -147,6 +147,13 @@ async def test_submission_non_verified(client):
     assert c["submit_response"] is None
     assert c["error"] == "protocol_version_too_old"
 
+    # unparsable protocol version -> invalid protocol version error
+    msm["protocol_version"] = "abc"
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["is_verified"] is False
+    assert c["submit_response"] is None
+    assert c["error"] == "invalid_protocol_version"
+
 # TODO implement credential update
 @pytest.mark.skip
 @pytest.mark.asyncio
