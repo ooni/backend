@@ -237,7 +237,6 @@ def probe_update_post(probe_update: ProbeUpdate) -> ProbeUpdateResponse:
 
 class CheckIn(BaseModel):
     run_type: str = "timed"
-    charging: bool = True
     probe_cc: str = "ZZ"
     probe_asn: str = "AS0"
     on_wifi: bool = False
