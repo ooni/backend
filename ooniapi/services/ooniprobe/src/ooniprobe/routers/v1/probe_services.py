@@ -14,8 +14,6 @@ from typing import (
     Tuple,
 )
 
-import geoip2
-import geoip2.errors
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from ooniauth_py import (
@@ -29,6 +27,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
+from ...common.errors import AddressNotFoundError
 from ...common.prio import (
     FailoverTestListDep,
     failover_generate_test_list,
@@ -486,7 +485,7 @@ def probe_geoip(
         db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
         db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
-    except geoip2.errors.AddressNotFoundError:
+    except AddressNotFoundError:
         Metrics.GEOIP_ADDR_NOT_FOUND.inc()
     except Exception as e:
         log.error(str(e), exc_info=True)
@@ -709,14 +708,14 @@ async def geolookup(
     for ipaddr in data.addresses:
         try:
             cc = lookup_probe_cc(ipaddr, cc_reader)
-        except geoip2.errors.AddressNotFoundError:
+        except AddressNotFoundError:
             cc = None
         try:
             asn, as_name = lookup_probe_network(ipaddr, asn_reader)
             # make asn int unless it is None
             if asn is not None and asn.startswith("AS"):
                 asn = int(asn[2:])
-        except geoip2.errors.AddressNotFoundError:
+        except AddressNotFoundError:
             asn = as_name = None
 
         geolocation[ipaddr] = GeoLookupResult(

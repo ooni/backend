@@ -149,3 +149,6 @@ class InvalidRequest(BaseOONIException):
 
     err_str = "err_request_params"
     description = "Invalid parameters in the request"
+
+class AddressNotFoundError(Exception):
+    """Exception raised for IP not found in geolookup database"""

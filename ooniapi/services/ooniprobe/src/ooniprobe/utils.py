@@ -28,6 +28,7 @@ from .metrics import Metrics
 from .common.config import Settings
 from .common.clickhouse_utils import insert_click
 from .common.dependencies import ClickhouseDep
+from .common.errors import AddressNotFoundError
 from .dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
@@ -145,16 +146,27 @@ def extract_probe_ipaddr(request: Request) -> str:
 
 
 def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    resp = cc_reader.country(ipaddr)
-    return resp.country.iso_code or "ZZ"
+    entry = cc_reader.get(ipaddr)
+    try:
+        return entry['country']['iso_code']
+    except KeyError:
+        return "ZZ"
+    except Exception as e:
+        log.error(f"Error looking up {ipaddr}: {e}")
+        raise AddressNotFoundError
 
 
 def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    resp = asn_reader.asn(ipaddr)
+    entry = asn_reader.get(ipaddr)
+    try:
+        asn = entry['autonomous_system_number']
+    except KeyError:
+        raise AddressNotFoundError
+    as_org = entry.get('autonomous_system_organization', "0")
 
     return (
-        "AS{}".format(resp.autonomous_system_number),
-        resp.autonomous_system_organization or "0",
+        f"AS{asn}",
+        as_org
     )
 
 
