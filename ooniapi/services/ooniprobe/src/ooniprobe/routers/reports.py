@@ -216,7 +216,7 @@ async def receive_measurement(
 
     log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
     Metrics.MISSED_MSMNTS.inc()
-    return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+    return empty_measurement
 
 
 @timer(name="close_report")
