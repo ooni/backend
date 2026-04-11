@@ -205,15 +205,16 @@ async def receive_measurement(
             request.app.state.s3_client.upload_fileobj,
             io.BytesIO(data),
             Bucket=settings.failed_reports_bucket,
-            Key=report_id,
+            Key=msmt_uid,
         )
     except Exception:
         log.exception("Unable to upload measurement to s3")
         Metrics.SEND_S3_FAILURE.inc()
+        return empty_measurement
 
-    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
+    log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
     Metrics.MISSED_MSMNTS.inc()
-    return empty_measurement
+    return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
 
 @timer(name="close_report")
