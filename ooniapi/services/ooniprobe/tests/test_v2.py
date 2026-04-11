@@ -20,19 +20,22 @@ DUMMY_VPN_CERT = OpenVPNConfig(
 )
 
 
-def test_get_version(client):
+@pytest.mark.asyncio
+async def test_get_version(client):
     r = client.get("/version")
     j = r.json()
     assert "version" in j
     assert "build_label" in j
 
 
-def test_get_root(client):
+@pytest.mark.asyncio
+async def test_get_root(client):
     r = client.get("/")
     assert r.status_code == 200
 
 
-def test_get_config(client):
+@pytest.mark.asyncio
+async def test_get_config(client):
     r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")
     assert r.status_code == 200
     j = r.json()
@@ -49,13 +52,15 @@ def test_get_config(client):
     assert j["date_updated"] == date_updated
 
 
-def test_invalid_provider_name(client, db):
+@pytest.mark.asyncio
+async def test_invalid_provider_name(client, db):
     # we probably aren't going to add NSA VPN to our provider list anytime soon :D
     r = client.get("/api/v2/ooniprobe/vpn-config/nsavpn")
     assert r.status_code != 200
 
 
-def test_config_updated(client, db):
+@pytest.mark.asyncio
+async def test_config_updated(client, db):
     with freeze_time("1984-01-01"):
         provider = models.OONIProbeVPNProvider(
             provider_name="riseupvpn",
@@ -90,8 +95,9 @@ def test_config_updated(client, db):
         assert j["date_updated"].startswith("1984-04-01")
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("error", [HTTPError, Exception])
-def test_get_config_fails_if_exception_while_fetching_credentials(client, db, error):
+async def test_get_config_fails_if_exception_while_fetching_credentials(client, db, error):
     # no previous credential; when forcing any exception on the fetch code the http client should get a 500
     with patch.object(vpn, "get_or_update_riseupvpn", side_effect=error("err")):
         r = client.get("/api/v2/ooniprobe/vpn-config/riseupvpn")

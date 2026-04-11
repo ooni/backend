@@ -1,6 +1,8 @@
 from typing import Tuple
 import json
 import time
+
+import pytest
 import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
@@ -19,14 +21,15 @@ def fake_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
 
 
 def missing_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep):
-    return ("AS0", None)
+    return (None, None)
 
 
 def missing_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
     return "ZZ"
 
 
-def test_geolookup(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_geolookup(client, monkeypatch):
     monkeypatch.setattr(ps, "lookup_probe_network", fake_lookup_probe_network)
     monkeypatch.setattr(ps, "lookup_probe_cc", fake_lookup_probe_cc)
     j = dict(
@@ -43,7 +46,8 @@ def test_geolookup(client, monkeypatch):
         assert g[ip]["as_name"] == "Testing Networks"
 
 
-def test_missing_geolookup(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_missing_geolookup(client, monkeypatch):
     monkeypatch.setattr(ps, "lookup_probe_network", missing_lookup_probe_network)
     monkeypatch.setattr(ps, "lookup_probe_cc", missing_lookup_probe_cc)
     j = dict(addresses=["1.2.3.4", "127.0.0.1"])
@@ -54,8 +58,8 @@ def test_missing_geolookup(client, monkeypatch):
 
     for ip in j["addresses"]:
         assert g[ip]["cc"] == "ZZ"
-        assert g[ip]["asn"] == 0
-        assert g[ip]["as_name"] == ""
+        assert g[ip]["asn"] == None
+        assert g[ip]["as_name"] == None
 
 def patched_lookup_probe_cc(ipaddr: str, cc_reader) -> str:
     d = {
@@ -79,7 +83,8 @@ def patched_lookup_probe_network(ipaddr: str, asn_reader) -> Tuple[str, str]:
     return d.get(ipaddr, ("AS0", ""))
 
 
-def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
+@pytest.mark.asyncio
+async def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
 
     monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
     monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)
@@ -145,7 +150,8 @@ def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, monkey
     time.sleep(0.1)  # Allow async insert to complete
 
 
-def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
+@pytest.mark.asyncio
+async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
     # Use the same patched geoip lookup to force mismatches
     monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
     monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)

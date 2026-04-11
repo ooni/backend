@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import boto3
+import ooniauth_py
 import ujson
 import geoip2.database
 from fastapi import Depends
@@ -88,6 +89,12 @@ class ManifestMeta(BaseModel):
     manifest_url: str = Field(
         description="URL pointing to the AWS public record of this manifest"
     )
+    library_version: str = Field(
+        description="Version of the Python library implementing the anonymous credentials protocol"
+    )
+    protocol_version: str = Field(
+        description="Anonymous credentials protocol implementation version"
+    )
 
 
 class ManifestResponse(BaseModel):
@@ -114,6 +121,8 @@ def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
         version=latest["VersionId"],
         last_modification_date=latest["LastModified"],
         manifest_url=f"https://{bucket}.s3.amazonaws.com/{file}",
+        library_version=ooniauth_py.__version__,
+        protocol_version=ooniauth_py.get_protocol_version()
     )
 
     # Get Object
@@ -180,3 +189,17 @@ async def get_tor_targets_from_s3(
 
 
 TorTargetsDep = Annotated[Dict, Depends(get_tor_targets_from_s3)]
+
+async def get_psiphon_config_from_s3(
+    settings: SettingsDep, s3client: S3ClientDep, cache: CacheDep
+) -> Dict[str, Any]:
+    cacheKey = str(Path(settings.config_bucket, settings.psiphon_config))
+    resp = cache.get(cacheKey)
+    if resp is None:
+        psiphon_config_str = read_file(s3client, settings.config_bucket, settings.psiphon_config)
+        resp = ujson.loads(psiphon_config_str)
+        cache[cacheKey] = resp
+    yield resp
+
+
+PsiphonConfigDep = Annotated[Dict, Depends(get_psiphon_config_from_s3)]

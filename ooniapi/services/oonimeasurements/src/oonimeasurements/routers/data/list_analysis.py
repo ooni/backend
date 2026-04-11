@@ -131,8 +131,7 @@ async def list_measurements(
     results: List[AnalysisEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            d = dict(zip(cols, row))
-            results.append(AnalysisEntry(**d))
+            results.append(AnalysisEntry(**row))
 
     response = ListAnalysisResponse(
         metadata=ResponseMetadata(

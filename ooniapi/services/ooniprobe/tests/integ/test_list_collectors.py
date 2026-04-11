@@ -1,4 +1,8 @@
-def test_list_collectors(client):
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_list_collectors(client):
     c = client.get("/api/v1/collectors").json()
     assert len(c) == 6
     assert c == [
