@@ -200,12 +200,14 @@ async def receive_measurement(
             await asyncio.sleep(sleep_time)
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
+    ts_prefix = now.strftime("%Y%m%d%H")
+    s3_key = f"{ts_prefix}/{msmt_uid}"
     try:
         await run_in_threadpool(
             request.app.state.s3_client.upload_fileobj,
             io.BytesIO(data),
             Bucket=settings.failed_reports_bucket,
-            Key=msmt_uid,
+            Key=s3_key,
         )
     except Exception:
         log.exception("Unable to upload measurement to s3")
