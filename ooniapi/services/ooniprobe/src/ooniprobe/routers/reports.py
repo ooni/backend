@@ -161,6 +161,20 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
+    try:
+        await run_in_threadpool(
+            compare_probe_msmt_cc_asn,
+            msmt_uid,
+            cc,
+            asn,
+            request,
+            cc_reader,
+            asn_reader,
+            clickhouse,
+        )
+    except Exception:
+        log.exception("failed to compared probe_msmt_cc_asn")
+
     # Use exponential back off with jitter between retries
     client = request.app.state.fastpath_client
     N_RETRIES = 3
@@ -170,42 +184,38 @@ async def receive_measurement(
 
             resp = await client.post(url, content=data)
 
-            assert resp.status_code == 200, resp.content
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"Unexpected status {resp.status_code}: {resp.content}"
+                )
 
-            await run_in_threadpool(
-                compare_probe_msmt_cc_asn,
-                msmt_uid,
-                cc,
-                asn,
-                request,
-                cc_reader,
-                asn_reader,
-                clickhouse,
-            )
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
-        except Exception as exc:
-            log.error(
-                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
-            )
+        except Exception:
+            Metrics.SEND_FASTPATH_FAILURE.inc()
             sleep_time = random.uniform(0.3, 2 ** (t + 1))
+            log.exception(
+                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Sleeping for {sleep_time}s"
+            )
             await asyncio.sleep(sleep_time)
 
-    Metrics.SEND_FASTPATH_FAILURE.inc()
-
     # wasn't possible to send msmnt to fastpath, try to send it to s3
+    ts_prefix = now.strftime("%Y%m%d%H")
+    tn = test_name.replace("_", "")
+    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{tn}/{msmt_uid}.post"
     try:
         await run_in_threadpool(
             request.app.state.s3_client.upload_fileobj,
             io.BytesIO(data),
             Bucket=settings.failed_reports_bucket,
-            Key=report_id,
+            Key=s3_key,
         )
-    except Exception as exc:
-        log.error(f"Unable to upload measurement to s3. Error: {exc}")
+    except Exception:
+        log.exception("Unable to upload measurement to s3")
         Metrics.SEND_S3_FAILURE.inc()
+        return empty_measurement
 
-    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
+    log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
     Metrics.MISSED_MSMNTS.inc()
     return empty_measurement
 
