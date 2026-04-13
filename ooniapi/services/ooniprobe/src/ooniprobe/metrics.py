@@ -36,7 +36,7 @@ class Metrics:
     )
 
     READ_BODY_TIMING = Histogram(
-        "measurement_read_body",
+        "measurement_read_body_seconds",
         "How long it took to read the measurement body",
     )
 
