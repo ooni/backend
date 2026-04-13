@@ -87,7 +87,7 @@ async def test_submission_basic(client):
     msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
 
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c['is_verified'] is True
+    assert c['is_verified'] is True, c
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
