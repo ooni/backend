@@ -1814,7 +1814,10 @@ def core():
         shut_down(queue)
         time.sleep(1)
         log.info("Join")
-        [w.join() for w in workers]
+        for w in workers:
+            metrics.incr("joined")
+            w.join()
+            metrics.decr("joined")
         log.info("Join done")
         clean_caches()
 
