@@ -1805,6 +1805,7 @@ def core():
         start_http_api(queue)
 
     except Exception as e:
+        metrics.incr("worker_exception")
         log.exception(e)
 
     finally:
