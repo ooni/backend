@@ -89,7 +89,7 @@ async def test_submission_basic(client):
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c['is_verified'] is True
+    assert c["verification_status"] == "verified"
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
@@ -117,14 +117,14 @@ async def test_submission_non_verified(client):
 
     # no anoncred fields -> processed but not verified, no error
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["is_verified"] is False
+    assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] is None
 
     # unknown manifest -> processed but not verified, manifest error
     msm["manifest_version"] = "does-not-exist"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["is_verified"] is False
+    assert c["verification_status"] == "failed"
     assert c["submit_response"] is None
     assert c["error"] == "manifest_not_found"
 
@@ -133,7 +133,7 @@ async def test_submission_non_verified(client):
     msm["nym"] = "dummy-nym"
     msm["manifest_version"] = manifest_version
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["is_verified"] is False
+    assert c["verification_status"] == "failed"
     assert c["submit_response"] is None
     assert c["error"] == "incomplete_anonc_fields"
 
@@ -144,14 +144,14 @@ async def test_submission_non_verified(client):
     msm["manifest_version"] = manifest_version
     msm["protocol_version"] = "0.0.1"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["is_verified"] is False
+    assert c["verification_status"] == "failed"
     assert c["submit_response"] is None
     assert c["error"] == "protocol_version_too_old"
 
     # unparsable protocol version -> invalid protocol version error
     msm["protocol_version"] = "abc"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["is_verified"] is False
+    assert c["verification_status"] == "failed"
     assert c["submit_response"] is None
     assert c["error"] == "invalid_protocol_version"
 
@@ -242,7 +242,7 @@ async def test_credential_update_with_submission(client, client_with_original_ma
 
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
 
-    assert c['is_verified'] is True
+    assert c["verification_status"] == "verified"
 
     # second submit: should work after updating creds
     new_manifest = getj(client, "/api/v1/manifest")

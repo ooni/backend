@@ -3,6 +3,7 @@ import io
 import logging
 import random
 import time
+from enum import Enum
 from datetime import datetime, timedelta, timezone
 from hashlib import sha512
 from typing import (
@@ -841,6 +842,20 @@ class SubmitMeasurementRequest(BaseModel):
         )
 
 
+class VerificationStatus(str, Enum):
+    VERIFIED = "verified"
+    FAILED = "failed"
+    UNVERIFIED = "unverified"
+
+    @property
+    def code(self) -> str:
+        return {
+            VerificationStatus.VERIFIED: "t",
+            VerificationStatus.FAILED: "f",
+            VerificationStatus.UNVERIFIED: "u",
+        }[self]
+
+
 class SubmitMeasurementResponse(BaseModel):
     """
     Acknowledge
@@ -849,7 +864,9 @@ class SubmitMeasurementResponse(BaseModel):
     measurement_uid: str | None = Field(
         examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
     )
-    is_verified: bool = Field(description="if the ZKP was able to verify this request")
+    verification_status: VerificationStatus = Field(
+        description="Verification status: verified, failed, or unverified"
+    )
     submit_response: str | None = Field(
         description="Anonymous credential verification response. Null if verification failed"
     )
@@ -926,14 +943,15 @@ async def submit_measurement(
         raise HTTPException(400, detail = {"error" : "cc_zz", "message" : "Measurement discarded, CC == ZZ"})
 
     # Anonymous credentials verification
-    is_verified, submit_error, submit_response = _verify_submit(
+    verification_status, submit_error, submit_response = _verify_submit(
         submit_request, manifest, settings
     )
 
     data = submit_request.model_dump()
 
     # Add verification-related data.
-    data["is_verified"] = is_verified
+    # use one-letter code for DB, human readable for clients
+    data["is_verified"] = verification_status.code
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
     ujson.dump(data, stream)
@@ -974,7 +992,7 @@ async def submit_measurement(
             )
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
-                is_verified=is_verified,
+                verification_status=verification_status,
                 submit_response=submit_response,
                 error=submit_error,
             )
@@ -1005,7 +1023,7 @@ async def submit_measurement(
     Metrics.MISSED_MSMNTS.inc()
     return SubmitMeasurementResponse(
         measurement_uid=msmt_uid,
-        is_verified=is_verified,
+        verification_status=verification_status,
         submit_response=submit_response,
         error=submit_error or "submission_delivery_failed",
     )
@@ -1014,11 +1032,14 @@ def _verify_submit(
     submit_request: SubmitMeasurementRequest,
     manifest: ManifestDep,
     settings: SettingsDep,
-) -> tuple[bool, str | None, str | None]:
+) -> tuple[VerificationStatus, str | None, str | None]:
     """
     Run the anonymous credentials verification when the relevant fields are present.
 
-    Returns (is_verified, submit_error, submit_response).
+    Returns (verification_status, submit_error, submit_response).
+    - "u": unverified (verification did not run)
+    - "t": verified
+    - "f": verification failed
     """
     # Not intended to be verified: not an error but not verified
     if (
@@ -1027,14 +1048,14 @@ def _verify_submit(
         and submit_request.manifest_version is None
         and submit_request.protocol_version is None
     ):
-        return (False, None, None)
+        return (VerificationStatus.UNVERIFIED, None, None)
 
     # Check manifest version
     if submit_request.manifest_version != manifest.meta.version:
         # TODO We should validate if this is an old manifest or an unknown manifest, for now
         # we treat them as the same error (unknown manifest)
         log.error("Old or unknown manifest in submission request")
-        return False, "manifest_not_found", None
+        return VerificationStatus.FAILED, "manifest_not_found", None
 
 
     # Check anonymous credentials fields are complete
@@ -1047,7 +1068,7 @@ def _verify_submit(
         or "probe_asn" not in submit_request.content
     ):
         log.error("Incomplete anonymous credentials fields in submission request")
-        return False, "incomplete_anonc_fields", None
+        return VerificationStatus.FAILED, "incomplete_anonc_fields", None
 
     # Check protocol version
     try:
@@ -1058,13 +1079,13 @@ def _verify_submit(
 
         if probe_version_tup < min_version_tup:
             log.error(f"Probe version too old: {submit_request.protocol_version} < {settings.minimum_anonc_protocol_version}")
-            return False, "protocol_version_too_old", None
+            return VerificationStatus.FAILED, "protocol_version_too_old", None
 
     except Exception as e:
         log.error(f"Unable to parse version string. probe version = {submit_request.protocol_version}, "
         f"minimum protocol version = {settings.minimum_anonc_protocol_version}. Error: {e}"
         )
-        return False, "invalid_protocol_version", None
+        return VerificationStatus.FAILED, "invalid_protocol_version", None
 
     # Get the limits in age range and measurement count for this request
     age_range, count_range = get_ranges_from_policy(manifest.manifest.submission_policy, submit_request.content['probe_cc'], submit_request.content['probe_asn'])
@@ -1082,10 +1103,10 @@ def _verify_submit(
             list(age_range),
             list(count_range),
         )
-        return (True, None, submit_response)
+        return (VerificationStatus.VERIFIED, None, submit_response)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         log.error(f"ZKP Failed: {e}")
-        return (False, _anonc_exc_to_str(e), None)
+        return (VerificationStatus.FAILED, _anonc_exc_to_str(e), None)
 
 
 def _parse_version_tuple(version: str) -> tuple[int, ...]:
