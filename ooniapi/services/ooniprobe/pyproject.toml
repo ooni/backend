@@ -67,7 +67,7 @@ artifacts = ["BUILD_LABEL"]
 
 [tool.hatch.envs.default]
 dependencies = [
-  "pytest",
+  "pytest ~= 9.0.2",
   "pytest-cov",
   "click",
   "black",
