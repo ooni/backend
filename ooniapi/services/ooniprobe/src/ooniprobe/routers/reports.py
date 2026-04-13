@@ -117,6 +117,7 @@ async def receive_measurement(
         log.info(
             f"Unexpected report_id {report_id[:200]}. Error: {e}",
         )
+        Metrics.BAD_MEASUREMENTS.labels(reason="bad_report_id").inc()
         raise error("Incorrect format")
 
     # TODO validate the timestamp?
@@ -129,19 +130,22 @@ async def receive_measurement(
         asn_i = int(asn)
     except ValueError as e:
         log.info(f"ASN value not parsable {asn}. Error: {e}")
+        Metrics.BAD_MEASUREMENTS.labels(reason="bad_asn").inc()
         error("Incorrect format")
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
-        Metrics.MSMNT_DISCARD_ASN0.inc()
+        Metrics.BAD_MEASUREMENTS.labels(reason="asn_0").inc()
         return empty_measurement
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
-        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        Metrics.BAD_MEASUREMENTS.labels(reason="cc_zz").inc()
         return empty_measurement
 
-    data = await request.body()
+    with Metrics.READ_BODY_TIMING.time():
+        data = await request.body()
+
     if content_encoding == "zstd":
         try:
             compressed_len = len(data)
@@ -149,6 +153,7 @@ async def receive_measurement(
             log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
         except Exception as e:
             log.info(f"Failed zstd decompression. Error: {e}")
+            Metrics.BAD_MEASUREMENTS.labels(reason="zstd_fail").inc()
             error("Incorrect format")
 
     # Write the whole body of the measurement in a directory based on a 1-hour
@@ -161,24 +166,26 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    try:
-        await run_in_threadpool(
-            compare_probe_msmt_cc_asn,
-            msmt_uid,
-            cc,
-            asn,
-            request,
-            cc_reader,
-            asn_reader,
-            clickhouse,
-        )
-    except Exception:
-        log.exception("failed to compared probe_msmt_cc_asn")
+    with Metrics.COMPARE_CC_TIMING.time():
+        try:
+            await run_in_threadpool(
+                compare_probe_msmt_cc_asn,
+                msmt_uid,
+                cc,
+                asn,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
+            )
+        except Exception:
+            log.exception("failed to compared probe_msmt_cc_asn")
+            Metrics.COMPARE_CC_FAILURE.inc()
 
     # Use exponential back off with jitter between retries
     client = request.app.state.fastpath_client
-    N_RETRIES = 3
-    for t in range(N_RETRIES):
+
+    with Metrics.SEND_FASTPATH_TIMING.time():
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
@@ -189,35 +196,32 @@ async def receive_measurement(
                     f"Unexpected status {resp.status_code}: {resp.content}"
                 )
 
+            Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
         except Exception:
-            Metrics.SEND_FASTPATH_FAILURE.inc()
-            sleep_time = random.uniform(0.3, 2 ** (t + 1))
-            log.exception(
-                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Sleeping for {sleep_time}s"
-            )
-            await asyncio.sleep(sleep_time)
+            log.exception("Unable to send measurement to fastpath")
+            Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")
     tn = test_name.replace("_", "")
     s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{tn}/{msmt_uid}.post"
-    try:
-        await run_in_threadpool(
-            request.app.state.s3_client.upload_fileobj,
-            io.BytesIO(data),
-            Bucket=settings.failed_reports_bucket,
-            Key=s3_key,
-        )
-    except Exception:
-        log.exception("Unable to upload measurement to s3")
-        Metrics.SEND_S3_FAILURE.inc()
-        return empty_measurement
-
-    log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
-    Metrics.MISSED_MSMNTS.inc()
-    return empty_measurement
+    with Metrics.SEND_S3_TIMING.time():
+        try:
+            await run_in_threadpool(
+                request.app.state.s3_client.upload_fileobj,
+                io.BytesIO(data),
+                Bucket=settings.failed_reports_bucket,
+                Key=s3_key,
+            )
+            Metrics.SEND_S3_CNT.labels(status="ok").inc()
+            log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
+            return empty_measurement
+        except Exception:
+            log.exception("Unable to upload measurement to s3")
+            Metrics.SEND_S3_CNT.labels(status="fail").inc()
+            return empty_measurement
 
 
 @timer(name="close_report")

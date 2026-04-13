@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Info, Gauge
+from prometheus_client import Counter, Gauge, Histogram, Info
 
 
 class Metrics:
@@ -15,7 +15,7 @@ class Metrics:
 
     MSMNT_RECEIVED_CNT = Counter(
         "receive_measurement_count",
-        "Count of incomming measurements",
+        "Count of incoming measurements",
     )
 
     PROBE_CC_ASN_MATCH = Counter(
@@ -29,19 +29,48 @@ class Metrics:
         labelnames=["mismatch"],
     )
 
-    MISSED_MSMNTS = Counter(
-        "missed_msmnts", "Measurements that failed to be sent to the fast path."
+    BAD_MEASUREMENTS = Counter(
+        "measurement_bad_count",
+        "Measurements that are bad disaggregated by reason",
+        labelnames=["reason"],
     )
 
-    SEND_FASTPATH_FAILURE = Counter(
-        "measurement_fastpath_send_failure_count",
+    COMPARE_CC_TIMING = Histogram(
+        "measurement_compare_cc_seconds",
+        "How long it took compare the probe_cc and probe_asn",
+    )
+
+    COMPARE_CC_FAILURE = Histogram(
+        "measurement_compare_cc_failure_count",
+        "How many times ooniprobe failed to compare the probe_cc and probe_asn",
+    )
+
+    READ_BODY_TIMING = Histogram(
+        "measurement_read_body",
+        "How long it took to read the measurement body",
+    )
+
+    SEND_FASTPATH_TIMING = Histogram(
+        "measurement_fastpath_send_seconds",
+        "How long it took to post the measurement to the fastpath",
+    )
+
+    SEND_S3_TIMING = Histogram(
+        "measurement_s3_upload_seconds",
+        "How long it took to send the measurement to s3",
+    )
+
+    SEND_FASTPATH_CNT = Counter(
+        "measurement_fastpath_send_count",
         "How many times ooniprobe failed to send a measurement to fastpath",
+        labelnames=["status"],
     )
 
-    SEND_S3_FAILURE = Counter(
-        "measurement_s3_upload_failure_count",
-        "How many times ooniprobe failed to send a measurement to s3. "
+    SEND_S3_CNT = Counter(
+        "measurement_s3_upload_count",
+        "How many times ooniprobe sent a measurement to s3 disaggregated by status"
         "Measurements are sent to s3 when they can't be sent to the fastpath",
+        labelnames=["status"],
     )
 
     # -- < Probe services > ----------------------------------------------------
