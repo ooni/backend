@@ -3,16 +3,6 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 
 class Metrics:
     # -- < Measurement submission > ------------------------------------
-    MSMNT_DISCARD_ASN0 = Counter(
-        "receive_measurement_discard_asn_0",
-        "How many measurements were discarded due to probe_asn == ASN0",
-    )
-
-    MSMNT_DISCARD_CC_ZZ = Counter(
-        "receive_measurement_discard_cc_zz",
-        "How many measurements were discarded due to probe_cc == ZZ",
-    )
-
     MSMNT_RECEIVED_CNT = Counter(
         "receive_measurement_count",
         "Count of incoming measurements",
