@@ -1772,6 +1772,7 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         metrics.incr("unhandled_exception")
 
 
+@metrics.incr("shut_down")
 def shut_down(queue):
     log.info("Shutting down workers")
     [queue.put(None) for n in range(NUM_WORKERS)]
