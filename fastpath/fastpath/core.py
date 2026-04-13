@@ -1734,6 +1734,8 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
 
         # TODO: build an object or typed dict here instead of passing args by
         # position. Move the dict from db.py "new = dict(..."
+        upsert_timer = metrics.timer("clickhouse_upsert")
+        upsert_timer.start()
         db.clickhouse_upsert_summary(
             measurement,
             scores,
@@ -1760,7 +1762,7 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             msm_range,
             buffer_writes=buffer_writes,
         )
-
+        upsert_timer.stop()
         tn = measurement.get("test_name")
         if tn == "openvpn":
             db.clickhouse_upsert_openvpn_obs(measurement, scores, msmt_uid)
