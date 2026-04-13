@@ -1582,6 +1582,7 @@ def msm_processor(queue):
     db.setup_clickhouse(conf)
     update_fingerprints_if_needed()
 
+    metrics.incr("num_workers")
     while True:
         msm_tup = queue.get()
         if msm_tup is None:
@@ -1593,6 +1594,8 @@ def msm_processor(queue):
 
         process_measurement(msm_tup)
         update_fingerprints_if_needed()
+
+    metrics.decr("num_workers")
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
