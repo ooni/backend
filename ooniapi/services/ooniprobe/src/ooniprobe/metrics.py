@@ -2,6 +2,31 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 
 
 class Metrics:
+    # Discontinued metrics TODO: switch to the new ones below:
+
+    # these two are part of the same metric disaggregated by status
+    MSMNT_DISCARD_ASN0 = Counter(
+        "receive_measurement_discard_asn_0",
+        "How many measurements were discarded due to probe_asn == ASN0",
+    )
+    MSMNT_DISCARD_CC_ZZ = Counter(
+        "receive_measurement_discard_cc_zz",
+        "How many measurements were discarded due to probe_cc == ZZ",
+    )
+    MISSED_MSMNTS = Counter(
+        "missed_msmnts", "Measurements that failed to be sent to the fast path."
+    )
+
+    # These are now part of SEND_*_CNT disaggregated by status
+    SEND_FASTPATH_FAILURE = Counter(
+        "measurement_fastpath_send_failure_count",
+        "How many times ooniprobe failed to send a measurement to fastpath",
+    )
+    SEND_S3_FAILURE = Counter(
+        "measurement_s3_upload_failure_count",
+        "How many times ooniprobe failed to send a measurement to s3. ",
+    )
+
     # -- < Measurement submission > ------------------------------------
     MSMNT_RECEIVED_CNT = Counter(
         "receive_measurement_count",
