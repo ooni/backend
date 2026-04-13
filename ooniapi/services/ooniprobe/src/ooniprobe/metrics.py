@@ -19,7 +19,7 @@ class Metrics:
         labelnames=["mismatch"],
     )
 
-    BAD_MEASUREMENTS = Counter(
+    BAD_MEASUREMENTS_CNT = Counter(
         "measurement_bad_count",
         "Measurements that are bad disaggregated by reason",
         labelnames=["reason"],
@@ -30,7 +30,7 @@ class Metrics:
         "How long it took compare the probe_cc and probe_asn",
     )
 
-    COMPARE_CC_FAILURE = Histogram(
+    COMPARE_CC_FAILURE = Counter(
         "measurement_compare_cc_failure_count",
         "How many times ooniprobe failed to compare the probe_cc and probe_asn",
     )

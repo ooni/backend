@@ -117,7 +117,7 @@ async def receive_measurement(
         log.info(
             f"Unexpected report_id {report_id[:200]}. Error: {e}",
         )
-        Metrics.BAD_MEASUREMENTS.labels(reason="bad_report_id").inc()
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_report_id").inc()
         raise error("Incorrect format")
 
     # TODO validate the timestamp?
@@ -130,17 +130,17 @@ async def receive_measurement(
         asn_i = int(asn)
     except ValueError as e:
         log.info(f"ASN value not parsable {asn}. Error: {e}")
-        Metrics.BAD_MEASUREMENTS.labels(reason="bad_asn").inc()
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_asn").inc()
         error("Incorrect format")
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
-        Metrics.BAD_MEASUREMENTS.labels(reason="asn_0").inc()
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
         return empty_measurement
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
-        Metrics.BAD_MEASUREMENTS.labels(reason="cc_zz").inc()
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
         return empty_measurement
 
     with Metrics.READ_BODY_TIMING.time():
@@ -153,7 +153,7 @@ async def receive_measurement(
             log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
         except Exception as e:
             log.info(f"Failed zstd decompression. Error: {e}")
-            Metrics.BAD_MEASUREMENTS.labels(reason="zstd_fail").inc()
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="zstd_fail").inc()
             error("Incorrect format")
 
     # Write the whole body of the measurement in a directory based on a 1-hour
