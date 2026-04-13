@@ -1,5 +1,5 @@
 import io
-from typing import Annotated, TypeAlias, Any, Dict
+from typing import Annotated, TypeAlias, Any, Dict, List
 from datetime import datetime
 import time
 from pathlib import Path
@@ -75,7 +75,7 @@ class Manifest(BaseModel):
     """
 
     nym_scope: str = "ooni.org/{probe_cc}/{probe_asn}"
-    submission_policy: Dict[str, Any] = dict()
+    submission_policy: List[Dict[str, Any]] = Field(default_factory=list)
     public_parameters: str
 
 

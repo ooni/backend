@@ -1112,32 +1112,36 @@ def _verify_submit(
 def _parse_version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(n) for n in version.split("."))
 
-def get_ranges_from_policy(policy : Dict[str, Any], probe_cc : str, probe_asn : str) -> Tuple[Tuple[int,int], Tuple[int,int]]:
+def get_ranges_from_policy(
+    policy: List[Dict[str, Any]], probe_cc: str, probe_asn: str
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
     Gets the age and measurement count ranges from the specified policy.
 
-    Matching order, match the most strict first:
-
-    probe_cc/probe_asn
-    probe_cc/*
-    */probe_asn
-    */*
-    *
+    Matching order: first match in the list wins (highest priority first).
 
     returns:
     age_range, msm_range
     """
 
-    keys = [
-        f"{probe_cc}/{probe_asn}",
-        f"{probe_cc}/*",
-        f"*/{probe_asn}",
-        "*/*",
-        "*", # use this as shortcut
-        ]
+    d = None
+    for item in (policy or []):
+        if not isinstance(item, dict):
+            continue
+        match = item.get("match", {})
+        entry_policy = item.get("policy", {})
+        if not isinstance(match, dict) or not isinstance(entry_policy, dict):
+            log.error(f"Malformed entry: {item}")
+            continue
 
-    for k in keys:
-        if (d := policy.get(k)) is not None:
+        match_cc = match.get("probe_cc", "*")
+        match_asn = match.get("probe_asn", "*")
+
+        cc_ok = match_cc == "*" or match_cc == probe_cc
+        asn_ok = match_asn == "*" or match_asn == probe_asn
+
+        if cc_ok and asn_ok:
+            d = entry_policy
             break
 
     def_age_range, def_msm_range = get_default_ranges()

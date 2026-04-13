@@ -11,12 +11,15 @@ import ooniprobe.main as m
 def fake_get_manifest(s3, bucket, key):
     return ManifestResponse(
         manifest=Manifest(
-            submission_policy={
-                "*/*": {
-                    "age": [2461110, 2826140],
-                    "measurement_count": [0, 10000000],
+            submission_policy=[
+                {
+                    "match": {"probe_cc": "*", "probe_asn": "*"},
+                    "policy": {
+                        "age": [2461110, 2826140],
+                        "measurement_count": [0, 10000000],
+                    },
                 }
-            },
+            ],
             public_parameters="public parameters"
             ),
         meta = ManifestMeta(

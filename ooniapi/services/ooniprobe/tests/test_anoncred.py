@@ -157,14 +157,28 @@ async def test_submission_non_verified(client):
 
 
 def test_get_ranges_from_policy_match_precedence():
-    policy = {
-        "*": {"age": [1, 2], "measurement_count": [10, 20]},
-        "*/*": {"age": [3, 4], "measurement_count": [30, 40]},
-        "*/AS15704": {"age": [5, 6], "measurement_count": [50, 60]},
-        "ES/*": {"age": [7, 8], "measurement_count": [70, 80]},
-        "ES/AS15704": {"age": [9, 10], "measurement_count": [90, 100]},
-        "VE/AS8048": {} # Means default
-    }
+    policy = [
+        {
+            "match": {"probe_asn": "AS15704", "probe_cc": "ES"},
+            "policy": {"age": [9, 10], "measurement_count": [90, 100]},
+        },
+        {
+            "match": {"probe_asn": "*", "probe_cc": "ES"},
+            "policy": {"age": [7, 8], "measurement_count": [70, 80]},
+        },
+        {
+            "match": {"probe_asn": "AS15704", "probe_cc": "*"},
+            "policy": {"age": [5, 6], "measurement_count": [50, 60]},
+        },
+        {
+            "match": {"probe_asn": "AS8048", "probe_cc": "VE"},
+            "policy": {},
+        },
+        {
+            "match": {"probe_asn": "*", "probe_cc": "*"},
+            "policy": {"age": [3, 4], "measurement_count": [30, 40]},
+        },
+    ]
 
     age_range, msm_range = get_ranges_from_policy(policy, "ES", "AS15704")
     assert age_range == (9, 10)
@@ -188,10 +202,13 @@ def test_get_ranges_from_policy_match_precedence():
     assert msm_range == def_msm
 
 
-def test_get_ranges_from_policy_uses_star_shortcut_when_no_slash_match():
-    policy = {
-        "*": {"age": [11, 12], "measurement_count": [110, 120]},
-    }
+def test_get_ranges_from_policy_uses_wildcard_match():
+    policy = [
+        {
+            "match": {"probe_asn": "*", "probe_cc": "*"},
+            "policy": {"age": [11, 12], "measurement_count": [110, 120]},
+        }
+    ]
     age_range, msm_range = get_ranges_from_policy(policy, "BR", "AS28573")
     assert age_range == (11, 12)
     assert msm_range == (110, 120)
@@ -200,14 +217,35 @@ def test_get_ranges_from_policy_uses_star_shortcut_when_no_slash_match():
 def test_get_ranges_from_policy_uses_defaults_when_missing_policy_or_fields():
     def_age_range, def_msm_range = get_default_ranges()
 
-    age_range, msm_range = get_ranges_from_policy({}, "FR", "AS3215")
+    age_range, msm_range = get_ranges_from_policy([], "FR", "AS3215")
     assert age_range == def_age_range
     assert msm_range == def_msm_range
 
-    policy = {"FR/*": {"age": [21, 22]}}
+    policy = [
+        {
+            "match": {"probe_asn": "*", "probe_cc": "FR"},
+            "policy": {"age": [21, 22]},
+        }
+    ]
     age_range, msm_range = get_ranges_from_policy(policy, "FR", "AS3215")
     assert age_range == (21, 22)
     assert msm_range == def_msm_range
+
+
+def test_get_ranges_from_policy_first_match_wins():
+    policy = [
+        {
+            "match": {"probe_asn": "*", "probe_cc": "*"},
+            "policy": {"age": [1, 1], "measurement_count": [1, 1]},
+        },
+        {
+            "match": {"probe_asn": "AS1234", "probe_cc": "IT"},
+            "policy": {"age": [9, 9], "measurement_count": [9, 9]},
+        },
+    ]
+    age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS1234")
+    assert age_range == (1, 1)
+    assert msm_range == (1, 1)
 
 # TODO implement credential update
 @pytest.mark.skip

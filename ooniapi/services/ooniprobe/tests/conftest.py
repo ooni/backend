@@ -112,12 +112,15 @@ def make_manifest_mock_fn(public_params: str):
     def get_manifest_mock():
         return ManifestResponse(
             manifest=Manifest(
-                submission_policy={
-                    "*/*": {
-                        "age": [2461110, 2826140],
-                        "measurement_count": [0, 10000000],
+                submission_policy=[
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
                     }
-                },
+                ],
                 public_parameters=public_params,
             ),
             meta=ManifestMeta(
