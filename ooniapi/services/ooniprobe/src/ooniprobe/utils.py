@@ -25,7 +25,7 @@ from .common.clickhouse_utils import insert_click
 from .common.config import Settings
 from .common.dependencies import ClickhouseDep
 from .common.errors import AddressNotFoundError
-from .dependencies import ASNReaderDep, CCReaderDep
+from .dependencies import ASNCCReaderDep
 from .metrics import Metrics
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
@@ -141,29 +141,18 @@ def extract_probe_ipaddr(request: Request) -> str:
     return request.client.host if request.client else ""
 
 
-def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    entry = cc_reader.get(ipaddr)
+def geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> str:
+    entry = asn_cc_reader.get(ipaddr)
     try:
-        return entry['country']['iso_code']
+        cc = entry['country']['iso_code']
+        asn = entry['autonomous_system_number']
+        as_org = entry.get('autonomous_system_organization', "0")
+        return (cc, f"AS{asn}", as_org)
     except KeyError:
-        return "ZZ"
+        raise AddressNotFoundError
     except Exception as e:
         log.error(f"Error looking up {ipaddr}: {e}")
         raise AddressNotFoundError
-
-
-def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    entry = asn_reader.get(ipaddr)
-    try:
-        asn = entry['autonomous_system_number']
-    except KeyError:
-        raise AddressNotFoundError
-    as_org = entry.get('autonomous_system_organization', "0")
-
-    return (
-        f"AS{asn}",
-        as_org
-    )
 
 
 def error(msg: str | Dict[str, Any], status_code: int = 400):
@@ -175,8 +164,7 @@ def compare_probe_msmt_cc_asn(
     cc: str,
     asn: str,
     request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     clickhouse: ClickhouseDep,
 ):
     """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
@@ -184,8 +172,7 @@ def compare_probe_msmt_cc_asn(
     """
     cc = cc.upper()
     ipaddr = extract_probe_ipaddr(request)
-    db_cc = lookup_probe_cc(ipaddr, cc_reader)
-    db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
+    db_cc, db_asn, _ = geolookup_probe(ipaddr, asn_cc_reader)
 
     if db_asn.startswith("AS"):
         db_asn = db_asn[2:]

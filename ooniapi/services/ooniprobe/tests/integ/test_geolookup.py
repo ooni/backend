@@ -5,33 +5,24 @@ import time
 import pytest
 import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
-from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
+from ooniprobe.dependencies import ASNCCReaderDep
 from ooniprobe.common.clickhouse_utils import query_click_one_row
 from clickhouse_driver import Client as Clickhouse
 from ..utils import make_submit_request, postj, setup_user
 from ..test_anoncred import make_measurement, make_report_request
 
 
-def fake_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    return ("AS4242", "Testing Networks")
+def fake_geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> str:
+    return ("US", "AS4242", "Testing Networks")
 
 
-def fake_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    return "US"
-
-
-def missing_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep):
-    return (None, None)
-
-
-def missing_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    return "ZZ"
+def missing_geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep):
+    return ("ZZ", None, None)
 
 
 @pytest.mark.asyncio
 async def test_geolookup(client, monkeypatch):
-    monkeypatch.setattr(ps, "lookup_probe_network", fake_lookup_probe_network)
-    monkeypatch.setattr(ps, "lookup_probe_cc", fake_lookup_probe_cc)
+    monkeypatch.setattr(ps, "geolookup_probe", fake_geolookup_probe)
     j = dict(
         addresses=["192.33.4.12", "170.247.170.2", "2801:1b8:10::b", "2001:500:2::c"]
     )
@@ -48,8 +39,7 @@ async def test_geolookup(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_missing_geolookup(client, monkeypatch):
-    monkeypatch.setattr(ps, "lookup_probe_network", missing_lookup_probe_network)
-    monkeypatch.setattr(ps, "lookup_probe_cc", missing_lookup_probe_cc)
+    monkeypatch.setattr(ps, "geolookup_probe", missing_geolookup_probe)
     j = dict(addresses=["1.2.3.4", "127.0.0.1"])
     c = client.post("/api/v1/geolookup", json=j).json()
     assert "geolocation" in c

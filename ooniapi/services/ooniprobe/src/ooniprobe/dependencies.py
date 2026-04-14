@@ -36,20 +36,12 @@ def get_postgresql_session(settings: SettingsDep):
 PostgresSessionDep = Annotated[Session, Depends(get_postgresql_session)]
 
 
-def get_cc_reader(settings: SettingsDep):
+def get_asn_cc_reader(settings: SettingsDep):
     db_path = Path(settings.geoip_db_dir, "asn_cc.mmdb")
     return maxminddb.open_database(db_path)
 
 
-CCReaderDep = Annotated[maxminddb.Reader, Depends(get_cc_reader)]
-
-
-def get_asn_reader(settings: SettingsDep):
-    db_path = Path(settings.geoip_db_dir, "asn_cc.mmdb")
-    return maxminddb.open_database(db_path)
-
-
-ASNReaderDep = Annotated[maxminddb.Reader, Depends(get_asn_reader)]
+ASNCCReaderDep = Annotated[maxminddb.Reader, Depends(get_asn_cc_reader)]
 
 
 def get_s3_client() -> S3Client:
