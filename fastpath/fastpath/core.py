@@ -1857,8 +1857,11 @@ def update_fingerprints_if_needed() -> None:
         return  # too early
 
     log.info("Updating fingerprints")
-    dns_fp, http_fp = db.fetch_fingerprints()
-    fingerprints = prepare_fingerprints(dns_fp, http_fp)
+    try:
+        dns_fp, http_fp = db.fetch_fingerprints()
+        fingerprints = prepare_fingerprints(dns_fp, http_fp)
+    except Exception as e:
+        log.error(f"Uncaught exception {e}")
 
 
 def main():
