@@ -7,6 +7,9 @@ Usage:
 
 If the first argument is omitted, the default public manifest URL is used.
 
+You might need to have ooniprobe installed as a dependency. Run with hatch: using `hatch shell`
+or `hatch run scripts/validate_manifest.py ...`
+
 Examples:
   python scripts/validate_manifest.py
   python scripts/validate_manifest.py https://ooni-anoncreds-manifests-eu-central-1.s3.eu-central-1.amazonaws.com/manifest.json
