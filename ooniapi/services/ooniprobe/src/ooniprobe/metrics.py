@@ -65,6 +65,11 @@ class Metrics:
         "How long it took to read the measurement body",
     )
 
+    NORMALIZE_BODY_TIMING = Histogram(
+        "measurement_normalize_body_seconds",
+        "How long it took to parse and normalize the measurement body",
+    )
+
     SEND_FASTPATH_TIMING = Histogram(
         "measurement_fastpath_send_seconds",
         "How long it took to post the measurement to the fastpath",

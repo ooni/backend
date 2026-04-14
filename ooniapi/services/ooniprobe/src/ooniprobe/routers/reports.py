@@ -1,11 +1,10 @@
-import asyncio
 import io
 import logging
-import random
 from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List
 
+import ujson
 import zstd
 from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
@@ -15,7 +14,7 @@ from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..dependencies import ASNReaderDep, CCReaderDep, S3ClientDep, SettingsDep
+from ..dependencies import ASNReaderDep, CCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
     compare_probe_msmt_cc_asn,
@@ -156,6 +155,14 @@ async def receive_measurement(
             Metrics.BAD_MEASUREMENTS_CNT.labels(reason="zstd_fail").inc()
             error("Incorrect format")
 
+    with Metrics.NORMALIZE_BODY_TIMING.time():
+        try:
+            data = await run_in_threadpool(_ensure_unverified_flag, data)
+        except Exception as e:
+            log.info(f"Failed to parse and measurement body. Error: {e}")
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
+            error("Incorrect format")
+
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
@@ -222,6 +229,12 @@ async def receive_measurement(
             log.exception("Unable to upload measurement to s3")
             Metrics.SEND_S3_CNT.labels(status="fail").inc()
             return empty_measurement
+
+
+def _ensure_unverified_flag(data: bytes) -> bytes:
+    measurement = ujson.loads(data)
+    measurement["is_verified"] = "u"
+    return ujson.dumps(measurement).encode("utf-8")
 
 
 @timer(name="close_report")
