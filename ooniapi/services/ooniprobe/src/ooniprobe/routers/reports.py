@@ -155,13 +155,12 @@ async def receive_measurement(
             Metrics.BAD_MEASUREMENTS_CNT.labels(reason="zstd_fail").inc()
             error("Incorrect format")
 
-    with Metrics.NORMALIZE_BODY_TIMING.time():
-        try:
-            data = await run_in_threadpool(_ensure_unverified_flag, data)
-        except Exception as e:
-            log.info(f"Failed to parse and measurement body. Error: {e}")
-            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
-            error("Incorrect format")
+    try:
+        data = await run_in_threadpool(_ensure_unverified_flag, data)
+    except Exception as e:
+        log.info(f"Failed to parse and measurement body. Error: {e}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
+        error("Incorrect format")
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
@@ -232,9 +231,11 @@ async def receive_measurement(
 
 
 def _ensure_unverified_flag(data: bytes) -> bytes:
-    measurement = ujson.loads(data)
+    with Metrics.DESERIALIZE_BODY_TIMING.time():
+        measurement = ujson.loads(data)
     measurement["is_verified"] = "u"
-    return ujson.dumps(measurement).encode("utf-8")
+    with Metrics.SERIALIZE_BODY_TIMING.time():
+        return ujson.dumps(measurement).encode("utf-8")
 
 
 @timer(name="close_report")
