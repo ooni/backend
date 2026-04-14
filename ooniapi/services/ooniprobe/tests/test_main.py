@@ -3,22 +3,28 @@ import pytest
 from datetime import datetime
 import httpx
 import ooniauth_py
+import ujson
 from fastapi.testclient import TestClient
-from ooniprobe.main import lifespan, app
-from ooniprobe.dependencies import Manifest, ManifestResponse, ManifestMeta
+from pydantic import ValidationError
+from ooniprobe.main import app, lifespan
+from ooniprobe.dependencies import (
+    Manifest,
+    ManifestMeta,
+    ManifestResponse,
+    Match,
+    Policy,
+    PolicyEntry,
+)
 import ooniprobe.main as m
 
 def fake_get_manifest(s3, bucket, key):
     return ManifestResponse(
         manifest=Manifest(
             submission_policy=[
-                {
-                    "match": {"probe_cc": "*", "probe_asn": "*"},
-                    "policy": {
-                        "age": [2461110, 2826140],
-                        "measurement_count": [0, 10000000],
-                    },
-                }
+                PolicyEntry(
+                    match=Match(probe_cc="*", probe_asn="*"),
+                    policy=Policy(age=(2461110, 2826140), measurement_count=(0, 10000000)),
+                )
             ],
             public_parameters="public parameters"
             ),
