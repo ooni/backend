@@ -1130,7 +1130,7 @@ def get_ranges_from_policy(
     age_range, msm_range
     """
 
-    for item in (policy or []):
+    for item in policy:
         match_cc = item.match.probe_cc
         match_asn = item.match.probe_asn
 
