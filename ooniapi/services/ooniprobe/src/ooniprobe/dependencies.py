@@ -98,7 +98,7 @@ class Manifest(BaseModel):
     """
 
     nym_scope: str = "ooni.org/{probe_cc}/{probe_asn}"
-    submission_policy: List[PolicyEntry] = Field(default_factory=list)
+    submission_policy: List[PolicyEntry]
     public_parameters: str
 
 
