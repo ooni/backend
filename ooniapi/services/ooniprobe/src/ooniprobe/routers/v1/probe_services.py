@@ -44,7 +44,6 @@ from ...dependencies import (
     ManifestDep,
     ManifestResponse,
     PostgresSessionDep,
-    S3ClientDep,
     SettingsDep,
     TorTargetsDep,
     PsiphonConfigDep
@@ -968,6 +967,22 @@ async def submit_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
+    with Metrics.COMPARE_CC_TIMING.time():
+        try:
+            await run_in_threadpool(
+                compare_probe_msmt_cc_asn,
+                msmt_uid,
+                cc,
+                asn,
+                request,
+                cc_reader,
+                asn_reader,
+                clickhouse,
+            )
+        except Exception:
+            log.exception("failed to compared probe_msmt_cc_asn")
+            Metrics.COMPARE_CC_FAILURE.inc()
+
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
     client = request.app.state.fastpath_client
@@ -980,16 +995,6 @@ async def submit_measurement(
 
             assert resp.status_code == 200, resp.content
 
-            await run_in_threadpool(
-                compare_probe_msmt_cc_asn,
-                msmt_uid,
-                cc,
-                asn,
-                request,
-                cc_reader,
-                asn_reader,
-                clickhouse,
-            )
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
                 verification_status=verification_status,
