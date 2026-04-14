@@ -390,6 +390,33 @@ def test_manifest_requires_catch_all_rule():
             }
         )
 
+
+def test_manifest_requires_catch_all_rule_to_be_last():
+    with pytest.raises(
+        ValidationError, match="catch-all rule in submission_policy should be the last entry"
+    ):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    },
+                    {
+                        "match": {"probe_cc": "IT", "probe_asn": "AS1234"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    },
+                ]
+            }
+        )
+
+
 # TODO implement credential update
 @pytest.mark.skip
 @pytest.mark.asyncio

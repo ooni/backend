@@ -103,14 +103,25 @@ class Manifest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_catch_all(self):
-        has_catch_all = any(
-            entry.match.probe_cc == "*" and entry.match.probe_asn == "*"
-            for entry in self.submission_policy
-        )
+
+        has_catch_all = False
+        catch_all_index = -1
+        for (i, entry) in enumerate(self.submission_policy):
+            if entry.match.probe_cc == "*" and entry.match.probe_asn == "*":
+                has_catch_all = True
+                catch_all_index = i
+                break
+
         if not has_catch_all:
             raise ValueError(
                 "submission_policy must include a catch-all rule with "
                 "match.probe_cc='*' and match.probe_asn='*'"
+            )
+
+        if catch_all_index != len(self.submission_policy) - 1:
+            raise ValueError(
+                "catch-all rule in submission_policy should be the last entry. "
+                f"Current index: {catch_all_index} of {len(self.submission_policy) - 1}"
             )
         return self
 
