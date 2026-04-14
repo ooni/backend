@@ -1,10 +1,11 @@
 from typing import Any, Dict
 import ooniauth_py
 import pytest
+import ujson
 from fastapi import status
 from ooniauth_py import UserState, ServerState
 from pydantic import ValidationError
-from ooniprobe.dependencies import Match, Policy, PolicyEntry
+from ooniprobe.dependencies import Manifest, Match, Policy, PolicyEntry
 from ooniprobe.routers.v1.probe_services import get_ranges_from_policy
 from .utils import getj, make_submit_request, postj, setup_user
 
@@ -239,6 +240,136 @@ def test_get_ranges_from_policy_first_match_wins():
     age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS1234")
     assert age_range == (1, 1)
     assert msm_range == (1, 1)
+
+
+def _manifest_from_payload(payload):
+    manifest_payload = {
+        "nym_scope": "ooni.org/{probe_cc}/{probe_asn}",
+        "public_parameters": "public parameters",
+        **payload,
+    }
+    manifest_raw = ujson.dumps(manifest_payload)
+    manifest_json = ujson.loads(manifest_raw)
+    return Manifest(**manifest_json)
+
+
+def test_manifest_parsing_preserves_important_fields():
+    manifest = _manifest_from_payload(
+        {
+            "submission_policy": [
+                {
+                    "match": {"probe_cc": "*", "probe_asn": "*"},
+                    "policy": {
+                        "age": [2461110, 2826140],
+                        "measurement_count": [0, 10000000],
+                    },
+                }
+            ]
+        }
+    )
+    assert manifest.nym_scope == "ooni.org/{probe_cc}/{probe_asn}"
+    assert manifest.public_parameters == "public parameters"
+    assert len(manifest.submission_policy) == 1
+    entry = manifest.submission_policy[0]
+    assert entry.match.probe_cc == "*"
+    assert entry.match.probe_asn == "*"
+    assert entry.policy.age == (2461110, 2826140)
+    assert entry.policy.measurement_count == (0, 10000000)
+
+
+def test_manifest_rejects_ranges_with_invalid_length():
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110],
+                            "measurement_count": [0, 10000000],
+                        },
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {"age": [2461110, 2826140], "measurement_count": [0]},
+                    }
+                ]
+            }
+        )
+
+
+def test_manifest_requires_probe_cc_and_probe_asn():
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    }
+                ]
+            }
+        )
+
+
+def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {"submission_policy": [{"match": {"probe_cc": "*", "probe_asn": "*"}}]}
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        }
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload({"submission_policy": "not-a-list"})
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": "not-a-dict",
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    }
+                ]
+            }
+        )
 
 # TODO implement credential update
 @pytest.mark.skip

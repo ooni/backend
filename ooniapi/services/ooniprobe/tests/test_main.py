@@ -3,9 +3,7 @@ import pytest
 from datetime import datetime
 import httpx
 import ooniauth_py
-import ujson
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 from ooniprobe.main import app, lifespan
 from ooniprobe.dependencies import (
     Manifest,
