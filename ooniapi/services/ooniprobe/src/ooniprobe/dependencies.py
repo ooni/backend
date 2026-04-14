@@ -104,7 +104,8 @@ class Manifest(BaseModel):
     @model_validator(mode="after")
     def _validate_catch_all(self):
 
-        has_catch_all = False
+        # ensure the last entry in the submission_policy is the catch_all rule
+        has_catch_all = self.submission_policy[-1].match.probe_cc == "*" and self.submission_policy.match.probe_asn[-1] == "*" 
         catch_all_index = -1
         for (i, entry) in enumerate(self.submission_policy):
             if entry.match.probe_cc == "*" and entry.match.probe_asn == "*":
