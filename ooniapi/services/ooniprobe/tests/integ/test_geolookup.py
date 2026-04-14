@@ -8,7 +8,7 @@ from ooniprobe import utils
 from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.common.clickhouse_utils import query_click_one_row
 from clickhouse_driver import Client as Clickhouse
-from ..utils import postj, setup_user
+from ..utils import make_submit_request, postj, setup_user
 from ..test_anoncred import make_measurement, make_report_request
 
 
@@ -163,13 +163,12 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
 
     # Create anoncred user and submit_request
     user, manifest_version, emission_day = setup_user(client)
-    submit_request = user.make_submit_request("VE", "AS65550", emission_day)
+    submit_request = make_submit_request(user, "VE", "AS65550")
 
     # Build measurement body used by /api/v1/submit_measurement/{rid}
     msm = make_measurement(
         submit_request.nym,
         submit_request.request,
-        emission_day,
         manifest_version,
         probe_cc="VE",
         probe_asn="AS65550",
