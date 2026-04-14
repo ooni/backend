@@ -79,7 +79,7 @@ def main():
         log.error(f"Manifest validation failed:\n{e}")
         sys.exit(1)
 
-    print("Manifest validated :)")
+    print("Manifest valid :)")
     return 0
 
 
