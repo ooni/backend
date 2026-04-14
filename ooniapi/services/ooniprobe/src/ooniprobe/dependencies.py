@@ -12,7 +12,7 @@ from fastapi import Depends
 
 from mypy_boto3_s3 import S3Client
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -100,6 +100,19 @@ class Manifest(BaseModel):
     nym_scope: str = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy: List[PolicyEntry]
     public_parameters: str
+
+    @model_validator(mode="after")
+    def _validate_catch_all(self):
+        has_catch_all = any(
+            entry.match.probe_cc == "*" and entry.match.probe_asn == "*"
+            for entry in self.submission_policy
+        )
+        if not has_catch_all:
+            raise ValueError(
+                "submission_policy must include a catch-all rule with "
+                "match.probe_cc='*' and match.probe_asn='*'"
+            )
+        return self
 
 
 class ManifestMeta(BaseModel):

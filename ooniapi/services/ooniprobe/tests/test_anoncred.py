@@ -371,6 +371,25 @@ def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
             }
         )
 
+
+def test_manifest_requires_catch_all_rule():
+    with pytest.raises(
+        ValidationError, match="submission_policy must include a catch-all rule"
+    ):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "IT", "probe_asn": "AS1234"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    }
+                ]
+            }
+        )
+
 # TODO implement credential update
 @pytest.mark.skip
 @pytest.mark.asyncio
