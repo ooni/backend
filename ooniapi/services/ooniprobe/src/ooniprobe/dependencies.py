@@ -1,5 +1,5 @@
 import io
-from typing import Annotated, TypeAlias, Any, Dict, List
+from typing import Annotated, Tuple, TypeAlias, Any, Dict, List
 from datetime import datetime
 import time
 from pathlib import Path
@@ -68,6 +68,29 @@ def get_cache():
 
 CacheDep = Annotated[Dict[str, Any], Depends(get_cache)]
 
+class Policy(BaseModel):
+    age: Tuple[int, int] = Field(
+        description="Inclusive lower/upper bounds for the probe age accepted by this rule."
+    )
+    measurement_count: Tuple[int, int] = Field(
+        description="Inclusive lower/upper bounds for the probe measurement count accepted by this rule."
+    )
+
+class Match(BaseModel):
+    probe_cc: str = Field(
+        description="Two-letter probe country code. Use '*' to match any country."
+    )
+    probe_asn: str = Field(
+        description="Probe ASN in 'ASNNNN' format. Use '*' to match any ASN."
+    )
+
+class PolicyEntry(BaseModel):
+    """
+    Single `submission_policy` rule in the manifest.
+    Defines which probes match this entry and which verification ranges apply.
+    """
+    policy: Policy
+    match: Match
 
 class Manifest(BaseModel):
     """
@@ -75,7 +98,7 @@ class Manifest(BaseModel):
     """
 
     nym_scope: str = "ooni.org/{probe_cc}/{probe_asn}"
-    submission_policy: List[Dict[str, Any]] = Field(default_factory=list)
+    submission_policy: List[PolicyEntry] = Field(default_factory=list)
     public_parameters: str
 
 
@@ -160,7 +183,6 @@ def _get_manifest(
     return get_manifest_cached(
         s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file, cache
     )
-
 
 ManifestDep = Annotated[ManifestResponse, Depends(_get_manifest)]
 

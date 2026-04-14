@@ -43,6 +43,7 @@ from ...dependencies import (
     CCReaderDep,
     ManifestDep,
     ManifestResponse,
+    PolicyEntry,
     PostgresSessionDep,
     SettingsDep,
     TorTargetsDep,
@@ -1118,7 +1119,7 @@ def _parse_version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(n) for n in version.split("."))
 
 def get_ranges_from_policy(
-    policy: List[Dict[str, Any]], probe_cc: str, probe_asn: str
+    policy: List[PolicyEntry], probe_cc: str, probe_asn: str
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
     Gets the age and measurement count ranges from the specified policy.
@@ -1129,45 +1130,18 @@ def get_ranges_from_policy(
     age_range, msm_range
     """
 
-    d = None
     for item in (policy or []):
-        if not isinstance(item, dict):
-            continue
-        match = item.get("match", {})
-        entry_policy = item.get("policy", {})
-        if not isinstance(match, dict) or not isinstance(entry_policy, dict):
-            log.error(f"Malformed entry: {item}")
-            continue
-
-        match_cc = match.get("probe_cc", "*")
-        match_asn = match.get("probe_asn", "*")
+        match_cc = item.match.probe_cc
+        match_asn = item.match.probe_asn
 
         cc_ok = match_cc == "*" or match_cc == probe_cc
         asn_ok = match_asn == "*" or match_asn == probe_asn
 
         if cc_ok and asn_ok:
-            d = entry_policy
-            break
+            return item.policy.age, item.policy.measurement_count
 
-    def_age_range, def_msm_range = get_default_ranges()
-    if d is None:
-        return def_age_range, def_msm_range
-
-    age_range = tuple(d.get('age', def_age_range))
-    msm_range = tuple(d.get('measurement_count', def_msm_range))
-
-    return age_range, msm_range
-
-
-def get_default_ranges() -> Tuple[Tuple[int,int], Tuple[int,int]]:
-    """
-    returns:
-    age_range, msm_range
-    """
-    #TODO Agree on good default ranges
-    return (
-        (2461110, 2826140),
-        (0, 10000000)
+    raise ValueError(
+        f"No matching submission_policy entry for probe_cc={probe_cc} probe_asn={probe_asn}"
     )
 
 

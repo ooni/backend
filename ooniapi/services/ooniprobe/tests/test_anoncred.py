@@ -3,7 +3,9 @@ import ooniauth_py
 import pytest
 from fastapi import status
 from ooniauth_py import UserState, ServerState
-from ooniprobe.routers.v1.probe_services import get_default_ranges, get_ranges_from_policy
+from pydantic import ValidationError
+from ooniprobe.dependencies import Match, Policy, PolicyEntry
+from ooniprobe.routers.v1.probe_services import get_ranges_from_policy
 from .utils import getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
@@ -158,26 +160,22 @@ async def test_submission_non_verified(client):
 
 def test_get_ranges_from_policy_match_precedence():
     policy = [
-        {
-            "match": {"probe_asn": "AS15704", "probe_cc": "ES"},
-            "policy": {"age": [9, 10], "measurement_count": [90, 100]},
-        },
-        {
-            "match": {"probe_asn": "*", "probe_cc": "ES"},
-            "policy": {"age": [7, 8], "measurement_count": [70, 80]},
-        },
-        {
-            "match": {"probe_asn": "AS15704", "probe_cc": "*"},
-            "policy": {"age": [5, 6], "measurement_count": [50, 60]},
-        },
-        {
-            "match": {"probe_asn": "AS8048", "probe_cc": "VE"},
-            "policy": {},
-        },
-        {
-            "match": {"probe_asn": "*", "probe_cc": "*"},
-            "policy": {"age": [3, 4], "measurement_count": [30, 40]},
-        },
+        PolicyEntry(
+            match=Match(probe_asn="AS15704", probe_cc="ES"),
+            policy=Policy(age=(9, 10), measurement_count=(90, 100)),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="ES"),
+            policy=Policy(age=(7, 8), measurement_count=(70, 80)),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="AS15704", probe_cc="*"),
+            policy=Policy(age=(5, 6), measurement_count=(50, 60)),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="*"),
+            policy=Policy(age=(3, 4), measurement_count=(30, 40)),
+        ),
     ]
 
     age_range, msm_range = get_ranges_from_policy(policy, "ES", "AS15704")
@@ -196,52 +194,47 @@ def test_get_ranges_from_policy_match_precedence():
     assert age_range == (3, 4)
     assert msm_range == (30, 40)
 
-    age_range, msm_range = get_ranges_from_policy(policy, "VE", "AS8048")
-    def_age, def_msm = get_default_ranges()
-    assert age_range == def_age
-    assert msm_range == def_msm
+    no_catchall_policy = [
+        PolicyEntry(
+            match=Match(probe_asn="AS15704", probe_cc="ES"),
+            policy=Policy(age=(9, 10), measurement_count=(90, 100)),
+        )
+    ]
+    with pytest.raises(ValueError, match="No matching submission_policy entry"):
+        get_ranges_from_policy(no_catchall_policy, "VE", "AS8048")
 
 
 def test_get_ranges_from_policy_uses_wildcard_match():
     policy = [
-        {
-            "match": {"probe_asn": "*", "probe_cc": "*"},
-            "policy": {"age": [11, 12], "measurement_count": [110, 120]},
-        }
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="*"),
+            policy=Policy(age=(11, 12), measurement_count=(110, 120)),
+        )
     ]
     age_range, msm_range = get_ranges_from_policy(policy, "BR", "AS28573")
     assert age_range == (11, 12)
     assert msm_range == (110, 120)
 
 
-def test_get_ranges_from_policy_uses_defaults_when_missing_policy_or_fields():
-    def_age_range, def_msm_range = get_default_ranges()
+def test_get_ranges_from_policy_requires_matching_entry():
+    with pytest.raises(ValueError, match="No matching submission_policy entry"):
+        get_ranges_from_policy([], "FR", "AS3215")
 
-    age_range, msm_range = get_ranges_from_policy([], "FR", "AS3215")
-    assert age_range == def_age_range
-    assert msm_range == def_msm_range
-
-    policy = [
-        {
-            "match": {"probe_asn": "*", "probe_cc": "FR"},
-            "policy": {"age": [21, 22]},
-        }
-    ]
-    age_range, msm_range = get_ranges_from_policy(policy, "FR", "AS3215")
-    assert age_range == (21, 22)
-    assert msm_range == def_msm_range
+def test_policy_entry_requires_both_ranges():
+    with pytest.raises(ValidationError):
+        Policy.model_validate({"age": [21, 22]})
 
 
 def test_get_ranges_from_policy_first_match_wins():
     policy = [
-        {
-            "match": {"probe_asn": "*", "probe_cc": "*"},
-            "policy": {"age": [1, 1], "measurement_count": [1, 1]},
-        },
-        {
-            "match": {"probe_asn": "AS1234", "probe_cc": "IT"},
-            "policy": {"age": [9, 9], "measurement_count": [9, 9]},
-        },
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="*"),
+            policy=Policy(age=(1, 1), measurement_count=(1, 1)),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="AS1234", probe_cc="IT"),
+            policy=Policy(age=(9, 9), measurement_count=(9, 9)),
+        ),
     ]
     age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS1234")
     assert age_range == (1, 1)
