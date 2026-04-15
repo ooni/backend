@@ -1661,11 +1661,6 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             log.error(f"Unexpected is_verified={is_verified}, defaulting to 'u'")
             is_verified = "u"
 
-        nym = g(measurement, 'nym')
-        zkp_request = g(measurement, 'zkp_request')
-        age_range = g(measurement, 'age_range')
-        msm_range = g(measurement, 'msm_range')
-
         if "content" in measurement and "format" in measurement:
             measurement = unwrap_msmt(measurement)
         rid = measurement.get("report_id")
@@ -1755,10 +1750,6 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             test_helper_type,
             ooni_run_link_id,
             is_verified,
-            nym,
-            zkp_request,
-            age_range,
-            msm_range,
             buffer_writes=buffer_writes,
         )
 

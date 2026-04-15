@@ -156,10 +156,6 @@ def test_score_web_connectivity_bug_610_2(fprints):
             "test_helper_type": "https",
             "ooni_run_link_id": None,
             "is_verified" : "u",
-            "nym" : None,
-            "zkp_request" : None,
-            "age_range" : None,
-            "msm_range" : None,
         }
     ]
 
@@ -209,10 +205,6 @@ def test_score_browser_web(fprints):
             "test_start_time": datetime.datetime(2023, 3, 20, 18, 26, 35),
             "test_version": "0.1.0",
             "is_verified" : "u",
-            "nym" : None,
-            "zkp_request" : None,
-            "age_range" : None,
-            "msm_range" : None,
         },
     ]
 
@@ -266,10 +258,6 @@ def test_score_openvpn():
             "test_helper_type": "",
             "ooni_run_link_id": None,
             "is_verified" : "u",
-            "nym" : None,
-            "zkp_request" : None,
-            "age_range" : None,
-            "msm_range" : None,
         }
     ]
 
