@@ -172,11 +172,7 @@ def _write_rows_to_fastpath(rows: List[Dict]):
     test_helper_address,
     test_helper_type,
     ooni_run_link_id,
-    is_verified,
-    nym,
-    zkp_request,
-    age_range,
-    msm_range
+    is_verified
     ) VALUES
         """
     )
