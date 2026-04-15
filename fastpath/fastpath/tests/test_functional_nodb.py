@@ -125,7 +125,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version, test_helper_address, test_helper_type, ooni_run_link_id, "
-        "is_verified, nym, zkp_request, age_range, msm_range ) VALUES "
+        "is_verified ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -174,7 +174,7 @@ def test_score_browser_web(fprints):
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version, test_helper_address, test_helper_type, ooni_run_link_id, "
-        "is_verified, nym, zkp_request, age_range, msm_range ) VALUES "
+        "is_verified ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -227,7 +227,7 @@ def test_score_openvpn():
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version, test_helper_address, test_helper_type, ooni_run_link_id, "
-        "is_verified, nym, zkp_request, age_range, msm_range ) VALUES "
+        "is_verified ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
