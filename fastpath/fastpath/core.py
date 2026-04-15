@@ -1656,7 +1656,10 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         if measurement is None:
             measurement = ujson.loads(msm_jstr)
 
-        is_verified = g(measurement, 'is_verified', default=False)
+        is_verified = g(measurement, "is_verified", default="u")
+        if is_verified not in ("u", "t", "f"):
+            log.error(f"Unexpected is_verified={is_verified}, defaulting to 'u'")
+            is_verified = "u"
 
         if "content" in measurement and "format" in measurement:
             measurement = unwrap_msmt(measurement)
