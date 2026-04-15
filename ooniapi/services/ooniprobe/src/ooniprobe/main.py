@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
 from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from . import models
 from .__about__ import VERSION
@@ -165,6 +165,9 @@ async def health(
     # Check that you can retrieve the manifest
     try:
         get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
+    except ValidationError as e: # Bad manifest
+        errors.append("bad_anonc_manifest")
+        log.error(f"Error parsing manifest file: {e}")
     except Exception as e:
         errors.append("anonc_manifest_unreachable")
         log.error(f"Error retrieving manifest: {e}")

@@ -43,8 +43,8 @@ from ...dependencies import (
     CCReaderDep,
     ManifestDep,
     ManifestResponse,
+    PolicyEntry,
     PostgresSessionDep,
-    S3ClientDep,
     SettingsDep,
     TorTargetsDep,
     PsiphonConfigDep
@@ -1093,6 +1093,8 @@ def _verify_submit(
         )
         return VerificationStatus.FAILED, "invalid_protocol_version", None
 
+    # Get the limits in age range and measurement count for this request
+    age_range, count_range = get_ranges_from_policy(manifest.manifest.submission_policy, submit_request.content['probe_cc'], submit_request.content['probe_asn'])
 
     # Run verification
     try:
@@ -1104,8 +1106,8 @@ def _verify_submit(
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
             submit_request.content["probe_asn"],
-            [2461109, 2464789],  # TODO lookup these ranges from the manifest
-            [0, 1100100100],
+            list(age_range),
+            list(count_range),
         )
         return (VerificationStatus.VERIFIED, None, submit_response)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
@@ -1115,6 +1117,32 @@ def _verify_submit(
 
 def _parse_version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(n) for n in version.split("."))
+
+def get_ranges_from_policy(
+    policy: List[PolicyEntry], probe_cc: str, probe_asn: str
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    """
+    Gets the age and measurement count ranges from the specified policy.
+
+    Matching order: first match in the list wins (highest priority first).
+
+    returns:
+    age_range, msm_range
+    """
+
+    for item in policy:
+        match_cc = item.match.probe_cc
+        match_asn = item.match.probe_asn
+
+        cc_ok = match_cc == "*" or match_cc == probe_cc
+        asn_ok = match_asn == "*" or match_asn == probe_asn
+
+        if cc_ok and asn_ok:
+            return item.policy.age, item.policy.measurement_count
+
+    raise ValueError(
+        f"No matching submission_policy entry for probe_cc={probe_cc} probe_asn={probe_asn}"
+    )
 
 
 class CredentialUpdateRequest(BaseModel):
