@@ -53,9 +53,9 @@ from fastpath.utils import dget_or as g_or
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = 12
+NUM_WORKERS = 2
 
-queue = mp.Queue(NUM_WORKERS * 5)
+queue = mp.Queue(NUM_WORKERS * 100)
 
 log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
