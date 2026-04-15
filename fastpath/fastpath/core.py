@@ -1659,11 +1659,10 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         if measurement is None:
             measurement = ujson.loads(msm_jstr)
 
-        is_verified = g(measurement, 'is_verified', default=False)
-        nym = g(measurement, 'nym')
-        zkp_request = g(measurement, 'zkp_request')
-        age_range = g(measurement, 'age_range')
-        msm_range = g(measurement, 'msm_range')
+        is_verified = g(measurement, "is_verified", default="u")
+        if is_verified not in ("u", "t", "f"):
+            log.error(f"Unexpected is_verified={is_verified}, defaulting to 'u'")
+            is_verified = "u"
 
         if "content" in measurement and "format" in measurement:
             measurement = unwrap_msmt(measurement)
@@ -1756,10 +1755,6 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             test_helper_type,
             ooni_run_link_id,
             is_verified,
-            nym,
-            zkp_request,
-            age_range,
-            msm_range,
             buffer_writes=buffer_writes,
         )
         upsert_timer.stop()
@@ -1863,8 +1858,11 @@ def update_fingerprints_if_needed() -> None:
         return  # too early
 
     log.info("Updating fingerprints")
-    dns_fp, http_fp = db.fetch_fingerprints()
-    fingerprints = prepare_fingerprints(dns_fp, http_fp)
+    try:
+        dns_fp, http_fp = db.fetch_fingerprints()
+        fingerprints = prepare_fingerprints(dns_fp, http_fp)
+    except Exception as e:
+        log.error(f"Uncaught exception {e}")
 
 
 def main():

@@ -35,3 +35,12 @@ def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, 
     user.handle_registration_response(resp['credential_sign_response'])
 
     return (user, manifest['meta']['version'], resp['emission_day'])
+
+
+def make_submit_request(user: UserState, probe_cc: str, probe_asn: str):
+    return user.make_submit_request(
+        probe_cc,
+        probe_asn,
+        (2461110, 2826140),
+        (0, 10000000),
+    )
