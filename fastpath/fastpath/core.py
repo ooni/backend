@@ -17,7 +17,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 from hashlib import sha512
 import binascii
 import logging
@@ -53,7 +53,7 @@ from fastpath.utils import dget_or as g_or
 
 log = logging.getLogger("fastpath")
 
-def _read_int_from_env(env_name : str) -> int | None:
+def _read_int_from_env(env_name : str) -> Optional[int]:
     try:
         val = os.environ.get(env_name)
         return int(val) if val else None
