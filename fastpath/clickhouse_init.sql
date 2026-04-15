@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS default.fastpath
     `test_helper_address` LowCardinality(String),
     `test_helper_type` LowCardinality(String),
     `ooni_run_link_id` Nullable(UInt64),
-    `is_verified` Int8,
+    `is_verified` LowCardinality(String),
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_start_time, report_id, input)
