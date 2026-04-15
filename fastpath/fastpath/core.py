@@ -51,13 +51,22 @@ from fastpath.metrics import setup_metrics
 
 from fastpath.utils import dget_or as g_or
 
+log = logging.getLogger("fastpath")
+
+def _read_int_from_env(env_name : str) -> int | None:
+    try:
+        val = os.environ.get(env_name)
+        return int(val) if val else None
+    except Exception as e:
+        log.error(f"Unable to read env variable '{env_name}': {e}")
+        return None
+
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = 2
+NUM_WORKERS = _read_int_from_env("FASTPATH_NUM_WORKERS") or 2
+QUEUE_SIZE = _read_int_from_env("FASTPATH_QUEUE_SIZE") or NUM_WORKERS * 100
+queue = mp.Queue(QUEUE_SIZE)
 
-queue = mp.Queue(NUM_WORKERS * 100)
-
-log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
