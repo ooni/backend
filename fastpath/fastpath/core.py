@@ -1587,6 +1587,7 @@ def msm_processor(queue):
         msm_tup = queue.get()
         if msm_tup is None:
             log.info("Worker with PID %d exiting", os.getpid())
+            metrics.decr("num_workers")
             return
 
         if conf.write_to_disk:
@@ -1595,7 +1596,6 @@ def msm_processor(queue):
         process_measurement(msm_tup)
         update_fingerprints_if_needed()
 
-    metrics.decr("num_workers")
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
