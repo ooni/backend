@@ -1589,17 +1589,32 @@ def msm_processor(queue):
     db.setup_clickhouse(conf)
     update_fingerprints_if_needed()
 
+    metrics.incr("num_workers")
     while True:
         msm_tup = queue.get()
         if msm_tup is None:
             log.info("Worker with PID %d exiting", os.getpid())
+            metrics.decr("num_workers")
             return
 
         if conf.write_to_disk:
-            write_measurement_to_disk(msm_tup)
+            try:
+                write_measurement_to_disk(msm_tup)
+            except Exception as e:
+                log.error("failed to write measurements to disk")
+                log.exception(e)
+                metrics.incr("unhandled_exception")
 
+        # already wrapped in try except inside of function body
         process_measurement(msm_tup)
-        update_fingerprints_if_needed()
+
+        try:
+            update_fingerprints_if_needed()
+        except Exception as e:
+            log.error("failed to update fingerprints")
+            log.exception(e)
+            metrics.incr("unhandled_exception")
+        metrics.gauge("queue_size", queue.qsize())
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
@@ -1737,6 +1752,8 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
 
         # TODO: build an object or typed dict here instead of passing args by
         # position. Move the dict from db.py "new = dict(..."
+        upsert_timer = metrics.timer("clickhouse_upsert")
+        upsert_timer.start()
         db.clickhouse_upsert_summary(
             measurement,
             scores,
@@ -1759,7 +1776,7 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             is_verified,
             buffer_writes=buffer_writes,
         )
-
+        upsert_timer.stop()
         tn = measurement.get("test_name")
         if tn == "openvpn":
             db.clickhouse_upsert_openvpn_obs(measurement, scores, msmt_uid)
@@ -1770,6 +1787,7 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
 
 
 def shut_down(queue):
+    metrics.incr("shut_down")
     log.info("Shutting down workers")
     [queue.put(None) for n in range(NUM_WORKERS)]
     # FIXME
@@ -1801,6 +1819,7 @@ def core():
         start_http_api(queue)
 
     except Exception as e:
+        metrics.incr("worker_exception")
         log.exception(e)
 
     finally:
@@ -1809,7 +1828,10 @@ def core():
         shut_down(queue)
         time.sleep(1)
         log.info("Join")
-        [w.join() for w in workers]
+        for w in workers:
+            metrics.incr("joined")
+            w.join()
+            metrics.decr("joined")
         log.info("Join done")
         clean_caches()
 
