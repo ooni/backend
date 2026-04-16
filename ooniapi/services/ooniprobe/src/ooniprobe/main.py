@@ -50,8 +50,6 @@ async def lifespan(
 
     yield
 
-    await app.state.fastpath_client.aclose()
-
 
 def init_ooniauth():
     # Creating a server state from scratch initializes the underlying crypto library
