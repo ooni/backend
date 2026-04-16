@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import random
+import requests
 import time
 from enum import Enum
 from datetime import datetime, timedelta, timezone
@@ -986,15 +987,13 @@ async def submit_measurement(
 
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
-    client = request.app.state.fastpath_client
     N_RETRIES = 3
     for t in range(N_RETRIES):
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await client.post(url, content=data_bin, timeout=59)
-
-            assert resp.status_code == 200, resp.content
+            resp = await run_in_threadpool(requests.post, url, data=data)
+            resp.raise_for_status()
 
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,
