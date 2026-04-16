@@ -1591,11 +1591,23 @@ def msm_processor(queue):
             return
 
         if conf.write_to_disk:
-            write_measurement_to_disk(msm_tup)
+            try:
+                write_measurement_to_disk(msm_tup)
+            except Exception as e:
+                log.error("failed to write measurements to disk")
+                log.exception(e)
+                metrics.incr("unhandled_exception")
 
+        # already wrapped in try except inside of function body
         process_measurement(msm_tup)
         update_fingerprints_if_needed()
 
+        try:
+            update_fingerprints_if_needed()
+        except Exception as e:
+            log.error("failed to update fingerprints")
+            log.exception(e)
+            metrics.incr("unhandled_exception")
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
