@@ -1600,7 +1600,6 @@ def msm_processor(queue):
 
         # already wrapped in try except inside of function body
         process_measurement(msm_tup)
-        update_fingerprints_if_needed()
 
         try:
             update_fingerprints_if_needed()
@@ -1608,6 +1607,7 @@ def msm_processor(queue):
             log.error("failed to update fingerprints")
             log.exception(e)
             metrics.incr("unhandled_exception")
+        metrics.gauge("queue_size", queue.qsize())
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
