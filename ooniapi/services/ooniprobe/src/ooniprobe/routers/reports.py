@@ -189,7 +189,6 @@ async def receive_measurement(
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
             resp = await run_in_threadpool(requests.post, url, data=data)
-
             resp.raise_for_status()
             Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
