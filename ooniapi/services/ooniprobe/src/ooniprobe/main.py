@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import boto3
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 import requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
@@ -174,8 +175,8 @@ async def health(
     }
 
     if len(errors) > 0:
-        result['status'] = "fail"
-        raise HTTPException(500, result)
+        result["status"] = "fail"
+        return JSONResponse(status_code=500, content=result)
 
     return result
 
