@@ -53,18 +53,16 @@ from fastpath.utils import dget_or as g_or
 
 log = logging.getLogger("fastpath")
 
-def _read_int_from_env(env_name : str) -> Optional[int]:
-    try:
-        val = os.environ.get(env_name)
-        return int(val) if val else None
-    except Exception as e:
-        log.error(f"Unable to read env variable '{env_name}': {e}")
-        return None
+def _read_int_from_env(env_name : str, default_value : int) -> int:
+    return int(os.environ.get(env_name, default_value))
 
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = _read_int_from_env("FASTPATH_NUM_WORKERS") or 2
-QUEUE_SIZE = _read_int_from_env("FASTPATH_QUEUE_SIZE") or NUM_WORKERS * 100
+NUM_WORKERS = _read_int_from_env("FASTPATH_NUM_WORKERS", 2)
+# We can assume an upper bound of 1MB per measurement.
+# Setting the default to NUM_WORKERS * 20, means it should not grow beyond 50
+# MB per worker
+QUEUE_SIZE = _read_int_from_env("FASTPATH_QUEUE_SIZE", NUM_WORKERS * 50)
 queue = mp.Queue(QUEUE_SIZE)
 
 metrics = setup_metrics(name="fastpath")
@@ -1866,7 +1864,7 @@ def update_fingerprints_if_needed() -> None:
 
 def main():
     setup()
-    log.info("Starting")
+    log.info(f"Starting {NUM_WORKERS} workers with {QUEUE_SIZE} queue size")
     core()
 
 
