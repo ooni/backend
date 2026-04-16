@@ -13,9 +13,6 @@ services:
     volumes:
       - .:/app:Z
     working_dir: /app
-    profiles:
-      - default
-      - all
     depends_on:
       statsd_exporter:
         condition: service_started
@@ -42,9 +39,6 @@ services:
       retries: 3
       start_period: 60s
       timeout: 10s
-    profiles:
-      - all
-      - clickhouse 
 
   statsd_exporter:
     image: docker.io/prom/statsd-exporter:latest
@@ -62,9 +56,6 @@ services:
       retries: 5
       start_period: 10s
       timeout: 2s
-    profiles:
-      - all
-      - metrics
 
   prometheus:
     image: docker.io/prom/prometheus:latest
@@ -81,9 +72,6 @@ services:
       retries: 5
       start_period: 10s
       timeout: 2s
-    profiles:
-      - all
-      - metrics
 
   grafana:
     image: docker.io/grafana/grafana:latest
@@ -101,9 +89,6 @@ services:
       retries: 5
       start_period: 10s
       timeout: 2s
-    profiles:
-      - all
-      - metrics
 
 volumes:
   clickhouse-data:
