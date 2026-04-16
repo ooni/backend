@@ -180,7 +180,7 @@ async def health(
     }
 
     if len(errors) > 0:
-        result['status '] = "fail"
+        result['status'] = "fail"
         raise HTTPException(500, result)
 
     return result
