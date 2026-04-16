@@ -4,7 +4,7 @@ from typing import Optional
 
 import boto3
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
@@ -172,16 +172,18 @@ async def health(
         errors.append("anonc_manifest_unreachable")
         log.error(f"Error retrieving manifest: {e}")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
-        "status": status,
+    result = {
+        "status": "ok",
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+
+    if len(errors) > 0:
+        result['status '] = "fail"
+        raise HTTPException(500, result)
+
+    return result
 
 
 @app.get("/")
