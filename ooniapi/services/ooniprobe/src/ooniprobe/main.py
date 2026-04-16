@@ -10,6 +10,7 @@ from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from . import models
 from .__about__ import VERSION
