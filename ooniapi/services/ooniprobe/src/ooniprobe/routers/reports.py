@@ -199,8 +199,8 @@ async def receive_measurement(
             Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
-        except Exception:
-            log.exception("Unable to send measurement to fastpath")
+        except Exception as e:
+            log.exception(f"Unable to send measurement to fastpath ({settings.fastpath_url}): {e}")
             Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
