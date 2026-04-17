@@ -1059,9 +1059,9 @@ def _verify_submit(
     # Check manifest version
     if submit_request.manifest_version != manifest.meta.version:
         # TODO We should validate if this is an old manifest or an unknown manifest, for now
-        # we treat them as the same error (unknown manifest)
+        # we treat them as the same error: unknown manifest
         log.error("Old or unknown manifest in submission request")
-        return VerificationStatus.FAILED, "manifest_not_found", None
+        return VerificationStatus.UNVERIFIED, "manifest_not_found", None
 
 
     # Check anonymous credentials fields are complete
