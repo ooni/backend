@@ -80,7 +80,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "admin"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:Z
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:Z
+      - ./grafana/data:/var/lib/grafana:Z
+
     ports:
       - "3000:3000"
     healthcheck:
