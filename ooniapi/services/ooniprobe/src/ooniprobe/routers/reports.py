@@ -157,7 +157,7 @@ async def receive_measurement(
             error("Incorrect format")
 
     try:
-        data = await run_in_threadpool(_ensure_unverified_flag, data)
+        data = await run_in_threadpool(_set_unverified_flag, data)
     except Exception as e:
         log.info(f"Failed to parse and measurement body. Error: {e}")
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
@@ -225,7 +225,7 @@ async def receive_measurement(
             return empty_measurement
 
 
-def _ensure_unverified_flag(data: bytes) -> bytes:
+def _set_unverified_flag(data: bytes) -> bytes:
     with Metrics.DESERIALIZE_BODY_TIMING.time():
         measurement = ujson.loads(data)
     measurement["is_verified"] = "u"
