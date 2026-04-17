@@ -1,6 +1,8 @@
 import json
 import zstd
 import pytest
+from hashlib import sha512
+import ujson
 
 def postj(client, url, json):
     response = client.post(url, json=json)
@@ -77,9 +79,16 @@ async def test_collector_upload_msmt_valid(client):
 @pytest.mark.asyncio
 async def test_collector_upload_msmt_valid_zstd(client):
     rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
-    msmt = json.dumps(dict(test_keys={})).encode()
-    zmsmt = zstd.compress(msmt)
+    msmt_payload = {"test_keys": {}}
+    zmsmt = zstd.compress(json.dumps(msmt_payload).encode())
     headers = [("Content-Encoding", "zstd")]
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
     assert len(c) == 1
-    assert c['measurement_uid'].endswith("_IT_integtest_50be3cd5406bca65"), c
+
+    expected_hash = _get_hash_of({"test_keys": {}, "is_verified": "u"})
+    assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
+
+def _get_hash_of(msmt : dict) -> str:
+    # separators make this consistent with what the server receives
+    d = ujson.dumps(msmt).encode()
+    return sha512(d).hexdigest()[:16]
