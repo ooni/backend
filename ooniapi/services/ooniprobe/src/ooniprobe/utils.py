@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from os import urandom
 from typing import Any, Dict, List, Tuple, TypedDict
 
-import httpx
+import requests
 import pem
 from fastapi import HTTPException, Request
 from mypy_boto3_s3 import S3Client
@@ -47,15 +47,17 @@ class OpenVPNEndpoint(TypedDict):
 
 
 def fetch_riseup_ca() -> str:
-    r = httpx.get(RISEUP_CA_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    r = requests.get(RISEUP_CA_URL)
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_riseup_cert() -> str:
-    r = httpx.get(RISEUP_CERT_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    r = requests.get(RISEUP_CERT_URL)
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_openvpn_config() -> OpenVPNConfig:
@@ -68,7 +70,7 @@ def fetch_openvpn_config() -> OpenVPNConfig:
 def fetch_openvpn_endpoints() -> List[OpenVPNEndpoint]:
     endpoints = []
 
-    r = httpx.get(RISEUP_ENDPOINT_URL)
+    r = requests.get(RISEUP_ENDPOINT_URL)
     r.raise_for_status()
     j = r.json()
     for ep in j["gateways"]:

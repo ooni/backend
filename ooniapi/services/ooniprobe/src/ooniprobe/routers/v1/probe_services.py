@@ -992,9 +992,9 @@ async def submit_measurement(
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await client.post(url, content=data_bin, timeout=59)
-
-            assert resp.status_code == 200, resp.content
+            resp = await run_in_threadpool(client.post, url, data=data)
+            with resp:
+                resp.raise_for_status()
 
             return SubmitMeasurementResponse(
                 measurement_uid=msmt_uid,

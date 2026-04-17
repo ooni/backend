@@ -17,7 +17,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 from hashlib import sha512
 import binascii
 import logging
@@ -51,13 +51,20 @@ from fastpath.metrics import setup_metrics
 
 from fastpath.utils import dget_or as g_or
 
+log = logging.getLogger("fastpath")
+
+def _read_int_from_env(env_name : str, default_value : int) -> int:
+    return int(os.environ.get(env_name, default_value))
+
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = 12
+NUM_WORKERS = _read_int_from_env("FASTPATH_NUM_WORKERS", 2)
+# We can assume an upper bound of 1MB per measurement.
+# Setting the default to NUM_WORKERS * 20, means it should not grow beyond 50
+# MB per worker
+QUEUE_SIZE = _read_int_from_env("FASTPATH_QUEUE_SIZE", NUM_WORKERS * 50)
+queue = mp.Queue(QUEUE_SIZE)
 
-queue = mp.Queue(NUM_WORKERS * 5)
-
-log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
@@ -1591,10 +1598,23 @@ def msm_processor(queue):
             return
 
         if conf.write_to_disk:
-            write_measurement_to_disk(msm_tup)
+            try:
+                write_measurement_to_disk(msm_tup)
+            except Exception as e:
+                log.error("failed to write measurements to disk")
+                log.exception(e)
+                metrics.incr("unhandled_exception")
 
+        # already wrapped in try except inside of function body
         process_measurement(msm_tup)
-        update_fingerprints_if_needed()
+
+        try:
+            update_fingerprints_if_needed()
+        except Exception as e:
+            log.error("failed to update fingerprints")
+            log.exception(e)
+            metrics.incr("unhandled_exception")
+        metrics.gauge("queue_size", queue.qsize())
 
 
 
@@ -1867,7 +1887,7 @@ def update_fingerprints_if_needed() -> None:
 
 def main():
     setup()
-    log.info("Starting")
+    log.info(f"Starting {NUM_WORKERS} workers with {QUEUE_SIZE} queue size")
     core()
 
 
