@@ -106,6 +106,10 @@ def setup_router(app: FastAPI):
             "version": pkg_version,
             "build_label": build_label,
         }
+
+        if len(errors):
+            log.error(f"Health check errors detected: {errors}")
+
         return JSONResponse(content=result, status_code=code)
 
     @app.get("/")

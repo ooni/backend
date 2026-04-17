@@ -100,6 +100,9 @@ async def health(
         "version": pkg_version,
         "build_label": build_label,
     }
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
     return JSONResponse(content=result, status_code=code)
 
 

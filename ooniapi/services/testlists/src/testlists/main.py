@@ -3,11 +3,9 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.request import urlopen
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from fastapi_utils.tasks import repeat_every
 
 from pydantic import BaseModel
 
@@ -136,6 +134,9 @@ async def health(
         "version": VERSION,
         "build_label": build_label,
     }
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
     return JSONResponse(content=result, status_code=code)
 
 
