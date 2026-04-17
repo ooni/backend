@@ -48,8 +48,11 @@ async def lifespan(
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
     app.state.s3_client = boto3.client("s3")
+    app.state.fastpath_client = requests.Session()
 
     yield
+
+    app.state.fastpath_client.close()
 
 
 def init_ooniauth():
@@ -123,8 +126,9 @@ async def health(
         log.error(e)
 
     try:
-        resp = await run_in_threadpool(requests.get, settings.fastpath_url)
-        resp.raise_for_status()
+        resp = await run_in_threadpool(app.state.fastpath_client.get, settings.fastpath_url)
+        with resp:
+            resp.raise_for_status()
     except Exception as exc:
         log.error(str(exc))
         errors.append("fastpath_connection_error")
