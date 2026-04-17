@@ -3,13 +3,14 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import boto3
-import httpx
+import requests
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from . import models
 from .__about__ import VERSION
@@ -46,14 +47,9 @@ async def lifespan(
 
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
-    app.state.fastpath_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
-    )
     app.state.s3_client = boto3.client("s3")
 
     yield
-
-    await app.state.fastpath_client.aclose()
 
 
 def init_ooniauth():
@@ -127,10 +123,8 @@ async def health(
         log.error(e)
 
     try:
-        resp = await app.state.fastpath_client.get(settings.fastpath_url)
-        assert resp.status_code == 200, (
-            "Unexpected status trying to connect to fastpath: " + str(resp.status_code)
-        )
+        resp = await run_in_threadpool(requests.get, settings.fastpath_url)
+        resp.raise_for_status()
     except Exception as exc:
         log.error(str(exc))
         errors.append("fastpath_connection_error")

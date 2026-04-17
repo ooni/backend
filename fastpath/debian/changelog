@@ -1,3 +1,17 @@
+fastpath (0.92) unstable; urgency=medium
+
+  * Add extra metrics, logging and configuration options through
+    environment
+
+ -- Luis Diaz <luis@openobservatory.org>  Thu, 16 Apr 2026 13:52:39 +0200
+
+fastpath (0.91) unstable; urgency=medium
+
+  * Remove zkp_request, nym, age_range, msm_range fields from the DB and
+    json
+
+ -- Luis Diaz <luis@openobservatory.org>  Wed, 08 Apr 2026 11:26:40 +0200
+
 fastpath (0.90) unstable; urgency=medium
 
   * Fix bad anonymous credentials measurement submission

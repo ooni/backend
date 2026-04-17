@@ -252,7 +252,3 @@ ORDER BY (ooni_run_link_id, descriptor_creation_time)
 SETTINGS index_granularity = 1;
 
 ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` LowCardinality(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);

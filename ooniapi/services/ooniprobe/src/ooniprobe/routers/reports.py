@@ -1,5 +1,6 @@
 import io
 import logging
+import requests
 from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List
@@ -189,24 +190,17 @@ async def receive_measurement(
             Metrics.COMPARE_CC_FAILURE.inc()
 
     # Use exponential back off with jitter between retries
-    client = request.app.state.fastpath_client
-
     with Metrics.SEND_FASTPATH_TIMING.time():
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await client.post(url, content=data)
-
-            if resp.status_code != 200:
-                raise RuntimeError(
-                    f"Unexpected status {resp.status_code}: {resp.content}"
-                )
-
+            resp = await run_in_threadpool(requests.post, url, data=data)
+            resp.raise_for_status()
             Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
             return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
-        except Exception:
-            log.exception("Unable to send measurement to fastpath")
+        except Exception as e:
+            log.exception(f"Unable to send measurement to fastpath ({settings.fastpath_url}): {e}")
             Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3

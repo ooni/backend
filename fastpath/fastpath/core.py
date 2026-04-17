@@ -17,7 +17,7 @@ from base64 import b64decode
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 from hashlib import sha512
 import binascii
 import logging
@@ -51,13 +51,20 @@ from fastpath.metrics import setup_metrics
 
 from fastpath.utils import dget_or as g_or
 
+log = logging.getLogger("fastpath")
+
+def _read_int_from_env(env_name : str, default_value : int) -> int:
+    return int(os.environ.get(env_name, default_value))
+
 LOCALITY_VALS = ("general", "global", "country", "isp", "local")
 
-NUM_WORKERS = 12
+NUM_WORKERS = _read_int_from_env("FASTPATH_NUM_WORKERS", 2)
+# We can assume an upper bound of 1MB per measurement.
+# Setting the default to NUM_WORKERS * 20, means it should not grow beyond 50
+# MB per worker
+QUEUE_SIZE = _read_int_from_env("FASTPATH_QUEUE_SIZE", NUM_WORKERS * 50)
+queue = mp.Queue(QUEUE_SIZE)
 
-queue = mp.Queue(NUM_WORKERS * 5)
-
-log = logging.getLogger("fastpath")
 metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
@@ -1582,17 +1589,32 @@ def msm_processor(queue):
     db.setup_clickhouse(conf)
     update_fingerprints_if_needed()
 
+    metrics.incr("num_workers")
     while True:
         msm_tup = queue.get()
         if msm_tup is None:
             log.info("Worker with PID %d exiting", os.getpid())
+            metrics.decr("num_workers")
             return
 
         if conf.write_to_disk:
-            write_measurement_to_disk(msm_tup)
+            try:
+                write_measurement_to_disk(msm_tup)
+            except Exception as e:
+                log.error("failed to write measurements to disk")
+                log.exception(e)
+                metrics.incr("unhandled_exception")
 
+        # already wrapped in try except inside of function body
         process_measurement(msm_tup)
-        update_fingerprints_if_needed()
+
+        try:
+            update_fingerprints_if_needed()
+        except Exception as e:
+            log.error("failed to update fingerprints")
+            log.exception(e)
+            metrics.incr("unhandled_exception")
+        metrics.gauge("queue_size", queue.qsize())
 
 
 def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) -> None:
@@ -1660,11 +1682,6 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         if is_verified not in ("u", "t", "f"):
             log.error(f"Unexpected is_verified={is_verified}, defaulting to 'u'")
             is_verified = "u"
-
-        nym = g(measurement, 'nym')
-        zkp_request = g(measurement, 'zkp_request')
-        age_range = g(measurement, 'age_range')
-        msm_range = g(measurement, 'msm_range')
 
         if "content" in measurement and "format" in measurement:
             measurement = unwrap_msmt(measurement)
@@ -1735,6 +1752,8 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
 
         # TODO: build an object or typed dict here instead of passing args by
         # position. Move the dict from db.py "new = dict(..."
+        upsert_timer = metrics.timer("clickhouse_upsert")
+        upsert_timer.start()
         db.clickhouse_upsert_summary(
             measurement,
             scores,
@@ -1755,13 +1774,9 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
             test_helper_type,
             ooni_run_link_id,
             is_verified,
-            nym,
-            zkp_request,
-            age_range,
-            msm_range,
             buffer_writes=buffer_writes,
         )
-
+        upsert_timer.stop()
         tn = measurement.get("test_name")
         if tn == "openvpn":
             db.clickhouse_upsert_openvpn_obs(measurement, scores, msmt_uid)
@@ -1772,6 +1787,7 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
 
 
 def shut_down(queue):
+    metrics.incr("shut_down")
     log.info("Shutting down workers")
     [queue.put(None) for n in range(NUM_WORKERS)]
     # FIXME
@@ -1803,6 +1819,7 @@ def core():
         start_http_api(queue)
 
     except Exception as e:
+        metrics.incr("worker_exception")
         log.exception(e)
 
     finally:
@@ -1811,7 +1828,10 @@ def core():
         shut_down(queue)
         time.sleep(1)
         log.info("Join")
-        [w.join() for w in workers]
+        for w in workers:
+            metrics.incr("joined")
+            w.join()
+            metrics.decr("joined")
         log.info("Join done")
         clean_caches()
 
@@ -1857,13 +1877,16 @@ def update_fingerprints_if_needed() -> None:
         return  # too early
 
     log.info("Updating fingerprints")
-    dns_fp, http_fp = db.fetch_fingerprints()
-    fingerprints = prepare_fingerprints(dns_fp, http_fp)
+    try:
+        dns_fp, http_fp = db.fetch_fingerprints()
+        fingerprints = prepare_fingerprints(dns_fp, http_fp)
+    except Exception as e:
+        log.error(f"Uncaught exception {e}")
 
 
 def main():
     setup()
-    log.info("Starting")
+    log.info(f"Starting {NUM_WORKERS} workers with {QUEUE_SIZE} queue size")
     core()
 
 
