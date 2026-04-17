@@ -3,11 +3,9 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.request import urlopen
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from fastapi_utils.tasks import repeat_every
 
 from pydantic import BaseModel
 
@@ -129,16 +127,17 @@ async def health(
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")

@@ -3,8 +3,9 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import boto3
-import requests
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
@@ -48,8 +49,11 @@ async def lifespan(
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
     app.state.s3_client = boto3.client("s3")
+    app.state.fastpath_client = requests.Session()
 
     yield
+
+    app.state.fastpath_client.close()
 
 
 def init_ooniauth():
@@ -123,8 +127,9 @@ async def health(
         log.error(e)
 
     try:
-        resp = await run_in_threadpool(requests.get, settings.fastpath_url)
-        resp.raise_for_status()
+        resp = await run_in_threadpool(app.state.fastpath_client.get, settings.fastpath_url)
+        with resp:
+            resp.raise_for_status()
     except Exception as exc:
         log.error(str(exc))
         errors.append("fastpath_connection_error")
@@ -166,16 +171,19 @@ async def health(
         errors.append("anonc_manifest_unreachable")
         log.error(f"Error retrieving manifest: {e}")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")

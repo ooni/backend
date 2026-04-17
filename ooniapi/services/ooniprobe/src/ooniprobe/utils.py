@@ -49,14 +49,16 @@ class OpenVPNEndpoint(TypedDict):
 
 def fetch_riseup_ca() -> str:
     r = requests.get(RISEUP_CA_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_riseup_cert() -> str:
     r = requests.get(RISEUP_CERT_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_openvpn_config() -> OpenVPNConfig:
