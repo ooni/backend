@@ -3,6 +3,7 @@ import zstd
 import pytest
 from hashlib import sha512
 import ujson
+import copy
 
 def postj(client, url, json):
     response = client.post(url, json=json)
@@ -68,9 +69,10 @@ async def test_collector_upload_msmt_valid(client):
     }
     assert len(rid) == 61, rid
 
-    msmt = dict(test_keys={})
-    c = postj(client, f"/report/{rid}", {"format":"json", "content":msmt}) # unsure about this merge
-    assert c['measurement_uid'].endswith("_IE_webconnectivity_e7889aeba0b36729"), c
+    upload_payload = {"format": "json", "content": {"test_keys": {}}}
+    c = postj(client, f"/report/{rid}", upload_payload)
+    expected_hash = _get_hash_of(upload_payload)
+    assert c["measurement_uid"].endswith(f"_IE_webconnectivity_{expected_hash}"), c
 
     c = postj(client, f"/report/{rid}/close", json={})
     assert c == {}, c
@@ -85,10 +87,11 @@ async def test_collector_upload_msmt_valid_zstd(client):
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
     assert len(c) == 1
 
-    expected_hash = _get_hash_of({"test_keys": {}, "is_verified": "u"})
+    expected_hash = _get_hash_of(msmt_payload)
     assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
 
-def _get_hash_of(msmt : dict) -> str:
-    # separators make this consistent with what the server receives
-    d = ujson.dumps(msmt).encode()
+def _get_hash_of(msmt: dict) -> str:
+    payload = copy.deepcopy(msmt)
+    payload["is_verified"] = "u"
+    d = ujson.dumps(payload).encode()
     return sha512(d).hexdigest()[:16]
