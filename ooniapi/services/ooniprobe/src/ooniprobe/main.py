@@ -168,14 +168,13 @@ async def health(
         log.error(f"Error retrieving manifest: {e}")
 
     result = {
-        "status": "ok",
+        "status": "ok" if len(errors) == 0 else "fail",
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
 
     if len(errors) > 0:
-        result["status"] = "fail"
         return JSONResponse(status_code=503, content=result)
 
     return result

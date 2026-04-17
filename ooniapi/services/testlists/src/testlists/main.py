@@ -129,16 +129,16 @@ async def health(
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
-        "status": status,
+    result = {
+        "status": "ok" if len(errors) == 0 else "fail",
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+    if len(errors) > 0:
+        return JSONResponse(status_code=503, content=result)
+
+    return result
 
 
 @app.get("/")

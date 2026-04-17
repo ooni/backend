@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel
 
@@ -81,15 +82,17 @@ async def health(
     if settings.aws_secret_access_key == "" or settings.aws_access_key_id == "":
         errors.append("bad_aws_credentials")
 
-    if len(errors) > 0:
-        log.error(f"Health check errors: {errors}")
-        raise HTTPException(status_code=542, detail=f"health check failed")
-
-    return {
-        "status": "ok",
+    result = {
+        "status": "ok" if len(errors) == 0 else "fail",
+        "errors": errors,
         "version": pkg_version,
         "build_label": build_label,
     }
+    if len(errors) > 0:
+        log.error(f"Health check errors: {errors}")
+        return JSONResponse(status_code=503, content=result)
+
+    return result
 
 
 @app.get("/")
