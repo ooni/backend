@@ -1,0 +1,109 @@
+{
+    "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+    "type": "app",
+    "name": "Grafana Profiles Drilldown",
+    "id": "grafana-pyroscope-app",
+    "autoEnabled": true,
+    "backend": false,
+    "preload": true,
+    "languages": [
+        "en-US"
+    ],
+    "dependencies": {
+        "grafanaDependency": ">=11.6.11 <12 || >=12.0.10 <12.1 || >=12.1.7 <12.2 || >=12.2.5",
+        "plugins": [],
+        "extensions": {
+            "exposedComponents": [
+                "grafana-o11yinsights-app/insights-launcher/v1",
+                "grafana-adaptiveprofiles-app/resolution-boost/v1",
+                "grafana/query-library-context/v1"
+            ]
+        }
+    },
+    "info": {
+        "keywords": [
+            "app",
+            "pyroscope",
+            "profiling",
+            "explore",
+            "profiles",
+            "performance",
+            "drilldown"
+        ],
+        "description": "View and analyze high-level service performance, identify problem processes for optimization, and diagnose issues to determine root causes.",
+        "author": {
+            "name": "Grafana"
+        },
+        "logos": {
+            "small": "img/logo.svg",
+            "large": "img/logo.svg"
+        },
+        "screenshots": [
+            {
+                "name": "Hero Image",
+                "path": "img/hero-image.png"
+            }
+        ],
+        "version": "2.0.3",
+        "updated": "2026-04-15",
+        "links": [
+            {
+                "name": "GitHub",
+                "url": "https://github.com/grafana/profiles-drilldown"
+            },
+            {
+                "name": "Report bug",
+                "url": "https://github.com/grafana/profiles-drilldown/issues/new"
+            }
+        ]
+    },
+    "includes": [
+        {
+            "type": "page",
+            "name": "Profiles",
+            "path": "/a/grafana-pyroscope-app/explore",
+            "action": "datasources:explore",
+            "addToNav": true,
+            "defaultNav": true
+        }
+    ],
+    "extensions": {
+        "exposedComponents": [
+            {
+                "id": "grafana-pyroscope-app/embedded-profiles-exploration/v1",
+                "title": "Embedded Profiles Exploration",
+                "description": "A component that renders a profiles exploration view that can be embedded in other parts of Grafana."
+            }
+        ],
+        "extensionPoints": [
+            {
+                "id": "grafana-pyroscope-app/settings/v1"
+            }
+        ],
+        "addedLinks": [
+            {
+                "title": "Open in Grafana Profiles Drilldown",
+                "description": "Try our new queryless experience for profiles",
+                "targets": [
+                    "grafana/explore/toolbar/action",
+                    "grafana/traceview/details",
+                    "grafana-assistant-app/navigateToDrilldown/v1"
+                ]
+            }
+        ]
+    },
+    "routes": [
+        {
+            "path": "/grafanacom-api/instances",
+            "method": "GET",
+            "url": "{{.SecureJsonData.gcomApiUrl}}/instances/{{.SecureJsonData.stackId}}",
+            "headers": [
+                {
+                    "name": "Authorization",
+                    "content": "Bearer {{.SecureJsonData.gcomApiToken}}"
+                }
+            ]
+        }
+    ],
+    "buildMode": "production"
+}

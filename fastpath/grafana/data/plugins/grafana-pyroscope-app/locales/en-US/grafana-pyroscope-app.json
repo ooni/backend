@@ -1,0 +1,662 @@
+{
+  "actions": {
+    "exemplar-toggle": {
+      "hide": "Hide exemplars",
+      "label": "Exemplars",
+      "show": "Show exemplars"
+    },
+    "fav": {
+      "favorite": "Favorite",
+      "unfavorite": "Unfavorite"
+    }
+  },
+  "ad-hoc": {
+    "profile-type-selector": {
+      "label": "Profile"
+    },
+    "tabs": {
+      "comparison-view": "Comparison view",
+      "single-view": "Single view"
+    },
+    "view": {
+      "title": "Ad hoc view"
+    }
+  },
+  "ai-panel": {
+    "analyzing": "Analyzing...",
+    "close": "Close panel",
+    "fetch-error": "Error while loading profile data!",
+    "fetch-error-message": "Sorry for any inconvenience, please try again later.",
+    "follow-up": {
+      "placeholder": "Ask a follow-up question...",
+      "send": "Send"
+    },
+    "llm-error": "An error occured while generating content using OpenAI!",
+    "llm-error-message": "Sorry for any inconvenience, please retry or if the problem persists, contact your organization admin.",
+    "reply": {
+      "search-node": "Search for this node"
+    },
+    "retry": "Retry",
+    "title": "Flame graph analysis",
+    "validation-error": "Validation error!"
+  },
+  "analyze-diff": {
+    "context": {
+      "title": "DOT Profiles and instructions"
+    },
+    "error": "Failed to fetch DOT profiles for analysis",
+    "prompt": "Analyze the differences between these two performance profiles."
+  },
+  "back-button": {
+    "aria-label": "Back to Profiles Drilldown",
+    "label": "Back to Profiles Drilldown"
+  },
+  "create-recording-rule": {
+    "cancel": "Cancel",
+    "create": "Create",
+    "filters": {
+      "description": "Filters selected in the main view will be applied to this rule",
+      "label": "Filters",
+      "none": "No filters selected"
+    },
+    "function-name": {
+      "aria-label": "Function name",
+      "description": "Optional function name to filter the recording rule",
+      "label": "Function name",
+      "placeholder": "Leave empty for total aggregation"
+    },
+    "labels": {
+      "description": "Additional profiling labels to forward to the metric",
+      "label": "Additional labels"
+    },
+    "menu-option": "Create recording rule",
+    "metric-name": {
+      "aria-label": "Metric name",
+      "description": "",
+      "invalid": "Invalid metric name.",
+      "label": "Metric name",
+      "pattern-alphanumeric": "Only contain alphanumeric characters or underscores",
+      "pattern-error": "Metric name is invalid, it must have the following properties:",
+      "pattern-no-number": "Must not begin with a number",
+      "required": "Metric name is required."
+    },
+    "profile-type": {
+      "label": "Profile type"
+    },
+    "service-name": {
+      "all": "All services",
+      "label": "Service name"
+    },
+    "title": "Create recording rule"
+  },
+  "diff-flame-graph": {
+    "compare-panel": {
+      "annotation-title": "{{title}} flame graph range",
+      "baseline": "Baseline",
+      "comparison": "Comparison",
+      "flame-graph": "Flame graph",
+      "range-selection-mode": "Range selection mode",
+      "sync-time-ranges": "Sync time ranges",
+      "time-picker": "Time picker",
+      "tooltip-description": "Use these buttons to change the behaviour when selecting a range with the mouse on the time series:",
+      "tooltip-flame-graph": "Flame graph",
+      "tooltip-flame-graph-description": "Time range for building the flame graph (the stack traces will be retrieved only for the selected range)",
+      "tooltip-time-picker": "Time picker",
+      "tooltip-time-picker-description": "Time range zoom in (default behaviour)"
+    },
+    "error-loading-profile": "Error while loading profile data!",
+    "explain-button": "Explain Diff Flame Graph",
+    "missing-selections": {
+      "auto-select": "Auto-select",
+      "how-to-alt": "How to view the diff flame graph",
+      "learn-how": "Click here to learn how to select the flame graph ranges with the mouse",
+      "step-1": "Ensure that the “Flame graph” range selection mode is selected",
+      "step-2": "Use your mouse to select the desired time ranges on both the baseline and the comparison time series",
+      "title": "Select both the baseline and the comparison flame graph ranges to view the diff flame graph"
+    },
+    "no-profile-data": "No profile data available",
+    "no-profile-data-message": "Please verify that you've selected adequate filters and time ranges.",
+    "presets": {
+      "1h-ago-vs-now": "1h ago vs now",
+      "1h-ago-vs-now-description": "30m window",
+      "24h-ago-vs-now": "24h ago vs now",
+      "6h-ago-vs-now": "6h ago vs now",
+      "label": "Comparison presets",
+      "placeholder": "Choose a preset"
+    },
+    "settings-error": {
+      "message": "Some features might not work as expected (e.g. flamegraph export options). Please try to reload the page, sorry for the inconvenience.",
+      "title": "Error while retrieving the plugin settings!"
+    },
+    "title": "Diff flame graph for {{serviceName}} ({{profileMetricType}})"
+  },
+  "error-page": {
+    "banner-message": "Please try reloading the page or, if the problem persists, contact your organization admin. Sorry for the inconvenience.",
+    "banner-title": "Fatal error!",
+    "title": "Grafana Profiles Drilldown"
+  },
+  "explorer": {
+    "exploration-type": {
+      "all-services": "All services",
+      "all-services-description": "Overview of all services, for any given profile type",
+      "diff-flame-graph": "Diff flame graph",
+      "diff-flame-graph-description": "Compare the differences between two flame graphs",
+      "favorites": "Favorites",
+      "favorites-description": "Overview of favorited visualizations",
+      "flame-graph": "Flame graph",
+      "flame-graph-description": "Single service flame graph",
+      "label": "Exploration",
+      "labels": "Labels",
+      "labels-description": "Single service label exploration and filtering",
+      "profile-types": "Profile types",
+      "profile-types-description": "Overview of all the profile types for a single service"
+    },
+    "header": {
+      "add-recording-rule": "Add recording rule",
+      "recording-rules-tooltip": "Recording rules",
+      "settings-tooltip": "View/edit tenant settings",
+      "share-tooltip": "Copy shareable link to the clipboard",
+      "upload-tooltip": "Upload ad hoc profiles",
+      "view-recording-rules": "View recording rules"
+    }
+  },
+  "export-data": {
+    "aria-label": "Export profile data",
+    "tooltip": "Export profile data"
+  },
+  "export-menu": {
+    "aria-label": "Export profile data",
+    "error-flamegraph-com": "Failed to export to flamegraph.com!",
+    "error-loading-profile": "Error while loading flamebearer profile data!",
+    "error-png": "Failed to export to png!",
+    "error-pprof": "Failed to export to pprof!",
+    "json": "json",
+    "json-label": "json",
+    "png": "png",
+    "png-label": "png",
+    "pprof": "pprof",
+    "tooltip": "Export profile data"
+  },
+  "exposed-components": {
+    "loading": "Loading..."
+  },
+  "favorites": {
+    "data-source": {
+      "test-success": "OK"
+    }
+  },
+  "flame-graph": {
+    "error-loading-profile": "Error while loading profile data!",
+    "explain-button": "Explain Flame Graph",
+    "profile-id-selector": {
+      "filter-label": "Filter label",
+      "filter-operator": "Filter operator",
+      "filter-value": "Filter value",
+      "name": "Profile id",
+      "remove": "Remove profile id selector from query",
+      "tooltip": "You have added a profile id selector to the flamegraph query ({{profileIdSelector}})."
+    },
+    "settings-error": {
+      "message": "Some features might not work as expected (e.g. collapsed flame graphs). Please try to reload the page, sorry for the inconvenience.",
+      "title": "Error while retrieving the plugin settings!"
+    },
+    "span-selector": {
+      "added": "Span selector added",
+      "remove": "Remove span selector from query",
+      "tooltip": "You have added a span selector to the flamegraph query ({{spanSelector}})."
+    },
+    "title": "Flame graph for {{serviceName}} ({{profileMetricType}})"
+  },
+  "function-details": {
+    "ai-suggestions": {
+      "analyzing": "Analyzing...",
+      "fetch-error": "Error while fetching profiles!",
+      "fetch-error-message": "Sorry for any inconvenience, please try again later.",
+      "llm-error": "Failed to generate content using OpenAI!",
+      "llm-error-message": "Sorry for any inconvenience, please try again later or if the problem persists, contact your organization admin.",
+      "title": "Code Optimization Suggestions"
+    },
+    "close": "close",
+    "code": {
+      "breakdown-per-line": "Breakdown per line",
+      "file-unavailable": "(file information unavailable)",
+      "optimize": "Optimize Code",
+      "view-on-github": "View on GitHub"
+    },
+    "commit": "Commit",
+    "commit-option": {
+      "author-date": "{{author}} on {{date}}"
+    },
+    "commit-select": {
+      "no-options": "No commits found"
+    },
+    "commit-tooltip": "The version of the application (commit) where the function is defined. Use the dropdown menu to target a specific commit.",
+    "context-menu": {
+      "label": "Function details"
+    },
+    "copy-to-clipboard": "Copy to clipboard",
+    "fetch-error": "Error while fetching function details!",
+    "file": "File",
+    "file-path-copied": "File path copied to clipboard!",
+    "file-tooltip": "File path where that function is defined",
+    "function-name": "Function name",
+    "github": {
+      "banner-dismiss": "Dismiss",
+      "banner-git-ref": "They should respectively be set to the full repository GitHub URL and the current <2>git ref</2> of the running service.",
+      "banner-labels": "To activate this feature, you will need to add two new labels when sending profiles <2>service_repository</2> and <4>service_git_ref</4>. ",
+      "banner-language-support": "This language supports integration with <1></1> GitHub.",
+      "banner-learn-more": "Learn more",
+      "banner-title": "Integrate with Github",
+      "connect-button": "Connect to {{name}}",
+      "connect-tooltip": "Once connected, the GitHub code will be accessible only from this browser session.",
+      "connecting": "Connecting to GitHub...",
+      "disconnect": "Disconnect from GitHub",
+      "view-commit": "View commit"
+    },
+    "github-callback": {
+      "logging-in": "Logging in to GitHub...",
+      "title": "GitHub Login"
+    },
+    "not-available": "-",
+    "override": {
+      "add": "Add",
+      "add-title": "Add new repository details override",
+      "alert-debug": "For debugging purposes, you can manually provide repository details using this form. The custom value is saved in your browser local storage for given data source and service name.",
+      "alert-labels": "To activate GitHub Integration feature, you will need to add two new labels when sending profiles:<1>service_repository</1> and <3>service_git_ref</3>.",
+      "alert-title": "Github Integration labels",
+      "aria-label": "override repository settings",
+      "data-source": "Data source",
+      "delete": "Delete override",
+      "edit": "Edit",
+      "edit-title": "Edit repository details override",
+      "git-ref-label": "service_git_ref (commit reference)",
+      "git-ref-placeholder": "HEAD",
+      "remove-all": "Remove all overrides",
+      "remove-all-confirm": "Remove all",
+      "repository-label": "service_repository (repository URL) - required",
+      "repository-placeholder": "Enter GitHub repo name, https://github.com/org/repo",
+      "repository-required": "Repository name is required",
+      "root-path": "Path to root",
+      "root-path-placeholder": "Enter root path",
+      "service-name": "Service name",
+      "user-set": "(user set)"
+    },
+    "repository": "Repository",
+    "repository-tooltip": "The repository configured for the selected service",
+    "start-line": "Start line",
+    "start-line-tooltip": "The line where this function definition starts",
+    "title": "Function Details"
+  },
+  "give-feedback": {
+    "button": "Give feedback",
+    "tooltip": "Share your thoughts about Profiles in Grafana."
+  },
+  "grid": {
+    "empty-state": {
+      "no-results": "No results"
+    },
+    "error": {
+      "title": "Query error!"
+    },
+    "exemplars": {
+      "view-profile": "View profile"
+    },
+    "layout": {
+      "aria-label": "Layout switcher",
+      "grid": "Grid",
+      "rows": "Rows"
+    },
+    "no-data": {
+      "label": "Hide panels without data"
+    },
+    "panel-type": {
+      "aria-label": "Panel type switcher",
+      "histograms": "Histograms",
+      "maxima": "Maxima",
+      "time-series": "Time series",
+      "totals": "Totals"
+    },
+    "quick-filter": {
+      "aria-label": "Quick filter",
+      "clear": "Clear search"
+    }
+  },
+  "labels": {
+    "compare": {
+      "button_one": "Compare ({{count}}/2)",
+      "button_other": "Compare ({{count}}/2)",
+      "clear-tooltip": "Clear comparison selection",
+      "tooltip-empty": "Select both a baseline and a comparison panel to compare their flame graphs",
+      "tooltip-ready": "Compare \"{{baseline}}\" vs \"{{comparison}}\"",
+      "tooltip-select-baseline": "Select another panel to compare against \"{{label}}\"",
+      "tooltip-select-comparison": "Select another panel to compare against \"{{label}}\""
+    },
+    "data-source": {
+      "all": "All",
+      "test-success": "OK"
+    },
+    "filter": {
+      "clear-tooltip": "Clear \"{{label}}\" from the filters",
+      "exclude": "Exclude",
+      "exclude-tooltip": "Exclude \"{{label}}\" in the filters",
+      "include": "Include",
+      "include-tooltip": "Include \"{{label}}\" in the filters"
+    },
+    "grid": {
+      "no-results": "No results",
+      "refresh-tooltip": "Click to completely refresh all the panels present on the screen"
+    },
+    "stats-panel": {
+      "baseline": "Baseline",
+      "baseline-description": "Click to select \"{{value}}\" as baseline for comparison",
+      "comparison": "Comparison",
+      "comparison-description": "Click to select \"{{value}}\" as target for comparison",
+      "total": "{{statsDescription}}: {{total}}"
+    }
+  },
+  "onboarding": {
+    "empty-loading": {
+      "title": "Loading..."
+    },
+    "modal": {
+      "billing": {
+        "description": "Usage of Grafana Cloud Profiles is subject to <2>Grafana Cloud Pricing</2> for Profiles.<br/>For additional information, read the announcement <6>blog post</6>.",
+        "title": "How Billing Works"
+      },
+      "cloud": {
+        "step1": {
+          "description": "Use <2>Grafana Alloy</2> or <6>Pyroscope SDKs</6> to push profiles from your applications to Grafana Cloud.",
+          "title": "Add Profiling to Your Application"
+        },
+        "step2": {
+          "description": "Go to <1>Grafana Cloud Stack settings</1> to find your Grafana Cloud Credentials.",
+          "title": "Configure Your Applications"
+        },
+        "step3": {
+          "description": "Once you're done with initial setup, refresh this page to see your profiling data.",
+          "title": "Start Getting Performance Insights"
+        }
+      },
+      "decrease-latency": {
+        "description": "Maintain high speed and efficiency and improve application performance. In a competitive digital world, decreasing latency translates to increasing revenue.",
+        "title": "Decrease Latency"
+      },
+      "how-to-get-started": "How to Get Started",
+      "reduce-costs": {
+        "description": "Spot CPU spikes, memory leaks, and other inefficiencies with code-level visibility into resource usage. Teams can then optimize their code and lower infrastructure costs.",
+        "title": "Reduce Costs"
+      },
+      "resolve-incidents": {
+        "description": "Cut down the mean time to resolution (MTTR) by correlating continuous profiling data with metrics, logs, and traces to quickly identify the root cause of any issue.",
+        "title": "Resolve Incidents Faster"
+      },
+      "self-hosted": {
+        "step1": {
+          "description": "Install <1>Pyroscope Server</1> on your infrastructure. Or if you want to use a hosted service, go to <5>Grafana Cloud Stack settings</5> to find your Grafana Cloud Credentials.",
+          "title": "Set Up Your Pyroscope Server"
+        },
+        "step2": {
+          "description": "Add a new <1>Pyroscope datasource</1>. Use your Pyroscope server URL and appropriate security credentials if you use Grafana Cloud Profiles.",
+          "title": "Configure Grafana"
+        },
+        "step3": {
+          "description": "Use <2>Grafana Alloy</2> or <6>Pyroscope SDKs</6> to push profiles from your applications to Grafana Cloud.",
+          "title": "Add Profiling to Your Application"
+        }
+      },
+      "subtitle": "Optimize infrastructure spend, simplify debugging, and enhance application performance",
+      "title": "Welcome to Grafana Profiles Drilldown",
+      "what-you-can-do": "What You Can Do"
+    },
+    "no-data-source": {
+      "alert-message": "This plugin requires a Pyroscope data source. Please <2>add and configure a Pyroscope data source</2> to your Grafana instance.",
+      "alert-title": "Missing Pyroscope data source!",
+      "title": "Grafana Profiles Drilldown"
+    },
+    "page": {
+      "close": "Close",
+      "nav": "Onboarding"
+    }
+  },
+  "panel-box": {
+    "cancel-query": "Cancel query",
+    "loading-bar": "Panel loading bar",
+    "panel-status": "Panel status",
+    "stop-streaming": "Stop streaming",
+    "streaming": "Streaming",
+    "untitled": "Untitled"
+  },
+  "panel-menu": {
+    "aria-label-no-title": "Menu for panel with no title",
+    "aria-label-with-title": "Menu for panel with title {{title}}",
+    "title": "Menu"
+  },
+  "plugin-info": {
+    "aria-label": "Plugin info",
+    "changelog": "Changelog",
+    "commit-sha": "Commit SHA: {{shortCommitSha}}",
+    "contribute": "Contribute",
+    "documentation": "Documentation",
+    "grafana-version": "Grafana {{edition}} v{{version}} ({{env}})",
+    "last-update": "Last update: {{updated}}",
+    "report-issue": "Report an issue",
+    "title": "Plugin info",
+    "version": "Grafana Profiles Drilldown v{{version}}"
+  },
+  "query-analysis": {
+    "blocks": "Blocks",
+    "data-in-time-range": "Data in time range",
+    "deduplication": "Deduplication",
+    "index-store": "Index Store",
+    "no": "no",
+    "profiles": "Profiles",
+    "profiles-store": "Profiles Store",
+    "query-info-aria-label": "Query info",
+    "replicas": "Replicas",
+    "samples": "Samples",
+    "series": "Series",
+    "series-in-query": "Series in query",
+    "stored-data-in-time-range": "Stored data in time range: {{totalBytesInTimeRange}}",
+    "symbols-store": "Symbols Store",
+    "yes": "yes"
+  },
+  "query-builder": {
+    "chiclet": {
+      "edit-attribute": "Edit \"{{label}}\"",
+      "edit-operator": "Edit \"{{label}}\"",
+      "filter": "Filter",
+      "filter-label": "Filter label",
+      "filter-operator": "Filter operator",
+      "filter-value": "Filter value",
+      "partial-filter": "Partial filter",
+      "remove-filter": "Remove filter"
+    },
+    "error-load": "An unexpected error occurred while loading! Please try again.",
+    "execute": "Execute",
+    "execute-tooltip": "Execute new query",
+    "loading": "Loading...",
+    "no-value": "(no value)",
+    "nothing-to-execute-tooltip": "Nothing to execute, all filters applied",
+    "operators": {
+      "in": "in",
+      "in-description": "Is one of",
+      "is-empty": "is empty",
+      "not-in": "not in",
+      "not-in-description": "Is not one of",
+      "regex-match-description": "Matches regex",
+      "regex-not-match-description": "Does not match regex"
+    },
+    "placeholder": {
+      "filter-add": "Filter by label values...",
+      "select-label": "Select a label...",
+      "select-operator": "Select an operator...",
+      "select-value": "Select a value...",
+      "select-values": "Select values...",
+      "type-value": "Type a regex..."
+    },
+    "suggestions-disabled": "Suggestions are disabled for this label.",
+    "suggestions-none": "No suggestions available."
+  },
+  "recording-rules": {
+    "delete": {
+      "aria-label": "Delete recording rule",
+      "body": "Are you sure you want to delete {{metricName}} recording rule?",
+      "confirm": "Yes",
+      "title": "Delete recording rule"
+    },
+    "details": {
+      "filters": "Filters",
+      "no": "No",
+      "no-labels": "No labels",
+      "read-only": "Read only",
+      "yes": "Yes"
+    },
+    "empty": {
+      "description": "Open a flame graph, click on the \"total\" block at the top and select \"Create recording rule\" from the context menu to define a new rule.",
+      "message": "No recording rules"
+    },
+    "error": {
+      "feature-required": "This feature requires Pyroscope with recording_rules flag enabled.",
+      "message": "Error while retrieving recording rules",
+      "title": "Error while retrieving recording rules"
+    },
+    "table": {
+      "actions": "Actions",
+      "all-services": "All services",
+      "function-name": "Function Name",
+      "labels": "Labels",
+      "name": "Name",
+      "none": "None",
+      "profile-type": "Profile Type",
+      "readonly-tooltip": "This rule is provisioned with tenant settings and cannot be deleted.",
+      "service-name": "Service Name",
+      "total-all-functions": "Total (all functions)"
+    },
+    "title": "Recording rules"
+  },
+  "saved-searches": {
+    "load": {
+      "no-searches": "No saved searches to display.",
+      "no-searches-tooltip": "No saved searches to load",
+      "remove-tooltip": "Remove",
+      "saved-query-tooltip": "Load saved query",
+      "select": "Select",
+      "select-pyroscope-query": "Please select a Pyroscope query.",
+      "title": "Load a previously saved search",
+      "tooltip": "Load saved search"
+    },
+    "save": {
+      "cancel": "Cancel",
+      "close": "Close",
+      "description-label": "Description",
+      "error-message": "Unexpected error saving this search.",
+      "existing-search-warning": "There is a previously saved search with the same query: {{title}}",
+      "info-message": "Saved searches are stored locally in your browser and will only be available on this device.",
+      "save": "Save",
+      "saved-queries-tooltip": "Save in Saved Queries",
+      "success-body": "Search successfully saved.",
+      "success-message": "Search successfully saved.",
+      "success-title": "Success",
+      "title": "Save current search",
+      "title-label": "Title",
+      "tooltip": "Save search"
+    }
+  },
+  "series": {
+    "data-source": {
+      "test-success": "OK"
+    }
+  },
+  "settings": {
+    "loading": "Loading...",
+    "save-button": "Save settings",
+    "tabs": {
+      "ui-settings": "UI Settings",
+      "unknown-extension": "Unknown Extension"
+    },
+    "title": "Profiles settings (tenant)",
+    "ui": {
+      "collapsed-flame-graphs": {
+        "label": "Collapsed flame graphs",
+        "toggle": "Toggle collapsed flame graphs"
+      },
+      "enable-function-details": {
+        "label": "Enable function details",
+        "learn-more": "Learn more",
+        "toggle": "Toggle function details",
+        "tooltip": "The function details feature enables mapping of resource usage to lines of source code. If the GitHub integration is configured, then the source code will be downloaded from GitHub."
+      },
+      "fetch-error": {
+        "message": "Please try to reload the page, sorry for the inconvenience.",
+        "title": "Error while retrieving the plugin settings!"
+      },
+      "flame-graph": {
+        "label": "Flame graph"
+      },
+      "function-details": {
+        "label": "Function details"
+      },
+      "max-nodes": {
+        "label": "Maximum number of nodes"
+      },
+      "metrics-from-profiles": {
+        "disable-hint": "To stop exporting data, delete all related recording rules before disabling this feature.",
+        "disable-warning": "Disabling this feature only hides it from the UI. No existing recording rules are removed. These rules will remain active and continue to export metrics, which will still impact your bill.",
+        "enable-warning": "Enabling this feature lets you define recording rules from Profiles Drilldown. Any recording rules you create will send new metrics to your Grafana Cloud instance, increasing your data usage in Grafana Mimir and potentially affecting your bill.",
+        "label": "Metrics from profiles",
+        "toggle": "Enable metrics from profiles",
+        "toggle-label": "Enable metrics from profiles",
+        "tooltip": "Allows creating recording rules from profiles"
+      }
+    }
+  },
+  "timeseries": {
+    "menu": {
+      "exemplars": "Exemplars",
+      "open-in-explore": "Open in Explore",
+      "scale-linear": "Linear",
+      "scale-log2": "Log2",
+      "scale-type": "Scale type"
+    }
+  },
+  "variables": {
+    "data-source": {
+      "label": "Data source"
+    },
+    "favorite": {
+      "label": "🔖 Favorite"
+    },
+    "filters": {
+      "label": "Filters"
+    },
+    "group-by": {
+      "label": "Group by labels",
+      "labels-selector": "Labels selector",
+      "other-labels-placeholder": "Other labels",
+      "other-labels-selector": "Other labels selector",
+      "refresh-tooltip": "Click to refresh all labels",
+      "select-label-placeholder": "Select label"
+    },
+    "profile-id-selector": {
+      "label": "Profile Id Selector"
+    },
+    "profile-metric": {
+      "aria-label": "Profile metrics list",
+      "label": "Profile type",
+      "loading": "Loading...",
+      "placeholder_one": "Select a profile metric ({{count}})",
+      "placeholder_other": "Select a profile metric ({{count}})"
+    },
+    "service-name": {
+      "aria-label": "Services list",
+      "label": "Service",
+      "loading": "Loading services...",
+      "placeholder_one": "Select a service ({{count}})",
+      "placeholder_other": "Select a service ({{count}})",
+      "unmatched-tooltip": "\"{{serviceName}}\" does not appear in the list of services returned for this data source and time range. Please select a different service from the dropdown."
+    },
+    "span-selector": {
+      "label": "Span selector"
+    }
+  }
+}

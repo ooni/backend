@@ -1,0 +1,393 @@
+{
+  "action-bar": {
+    "tab": {
+      "breakdown": "Részletezés",
+      "query-results": "",
+      "query-results-description": "",
+      "related-logs": "Kapcsolódó naplók",
+      "related-logs-description": "Releváns naplók az aktuális címkeszűrők és időtartomány alapján",
+      "related-metrics": "Kapcsolódó metrikák",
+      "related-metrics-description": "Releváns metrikák az aktuális címkeszűrők alapján"
+    }
+  },
+  "breakdown": {
+    "add-to-filters": "Hozzáadás a szűrőkhöz",
+    "by-label": "Címke szerint",
+    "group-by": {
+      "label": "Csoportosítási szempont"
+    },
+    "label-values-list": {
+      "error-title": "Hiba történt a metrikák betöltésekor!",
+      "no-values": "Nem található címkeérték az aktuális szűrőkhöz és időtartományhoz.",
+      "search-aria-label": "",
+      "search-label": "Keresés",
+      "view-label": "Nézet"
+    },
+    "labels-list": {
+      "breakdown-by-label": "Részletezés a következő szerint: {{label}}",
+      "error-title": "Hiba történt a címkék betöltésekor!",
+      "no-labels": "Nem található címke az aktuális szűrőkhöz és időtartományhoz.",
+      "view-label": "Nézet"
+    },
+    "section-label": "Részletezés",
+    "select-label": "Kiválasztás"
+  },
+  "checkbox-list": {
+    "clear": "törlés",
+    "collapse": "Összecsukás",
+    "expand": "Kibontás",
+    "no-results": "Nincs találat.",
+    "selected-count_one": "{{count}} kiválasztva",
+    "selected-count_other": "{{count}} kiválasztva"
+  },
+  "configure-panel": {
+    "apply": "Alkalmaz",
+    "cancel": "Mégse",
+    "restore-default": "Alapértelmezett konfiguráció visszaállítása",
+    "restore-modal-body": "Biztosan visszaállítja a(z) {{metric}} metrika alapértelmezett konfigurációját?",
+    "restore-modal-confirm": "Visszaállítás",
+    "restore-modal-title": "Alapértelmezett konfiguráció visszaállítása",
+    "select-function-message": "Válasszon ki egy Prometheus-funkciót, amely a(z) {{metricName}} metrika alapértelmezett megjelenítési módja lesz."
+  },
+  "data-source-variable": {
+    "description": "Csak Prometheus-adatforrások támogatottak",
+    "label": "Adatforrás"
+  },
+  "data-trail": {
+    "configure-drawer": {
+      "title": "A Prometheus-funkció konfigurálása"
+    },
+    "filters": {
+      "add-label": "Címke hozzáadása",
+      "label": "Szűrők"
+    }
+  },
+  "error-view": {
+    "message": "<2>Próbálja meg újra betölteni az oldalt</2>, vagy ha a probléma továbbra is fennáll, lépjen kapcsolatba a szervezete rendszergazdájával. Elnézést kérünk a kellemetlenségért.",
+    "stack-trace-label": "Stack nyomvonalának megtekintése",
+    "title": "Végzetes hiba!"
+  },
+  "extreme-value-filter": {
+    "message": "A paneladatok lekérése megismétlődött egy összetettebb lekérdezéssel a sorozat rendkívül kis értékeinek kezelése érdekében"
+  },
+  "fetch-alerting-metrics": {
+    "error": "A riasztási szabályok lekérése nem sikerült"
+  },
+  "fetch-dashboard-metrics": {
+    "error": "Az irányítópult-metrikák lekérése nem sikerült",
+    "limit-warning-body": "",
+    "limit-warning-title": ""
+  },
+  "filtered-metrics-variable": {
+    "label": "Szűrt metrikák"
+  },
+  "give-feedback": {
+    "button": "Visszajelzés küldése",
+    "tooltip": "Ossza meg gondolatait a Grafanában elérhető metrikákról."
+  },
+  "gmd-viz-panel": {
+    "native-histogram": "Natív hisztogram",
+    "variant": {
+      "heatmap": "hőtérkép",
+      "percentiles": "percentilisek"
+    }
+  },
+  "inline-banner": {
+    "unknown-error": "Ismeretlen hiba!"
+  },
+  "kg-annotations": {
+    "layer": {
+      "name": ""
+    },
+    "query": {
+      "name": ""
+    },
+    "severity": {
+      "critical": "",
+      "info": "",
+      "warning": ""
+    },
+    "toggle": {
+      "description": "",
+      "disabled-tooltip": "",
+      "label": "",
+      "learn-more": ""
+    }
+  },
+  "labels-datasource": {
+    "none-option": "(nincs)",
+    "test-success": "OK"
+  },
+  "labels-list": {
+    "clear": "törlés",
+    "no-results": "Nincs találat.",
+    "no-selection": "Nincs kiválasztás",
+    "selected": "Kiválasztva: „{{selectedLabel}}”"
+  },
+  "labels-variable": {
+    "label": "Csoportosítási címke",
+    "placeholder": "Csoportosítási címke…"
+  },
+  "layout-switcher": {
+    "aria-label": "Elrendezésváltó",
+    "option": {
+      "grid": "Rács",
+      "rows": "Sorok",
+      "single": "Különálló"
+    }
+  },
+  "lazy-loading": {
+    "fallback": "Betöltés…"
+  },
+  "list-controls": {
+    "search-aria-label": ""
+  },
+  "metrics": {
+    "metrics-drilldown": {
+      "load-query": {
+        "button-no-query-tooltip": "",
+        "button-tooltip": "",
+        "empty": "",
+        "load-error": "",
+        "load-type-error": "",
+        "modal-title": "",
+        "remove": "",
+        "saved-query-button-tooltip": "",
+        "select": ""
+      },
+      "save-query": {
+        "already-exists": {
+          "alert": ""
+        },
+        "button-tooltip": "",
+        "button-tooltip-saved-queries": "",
+        "cancel": "",
+        "description": "",
+        "error": "",
+        "modal-alert": "",
+        "modal-title": "",
+        "save": "",
+        "success": "",
+        "title": ""
+      }
+    }
+  },
+  "metrics-group-by-list": {
+    "error-title": "Hiba történt a(z) „{{labelName}}” címke értékeinek betöltésekor!",
+    "no-values": "Nem található címkeérték a(z) „{{labelName}}” címkéhez."
+  },
+  "metrics-group-by-row": {
+    "error-title": "Hiba történt a metrikák betöltésekor!",
+    "no-metrics": "Nem található metrika az aktuális szűrőkhöz és időtartományhoz.",
+    "select": "Kiválasztás",
+    "select-tooltip": "Metrikák megtekintése a következő esetén: {{labelName}}={{labelValue}}",
+    "show-more-tooltip": "További metrikák megjelenítése a következőhöz: {{labelName}}=„{{labelValue}}”"
+  },
+  "metrics-list": {
+    "error-title": "Hiba történt a metrikák betöltésekor!",
+    "no-metrics": "Nem található metrika az aktuális szűrőkhöz és időtartományhoz."
+  },
+  "metrics-sorter": {
+    "error": {
+      "get-recent-metrics": "Nem sikerült lekérni a legutóbbi metrikákat:"
+    },
+    "label": "Rendezés alapja",
+    "option": {
+      "alerting-usage": "Riasztás használata",
+      "alphabetical": "Betűrendben [A–Z]",
+      "alphabetical-reversed": "Betűrendben [Z–A]",
+      "dashboard-usage": "Irányítópult használata",
+      "default": "Alapértelmezett"
+    }
+  },
+  "metrics-variable": {
+    "label": "Metrikák"
+  },
+  "onboarding": {
+    "learn-more": "További információért tekintse meg <2>dokumentációnkat</2>, vagy<5></5><6>próbálja ki online</6> a Grafana Playben!",
+    "no-datasource": "Észrevettük, hogy nincs konfigurálva Prometheus-adatforrás.<1></1>Adjon hozzá egy <4>Prometheus-adatforrást</4> a metrikák megtekintéséhez.",
+    "title": "Üdvözli a Grafana Metrics Drilldown"
+  },
+  "open-assistant": {
+    "explain-label": "Magyarázat az Asszisztenssel",
+    "metric-metadata-title": "Prometheus-metrika metaadatai"
+  },
+  "panel-menu": {
+    "action": {
+      "copy-url": "URL-cím másolása",
+      "copy-url-success": "URL-cím a vágólapra másolva",
+      "explore": "Explore"
+    },
+    "group": {
+      "actions": "Műveletek",
+      "navigation": "Navigáció"
+    }
+  },
+  "plugin-info": {
+    "button": {
+      "title": "Bővítményinformáció",
+      "tooltip": "Bővítményinformáció"
+    },
+    "header": {
+      "last-update": "Legutóbbi frissítés: {{updated}}",
+      "title": "Grafana Metrics Drilldown-verzió: {{version}}"
+    },
+    "menu": {
+      "changelog": "Változásnapló",
+      "commit-sha": "SHA-azonosító: {{sha}}",
+      "contribute": "Hozzájárulás",
+      "documentation": "Dokumentáció",
+      "grafana-version": "Grafana {{edition}}, verzió: {{version}} ({{env}})",
+      "prom-build-info": "{{application}} {{version}} {{buildDate}}",
+      "report-issue": "Probléma bejelentése"
+    }
+  },
+  "prefix-filter": {
+    "all-metrics": "Összes metrikanév",
+    "tooltip": "Megjelenítés a metrikaelőtag szerint. A metrikaelőtag a metrika nevének elején található egyetlen szó, amely a metrika tartományára utal.",
+    "view-by-label": "Megjelenítés alapja"
+  },
+  "query-results": {
+    "aria-label": "",
+    "error-title": "",
+    "unavailable-message": "",
+    "unavailable-title": ""
+  },
+  "quick-search": {
+    "ask-assistant-aria-label": "Kérdezze a Grafana Asszisztenst",
+    "ask-assistant-tooltip": "Kérdezze a Grafana Asszisztenst",
+    "clear-search-tooltip": "Keresés törlése",
+    "placeholder": "",
+    "placeholder-question-mode": "Tegyen fel egy kérdést a Grafana Asszisztensnek, és nyomja le az Enter gombot",
+    "placeholder-with-assistant": "",
+    "placeholder-with-assistant-tab-enter": "",
+    "count-filtered_one": "",
+    "count-filtered_other": "",
+    "count-total_one": "",
+    "count-total_other": ""
+  },
+  "quick-search-assistant": {
+    "label-filters-title": "Jelenlegi címkeszűrők",
+    "time-range-title": "Időtartomány"
+  },
+  "related-logs": {
+    "datasource-description": "Előfordulhat, hogy néhány Loki-adatforrás hiányzik a legördülő menüből, ha a több mint {{timeout}} másodpercig nem válaszoltak. Próbálja meg a Logs Drilldown használatával megtekinteni az összes Loki-adatforrás naplóját.",
+    "datasource-label": "Naplók adatforrása",
+    "experimental-note": "Megjegyzés: A Kapcsolódó naplók egy kísérleti funkció.",
+    "loading": "Betöltés…",
+    "no-logs-message": "A kiválasztott szűrőkkel nem találtunk az aktuális metrikához kapcsolódó naplót.",
+    "no-logs-title": "Nem található kapcsolódó napló",
+    "open-drilldown": "Logs Drilldown megnyitása",
+    "open-drilldown-tooltip": "Navigáljon a Logs Drilldown alkalmazáshoz",
+    "open-in-drilldown": "Megnyitás a Logs Drilldownban",
+    "open-in-drilldown-tooltip": "Használja a Logs Drilldown alkalmazást ezeknek a naplóknak az áttekintéséhez",
+    "suggestions": "A kapcsolódó naplók megkereséséhez próbálkozzon a következőkkel:<1><0>Állítsa be a címkeszűrőket úgy, hogy tartalmazzák az aktuális metrikában és a naplókban is megtalálható címkéket</0><1>Válasszon ki egy <2>Loki-felvételkészítési szabály</2> által létrehozott metrikát</1><2>Bővítse az időtartományt, hogy több adatot tartalmazzon</2></1>"
+  },
+  "related-metrics": {
+    "search-aria-label": ""
+  },
+  "select-action": {
+    "button": "Kiválasztás"
+  },
+  "select-new-metric": {
+    "button": "Új metrika kiválasztása",
+    "metrics-drilldown": "Metrics Drilldown",
+    "open-in-drilldown-tooltip": "Megnyitás a Metrics Drilldownban"
+  },
+  "show-more-button": {
+    "text_one": "",
+    "text_other": ""
+  },
+  "sidebar": {
+    "bookmarks": {
+      "date-created": "Létrehozás dátuma:",
+      "empty-state": "Még nincsenek könyvjelzők az<1></1>aktuális adatforráshoz.",
+      "remove-tooltip": "Könyvjelző eltávolítása"
+    },
+    "close-aria-label": "Bezárás",
+    "close-tooltip": "Bezárás",
+    "filter": {
+      "clear-search-tooltip": "Keresés törlése",
+      "hide-empty": "Üres elrejtése",
+      "search-aria-label": "",
+      "search-placeholder": "Keresés…"
+    },
+    "filter-type": {
+      "prefix": "előtag",
+      "recent": "legújabb",
+      "rule-group": "szabálycsoport",
+      "suffix": "utótag"
+    },
+    "labels-browser": {
+      "clear-search-tooltip": "Keresés törlése",
+      "search-aria-label": "",
+      "search-placeholder": "Keresés…"
+    },
+    "recent-metrics": {
+      "all-time": "Összes idő",
+      "past-interval": "Legutóbbi {{interval}}"
+    },
+    "section": {
+      "bookmarks": "Könyvjelzők",
+      "bookmarks-description": "Hozzáférés a mentett metrikákhoz gyors áttekintés céljából",
+      "group-by-labels": "Csoportosítás címkék szerint",
+      "group-by-labels-description": "Metrikák csoportosítása a címkeértékeik szerint",
+      "prefix-filters": "Előtagszűrők",
+      "prefix-filters-description": "Metrikák szűrése a névelőtagjuk alapján (Prometheus-névtér)",
+      "recent-metrics": "Legutóbbi metrikaszűrők",
+      "recent-metrics-description": "Metrikák szűrése a feldolgozásuk kezdete alapján",
+      "rules-filters": "Szabályszűrők",
+      "rules-filters-description": "Szűrési metrikák és felvételkészítési szabályok",
+      "suffix-filters": "Utótagszűrők",
+      "suffix-filters-description": "Metrikák szűrése a névutótagjuk alapján"
+    }
+  },
+  "sort-by": {
+    "label": "Rendezés alapja",
+    "option": {
+      "alphabetical": "Név [A–Z]",
+      "alphabetical-description": "Betűrend",
+      "alphabetical-reversed": "Név [Z–A]",
+      "alphabetical-reversed-description": "Fordított betűrend",
+      "outliers": "Kilógó sorozat",
+      "outliers-description": "Azokat az értékeket részesíti előnyben, amelyek az azonos címkén belül a többitől eltérő viselkedést mutatnak"
+    },
+    "placeholder": "Válasszon kritériumokat",
+    "tooltip": "Az értékeket szabványos vagy intelligens idősorszámítások segítségével rendezi."
+  },
+  "trail": {
+    "breadcrumb": {
+      "all-metrics": "Összes metrika",
+      "metrics": "Metrikák"
+    }
+  },
+  "ui-text": {
+    "metric-select": {
+      "bookmark": "Könyvjelző",
+      "copy-url": "URL-cím másolása",
+      "open-explore": "Megnyitás az Explore-ban",
+      "select-new-metric-tooltip": "Távolítsa el a meglévő metrikát, és válasszon új metrikát"
+    },
+    "search": {
+      "title": "Metrikák keresése"
+    }
+  },
+  "usage-data": {
+    "metric-used-in-plural_one": "A metrikát {{count}} {{usageType}} használta",
+    "metric-used-in-plural_other": "A metrikát {{count}} {{usageType}} használta",
+    "metric-used-in-singular_one": "A metrikát {{count}} {{usageType}} használta",
+    "metric-used-in-singular_other": "A metrikát {{count}} {{usageType}} használta",
+    "metric-used-plural_one": "A metrika {{count}} alkalommal volt használatban irányítópult-lekérdezésekben. Kattintson az irányítópultok megtekintéséhez.",
+    "metric-used-plural_other": "A metrika {{count}} alkalommal volt használatban irányítópult-lekérdezésekben. Kattintson az irányítópultok megtekintéséhez.",
+    "metric-used-singular_one": "A metrika {{count}} alkalommal volt használatban irányítópult-lekérdezésekben. Kattintson az irányítópultok megtekintéséhez.",
+    "metric-used-singular_other": "A metrika {{count}} alkalommal volt használatban irányítópult-lekérdezésekben. Kattintson az irányítópultok megtekintéséhez.",
+    "used-time-plural_one": "{{count}} alkalommal használta {{label}}",
+    "used-time-plural_other": "{{count}} alkalommal használta {{label}}",
+    "used-time-singular_one": "{{count}} alkalommal használta {{label}}",
+    "used-time-singular_other": "{{count}} alkalommal használta {{label}}"
+  },
+  "with-config-panel-options": {
+    "click-to-select": "Kattintson a konfiguráció kiválasztásához",
+    "current-config": "Jelenlegi konfiguráció"
+  }
+}
