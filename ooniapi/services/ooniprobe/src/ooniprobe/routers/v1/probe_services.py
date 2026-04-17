@@ -51,7 +51,6 @@ from ...dependencies import (
 )
 from ...utils import (
     compare_probe_msmt_cc_asn,
-    error,
     extract_probe_ipaddr,
     generate_report_id,
     lookup_probe_cc,
@@ -916,21 +915,30 @@ async def submit_measurement(
     except Exception:
         err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
         log.info(err_msg)
-        error(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     # TODO validate the timestamp?
     good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
     if not good:
         err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
         log.info(err_msg)
-        error(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     try:
         asn_i = int(asn)
     except ValueError:
         err_msg = f"Incorrect format: ASN value not parsable {asn}"
         log.info(err_msg)
-        error(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
