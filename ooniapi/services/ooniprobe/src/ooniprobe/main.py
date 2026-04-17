@@ -3,8 +3,9 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import boto3
-import requests
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
@@ -170,16 +171,19 @@ async def health(
         errors.append("anonc_manifest_unreachable")
         log.error(f"Error retrieving manifest: {e}")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")
