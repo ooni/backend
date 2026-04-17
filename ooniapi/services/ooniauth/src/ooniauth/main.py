@@ -82,17 +82,17 @@ async def health(
     if settings.aws_secret_access_key == "" or settings.aws_access_key_id == "":
         errors.append("bad_aws_credentials")
 
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
     result = {
-        "status": "ok" if len(errors) == 0 else "fail",
+        "status": status,
         "errors": errors,
         "version": pkg_version,
         "build_label": build_label,
     }
     if len(errors) > 0:
         log.error(f"Health check errors: {errors}")
-        return JSONResponse(status_code=503, content=result)
 
-    return result
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")

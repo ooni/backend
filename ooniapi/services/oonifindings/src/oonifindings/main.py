@@ -86,16 +86,14 @@ async def health(
         log.error(err)
         errors.append(err)
 
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
     result = {
-        "status": "ok" if len(errors) == 0 else "fail",
+        "status": status,
         "errors": errors,
         "version": pkg_version,
         "build_label": build_label,
     }
-    if len(errors) > 0:
-        return JSONResponse(status_code=503, content=result)
-
-    return result
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")
