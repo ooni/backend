@@ -127,7 +127,7 @@ async def test_submission_non_verified(client):
     # unknown manifest -> processed but not verified, manifest error
     msm["manifest_version"] = "does-not-exist"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["verification_status"] == "failed"
+    assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "manifest_not_found"
 
