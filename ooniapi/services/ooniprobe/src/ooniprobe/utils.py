@@ -141,7 +141,7 @@ def extract_probe_ipaddr(request: Request) -> str:
     return request.client.host if request.client else ""
 
 
-def geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> str:
+def geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple[str, str, str]:
     entry = asn_cc_reader.get(ipaddr)
     try:
         cc = entry['country']['iso_code']
