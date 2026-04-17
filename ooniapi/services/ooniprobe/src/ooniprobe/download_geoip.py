@@ -74,19 +74,13 @@ def check_geoip_db(path: Path) -> None:
     assert "cc" in path.name or "asn" in path.name, "invalid path"
 
     with maxminddb.open_database(str(path)) as reader:
-        if "asn" in path.name:
             r1 = reader.get("8.8.8.8")
             assert r1 is not None, "database file is invalid"
             assert "autonomous_system_number" in r1.keys(), "database file is invalid"
+            assert "country" in r1.keys(), "database file is invalid"
             m = reader.metadata()
             Metrics.GEOIP_ASN_NODE_CNT.set(m.node_count)
             Metrics.GEOIP_ASN_EPOCH.set(m.build_epoch)
-
-        if "cc" in path.name:
-            r2 = reader.get("8.8.8.8")
-            assert r2 is not None, "database file is invalid"
-            assert "country" in r2.keys(), "database file is invalid"
-            m = reader.metadata()
             Metrics.GEOIP_CC_NODE_CNT.set(m.node_count)
             Metrics.GEOIP_CC_EPOCH.set(m.build_epoch)
 
