@@ -1,7 +1,5 @@
-import asyncio
 import io
 import logging
-import random
 from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List
@@ -15,7 +13,7 @@ from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..dependencies import ASNReaderDep, CCReaderDep, S3ClientDep, SettingsDep
+from ..dependencies import ASNReaderDep, CCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
     compare_probe_msmt_cc_asn,
