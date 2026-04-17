@@ -176,7 +176,7 @@ async def health(
 
     if len(errors) > 0:
         result["status"] = "fail"
-        return JSONResponse(status_code=500, content=result)
+        return JSONResponse(status_code=503, content=result)
 
     return result
 
