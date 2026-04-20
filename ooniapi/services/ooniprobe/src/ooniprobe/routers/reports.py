@@ -158,7 +158,8 @@ async def receive_measurement(
     try:
         data = await run_in_threadpool(_set_unverified_flag, data)
     except Exception as e:
-        log.info(f"Failed to parse and measurement body. Error: {e}")
+        log.info("Failed to parse and modify measurement body")
+        log.exception(e)
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
         error("Incorrect format")
 
