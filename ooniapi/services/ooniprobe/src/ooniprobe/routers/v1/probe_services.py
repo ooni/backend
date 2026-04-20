@@ -51,7 +51,6 @@ from ...dependencies import (
 )
 from ...utils import (
     compare_probe_msmt_cc_asn,
-    error,
     extract_probe_ipaddr,
     generate_report_id,
     lookup_probe_cc,
@@ -916,21 +915,30 @@ async def submit_measurement(
     except Exception:
         err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
         log.info(err_msg)
-        error(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     # TODO validate the timestamp?
     good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
     if not good:
         err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
         log.info(err_msg)
-        error(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     try:
         asn_i = int(asn)
     except ValueError:
         err_msg = f"Incorrect format: ASN value not parsable {asn}"
         log.info(err_msg)
-        error(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
@@ -1059,9 +1067,9 @@ def _verify_submit(
     # Check manifest version
     if submit_request.manifest_version != manifest.meta.version:
         # TODO We should validate if this is an old manifest or an unknown manifest, for now
-        # we treat them as the same error (unknown manifest)
+        # we treat them as the same error: unknown manifest
         log.error("Old or unknown manifest in submission request")
-        return VerificationStatus.FAILED, "manifest_not_found", None
+        return VerificationStatus.UNVERIFIED, "manifest_not_found", None
 
 
     # Check anonymous credentials fields are complete
@@ -1074,7 +1082,7 @@ def _verify_submit(
         or "probe_asn" not in submit_request.content
     ):
         log.error("Incomplete anonymous credentials fields in submission request")
-        return VerificationStatus.FAILED, "incomplete_anonc_fields", None
+        return VerificationStatus.UNVERIFIED, "incomplete_anonc_fields", None
 
     # Check protocol version
     try:
@@ -1085,13 +1093,13 @@ def _verify_submit(
 
         if probe_version_tup < min_version_tup:
             log.error(f"Probe version too old: {submit_request.protocol_version} < {settings.minimum_anonc_protocol_version}")
-            return VerificationStatus.FAILED, "protocol_version_too_old", None
+            return VerificationStatus.UNVERIFIED, "protocol_version_too_old", None
 
     except Exception as e:
         log.error(f"Unable to parse version string. probe version = {submit_request.protocol_version}, "
         f"minimum protocol version = {settings.minimum_anonc_protocol_version}. Error: {e}"
         )
-        return VerificationStatus.FAILED, "invalid_protocol_version", None
+        return VerificationStatus.UNVERIFIED, "invalid_protocol_version", None
 
     # Get the limits in age range and measurement count for this request
     age_range, count_range = get_ranges_from_policy(manifest.manifest.submission_policy, submit_request.content['probe_cc'], submit_request.content['probe_asn'])
@@ -1113,6 +1121,9 @@ def _verify_submit(
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         log.error(f"ZKP Failed: {e}")
         return (VerificationStatus.FAILED, _anonc_exc_to_str(e), None)
+    except Exception as e:
+        log.error(f"Unexpected anonc error: {e}")
+        return (VerificationStatus.FAILED, "unknown_error", None)
 
 
 def _parse_version_tuple(version: str) -> tuple[int, ...]:

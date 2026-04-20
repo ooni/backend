@@ -127,7 +127,7 @@ async def test_submission_non_verified(client):
     # unknown manifest -> processed but not verified, manifest error
     msm["manifest_version"] = "does-not-exist"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["verification_status"] == "failed"
+    assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "manifest_not_found"
 
@@ -136,7 +136,7 @@ async def test_submission_non_verified(client):
     msm["nym"] = "dummy-nym"
     msm["manifest_version"] = manifest_version
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["verification_status"] == "failed"
+    assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "incomplete_anonc_fields"
 
@@ -147,14 +147,14 @@ async def test_submission_non_verified(client):
     msm["manifest_version"] = manifest_version
     msm["protocol_version"] = "0.0.1"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["verification_status"] == "failed"
+    assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "protocol_version_too_old"
 
     # unparsable protocol version -> invalid protocol version error
     msm["protocol_version"] = "abc"
     c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c["verification_status"] == "failed"
+    assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "invalid_protocol_version"
 
