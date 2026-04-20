@@ -983,8 +983,7 @@ async def submit_measurement(
                 cc,
                 asn,
                 request,
-                cc_reader,
-                asn_reader,
+                asn_cc_reader,
                 clickhouse,
             )
         except Exception:
@@ -1022,8 +1021,7 @@ async def submit_measurement(
             await run_in_threadpool(
                 _check_and_register_geoip_anomaly,
                 request,
-                cc_reader,
-                asn_reader,
+                asn_cc_reader,
                 clickhouse,
                 cc,
                 asn,

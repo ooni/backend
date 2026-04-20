@@ -1,9 +1,11 @@
+import asyncio
 import io
 import logging
 from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List, Tuple
 import ujson
+import random
 
 import zstd
 from fastapi import APIRouter, Header, Request, Response
@@ -174,9 +176,9 @@ async def receive_measurement(
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await client.post(url, content=data)
-
-            assert resp.status_code == 200, resp.content
+            resp = await run_in_threadpool(client.post, url, data=data)
+            with resp:
+                resp.raise_for_status()
 
             success = True
             break
