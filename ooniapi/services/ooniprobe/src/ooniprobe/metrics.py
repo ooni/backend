@@ -65,6 +65,16 @@ class Metrics:
         "How long it took to read the measurement body",
     )
 
+    DESERIALIZE_BODY_TIMING = Histogram(
+        "measurement_deserialize_body_seconds",
+        "How long it took to deserialize the measurement body from JSON",
+    )
+
+    SERIALIZE_BODY_TIMING = Histogram(
+        "measurement_serialize_body_seconds",
+        "How long it took to serialize the measurement body to JSON",
+    )
+
     SEND_FASTPATH_TIMING = Histogram(
         "measurement_fastpath_send_seconds",
         "How long it took to post the measurement to the fastpath",

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List
 
+import ujson
 import zstd
 from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
@@ -153,9 +154,18 @@ async def receive_measurement(
             Metrics.BAD_MEASUREMENTS_CNT.labels(reason="zstd_fail").inc()
             error("Incorrect format")
 
+    try:
+        data = await run_in_threadpool(_set_unverified_flag, data)
+    except Exception as e:
+        log.info("Failed to parse and modify measurement body")
+        log.exception(e)
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
+        error("Incorrect format")
+
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
+    # Hash MUST be computed after adding extra fields
     h = sha512(data).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
@@ -213,6 +223,14 @@ async def receive_measurement(
             log.exception("Unable to upload measurement to s3")
             Metrics.SEND_S3_CNT.labels(status="fail").inc()
             return empty_measurement
+
+
+def _set_unverified_flag(data: bytes) -> bytes:
+    with Metrics.DESERIALIZE_BODY_TIMING.time():
+        measurement = ujson.loads(data)
+    measurement["is_verified"] = "u"
+    with Metrics.SERIALIZE_BODY_TIMING.time():
+        return ujson.dumps(measurement).encode("utf-8")
 
 
 @timer(name="close_report")

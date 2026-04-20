@@ -956,6 +956,7 @@ async def submit_measurement(
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
+    # Hash MUST be computed after adding extra fields
     h = sha512(data_bin).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
