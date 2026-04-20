@@ -13,7 +13,7 @@ from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..dependencies import ASNReaderDep, CCReaderDep, SettingsDep
+from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
     compare_probe_msmt_cc_asn,
@@ -98,8 +98,7 @@ async def receive_measurement(
     report_id: str,
     request: Request,
     response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     settings: SettingsDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
@@ -172,8 +171,7 @@ async def receive_measurement(
                 cc,
                 asn,
                 request,
-                cc_reader,
-                asn_reader,
+                asn_cc_reader,
                 clickhouse,
             )
         except Exception:

@@ -7,7 +7,7 @@ from pathlib import Path
 import boto3
 import ooniauth_py
 import ujson
-import geoip2.database
+import maxminddb
 from fastapi import Depends
 
 from mypy_boto3_s3 import S3Client
@@ -36,20 +36,12 @@ def get_postgresql_session(settings: SettingsDep):
 PostgresSessionDep = Annotated[Session, Depends(get_postgresql_session)]
 
 
-def get_cc_reader(settings: SettingsDep):
-    db_path = Path(settings.geoip_db_dir, "cc.mmdb")
-    return geoip2.database.Reader(db_path)
+def get_asn_cc_reader(settings: SettingsDep):
+    db_path = Path(settings.geoip_db_dir, "asn_cc.mmdb")
+    return maxminddb.open_database(db_path)
 
 
-CCReaderDep = Annotated[geoip2.database.Reader, Depends(get_cc_reader)]
-
-
-def get_asn_reader(settings: SettingsDep):
-    db_path = Path(settings.geoip_db_dir, "asn.mmdb")
-    return geoip2.database.Reader(db_path)
-
-
-ASNReaderDep = Annotated[geoip2.database.Reader, Depends(get_asn_reader)]
+ASNCCReaderDep = Annotated[maxminddb.Reader, Depends(get_asn_cc_reader)]
 
 
 def get_s3_client() -> S3Client:

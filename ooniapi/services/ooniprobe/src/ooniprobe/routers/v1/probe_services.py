@@ -15,8 +15,6 @@ from typing import (
     Tuple,
 )
 
-import geoip2
-import geoip2.errors
 import ooniauth_py
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
@@ -31,6 +29,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
+from ...common.errors import AddressNotFoundError
 from ...common.prio import (
     FailoverTestListDep,
     failover_generate_test_list,
@@ -39,8 +38,7 @@ from ...common.prio import (
 from ...common.routers import BaseModel
 from ...common.utils import setcacheresponse, setnocacheresponse
 from ...dependencies import (
-    ASNReaderDep,
-    CCReaderDep,
+    ASNCCReaderDep,
     ManifestDep,
     ManifestResponse,
     PolicyEntry,
@@ -53,8 +51,7 @@ from ...utils import (
     compare_probe_msmt_cc_asn,
     extract_probe_ipaddr,
     generate_report_id,
-    lookup_probe_cc,
-    lookup_probe_network,
+    geolookup_probe,
 )
 from ..reports import Metrics
 
@@ -333,8 +330,7 @@ def check_in(
     request: Request,
     response: Response,
     check_in: CheckIn,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     clickhouse: ClickhouseDep,
     settings: SettingsDep,
 ) -> CheckInResponse:
@@ -350,8 +346,7 @@ def check_in(
         ipaddr,
         probe_cc,
         probe_asn,
-        cc_reader,
-        asn_reader,
+        asn_cc_reader,
     )
 
     # On run_type=manual preserve the old behavior: test the whole list
@@ -473,8 +468,7 @@ def probe_geoip(
     ipaddr: str,
     probe_cc: str,
     asn: str,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
 ) -> Tuple[Dict, str, int]:
     """Looks up probe CC, ASN, network name using GeoIP, prepare
     response dict
@@ -483,10 +477,9 @@ def probe_geoip(
     db_asn = "AS0"
     db_probe_network_name = None
     try:
-        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
+        db_probe_cc, db_asn, db_probe_network_name  = geolookup_probe(ipaddr, asn_cc_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
-    except geoip2.errors.AddressNotFoundError:
+    except AddressNotFoundError:
         Metrics.GEOIP_ADDR_NOT_FOUND.inc()
     except Exception as e:
         log.error(str(e), exc_info=True)
@@ -700,25 +693,20 @@ class GeoLookupResponse(BaseModel):
 async def geolookup(
     data: GeoLookupRequest,
     response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
 ) -> GeoLookupResponse:
     geolocation = dict()
 
     # for each address provided, call probe_geoip and add the data to our response
     for ipaddr in data.addresses:
         try:
-            cc = lookup_probe_cc(ipaddr, cc_reader)
-        except geoip2.errors.AddressNotFoundError:
-            cc = None
-        try:
-            asn, as_name = lookup_probe_network(ipaddr, asn_reader)
-            # make asn int unless it is None
+            cc, asn, as_name = geolookup_probe(ipaddr, asn_cc_reader)
             if asn is not None and asn.startswith("AS"):
                 asn = int(asn[2:])
-        except geoip2.errors.AddressNotFoundError:
-            asn = as_name = None
 
+        except AddressNotFoundError:
+            cc = None
+            asn = as_name = None
         geolocation[ipaddr] = GeoLookupResult(
             cc=cc, asn=asn, as_name=as_name
         )
@@ -887,8 +875,7 @@ async def submit_measurement(
     request: Request,
     submit_request: SubmitMeasurementRequest,
     response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     settings: SettingsDep,
     manifest: ManifestDep,
     clickhouse: ClickhouseDep,

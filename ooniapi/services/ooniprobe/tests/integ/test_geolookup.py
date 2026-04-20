@@ -5,33 +5,24 @@ import time
 import pytest
 import ooniprobe.routers.v1.probe_services as ps
 from ooniprobe import utils
-from ooniprobe.dependencies import CCReaderDep, ASNReaderDep
+from ooniprobe.dependencies import ASNCCReaderDep
 from ooniprobe.common.clickhouse_utils import query_click_one_row
 from clickhouse_driver import Client as Clickhouse
 from ..utils import make_submit_request, postj, setup_user
 from ..test_anoncred import make_measurement, make_report_request
 
 
-def fake_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    return ("AS4242", "Testing Networks")
+def fake_geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple:
+    return ("US", "AS4242", "Testing Networks")
 
 
-def fake_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    return "US"
-
-
-def missing_lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep):
-    return (None, None)
-
-
-def missing_lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    return "ZZ"
+def missing_geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple[str, str, str]:
+    return ("ZZ", None, None)
 
 
 @pytest.mark.asyncio
 async def test_geolookup(client, monkeypatch):
-    monkeypatch.setattr(ps, "lookup_probe_network", fake_lookup_probe_network)
-    monkeypatch.setattr(ps, "lookup_probe_cc", fake_lookup_probe_cc)
+    monkeypatch.setattr(ps, "geolookup_probe", fake_geolookup_probe)
     j = dict(
         addresses=["192.33.4.12", "170.247.170.2", "2801:1b8:10::b", "2001:500:2::c"]
     )
@@ -48,8 +39,7 @@ async def test_geolookup(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_missing_geolookup(client, monkeypatch):
-    monkeypatch.setattr(ps, "lookup_probe_network", missing_lookup_probe_network)
-    monkeypatch.setattr(ps, "lookup_probe_cc", missing_lookup_probe_cc)
+    monkeypatch.setattr(ps, "geolookup_probe", missing_geolookup_probe)
     j = dict(addresses=["1.2.3.4", "127.0.0.1"])
     c = client.post("/api/v1/geolookup", json=j).json()
     assert "geolocation" in c
@@ -61,23 +51,13 @@ async def test_missing_geolookup(client, monkeypatch):
         assert g[ip]["asn"] == None
         assert g[ip]["as_name"] == None
 
-def patched_lookup_probe_cc(ipaddr: str, cc_reader) -> str:
+
+def patched_geolookup_probe(ipaddr: str, asn_reader) -> Tuple[str, str, str]:
     d = {
-        "123.123.123.123": "VE",
-        "123.123.123.124": "US",
-        "123.123.123.125": "VE",
-        "123.123.123.126": "US",
-    }
-
-    return d.get(ipaddr, "ZZ")
-
-
-def patched_lookup_probe_network(ipaddr: str, asn_reader) -> Tuple[str, str]:
-    d = {
-        "123.123.123.123": ("AS65550", "Testing VE"),
-        "123.123.123.124": ("AS65550", "Testing VE 2"),
-        "123.123.123.125": ("AS65551", "Testing US"),
-        "123.123.123.126": ("AS65551", "Testing US 2"),
+        "123.123.123.123": ("VE", "AS65550", "Testing VE"),
+        "123.123.123.124": ("US", "AS65550", "Testing VE 2"),
+        "123.123.123.125": ("VE", "AS65551", "Testing US"),
+        "123.123.123.126": ("US", "AS65551", "Testing US 2"),
     }
 
     return d.get(ipaddr, ("AS0", ""))
@@ -86,8 +66,7 @@ def patched_lookup_probe_network(ipaddr: str, asn_reader) -> Tuple[str, str]:
 @pytest.mark.asyncio
 async def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
 
-    monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
-    monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)
+    monkeypatch.setattr(utils, "geolookup_probe", patched_geolookup_probe)
 
     j = {
         "data_format_version": "0.2.0",
@@ -153,8 +132,7 @@ async def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, 
 @pytest.mark.asyncio
 async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measurements, monkeypatch):
     # Use the same patched geoip lookup to force mismatches
-    monkeypatch.setattr(utils, "lookup_probe_cc", patched_lookup_probe_cc)
-    monkeypatch.setattr(utils, "lookup_probe_network", patched_lookup_probe_network)
+    monkeypatch.setattr(utils, "geolookup_probe", patched_geolookup_probe)
 
     # Open a report for the anoncred submit endpoint
     report_req = make_report_request(probe_cc="VE", probe_asn="AS65550")
