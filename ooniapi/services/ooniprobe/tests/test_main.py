@@ -2,22 +2,37 @@ import pytest
 
 from datetime import datetime
 import httpx
+import ooniauth_py
 from fastapi.testclient import TestClient
-from ooniprobe.main import lifespan, app
-from ooniprobe.dependencies import Manifest, ManifestResponse, ManifestMeta
+from ooniprobe.main import app, lifespan
+from ooniprobe.dependencies import (
+    Manifest,
+    ManifestMeta,
+    ManifestResponse,
+    Match,
+    Policy,
+    PolicyEntry,
+)
 import ooniprobe.main as m
 
 def fake_get_manifest(s3, bucket, key):
     return ManifestResponse(
         manifest=Manifest(
-            submission_policy={"*/*" : "*"},
+            submission_policy=[
+                PolicyEntry(
+                    match=Match(probe_cc="*", probe_asn="*"),
+                    policy=Policy(age=(2461110, 2826140), measurement_count=(0, 10000000)),
+                )
+            ],
             public_parameters="public parameters"
             ),
         meta = ManifestMeta(
             version="1",
             last_modification_date=datetime.now(),
-            manifest_url="https://ooni.mock/manifest"
-            )
+            manifest_url="https://ooni.mock/manifest",
+            library_version=ooniauth_py.__version__,
+            protocol_version=ooniauth_py.get_protocol_version(),
+        )
     )
 
 @pytest.mark.asyncio

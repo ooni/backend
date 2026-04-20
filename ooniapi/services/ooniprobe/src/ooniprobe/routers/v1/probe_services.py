@@ -1,8 +1,11 @@
 import asyncio
 import io
 import logging
-from datetime import datetime, timezone, timedelta
+import random
 import time
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from hashlib import sha512
 from typing import (
     List,
     Any,
@@ -11,25 +14,22 @@ from typing import (
     Optional,
     Annotated,
 )
-import random
-from hashlib import sha512
 
-import geoip2
-import geoip2.errors
-from fastapi import APIRouter, HTTPException, Query, Response, Request
-from pydantic import Field, IPvAnyAddress
-from fastapi import status, Header
+import ooniauth_py
+import ujson
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from ooniauth_py import (
     ProtocolError,
     CredentialError,
     DeserializationFailed,
     ServerState,
 )
+from pydantic import Field, IPvAnyAddress
 from starlette.concurrency import run_in_threadpool
-import ujson
 
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
+from ...common.errors import AddressNotFoundError
 from ...common.prio import (
     FailoverTestListDep,
     failover_generate_test_list,
@@ -38,22 +38,20 @@ from ...common.prio import (
 from ...common.routers import BaseModel
 from ...common.utils import setcacheresponse, setnocacheresponse
 from ...dependencies import (
-    ASNReaderDep,
-    CCReaderDep,
+    ASNCCReaderDep,
     ManifestDep,
     ManifestResponse,
+    PolicyEntry,
     PostgresSessionDep,
     SettingsDep,
     TorTargetsDep,
     PsiphonConfigDep
 )
 from ...utils import (
-    error,
     extract_probe_ipaddr,
     generate_report_id,
+    geolookup_probe,
     get_cc_asn,
-    lookup_probe_cc,
-    lookup_probe_network,
     normalize_asn,
     register_geoip_anomaly,
 )
@@ -335,8 +333,7 @@ def check_in(
     request: Request,
     response: Response,
     check_in: CheckIn,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     clickhouse: ClickhouseDep,
     settings: SettingsDep,
 ) -> CheckInResponse:
@@ -352,8 +349,7 @@ def check_in(
         ipaddr,
         probe_cc,
         probe_asn,
-        cc_reader,
-        asn_reader,
+        asn_cc_reader,
     )
 
     # On run_type=manual preserve the old behavior: test the whole list
@@ -403,7 +399,7 @@ def check_in(
             # TODO(https://github.com/ooni/probe-cli/pull/1522): we disable torsf until we have
             # addressed the issue with the fast.ly based rendezvous method being broken
             "torsf_enabled": False,
-            "vanilla_tor_enabled": True,
+            "vanilla_tor_enabled": False,
             "openvpn_enabled": False,
         }
     )
@@ -475,8 +471,7 @@ def probe_geoip(
     ipaddr: str,
     probe_cc: str,
     asn: str,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
 ) -> Tuple[Dict, str, int]:
     """Looks up probe CC, ASN, network name using GeoIP, prepare
     response dict
@@ -485,10 +480,9 @@ def probe_geoip(
     db_asn = "AS0"
     db_probe_network_name = None
     try:
-        db_probe_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn, db_probe_network_name = lookup_probe_network(ipaddr, asn_reader)
+        db_probe_cc, db_asn, db_probe_network_name  = geolookup_probe(ipaddr, asn_cc_reader)
         Metrics.GEOIP_ADDR_FOUND.labels(probe_cc=db_probe_cc, asn=db_asn).inc()
-    except geoip2.errors.AddressNotFoundError:
+    except AddressNotFoundError:
         Metrics.GEOIP_ADDR_NOT_FOUND.inc()
     except Exception as e:
         log.error(str(e), exc_info=True)
@@ -702,25 +696,20 @@ class GeoLookupResponse(BaseModel):
 async def geolookup(
     data: GeoLookupRequest,
     response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
 ) -> GeoLookupResponse:
     geolocation = dict()
 
     # for each address provided, call probe_geoip and add the data to our response
     for ipaddr in data.addresses:
         try:
-            cc = lookup_probe_cc(ipaddr, cc_reader)
-        except geoip2.errors.AddressNotFoundError:
-            cc = None
-        try:
-            asn, as_name = lookup_probe_network(ipaddr, asn_reader)
-            # make asn int unless it is None
+            cc, asn, as_name = geolookup_probe(ipaddr, asn_cc_reader)
             if asn is not None and asn.startswith("AS"):
                 asn = int(asn[2:])
-        except geoip2.errors.AddressNotFoundError:
-            asn = as_name = None
 
+        except AddressNotFoundError:
+            cc = None
+            asn = as_name = None
         geolocation[ipaddr] = GeoLookupResult(
             cc=cc, asn=asn, as_name=as_name
         )
@@ -797,13 +786,20 @@ def sign_credential(
     )
 
 
-def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+def _anonc_exc_to_str(error: ProtocolError | CredentialError | DeserializationFailed) -> str:
+    """
+    returns a short error string depending on the error type
+    """
     type_to_str = {
         ProtocolError: "protocol_error",
         DeserializationFailed: "deserialization_failed",
         CredentialError: "credential_error",
     }
-    type_str = type_to_str[type(error)]
+    return type_to_str[type(error)]
+
+
+def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
+    type_str = _anonc_exc_to_str(error)
 
     assert isinstance(error, (ProtocolError, CredentialError, DeserializationFailed))
     status_code = (
@@ -822,27 +818,32 @@ class SubmitMeasurementRequest(BaseModel):
     content: Dict[str, Any]
     # -- < Anonymous Credentials > ----------------------
     # not post quantum, in the future we might want to use a hashed key for storage
-    nym: str
-    zkp_request: str
-    probe_age_range: Tuple[int, int] = Field(
-        description="A range representing an interval containing the probe actual age. "
-        "This is used for the anonymous credentials protocol to identify the probe without using "
-        "personally identifiable information.\n"
-        "The server will use the age range to validate in zero proof that the request came from a "
-        "trusted probe. "
-        "Example: if probe age is 30 days, a valid answer is (25, 35)"
-        "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
+    nym: str | None = None
+    zkp_request: str | None = Field(description=
+        "zkp request computed by the ooniauth-core library, base-64 encoded as a string. "
+        "Note that this has to be computed with the ASN in the same format as the `probe_asn` in "
+        "the measurement body (`content` key)",
+        default = None
     )
-    probe_msm_range: Tuple[int, int] = Field(
-        description="A range representing an interval containing the how many measurements the probe has sent. "
-        "This is used for the anonymous credentials protocol to identify the probe without using "
-        "personally identifiable information.\n"
-        "The server will use the measurement count range to validate in zero proof that "
-        "the request came from a trusted probe. "
-        "Example: if the probe has sent 100 measurements, a valid answer is (90, 110)"
-        "See: https://github.com/ooni/userauth/blob/db333a4cbee30bf289aacba857fbcb28cc9d7505/ooniauth-core/src/submit.rs#L142"
-    )
-    manifest_version: str
+    manifest_version: str | None = None
+    protocol_version: str | None = Field(description =
+        "`ooniauth-core` version used by the **probe** sending this request",
+        default = None
+        )
+
+
+class VerificationStatus(str, Enum):
+    VERIFIED = "verified"
+    FAILED = "failed"
+    UNVERIFIED = "unverified"
+
+    @property
+    def code(self) -> str:
+        return {
+            VerificationStatus.VERIFIED: "t",
+            VerificationStatus.FAILED: "f",
+            VerificationStatus.UNVERIFIED: "u",
+        }[self]
 
 
 class SubmitMeasurementResponse(BaseModel):
@@ -853,9 +854,21 @@ class SubmitMeasurementResponse(BaseModel):
     measurement_uid: str | None = Field(
         examples=["20210208220710.181572_MA_ndt_7888edc7748936bf"], default=None
     )
-    is_verified: bool = Field(description="if the ZKP was able to verify this request")
+    verification_status: VerificationStatus = Field(
+        description="Verification status: verified, failed, or unverified"
+    )
     submit_response: str | None = Field(
         description="Anonymous credential verification response. Null if verification failed"
+    )
+    protocol_version: str = Field(
+        description="Protocol version used by the backend: current `ooniauth-core` version",
+        default=ooniauth_py.get_protocol_version(),
+    )
+    error: str | None = Field(
+        description="If there was an error accepting this measurement. Note that if the status code is 2xx, "
+        "the measurement was saved, even with this error present. "
+        "Null if no errors.",
+        default=None,
     )
 
 
@@ -865,13 +878,12 @@ async def submit_measurement(
     request: Request,
     submit_request: SubmitMeasurementRequest,
     response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     settings: SettingsDep,
     manifest: ManifestDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
-) -> SubmitMeasurementResponse | Dict[str, Any]:
+) -> SubmitMeasurementResponse:
     """
     Submit measurement, using the anonymous credentials protocol to establish a confidence
     layer over the incoming measurements.
@@ -880,70 +892,58 @@ async def submit_measurement(
     revealing personally identifiable information.
 
     An error will be returned if using a deprecated manifest version
+
+    Note that even if `error` is not null in the response, the measurement might still be processed.
+
+    Assume that:
+    - status code 2xx: The measurement was processed and stored, even if not verified
+    - status code 4xx or 5xx: the measurement was not processed nor stored
     """
     setnocacheresponse(response)
-    empty_measurement = {}
     try:
         rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
     except Exception:
-        log.info("Unexpected report_id %r", report_id[:200])
-        raise error("Incorrect format")
+        err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
+        log.info(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     # TODO validate the timestamp?
     good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
     if not good:
-        log.info("Unexpected report_id %r", report_id[:200])
-        error("Incorrect format")
+        err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
+        log.info(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     try:
         asn_i = int(asn)
     except ValueError:
-        log.info("ASN value not parsable %r", asn)
-        error("Incorrect format")
+        err_msg = f"Incorrect format: ASN value not parsable {asn}"
+        log.info(err_msg)
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "incorrect_format", "message": err_msg},
+        )
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
         Metrics.MSMNT_DISCARD_ASN0.inc()
-        return empty_measurement
+        raise HTTPException(400, detail = {"error" : "asn_0", "message" : "Measurement discarded, ASN == 0"})
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
-        return empty_measurement
+        raise HTTPException(400, detail = {"error" : "cc_zz", "message" : "Measurement discarded, CC == ZZ"})
 
-    # Run verification
-    assert "probe_cc" in submit_request.content and isinstance(
-        submit_request.content["probe_cc"], str
+    # Anonymous credentials verification
+    verification_status, submit_error, submit_response = _verify_submit(
+        submit_request, manifest, settings
     )
-    assert "probe_asn" in submit_request.content and isinstance(
-        submit_request.content["probe_asn"], str
-    )
-    protocol_state = ServerState.from_creds(
-        manifest.manifest.public_parameters, settings.anonc_secret_key
-    )
-
-    if submit_request.manifest_version == manifest.meta.version:
-        try:
-            submit_response = protocol_state.handle_submit_request(
-                submit_request.nym,
-                submit_request.zkp_request,
-                submit_request.content["probe_cc"],
-                submit_request.content["probe_asn"],
-                list(submit_request.probe_age_range),
-                list(submit_request.probe_msm_range),
-            )
-            is_verified = True
-        except (DeserializationFailed, ProtocolError, CredentialError) as e:
-            # proof failed
-            # TODO Q: should we add a "why not verified" field to the measurement?
-            log.error(f"ZKP Failed: {e}")
-            is_verified = False
-            submit_response = None
-    else:
-        log.error(
-            f"Unable to run ZKP verification: invalid manifest version '{submit_request.manifest_version}'"
-        )
-        _raise_manifest_not_found(submit_request.manifest_version)
 
     annotations = submit_request.content.get("annotations") or {}
     platform = annotations.get("platform") or ""
@@ -953,7 +953,8 @@ async def submit_measurement(
     data = submit_request.model_dump()
 
     # Add verification-related data.
-    data["is_verified"] = is_verified
+    # use one-letter code for DB, human readable for clients
+    data["is_verified"] = verification_status.code
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
     ujson.dump(data, stream)
@@ -963,6 +964,7 @@ async def submit_measurement(
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
+    # Hash MUST be computed after adding extra fields
     h = sha512(data_bin).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
@@ -975,49 +977,55 @@ async def submit_measurement(
     client = request.app.state.fastpath_client
     N_RETRIES = 3
     success = False
-    for t in range(N_RETRIES):
-        try:
-            url = f"{settings.fastpath_url}/{msmt_uid}"
+    with Metrics.SEND_FASTPATH_TIMING.time():
+        for t in range(N_RETRIES):
+            try:
+                url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await client.post(url, content=data_bin, timeout=59)
+                resp = await run_in_threadpool(client.post, url, data=data_bin)
+                with resp:
+                    resp.raise_for_status()
 
-            assert resp.status_code == 200, resp.content
+                Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
+                success = True
+                break
 
-            success = True
-            break
-
-        except Exception as exc:
-            log.error(
-                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
-            )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
-            await asyncio.sleep(sleep_time)
+            except Exception as exc:
+                log.error(
+                    f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+                )
+                sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
+                await asyncio.sleep(sleep_time)
 
     if success:
-        try: # Make sure an exception in this function will not trigger a retry
-            await run_in_threadpool(
-                _check_and_register_geoip_anomaly,
-                request,
-                cc_reader,
-                asn_reader,
-                clickhouse,
-                cc,
-                asn,
-                msmt_uid,
-                platform,
-                software_name,
-                software_version,
-            )
-        except Exception as e:
-            log.error(f"Error checking for geoip anomalies: {e}")
+        # Geoip anomaly detection runs only when the measurement was successfully
+        # submitted to the fastpath, so retries don't cause duplicate anomaly entries.
+        with Metrics.COMPARE_CC_TIMING.time():
+            try:
+                await run_in_threadpool(
+                    _check_and_register_geoip_anomaly,
+                    request,
+                    asn_cc_reader,
+                    clickhouse,
+                    cc,
+                    asn,
+                    msmt_uid,
+                    platform,
+                    software_name,
+                    software_version,
+                )
+            except Exception as e:
+                log.error(f"Error checking for geoip anomalies: {e}")
+                Metrics.COMPARE_CC_FAILURE.inc()
 
         return SubmitMeasurementResponse(
-                measurement_uid=msmt_uid,
-                is_verified=is_verified,
-                submit_response=submit_response,
-            )
+            measurement_uid=msmt_uid,
+            verification_status=verification_status,
+            submit_response=submit_response,
+            error=submit_error,
+        )
 
-    Metrics.SEND_FASTPATH_FAILURE.inc()
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     data_buff.seek(0)
@@ -1034,13 +1042,130 @@ async def submit_measurement(
 
     log.error(f"Unable to send report to fastpath. report_id: {report_id}")
     Metrics.MISSED_MSMNTS.inc()
-    return empty_measurement
+    return SubmitMeasurementResponse(
+        measurement_uid=msmt_uid,
+        verification_status=verification_status,
+        submit_response=submit_response,
+        error=submit_error or "submission_delivery_failed",
+    )
+
+def _verify_submit(
+    submit_request: SubmitMeasurementRequest,
+    manifest: ManifestDep,
+    settings: SettingsDep,
+) -> tuple[VerificationStatus, str | None, str | None]:
+    """
+    Run the anonymous credentials verification when the relevant fields are present.
+
+    Returns (verification_status, submit_error, submit_response).
+    - "u": unverified (verification did not run)
+    - "t": verified
+    - "f": verification failed
+    """
+    # Not intended to be verified: not an error but not verified
+    if (
+        submit_request.nym is None
+        and submit_request.zkp_request is None
+        and submit_request.manifest_version is None
+        and submit_request.protocol_version is None
+    ):
+        return (VerificationStatus.UNVERIFIED, None, None)
+
+    # Check manifest version
+    if submit_request.manifest_version != manifest.meta.version:
+        # TODO We should validate if this is an old manifest or an unknown manifest, for now
+        # we treat them as the same error: unknown manifest
+        log.error("Old or unknown manifest in submission request")
+        return VerificationStatus.UNVERIFIED, "manifest_not_found", None
+
+
+    # Check anonymous credentials fields are complete
+    if (
+        submit_request.nym is None
+        or submit_request.zkp_request is None
+        or submit_request.manifest_version is None
+        or submit_request.protocol_version is None
+        or "probe_cc" not in submit_request.content
+        or "probe_asn" not in submit_request.content
+    ):
+        log.error("Incomplete anonymous credentials fields in submission request")
+        return VerificationStatus.UNVERIFIED, "incomplete_anonc_fields", None
+
+    # Check protocol version
+    try:
+        probe_version_tup = _parse_version_tuple(submit_request.protocol_version)
+        min_version_tup = _parse_version_tuple(
+            settings.minimum_anonc_protocol_version
+        )
+
+        if probe_version_tup < min_version_tup:
+            log.error(f"Probe version too old: {submit_request.protocol_version} < {settings.minimum_anonc_protocol_version}")
+            return VerificationStatus.UNVERIFIED, "protocol_version_too_old", None
+
+    except Exception as e:
+        log.error(f"Unable to parse version string. probe version = {submit_request.protocol_version}, "
+        f"minimum protocol version = {settings.minimum_anonc_protocol_version}. Error: {e}"
+        )
+        return VerificationStatus.UNVERIFIED, "invalid_protocol_version", None
+
+    # Get the limits in age range and measurement count for this request
+    age_range, count_range = get_ranges_from_policy(manifest.manifest.submission_policy, submit_request.content['probe_cc'], submit_request.content['probe_asn'])
+
+    # Run verification
+    try:
+        protocol_state = ServerState.from_creds(
+            manifest.manifest.public_parameters, settings.anonc_secret_key
+        )
+        submit_response = protocol_state.handle_submit_request(
+            submit_request.nym,
+            submit_request.zkp_request,
+            submit_request.content["probe_cc"],
+            submit_request.content["probe_asn"],
+            list(age_range),
+            list(count_range),
+        )
+        return (VerificationStatus.VERIFIED, None, submit_response)
+    except (DeserializationFailed, ProtocolError, CredentialError) as e:
+        log.error(f"ZKP Failed: {e}")
+        return (VerificationStatus.FAILED, _anonc_exc_to_str(e), None)
+    except Exception as e:
+        log.error(f"Unexpected anonc error: {e}")
+        return (VerificationStatus.FAILED, "unknown_error", None)
+
+
+def _parse_version_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in version.split("."))
+
+def get_ranges_from_policy(
+    policy: List[PolicyEntry], probe_cc: str, probe_asn: str
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    """
+    Gets the age and measurement count ranges from the specified policy.
+
+    Matching order: first match in the list wins (highest priority first).
+
+    returns:
+    age_range, msm_range
+    """
+
+    for item in policy:
+        match_cc = item.match.probe_cc
+        match_asn = item.match.probe_asn
+
+        cc_ok = match_cc == "*" or match_cc == probe_cc
+        asn_ok = match_asn == "*" or match_asn == probe_asn
+
+        if cc_ok and asn_ok:
+            return item.policy.age, item.policy.measurement_count
+
+    raise ValueError(
+        f"No matching submission_policy entry for probe_cc={probe_cc} probe_asn={probe_asn}"
+    )
 
 
 def _check_and_register_geoip_anomaly(
     request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     clickhouse: ClickhouseDep,
     cc: str,
     asn: str,
@@ -1049,7 +1174,7 @@ def _check_and_register_geoip_anomaly(
     software_name: str,
     software_version: str,
 ) -> None:
-    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    actual_cc, actual_asn = get_cc_asn(request, asn_cc_reader)
     if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
         register_geoip_anomaly(
             cc,

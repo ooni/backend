@@ -1,12 +1,10 @@
-import asyncio
 import io
 import logging
-import random
 from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List, Tuple
-import ujson
 
+import ujson
 import zstd
 from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
@@ -16,7 +14,7 @@ from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
 from ..common.utils import setnocacheresponse
-from ..dependencies import ASNReaderDep, CCReaderDep, SettingsDep
+from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
     error,
@@ -103,8 +101,7 @@ async def receive_measurement(
     report_id: str,
     request: Request,
     response: Response,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     settings: SettingsDep,
     clickhouse: ClickhouseDep,
     content_encoding: str = Header(default=None),
@@ -120,6 +117,7 @@ async def receive_measurement(
         log.info(
             f"Unexpected report_id {report_id[:200]}. Error: {e}",
         )
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_report_id").inc()
         raise error("Incorrect format")
 
     # TODO validate the timestamp?
@@ -132,19 +130,22 @@ async def receive_measurement(
         asn_i = int(asn)
     except ValueError as e:
         log.info(f"ASN value not parsable {asn}. Error: {e}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_asn").inc()
         error("Incorrect format")
 
     if asn_i == 0:
         log.info("Discarding ASN == 0")
-        Metrics.MSMNT_DISCARD_ASN0.inc()
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
         return empty_measurement
 
     if cc.upper() == "ZZ":
         log.info("Discarding CC == ZZ")
-        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
         return empty_measurement
 
-    data = await request.body()
+    with Metrics.READ_BODY_TIMING.time():
+        data = await request.body()
+
     if content_encoding == "zstd":
         try:
             compressed_len = len(data)
@@ -152,11 +153,21 @@ async def receive_measurement(
             log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
         except Exception as e:
             log.info(f"Failed zstd decompression. Error: {e}")
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="zstd_fail").inc()
             error("Incorrect format")
+
+    try:
+        data = await run_in_threadpool(_set_unverified_flag, data)
+    except Exception as e:
+        log.info("Failed to parse and modify measurement body")
+        log.exception(e)
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
+        error("Incorrect format")
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
     now = datetime.now(timezone.utc)
+    # Hash MUST be computed after adding extra fields
     h = sha512(data).hexdigest()[:16]
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
@@ -164,76 +175,82 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    # Use exponential back off with jitter between retries
     client = request.app.state.fastpath_client
-    N_RETRIES = 3
     success = False
-    for t in range(N_RETRIES):
+    with Metrics.SEND_FASTPATH_TIMING.time():
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await client.post(url, content=data)
-
-            assert resp.status_code == 200, resp.content
-
+            resp = await run_in_threadpool(client.post, url, data=data)
+            with resp:
+                resp.raise_for_status()
+            Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
             success = True
-            break
 
-        except Exception as exc:
-            log.error(
-                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
-            )
-            sleep_time = random.uniform(0.3, 2 ** (t + 1))
-            await asyncio.sleep(sleep_time)
+        except Exception as e:
+            log.exception(f"Unable to send measurement to fastpath ({settings.fastpath_url}): {e}")
+            Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     if success:
-        try:  # Make sure an error in this function won't trigger a retry
-            await run_in_threadpool(
-                _check_and_register_geoip_anomaly,
-                request,
-                cc_reader,
-                asn_reader,
-                clickhouse,
-                cc,
-                asn,
-                msmt_uid,
-                data,
-            )
-        except Exception as e:
-            log.error(f"Error checking for geoip anomalies: {e}")
+        # Geoip anomaly detection runs only when the measurement was successfully
+        # submitted to the fastpath, so retries don't cause duplicate anomaly entries.
+        with Metrics.COMPARE_CC_TIMING.time():
+            try:
+                await run_in_threadpool(
+                    _check_and_register_geoip_anomaly,
+                    request,
+                    asn_cc_reader,
+                    clickhouse,
+                    cc,
+                    asn,
+                    msmt_uid,
+                    data,
+                )
+            except Exception as e:
+                log.error(f"Error checking for geoip anomalies: {e}")
+                Metrics.COMPARE_CC_FAILURE.inc()
 
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
-    Metrics.SEND_FASTPATH_FAILURE.inc()
-
     # wasn't possible to send msmnt to fastpath, try to send it to s3
-    try:
-        await run_in_threadpool(
-            request.app.state.s3_client.upload_fileobj,
-            io.BytesIO(data),
-            Bucket=settings.failed_reports_bucket,
-            Key=report_id,
-        )
-    except Exception as exc:
-        log.error(f"Unable to upload measurement to s3. Error: {exc}")
-        Metrics.SEND_S3_FAILURE.inc()
+    ts_prefix = now.strftime("%Y%m%d%H")
+    tn = test_name.replace("_", "")
+    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{tn}/{msmt_uid}.post"
+    with Metrics.SEND_S3_TIMING.time():
+        try:
+            await run_in_threadpool(
+                request.app.state.s3_client.upload_fileobj,
+                io.BytesIO(data),
+                Bucket=settings.failed_reports_bucket,
+                Key=s3_key,
+            )
+            Metrics.SEND_S3_CNT.labels(status="ok").inc()
+            log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
+            return empty_measurement
+        except Exception:
+            log.exception("Unable to upload measurement to s3")
+            Metrics.SEND_S3_CNT.labels(status="fail").inc()
+            return empty_measurement
 
-    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
-    Metrics.MISSED_MSMNTS.inc()
-    return empty_measurement
+
+def _set_unverified_flag(data: bytes) -> bytes:
+    with Metrics.DESERIALIZE_BODY_TIMING.time():
+        measurement = ujson.loads(data)
+    measurement["is_verified"] = "u"
+    with Metrics.SERIALIZE_BODY_TIMING.time():
+        return ujson.dumps(measurement).encode("utf-8")
+
 
 def _check_and_register_geoip_anomaly(
     request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
+    asn_cc_reader: ASNCCReaderDep,
     clickhouse: ClickhouseDep,
     cc: str,
     asn: str,
     msmt_uid: str,
     data: bytes,
 ) -> None:
-    # check for geoip anomalies
-    actual_cc, actual_asn = get_cc_asn(request, cc_reader, asn_reader)
+    actual_cc, actual_asn = get_cc_asn(request, asn_cc_reader)
     if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
         # expensive: parses measurement body and sends anomaly to clickhouse
         platform, software_name, software_version = _parse_metadata(data)

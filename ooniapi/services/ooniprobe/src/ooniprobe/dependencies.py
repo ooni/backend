@@ -1,17 +1,18 @@
 import io
-from typing import Annotated, TypeAlias, Any, Dict
+from typing import Annotated, Tuple, TypeAlias, Any, Dict, List
 from datetime import datetime
 import time
 from pathlib import Path
 
 import boto3
+import ooniauth_py
 import ujson
-import geoip2.database
+import maxminddb
 from fastapi import Depends
 
 from mypy_boto3_s3 import S3Client
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -35,20 +36,12 @@ def get_postgresql_session(settings: SettingsDep):
 PostgresSessionDep = Annotated[Session, Depends(get_postgresql_session)]
 
 
-def get_cc_reader(settings: SettingsDep):
-    db_path = Path(settings.geoip_db_dir, "cc.mmdb")
-    return geoip2.database.Reader(db_path)
+def get_asn_cc_reader(settings: SettingsDep):
+    db_path = Path(settings.geoip_db_dir, "asn_cc.mmdb")
+    return maxminddb.open_database(db_path)
 
 
-CCReaderDep = Annotated[geoip2.database.Reader, Depends(get_cc_reader)]
-
-
-def get_asn_reader(settings: SettingsDep):
-    db_path = Path(settings.geoip_db_dir, "asn.mmdb")
-    return geoip2.database.Reader(db_path)
-
-
-ASNReaderDep = Annotated[geoip2.database.Reader, Depends(get_asn_reader)]
+ASNCCReaderDep = Annotated[maxminddb.Reader, Depends(get_asn_cc_reader)]
 
 
 def get_s3_client() -> S3Client:
@@ -67,6 +60,29 @@ def get_cache():
 
 CacheDep = Annotated[Dict[str, Any], Depends(get_cache)]
 
+class Policy(BaseModel):
+    age: Tuple[int, int] = Field(
+        description="Inclusive lower/upper bounds for the probe age accepted by this rule."
+    )
+    measurement_count: Tuple[int, int] = Field(
+        description="Inclusive lower/upper bounds for the probe measurement count accepted by this rule."
+    )
+
+class Match(BaseModel):
+    probe_cc: str = Field(
+        description="Two-letter probe country code. Use '*' to match any country."
+    )
+    probe_asn: str = Field(
+        description="Probe ASN in 'ASNNNN' format. Use '*' to match any ASN."
+    )
+
+class PolicyEntry(BaseModel):
+    """
+    Single `submission_policy` rule in the manifest.
+    Defines which probes match this entry and which verification ranges apply.
+    """
+    policy: Policy
+    match: Match
 
 class Manifest(BaseModel):
     """
@@ -74,8 +90,26 @@ class Manifest(BaseModel):
     """
 
     nym_scope: str = "ooni.org/{probe_cc}/{probe_asn}"
-    submission_policy: Dict[str, Any] = dict()
+    submission_policy: List[PolicyEntry]
     public_parameters: str
+
+    @model_validator(mode="after")
+    def _validate_catch_all(self):
+
+        # ensure the last entry in the submission_policy is the catch_all rule
+        if len(self.submission_policy) == 0:
+            raise ValueError(
+                "submission_policy must include a catch-all rule with "
+                "match.probe_cc='*' and match.probe_asn='*'"
+            )
+
+        catch_all = self.submission_policy[-1]
+        if catch_all.match.probe_asn != "*" or catch_all.match.probe_cc != "*":
+            raise ValueError(
+                "Last rule in submission policy should be a catch-all. "
+            )
+
+        return self
 
 
 class ManifestMeta(BaseModel):
@@ -87,6 +121,12 @@ class ManifestMeta(BaseModel):
     last_modification_date: datetime
     manifest_url: str = Field(
         description="URL pointing to the AWS public record of this manifest"
+    )
+    library_version: str = Field(
+        description="Version of the Python library implementing the anonymous credentials protocol"
+    )
+    protocol_version: str = Field(
+        description="Anonymous credentials protocol implementation version"
     )
 
 
@@ -114,6 +154,8 @@ def get_manifest(s3: S3ClientDep, bucket: str, file: str) -> ManifestResponse:
         version=latest["VersionId"],
         last_modification_date=latest["LastModified"],
         manifest_url=f"https://{bucket}.s3.amazonaws.com/{file}",
+        library_version=ooniauth_py.__version__,
+        protocol_version=ooniauth_py.get_protocol_version()
     )
 
     # Get Object
@@ -151,7 +193,6 @@ def _get_manifest(
     return get_manifest_cached(
         s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file, cache
     )
-
 
 ManifestDep = Annotated[ManifestResponse, Depends(_get_manifest)]
 

@@ -1,13 +1,12 @@
 import json
-import os
 import pathlib
-import shutil
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 from urllib.request import urlopen
 
+import ooniauth_py
 import pytest
 import ujson
 from clickhouse_driver import Client as ClickhouseClient
@@ -113,12 +112,23 @@ def make_manifest_mock_fn(public_params: str):
     def get_manifest_mock():
         return ManifestResponse(
             manifest=Manifest(
-                submission_policy={"*/*": "*"}, public_parameters=public_params
+                submission_policy=[
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "measurement_count": [0, 10000000],
+                        },
+                    }
+                ],
+                public_parameters=public_params,
             ),
             meta=ManifestMeta(
                 version="1",
                 last_modification_date=datetime.now(),
                 manifest_url="https://ooni.mock/manifest",
+                library_version=ooniauth_py.__version__,
+                protocol_version=ooniauth_py.get_protocol_version(),
             ),
         )
 
@@ -149,8 +159,8 @@ def test_creds():
 
     # (Secret key, public key)
     return (
-        "ASAAAAAAAAAAXgJT5699LDE/QjmzDjsHcVP+EOxPO/aS4grULhSZqAsgAAAAAAAAAEf1WUPkxSb1cCAUAPvwqqtsOSiLd0m/BpY5HAZLvGQFAwAAAAAAAAAgAAAAAAAAABjrB0p6whCfu/5mDCtrZ/DSaPy+dC3LFL08taNMZ10KIAAAAAAAAAAC8BjxPSqTTnYT1IrWSFkHWvE3e/dstCrLo6GvN6+FAyAAAAAAAAAAyxD+iRjtKEHwRj1AwpDt0Sj4WI8pSDfoxB29G/8eYQ0=",
-        "ASAAAAAAAAAA0Dfe5U+8tRO3siBVVp+zEoC309fhfhtsVJIv2zpeD1cBIAAAAAAAAAAw/LnzUbQepSaQzI29yCH31/Q2Awq9NuTfgW4BQzorGwMAAAAAAAAAIAAAAAAAAABgspiZ6jNoM11fBO/JJ82Ry+QJ6S2mpOpCOmu2KsxGfiAAAAAAAAAACltCp9TukC2mNw0YYAAjqhXH2fsOYoz5FwcjE1bZoD0gAAAAAAAAAN4hyN9hpFgmOU37ynNgoIBLnSg+dObJ/yWRwt5/uYhh",
+        "AUGQSPO28+QLlf8fKhQjqAD2Ehjn0Q471Yavs7n0qsYJ0nnZ1G/Y2LqvjC3Stq0o9Ka6lB2Xq9EDIEOFhQsjbQQDAAAAAAAAAGk422WHZ5MEPCTMbaj4sDvW27Yvl+pRzDuuTasyEpIDRCEzgL3tIOErnbYtca/68gHUxIfXRCDtcSMEvxVhSAynRFLeT0pXf5fRFwX4gbzNVgvzh0MthADyh7UUPmj6BQ==",
+        "AaJpxHsB+x4axWCrFxohF+ML5inYWbPbVQro9YGxb9NVAcgzlHrnd7PLfwWQe69W3ZLcGe4R/CnbFBwhCfdfvvpCAwAAAAAAAAAkAklNBr7fMUrdkeNT360ZsLTGN8A7kKMX6b60tJ5YCBLJ9QJdwnkp12VHPgND2/chraDFw8snqfq0JDZI2tJ04sqKzWi+y57qzh0HG+pkZ3xe7RceyE4isTs7ZRzriwA=",
     )
 
 
