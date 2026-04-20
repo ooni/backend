@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
 
 # Stage 2: Running
-FROM python:3.12-slim-bookworm 
+FROM python:3.12-slim-bookworm
 
 RUN useradd -m -u 1420 -s /bin/bash fastpath
 
@@ -32,7 +32,7 @@ RUN mkdir -p /var/lib/fastpath
 RUN chown -R fastpath:fastpath /var/lib/fastpath
 RUN chown -R fastpath:fastpath /etc/ooni/
 RUN mkdir -p /var/lib/ooniapi/
-RUN chown -R fastpath:fastpath /var/lib/ooniapi/  
+RUN chown -R fastpath:fastpath /var/lib/ooniapi/
 
 
 USER fastpath

@@ -4,32 +4,37 @@ VPN Services
 Insert VPN credentials into database.
 """
 
-import itertools
-import logging
-from typing import List, TypedDict, Tuple
 import io
 import ujson
 
 from fastapi import Request
 from typing import Dict, Any
-
 from fastapi import HTTPException
 
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
 import pem
+import itertools
+import logging
 from base64 import b64encode
 from datetime import datetime, timezone
 from os import urandom
+from typing import Any, Dict, List, Tuple, TypedDict
 
-import httpx
+import requests
+import pem
+from fastapi import HTTPException, Request
+from mypy_boto3_s3 import S3Client
+from sqlalchemy.orm import Session
 
-from .metrics import Metrics
-from .common.config import Settings
-from .common.clickhouse_utils import insert_click
-from .common.dependencies import ClickhouseDep
-from .dependencies import CCReaderDep, ASNReaderDep
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
+
+from .common.clickhouse_utils import insert_click
+from .common.config import Settings
+from .common.dependencies import ClickhouseDep
+from .common.errors import AddressNotFoundError
+from .dependencies import ASNCCReaderDep
+from .metrics import Metrics
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"
@@ -51,15 +56,17 @@ class OpenVPNEndpoint(TypedDict):
 
 
 def fetch_riseup_ca() -> str:
-    r = httpx.get(RISEUP_CA_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    r = requests.get(RISEUP_CA_URL)
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_riseup_cert() -> str:
-    r = httpx.get(RISEUP_CERT_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    r = requests.get(RISEUP_CERT_URL)
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_openvpn_config() -> OpenVPNConfig:
@@ -72,7 +79,7 @@ def fetch_openvpn_config() -> OpenVPNConfig:
 def fetch_openvpn_endpoints() -> List[OpenVPNEndpoint]:
     endpoints = []
 
-    r = httpx.get(RISEUP_ENDPOINT_URL)
+    r = requests.get(RISEUP_ENDPOINT_URL)
     r.raise_for_status()
     j = r.json()
     for ep in j["gateways"]:
@@ -100,7 +107,7 @@ def upsert_endpoints(
     db: Session, new_endpoints: List[OpenVPNEndpoint], provider: OONIProbeVPNProvider
 ):
     new_endpoints_map = {
-        f'{ep["address"]}-{ep["protocol"]}-{ep["transport"]}': ep
+        f"{ep['address']}-{ep['protocol']}-{ep['transport']}": ep
         for ep in new_endpoints
     }
     for endpoint in provider.endpoints:
@@ -144,18 +151,18 @@ def extract_probe_ipaddr(request: Request) -> str:
     return request.client.host if request.client else ""
 
 
-def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    resp = cc_reader.country(ipaddr)
-    return resp.country.iso_code or "ZZ"
-
-
-def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    resp = asn_reader.asn(ipaddr)
-
-    return (
-        "AS{}".format(resp.autonomous_system_number),
-        resp.autonomous_system_organization or "0",
-    )
+def geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple[str, str, str]:
+    entry = asn_cc_reader.get(ipaddr)
+    try:
+        cc = entry['country']['iso_code']
+        asn = entry['autonomous_system_number']
+        as_org = entry.get('autonomous_system_organization', "0")
+        return (cc, f"AS{asn}", as_org)
+    except KeyError:
+        raise AddressNotFoundError
+    except Exception as e:
+        log.error(f"Error looking up {ipaddr}: {e}")
+        raise AddressNotFoundError
 
 
 def error(msg: str | Dict[str, Any], status_code: int = 400):
@@ -174,11 +181,9 @@ def normalize_asn(asn: str) -> int:
 
 
 def get_cc_asn(
-    request: Request, cc_reader: CCReaderDep, asn_reader: ASNReaderDep) -> Tuple[str, str]:
+    request: Request, asn_cc_reader: ASNCCReaderDep) -> Tuple[str, str]:
     ipaddr = extract_probe_ipaddr(request)
-    cc = lookup_probe_cc(ipaddr, cc_reader)
-    asn, _ = lookup_probe_network(ipaddr, asn_reader)
-
+    cc, asn, _ = geolookup_probe(ipaddr, asn_cc_reader)
     return cc, asn
 
 def register_geoip_anomaly(
@@ -222,6 +227,53 @@ def register_geoip_anomaly(
         [("geoip", actual_cc, actual_asn_int, details)],
         max_execution_time=5,
     )
+
+
+def compare_probe_msmt_cc_asn(
+    measurement_uid: str,
+    cc: str,
+    asn: str,
+    request: Request,
+    asn_cc_reader: ASNCCReaderDep,
+    clickhouse: ClickhouseDep,
+):
+    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
+    Generates a metric.
+    """
+    cc = cc.upper()
+    ipaddr = extract_probe_ipaddr(request)
+    db_cc, db_asn, _ = geolookup_probe(ipaddr, asn_cc_reader)
+
+    if db_asn.startswith("AS"):
+        db_asn = db_asn[2:]
+    if db_cc == cc and db_asn == asn:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
+    if db_cc != cc:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
+    if db_asn != asn:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+
+    if db_asn != asn or db_cc != cc:
+        details = ujson.dumps(
+            {
+                "submission_cc": cc,
+                "submission_asn": int(asn),
+                "measurement_uid": measurement_uid,
+            }
+        )
+
+        insert_click(
+            clickhouse,
+            """
+            INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
+            SETTINGS
+                async_insert=1,
+                wait_for_async_insert=0
+            VALUES
+            """,
+            [("geoip", db_cc, int(db_asn), details)],
+            max_execution_time=5,
+        )
 
 
 def get_first_ip(headers: str) -> str:

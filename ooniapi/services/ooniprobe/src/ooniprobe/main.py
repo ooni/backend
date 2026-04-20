@@ -3,13 +3,15 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import boto3
-import httpx
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
 from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from . import models
 from .__about__ import VERSION
@@ -46,14 +48,12 @@ async def lifespan(
 
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
-    app.state.fastpath_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
-    )
     app.state.s3_client = boto3.client("s3")
+    app.state.fastpath_client = requests.Session()
 
     yield
 
-    await app.state.fastpath_client.aclose()
+    app.state.fastpath_client.close()
 
 
 def init_ooniauth():
@@ -127,10 +127,9 @@ async def health(
         log.error(e)
 
     try:
-        resp = await app.state.fastpath_client.get(settings.fastpath_url)
-        assert resp.status_code == 200, (
-            "Unexpected status trying to connect to fastpath: " + str(resp.status_code)
-        )
+        resp = await run_in_threadpool(app.state.fastpath_client.get, settings.fastpath_url)
+        with resp:
+            resp.raise_for_status()
     except Exception as exc:
         log.error(str(exc))
         errors.append("fastpath_connection_error")
@@ -165,20 +164,26 @@ async def health(
     # Check that you can retrieve the manifest
     try:
         get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
+    except ValidationError as e: # Bad manifest
+        errors.append("bad_anonc_manifest")
+        log.error(f"Error parsing manifest file: {e}")
     except Exception as e:
         errors.append("anonc_manifest_unreachable")
         log.error(f"Error retrieving manifest: {e}")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")
@@ -195,9 +200,9 @@ def check_ooniauth_health():
     # should be able to handle a credential sign request when restoring from hard-coded credentials
 
     # These keys are innocuous, just created to test this
-    secret_key = "ASAAAAAAAAAAnRLPQN8ob4XuuyS26QmvtE5yDOVbDz7wgfeoxGk99AcgAAAAAAAAAOhrJeXjwKfUY0HLwR4pMg0g3QSdyHvM1IvutqnnMksMAwAAAAAAAAAgAAAAAAAAAOR570uB89vTt0o77JCgQ5YXQpu5WpDOWBwVxhW17rAOIAAAAAAAAADrzYyr7wxWft6wiSSlYsH6HJLFhWMsM4N/Stn6ReqAASAAAAAAAAAA0wTZILAyR9U4zl1O8hZAILKaxfNDKQ3RbmPHnjjFiAs="
-    public_parameters = "ASAAAAAAAAAAAvJtNWTwFzdhbrl8v6JB18ReQyndy8/K1w2U8i2Yg30BIAAAAAAAAAAguFDwcr38wUVt2rlLXB2/8yFhniOjNYqIl4ojiAuyMwMAAAAAAAAAIAAAAAAAAAAAe1Xz7jZ5Sunow6X1wBcQgydjCp9NpYkHdBaJyUuCUSAAAAAAAAAAtKLWocJ4JqqNf6iX1HzPzQUVJaXlj7iL52bVxgeLhWwgAAAAAAAAAEZjgujZgU+k0ro0pZHd1JhoxRvRSVaPH1nHyjD8U7lG"
-    sign_request = "IAAAAAAAAABIGoRkdnwwlTAeKECF7DBNXmqdTMlhr+HsANap/DkQaWAAAAAAAAAADHgP2bLRdUt8AgWPdXdTXCl2/vnGZ9gW5yGtmDfXgyMKzTXS04EBASlz5wIVZSrLaykSAIcMM7EUwaK0Yqps0QJfoj0i3Y9Mc8yVlP0z3/kSuHTKpmq4GOEIaGFXTH6k"
+    secret_key = "AUGQSPO28+QLlf8fKhQjqAD2Ehjn0Q471Yavs7n0qsYJ0nnZ1G/Y2LqvjC3Stq0o9Ka6lB2Xq9EDIEOFhQsjbQQDAAAAAAAAAGk422WHZ5MEPCTMbaj4sDvW27Yvl+pRzDuuTasyEpIDRCEzgL3tIOErnbYtca/68gHUxIfXRCDtcSMEvxVhSAynRFLeT0pXf5fRFwX4gbzNVgvzh0MthADyh7UUPmj6BQ=="
+    public_parameters = "AaJpxHsB+x4axWCrFxohF+ML5inYWbPbVQro9YGxb9NVAcgzlHrnd7PLfwWQe69W3ZLcGe4R/CnbFBwhCfdfvvpCAwAAAAAAAAAkAklNBr7fMUrdkeNT360ZsLTGN8A7kKMX6b60tJ5YCBLJ9QJdwnkp12VHPgND2/chraDFw8snqfq0JDZI2tJ04sqKzWi+y57qzh0HG+pkZ3xe7RceyE4isTs7ZRzriwA="
+    sign_request = "6iOCB9U1J7UowHfVGq0zoWiP2zSi7589rqS7bdNBC2NlAAAAAAAAAAPW0h/qB7voDedoLiDttZwawVv7xdlZY7GkbijU+o+RAAIAAAAKx1aegNytJO5oarCsIx0t5FQpqP5Wm54k+ECb9nVh7wqQpREN1uu20ZqgU4iW8XDwzOnw8IfWJBSv7FTaF0ne"
 
     server = ServerState.from_creds(public_parameters, secret_key)
     server.handle_registration_request(sign_request)

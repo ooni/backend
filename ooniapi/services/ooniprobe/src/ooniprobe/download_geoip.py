@@ -9,7 +9,7 @@ import timeit
 import shutil
 import logging
 
-import geoip2.database
+import maxminddb
 from pathlib import Path
 from datetime import datetime, timezone
 from urllib.error import HTTPError
@@ -73,18 +73,14 @@ def is_latest_available(url: str) -> bool:
 def check_geoip_db(path: Path) -> None:
     assert "cc" in path.name or "asn" in path.name, "invalid path"
 
-    with geoip2.database.Reader(str(path)) as reader:
-        if "asn" in path.name:
-            r1 = reader.asn("8.8.8.8")
+    with maxminddb.open_database(str(path)) as reader:
+            r1 = reader.get("8.8.8.8")
             assert r1 is not None, "database file is invalid"
+            assert "autonomous_system_number" in r1.keys(), "database file is invalid"
+            assert "country" in r1.keys(), "database file is invalid"
             m = reader.metadata()
             Metrics.GEOIP_ASN_NODE_CNT.set(m.node_count)
             Metrics.GEOIP_ASN_EPOCH.set(m.build_epoch)
-
-        elif "cc" in path.name:
-            r2 = reader.country("8.8.8.8")
-            assert r2 is not None, "database file is invalid"
-            m = reader.metadata()
             Metrics.GEOIP_CC_NODE_CNT.set(m.node_count)
             Metrics.GEOIP_CC_EPOCH.set(m.build_epoch)
 
@@ -116,10 +112,9 @@ def download_geoip(db_dir: Path, url: str, filename: str) -> None:
     Metrics.GEOIP_DOWNLOAD_TIME.observe(endtime - start_time)
 
 
-def update_geoip(db_dir: Path, ts: str, asn_url: str, cc_url: str) -> None:
+def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> None:
     db_dir.mkdir(parents=True, exist_ok=True)
-    download_geoip(db_dir, asn_url, "asn.mmdb")
-    download_geoip(db_dir, cc_url, "cc.mmdb")
+    download_geoip(db_dir, asn_cc_url, "asn_cc.mmdb")
 
     with (db_dir / "geoipdbts").open("w") as out_file:
         out_file.write(ts)
@@ -131,16 +126,17 @@ def update_geoip(db_dir: Path, ts: str, asn_url: str, cc_url: str) -> None:
 def try_update(db_dir: str):
     db_dir_path = Path(db_dir)
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m")
-    asn_url = f"https://download.db-ip.com/free/dbip-asn-lite-{ts}.mmdb.gz"
-    cc_url = f"https://download.db-ip.com/free/dbip-country-lite-{ts}.mmdb.gz"
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-01")
+    ver = datetime.now(timezone.utc).strftime("%Y%m01")
+
+    asn_cc_url = f"https://github.com/ooni/historical-geoip/releases/download/{ver}/{ver}-ip2country_as.mmdb.gz"
 
     if is_already_updated(db_dir_path, ts):
         log.debug("Database already updated. Exiting.")
         return
 
-    if not is_latest_available(asn_url) or not is_latest_available(cc_url):
+    if not is_latest_available(asn_cc_url):
         log.debug("Update not available yet. Exiting.")
         return
 
-    update_geoip(db_dir_path, ts, asn_url, cc_url)
+    update_geoip(db_dir_path, ts, asn_cc_url)
