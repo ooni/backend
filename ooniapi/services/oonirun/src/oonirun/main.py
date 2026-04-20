@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel
 
@@ -12,7 +13,6 @@ from . import models
 from .routers import v2
 
 from .common.dependencies import get_settings, SettingsDep, ClickhouseDep, PostgresDep
-from .common.version import get_build_label, get_pkg_version
 from .common.version import get_build_label, get_pkg_version
 from .common.metrics import mount_metrics
 from .common.clickhouse_utils import query_click
@@ -93,16 +93,17 @@ async def health(
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
-        "status":   status,
-        "errors":   errors,
-        "version":  pkg_version,
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
+        "status": status,
+        "errors": errors,
+        "version": pkg_version,
         "build_label": build_label,
     }
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")
