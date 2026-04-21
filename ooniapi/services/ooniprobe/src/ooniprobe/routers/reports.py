@@ -280,11 +280,11 @@ def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
     except Exception as e:
         log.error(f"Couldn't parse json body: {e}")
         return ("", "", "")
-    content = body.get("content") or {}
-    annotations = content.get("annotations") or {}
-    platform = annotations.get("platform") or ""
-    software_name = content.get("software_name") or ""
-    software_version = content.get("software_version") or ""
+    content = body.get("content", {})
+    annotations = content.get("annotations", {})
+    platform = annotations.get("platform", "")
+    software_name = content.get("software_name", "")
+    software_version = content.get("software_version", "")
     return (platform, software_name, software_version)
 
 

@@ -945,7 +945,7 @@ async def submit_measurement(
         submit_request, manifest, settings
     )
 
-    annotations = submit_request.content.get("annotations") or {}
+    annotations = submit_request.content.get("annotations", {})
     platform = annotations.get("platform") or ""
     software_name = submit_request.content.get("software_name") or ""
     software_version = submit_request.content.get("software_version") or ""
