@@ -2,7 +2,7 @@ import io
 import logging
 from datetime import datetime, timezone
 from hashlib import sha512
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import ujson
 import zstd
@@ -17,9 +17,11 @@ from ..common.utils import setnocacheresponse
 from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
-    compare_probe_msmt_cc_asn,
     error,
     generate_report_id,
+    get_cc_asn,
+    normalize_asn,
+    register_geoip_anomaly,
 )
 
 router = APIRouter()
@@ -173,23 +175,8 @@ async def receive_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    with Metrics.COMPARE_CC_TIMING.time():
-        try:
-            await run_in_threadpool(
-                compare_probe_msmt_cc_asn,
-                msmt_uid,
-                cc,
-                asn,
-                request,
-                asn_cc_reader,
-                clickhouse,
-            )
-        except Exception:
-            log.exception("failed to compared probe_msmt_cc_asn")
-            Metrics.COMPARE_CC_FAILURE.inc()
-
-    # Use exponential back off with jitter between retries
     client = request.app.state.fastpath_client
+    success = False
     with Metrics.SEND_FASTPATH_TIMING.time():
         try:
             url = f"{settings.fastpath_url}/{msmt_uid}"
@@ -198,11 +185,32 @@ async def receive_measurement(
             with resp:
                 resp.raise_for_status()
             Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
-            return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+            success = True
 
         except Exception as e:
             log.exception(f"Unable to send measurement to fastpath ({settings.fastpath_url}): {e}")
             Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
+
+    if success:
+        # Geoip anomaly detection runs only when the measurement was successfully
+        # submitted to the fastpath, so retries don't cause duplicate anomaly entries.
+        with Metrics.COMPARE_CC_TIMING.time():
+            try:
+                await run_in_threadpool(
+                    _check_and_register_geoip_anomaly,
+                    request,
+                    asn_cc_reader,
+                    clickhouse,
+                    cc,
+                    asn,
+                    msmt_uid,
+                    data,
+                )
+            except Exception as e:
+                log.error(f"Error checking for geoip anomalies: {e}")
+                Metrics.COMPARE_CC_FAILURE.inc()
+
+        return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")
@@ -231,6 +239,53 @@ def _set_unverified_flag(data: bytes) -> bytes:
     measurement["is_verified"] = "u"
     with Metrics.SERIALIZE_BODY_TIMING.time():
         return ujson.dumps(measurement).encode("utf-8")
+
+
+def _check_and_register_geoip_anomaly(
+    request: Request,
+    asn_cc_reader: ASNCCReaderDep,
+    clickhouse: ClickhouseDep,
+    cc: str,
+    asn: str,
+    msmt_uid: str,
+    data: bytes,
+) -> None:
+    actual_cc, actual_asn = get_cc_asn(request, asn_cc_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        # expensive: parses measurement body and sends anomaly to clickhouse
+        platform, software_name, software_version = _parse_metadata(data)
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+    else:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
+
+
+def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
+    """
+    Parse measurement body, and return the following metadata:
+
+    platform, software_name, software_version
+    """
+    try:
+        body = ujson.loads(data.decode("utf-8"))
+    except Exception as e:
+        log.error(f"Couldn't parse json body: {e}")
+        return ("", "", "")
+    content = body.get("content", {})
+    annotations = content.get("annotations", {})
+    platform = annotations.get("platform", "")
+    software_name = content.get("software_name", "")
+    software_version = content.get("software_version", "")
+    return (platform, software_name, software_version)
 
 
 @timer(name="close_report")

@@ -6,8 +6,8 @@ Insert VPN credentials into database.
 
 import io
 import itertools
-import json
 import logging
+import ujson
 from base64 import b64encode
 from datetime import datetime, timezone
 from os import urandom
@@ -161,51 +161,73 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
     raise HTTPException(status_code=status_code, detail=msg)
 
 
-def compare_probe_msmt_cc_asn(
-    measurement_uid: str,
-    cc: str,
-    asn: str,
-    request: Request,
-    asn_cc_reader: ASNCCReaderDep,
-    clickhouse: ClickhouseDep,
-):
-    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
-    Generates a metric.
-    """
-    cc = cc.upper()
-    ipaddr = extract_probe_ipaddr(request)
-    db_cc, db_asn, _ = geolookup_probe(ipaddr, asn_cc_reader)
+def normalize_asn(asn: str) -> int:
+    """Return ASN as int (strip 'AS' prefix if present). Invalid values return 0."""
+    s = str(asn).strip()
+    s = s[2:] if s.startswith("AS") else s
+    try:
+        return int(s)
+    except (ValueError, TypeError) as e:
+        log.error(f"Invalid asn: {e}")
+        return 0
 
-    if db_asn.startswith("AS"):
-        db_asn = db_asn[2:]
-    if db_cc == cc and db_asn == asn:
-        Metrics.PROBE_CC_ASN_MATCH.inc()
-    if db_cc != cc:
+
+def get_cc_asn(
+    request: Request, asn_cc_reader: ASNCCReaderDep
+) -> Tuple[str, str]:
+    """Geo-lookup the request's source IP and return (cc, asn).
+
+    Falls back to ("ZZ", "AS0") when the lookup fails.
+    """
+    ipaddr = extract_probe_ipaddr(request)
+    try:
+        cc, asn, _ = geolookup_probe(ipaddr, asn_cc_reader)
+    except AddressNotFoundError:
+        return ("ZZ", "AS0")
+    return cc, asn
+
+
+def register_geoip_anomaly(
+    cc: str,
+    actual_cc: str,
+    asn: str,
+    actual_asn: str,
+    clickhouse: ClickhouseDep,
+    measurement_uid: str,
+    platform: str,
+    software_name: str,
+    software_version: str,
+) -> None:
+    """Record a geoip mismatch in faulty_measurements."""
+    sub_asn = normalize_asn(asn)
+    actual_asn_int = normalize_asn(actual_asn)
+    if actual_cc != cc:
         Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-    if db_asn != asn:
+    if actual_asn_int != sub_asn:
         Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
 
-    if db_asn != asn or db_cc != cc:
-        details = json.dumps(
-            {
-                "submission_cc": cc,
-                "submission_asn": int(asn),
-                "measurement_uid": measurement_uid,
-            }
-        )
-
-        insert_click(
-            clickhouse,
-            """
-            INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
-            SETTINGS
-                async_insert=1,
-                wait_for_async_insert=0
-            VALUES
-            """,
-            [("geoip", db_cc, int(db_asn), details)],
-            max_execution_time=5,
-        )
+    details = ujson.dumps(
+        {
+            "submission_cc": cc.upper(),
+            "submission_asn": sub_asn,
+            "measurement_uid": measurement_uid,
+            "software_name": software_name,
+            "software_version": software_version,
+            "platform": platform,
+        }
+    )
+    insert_click(
+        clickhouse,
+        """
+        INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
+        SETTINGS
+            async_insert=1,
+            wait_for_async_insert=0
+        VALUES
+        """,
+        [("geoip", actual_cc, actual_asn_int, details)],
+        max_execution_time=5,
+    )
 
 
 def get_first_ip(headers: str) -> str:

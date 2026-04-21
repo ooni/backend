@@ -48,8 +48,8 @@ async def test_missing_geolookup(client, monkeypatch):
 
     for ip in j["addresses"]:
         assert g[ip]["cc"] == "ZZ"
-        assert g[ip]["asn"] == None
-        assert g[ip]["as_name"] == None
+        assert g[ip]["asn"] is None
+        assert g[ip]["as_name"] is None
 
 
 def patched_geolookup_probe(ipaddr: str, asn_reader) -> Tuple[str, str, str]:
@@ -68,7 +68,7 @@ async def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, 
 
     monkeypatch.setattr(utils, "geolookup_probe", patched_geolookup_probe)
 
-    j = {
+    report_req = {
         "data_format_version": "0.2.0",
         "format": "json",
         "probe_asn": "AS65550",
@@ -80,53 +80,69 @@ async def test_geoip_mismatch(client, clickhouse_db, clean_faulty_measurements, 
         "test_version": "0.1.0",
     }
 
+    report_body = {
+        "format": "json",
+        "content": {
+            "probe_asn": "AS65550",
+            "probe_cc": "VE",
+            "software_name": "ooni-integ-test",
+            "software_version": "0.0.0",
+            "annotations": {"platform": "linux"},
+            "test_name": "web_connectivity",
+            "test_start_time": "2020-09-09 14:11:11",
+            "test_version": "0.1.0",
+        },
+    }
+
     c = postj(
         client,
         "/report",
-        j,
+        report_req,
     )
     rid = c["report_id"]
-
-    # Clear table before starting
-    clickhouse_db.execute("TRUNCATE TABLE faulty_measurements")
-
-    body = {"format": "json", "content": {}}
 
     # matching cc and asn
     postj(
         client,
         f"/report/{rid}",
-        body,
+        report_body,
         headers={"X-Forwarded-For": "123.123.123.123"},
     )
     time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 0)
 
     # cc mismatch only
     postj(
         client,
         f"/report/{rid}",
-        body,
+        report_body,
         headers={"X-Forwarded-For": "123.123.123.124"},
     )
     time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 1)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65550)
 
     # ASN mismatch only
     postj(
         client,
         f"/report/{rid}",
-        body,
+        report_body,
         headers={"X-Forwarded-For": "123.123.123.125"},
     )
     time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 2)
+    _check_mismatch(clickhouse_db, "VE", 65550, "VE", 65551)
 
     # both cc and ASN mismatch
     postj(
         client,
         f"/report/{rid}",
-        body,
+        report_body,
         headers={"X-Forwarded-For": "123.123.123.126"},
     )
     time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 3)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
 
 
 @pytest.mark.asyncio
@@ -157,15 +173,58 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
     msm_content["annotations"] = {"platform": "linux"}
 
 
-def check_mismatch(
-    clickhouse_db : Clickhouse,
+    # matching cc and asn
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.123"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 0)
+
+    # cc mismatch only
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.124"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 1)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65550)
+
+    # ASN mismatch only
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.125"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 2)
+    _check_mismatch(clickhouse_db, "VE", 65550, "VE", 65551)
+
+    # both cc and ASN mismatch
+    postj(
+        client,
+        f"/api/v1/submit_measurement/{rid}",
+        msm,
+        headers={"X-Forwarded-For": "123.123.123.126"},
+    )
+    time.sleep(0.1)  # Allow async insert to complete
+    _check_fm_count(clickhouse_db, 3)
+    _check_mismatch(clickhouse_db, "VE", 65550, "US", 65551)
+
+def _check_mismatch(
+    clickhouse : Clickhouse,
     submission_cc: str,
     submission_asn: int,
     actual_cc: str,
     actual_asn: int,
 ):
     row = query_click_one_row(
-        clickhouse_db,
+        clickhouse,
         """
         SELECT *
         FROM faulty_measurements
@@ -181,3 +240,19 @@ def check_mismatch(
     details = json.loads(row["details"])
     assert details["submission_cc"] == submission_cc
     assert details["submission_asn"] == submission_asn
+    assert "measurement_uid" in details and details['measurement_uid']
+    assert "software_name" in details and details['software_name']
+    assert "software_version" in details and details['software_version']
+    assert "platform" in details and details['platform']
+
+def _check_fm_count(clickhouse_db: Clickhouse, expected: int):
+    """
+    Checks that there are exactly `expected` faulty measurements entries
+    """
+
+    r = query_click_one_row(
+        clickhouse_db,
+        "SELECT count(*) as total FROM faulty_measurements",
+        {},
+    )
+    assert r and r["total"] == expected, r

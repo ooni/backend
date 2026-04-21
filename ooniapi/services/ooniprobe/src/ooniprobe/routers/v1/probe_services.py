@@ -3,25 +3,25 @@ import io
 import logging
 import random
 import time
-from enum import Enum
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from hashlib import sha512
 from typing import (
-    Annotated,
+    List,
     Any,
     Dict,
-    List,
-    Optional,
     Tuple,
+    Optional,
+    Annotated,
 )
 
 import ooniauth_py
 import ujson
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from ooniauth_py import (
+    ProtocolError,
     CredentialError,
     DeserializationFailed,
-    ProtocolError,
     ServerState,
 )
 from pydantic import Field, IPvAnyAddress
@@ -48,11 +48,14 @@ from ...dependencies import (
     PsiphonConfigDep
 )
 from ...utils import (
-    compare_probe_msmt_cc_asn,
     extract_probe_ipaddr,
     generate_report_id,
     geolookup_probe,
+    get_cc_asn,
+    normalize_asn,
+    register_geoip_anomaly,
 )
+
 from ..reports import Metrics
 
 router = APIRouter(prefix="/v1")
@@ -942,6 +945,11 @@ async def submit_measurement(
         submit_request, manifest, settings
     )
 
+    annotations = submit_request.content.get("annotations", {})
+    platform = annotations.get("platform") or ""
+    software_name = submit_request.content.get("software_name") or ""
+    software_version = submit_request.content.get("software_version") or ""
+
     data = submit_request.model_dump()
 
     # Add verification-related data.
@@ -964,49 +972,60 @@ async def submit_measurement(
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
-    with Metrics.COMPARE_CC_TIMING.time():
-        try:
-            await run_in_threadpool(
-                compare_probe_msmt_cc_asn,
-                msmt_uid,
-                cc,
-                asn,
-                request,
-                cc_reader,
-                asn_reader,
-                clickhouse,
-            )
-        except Exception:
-            log.exception("failed to compared probe_msmt_cc_asn")
-            Metrics.COMPARE_CC_FAILURE.inc()
-
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
     client = request.app.state.fastpath_client
     N_RETRIES = 3
-    for t in range(N_RETRIES):
-        try:
-            url = f"{settings.fastpath_url}/{msmt_uid}"
+    success = False
+    with Metrics.SEND_FASTPATH_TIMING.time():
+        for t in range(N_RETRIES):
+            try:
+                url = f"{settings.fastpath_url}/{msmt_uid}"
 
-            resp = await run_in_threadpool(client.post, url, data=data)
-            with resp:
-                resp.raise_for_status()
+                resp = await run_in_threadpool(client.post, url, data=data_bin)
+                with resp:
+                    resp.raise_for_status()
 
-            return SubmitMeasurementResponse(
-                measurement_uid=msmt_uid,
-                verification_status=verification_status,
-                submit_response=submit_response,
-                error=submit_error,
-            )
+                Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
+                success = True
+                break
 
-        except Exception as exc:
-            log.error(
-                f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
-            )
-            sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
-            await asyncio.sleep(sleep_time)
+            except Exception as exc:
+                log.error(
+                    f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+                )
+                sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
+                await asyncio.sleep(sleep_time)
 
-    Metrics.SEND_FASTPATH_FAILURE.inc()
+    if success:
+        # Geoip anomaly detection runs only when the measurement was successfully
+        # submitted to the fastpath, so retries don't cause duplicate anomaly entries.
+        with Metrics.COMPARE_CC_TIMING.time():
+            try:
+                await run_in_threadpool(
+                    _check_and_register_geoip_anomaly,
+                    request,
+                    asn_cc_reader,
+                    clickhouse,
+                    cc,
+                    asn,
+                    msmt_uid,
+                    platform,
+                    software_name,
+                    software_version,
+                )
+            except Exception as e:
+                log.error(f"Error checking for geoip anomalies: {e}")
+                Metrics.COMPARE_CC_FAILURE.inc()
+
+        return SubmitMeasurementResponse(
+            measurement_uid=msmt_uid,
+            verification_status=verification_status,
+            submit_response=submit_response,
+            error=submit_error,
+        )
+
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     data_buff.seek(0)
@@ -1144,6 +1163,33 @@ def get_ranges_from_policy(
     )
 
 
+def _check_and_register_geoip_anomaly(
+    request: Request,
+    asn_cc_reader: ASNCCReaderDep,
+    clickhouse: ClickhouseDep,
+    cc: str,
+    asn: str,
+    msmt_uid: str,
+    platform: str,
+    software_name: str,
+    software_version: str,
+) -> None:
+    actual_cc, actual_asn = get_cc_asn(request, asn_cc_reader)
+    if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
+        register_geoip_anomaly(
+            cc,
+            actual_cc,
+            asn,
+            actual_asn,
+            clickhouse,
+            msmt_uid,
+            platform,
+            software_name,
+            software_version,
+        )
+    else:
+        Metrics.PROBE_CC_ASN_MATCH.inc()
+
 class CredentialUpdateRequest(BaseModel):
     old_manifest_version: str = Field(
         description="The original manifest version you are trying to update from"
@@ -1244,15 +1290,15 @@ class PsiphonConfig(BaseModel):
 @router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
 def psiphon_config(
     request: Request,
-    settings: SettingsDep,
     config: PsiphonConfigDep
     ) -> PsiphonConfig:
 
     token = request.headers.get("Authorization")
-    if token == None:
+    if token is None:
         # XXX not actually validated
         pass
     if config is not None:
         return config
+
     log.info("psiphon-config: failed to receive psiphon-config from s3")
     raise HTTPException(status_code=401, detail="Invalid psiphon-config")
