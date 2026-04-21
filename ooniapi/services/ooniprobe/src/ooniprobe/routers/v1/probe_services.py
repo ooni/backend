@@ -708,7 +708,7 @@ async def geolookup(
                 asn = int(asn[2:])
 
         except AddressNotFoundError:
-            cc = None
+            cc = "ZZ"
             asn = as_name = None
         geolocation[ipaddr] = GeoLookupResult(
             cc=cc, asn=asn, as_name=as_name
