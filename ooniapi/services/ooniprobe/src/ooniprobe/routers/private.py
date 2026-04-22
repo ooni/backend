@@ -107,7 +107,15 @@ def api_private_asn_by_month() -> ASNByMonthResponse:
     return validated
 
 
-@api_private_blueprint.route("/countries_by_month")
+class CountryCount(BaseModel):
+    date: datetime = Field(..., description="Timestamp for the measurement (ISO 8601).")
+    value: int = Field(..., description="Count of unique countries seen.")
+
+
+CountryByMonthResponse = List[ASNCount]
+
+
+@router.get("/countries_by_month", tags=["private_api"], response_model=CountryByMonthResponse)
 def api_private_countries_by_month() -> Response:
     """Countries count by month
     ---
@@ -125,7 +133,8 @@ def api_private_countries_by_month() -> Response:
     """
     li = list(query_click(q, {}))
     expand_dates(li)
-    return cachedjson("1d", li)
+    validated: CountryByMonthResponse = [CountryCount(**item) for item in li]
+    return validated
 
 
 @api_private_blueprint.route("/test_names", methods=["GET"])
