@@ -136,8 +136,13 @@ def api_private_countries_by_month() -> Response:
     validated: CountryByMonthResponse = [CountryCount(**item) for item in li]
     return validated
 
+class TestName(BaseModel):
+    id: str = Field(..., description="test id")
+    name: str = Field(..., description="test name")
 
-@api_private_blueprint.route("/test_names", methods=["GET"])
+TestNamesResponse: List[TestName]
+
+@router.get("/test_names", tags=["private_api"], response_model=TestNamesResponse)
 def api_private_test_names() -> Response:
     """Provides test names and descriptions to Explorer
     ---
@@ -172,8 +177,8 @@ def api_private_test_names() -> Response:
         "web_connectivity": "Web Connectivity",
         "whatsapp": "WhatsApp",
     }
-    test_names = [{"id": k, "name": v} for k, v in TEST_NAMES.items()]
-    return cachedjson("1h", test_names=test_names)
+    validated: TestNamesResponse = [TestName(id=k, name=v) for k, v in TEST_NAMES.items()]
+    return validated
 
 
 @api_private_blueprint.route("/countries", methods=["GET"])
