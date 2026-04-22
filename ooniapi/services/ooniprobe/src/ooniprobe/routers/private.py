@@ -397,8 +397,18 @@ def api_private_test_coverage(
     return validated
 
 
-@api_private_blueprint.route("/website_networks", methods=["GET"])
-def api_private_website_network_tests() -> Response:
+class MeasurementsByASN(BaseModel):
+    count: int = Field(..., description="Number of measurments for eachnetworks in country")
+    probe_asn: str = Field(..., description="Autonomous System Number")
+
+
+WebsiteNetworksResponse: List[MeasurementsByASN]
+
+
+@router.get("/website_networks", response_model=WebsiteNetworksResponse, tags=["private"])
+def api_private_website_network_tests(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code")
+    ) -> WebsiteNetworksResponse:
     """TODO
     ---
     parameters:
@@ -410,7 +420,6 @@ def api_private_website_network_tests() -> Response:
       '200':
         description: TODO
     """
-    probe_cc = validate_probe_cc_query_param()
     s = """SELECT
         COUNT() AS count,
         probe_asn
@@ -423,7 +432,8 @@ def api_private_website_network_tests() -> Response:
         ORDER BY count DESC
         """
     results = query_click(sql.text(s), {"probe_cc": probe_cc})
-    return cachedjson("0s", results=results)
+    validated: WebsiteNetworksResponse = [MeasurementsByASN(**x) for x in results]
+    return validated
 
 
 @api_private_blueprint.route("/website_stats", methods=["GET"])
