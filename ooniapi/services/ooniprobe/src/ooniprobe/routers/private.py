@@ -77,8 +77,16 @@ def expand_dates(li):
         i["date"] = i["date"].strftime("%Y-%m-%dT00:00:00+00:00")
 
 
-@api_private_blueprint.route("/asn_by_month")
-def api_private_asn_by_month() -> Response:
+class ASNCount(BaseModel):
+    date: datetime = Field(..., description="Timestamp for the measurement (ISO 8601).")
+    value: int = Field(..., description="Count of unique ASN seen.")
+
+
+ASNByMonthResponse = List[ASNCount]
+
+
+@router.get("/asn_by_month", tags=["private_api"], response_model=ASNByMonthResponse)
+def api_private_asn_by_month() -> ASNByMonthResponse:
     """Network count by month
     ---
     responses:
@@ -95,7 +103,8 @@ def api_private_asn_by_month() -> Response:
     """
     li = list(query_click(q, {}))
     expand_dates(li)
-    return cachedjson("1d", li)
+    validated: ASNByMonthResponse = [ASNCount(**item) for item in li]
+    return validated
 
 
 @api_private_blueprint.route("/countries_by_month")
