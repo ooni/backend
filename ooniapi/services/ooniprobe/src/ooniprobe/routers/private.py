@@ -364,8 +364,16 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
     return query_click(sql.text(s), d)
 
 
-@api_private_blueprint.route("/test_coverage", methods=["GET"])
-def api_private_test_coverage() -> Response:
+class TestCoverageResponse(BaseModel):
+    network_coverage: List[Any]
+    test_coverage: List[Any]
+
+
+@router.get("/test_coverage", response_model=TestCoverageResponse, tags=["private"])
+def api_private_test_coverage(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    test_groups: str = Field(None, description="XXX: What is this?")
+) -> TestCoverageResponse:
     """Return number of measurements per day across test categories
     ---
     parameters:
@@ -380,14 +388,13 @@ def api_private_test_coverage() -> Response:
     """
     # TODO: merge the two queries into one?
     # TODO: remove test categories or move aggregation to the front-end?
-    probe_cc = validate_probe_cc_query_param()
-    test_groups = request.args.get("test_groups")
     if test_groups is not None:
         test_groups = test_groups.split(",")
 
     tc = get_recent_test_coverage_ch(probe_cc)
     nc = get_recent_network_coverage_ch(probe_cc, test_groups)
-    return cachedjson("1h", network_coverage=nc, test_coverage=tc)
+    validated = TestCoverageResponse(network_coverage=nc, test_coverage=tc)
+    return validated
 
 
 @api_private_blueprint.route("/website_networks", methods=["GET"])
