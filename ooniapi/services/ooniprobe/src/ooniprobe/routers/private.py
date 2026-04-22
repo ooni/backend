@@ -39,6 +39,7 @@ from ooniapi.probe_services import (
 
 from ..common.routers import BaseModel
 from fastapi import APIRouter, Header, Request, Response
+from pydantic_extra_types.country import CountryAlpha2
 
 
 # The private API is exposed under the prefix /api/_
@@ -181,8 +182,17 @@ def api_private_test_names() -> Response:
     return validated
 
 
-@api_private_blueprint.route("/countries", methods=["GET"])
-def api_private_countries() -> Response:
+class CountryStat(BaseModel):
+    alpha_2: CountryAlpha2 = Field(..., description="Country Code")
+    count: int = Field(..., description="Measurement count")
+    name: str = Field(..., description="Country Name")
+
+
+AllCountryStats : List[CountryStat]
+
+
+@router.get("/countries", tags=["private_api"], response_model=AllCountryStats)
+def api_private_countries() -> AllCountryStats:
     """Summary of countries
     ---
     responses:
@@ -200,12 +210,13 @@ def api_private_countries() -> Response:
         try:
             name = lookup_country(r["probe_cc"])
             c.append(
-                dict(alpha_2=r["probe_cc"], name=name, count=r["measurement_count"])
+                CountryStat(alpha_2=r["probe_cc"], name=name, count=r["measurement_count"])
             )
         except KeyError:
             pass
 
-    return cachedjson("1d", countries=c)
+    validated: AllCountryStats = c
+    return validated
 
 
 @api_private_blueprint.route("/quotas_summary", methods=["GET"])
