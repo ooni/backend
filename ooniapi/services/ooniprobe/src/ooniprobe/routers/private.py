@@ -24,7 +24,6 @@ from ooniapi.auth import role_required
 from ooniapi.config import metrics
 from ooniapi.countries import lookup_country
 from ooniapi.data import dnscheck_inputs, stunreachability_inputs
-from ooniapi.database import query_click, query_click_one_row
 from ooniapi.models import TEST_GROUPS
 from ooniapi.prio import generate_test_list
 from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
@@ -38,6 +37,7 @@ from ooniapi.probe_services import (
 
 
 from ..common.routers import BaseModel
+from ..common.clickhouse_utils import query_click, query_click_one_row
 from fastapi import APIRouter, Header, Request, Response
 from pydantic_extra_types.country import CountryAlpha2
 
