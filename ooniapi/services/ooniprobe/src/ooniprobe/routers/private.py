@@ -236,9 +236,16 @@ def api_private_quotas_summary() -> Response:
     raise NotImplemented
 
 
+class CheckReportIDResponse(BaseModel):
+    v: int = Field(..., description="version number of this response")
+    found: bool = Field(..., description="Report found")
 
-@api_private_blueprint.route("/check_report_id", methods=["GET"])
-def check_report_id() -> Response:
+
+@router.get("/check_report_id",
+    response_model=CheckReportIDResponse,
+    tags=["private_api"],
+)
+def check_report_id() -> CheckReportIDResponse:
     """Legacy. Used to check if a report_id existed in the fastpath table.
     Used by https://github.com/ooni/probe/issues/1034
     ---
@@ -263,7 +270,7 @@ def check_report_id() -> Response:
           example: { "found": true, "v": 0 }
 
     """
-    return cachedjson("1s", v=0, found=True)
+    return CheckReportIDResponse(v=0, found=true)
 
 
 def last_30days(begin=31, end=1):
