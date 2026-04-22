@@ -1128,7 +1128,6 @@ def private_api_check_in() -> Response:
                           type: object
 
     """
-    log = current_app.logger
     # TODO: Implement throttling
     data = req_json()
     run_type = data.get("run_type", "timed")
