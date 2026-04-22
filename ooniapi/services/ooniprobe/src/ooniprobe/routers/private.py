@@ -373,7 +373,7 @@ class TestCoverageResponse(BaseModel):
 @router.get("/test_coverage", response_model=TestCoverageResponse, tags=["private"])
 def api_private_test_coverage(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    test_groups: str = Field(None, description="XXX: What is this?")
+    test_groups: str = Query(None, description="XXX: What is this?")
 ) -> TestCoverageResponse:
     """Return number of measurements per day across test categories
     ---
