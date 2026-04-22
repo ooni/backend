@@ -36,14 +36,19 @@ from ooniapi.probe_services import (
     generate_report_id,
 )
 
+
+from ..common.routers import BaseModel
+from fastapi import APIRouter, Header, Request, Response
+
+
 # The private API is exposed under the prefix /api/_
 # e.g. https://api.ooni.io/api/_/test_names
+router = APIRouter(prefix="/_")
 
-api_private_blueprint = Blueprint("api_private", "measurements")
+log = logging.getLogger(__name__)
 
 # TODO: configure tags for HTTP caching across where useful
 
-log = logging.getLogger()
 
 
 def daterange(start_date, end_date):
