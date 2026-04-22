@@ -36,10 +36,12 @@ from ooniapi.probe_services import (
 )
 
 
-from ..common.routers import BaseModel
-from ..common.clickhouse_utils import query_click, query_click_one_row
-from fastapi import APIRouter, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic_extra_types.country import CountryAlpha2
+
+from ..common.clickhouse_utils import query_click, query_click_one_row
+from ..common.dependencies import role_required
+from ..common.routers import BaseModel
 
 
 # The private API is exposed under the prefix /api/_
@@ -219,13 +221,20 @@ def api_private_countries() -> AllCountryStats:
     return validated
 
 
-@api_private_blueprint.route("/quotas_summary", methods=["GET"])
-@role_required(["admin"])
+@router.get(
+    "/quotas_summary",
+    response_model=AllCountryStats,
+    tags=["private_api"],
+    dependencies=[Depends(role_required(["admin"]))],
+)
 def api_private_quotas_summary() -> Response:
     """Summary on rate-limiting quotas.
     [(first ipaddr octet, remaining daily quota), ... ]
     """
-    return nocachejson(current_app.limiter.get_lowest_daily_quotas_summary())
+    # XXX: add limiter to ooniapi
+    #return nocachejson(current_app.limiter.get_lowest_daily_quotas_summary())
+    raise NotImplemented
+
 
 
 @api_private_blueprint.route("/check_report_id", methods=["GET"])
