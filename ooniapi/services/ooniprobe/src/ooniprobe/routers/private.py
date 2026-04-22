@@ -36,8 +36,9 @@ from ooniapi.probe_services import (
 )
 
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
+from pydantic import AnyUrl
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required
