@@ -482,8 +482,32 @@ def api_private_website_stats(
     return WebsiteStatsResponse(result=results)
 
 
-@api_private_blueprint.route("/website_urls", methods=["GET"])
-def api_private_website_test_urls() -> Response:
+class WebsiteURLItem(BaseModel):
+    input: AnyUrl
+    anomaly_count: conint(ge=0)
+    confirmed_count: conint(ge=0)
+    failure_count: conint(ge=0)
+    total_count: conint(ge=0)
+
+class PaginationMetadata(BaseModel):
+    offset: int
+    limit: int
+    current_page: int
+    total_count: int
+    next_url: Optional[AnyUrl] = None
+
+class WebsiteURLsResponse(BaseModel):
+    metadata: PaginationMetadata
+    results: List[WebsiteURLItem]
+
+
+@router.get("/website_urls", response_model=WebsiteURLsResponse, tags=["private"])
+def api_private_website_test_urls(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    probe_asn: str = Query(..., description="ASN, e.g. AS1234")
+    limit: int = Query(10, description="Limit results")
+    offset: int = Query(0, description="Offset results")
+) -> WebsiteURLsResponse:
     """TODO
     ---
     responses:
@@ -491,13 +515,9 @@ def api_private_website_test_urls() -> Response:
         description: TODO
     """
     # TODO optimize or remove
-    limit = int(request.args.get("limit", 10))
     if limit <= 0:
         limit = 10
-    offset = int(request.args.get("offset", 0))
 
-    probe_cc = validate_probe_cc_query_param()
-    probe_asn = validate_probe_asn_query_param()
     probe_asn = int(probe_asn.replace("AS", ""))
 
     # Count how many distinct inputs we have in this CC / ASN / period
@@ -562,7 +582,8 @@ def api_private_website_test_urls() -> Response:
         )
         metadata["next_url"] = next_url
 
-    return cachedjson("1h", metadata=metadata, results=results)  # TODO caching
+    # validate and return
+    return WebsiteURLsResponse(metadata=metadata, results=results)
 
 
 @api_private_blueprint.route("/vanilla_tor_stats", methods=["GET"])
