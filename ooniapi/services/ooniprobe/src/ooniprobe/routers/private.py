@@ -869,8 +869,14 @@ def api_private_country_overview(
     return result
 
 
-@api_private_blueprint.route("/global_overview", methods=["GET"])
-def api_private_global_overview() -> Response:
+class GlobalOverviewResponse(BaseModel):
+    network_count: int = Field(..., "Number of networks measured")
+    country_count: int = Field(..., "Nubmer of countries measured")
+    measurement_count: int = Field(..., "Number of total measurements")
+
+
+@router.get("/global_overview", response_model=GlobalOverviewResponse, tags=["private"])
+def api_private_global_overview() -> GlobalOverviewResponse:
     """Provide global summary of measurements
     Sources: global_stats db table
     ---
@@ -886,7 +892,11 @@ def api_private_global_overview() -> Response:
     """
     r = query_click_one_row(q, {})
     assert r
-    return cachedjson("1d", **r)
+    result = GlobalOverViewResponse(
+            network_count=r["network_count"],
+            country_count=r["country_count"],
+            measurement_count=r["measurement_count"])
+    return result
 
 
 @api_private_blueprint.route("/global_overview_by_month", methods=["GET"])
