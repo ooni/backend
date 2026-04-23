@@ -832,8 +832,15 @@ def api_private_network_stats(
     return NetworkStatsResponse(metadata=NetworkMetadata(), results=[])
 
 
-@api_private_blueprint.route("/country_overview", methods=["GET"])
-def api_private_country_overview() -> Response:
+class CountryOverviewResponse(BaseModel):
+    first_bucket_date: date = Field(..., description="First bucket date YYYY-MM-DD")
+    measurement_count: int = Field(..., description="Number of measurements")
+    network_count: int = Field(..., description="Number of networks measured")
+
+@router.get("/country_overview", response_model=CountryOverviewResponse, tags=["private"])
+def api_private_country_overview(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+) -> CountryOverviewResponse:
     """Country-specific overview
     ---
     responses:
@@ -845,7 +852,6 @@ def api_private_country_overview() -> Response:
     """
     # TODO: add circumvention_tools_blocked im_apps_blocked
     # middlebox_detected_networks websites_confirmed_blocked
-    probe_cc = validate_probe_cc_query_param()
     s = """SELECT
         toDate(MIN(measurement_start_time)) AS first_bucket_date,
         COUNT() AS measurement_count,
@@ -856,8 +862,11 @@ def api_private_country_overview() -> Response:
     """
     r = query_click_one_row(sql.text(s), {"probe_cc": probe_cc})
     assert r
-    # FIXME: websites_confirmed_blocked
-    return cachedjson("1d", **r)
+    result = CountryOverviewResponse(
+            first_bucket_date=r["first_bucket_date"],
+            measurement_count=r["measurement_count"],
+            network_count=r["network_count"])
+    return result
 
 
 @api_private_blueprint.route("/global_overview", methods=["GET"])
