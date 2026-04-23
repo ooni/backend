@@ -586,8 +586,27 @@ def api_private_website_test_urls(
     return WebsiteURLsResponse(metadata=metadata, results=results)
 
 
-@api_private_blueprint.route("/vanilla_tor_stats", methods=["GET"])
-def api_private_vanilla_tor_stats() -> Response:
+class NetworkStat(BaseModel):
+    failure_count: int
+    last_tested: Optional[date]  # SQL toDate() returns a date
+    probe_asn: int
+    total_count: int
+    success_count: int
+    test_runtime_avg: Optional[float] = None
+    test_runtime_max: Optional[float] = None
+    test_runtime_min: Optional[float] = None
+
+
+class TorStatsResponse(BaseModel):
+    last_tested: Optional[date]
+    networks: List[NetworkStat]
+    notok_networks: int
+
+
+@router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
+def api_private_vanilla_tor_stats(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code")
+) -> TorStatsResponse:
     """Tor statistics over ASN for a given CC
     ---
     parameters:
@@ -600,7 +619,6 @@ def api_private_vanilla_tor_stats() -> Response:
       '200':
         description: TODO
     """
-    probe_cc = validate_probe_cc_query_param()
     blocked = 0
     nets = []
     s = """SELECT
@@ -628,10 +646,18 @@ def api_private_vanilla_tor_stats() -> Response:
                 blocked += 1
 
     if not nets:
-        return cachedjson("0s", networks=[], notok_networks=0, last_tested=None)
+        return TorStatsResponse(
+            last_tested=None,
+            networks=[],
+            notok_networks=0,
+        )
 
     lt = max(n["last_tested"] for n in nets)
-    return cachedjson("0s", networks=nets, notok_networks=blocked, last_tested=lt)
+    return TorStatsResponse(
+        last_tested=lt,
+        networks=nets,
+        notok_networks=blocked,
+    )
 
 
 @api_private_blueprint.route("/im_networks", methods=["GET"])
