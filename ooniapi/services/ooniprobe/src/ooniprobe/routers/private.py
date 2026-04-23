@@ -727,21 +727,33 @@ def isomid(d) -> str:
     return f"{d}T00:00:00+00:00"
 
 
-@api_private_blueprint.route("/im_stats", methods=["GET"])
-def api_private_im_stats() -> Response:
+class IMStatsItem(BaseModel):
+    anomaly_count: Optional[int] = None
+    test_day: datetime
+    total_count: int
+
+
+class IMStatsResponse(BaseModel):
+    results: List[IMStatsItem]
+
+
+@router.get("/im_stats", response_model=IMStatsResponse, tags=["private"])
+def api_private_im_stats(
+    probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    test_name: str = Query(..., description="Test name")
+) -> IMStatsResponse:
     """Instant messaging statistics
     ---
     responses:
       '200':
         description: TODO
     """
-    test_name = request.args.get("test_name")
-    if not test_name or test_name not in TEST_GROUPS["im"]:
-        raise BadRequest("invalid test_name")
+    test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
+    if test_name not in test_names:
+        raise HTTPException(status_code=400, detail="Invalid test_name")
 
-    probe_cc = validate_probe_cc_query_param()
-    probe_asn = validate_probe_asn_query_param()
-    probe_asn = int(probe_asn.replace("AS", ""))
+    probe_asn = int(probe_asn.upper().replace("AS", ""))
 
     s = """SELECT
         COUNT() as total_count,
@@ -762,7 +774,7 @@ def api_private_im_stats() -> Response:
     }
     q = query_click(sql.text(s), query_params)
     tmp = {r["test_day"]: r for r in q}
-    results = []
+    items: List[IMStatsItem] = []
     days = [date.today() + timedelta(days=(d - 31)) for d in range(32)]
     for d in days:
         if d in tmp:
@@ -771,10 +783,10 @@ def api_private_im_stats() -> Response:
         else:
             test_day = isomid(d)
             total_count = 0
-        e = dict(anomaly_count=None, test_day=test_day, total_count=total_count)
-        results.append(e)
+        items.append(IMStatsItem(anomaly_count=None, test_day=test_day, total_count=total_count))
 
-    return cachedjson("1h", results=results)  # TODO caching
+    response = IMStatsResponse(results=items)
+    return response
 
 
 @api_private_blueprint.route("/network_stats", methods=["GET"])
