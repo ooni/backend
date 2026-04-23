@@ -789,8 +789,33 @@ def api_private_im_stats(
     return response
 
 
-@api_private_blueprint.route("/network_stats", methods=["GET"])
-def api_private_network_stats() -> Response:
+class NetworkStats(BaseModel):
+    asn: int = Field(..., description="ASN (int)")
+    asn_name: str = Field(..., description="Autonomous System Name")
+    download_speed_mbps_median: float = Field(description="Median download speed in megabits")
+    upload_speed_mbps_median: float = Field(description="Median upload speed in megabites")
+    middlebox_detected: bool = Field(..., description="Middlebox was detected")
+    msm_count: float = Field(..., description="FIXME: example: 24596.0")
+    rtt_avg: float = Field(..., description="Round Trip Time Average")
+
+
+class NetworkMetadata(BaseModel):
+    current_page: int = Field(1, description="Current page")
+    limit: int = Field(10, description="Result limit")
+    next_url: Optional[AnyUrl] = Field(None, description="Next URL")
+    offset: int = Field(0, description="Result offset")
+    total_count: int = Field(0, description="Total results")
+
+
+class NetworkStatsResponse(BaseModel):
+    metadata: NetworkMetadata = Field(..., description="Networks metadata")
+    results: List[NetworkStats] = Field(..., description="List of network stats")
+
+
+@router.get("/network_stats", response_model=NetworkStatsResponse, tags=["private"])
+def api_private_network_stats(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+) -> NetworkStatsResponse:
     """Network speed statistics - not implemented
     ---
     parameters:
@@ -803,44 +828,8 @@ def api_private_network_stats() -> Response:
         description: TODO
     """
     # TODO: implement the stats from NDT in fastpath and then here
-    probe_cc = validate_probe_cc_query_param()
 
-    return cachedjson(
-        "1d",
-        {
-            "metadata": {
-                "current_page": 1,
-                "limit": 10,
-                "next_url": None,
-                "offset": 0,
-                "total_count": 0,
-            },
-            "results": [],
-        },
-    )
-
-    # Sample:
-    # {
-    #     "metadata": {
-    #         "current_page": 1,
-    #         "limit": 10,
-    #         "next_url": "https://api.ooni.io/api/_/network_stats?probe_cc=IT&offset=10&limit=10",
-    #         "offset": 0,
-    #         "total_count": 238,
-    #     },
-    #     "results": [
-    #         {
-    #             "asn": 3269,
-    #             "asn_name": "ASN-IBSNAZ",
-    #             "download_speed_mbps_median": 12.154,
-    #             "middlebox_detected": null,
-    #             "msm_count": 24596.0,
-    #             "rtt_avg": 87.826,
-    #             "upload_speed_mbps_median": 2.279,
-    #         },
-    #         ...
-    #     ],
-    # }
+    return NetworkStatsResponse(metadata=NetworkMetadata(), results=[])
 
 
 @api_private_blueprint.route("/country_overview", methods=["GET"])
