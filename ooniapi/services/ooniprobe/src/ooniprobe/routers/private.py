@@ -38,7 +38,7 @@ from ooniapi.probe_services import (
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
-from pydantic import AnyUrl
+from pydantic import AnyUrl, conint
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required
@@ -436,21 +436,32 @@ def api_private_website_network_tests(
     validated: WebsiteNetworksResponse = [MeasurementsByASN(**x) for x in results]
     return validated
 
+class DayStats(BaseModel):
+    test_day: date
+    anomaly_count: conint(ge=0)
+    confirmed_count: conint(ge=0)
+    failure_count: conint(ge=0)
+    total_count: conint(ge=0)
 
-@api_private_blueprint.route("/website_stats", methods=["GET"])
-def api_private_website_stats() -> Response:
-    """TODO
+class WebsiteStatsResponse(BaseModel):
+    results: List[DayStats]
+
+@router.get("/website_stats", response_model=WebsiteStatsResponse, tags=["private"])
+def api_private_website_stats(
+    input: AnyUrl = Query(..., "Website to query stats"),
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    probe_asn: int = Query(..., description="ASN (integer)"),
+) -> Response:
+    """Returns daily aggregated stats for the given website, country and ASN
     ---
     responses:
       '200':
-        description: TODO
+      description: daily website stats
     """
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
-    url = request.args.get("input")
-    probe_cc = validate_probe_cc_query_param()
-    probe_asn = validate_probe_asn_query_param()
+    url = input
 
     s = """SELECT
         toDate(measurement_start_time) AS test_day,
@@ -468,7 +479,7 @@ def api_private_website_stats() -> Response:
     """
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
     results = query_click(sql.text(s), d)
-    return cachedjson("0s", results=results)
+    return WebsiteStatsResponse(result=results)
 
 
 @api_private_blueprint.route("/website_urls", methods=["GET"])
