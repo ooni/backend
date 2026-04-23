@@ -659,16 +659,32 @@ def api_private_vanilla_tor_stats(
         notok_networks=blocked,
     )
 
+class NetworkEntry(BaseModel):
+    asn: int
+    name: str
+    total_count: int
+    last_tested: date
 
-@api_private_blueprint.route("/im_networks", methods=["GET"])
-def api_private_im_networks() -> Response:
+
+class IMNetworkStats(BaseModel):
+    anomaly_networks: List[NetworkEntry]
+    ok_networks: List[NetworkEntry]
+    last_tested: date
+
+
+IMNetworksResponse: Dict[str, IMNetworksStats]
+
+
+@router.get("/im_networks", response_model=IMNetworksResponse, tags=["private"])
+def api_private_im_networks(
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code")
+) -> IMNetworksResponse:
     """Instant messaging networks statistics
     ---
     responses:
       '200':
         description: TODO
     """
-    probe_cc = validate_probe_cc_query_param()
     s = """SELECT
     COUNT() AS total_count,
     '' AS name,
@@ -683,31 +699,27 @@ def api_private_im_networks() -> Response:
     GROUP BY test_name, probe_asn
     ORDER BY test_name ASC, total_count DESC
     """
-    results: Dict[str, Dict] = {}
-    test_names = sorted(TEST_GROUPS["im"])
+    test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
     q = query_click(sql.text(s), {"probe_cc": probe_cc, "test_names": test_names})
+    results = IMNetworksResponse()
     for r in q:
-        e = results.get(
-            r["test_name"],
-            {
-                "anomaly_networks": [],
-                "ok_networks": [],
-                "last_tested": r["last_tested"],
-            },
-        )
-        e["ok_networks"].append(
-            {
-                "asn": r["probe_asn"],
-                "name": "",
-                "total_count": r["total_count"],
-                "last_tested": r["last_tested"],
-            }
-        )
-        if e["last_tested"] < r["last_tested"]:
-            e["last_tested"] = r["last_tested"]
-        results[r["test_name"]] = e
+        # get stats for test_name or create a new IMNetworksStats
+        stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested))
 
-    return cachedjson("1h", **results)  # TODO caching
+        # create and add a new entry
+        entry = NetworkEntry(asn=r["probe_asn"], name="", total_count=r["total_count"], last_tested=r["last_tested"])
+        stats.ok_networks.append(entry)
+
+        # XXX: anomaly_networks appears unused
+
+        # update last_tested if it is the latest measurement
+        if stats.last_tested < entry.last_tested:
+            stats.last_tested = entry.last_tested
+
+        # save the object in results
+        results[stats.test_name] = stats
+
+    return results
 
 
 def isomid(d) -> str:
