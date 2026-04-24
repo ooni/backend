@@ -14,11 +14,7 @@ from typing import Dict, Any, Tuple
 import logging
 import math
 
-from flask import Blueprint, current_app, request, Response
-
 from sqlalchemy import sql
-
-from werkzeug.exceptions import BadRequest
 
 from ooniapi.auth import role_required
 from ooniapi.config import metrics
