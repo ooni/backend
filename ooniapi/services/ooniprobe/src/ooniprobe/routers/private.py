@@ -527,8 +527,8 @@ class WebsiteURLsResponse(BaseModel):
 @router.get("/website_urls", response_model=WebsiteURLsResponse, tags=["private"])
 def api_private_website_test_urls(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    probe_asn: str = Query(..., description="ASN, e.g. AS1234")
-    limit: int = Query(10, description="Limit results")
+    probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
+    limit: int = Query(10, description="Limit results"),
     offset: int = Query(0, description="Offset results")
 ) -> WebsiteURLsResponse:
     """TODO
