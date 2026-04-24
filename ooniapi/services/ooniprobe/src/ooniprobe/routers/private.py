@@ -1118,8 +1118,14 @@ def api_private_domain_metadata(
     return DomainMetadataResponse(category_code=category_code, canonical_domain=canonical_domain)
 
 
-@api_private_blueprint.route("/asnmeta")
-def api_private_asnmeta() -> Response:
+class ASNMetadataResponse(BaseModel):
+    org_name: string = Field("Unknown", description="ORG Name of ASN")
+
+
+@router.get("/asnmeta", response_model=ASNMetadataResponse, tags=["private"])
+def api_private_asnmeta(
+    asn: int = Query(..., description="Autonomous System Number, e.g. 1234"),
+) -> ASNMetadataResponse:
     """Look up organization name by ASN
     Sources: ansmeta db table
     ---
@@ -1144,7 +1150,7 @@ def api_private_asnmeta() -> Response:
     """
     res = query_click_one_row(sql.text(q), dict(asn=asn))
     org_name = res["org_name"] if res else "Unknown"
-    return cachedjson("2h", org_name=org_name)
+    return ASNMetadataResponse(org_name=org_name)
 
 
 @api_private_blueprint.route("/networks")
