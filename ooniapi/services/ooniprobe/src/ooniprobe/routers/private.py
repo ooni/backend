@@ -911,6 +911,7 @@ class GlobalOverviewMonthResponse(BaseModel):
     countries_by_month: List[GlobalOverviewStat]
     measurement_by_month: List[GlobalOverviewStat]
 
+
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
 def api_private_global_by_month() -> Response:
     """Provide global summary of measurements
