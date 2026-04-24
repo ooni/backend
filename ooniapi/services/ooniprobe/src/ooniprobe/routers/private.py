@@ -1201,8 +1201,19 @@ def api_private_networks() -> Response:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
-@api_private_blueprint.route("/domains")
-def api_private_domains() -> Response:
+class MeasuredDomainStat(BaseModel):
+    category_code: str = Field(..., description="Citizenlab Category Code")
+    domain_name: DomainStr = Field(..., description="Domain Name")
+    measurement_count: int = Field(..., description="Number of measurements")
+
+
+class DomainsMeasuredResponse(BaseModel):
+    results: List[MeasuredDomainStat] = Field(..., description="Domains that have measurements")
+    v: int = Field(..., description="Version of API response")
+
+
+@router.get("/domains", response_model=DomainsMeasuredResponse, tags=["private"])
+def api_private_domains() -> DomainsMeasuredResponse:
     """List all the domains in the test-lists with their measurement count
     ---
     responses:
@@ -1234,9 +1245,9 @@ def api_private_domains() -> Response:
     """
     try:
         results = query_click(sql.text(q), {})
-        return cachedjson("2h", v=0, results=results)
+        return DomainsMeasuredResponse(v=0, results=results)
     except Exception as e:
-        return jerror(str(e), v=0)
+        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
 @api_private_blueprint.route("/check-in", methods=["POST"])
