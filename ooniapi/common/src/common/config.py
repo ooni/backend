@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 from pydantic import Field
+from pydantic.fields import Deprecated
 from pydantic_settings import BaseSettings
 
 
@@ -46,7 +47,16 @@ class Settings(BaseSettings):
     geoip_db_dir: str = "/var/lib/ooni/geoip"
     # -- < Ooniprobe only > -------------------------------------------------------------
     msmt_spool_dir: str = ""
-    fastpath_url: str = ""  # example: http://123.123.123.123:8472
+    fastpath_url: str = Field(
+        default="",
+        deprecated=Deprecated(
+            "This will be replaced by the `fastpath_urls` field in the near future"
+        ),
+    )  # example: http://123.123.123.123:8472
+    fastpath_urls: List[str] = Field(
+        description="List of fastpath instances to send measurements to",
+        default_factory=list,
+    )
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )

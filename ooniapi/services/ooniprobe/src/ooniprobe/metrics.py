@@ -88,7 +88,7 @@ class Metrics:
     SEND_FASTPATH_CNT = Counter(
         "measurement_fastpath_send_count",
         "How many times ooniprobe failed to send a measurement to fastpath",
-        labelnames=["status"],
+        labelnames=["status", "instance"],
     )
 
     SEND_S3_CNT = Counter(
