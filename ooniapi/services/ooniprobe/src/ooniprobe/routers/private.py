@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 import logging
 import math
@@ -974,7 +974,14 @@ def api_private_circumvention_stats_by_country() -> Response:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
-def pivot_circumvention_runtime_stats(rows):
+class CircumventionRuntimeStat(BaseModel):
+    test_name: str = Field(..., description="Name of test")
+    probe_cc: CountryAlpha2 = Field(..., description="Country code of probe")
+    date: date = Field(..., description="Date of metric")
+    v: Tuple[float, float, int] = Field((), description="(p50, p90, cnt)")
+
+
+def pivot_circumvention_runtime_stats(rows) -> List[CircumventionRuntimeStat]:
     # "pivot": create a datapoint for each probe_cc/test_name/date
     tmp = {}
     test_names = set()
@@ -992,18 +999,18 @@ def pivot_circumvention_runtime_stats(rows):
     test_names = sorted(test_names)
     no_data = ()
     result = [
-        dict(
-            test_name=k[0],
-            probe_cc=k[1],
-            date=k[2],
-            v=tmp.get(k, no_data),
-        )
+        RuntimeStat(test_name=k[0], probe_cc=k[1], date=k[2], v=tmp.get(k, no_data))
         for k in product(test_names, ccs, dates)
     ]
     return result
 
 
-@api_private_blueprint.route("/circumvention_runtime_stats")
+class CircumventionRuntimeStatsResponse(BaseModel):
+    results: List[CircumventionRuntimeStat]
+    v: int = Field(..., description="Version of API response")
+
+
+@router.get("/circumvention_runtime_stats", response_model=CircumventionRuntimeStatsResponse, tags=["private"])
 def api_private_circumvention_runtime_stats() -> Response:
     """Runtime statistics on protocols used for circumvention,
     grouped by date, country, test_name.
@@ -1028,11 +1035,10 @@ def api_private_circumvention_runtime_stats() -> Response:
     """
     try:
         r = query_click(sql.text(q), {})
-        result = pivot_circumvention_runtime_stats(r)
-        return cachedjson("1d", v=0, results=result)
+        return CircumventionRuntimeStatsResponse(results=pivot_circumvention_runtime_stats(r), v=0)
 
     except Exception as e:
-        return jerror(str(e), v=0)
+        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
 @api_private_blueprint.route("/domain_metadata")
