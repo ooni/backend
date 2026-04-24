@@ -940,7 +940,17 @@ def api_private_global_by_month() -> Response:
     return validated
 
 
-@api_private_blueprint.route("/circumvention_stats_by_country")
+class CountryCircumventionStat(BaseModel):
+    cnt: conint(ge=0) = Field(..., description="Count of measurements")
+    probe_cc: CountryAlpha2 = Field(..., description="Country code of probe")
+
+
+class CircumventionStatsResponse(BaseModel):
+    results: Optional[List[CountryCircumventionStat]] = Field(None, description="List of per-country circumvention tool measurement counts over 6 months")
+    v: int = Field(..., description="API Response version")
+
+
+@router.get("/circumvention_stats_by_country", response_model=CircumventionStatsResponse, tags=["private"])
 def api_private_circumvention_stats_by_country() -> Response:
     """Aggregated statistics on protocols used for circumvention,
     grouped by country.
@@ -958,10 +968,10 @@ def api_private_circumvention_stats_by_country() -> Response:
     """
     try:
         result = query_click(sql.text(q), {})
-        return cachedjson("1d", v=0, results=result)
+        return CountryCircumVentionStatsResponse(results=result)
 
     except Exception as e:
-        return cachedjson("0d", v=0, error=str(e))
+        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
 def pivot_circumvention_runtime_stats(rows):
