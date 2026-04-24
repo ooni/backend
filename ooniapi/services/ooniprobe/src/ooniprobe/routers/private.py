@@ -980,7 +980,7 @@ def api_private_circumvention_stats_by_country() -> Response:
 class CircumventionRuntimeStat(BaseModel):
     test_name: str = Field(..., description="Name of test")
     probe_cc: CountryAlpha2 = Field(..., description="Country code of probe")
-    date: date = Field(..., description="Date of metric")
+    metric_date: date = Field(..., alias="date", description="Date of metric")
     v: Tuple[float, float, int] = Field((), description="(p50, p90, cnt)")
 
 
