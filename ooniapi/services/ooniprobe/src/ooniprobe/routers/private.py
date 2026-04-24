@@ -1045,10 +1045,13 @@ def api_private_circumvention_runtime_stats() -> Response:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
-DomainStr = constr(
-    strip_whitespace=True,
-    regex=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[A-Za-z]{2,}$"
-)
+DomainStr = Annotated[
+    str,
+    Field(
+        strip_whitespace=True,
+        pattern=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[A-Za-z]{2,}$"
+    )
+]
 
 
 class DomainMetadataResponse(BaseModel):
