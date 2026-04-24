@@ -873,9 +873,9 @@ def api_private_country_overview(
 
 
 class GlobalOverviewResponse(BaseModel):
-    network_count: int = Field(..., "Number of networks measured")
-    country_count: int = Field(..., "Nubmer of countries measured")
-    measurement_count: int = Field(..., "Number of total measurements")
+    network_count: int = Field(..., description="Number of networks measured")
+    country_count: int = Field(..., description="Number of countries measured")
+    measurement_count: int = Field(..., description="Number of total measurements")
 
 
 @router.get("/global_overview", response_model=GlobalOverviewResponse, tags=["private"])
