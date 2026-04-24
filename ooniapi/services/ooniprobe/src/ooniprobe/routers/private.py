@@ -18,7 +18,7 @@ from sqlalchemy import sql
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
-from pydantic import AnyUrl, conint, constr
+from pydantic import AnyUrl, conint, Field
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required
