@@ -16,22 +16,6 @@ import math
 
 from sqlalchemy import sql
 
-from ooniapi.auth import role_required
-from ooniapi.config import metrics
-from ooniapi.countries import lookup_country
-from ooniapi.data import dnscheck_inputs, stunreachability_inputs
-from ooniapi.models import TEST_GROUPS
-from ooniapi.prio import generate_test_list
-from ooniapi.utils import cachedjson, nocachejson, jerror, req_json
-
-from ooniapi.probe_services import (
-    probe_geoip,
-    extract_probe_ipaddr_octect,
-    generate_test_helpers_conf,
-    generate_report_id,
-)
-
-
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic import AnyUrl, conint, constr
