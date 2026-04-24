@@ -14,6 +14,7 @@ dependencies = [
   "ujson ~= 5.9.0",
   "urllib3 ~= 2.1.0",
   "python-dateutil ~= 2.8.2",
+  "pycountry ~= 26.2.16",
   "pydantic-settings ~= 2.1.0",
   "statsd ~= 4.0.1",
   "uvicorn ~= 0.25.0",
