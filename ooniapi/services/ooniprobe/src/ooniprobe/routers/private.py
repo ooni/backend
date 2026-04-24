@@ -38,7 +38,7 @@ from ooniapi.probe_services import (
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
-from pydantic import AnyUrl, conint
+from pydantic import AnyUrl, conint, constr
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required
@@ -1041,8 +1041,21 @@ def api_private_circumvention_runtime_stats() -> Response:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
-@api_private_blueprint.route("/domain_metadata")
-def api_private_domain_metadata() -> Response:
+DomainStr = constr(
+    strip_whitespace=True,
+    regex=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[A-Za-z]{2,}$"
+)
+
+
+class DomainMetadataResponse(BaseModel):
+    canonical_domain: DomainStr = Field(..., description="Domain name")
+    category_code: str = Field(..., description="Citizenlab Category Code")
+
+
+@router.get("/domain_metadata", response_model=DomainMetadataResponse, tags=["private"])
+def api_private_domain_metadata(
+    domain: DomainStr = Query(..., description="Domain Name"),
+) -> DomainMetadataResponse:
     """Return the primary category code of a certain domain_name and its
     canonical representation.
     We consider the primary category code to be the category code of whatever is
@@ -1102,8 +1115,7 @@ def api_private_domain_metadata() -> Response:
         category_code = res["category_code"]
         canonical_domain = res["domain"]
 
-    j = dict(category_code=category_code, canonical_domain=canonical_domain)
-    return cachedjson("2h", **j)
+    return DomainMetadataResponse(category_code=category_code, canonical_domain=canonical_domain)
 
 
 @api_private_blueprint.route("/asnmeta")
