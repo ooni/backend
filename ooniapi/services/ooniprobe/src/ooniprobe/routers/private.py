@@ -454,7 +454,7 @@ class WebsiteStatsResponse(BaseModel):
 
 @router.get("/website_stats", response_model=WebsiteStatsResponse, tags=["private"])
 def api_private_website_stats(
-    input: AnyUrl = Query(..., "Website to query stats"),
+    input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: int = Query(..., description="ASN (integer)"),
 ) -> Response:
@@ -707,7 +707,7 @@ def api_private_im_networks(
     results = IMNetworksResponse()
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
-        stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested))
+        stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested=None))
 
         # create and add a new entry
         entry = NetworkEntry(asn=r["probe_asn"], name="", total_count=r["total_count"], last_tested=r["last_tested"])
@@ -1199,7 +1199,7 @@ def api_private_networks() -> Response:
     """
     try:
         results = query_click(sql.text(q), {})
-        return MeasuredNetworksResponse(results=results v=0)
+        return MeasuredNetworksResponse(results=results, v=0)
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
