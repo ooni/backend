@@ -1126,7 +1126,7 @@ def api_private_domain_metadata(
 
 
 class ASNMetadataResponse(BaseModel):
-    org_name: string = Field("Unknown", description="ORG Name of ASN")
+    org_name: str = Field("Unknown", description="ORG Name of ASN")
 
 
 @router.get("/asnmeta", response_model=ASNMetadataResponse, tags=["private"])
