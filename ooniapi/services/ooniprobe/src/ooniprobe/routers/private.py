@@ -899,7 +899,16 @@ def api_private_global_overview() -> GlobalOverviewResponse:
     return result
 
 
-@api_private_blueprint.route("/global_overview_by_month", methods=["GET"])
+class GlobalOverviewStat(BaseModel):
+    date: datetime
+    value: int
+
+class GlobalOverviewMonthResponse(BaseModel):
+    networks_by_month: List[GlobalOverviewStat]
+    countries_by_month: List[GlobalOverviewStat]
+    measurement_by_month: List[GlobalOverviewStat]
+
+@router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
 def api_private_global_by_month() -> Response:
     """Provide global summary of measurements
     Sources: global_by_month db table
@@ -927,9 +936,8 @@ def api_private_global_by_month() -> Response:
     expand_dates(n)
     expand_dates(c)
     expand_dates(m)
-    return cachedjson(
-        "1d", networks_by_month=n, countries_by_month=c, measurements_by_month=m
-    )
+    validated = GlobalOverviewMonthResponse(networks_by_month=n, countries_by_month=c, measurements_by_month=m)
+    return validated
 
 
 @api_private_blueprint.route("/circumvention_stats_by_country")
