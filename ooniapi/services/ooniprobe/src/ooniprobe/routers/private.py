@@ -157,10 +157,9 @@ class TestName(BaseModel):
     id: str = Field(..., description="test id")
     name: str = Field(..., description="test name")
 
-TestNamesResponse: List[TestName]
 
-@router.get("/test_names", tags=["private_api"], response_model=TestNamesResponse)
-def api_private_test_names() -> Response:
+@router.get("/test_names", tags=["private_api"], response_model=List[TestName])
+def api_private_test_names() -> List[TestName]:
     """Provides test names and descriptions to Explorer
     ---
     responses:
@@ -194,7 +193,7 @@ def api_private_test_names() -> Response:
         "web_connectivity": "Web Connectivity",
         "whatsapp": "WhatsApp",
     }
-    validated: TestNamesResponse = [TestName(id=k, name=v) for k, v in TEST_NAMES.items()]
+    validated: List[TestNames] = [TestName(id=k, name=v) for k, v in TEST_NAMES.items()]
     return validated
 
 
@@ -204,11 +203,8 @@ class CountryStat(BaseModel):
     name: str = Field(..., description="Country Name")
 
 
-AllCountryStats : List[CountryStat]
-
-
-@router.get("/countries", tags=["private_api"], response_model=AllCountryStats)
-def api_private_countries() -> AllCountryStats:
+@router.get("/countries", tags=["private_api"], response_model=List[CountryStat])
+def api_private_countries() -> List[CountryStat]:
     """Summary of countries
     ---
     responses:
@@ -231,17 +227,17 @@ def api_private_countries() -> AllCountryStats:
         except KeyError:
             pass
 
-    validated: AllCountryStats = c
+    validated: List[CountryStat] = c
     return validated
 
 
 @router.get(
     "/quotas_summary",
-    response_model=AllCountryStats,
+    response_model=List[CountryStat],
     tags=["private_api"],
     dependencies=[Depends(role_required(["admin"]))],
 )
-def api_private_quotas_summary() -> Response:
+def api_private_quotas_summary() -> List[CountryStat]:
     """Summary on rate-limiting quotas.
     [(first ipaddr octet, remaining daily quota), ... ]
     """
@@ -416,13 +412,10 @@ class MeasurementsByASN(BaseModel):
     probe_asn: str = Field(..., description="Autonomous System Number")
 
 
-WebsiteNetworksResponse: List[MeasurementsByASN]
-
-
-@router.get("/website_networks", response_model=WebsiteNetworksResponse, tags=["private"])
+@router.get("/website_networks", response_model=List[MeasurementsByASN], tags=["private"])
 def api_private_website_network_tests(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
-    ) -> WebsiteNetworksResponse:
+    ) -> List[MeasurementsByASN]:
     """TODO
     ---
     parameters:
@@ -446,7 +439,7 @@ def api_private_website_network_tests(
         ORDER BY count DESC
         """
     results = query_click(sql.text(s), {"probe_cc": probe_cc})
-    validated: WebsiteNetworksResponse = [MeasurementsByASN(**x) for x in results]
+    validated: List[MeasurementsByASN] = [MeasurementsByASN(**x) for x in results]
     return validated
 
 class DayStats(BaseModel):
@@ -685,13 +678,10 @@ class IMNetworkStats(BaseModel):
     last_tested: date
 
 
-IMNetworksResponse: Dict[str, IMNetworksStats]
-
-
-@router.get("/im_networks", response_model=IMNetworksResponse, tags=["private"])
+@router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
 def api_private_im_networks(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
-) -> IMNetworksResponse:
+) -> Dict[str, IMNetworkStats]:
     """Instant messaging networks statistics
     ---
     responses:
