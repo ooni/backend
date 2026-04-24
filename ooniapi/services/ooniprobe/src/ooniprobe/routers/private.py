@@ -1153,7 +1153,18 @@ def api_private_asnmeta(
     return ASNMetadataResponse(org_name=org_name)
 
 
-@api_private_blueprint.route("/networks")
+class MeasuredNetworkStat(BaseModel):
+    cnt: conint(ge=0) = Field(..., description="Number of measurements")
+    org_name: str = Field("", description="ORG Name of network")
+    probe_asn: conint(ge=0) = Field(..., description="ASN of network (int)")
+
+
+class MeasuredNetworksResponse(BaseModel):
+    results: List[MeasuredNetworkStat] = Field(..., description="Networks that have measurements")
+    v: int = Field(..., description="Version of API response")
+
+
+@router.get("/networks", response_model=MeasuredNetworksResponse, tags=["private"])
 def api_private_networks() -> Response:
     """List all networks that have measurements
     ---
@@ -1185,9 +1196,9 @@ def api_private_networks() -> Response:
     """
     try:
         results = query_click(sql.text(q), {})
-        return cachedjson("2h", v=0, results=results)
+        return MeasuredNetworksResponse(results=results v=0)
     except Exception as e:
-        return jerror(str(e), v=0)
+        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
 @api_private_blueprint.route("/domains")
