@@ -975,27 +975,29 @@ async def submit_measurement(
     # Use exponential back off with jitter between retries to avoid choking the fastpath server
     # with many retries at the same time when there's a temporary issue
     client = request.app.state.fastpath_client
-    N_RETRIES = 3
     success = False
-    with Metrics.SEND_FASTPATH_TIMING.time():
-        for t in range(N_RETRIES):
+    fastpath_urls = [*settings.fastpath_urls, settings.fastpath_url] if settings.fastpath_url else settings.fastpath_urls
+    for (i, fastpath_url) in enumerate(fastpath_urls):
+        with Metrics.SEND_FASTPATH_TIMING.time():
             try:
-                url = f"{settings.fastpath_url}/{msmt_uid}"
+                url = f"{fastpath_url}/{msmt_uid}"
 
                 resp = await run_in_threadpool(client.post, url, data=data_bin)
                 with resp:
                     resp.raise_for_status()
-
-                Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
+                Metrics.SEND_FASTPATH_CNT.labels(
+                    status="ok",
+                    instance=fastpath_url
+                    ).inc()
                 success = True
-                break
 
-            except Exception as exc:
-                log.error(
-                    f"[Try {t + 1}/{N_RETRIES}] Error trying to send measurement to the fastpath ({settings.fastpath_url}). Error: {exc}"
+            except Exception as e:
+                log.exception(
+                    f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
+                    f"({fastpath_url}): {e}"
                 )
-                sleep_time = random.uniform(0, min(3, 0.3 * 2**t))
-                await asyncio.sleep(sleep_time)
+
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully

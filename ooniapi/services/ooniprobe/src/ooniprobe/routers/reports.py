@@ -197,7 +197,8 @@ async def receive_measurement(
                     f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
                     f"({fastpath_url}): {e}"
                 )
-            Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
+
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
