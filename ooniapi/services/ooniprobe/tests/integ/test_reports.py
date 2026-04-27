@@ -3,7 +3,8 @@ import zstd
 import pytest
 from hashlib import sha512
 import ujson
-import copy
+
+from ..utils import get_msmt_hash
 
 
 def postj(client, url, json):
@@ -72,7 +73,7 @@ async def test_collector_upload_msmt_valid(client):
 
     upload_payload = {"format": "json", "content": {"test_keys": {}}}
     c = postj(client, f"/report/{rid}", upload_payload)
-    expected_hash = _get_hash_of(upload_payload)
+    expected_hash = get_msmt_hash(upload_payload)
     assert c["measurement_uid"].endswith(f"_IE_webconnectivity_{expected_hash}"), c
 
     c = postj(client, f"/report/{rid}/close", json={})
@@ -88,11 +89,11 @@ async def test_collector_upload_msmt_valid_zstd(client):
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
     assert len(c) == 1
 
-    expected_hash = _get_hash_of(msmt_payload)
+    expected_hash = get_msmt_hash(msmt_payload)
     assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
 
 @pytest.mark.asyncio
-async def test_collector_upload_msmt_fastpath_fallback(client_with_mocked_fastpath):
+async def test_fastpath_fallback(client_with_mocked_fastpath):
     """When the first fastpath URL fails, the second one in the list
     should still receive the measurement.
     """
@@ -115,7 +116,7 @@ async def test_collector_upload_msmt_fastpath_fallback(client_with_mocked_fastpa
     msmt_uid = body["measurement_uid"]
     assert msmt_uid, body
 
-    expected_hash = _get_hash_of(msmt_payload)
+    expected_hash = get_msmt_hash(msmt_payload)
     assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
 
     # check saved data
@@ -125,9 +126,3 @@ async def test_collector_upload_msmt_fastpath_fallback(client_with_mocked_fastpa
     stored = mock_fastpath.uploads[expected_url]
     assert sha512(stored).hexdigest()[:16] == expected_hash
     assert ujson.loads(stored)["is_verified"] == "u"
-
-def _get_hash_of(msmt: dict) -> str:
-    payload = copy.deepcopy(msmt)
-    payload["is_verified"] = "u"
-    d = ujson.dumps(payload).encode()
-    return sha512(d).hexdigest()[:16]
