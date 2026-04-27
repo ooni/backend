@@ -990,6 +990,7 @@ async def submit_measurement(
                     instance=fastpath_url
                     ).inc()
                 success = True
+                break
 
             except Exception as e:
                 log.exception(
