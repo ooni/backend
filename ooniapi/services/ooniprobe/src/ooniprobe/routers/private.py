@@ -73,21 +73,6 @@ def daterange(start_date, end_date):
         yield start_date + timedelta(n)
 
 
-def validate_probe_cc_query_param():
-    probe_cc = request.args.get("probe_cc")
-    if probe_cc is None or len(probe_cc) != 2:
-        raise BadRequest("missing or incorrect probe_cc")
-    return probe_cc
-
-
-def validate_probe_asn_query_param():
-    probe_asn = request.args.get("probe_asn")
-    if probe_asn is None:
-        # TODO: validate and return int?
-        raise BadRequest("missing or incorrect probe_asn")
-    return probe_asn
-
-
 def expand_dates(li):
     """Replaces 'date' key in a list of dict"""
     for i in li:
