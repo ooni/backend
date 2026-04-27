@@ -1,7 +1,6 @@
 import json
 import zstd
 import pytest
-from hashlib import sha512
 import ujson
 
 from ..utils import get_msmt_hash
@@ -123,6 +122,6 @@ async def test_fastpath_fallback(client_with_mocked_fastpath):
     expected_url = f"{success_url}/{msmt_uid}"
     assert list(mock_fastpath.uploads.keys()) == [expected_url]
 
-    stored = mock_fastpath.uploads[expected_url]
-    assert sha512(stored).hexdigest()[:16] == expected_hash
-    assert ujson.loads(stored)["is_verified"] == "u"
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    assert get_msmt_hash(stored) == expected_hash
+    assert stored["is_verified"] == "u"
