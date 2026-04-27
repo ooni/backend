@@ -5,8 +5,6 @@
 
 import pytest
 
-from tests.utils import mock_load_json
-
 
 def privapi(client, subpath):
     response = client.get(f"/api/_/{subpath}")
