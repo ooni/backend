@@ -22,7 +22,7 @@ from pydantic import AnyUrl, conint, Field
 
 from .v1.probe_services import probe_geoip, generate_test_helpers_conf
 from ..common.clickhouse_utils import query_click, query_click_one_row
-from ..common.dependencies import role_required
+from ..common.dependencies import role_required, ClickhouseDep
 from ..common.prio import generate_test_list
 from ..common.routers import BaseModel
 from ..metrics import Metrics
@@ -103,7 +103,9 @@ ASNByMonthResponse = List[ASNCount]
 
 
 @router.get("/asn_by_month", tags=["private_api"], response_model=ASNByMonthResponse)
-def api_private_asn_by_month() -> ASNByMonthResponse:
+def api_private_asn_by_month(
+    clickhouse: ClickhouseDep,
+) -> ASNByMonthResponse:
     """Network count by month
     ---
     responses:
@@ -118,7 +120,7 @@ def api_private_asn_by_month() -> ASNByMonthResponse:
     AND measurement_start_time > toStartOfMonth(subtractMonths(now(), 24))
     GROUP BY date ORDER BY date
     """
-    li = list(query_click(q, {}))
+    li = list(query_click(clickhouse, q, {}))
     expand_dates(li)
     validated: ASNByMonthResponse = [ASNCount(**item) for item in li]
     return validated
@@ -1220,7 +1222,9 @@ class DomainsMeasuredResponse(BaseModel):
 
 
 @router.get("/domains", response_model=DomainsMeasuredResponse, tags=["private"])
-def api_private_domains() -> DomainsMeasuredResponse:
+def api_private_domains(
+    clickhouse: ClickhouseDep,
+) -> DomainsMeasuredResponse:
     """List all the domains in the test-lists with their measurement count
     ---
     responses:
@@ -1251,7 +1255,7 @@ def api_private_domains() -> DomainsMeasuredResponse:
     ORDER BY domain_name
     """
     try:
-        results = query_click(sql.text(q), {})
+        results = query_click(clickhouse, sql.text(q), {})
         return DomainsMeasuredResponse(v=0, results=results)
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
