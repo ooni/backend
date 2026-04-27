@@ -5,6 +5,7 @@ from hashlib import sha512
 import ujson
 import copy
 
+
 def postj(client, url, json):
     response = client.post(url, json=json)
     assert response.status_code == 200, response.json()
@@ -89,6 +90,41 @@ async def test_collector_upload_msmt_valid_zstd(client):
 
     expected_hash = _get_hash_of(msmt_payload)
     assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
+
+@pytest.mark.asyncio
+async def test_collector_upload_msmt_fastpath_fallback(client_with_mocked_fastpath):
+    """When the first fastpath URL fails, the second one in the list
+    should still receive the measurement.
+    """
+    client, mock_fastpath, success_url = client_with_mocked_fastpath
+
+    rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
+    msmt_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "annotations": {"platform": "test_platform"},
+            "software_name": "test_software",
+            "software_version": "0.0.0",
+        },
+    }
+    resp = client.post(f"/report/{rid}", json=msmt_payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "measurement_uid" in body, body
+    msmt_uid = body["measurement_uid"]
+    assert msmt_uid, body
+
+    expected_hash = _get_hash_of(msmt_payload)
+    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
+
+    # check saved data
+    expected_url = f"{success_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url]
+
+    stored = mock_fastpath.uploads[expected_url]
+    assert sha512(stored).hexdigest()[:16] == expected_hash
+    assert ujson.loads(stored)["is_verified"] == "u"
 
 def _get_hash_of(msmt: dict) -> str:
     payload = copy.deepcopy(msmt)

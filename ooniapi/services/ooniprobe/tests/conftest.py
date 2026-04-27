@@ -8,6 +8,7 @@ from urllib.request import urlopen
 
 import ooniauth_py
 import pytest
+import requests
 import ujson
 from clickhouse_driver import Client as ClickhouseClient
 from fastapi.testclient import TestClient
@@ -289,3 +290,80 @@ def load_url_priorities(clickhouse_db: ClickhouseClient):
 @pytest.fixture(scope="function")
 def client_with_original_manifest(client):
     return setup_user(client)
+
+
+class MockFastpathResponse:
+    """
+    Mocked fastpath response to emulate fastpath client responses
+    """
+
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}")
+
+
+class MockFastpathClient:
+    """
+    This mocked fastpath client that responds with error for some paths, and success with other
+    paths.
+
+    Used for testing fastpath responses
+    """
+
+    def __init__(self, success_url_prefix: str = "/good/"):
+        self.success_url_prefix = success_url_prefix
+        self.uploads: dict[str, bytes] = {}
+
+    def post(self, url: str, data: bytes = b"", **kwargs):
+        if self.success_url_prefix in url:
+            self.uploads[url] = data
+            return MockFastpathResponse(200)
+        return MockFastpathResponse(502)
+
+    def close(self):
+        # called by the app lifespan on shutdown
+        pass
+
+
+@pytest_asyncio.fixture
+async def client_with_mocked_fastpath(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client variant to test fastpath behaviour, see the mocked fastpath client
+    above.
+
+    Yields `(client, mock_fastpath, success_url)`.
+    """
+    fail_url = "http://fastpath.ooni/bad"
+    success_url = "http://fastpath.ooni/good"
+
+    _, public_key = test_creds
+
+    settings = test_settings().model_copy(
+        update={
+            "fastpath_url": "",
+            "fastpath_urls": [fail_url, success_url],
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_s3_client] = get_s3_client_mock
+    app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
+    app.dependency_overrides[get_psiphon_config_from_s3] = get_psiphon_config_from_s3_mock
+    app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
+    try_update(geoip_db_dir)
+
+    mock_fastpath = MockFastpathClient()
+    async with lifespan(app, settings, repeating_tasks_active=False):
+        with TestClient(app) as client:
+            app.state.fastpath_client = mock_fastpath
+            yield client, mock_fastpath, success_url
