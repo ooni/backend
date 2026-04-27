@@ -141,6 +141,41 @@ async def test_fastpath_fallback(client_with_mocked_fastpath):
 
 
 @pytest.mark.asyncio
+async def test_fastpath_only_submits_once_on_success(client_with_two_working_fastpaths):
+    """
+    When the first fastpath URL succeeds, the receiver should stop iterating
+    """
+    client, mock_fastpath, first_url, second_url = client_with_two_working_fastpaths
+
+    # open report
+    j = make_report_request("IE", "AS34245")
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    submit_request = make_submit_request(user, "IE", "AS34245")
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    # Sanity-check the bytes that were forwarded to the fastpath
+    expected_hash = get_msmt_hash(msm, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+    # Only the first fastpath URL should have received the measurement
+    expected_url = f"{first_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url], (
+        "measurement should be forwarded to the first fastpath URL only, "
+        f"got {list(mock_fastpath.uploads.keys())}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_submission_non_verified(client):
     """
 

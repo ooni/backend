@@ -367,3 +367,37 @@ async def client_with_mocked_fastpath(
         with TestClient(app) as client:
             app.state.fastpath_client = mock_fastpath
             yield client, mock_fastpath, success_url
+
+
+@pytest_asyncio.fixture
+async def client_with_two_working_fastpaths(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client variant to test successful fastpath submissions with two healthy fastpath instances
+
+    Yields `(client, mock_fastpath, first_url, second_url)`.
+    """
+    first_url = "http://fastpath-a.ooni/good"
+    second_url = "http://fastpath-b.ooni/good"
+
+    _, public_key = test_creds
+
+    settings = test_settings().model_copy(
+        update={
+            "fastpath_url": "",
+            "fastpath_urls": [first_url, second_url],
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_s3_client] = get_s3_client_mock
+    app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
+    app.dependency_overrides[get_psiphon_config_from_s3] = get_psiphon_config_from_s3_mock
+    app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
+    try_update(geoip_db_dir)
+
+    mock_fastpath = MockFastpathClient()
+    async with lifespan(app, settings, repeating_tasks_active=False):
+        with TestClient(app) as client:
+            app.state.fastpath_client = mock_fastpath
+            yield client, mock_fastpath, first_url, second_url
