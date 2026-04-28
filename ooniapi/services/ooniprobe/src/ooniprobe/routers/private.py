@@ -1172,9 +1172,6 @@ def api_private_asnmeta(
       200:
         description: JSON object
     """
-    asn = request.args.get("asn")
-    if asn is None:
-        raise BadRequest("missing asn")
 
     q = """SELECT org_name
         FROM asnmeta
