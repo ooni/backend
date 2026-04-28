@@ -4,6 +4,7 @@ VPN Services
 Insert VPN credentials into database.
 """
 
+from dataclasses import dataclass
 import io
 import itertools
 import logging
@@ -11,7 +12,7 @@ import ujson
 from base64 import b64encode
 from datetime import datetime, timezone
 from os import urandom
-from typing import Any, Dict, List, Tuple, TypedDict
+from typing import Any, Dict, List, Mapping, Tuple, TypedDict
 
 import requests
 import pem
@@ -130,6 +131,44 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
     stn = test_name.replace("_", "")
     rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
     return rid
+
+
+@dataclass
+class MeasurementMetadata:
+    """Metadata extracted from a measurement body's `content` object."""
+
+    test_name: str  # lowercase, underscores stripped (matches report id segment)
+    probe_cc: str  # uppercase, 2-letter or "ZZ" when unknown
+    probe_asn: str  # canonical "AS..." string or "AS0"
+    platform: str
+    software_name: str
+    software_version: str
+
+
+def metadata_from_measurement_content(content: Mapping[str, Any]) -> MeasurementMetadata:
+    """Normalize fields the same way as `generate_report_id` / `open_report` do."""
+    test_name = str(content.get("test_name") or "").lower().replace("_", "")
+
+    cc = str(content.get("probe_cc") or "").upper().replace("_", "")
+    if len(cc) != 2:
+        cc = "ZZ"
+
+    raw_asn = str(content.get("probe_asn") or "AS0").upper()
+    if len(raw_asn) > 12 or len(raw_asn) < 3 or not raw_asn.startswith("AS"):
+        raw_asn = "AS0"
+
+    annotations = content.get("annotations", {})
+    if not isinstance(annotations, dict):
+        annotations = {}
+
+    return MeasurementMetadata(
+        test_name=test_name,
+        probe_cc=cc,
+        probe_asn=raw_asn,
+        platform=str(annotations.get("platform") or ""),
+        software_name=str(content.get("software_name") or ""),
+        software_version=str(content.get("software_version") or ""),
+    )
 
 
 def extract_probe_ipaddr(request: Request) -> str:

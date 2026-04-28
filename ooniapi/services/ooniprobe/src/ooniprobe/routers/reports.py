@@ -1,6 +1,5 @@
 import io
 import logging
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List, Tuple
@@ -18,9 +17,11 @@ from ..common.utils import setnocacheresponse
 from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
+    MeasurementMetadata,
     error,
     generate_report_id,
     get_cc_asn,
+    metadata_from_measurement_content,
     normalize_asn,
     register_geoip_anomaly,
 )
@@ -230,19 +231,6 @@ async def receive_measurement(
             Metrics.SEND_S3_CNT.labels(status="fail").inc()
             return empty_measurement
 
-@dataclass
-class MeasurementMetadata:
-    """
-    Metadata extracted from a measurement body in a single parse pass.
-    """
-    test_name: str        # lowercase, alnum, no underscores
-    probe_cc: str         # uppercase, or "ZZ"
-    probe_asn: str        # E.g. "AS15704", or "AS0"
-    platform: str
-    software_name: str
-    software_version: str
-
-
 def _process_measurement_body(data: bytes) -> Tuple[bytes, MeasurementMetadata]:
     """
     - Parse the measurement body
@@ -259,27 +247,7 @@ def _process_measurement_body(data: bytes) -> Tuple[bytes, MeasurementMetadata]:
     content = json.get("content")
     assert isinstance(content, dict)
 
-    test_name = str(content.get("test_name") or "").lower().replace("_", "")
-
-    cc = str(content.get("probe_cc") or "").upper().replace("_", "")
-    if len(cc) != 2:
-        cc = "ZZ"
-
-    raw_asn = str(content.get("probe_asn") or "AS0").upper()
-    if len(raw_asn) > 12 or len(raw_asn) < 3 or not raw_asn.startswith("AS"):
-        raw_asn = "AS0"
-
-    annotations = content.get("annotations", {})
-    assert isinstance(annotations, dict)
-
-    metadata = MeasurementMetadata(
-        test_name=test_name,
-        probe_cc=cc,
-        probe_asn=raw_asn,
-        platform=str(annotations.get("platform") or ""),
-        software_name=str(content.get("software_name") or ""),
-        software_version=str(content.get("software_version") or ""),
-    )
+    metadata = metadata_from_measurement_content(content)
 
     json["is_verified"] = "u"
 

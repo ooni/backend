@@ -152,14 +152,13 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
 
     # Open a report for the anoncred submit endpoint
     report_req = make_report_request(probe_cc="VE", probe_asn="AS65550")
-    c = postj(client, "/report", report_req)
-    rid = c["report_id"]
+    postj(client, "/report", report_req)
 
     # Create anoncred user and submit_request
     user, manifest_version, emission_day = setup_user(client)
     submit_request = make_submit_request(user, "VE", "AS65550")
 
-    # Build measurement body used by /api/v1/submit_measurement/{rid}
+    # Build measurement body for `/api/v1/submit_measurement`
     msm = make_measurement(
         submit_request.nym,
         submit_request.request,
@@ -176,7 +175,7 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
     # matching cc and asn
     postj(
         client,
-        f"/api/v1/submit_measurement/{rid}",
+        "/api/v1/submit_measurement",
         msm,
         headers={"X-Forwarded-For": "123.123.123.123"},
     )
@@ -186,7 +185,7 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
     # cc mismatch only
     postj(
         client,
-        f"/api/v1/submit_measurement/{rid}",
+        "/api/v1/submit_measurement",
         msm,
         headers={"X-Forwarded-For": "123.123.123.124"},
     )
@@ -197,7 +196,7 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
     # ASN mismatch only
     postj(
         client,
-        f"/api/v1/submit_measurement/{rid}",
+        "/api/v1/submit_measurement",
         msm,
         headers={"X-Forwarded-For": "123.123.123.125"},
     )
@@ -208,7 +207,7 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
     # both cc and ASN mismatch
     postj(
         client,
-        f"/api/v1/submit_measurement/{rid}",
+        "/api/v1/submit_measurement",
         msm,
         headers={"X-Forwarded-For": "123.123.123.126"},
     )

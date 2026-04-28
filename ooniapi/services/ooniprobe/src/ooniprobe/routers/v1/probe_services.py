@@ -52,6 +52,7 @@ from ...utils import (
     generate_report_id,
     geolookup_probe,
     get_cc_asn,
+    metadata_from_measurement_content,
     normalize_asn,
     register_geoip_anomaly,
 )
@@ -872,9 +873,8 @@ class SubmitMeasurementResponse(BaseModel):
     )
 
 
-@router.post("/submit_measurement/{report_id}", tags=["anonymous_credentials"])
+@router.post("/submit_measurement", tags=["anonymous_credentials"])
 async def submit_measurement(
-    report_id: str,
     request: Request,
     submit_request: SubmitMeasurementRequest,
     response: Response,
@@ -900,30 +900,20 @@ async def submit_measurement(
     - status code 4xx or 5xx: the measurement was not processed nor stored
     """
     setnocacheresponse(response)
-    try:
-        rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
-    except Exception:
-        err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
-        log.info(err_msg)
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "incorrect_format", "message": err_msg},
-        )
 
-    # TODO validate the timestamp?
+    metadata = metadata_from_measurement_content(submit_request.content)
+
+    test_name = metadata.test_name
+    cc = metadata.probe_cc
+    asn = metadata.probe_asn
+    asn_i = normalize_asn(asn)
+
     good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
     if not good:
-        err_msg = f"Incorrect format: unexpected report_id {report_id[:200]}"
-        log.info(err_msg)
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "incorrect_format", "message": err_msg},
+        err_msg = (
+            "Incorrect format: bad metadata in measurement body "
+            f"(test_name={test_name[:30]}, cc={cc})"
         )
-
-    try:
-        asn_i = int(asn)
-    except ValueError:
-        err_msg = f"Incorrect format: ASN value not parsable {asn}"
         log.info(err_msg)
         raise HTTPException(
             status_code=400,
@@ -933,22 +923,29 @@ async def submit_measurement(
     if asn_i == 0:
         log.info("Discarding ASN == 0")
         Metrics.MSMNT_DISCARD_ASN0.inc()
-        raise HTTPException(400, detail = {"error" : "asn_0", "message" : "Measurement discarded, ASN == 0"})
+        raise HTTPException(
+            400,
+            detail={
+                "error": "asn_0",
+                "message": "Measurement discarded, ASN == 0",
+            },
+        )
 
-    if cc.upper() == "ZZ":
+    if cc == "ZZ":
         log.info("Discarding CC == ZZ")
         Metrics.MSMNT_DISCARD_CC_ZZ.inc()
-        raise HTTPException(400, detail = {"error" : "cc_zz", "message" : "Measurement discarded, CC == ZZ"})
+        raise HTTPException(
+            400,
+            detail={
+                "error": "cc_zz",
+                "message": "Measurement discarded, CC == ZZ",
+            },
+        )
 
     # Anonymous credentials verification
     verification_status, submit_error, submit_response = _verify_submit(
         submit_request, manifest, settings
     )
-
-    annotations = submit_request.content.get("annotations", {})
-    platform = annotations.get("platform") or ""
-    software_name = submit_request.content.get("software_name") or ""
-    software_version = submit_request.content.get("software_version") or ""
 
     data = submit_request.model_dump()
 
@@ -1010,9 +1007,9 @@ async def submit_measurement(
                     cc,
                     asn,
                     msmt_uid,
-                    platform,
-                    software_name,
-                    software_version,
+                    metadata.platform,
+                    metadata.software_name,
+                    metadata.software_version,
                 )
             except Exception as e:
                 log.error(f"Error checking for geoip anomalies: {e}")
@@ -1028,19 +1025,21 @@ async def submit_measurement(
     Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
-    data_buff.seek(0)
+    ts_prefix = now.strftime("%Y%m%d%H")
+    tn = test_name.replace("_", "")
+    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{tn}/{msmt_uid}.post"
     try:
         await run_in_threadpool(
             request.app.state.s3_client.upload_fileobj,
-            data_buff,
+            io.BytesIO(data_bin),
             Bucket=settings.failed_reports_bucket,
-            Key=report_id,
+            Key=s3_key,
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
         Metrics.SEND_S3_FAILURE.inc()
 
-    log.error(f"Unable to send report to fastpath. report_id: {report_id}")
+    log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
     Metrics.MISSED_MSMNTS.inc()
     return SubmitMeasurementResponse(
         measurement_uid=msmt_uid,

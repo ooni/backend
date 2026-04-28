@@ -80,9 +80,7 @@ async def test_registration_errors(client):
 @pytest.mark.asyncio
 async def test_submission_basic(client):
     # open report
-    j = make_report_request("IE", "AS34245")
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
+    postj(client, "/report", json=make_report_request("IE", "AS34245"))
 
     # Create user
     user, manifest_version, emission_day = setup_user(client)
@@ -91,7 +89,7 @@ async def test_submission_basic(client):
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "verified", c
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
@@ -105,8 +103,7 @@ async def test_submission_non_verified(client):
 
     """
     j = make_report_request()
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
+    postj(client, "/report", json=j)
 
     msm = {
         "format": "json",
@@ -119,14 +116,14 @@ async def test_submission_non_verified(client):
     }
 
     # no anoncred fields -> processed but not verified, no error
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] is None
 
     # unknown manifest -> processed but not verified, manifest error
     msm["manifest_version"] = "does-not-exist"
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "manifest_not_found"
@@ -135,7 +132,7 @@ async def test_submission_non_verified(client):
     user, manifest_version, _ = setup_user(client)
     msm["nym"] = "dummy-nym"
     msm["manifest_version"] = manifest_version
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "incomplete_anonc_fields"
@@ -146,14 +143,14 @@ async def test_submission_non_verified(client):
     msm["zkp_request"] = submit_request.request
     msm["manifest_version"] = manifest_version
     msm["protocol_version"] = "0.0.1"
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "protocol_version_too_old"
 
     # unparsable protocol version -> invalid protocol version error
     msm["protocol_version"] = "abc"
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "unverified"
     assert c["submit_response"] is None
     assert c["error"] == "invalid_protocol_version"
@@ -415,14 +412,13 @@ async def test_credential_update_with_submission(client, client_with_original_ma
 
     # first submit: should just work out of the box
     j = make_report_request()
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
+    postj(client, "/report", json=j)
 
     submit_request = make_submit_request(user, "IE", "AS34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
 
     assert c["verification_status"] == "verified"
 
@@ -439,14 +435,13 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     user.handle_credential_update_response(result['update_response']) # should not crash
 
     j = make_report_request()
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
+    postj(client, "/report", json=j)
 
     submit_request = make_submit_request(user, "IE", "AS34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
 
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    c = postj(client, "/api/v1/submit_measurement", msm)
 
 
 def make_measurement(
