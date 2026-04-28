@@ -976,7 +976,7 @@ async def submit_measurement(
     # with many retries at the same time when there's a temporary issue
     client = request.app.state.fastpath_client
     success = False
-    fastpath_urls = [*settings.fastpath_urls, settings.fastpath_url] if settings.fastpath_url else settings.fastpath_urls
+    fastpath_urls = settings.fastpath_urls
     for (i, fastpath_url) in enumerate(fastpath_urls):
         with Metrics.SEND_FASTPATH_TIMING.time():
             try:

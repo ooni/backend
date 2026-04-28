@@ -126,11 +126,9 @@ async def health(
         errors.append("clickhouse_error")
         log.error(e)
 
-    fastpath_urls = [settings.fastpath_url, *settings.fastpath_urls] if settings.fastpath_url else settings.fastpath_urls
-
-    for fastpath_url in fastpath_urls:
+    for fastpath_url in settings.fastpath_urls:
         try:
-            resp = await run_in_threadpool(app.state.fastpath_client.get, settings.fastpath_url)
+            resp = await run_in_threadpool(app.state.fastpath_client.get, fastpath_url)
             with resp:
                 resp.raise_for_status()
         except Exception as exc:

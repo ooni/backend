@@ -181,7 +181,7 @@ def test_settings(
         clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server,
+        fastpath_urls=[fastpath_server],
         anonc_manifest_bucket="test-bucket",
         anonc_manifest_file="manifest.json",
         anonc_secret_key=secret_key,
@@ -351,7 +351,6 @@ async def client_with_mocked_fastpath(
 
     settings = test_settings().model_copy(
         update={
-            "fastpath_url": "",
             "fastpath_urls": [fail_url, success_url],
         }
     )
@@ -385,7 +384,6 @@ async def client_with_two_working_fastpaths(
 
     settings = test_settings().model_copy(
         update={
-            "fastpath_url": "",
             "fastpath_urls": [first_url, second_url],
         }
     )

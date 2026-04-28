@@ -176,7 +176,7 @@ async def receive_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     client = request.app.state.fastpath_client
-    fastpath_urls = [*settings.fastpath_urls, settings.fastpath_url] if settings.fastpath_url else settings.fastpath_urls
+    fastpath_urls = settings.fastpath_urls
     success = False
     for (i, fastpath_url) in enumerate(fastpath_urls):
         with Metrics.SEND_FASTPATH_TIMING.time():
