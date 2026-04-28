@@ -714,7 +714,7 @@ def api_private_im_networks(
     """
     test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
     q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names})
-    results = IMNetworksResponse()
+    results: Dict[str, IMNetworkStats] = {}
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
         stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested=None))
