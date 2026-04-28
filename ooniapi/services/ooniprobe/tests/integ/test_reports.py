@@ -42,6 +42,8 @@ async def test_collector_open_report(client):
 
 @pytest.mark.asyncio
 async def test_collector_upload_msmt_bogus(client):
+    # The path component is ignored, but a body without valid probe_cc /
+    # probe_asn / test_name still has to be rejected.
     j = dict(format="json", content=dict(test_keys={}))
     resp = client.post("/report/bogus", json=j)
     assert resp.status_code == 400, resp
@@ -69,7 +71,15 @@ async def test_collector_upload_msmt_valid(client):
     }
     assert len(rid) == 61, rid
 
-    upload_payload = {"format": "json", "content": {"test_keys": {}}}
+    upload_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "probe_cc": "IE",
+            "probe_asn": "AS34245",
+            "test_name": "web_connectivity",
+        },
+    }
     c = postj(client, f"/report/{rid}", upload_payload)
     expected_hash = _get_hash_of(upload_payload)
     assert c["measurement_uid"].endswith(f"_IE_webconnectivity_{expected_hash}"), c
@@ -80,15 +90,24 @@ async def test_collector_upload_msmt_valid(client):
 
 @pytest.mark.asyncio
 async def test_collector_upload_msmt_valid_zstd(client):
-    rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
-    msmt_payload = {"test_keys": {}}
+    rid = "ignored-by-the-server"
+    msmt_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "probe_cc": "IT",
+            "probe_asn": "AS1",
+            "test_name": "integtest",
+        },
+    }
     zmsmt = zstd.compress(json.dumps(msmt_payload).encode())
     headers = [("Content-Encoding", "zstd")]
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
-    assert len(c) == 1
+    assert "measurement_uid" in c, c
 
     expected_hash = _get_hash_of(msmt_payload)
     assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
+
 
 def _get_hash_of(msmt: dict) -> str:
     payload = copy.deepcopy(msmt)
