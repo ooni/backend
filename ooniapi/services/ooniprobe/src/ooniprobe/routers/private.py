@@ -744,6 +744,9 @@ class IMStatsItem(BaseModel):
     anomaly_count: Optional[int] = None
     test_day: datetime
     total_count: int
+    model_config = {
+        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
+    }
 
 
 class IMStatsResponse(BaseModel):
@@ -920,6 +923,10 @@ def api_private_global_overview(
 class GlobalOverviewStat(BaseModel):
     date: datetime
     value: int
+    model_config = {
+        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
+    }
+
 
 class GlobalOverviewMonthResponse(BaseModel):
     networks_by_month: List[GlobalOverviewStat]
