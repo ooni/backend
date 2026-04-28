@@ -9,8 +9,7 @@ import pytest
 def privapi(client, subpath):
     response = client.get(f"/api/_/{subpath}")
     assert response.status_code == 200
-    assert response.json
-    return response.json
+    return response.json()
 
 
 # TODO: improve tests
