@@ -619,7 +619,7 @@ class TorStatsResponse(BaseModel):
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
 def api_private_vanilla_tor_stats(
     clickhouse: ClickhouseDep,
-    probe_cc: CountryAlpha2 = Query(..., description="Country Code")
+    probe_cc: str = Query(..., description="Country Code")
 ) -> TorStatsResponse:
     """Tor statistics over ASN for a given CC
     ---
@@ -633,6 +633,10 @@ def api_private_vanilla_tor_stats(
       '200':
         description: TODO
     """
+    try:
+        CountryAlpha2(probe_cc)
+    except Exception:
+        raise
     blocked = 0
     nets = []
     s = """SELECT
