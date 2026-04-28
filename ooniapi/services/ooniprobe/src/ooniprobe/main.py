@@ -132,7 +132,7 @@ async def health(
             with resp:
                 resp.raise_for_status()
         except Exception as exc:
-            log.error(f"Unable to connect with fastpath '{fastpath_url}. Error: {exc}'")
+            log.error(f"Unable to connect with fastpath '{fastpath_url}'. Error: {exc}")
             errors.append("fastpath_connection_error")
 
 
