@@ -913,7 +913,7 @@ def api_private_global_overview(
     """
     r = query_click_one_row(clickhouse, q, {})
     assert r
-    result = GlobalOverViewResponse(
+    result = GlobalOverviewResponse(
             network_count=r["network_count"],
             country_count=r["country_count"],
             measurement_count=r["measurement_count"])
@@ -931,7 +931,7 @@ class GlobalOverviewStat(BaseModel):
 class GlobalOverviewMonthResponse(BaseModel):
     networks_by_month: List[GlobalOverviewStat]
     countries_by_month: List[GlobalOverviewStat]
-    measurement_by_month: List[GlobalOverviewStat]
+    measurements_by_month: List[GlobalOverviewStat]
 
 
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
