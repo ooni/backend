@@ -5,7 +5,7 @@ In here live private API endpoints for use only by OONI services. You should
 not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
@@ -82,6 +82,10 @@ def expand_dates(li):
 class ASNCount(BaseModel):
     date: datetime = Field(..., description="Timestamp for the measurement (ISO 8601).")
     value: int = Field(..., description="Count of unique ASN seen.")
+    model_config = {
+        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
+    }
+
 
 
 ASNByMonthResponse = List[ASNCount]
@@ -115,6 +119,9 @@ class CountryCount(BaseModel):
     date: datetime = Field(..., description="Timestamp for the measurement (ISO 8601).")
     value: int = Field(..., description="Count of unique countries seen.")
 
+    model_config = {
+        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
+    }
 
 CountryByMonthResponse = List[ASNCount]
 
