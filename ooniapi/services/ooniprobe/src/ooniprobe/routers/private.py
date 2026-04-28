@@ -143,7 +143,7 @@ def api_private_countries_by_month(
     AND measurement_start_time > toStartOfMonth(subtractMonths(now(), 24))
     GROUP BY date ORDER BY date
     """
-    li = list(query_click(q, {}))
+    li = list(query_click(clickhouse, q, {}))
     expand_dates(li)
     return [CountryCount(**item) for item in li]
 
@@ -221,7 +221,7 @@ def api_private_countries(
     GROUP BY probe_cc ORDER BY probe_cc
     """
     c = []
-    rows = query_click(q, {})
+    rows = query_click(clickhouse, q, {})
     for r in rows:
         try:
             name = lookup_country(r["probe_cc"])
@@ -318,12 +318,12 @@ def pivot_test_coverage(rows, test_group_names, days):
     return test_coverage
 
 
-def get_recent_test_coverage_ch(probe_cc):
+def get_recent_test_coverage_ch(clickhouse, probe_cc):
     """Returns
     [{"count": 4888, "test_day": "2021-10-16", "test_group": "websites"}, ... ]
     """
     q = "SELECT DISTINCT(test_group) FROM test_groups ORDER BY test_group"
-    rows = query_click(sql.text(q), {})
+    rows = query_click(clickhouse, sql.text(q), {})
     test_group_names = [r["test_group"] for r in rows]
 
     q = """SELECT
@@ -337,13 +337,13 @@ def get_recent_test_coverage_ch(probe_cc):
     AND probe_cc = :probe_cc
     GROUP BY measurement_start_day, test_group
     """
-    rows = query_click(sql.text(q), dict(probe_cc=probe_cc))
+    rows = query_click(clickhouse, sql.text(q), dict(probe_cc=probe_cc))
     rows = tuple(rows)
     l30d = tuple(last_30days(32, 2))
     return pivot_test_coverage(rows, test_group_names, l30d)
 
 
-def get_recent_network_coverage_ch(probe_cc, test_groups):
+def get_recent_network_coverage_ch(clickhouse, probe_cc, test_groups):
     """Count ASNs with at least one measurements, grouped by day,
     for a given CC, and filtered by test groups
     Return [{"count": 58, "test_day": "2021-10-16" }, ... ]"""
@@ -374,7 +374,7 @@ def get_recent_network_coverage_ch(probe_cc, test_groups):
         s = s.replace("--mark--", "")
         d = {"probe_cc": probe_cc}
 
-    return query_click(sql.text(s), d)
+    return query_click(clickhouse, sql.text(s), d)
 
 
 class TestCoverageResponse(BaseModel):
@@ -384,6 +384,7 @@ class TestCoverageResponse(BaseModel):
 
 @router.get("/test_coverage", response_model=TestCoverageResponse, tags=["private"])
 def api_private_test_coverage(
+    clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     test_groups: str = Query(None, description="XXX: What is this?")
 ) -> TestCoverageResponse:
@@ -404,8 +405,8 @@ def api_private_test_coverage(
     if test_groups is not None:
         test_groups = test_groups.split(",")
 
-    tc = get_recent_test_coverage_ch(probe_cc)
-    nc = get_recent_network_coverage_ch(probe_cc, test_groups)
+    tc = get_recent_test_coverage_ch(clickhouse, probe_cc)
+    nc = get_recent_network_coverage_ch(clickhouse, probe_cc, test_groups)
     validated = TestCoverageResponse(network_coverage=nc, test_coverage=tc)
     return validated
 
@@ -417,8 +418,9 @@ class MeasurementsByASN(BaseModel):
 
 @router.get("/website_networks", response_model=List[MeasurementsByASN], tags=["private"])
 def api_private_website_network_tests(
+    clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
-    ) -> List[MeasurementsByASN]:
+) -> List[MeasurementsByASN]:
     """TODO
     ---
     parameters:
@@ -441,7 +443,7 @@ def api_private_website_network_tests(
         GROUP BY probe_asn
         ORDER BY count DESC
         """
-    results = query_click(sql.text(s), {"probe_cc": probe_cc})
+    results = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc})
     validated: List[MeasurementsByASN] = [MeasurementsByASN(**x) for x in results]
     return validated
 
@@ -457,6 +459,7 @@ class WebsiteStatsResponse(BaseModel):
 
 @router.get("/website_stats", response_model=WebsiteStatsResponse, tags=["private"])
 def api_private_website_stats(
+    clickhouse: ClickhouseDep,
     input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: int = Query(..., description="ASN (integer)"),
@@ -487,7 +490,7 @@ def api_private_website_stats(
         GROUP BY test_day ORDER BY test_day
     """
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
-    results = query_click(sql.text(s), d)
+    results = query_click(clickhouse, sql.text(s), d)
     return WebsiteStatsResponse(result=results)
 
 
@@ -512,6 +515,7 @@ class WebsiteURLsResponse(BaseModel):
 
 @router.get("/website_urls", response_model=WebsiteURLsResponse, tags=["private"])
 def api_private_website_test_urls(
+    clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     limit: int = Query(10, description="Limit results"),
@@ -539,7 +543,7 @@ def api_private_website_test_urls(
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
     """
-    q = query_click_one_row(sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn))
+    q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn))
     total_count = q["input_count"] if q else 0
 
     # Group msmts by CC / ASN / period with LIMIT and OFFSET
@@ -566,7 +570,7 @@ def api_private_website_test_urls(
         "limit": limit,
         "offset": offset,
     }
-    results = query_click(sql.text(s), d)
+    results = query_click(clickhouse, sql.text(s), d)
     current_page = math.ceil(offset / limit) + 1
     metadata = {
         "offset": offset,
@@ -614,6 +618,7 @@ class TorStatsResponse(BaseModel):
 
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
 def api_private_vanilla_tor_stats(
+    clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> TorStatsResponse:
     """Tor statistics over ASN for a given CC
@@ -641,7 +646,7 @@ def api_private_vanilla_tor_stats(
         AND probe_cc =  :probe_cc
         GROUP BY probe_asn
     """
-    q = query_click(sql.text(s), {"probe_cc": probe_cc})
+    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc})
     extras = {
         "test_runtime_avg": None,
         "test_runtime_max": None,
@@ -683,6 +688,7 @@ class IMNetworkStats(BaseModel):
 
 @router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
 def api_private_im_networks(
+    clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> Dict[str, IMNetworkStats]:
     """Instant messaging networks statistics
@@ -706,7 +712,7 @@ def api_private_im_networks(
     ORDER BY test_name ASC, total_count DESC
     """
     test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
-    q = query_click(sql.text(s), {"probe_cc": probe_cc, "test_names": test_names})
+    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names})
     results = IMNetworksResponse()
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
@@ -745,6 +751,7 @@ class IMStatsResponse(BaseModel):
 
 @router.get("/im_stats", response_model=IMStatsResponse, tags=["private"])
 def api_private_im_stats(
+    clickhouse: ClickhouseDep,
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     test_name: str = Query(..., description="Test name")
@@ -778,7 +785,7 @@ def api_private_im_stats(
         "probe_asn": probe_asn,
         "test_name": test_name,
     }
-    q = query_click(sql.text(s), query_params)
+    q = query_click(clickhouse, sql.text(s), query_params)
     tmp = {r["test_day"]: r for r in q}
     items: List[IMStatsItem] = []
     days = [date.today() + timedelta(days=(d - 31)) for d in range(32)]
@@ -845,6 +852,7 @@ class CountryOverviewResponse(BaseModel):
 
 @router.get("/country_overview", response_model=CountryOverviewResponse, tags=["private"])
 def api_private_country_overview(
+    clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
 ) -> CountryOverviewResponse:
     """Country-specific overview
@@ -866,7 +874,7 @@ def api_private_country_overview(
         WHERE probe_cc = :probe_cc
         AND measurement_start_time > '2012-12-01'
     """
-    r = query_click_one_row(sql.text(s), {"probe_cc": probe_cc})
+    r = query_click_one_row(clickhouse, sql.text(s), {"probe_cc": probe_cc})
     assert r
     result = CountryOverviewResponse(
             first_bucket_date=r["first_bucket_date"],
@@ -882,7 +890,9 @@ class GlobalOverviewResponse(BaseModel):
 
 
 @router.get("/global_overview", response_model=GlobalOverviewResponse, tags=["private"])
-def api_private_global_overview() -> GlobalOverviewResponse:
+def api_private_global_overview(
+    clickhouse: ClickhouseDep,
+) -> GlobalOverviewResponse:
     """Provide global summary of measurements
     Sources: global_stats db table
     ---
@@ -896,7 +906,7 @@ def api_private_global_overview() -> GlobalOverviewResponse:
         COUNT(*) AS measurement_count
     FROM fastpath
     """
-    r = query_click_one_row(q, {})
+    r = query_click_one_row(clickhouse, q, {})
     assert r
     result = GlobalOverViewResponse(
             network_count=r["network_count"],
@@ -916,7 +926,9 @@ class GlobalOverviewMonthResponse(BaseModel):
 
 
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
-def api_private_global_by_month() -> Response:
+def api_private_global_by_month(
+    clickhouse: ClickhouseDep,
+) -> GlobalOverviewMonthResponse:
     """Provide global summary of measurements
     Sources: global_by_month db table
     ---
@@ -934,7 +946,7 @@ def api_private_global_by_month() -> Response:
         AND measurement_start_time < toStartOfMonth(today() + interval 1 month)
         GROUP BY month ORDER BY month
     """
-    rows = query_click(sql.text(q), {})
+    rows = query_click(clickhouse, sql.text(q), {})
     rows = list(rows)
 
     n = [{"date": r["month"], "value": r["networks_by_month"]} for r in rows]
@@ -958,7 +970,9 @@ class CircumventionStatsResponse(BaseModel):
 
 
 @router.get("/circumvention_stats_by_country", response_model=CircumventionStatsResponse, tags=["private"])
-def api_private_circumvention_stats_by_country() -> Response:
+def api_private_circumvention_stats_by_country(
+    clickhouse: ClickhouseDep,
+) -> CircumventionStatsResponse:
     """Aggregated statistics on protocols used for circumvention,
     grouped by country.
     ---
@@ -974,7 +988,7 @@ def api_private_circumvention_stats_by_country() -> Response:
         GROUP BY probe_cc ORDER BY probe_cc
     """
     try:
-        result = query_click(sql.text(q), {})
+        result = query_click(clickhouse, sql.text(q), {})
         return CountryCircumVentionStatsResponse(results=result)
 
     except Exception as e:
@@ -1018,7 +1032,9 @@ class CircumventionRuntimeStatsResponse(BaseModel):
 
 
 @router.get("/circumvention_runtime_stats", response_model=CircumventionRuntimeStatsResponse, tags=["private"])
-def api_private_circumvention_runtime_stats() -> Response:
+def api_private_circumvention_runtime_stats(
+    clickhouse: ClickhouseDep,
+) -> CircumventionRuntimeStatsResponse:
     """Runtime statistics on protocols used for circumvention,
     grouped by date, country, test_name.
     ---
@@ -1041,7 +1057,7 @@ def api_private_circumvention_runtime_stats() -> Response:
     GROUP BY date, probe_cc, test_name
     """
     try:
-        r = query_click(sql.text(q), {})
+        r = query_click(clickhouse, sql.text(q), {})
         return CircumventionRuntimeStatsResponse(results=pivot_circumvention_runtime_stats(r), v=0)
 
     except Exception as e:
@@ -1064,6 +1080,7 @@ class DomainMetadataResponse(BaseModel):
 
 @router.get("/domain_metadata", response_model=DomainMetadataResponse, tags=["private"])
 def api_private_domain_metadata(
+    clickhouse: ClickhouseDep,
     domain: DomainStr = Query(..., description="Domain Name"),
 ) -> DomainMetadataResponse:
     """Return the primary category code of a certain domain_name and its
@@ -1109,7 +1126,7 @@ def api_private_domain_metadata(
         ORDER BY length(url)
         LIMIT 1
     """
-    res = query_click_one_row(sql.text(q), dict(domains=domains))
+    res = query_click_one_row(clickhouse, sql.text(q), dict(domains=domains))
     if not res:
         # case 2: domain only inside a country list, so we just select the
         # shortest domain among the one with and without www
@@ -1119,7 +1136,7 @@ def api_private_domain_metadata(
             ORDER BY length(url)
             LIMIT 1
         """
-        res = query_click_one_row(sql.text(q), dict(domains=domains))
+        res = query_click_one_row(clickhouse, sql.text(q), dict(domains=domains))
 
     if res:
         category_code = res["category_code"]
@@ -1134,6 +1151,7 @@ class ASNMetadataResponse(BaseModel):
 
 @router.get("/asnmeta", response_model=ASNMetadataResponse, tags=["private"])
 def api_private_asnmeta(
+    clickhouse: ClickhouseDep,
     asn: int = Query(..., description="Autonomous System Number, e.g. 1234"),
 ) -> ASNMetadataResponse:
     """Look up organization name by ASN
@@ -1158,7 +1176,7 @@ def api_private_asnmeta(
         ORDER BY changed DESC
         LIMIT 1
     """
-    res = query_click_one_row(sql.text(q), dict(asn=asn))
+    res = query_click_one_row(clickhouse, sql.text(q), dict(asn=asn))
     org_name = res["org_name"] if res else "Unknown"
     return ASNMetadataResponse(org_name=org_name)
 
@@ -1175,7 +1193,9 @@ class MeasuredNetworksResponse(BaseModel):
 
 
 @router.get("/networks", response_model=MeasuredNetworksResponse, tags=["private"])
-def api_private_networks() -> Response:
+def api_private_networks(
+    clickhouse: ClickhouseDep,
+) -> MeasuredNetworksResponse:
     """List all networks that have measurements
     ---
     responses:
@@ -1205,7 +1225,7 @@ def api_private_networks() -> Response:
     ON (asorgs.asn = cnts.probe_asn)
     """
     try:
-        results = query_click(sql.text(q), {})
+        results = query_click(clickhouse, sql.text(q), {})
         return MeasuredNetworksResponse(results=results, v=0)
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
