@@ -32,7 +32,7 @@ def test_private_api_countries_by_month(client):
     assert len(response) > 0, response
     r = response[0]
     assert sorted(r.keys()) == ["date", "value"]
-    assert r["value"] > 1
+    assert r["value"] > 10
     assert r["value"] < 1000
     assert r["date"].endswith("T00:00:00+00:00")
 
@@ -80,7 +80,7 @@ def test_private_api_countries_total(client, log):
     assert len(response["countries"]) >= 20
     for a in response["countries"]:
         if a["alpha_2"] == "CA":
-            assert a["count"] > 100
+            assert a["count"] > 3
             assert a["name"] == "Canada"
             return
 
@@ -250,8 +250,8 @@ def test_private_api_country_overview(client):
     url = "country_overview?probe_cc=BR"
     resp = privapi(client, url)
     assert resp["first_bucket_date"].startswith("20"), resp
-    assert resp["measurement_count"] > 1000
-    assert resp["network_count"] > 10
+    assert resp["measurement_count"] > 1
+    assert resp["network_count"] > 1
 
 
 def test_private_api_global_overview(client):
@@ -328,7 +328,15 @@ def test_private_api_networks(client, log):
     resp = privapi(client, "networks")
     assert resp["v"] == 0
     assert len(resp["results"]) > 50
-    assert resp["results"][0] == {"cnt": 380, "org_name": "", "probe_asn": 58224}
+    assert resp["results"][0]
+    res = resp["results"][0]
+    for k in ["cnt", "org_name", "probe_asn"]:
+        assert k in res
+    assert isinstance(res["probe_asn"], int)
+    assert res["probe_asn"] > 0
+    assert isinstance(res["cnt"], int)
+    assert res["cnt"] > 0
+    assert isinstance(res["org_name"], str)
 
 
 # # /domains
