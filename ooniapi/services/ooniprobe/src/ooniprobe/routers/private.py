@@ -278,7 +278,7 @@ def check_report_id() -> CheckReportIDResponse:
           example: { "found": true, "v": 0 }
 
     """
-    return CheckReportIDResponse(v=0, found=true)
+    return CheckReportIDResponse(v=0, found=True)
 
 
 def last_30days(begin=31, end=1):
