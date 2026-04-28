@@ -442,6 +442,7 @@ def api_private_website_network_tests(
     validated: List[MeasurementsByASN] = [MeasurementsByASN(**x) for x in results]
     return validated
 
+
 class DayStats(BaseModel):
     test_day: date
     anomaly_count: conint(ge=0)
@@ -449,8 +450,10 @@ class DayStats(BaseModel):
     failure_count: conint(ge=0)
     total_count: conint(ge=0)
 
+
 class WebsiteStatsResponse(BaseModel):
     results: List[DayStats]
+
 
 @router.get("/website_stats", response_model=WebsiteStatsResponse, tags=["private"])
 def api_private_website_stats(
@@ -496,12 +499,14 @@ class WebsiteURLItem(BaseModel):
     failure_count: conint(ge=0)
     total_count: conint(ge=0)
 
+
 class PaginationMetadata(BaseModel):
     offset: int
     limit: int
     current_page: int
     total_count: int
     next_url: Optional[AnyUrl] = None
+
 
 class WebsiteURLsResponse(BaseModel):
     metadata: PaginationMetadata
@@ -667,6 +672,7 @@ def api_private_vanilla_tor_stats(
         networks=nets,
         notok_networks=blocked,
     )
+
 
 class NetworkEntry(BaseModel):
     asn: int
@@ -844,6 +850,7 @@ class CountryOverviewResponse(BaseModel):
     first_bucket_date: date = Field(..., description="First bucket date YYYY-MM-DD")
     measurement_count: int = Field(..., description="Number of measurements")
     network_count: int = Field(..., description="Number of networks measured")
+
 
 @router.get("/country_overview", response_model=CountryOverviewResponse, tags=["private"])
 def api_private_country_overview(
