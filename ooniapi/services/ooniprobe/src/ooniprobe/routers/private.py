@@ -1106,9 +1106,6 @@ def api_private_domain_metadata(
     }
     """
     category_code = "MISC"
-    domain = request.args.get("domain")
-    if domain is None:
-        raise BadRequest("missing domain")
 
     if domain.startswith("www."):
         canonical_domain = domain[4:]
