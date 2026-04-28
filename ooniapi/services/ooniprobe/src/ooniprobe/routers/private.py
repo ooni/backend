@@ -123,11 +123,12 @@ class CountryCount(BaseModel):
         "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
     }
 
-CountryByMonthResponse = List[ASNCount]
 
 
-@router.get("/countries_by_month", tags=["private_api"], response_model=CountryByMonthResponse)
-def api_private_countries_by_month() -> Response:
+@router.get("/countries_by_month", tags=["private_api"], response_model=List[CountryCount])
+def api_private_countries_by_month(
+    clickhouse: ClickhouseDep,
+) -> List[CountryCount]:
     """Countries count by month
     ---
     responses:
@@ -144,16 +145,20 @@ def api_private_countries_by_month() -> Response:
     """
     li = list(query_click(q, {}))
     expand_dates(li)
-    validated: CountryByMonthResponse = [CountryCount(**item) for item in li]
-    return validated
+    return [CountryCount(**item) for item in li]
+
 
 class TestName(BaseModel):
     id: str = Field(..., description="test id")
     name: str = Field(..., description="test name")
 
 
-@router.get("/test_names", tags=["private_api"], response_model=List[TestName])
-def api_private_test_names() -> List[TestName]:
+class TestNameResponse(BaseModel):
+    test_names: List[TestName]
+
+
+@router.get("/test_names", tags=["private_api"], response_model=TestNameResponse)
+def api_private_test_names() -> TestNameResponse:
     """Provides test names and descriptions to Explorer
     ---
     responses:
@@ -187,8 +192,7 @@ def api_private_test_names() -> List[TestName]:
         "web_connectivity": "Web Connectivity",
         "whatsapp": "WhatsApp",
     }
-    validated: List[TestNames] = [TestName(id=k, name=v) for k, v in TEST_NAMES.items()]
-    return validated
+    return TestNameResponse(test_names=[TestName(id=k, name=v) for k, v in TEST_NAMES.items()])
 
 
 class CountryStat(BaseModel):
@@ -197,8 +201,14 @@ class CountryStat(BaseModel):
     name: str = Field(..., description="Country Name")
 
 
-@router.get("/countries", tags=["private_api"], response_model=List[CountryStat])
-def api_private_countries() -> List[CountryStat]:
+class CountryStatResponse(BaseModel):
+    countries: List[CountryStat] = Field(..., description="List of countries")
+
+
+@router.get("/countries", tags=["private_api"], response_model=CountryStatResponse)
+def api_private_countries(
+    clickhouse: ClickhouseDep,
+) -> CountryStatResponse:
     """Summary of countries
     ---
     responses:
@@ -221,8 +231,7 @@ def api_private_countries() -> List[CountryStat]:
         except KeyError:
             pass
 
-    validated: List[CountryStat] = c
-    return validated
+    return CountryStatResponse(countries=c)
 
 
 @router.get(
