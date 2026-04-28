@@ -87,14 +87,10 @@ class ASNCount(BaseModel):
     }
 
 
-
-ASNByMonthResponse = List[ASNCount]
-
-
-@router.get("/asn_by_month", tags=["private_api"], response_model=ASNByMonthResponse)
+@router.get("/asn_by_month", tags=["private_api"], response_model=List[ASNCount])
 def api_private_asn_by_month(
     clickhouse: ClickhouseDep,
-) -> ASNByMonthResponse:
+) -> List[ASNCount]:
     """Network count by month
     ---
     responses:
@@ -111,8 +107,7 @@ def api_private_asn_by_month(
     """
     li = list(query_click(clickhouse, q, {}))
     expand_dates(li)
-    validated: ASNByMonthResponse = [ASNCount(**item) for item in li]
-    return validated
+    return [ASNCount(**item) for item in li]
 
 
 class CountryCount(BaseModel):
