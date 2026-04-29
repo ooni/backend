@@ -781,15 +781,7 @@ def api_private_country_overview(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
 ) -> CountryOverviewResponse:
-    """Country-specific overview
-    ---
-    responses:
-      '200':
-        description: {
-        "first_bucket_date":"2012-12-01",
-        "measurement_count":6659891,
-        "network_count":333}
-    """
+    """Country-level summary for the requested two-letter code: first available measurement date, total number of measurements since 2012-12-01, and number of distinct ASNs observed (networks)."""
     # TODO: add circumvention_tools_blocked im_apps_blocked
     # middlebox_detected_networks websites_confirmed_blocked
     s = """SELECT
@@ -819,13 +811,7 @@ class GlobalOverviewResponse(BaseModel):
 def api_private_global_overview(
     clickhouse: ClickhouseDep,
 ) -> GlobalOverviewResponse:
-    """Provide global summary of measurements
-    Sources: global_stats db table
-    ---
-    responses:
-      '200':
-        description: JSON struct TODO
-    """
+    """Global summary of measurements across all countries: total distinct networks (ASNs), total countries with measurements, and total measurement count (computed from the fastpath table)."""
     q = """SELECT
         COUNT(DISTINCT(probe_asn)) AS network_count,
         COUNT(DISTINCT probe_cc) AS country_count,
