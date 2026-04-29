@@ -828,30 +828,24 @@ def api_private_global_overview(
 
 
 class GlobalOverviewStat(BaseModel):
-    date: datetime
-    value: int
+    date: datetime = Field(..., description="Month start timestamp (ISO 8601, midnight UTC)", example="2026-03-01T00:00:00+00:00")
+    value: int = Field(..., description="Count value for the month", example=12345)
     model_config = {
         "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
     }
 
 
 class GlobalOverviewMonthResponse(BaseModel):
-    networks_by_month: List[GlobalOverviewStat]
-    countries_by_month: List[GlobalOverviewStat]
-    measurements_by_month: List[GlobalOverviewStat]
+    networks_by_month: List[GlobalOverviewStat] = Field(..., description="Monthly distinct network (ASN) counts")
+    countries_by_month: List[GlobalOverviewStat] = Field(..., description="Monthly distinct country counts")
+    measurements_by_month: List[GlobalOverviewStat] = Field(..., description="Monthly total measurement counts")
 
 
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
 def api_private_global_by_month(
     clickhouse: ClickhouseDep,
 ) -> GlobalOverviewMonthResponse:
-    """Provide global summary of measurements
-    Sources: global_by_month db table
-    ---
-    responses:
-      '200':
-        description: JSON struct TODO
-    """
+    """Monthly global time series for the last two years: distinct networks (ASNs), distinct countries, and total measurements per month (month timestamps are start-of-month)."""
     q = """SELECT
         COUNT(DISTINCT probe_asn) AS networks_by_month,
         COUNT(DISTINCT probe_cc) AS countries_by_month,
