@@ -92,11 +92,8 @@ def api_private_asn_by_month(
     clickhouse: ClickhouseDep,
 ) -> List[ASNCount]:
     """Network count by month
-    ---
-    responses:
-      '200':
-        description: [{"date":"2018-08-31","value":4411}, ... ]
     """
+
     q = """SELECT
         COUNT(DISTINCT(probe_asn)) AS value,
         toStartOfMonth(measurement_start_time) AS date
@@ -125,10 +122,6 @@ def api_private_countries_by_month(
     clickhouse: ClickhouseDep,
 ) -> List[CountryCount]:
     """Countries count by month
-    ---
-    responses:
-      '200':
-        description: TODO
     """
     q = """SELECT
         COUNT(DISTINCT(probe_cc)) AS value,
@@ -155,10 +148,6 @@ class TestNameResponse(BaseModel):
 @router.get("/test_names", tags=["private"], response_model=TestNameResponse)
 def api_private_test_names() -> TestNameResponse:
     """Provides test names and descriptions to Explorer
-    ---
-    responses:
-      '200':
-        description: TODO
     """
     # TODO: eventually drop this, once we see nobody is using it
     TEST_NAMES = {
@@ -205,10 +194,6 @@ def api_private_countries(
     clickhouse: ClickhouseDep,
 ) -> CountryStatResponse:
     """Summary of countries
-    ---
-    responses:
-      '200':
-        description: {"countries": [{"alpha_2": x, "count": y, "name":  z}, ... ]}
     """
     q = """
     SELECT probe_cc, COUNT() AS measurement_count
