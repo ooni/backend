@@ -613,16 +613,16 @@ def api_private_vanilla_tor_stats(
 
 
 class NetworkEntry(BaseModel):
-    asn: int
-    name: str
-    total_count: int
-    last_tested: date
+    asn: int = Field(..., description="Autonomous System Number (integer)", example=12345)
+    name: str = Field(..., description="Network/ASN name", example="Example ISP")
+    total_count: int = Field(..., description="Total number of measurements for this ASN and test", example=42)
+    last_tested: date = Field(..., description="Date of the most recent measurement (YYYY-MM-DD)", example="2026-03-29")
 
 
 class IMNetworkStats(BaseModel):
-    anomaly_networks: List[NetworkEntry]
-    ok_networks: List[NetworkEntry]
-    last_tested: date
+    anomaly_networks: List[NetworkEntry] = Field(..., description="List of networks showing anomalous behaviour for this test")
+    ok_networks: List[NetworkEntry] = Field(..., description="List of networks considered OK for this test")
+    last_tested: date = Field(..., description="Most recent measurement date across networks for this test", example="2026-03-29")
 
 
 @router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
@@ -630,12 +630,7 @@ def api_private_im_networks(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> Dict[str, IMNetworkStats]:
-    """Instant messaging networks statistics
-    ---
-    responses:
-      '200':
-        description: TODO
-    """
+    """Per-test instant messaging network statistics (per-ASN totals and last-tested date) for the past 31 days, keyed by test name."""
     s = """SELECT
     COUNT() AS total_count,
     '' AS name,
