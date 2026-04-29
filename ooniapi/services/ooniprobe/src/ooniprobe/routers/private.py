@@ -87,7 +87,7 @@ class ASNCount(BaseModel):
     }
 
 
-@router.get("/asn_by_month", tags=["private_api"], response_model=List[ASNCount])
+@router.get("/asn_by_month", tags=["private"], response_model=List[ASNCount])
 def api_private_asn_by_month(
     clickhouse: ClickhouseDep,
 ) -> List[ASNCount]:
@@ -120,7 +120,7 @@ class CountryCount(BaseModel):
 
 
 
-@router.get("/countries_by_month", tags=["private_api"], response_model=List[CountryCount])
+@router.get("/countries_by_month", tags=["private"], response_model=List[CountryCount])
 def api_private_countries_by_month(
     clickhouse: ClickhouseDep,
 ) -> List[CountryCount]:
@@ -152,7 +152,7 @@ class TestNameResponse(BaseModel):
     test_names: List[TestName]
 
 
-@router.get("/test_names", tags=["private_api"], response_model=TestNameResponse)
+@router.get("/test_names", tags=["private"], response_model=TestNameResponse)
 def api_private_test_names() -> TestNameResponse:
     """Provides test names and descriptions to Explorer
     ---
@@ -200,7 +200,7 @@ class CountryStatResponse(BaseModel):
     countries: List[CountryStat] = Field(..., description="List of countries")
 
 
-@router.get("/countries", tags=["private_api"], response_model=CountryStatResponse)
+@router.get("/countries", tags=["private"], response_model=CountryStatResponse)
 def api_private_countries(
     clickhouse: ClickhouseDep,
 ) -> CountryStatResponse:
@@ -232,7 +232,7 @@ def api_private_countries(
 @router.get(
     "/quotas_summary",
     response_model=List[CountryStat],
-    tags=["private_api"],
+    tags=["private"],
     dependencies=[Depends(role_required(["admin"]))],
 )
 def api_private_quotas_summary() -> List[CountryStat]:
@@ -251,7 +251,7 @@ class CheckReportIDResponse(BaseModel):
 
 @router.get("/check_report_id",
     response_model=CheckReportIDResponse,
-    tags=["private_api"],
+    tags=["private"],
 )
 def check_report_id() -> CheckReportIDResponse:
     """Legacy. Used to check if a report_id existed in the fastpath table.
