@@ -18,7 +18,7 @@ from sqlalchemy import sql
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
-from pydantic import AnyUrl, conint, Field
+from pydantic import AnyUrl, Field
 
 from .v1.probe_services import probe_geoip, generate_test_helpers_conf
 from ..common.clickhouse_utils import query_click, query_click_one_row
@@ -870,7 +870,7 @@ def api_private_global_by_month(
 
 
 class CountryCircumventionStat(BaseModel):
-    cnt: conint(ge=0) = Field(..., description="Count of measurements")
+    cnt: int = Field(..., description="Count of measurements")
     probe_cc: CountryAlpha2 = Field(..., description="Country code of probe")
 
 
@@ -1057,9 +1057,9 @@ def api_private_asnmeta(
 
 
 class MeasuredNetworkStat(BaseModel):
-    cnt: conint(ge=0) = Field(..., description="Number of measurements")
-    org_name: str = Field("", description="ORG Name of network")
-    probe_asn: conint(ge=0) = Field(..., description="ASN of network (int)")
+    cnt: int = Field(..., description="Number of measurements", example=123)
+    org_name: str = Field("", description="Organization name associated with the ASN", example="Example ISP")
+    probe_asn: int = Field(..., description="ASN of network (int)")
 
 
 class MeasuredNetworksResponse(BaseModel):
@@ -1071,12 +1071,7 @@ class MeasuredNetworksResponse(BaseModel):
 def api_private_networks(
     clickhouse: ClickhouseDep,
 ) -> MeasuredNetworksResponse:
-    """List all networks that have measurements
-    ---
-    responses:
-      200:
-        description: JSON object
-    """
+    """List all networks that have measurements by per-ASN measurement count and associated organization name."""
     q = """
     SELECT probe_asn, cnt, org_name FROM (
         SELECT
@@ -1121,12 +1116,7 @@ class DomainsMeasuredResponse(BaseModel):
 def api_private_domains(
     clickhouse: ClickhouseDep,
 ) -> DomainsMeasuredResponse:
-    """List all the domains in the test-lists with their measurement count
-    ---
-    responses:
-      200:
-        description: JSON object
-    """
+    """List all the domains in the test-lists with their measurement count."""
     # The nested ORDER BY lower(cc) puts global entries (cc=ZZ) on top so that
     # any(category_code) picks it up as the most meaningful category code.
     q = """
