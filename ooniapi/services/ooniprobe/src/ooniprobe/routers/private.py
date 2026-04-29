@@ -336,28 +336,29 @@ def get_recent_network_coverage_ch(clickhouse, probe_cc, test_groups):
     return query_click(clickhouse, sql.text(s), d)
 
 
+class NetworkCoveragePoint(BaseModel):
+    test_day: date = Field(..., description="Date for the measurement (YYYY-MM-DD)", example="2021-10-16")
+    count: int = Field(..., description="Count of unique ASNs seen that day", example=58)
+
+
+class TestCoveragePoint(BaseModel):
+    test_day: date = Field(..., description="Date for the measurement (YYYY-MM-DD)", example="2021-10-16")
+    test_group: str = Field(..., description="Test group name", example="websites")
+    count: int = Field(..., description="Number of measurements for this test group on that day", example=4888)
+
+
 class TestCoverageResponse(BaseModel):
-    network_coverage: List[Any]
-    test_coverage: List[Any]
+    network_coverage: List[NetworkCoveragePoint] = Field(..., description="Daily network coverage (ASNs per day)")
+    test_coverage: List[TestCoveragePoint] = Field(..., description="Per-test-group coverage per day")
 
 
 @router.get("/test_coverage", response_model=TestCoverageResponse, tags=["private"])
 def api_private_test_coverage(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    test_groups: str = Query(None, description="XXX: What is this?")
+    test_groups: str = Query(None, description="Comma-separated list of test group keys to filter results", example="websites,im")
 ) -> TestCoverageResponse:
     """Return number of measurements per day across test categories
-    ---
-    parameters:
-      - name: probe_cc
-        in: query
-        type: string
-        minLength: 2
-        required: true
-    responses:
-      '200':
-          description: '{"network_coverage: [...], "test_coverage": [...]}'
     """
     # TODO: merge the two queries into one?
     # TODO: remove test categories or move aggregation to the front-end?
