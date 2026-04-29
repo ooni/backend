@@ -337,14 +337,14 @@ def get_recent_network_coverage_ch(clickhouse, probe_cc, test_groups):
 
 
 class NetworkCoveragePoint(BaseModel):
-    test_day: date = Field(..., description="Date for the measurement (YYYY-MM-DD)", example="2021-10-16")
-    count: int = Field(..., description="Count of unique ASNs seen that day", example=58)
+    test_day: date = Field(..., description="Date for the measurement (YYYY-MM-DD)")
+    count: int = Field(..., description="Count of unique ASNs seen that day")
 
 
 class TestCoveragePoint(BaseModel):
-    test_day: date = Field(..., description="Date for the measurement (YYYY-MM-DD)", example="2021-10-16")
-    test_group: str = Field(..., description="Test group name", example="websites")
-    count: int = Field(..., description="Number of measurements for this test group on that day", example=4888)
+    test_day: date = Field(..., description="Date for the measurement (YYYY-MM-DD)")
+    test_group: str = Field(..., description="Test group name")
+    count: int = Field(..., description="Number of measurements for this test group on that day")
 
 
 class TestCoverageResponse(BaseModel):
@@ -356,7 +356,7 @@ class TestCoverageResponse(BaseModel):
 def api_private_test_coverage(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    test_groups: str = Query(None, description="Comma-separated list of test group keys to filter results", example="websites,im")
+    test_groups: str = Query(None, description="Comma-separated list of test group keys to filter results")
 ) -> TestCoverageResponse:
     """Return number of measurements per day across test categories
     """
@@ -399,11 +399,11 @@ def api_private_website_network_tests(
 
 
 class DayStats(BaseModel):
-    test_day: date = Field(..., description="Date for the aggregated counts (YYYY-MM-DD)", example="2026-03-29")
-    anomaly_count: int = Field(..., description="Number of measurements flagged as anomalies on this day", example=5)
-    confirmed_count: int = Field(..., description="Number of anomalies confirmed on this day", example=2)
-    failure_count: int = Field(..., description="Number of measurements that failed on this day", example=10)
-    total_count: int = Field(..., description="Total number of measurements for this day", example=100)
+    test_day: date = Field(..., description="Date for the aggregated counts (YYYY-MM-DD)")
+    anomaly_count: int = Field(..., description="Number of measurements flagged as anomalies on this day")
+    confirmed_count: int = Field(..., description="Number of anomalies confirmed on this day")
+    failure_count: int = Field(..., description="Number of measurements that failed on this day")
+    total_count: int = Field(..., description="Total number of measurements for this day")
 
 
 class WebsiteStatsResponse(BaseModel):
@@ -444,18 +444,18 @@ def api_private_website_stats(
 
 class WebsiteURLItem(BaseModel):
     input: AnyUrl = Field(..., description="Tested URL")
-    anomaly_count: int = Field(..., description="Number of measurements flagged as anomalies for this URL in the past 31 days", example=5)
-    confirmed_count: int = Field(..., description="Number of anomalies confirmed for this URL in the past 31 days", example=2)
-    failure_count: int = Field(..., description="Number of measurements that failed for this URL in the past 31 days", example=10)
-    total_count: int = Field(..., description="Total number of measurements for this URL in the past 31 days", example=100)
+    anomaly_count: int = Field(..., description="Number of measurements flagged as anomalies for this URL in the past 31 days")
+    confirmed_count: int = Field(..., description="Number of anomalies confirmed for this URL in the past 31 days")
+    failure_count: int = Field(..., description="Number of measurements that failed for this URL in the past 31 days")
+    total_count: int = Field(..., description="Total number of measurements for this URL in the past 31 days")
 
 
 class PaginationMetadata(BaseModel):
-    offset: int = Field(..., description="Current result offset", example=0)
-    limit: int = Field(..., description="Maximum number of results returned", example=10)
-    current_page: int = Field(..., description="Current page number (1-based)", example=1)
-    total_count: int = Field(..., description="Total number of matching URLs", example=123)
-    next_url: Optional[AnyUrl] = Field(None, description="URL for the next page of results, or null if none", example="https://example.com/api/_/website_urls?limit=10&offset=10")
+    offset: int = Field(..., description="Current result offset")
+    limit: int = Field(..., description="Maximum number of results returned")
+    current_page: int = Field(..., description="Current page number (1-based)")
+    total_count: int = Field(..., description="Total number of matching URLs")
+    next_url: Optional[AnyUrl] = Field(None, description="URL for the next page of results, or null if none")
 
 
 class WebsiteURLsResponse(BaseModel):
@@ -545,20 +545,20 @@ def api_private_website_test_urls(
 
 
 class NetworkStat(BaseModel):
-    failure_count: int = Field(..., description="Number of failed measurements for this ASN", example=3)
-    last_tested: Optional[date] = Field(None, description="Date of the most recent measurement (YYYY-MM-DD)", example="2026-03-29")
-    probe_asn: int = Field(..., description="Autonomous System Number (integer)", example=12345)
-    total_count: int = Field(..., description="Total number of measurements for this ASN", example=100)
-    success_count: int = Field(..., description="Number of successful measurements for this ASN", example=80)
-    test_runtime_avg: Optional[float] = Field(None, description="Average test runtime in seconds for this ASN", example=1.23)
-    test_runtime_max: Optional[float] = Field(None, description="Maximum test runtime in seconds for this ASN", example=2.5)
-    test_runtime_min: Optional[float] = Field(None, description="Minimum test runtime in seconds for this ASN", example=0.8)
+    failure_count: int = Field(..., description="Number of failed measurements for this ASN")
+    last_tested: Optional[date] = Field(None, description="Date of the most recent measurement (YYYY-MM-DD)")
+    probe_asn: int = Field(..., description="Autonomous System Number (integer)")
+    total_count: int = Field(..., description="Total number of measurements for this ASN")
+    success_count: int = Field(..., description="Number of successful measurements for this ASN")
+    test_runtime_avg: Optional[float] = Field(None, description="Average test runtime in seconds for this ASN")
+    test_runtime_max: Optional[float] = Field(None, description="Maximum test runtime in seconds for this ASN")
+    test_runtime_min: Optional[float] = Field(None, description="Minimum test runtime in seconds for this ASN")
 
 
 class TorStatsResponse(BaseModel):
-    last_tested: Optional[date] = Field(None, description="Most recent test date across all networks (YYYY-MM-DD)", example="2026-03-29")
+    last_tested: Optional[date] = Field(None, description="Most recent test date across all networks (YYYY-MM-DD)")
     networks: List[NetworkStat] = Field(..., description="List of per-ASN Tor test statistics")
-    notok_networks: int = Field(..., description="Number of networks considered 'not OK' (low success rate)", example=5)
+    notok_networks: int = Field(..., description="Number of networks considered 'not OK' (low success rate)")
 
 
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
@@ -613,16 +613,16 @@ def api_private_vanilla_tor_stats(
 
 
 class NetworkEntry(BaseModel):
-    asn: int = Field(..., description="Autonomous System Number (integer)", example=12345)
-    name: str = Field(..., description="Network/ASN name", example="Example ISP")
-    total_count: int = Field(..., description="Total number of measurements for this ASN and test", example=42)
-    last_tested: date = Field(..., description="Date of the most recent measurement (YYYY-MM-DD)", example="2026-03-29")
+    asn: int = Field(..., description="Autonomous System Number (integer)")
+    name: str = Field(..., description="Network/ASN name")
+    total_count: int = Field(..., description="Total number of measurements for this ASN and test")
+    last_tested: date = Field(..., description="Date of the most recent measurement (YYYY-MM-DD)")
 
 
 class IMNetworkStats(BaseModel):
     anomaly_networks: List[NetworkEntry] = Field(..., description="List of networks showing anomalous behaviour for this test")
     ok_networks: List[NetworkEntry] = Field(..., description="List of networks considered OK for this test")
-    last_tested: date = Field(..., description="Most recent measurement date across networks for this test", example="2026-03-29")
+    last_tested: date = Field(..., description="Most recent measurement date across networks for this test")
 
 
 @router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
@@ -675,8 +675,8 @@ def isomid(d) -> str:
 
 class IMStatsItem(BaseModel):
     anomaly_count: Optional[int] = Field(None, description="Number of measurements flagged as anomalies for that day")
-    test_day: datetime = Field(..., description="Timestamp for the day (ISO 8601, midnight UTC)", example="2020-08-01T00:00:00+00:00")
-    total_count: int = Field(..., description="Total number of measurements for that day", example=42)
+    test_day: datetime = Field(..., description="Timestamp for the day (ISO 8601, midnight UTC)")
+    total_count: int = Field(..., description="Total number of measurements for that day")
     model_config = {
         "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
     }
@@ -753,8 +753,8 @@ class NetworkMetadata(BaseModel):
 
 
 class NetworkStatsResponse(BaseModel):
-    metadata: NetworkMetadata = Field(..., description="Networks metadata")
-    results: List[NetworkStats] = Field(..., description="List of network stats")
+    metadata: NetworkMetadata = Field(..., description="Pagination and result metadata")
+    results: List[NetworkStats] = Field(..., description="List of per-ASN network statistics")
 
 
 @router.get("/network_stats", response_model=NetworkStatsResponse, tags=["private"])
@@ -828,8 +828,8 @@ def api_private_global_overview(
 
 
 class GlobalOverviewStat(BaseModel):
-    date: datetime = Field(..., description="Month start timestamp (ISO 8601, midnight UTC)", example="2026-03-01T00:00:00+00:00")
-    value: int = Field(..., description="Count value for the month", example=12345)
+    date: datetime = Field(..., description="Month start timestamp (ISO 8601, midnight UTC)")
+    value: int = Field(..., description="Count value for the month")
     model_config = {
         "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
     }
@@ -1057,8 +1057,8 @@ def api_private_asnmeta(
 
 
 class MeasuredNetworkStat(BaseModel):
-    cnt: int = Field(..., description="Number of measurements", example=123)
-    org_name: str = Field("", description="Organization name associated with the ASN", example="Example ISP")
+    cnt: int = Field(..., description="Number of measurements")
+    org_name: str = Field("", description="Organization name associated with the ASN")
     probe_asn: int = Field(..., description="ASN of network (int)")
 
 
