@@ -443,24 +443,24 @@ def api_private_website_stats(
 
 
 class WebsiteURLItem(BaseModel):
-    input: AnyUrl
-    anomaly_count: conint(ge=0)
-    confirmed_count: conint(ge=0)
-    failure_count: conint(ge=0)
-    total_count: conint(ge=0)
+    input: AnyUrl = Field(..., description="Tested URL")
+    anomaly_count: int = Field(..., description="Number of measurements flagged as anomalies for this URL in the past 31 days", example=5)
+    confirmed_count: int = Field(..., description="Number of anomalies confirmed for this URL in the past 31 days", example=2)
+    failure_count: int = Field(..., description="Number of measurements that failed for this URL in the past 31 days", example=10)
+    total_count: int = Field(..., description="Total number of measurements for this URL in the past 31 days", example=100)
 
 
 class PaginationMetadata(BaseModel):
-    offset: int
-    limit: int
-    current_page: int
-    total_count: int
-    next_url: Optional[AnyUrl] = None
+    offset: int = Field(..., description="Current result offset", example=0)
+    limit: int = Field(..., description="Maximum number of results returned", example=10)
+    current_page: int = Field(..., description="Current page number (1-based)", example=1)
+    total_count: int = Field(..., description="Total number of matching URLs", example=123)
+    next_url: Optional[AnyUrl] = Field(None, description="URL for the next page of results, or null if none", example="https://example.com/api/_/website_urls?limit=10&offset=10")
 
 
 class WebsiteURLsResponse(BaseModel):
-    metadata: PaginationMetadata
-    results: List[WebsiteURLItem]
+    metadata: PaginationMetadata = Field(..., description="Pagination metadata for the results")
+    results: List[WebsiteURLItem] = Field(..., description="List of URL statistics for the requested CC/ASN")
 
 
 @router.get("/website_urls", response_model=WebsiteURLsResponse, tags=["private"])
@@ -471,12 +471,7 @@ def api_private_website_test_urls(
     limit: int = Query(10, description="Limit results"),
     offset: int = Query(0, description="Offset results")
 ) -> WebsiteURLsResponse:
-    """TODO
-    ---
-    responses:
-      '200':
-        description: TODO
-    """
+    """Paginated list of tested URLs with per-URL counts (anomalies, confirmations, failures, totals) for the past 31 days."""
     # TODO optimize or remove
     if limit <= 0:
         limit = 10
