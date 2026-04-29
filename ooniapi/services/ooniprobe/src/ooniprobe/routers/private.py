@@ -674,16 +674,16 @@ def isomid(d) -> str:
 
 
 class IMStatsItem(BaseModel):
-    anomaly_count: Optional[int] = None
-    test_day: datetime
-    total_count: int
+    anomaly_count: Optional[int] = Field(None, description="Number of measurements flagged as anomalies for that day")
+    test_day: datetime = Field(..., description="Timestamp for the day (ISO 8601, midnight UTC)", example="2020-08-01T00:00:00+00:00")
+    total_count: int = Field(..., description="Total number of measurements for that day", example=42)
     model_config = {
         "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
     }
 
 
 class IMStatsResponse(BaseModel):
-    results: List[IMStatsItem]
+    results: List[IMStatsItem] = Field(..., description="Daily IM statistics for the requested ASN/CC/test (last 31 days)")
 
 
 @router.get("/im_stats", response_model=IMStatsResponse, tags=["private"])
@@ -693,12 +693,7 @@ def api_private_im_stats(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     test_name: str = Query(..., description="Test name")
 ) -> IMStatsResponse:
-    """Instant messaging statistics
-    ---
-    responses:
-      '200':
-        description: TODO
-    """
+    """Daily instant messaging measurement totals (and optional anomaly counts) for the past 31 days, for the given ASN, country, and test."""
     test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
     if test_name not in test_names:
         raise HTTPException(status_code=400, detail="Invalid test_name")
