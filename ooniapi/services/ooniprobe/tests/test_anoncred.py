@@ -7,7 +7,7 @@ from ooniauth_py import UserState, ServerState
 from pydantic import ValidationError
 from ooniprobe.dependencies import Manifest, Match, Policy, PolicyEntry
 from ooniprobe.routers.v1.probe_services import get_ranges_from_policy
-from .utils import getj, make_submit_request, postj, setup_user
+from .utils import get_msmt_hash, getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
 async def test_manifest_basic(client, db):
@@ -97,6 +97,82 @@ async def test_submission_basic(client):
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
     assert c["error"] is None
+
+
+@pytest.mark.asyncio
+async def test_fastpath_fallback(client_with_mocked_fastpath):
+    """
+    When the first fastpath URL fails, the second one in the list should
+    still receive a verified anonymous-credentials measurement.
+    """
+    client, mock_fastpath, success_url = client_with_mocked_fastpath
+
+    # open report
+    j = make_report_request("IE", "AS34245")
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    submit_request = make_submit_request(user, "IE", "AS34245")
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    assert c["submit_response"], (
+        "submit_response should not be null when verification succeeded"
+    )
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    # Verified anonymous-credential submissions inject "t" as the
+    # `is_verified` flag in the stored payload before hashing.
+    expected_hash = get_msmt_hash(msm, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+    # Check response bytes
+    expected_url = f"{success_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url]
+
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    assert get_msmt_hash(stored, is_verified="t") == expected_hash
+    assert stored["is_verified"] == "t"
+
+
+@pytest.mark.asyncio
+async def test_fastpath_only_submits_once_on_success(client_with_two_working_fastpaths):
+    """
+    When the first fastpath URL succeeds, the receiver should stop iterating
+    """
+    client, mock_fastpath, first_url, second_url = client_with_two_working_fastpaths
+
+    # open report
+    j = make_report_request("IE", "AS34245")
+    resp = postj(client, "/report", json=j)
+    rid = resp.pop("report_id")
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    submit_request = make_submit_request(user, "IE", "AS34245")
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+
+    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    # Sanity-check the bytes that were forwarded to the fastpath
+    expected_hash = get_msmt_hash(msm, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+    # Only the first fastpath URL should have received the measurement
+    expected_url = f"{first_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url], (
+        "measurement should be forwarded to the first fastpath URL only, "
+        f"got {list(mock_fastpath.uploads.keys())}"
+    )
 
 
 @pytest.mark.asyncio

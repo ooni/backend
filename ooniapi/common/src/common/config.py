@@ -46,7 +46,11 @@ class Settings(BaseSettings):
     geoip_db_dir: str = "/var/lib/ooni/geoip"
     # -- < Ooniprobe only > -------------------------------------------------------------
     msmt_spool_dir: str = ""
-    fastpath_url: str = ""  # example: http://123.123.123.123:8472
+    fastpath_urls: List[str] = Field(
+        description="List of fastpath instances to send measurements to",
+        default_factory=list,
+    ) # example: [http://123.123.123.123:8472]
+
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
