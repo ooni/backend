@@ -381,17 +381,7 @@ def api_private_website_network_tests(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> List[MeasurementsByASN]:
-    """TODO
-    ---
-    parameters:
-      - name: probe_cc
-        in: query
-        type: string
-        description: The two letter country code
-    responses:
-      '200':
-        description: TODO
-    """
+    """Daily counts of website measurements per ASN for the past 31 days, returned as a list of (probe_asn, count) ordered by count descending."""
     s = """SELECT
         COUNT() AS count,
         probe_asn
@@ -409,15 +399,15 @@ def api_private_website_network_tests(
 
 
 class DayStats(BaseModel):
-    test_day: date
-    anomaly_count: conint(ge=0)
-    confirmed_count: conint(ge=0)
-    failure_count: conint(ge=0)
-    total_count: conint(ge=0)
+    test_day: date = Field(..., description="Date for the aggregated counts (YYYY-MM-DD)", example="2026-03-29")
+    anomaly_count: int = Field(..., description="Number of measurements flagged as anomalies on this day", example=5)
+    confirmed_count: int = Field(..., description="Number of anomalies confirmed on this day", example=2)
+    failure_count: int = Field(..., description="Number of measurements that failed on this day", example=10)
+    total_count: int = Field(..., description="Total number of measurements for this day", example=100)
 
 
 class WebsiteStatsResponse(BaseModel):
-    results: List[DayStats]
+    results: List[DayStats] = Field(..., description="Daily aggregated statistics for the queried website, country, and ASN (ordered by day)")
 
 
 @router.get("/website_stats", response_model=WebsiteStatsResponse, tags=["private"])
@@ -426,13 +416,8 @@ def api_private_website_stats(
     input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: int = Query(..., description="ASN (integer)"),
-) -> Response:
-    """Returns daily aggregated stats for the given website, country and ASN
-    ---
-    responses:
-      '200':
-      description: daily website stats
-    """
+) -> WebsiteStatsResponse:
+    """Daily aggregated website measurement statistics (anomalies, confirmations, failures, and totals) for the past 31 days."""
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
