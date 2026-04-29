@@ -760,18 +760,11 @@ class NetworkStatsResponse(BaseModel):
 @router.get("/network_stats", response_model=NetworkStatsResponse, tags=["private"])
 def api_private_network_stats(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    limit: int = Query(10, description="Limit results"),
+    offset: int = Query(0, description="Offset results"),
+    clickhouse: ClickhouseDep,
 ) -> NetworkStatsResponse:
-    """Network speed statistics - not implemented
-    ---
-    parameters:
-      - name: probe_cc
-        in: query
-        type: string
-        description: The two letter country code
-    responses:
-      '200':
-        description: TODO
-    """
+
     # TODO: implement the stats from NDT in fastpath and then here
 
     return NetworkStatsResponse(metadata=NetworkMetadata(), results=[])
