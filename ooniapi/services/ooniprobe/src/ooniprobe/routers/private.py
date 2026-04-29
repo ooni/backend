@@ -545,20 +545,20 @@ def api_private_website_test_urls(
 
 
 class NetworkStat(BaseModel):
-    failure_count: int
-    last_tested: Optional[date]  # SQL toDate() returns a date
-    probe_asn: int
-    total_count: int
-    success_count: int
-    test_runtime_avg: Optional[float] = None
-    test_runtime_max: Optional[float] = None
-    test_runtime_min: Optional[float] = None
+    failure_count: int = Field(..., description="Number of failed measurements for this ASN", example=3)
+    last_tested: Optional[date] = Field(None, description="Date of the most recent measurement (YYYY-MM-DD)", example="2026-03-29")
+    probe_asn: int = Field(..., description="Autonomous System Number (integer)", example=12345)
+    total_count: int = Field(..., description="Total number of measurements for this ASN", example=100)
+    success_count: int = Field(..., description="Number of successful measurements for this ASN", example=80)
+    test_runtime_avg: Optional[float] = Field(None, description="Average test runtime in seconds for this ASN", example=1.23)
+    test_runtime_max: Optional[float] = Field(None, description="Maximum test runtime in seconds for this ASN", example=2.5)
+    test_runtime_min: Optional[float] = Field(None, description="Minimum test runtime in seconds for this ASN", example=0.8)
 
 
 class TorStatsResponse(BaseModel):
-    last_tested: Optional[date]
-    networks: List[NetworkStat]
-    notok_networks: int
+    last_tested: Optional[date] = Field(None, description="Most recent test date across all networks (YYYY-MM-DD)", example="2026-03-29")
+    networks: List[NetworkStat] = Field(..., description="List of per-ASN Tor test statistics")
+    notok_networks: int = Field(..., description="Number of networks considered 'not OK' (low success rate)", example=5)
 
 
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
@@ -566,18 +566,7 @@ def api_private_vanilla_tor_stats(
     clickhouse: ClickhouseDep,
     probe_cc: str = Query(..., description="Country Code")
 ) -> TorStatsResponse:
-    """Tor statistics over ASN for a given CC
-    ---
-    parameters:
-      - name: probe_cc
-        in: query
-        type: string
-        minLength: 2
-        required: true
-    responses:
-      '200':
-        description: TODO
-    """
+    """Per-ASN Tor measurement statistics for the given country over the last 6 months, including counts, last-tested date, and a tally of networks with low success rates."""
     try:
         CountryAlpha2(probe_cc)
     except Exception:
