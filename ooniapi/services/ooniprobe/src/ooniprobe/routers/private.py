@@ -240,28 +240,7 @@ class CheckReportIDResponse(BaseModel):
 )
 def check_report_id() -> CheckReportIDResponse:
     """Legacy. Used to check if a report_id existed in the fastpath table.
-    Used by https://github.com/ooni/probe/issues/1034
-    ---
-    produces:
-      - application/json
-    parameters:
-      - name: report_id
-        in: query
-        type: string
-    responses:
-      200:
-        description: Always returns True.
-        schema:
-          type: object
-          properties:
-            v:
-              type: integer
-              description: version number of this response
-            found:
-              type: boolean
-              description: True
-          example: { "found": true, "v": 0 }
-
+    Used by https://github.com/ooni/probe/issues/1034. Always returns True.
     """
     return CheckReportIDResponse(v=0, found=True)
 
