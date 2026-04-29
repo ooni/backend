@@ -145,12 +145,23 @@ async def receive_measurement(
     asn_i = normalize_asn(asn)
 
     # Same validation as old report_id
-    good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
-    if not good:
+    cc_ok = len(cc) == 2
+    test_name_alnum_ok = test_name.isalnum()
+    test_name_len_ok = 1 < len(test_name) < 30
+    if not (cc_ok and test_name_alnum_ok and test_name_len_ok):
         log.error(
             f"Bad metadata in measurement body: test_name={test_name[:30]}, cc={cc}"
         )
-        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_metadata").inc()
+        if not cc_ok:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_cc").inc()
+        if not test_name_alnum_ok:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(
+                reason="tn_not_alnum"
+            ).inc()
+        if not test_name_len_ok:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(
+                reason="tn_len"
+            ).inc()
         error("Incorrect format")
 
     if asn_i == 0:
