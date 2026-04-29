@@ -883,13 +883,7 @@ class CircumventionStatsResponse(BaseModel):
 def api_private_circumvention_stats_by_country(
     clickhouse: ClickhouseDep,
 ) -> CircumventionStatsResponse:
-    """Aggregated statistics on protocols used for circumvention,
-    grouped by country.
-    ---
-    responses:
-      200:
-        description: List of dicts with keys probe_cc and cnt
-    """
+    """Aggregated statistics on protocols used for circumvention, grouped by country. """
     q = """SELECT probe_cc, COUNT(*) as cnt
         FROM fastpath
         WHERE measurement_start_time > today() - interval 6 month
@@ -945,13 +939,7 @@ class CircumventionRuntimeStatsResponse(BaseModel):
 def api_private_circumvention_runtime_stats(
     clickhouse: ClickhouseDep,
 ) -> CircumventionRuntimeStatsResponse:
-    """Runtime statistics on protocols used for circumvention,
-    grouped by date, country, test_name.
-    ---
-    responses:
-      200:
-        description: List of dicts with keys probe_cc and cnt
-    """
+    """Runtime statistics on protocols used for circumvention, grouped by date, country, test_name. """
     q = """SELECT
         toDate(measurement_start_time) AS date,
         test_name,
@@ -1008,12 +996,6 @@ def api_private_domain_metadata(
     notes were taken on what fixes need to be done in the test-lists to ensure
     all of this works as expected (ex. moving shortest URL representations from
     the country lists into the global list).
-
-    Returns:
-    {
-        "category_code": "CITIZENLAB_CATEGORY_CODE",
-        "canonical_domain": "canonical.tld"
-    }
     """
     category_code = "MISC"
 
@@ -1061,18 +1043,7 @@ def api_private_asnmeta(
     clickhouse: ClickhouseDep,
     asn: int = Query(..., description="Autonomous System Number, e.g. 1234"),
 ) -> ASNMetadataResponse:
-    """Look up organization name by ASN
-    Sources: ansmeta db table
-    ---
-    parameters:
-      - name: asn
-        in: query
-        type: string
-        description: ASN
-    responses:
-      200:
-        description: JSON object
-    """
+    """Look up organization name by ASN"""
 
     q = """SELECT org_name
         FROM asnmeta
