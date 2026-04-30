@@ -146,7 +146,10 @@ class MeasurementMetadata:
 
 
 def metadata_from_measurement_content(content: dict[str, Any]) -> MeasurementMetadata:
-    """Normalize fields the same way as `generate_report_id` / `open_report` do."""
+    """
+    Parses metadata from the `content` key in a measurement body, then
+    formats fields the same way as `generate_report_id` / `open_report` do.
+    """
     test_name = str(content.get("test_name") or "").lower().replace("_", "")
 
     cc = str(content.get("probe_cc") or "").upper().replace("_", "")
@@ -201,7 +204,9 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
 
 
 def normalize_asn(asn: str) -> int:
-    """Return ASN as int (strip 'AS' prefix if present). Invalid values return 0."""
+    """
+    Return ASN as int (strip 'AS' prefix if present). Invalid values return 0.
+    """
     s = str(asn).strip()
     s = s[2:] if s.startswith("AS") else s
     try:
@@ -277,7 +282,8 @@ def check_measurement_meta(
 def get_cc_asn(
     request: Request, asn_cc_reader: ASNCCReaderDep
 ) -> Tuple[str, str]:
-    """Geo-lookup the request's source IP and return (cc, asn).
+    """
+    Geo-lookup the request's source IP and return (cc, asn).
 
     Falls back to ("ZZ", "AS0") when the lookup fails.
     """
@@ -300,7 +306,9 @@ def register_geoip_anomaly(
     software_name: str,
     software_version: str,
 ) -> None:
-    """Record a geoip mismatch in faulty_measurements."""
+    """
+    Record a geoip mismatch in faulty_measurements.
+    """
     sub_asn = normalize_asn(asn)
     actual_asn_int = normalize_asn(actual_asn)
     if actual_cc != cc:
