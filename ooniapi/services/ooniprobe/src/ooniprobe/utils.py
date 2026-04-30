@@ -211,6 +211,69 @@ def normalize_asn(asn: str) -> int:
         return 0
 
 
+def check_measurement_meta(
+    test_name: str,
+    probe_cc: str,
+    probe_asn: str,
+) -> None:
+    """
+    Checks metadata consistency, raising an HTTPException and stopping
+    ingestion when an inconsistency is detected
+    """
+    asn_i = normalize_asn(probe_asn)
+
+    cc_ok = len(probe_cc) == 2
+    test_name_alnum_ok = test_name.isalnum()
+    test_name_len_ok = 1 < len(test_name) < 30
+    if not (cc_ok and test_name_alnum_ok and test_name_len_ok):
+        log.error(
+            "Bad metadata in measurement body: test_name="
+            f"{test_name[:30]}, cc={probe_cc}"
+        )
+        reason: str | None = None
+        if not cc_ok:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_cc").inc()
+            reason = reason or "bad_cc"
+        if not test_name_alnum_ok:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="tn_not_alnum").inc()
+            reason = reason or "tn_not_alnum"
+        if not test_name_len_ok:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="tn_len").inc()
+            reason = reason or "tn_len"
+        assert reason is not None
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": reason,
+                "message": "Incorrect format",
+            },
+        )
+
+    if asn_i == 0:
+        log.info("Discarding ASN == 0")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
+        Metrics.MSMNT_DISCARD_ASN0.inc()
+        raise HTTPException(
+            400,
+            detail={
+                "error": "asn_0",
+                "message": "Measurement discarded, ASN == 0",
+            },
+        )
+
+    if probe_cc == "ZZ":
+        log.info("Discarding CC == ZZ")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
+        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        raise HTTPException(
+            400,
+            detail={
+                "error": "cc_zz",
+                "message": "Measurement discarded, CC == ZZ",
+            },
+        )
+
+
 def get_cc_asn(
     request: Request, asn_cc_reader: ASNCCReaderDep
 ) -> Tuple[str, str]:

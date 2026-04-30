@@ -18,6 +18,7 @@ from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
     MeasurementMetadata,
+    check_measurement_meta,
     error,
     generate_report_id,
     get_cc_asn,
@@ -142,37 +143,8 @@ async def receive_measurement(
     test_name = metadata.test_name
     cc = metadata.probe_cc
     asn = metadata.probe_asn
-    asn_i = normalize_asn(asn)
 
-    # Same validation as old report_id
-    cc_ok = len(cc) == 2
-    test_name_alnum_ok = test_name.isalnum()
-    test_name_len_ok = 1 < len(test_name) < 30
-    if not (cc_ok and test_name_alnum_ok and test_name_len_ok):
-        log.error(
-            f"Bad metadata in measurement body: test_name={test_name[:30]}, cc={cc}"
-        )
-        if not cc_ok:
-            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_cc").inc()
-        if not test_name_alnum_ok:
-            Metrics.BAD_MEASUREMENTS_CNT.labels(
-                reason="tn_not_alnum"
-            ).inc()
-        if not test_name_len_ok:
-            Metrics.BAD_MEASUREMENTS_CNT.labels(
-                reason="tn_len"
-            ).inc()
-        error("Incorrect format")
-
-    if asn_i == 0:
-        log.info("Discarding ASN == 0")
-        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
-        return empty_measurement
-
-    if cc == "ZZ":
-        log.info("Discarding CC == ZZ")
-        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
-        return empty_measurement
+    check_measurement_meta(test_name, cc, asn)
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window

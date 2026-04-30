@@ -48,6 +48,7 @@ from ...dependencies import (
     PsiphonConfigDep
 )
 from ...utils import (
+    check_measurement_meta,
     extract_probe_ipaddr,
     generate_report_id,
     geolookup_probe,
@@ -906,51 +907,8 @@ async def submit_measurement(
     test_name = metadata.test_name
     cc = metadata.probe_cc
     asn = metadata.probe_asn
-    asn_i = normalize_asn(asn)
 
-    cc_ok = len(cc) == 2
-    test_name_alnum_ok = test_name.isalnum()
-    test_name_len_ok = 1 < len(test_name) < 30
-    if not (cc_ok and test_name_alnum_ok and test_name_len_ok):
-        log.error(
-            f"Bad metadata in measurement body: test_name={test_name[:30]}, cc={cc}"
-        )
-        if not cc_ok:
-            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_cc").inc()
-        if not test_name_alnum_ok:
-            Metrics.BAD_MEASUREMENTS_CNT.labels(
-                reason="tn_not_alnum"
-            ).inc()
-        if not test_name_len_ok:
-            Metrics.BAD_MEASUREMENTS_CNT.labels(
-                reason="tn_len"
-            ).inc()
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "incorrect_format", "message": "Incorrect format"},
-        )
-
-    if asn_i == 0:
-        log.info("Discarding ASN == 0")
-        Metrics.MSMNT_DISCARD_ASN0.inc()
-        raise HTTPException(
-            400,
-            detail={
-                "error": "asn_0",
-                "message": "Measurement discarded, ASN == 0",
-            },
-        )
-
-    if cc == "ZZ":
-        log.info("Discarding CC == ZZ")
-        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
-        raise HTTPException(
-            400,
-            detail={
-                "error": "cc_zz",
-                "message": "Measurement discarded, CC == ZZ",
-            },
-        )
+    check_measurement_meta(test_name, cc, asn)
 
     # Anonymous credentials verification
     verification_status, submit_error, submit_response = _verify_submit(
