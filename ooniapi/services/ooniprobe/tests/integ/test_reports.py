@@ -1,9 +1,12 @@
+import copy
+from hashlib import sha512
 import json
 import zstd
 import pytest
-from hashlib import sha512
 import ujson
-import copy
+
+from ..utils import get_msmt_hash
+
 
 def postj(client, url, json):
     response = client.post(url, json=json)
@@ -81,7 +84,7 @@ async def test_collector_upload_msmt_valid(client):
         },
     }
     c = postj(client, f"/report/{rid}", upload_payload)
-    expected_hash = _get_hash_of(upload_payload)
+    expected_hash = get_msmt_hash(upload_payload)
     assert c["measurement_uid"].endswith(f"_IE_webconnectivity_{expected_hash}"), c
 
     c = postj(client, f"/report/{rid}/close", json={})
@@ -105,7 +108,7 @@ async def test_collector_upload_msmt_valid_zstd(client):
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
     assert "measurement_uid" in c, c
 
-    expected_hash = _get_hash_of(msmt_payload)
+    expected_hash = get_msmt_hash(msmt_payload)
     assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
 
 
@@ -114,3 +117,79 @@ def _get_hash_of(msmt: dict) -> str:
     payload["is_verified"] = "u"
     d = ujson.dumps(payload).encode()
     return sha512(d).hexdigest()[:16]
+
+@pytest.mark.asyncio
+async def test_fastpath_fallback(client_with_mocked_fastpath):
+    """When the first fastpath URL fails, the second one in the list
+    should still receive the measurement.
+    """
+    client, mock_fastpath, success_url = client_with_mocked_fastpath
+
+    rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
+    msmt_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "annotations": {"platform": "test_platform"},
+            "software_name": "test_software",
+            "software_version": "0.0.0",
+            "probe_cc": "IT",
+            "probe_asn": "AS1",
+            "test_name": "integtest",
+        },
+    }
+    resp = client.post(f"/report/{rid}", json=msmt_payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "measurement_uid" in body, body
+    msmt_uid = body["measurement_uid"]
+    assert msmt_uid, body
+
+    expected_hash = get_msmt_hash(msmt_payload)
+    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
+
+    # check saved data
+    expected_url = f"{success_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url]
+
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    assert get_msmt_hash(stored) == expected_hash
+    assert stored["is_verified"] == "u"
+
+
+@pytest.mark.asyncio
+async def test_fastpath_only_submits_once_on_success(client_with_two_working_fastpaths):
+    """
+    When the first fastpath URL succeeds, the receiver should stop iterating
+    """
+    client, mock_fastpath, first_url, second_url = client_with_two_working_fastpaths
+
+    rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
+    msmt_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "annotations": {"platform": "test_platform"},
+            "software_name": "test_software",
+            "software_version": "0.0.0",
+            "probe_cc": "IT",
+            "probe_asn": "AS1",
+            "test_name": "integtest",
+        },
+    }
+    resp = client.post(f"/report/{rid}", json=msmt_payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    msmt_uid = body.get("measurement_uid")
+    assert msmt_uid, body
+
+    # Sanity-check the bytes that were forwarded to the fastpath
+    expected_hash = get_msmt_hash(msmt_payload)
+    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
+
+    # Only the first fastpath URL should have received the measurement
+    expected_url = f"{first_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url], (
+        "measurement should be forwarded to the first fastpath URL only, "
+        f"got {list(mock_fastpath.uploads.keys())}"
+    )

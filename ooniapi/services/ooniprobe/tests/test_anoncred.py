@@ -7,7 +7,7 @@ from ooniauth_py import UserState, ServerState
 from pydantic import ValidationError
 from ooniprobe.dependencies import Manifest, Match, Policy, PolicyEntry
 from ooniprobe.routers.v1.probe_services import get_ranges_from_policy
-from .utils import getj, make_submit_request, postj, setup_user
+from .utils import get_msmt_hash, getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
 async def test_manifest_basic(client, db):
@@ -79,9 +79,6 @@ async def test_registration_errors(client):
 
 @pytest.mark.asyncio
 async def test_submission_basic(client):
-    # open report
-    postj(client, "/report", json=make_report_request("IE", "AS34245"))
-
     # Create user
     user, manifest_version, emission_day = setup_user(client)
 
@@ -98,13 +95,76 @@ async def test_submission_basic(client):
 
 
 @pytest.mark.asyncio
+async def test_fastpath_fallback(client_with_mocked_fastpath):
+    """
+    When the first fastpath URL fails, the second one in the list should
+    still receive a verified anonymous-credentials measurement.
+    """
+    client, mock_fastpath, success_url = client_with_mocked_fastpath
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    submit_request = make_submit_request(user, "IE", "AS34245")
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    assert c["submit_response"], (
+        "submit_response should not be null when verification succeeded"
+    )
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    # Verified anonymous-credential submissions inject "t" as the
+    # `is_verified` flag in the stored payload before hashing.
+    expected_hash = get_msmt_hash(msm, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+    # Check response bytes
+    expected_url = f"{success_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url]
+
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    assert get_msmt_hash(stored, is_verified="t") == expected_hash
+    assert stored["is_verified"] == "t"
+
+
+@pytest.mark.asyncio
+async def test_fastpath_only_submits_once_on_success(client_with_two_working_fastpaths):
+    """
+    When the first fastpath URL succeeds, the receiver should stop iterating
+    """
+    client, mock_fastpath, first_url, second_url = client_with_two_working_fastpaths
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    submit_request = make_submit_request(user, "IE", "AS34245")
+    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    # Sanity-check the bytes that were forwarded to the fastpath
+    expected_hash = get_msmt_hash(msm, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+    # Only the first fastpath URL should have received the measurement
+    expected_url = f"{first_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url], (
+        "measurement should be forwarded to the first fastpath URL only, "
+        f"got {list(mock_fastpath.uploads.keys())}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_submission_non_verified(client):
     """
 
     """
-    j = make_report_request()
-    postj(client, "/report", json=j)
-
     msm = {
         "format": "json",
         "content": {
@@ -411,9 +471,6 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     (user, manifest_version, emission_day) = client_with_original_manifest
 
     # first submit: should just work out of the box
-    j = make_report_request()
-    postj(client, "/report", json=j)
-
     submit_request = make_submit_request(user, "IE", "AS34245")
 
     msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
@@ -433,9 +490,6 @@ async def test_credential_update_with_submission(client, client_with_original_ma
 
     assert 'update_response' in result
     user.handle_credential_update_response(result['update_response']) # should not crash
-
-    j = make_report_request()
-    postj(client, "/report", json=j)
 
     submit_request = make_submit_request(user, "IE", "AS34245")
 
