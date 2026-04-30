@@ -12,7 +12,7 @@ import ujson
 from base64 import b64encode
 from datetime import datetime, timezone
 from os import urandom
-from typing import Any, Dict, List, Mapping, Tuple, TypedDict
+from typing import Any, Dict, List, Tuple, TypedDict
 
 import requests
 import pem
@@ -145,7 +145,7 @@ class MeasurementMetadata:
     software_version: str
 
 
-def metadata_from_measurement_content(content: Mapping[str, Any]) -> MeasurementMetadata:
+def metadata_from_measurement_content(content: dict[str, Any]) -> MeasurementMetadata:
     """Normalize fields the same way as `generate_report_id` / `open_report` do."""
     test_name = str(content.get("test_name") or "").lower().replace("_", "")
 
