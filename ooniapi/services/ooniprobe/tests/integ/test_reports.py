@@ -111,13 +111,6 @@ async def test_collector_upload_msmt_valid_zstd(client):
     expected_hash = get_msmt_hash(msmt_payload)
     assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
 
-
-def _get_hash_of(msmt: dict) -> str:
-    payload = copy.deepcopy(msmt)
-    payload["is_verified"] = "u"
-    d = ujson.dumps(payload).encode()
-    return sha512(d).hexdigest()[:16]
-
 @pytest.mark.asyncio
 async def test_fastpath_fallback(client_with_mocked_fastpath):
     """When the first fastpath URL fails, the second one in the list
