@@ -199,7 +199,7 @@ async def receive_measurement(
                     f"({fastpath_url}): {e}"
                 )
 
-    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
+        Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
