@@ -177,13 +177,14 @@ async def receive_measurement(
 
     client = request.app.state.fastpath_client
     fastpath_urls = settings.fastpath_urls
+    timeout = settings.fastpath_timeout
     success = False
     for (i, fastpath_url) in enumerate(fastpath_urls):
         with Metrics.SEND_FASTPATH_TIMING.time():
             try:
                 url = f"{fastpath_url}/{msmt_uid}"
 
-                resp = await run_in_threadpool(client.post, url, data=data)
+                resp = await run_in_threadpool(client.post, url, data=data, timeout=timeout)
                 with resp:
                     resp.raise_for_status()
                 Metrics.SEND_FASTPATH_CNT.labels(
