@@ -97,15 +97,13 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings: SettingsDep,
-    db: PostgresDep,
     clickhouse: ClickhouseDep,
 ):
     errors = []
     try:
         query = """
         SELECT COUNT()
-        FROM fastpath
-        WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
+        FROM citizenlab
         """
         query_click(db=clickhouse, query=query, query_params={})
     except Exception as e:
