@@ -91,6 +91,12 @@ class Metrics:
         labelnames=["status", "instance"],
     )
 
+    FASTPATH_INSTANCE_FAILURE = Counter(
+        "fastpath_instance_failure",
+        "How many times a measurement submission per fastpath instance failed",
+        labelnames = ["instance"]
+    )
+
     SEND_S3_CNT = Counter(
         "measurement_s3_upload_count",
         "How many times ooniprobe sent a measurement to s3 disaggregated by status"

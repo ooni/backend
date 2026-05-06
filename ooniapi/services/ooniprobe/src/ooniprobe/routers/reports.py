@@ -194,12 +194,13 @@ async def receive_measurement(
                 break
 
             except Exception as e:
+                Metrics.FASTPATH_INSTANCE_FAILURE.labels(
+                    instance=fastpath_url
+                    ).inc()
                 log.exception(
                     f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
                     f"({fastpath_url}): {e}"
                 )
-
-    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
@@ -221,6 +222,8 @@ async def receive_measurement(
                 Metrics.COMPARE_CC_FAILURE.inc()
 
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")
