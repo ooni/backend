@@ -194,11 +194,13 @@ async def receive_measurement(
                 break
 
             except Exception as e:
+                Metrics.FASTPATH_INSTANCE_FAILURE.labels(
+                    instance=fastpath_url
+                    ).inc()
                 log.exception(
                     f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
                     f"({fastpath_url}): {e}"
                 )
-
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
