@@ -110,6 +110,16 @@ async def health(
         errors.append("clickhouse_error")
         log.error(e)
 
+    for fastpath_url in settings.fastpath_urls:
+        try:
+            response = urlopen(fastpath_url)
+            assert (
+                response.status == 200
+            ), "Unexpected status trying to connect to fastpath: " + str(response.status)
+        except Exception as exc:
+            log.error(str(exc))
+            errors.append("fastpath_connection_error")
+
     if settings.jwt_encryption_key == "CHANGEME":
         errors.append("bad_jwt_secret")
 

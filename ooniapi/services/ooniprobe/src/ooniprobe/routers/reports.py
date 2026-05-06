@@ -176,20 +176,31 @@ async def receive_measurement(
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
     client = request.app.state.fastpath_client
+    fastpath_urls = settings.fastpath_urls
     success = False
-    with Metrics.SEND_FASTPATH_TIMING.time():
-        try:
-            url = f"{settings.fastpath_url}/{msmt_uid}"
+    for (i, fastpath_url) in enumerate(fastpath_urls):
+        with Metrics.SEND_FASTPATH_TIMING.time():
+            try:
+                url = f"{fastpath_url}/{msmt_uid}"
 
-            resp = await run_in_threadpool(client.post, url, data=data)
-            with resp:
-                resp.raise_for_status()
-            Metrics.SEND_FASTPATH_CNT.labels(status="ok").inc()
-            success = True
+                resp = await run_in_threadpool(client.post, url, data=data)
+                with resp:
+                    resp.raise_for_status()
+                Metrics.SEND_FASTPATH_CNT.labels(
+                    status="ok",
+                    instance=fastpath_url
+                    ).inc()
+                success = True
+                break
 
-        except Exception as e:
-            log.exception(f"Unable to send measurement to fastpath ({settings.fastpath_url}): {e}")
-            Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
+            except Exception as e:
+                Metrics.FASTPATH_INSTANCE_FAILURE.labels(
+                    instance=fastpath_url
+                    ).inc()
+                log.exception(
+                    f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
+                    f"({fastpath_url}): {e}"
+                )
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
@@ -211,6 +222,8 @@ async def receive_measurement(
                 Metrics.COMPARE_CC_FAILURE.inc()
 
         return ReceiveMeasurementResponse(measurement_uid=msmt_uid)
+
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")

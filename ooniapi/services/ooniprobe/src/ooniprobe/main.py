@@ -126,13 +126,19 @@ async def health(
         errors.append("clickhouse_error")
         log.error(e)
 
-    try:
-        resp = await run_in_threadpool(app.state.fastpath_client.get, settings.fastpath_url)
-        with resp:
-            resp.raise_for_status()
-    except Exception as exc:
-        log.error(str(exc))
+    fp_ok = False
+    for fastpath_url in settings.fastpath_urls:
+        try:
+            resp = await run_in_threadpool(app.state.fastpath_client.get, fastpath_url, timeout=5)
+            with resp:
+                resp.raise_for_status()
+            fp_ok = True
+        except Exception as exc:
+            log.error(f"Unable to connect with fastpath '{fastpath_url}'. Error: {exc}")
+
+    if not fp_ok:
         errors.append("fastpath_connection_error")
+
 
     try:
         db.query(models.OONIProbeVPNProvider).limit(1).all()
