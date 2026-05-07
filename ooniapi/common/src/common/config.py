@@ -50,6 +50,7 @@ class Settings(BaseSettings):
         description="List of fastpath instances to send measurements to",
         default_factory=list,
     ) # example: [http://123.123.123.123:8472]
+    fastpath_timeout: int = 10
 
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath

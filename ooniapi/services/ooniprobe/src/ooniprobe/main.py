@@ -127,9 +127,10 @@ async def health(
         log.error(e)
 
     fp_ok = False
+    timeout = settings.fastpath_timeout
     for fastpath_url in settings.fastpath_urls:
         try:
-            resp = await run_in_threadpool(app.state.fastpath_client.get, fastpath_url, timeout=5)
+            resp = await run_in_threadpool(app.state.fastpath_client.get, fastpath_url, timeout=timeout)
             with resp:
                 resp.raise_for_status()
             fp_ok = True
