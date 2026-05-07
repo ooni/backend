@@ -1,4 +1,5 @@
 import json
+import re
 import zstd
 import pytest
 import ujson
@@ -82,8 +83,9 @@ async def test_collector_upload_msmt_valid(client):
         },
     }
     c = postj(client, f"/report/{rid}", upload_payload)
-    expected_hash = get_msmt_hash(upload_payload)
-    assert c["measurement_uid"].endswith(f"_IE_webconnectivity_{expected_hash}"), c
+    assert re.fullmatch(
+        r"\d{14}\.\d+_IE_webconnectivity_[0-9a-f]{16}", c["measurement_uid"]
+    ), c
 
     c = postj(client, f"/report/{rid}/close", json={})
     assert c == {}, c
@@ -106,8 +108,9 @@ async def test_collector_upload_msmt_valid_zstd(client):
     c = post(client, f"/report/{rid}", zmsmt, headers=headers)
     assert "measurement_uid" in c, c
 
-    expected_hash = get_msmt_hash(msmt_payload)
-    assert c["measurement_uid"].endswith(f"_IT_integtest_{expected_hash}"), c
+    assert re.fullmatch(
+        r"\d{14}\.\d+_IT_integtest_[0-9a-f]{16}", c["measurement_uid"]
+    ), c
 
 @pytest.mark.asyncio
 async def test_fastpath_fallback(client_with_mocked_fastpath):
@@ -136,16 +139,54 @@ async def test_fastpath_fallback(client_with_mocked_fastpath):
     msmt_uid = body["measurement_uid"]
     assert msmt_uid, body
 
-    expected_hash = get_msmt_hash(msmt_payload)
-    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
-
-    # check saved data
     expected_url = f"{success_url}/{msmt_uid}"
     assert list(mock_fastpath.uploads.keys()) == [expected_url]
 
     stored = ujson.loads(mock_fastpath.uploads[expected_url])
-    assert get_msmt_hash(stored) == expected_hash
+    expected_hash = get_msmt_hash(stored)
+    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
     assert stored["is_verified"] == "u"
+
+
+@pytest.mark.asyncio
+async def test_fastpath_payload_has_report_id(client_with_two_working_fastpaths):
+    """
+    The body forwarded to the fastpath must include a freshly generated
+    `report_id` derived from the measurement body's metadata, regardless of
+    the (ignored) `report_id` in the URL path.
+    """
+    client, mock_fastpath, first_url, _ = client_with_two_working_fastpaths
+
+    og_rid = "ignored-by-the-server"
+    msmt_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "annotations": {"platform": "test_platform"},
+            "software_name": "test_software",
+            "software_version": "0.0.0",
+            "probe_cc": "IT",
+            "probe_asn": "AS1",
+            "test_name": "integtest",
+        },
+    }
+    resp = client.post(f"/report/{og_rid}", json=msmt_payload)
+    assert resp.status_code == 200, resp.text
+    msmt_uid = resp.json().get("measurement_uid")
+    assert msmt_uid
+
+    expected_url = f"{first_url}/{msmt_uid}"
+    assert expected_url in mock_fastpath.uploads, mock_fastpath.uploads
+
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    rid = stored.get("report_id")
+    assert isinstance(rid, str) and rid, stored
+    assert rid != og_rid
+    # collector_id is "1" in test_settings; report id format:
+    # <ts>_<test_name_stripped>_<cc>_<asn_i>_n<collector_id>_<rand>
+    assert re.fullmatch(
+        r"\d{8}T\d{6}Z_integtest_IT_1_n1_[A-Za-z0-9oo]{16}", rid
+    ), rid
 
 
 @pytest.mark.asyncio
@@ -174,13 +215,14 @@ async def test_fastpath_only_submits_once_on_success(client_with_two_working_fas
     msmt_uid = body.get("measurement_uid")
     assert msmt_uid, body
 
-    # Sanity-check the bytes that were forwarded to the fastpath
-    expected_hash = get_msmt_hash(msmt_payload)
-    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid
-
-    # Only the first fastpath URL should have received the measurement
     expected_url = f"{first_url}/{msmt_uid}"
-    assert list(mock_fastpath.uploads.keys()) == [expected_url], (
+    uploaded_urls = list(mock_fastpath.uploads.keys())
+    assert  uploaded_urls == [expected_url], (
         "measurement should be forwarded to the first fastpath URL only, "
-        f"got {list(mock_fastpath.uploads.keys())}"
+        f"got {uploaded_urls}"
     )
+
+    # Sanity-check the bytes that were forwarded to the fastpath
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    expected_hash = get_msmt_hash(stored)
+    assert msmt_uid.endswith(f"_IT_integtest_{expected_hash}"), msmt_uid

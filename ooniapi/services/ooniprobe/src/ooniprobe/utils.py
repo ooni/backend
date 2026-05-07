@@ -207,7 +207,7 @@ def normalize_asn(asn: str) -> int:
     """
     Return ASN as int (strip 'AS' prefix if present). Invalid values return 0.
     """
-    s = str(asn).strip()
+    s = str(asn).strip().upper()
     s = s[2:] if s.startswith("AS") else s
     try:
         return int(s)

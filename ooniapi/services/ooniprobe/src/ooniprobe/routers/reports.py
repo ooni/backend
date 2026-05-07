@@ -10,6 +10,7 @@ from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
 
+from ..common.config import Settings
 from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
@@ -133,7 +134,9 @@ async def receive_measurement(
             error("Incorrect format")
 
     try:
-        data, metadata = await run_in_threadpool(_process_measurement_body, data)
+        data, metadata = await run_in_threadpool(
+            _process_measurement_body, data, settings
+        )
     except Exception as e:
         log.info("Failed to parse and modify measurement body")
         log.exception(e)
@@ -224,11 +227,14 @@ async def receive_measurement(
             Metrics.SEND_S3_CNT.labels(status="fail").inc()
             return empty_measurement
 
-def _process_measurement_body(data: bytes) -> Tuple[bytes, MeasurementMetadata]:
+def _process_measurement_body(
+    data: bytes, settings: Settings
+) -> Tuple[bytes, MeasurementMetadata]:
     """
     - Parse the measurement body
     - extract some metadata fields
     - set `is_verified="u"`
+    - set report_id
     - re-serialize.
     """
 
@@ -243,6 +249,12 @@ def _process_measurement_body(data: bytes) -> Tuple[bytes, MeasurementMetadata]:
     metadata = metadata_from_measurement_content(content)
 
     json["is_verified"] = "u"
+    json["report_id"] = generate_report_id(
+        metadata.test_name,
+        settings,
+        metadata.probe_cc,
+        normalize_asn(metadata.probe_asn)
+    )
 
     with Metrics.SERIALIZE_BODY_TIMING.time():
         return ujson.dumps(json).encode("utf-8"), metadata
