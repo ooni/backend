@@ -113,11 +113,11 @@ async def test_collector_upload_msmt_valid_zstd(client):
     ), c
 
 @pytest.mark.asyncio
-async def test_fastpath_fallback(client_with_mocked_fastpath):
+async def test_fastpath_fallback(client_with_one_good_mocked_fastpath):
     """When the first fastpath URL fails, the second one in the list
     should still receive the measurement.
     """
-    client, mock_fastpath, success_url = client_with_mocked_fastpath
+    client, mock_fastpath, success_url = client_with_one_good_mocked_fastpath
 
     rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
     msmt_payload = {
@@ -149,13 +149,13 @@ async def test_fastpath_fallback(client_with_mocked_fastpath):
 
 
 @pytest.mark.asyncio
-async def test_fastpath_payload_has_report_id(client_with_two_working_fastpaths):
+async def test_fastpath_payload_has_report_id(client_with_mocked_fastpath):
     """
     The body forwarded to the fastpath must include a freshly generated
     `report_id` derived from the measurement body's metadata, regardless of
     the (ignored) `report_id` in the URL path.
     """
-    client, mock_fastpath, first_url, _ = client_with_two_working_fastpaths
+    client, mock_fastpath, fastpath_url = client_with_mocked_fastpath
 
     og_rid = "ignored-by-the-server"
     msmt_payload = {
@@ -175,7 +175,7 @@ async def test_fastpath_payload_has_report_id(client_with_two_working_fastpaths)
     msmt_uid = resp.json().get("measurement_uid")
     assert msmt_uid
 
-    expected_url = f"{first_url}/{msmt_uid}"
+    expected_url = f"{fastpath_url}/{msmt_uid}"
     assert expected_url in mock_fastpath.uploads, mock_fastpath.uploads
 
     stored = ujson.loads(mock_fastpath.uploads[expected_url])

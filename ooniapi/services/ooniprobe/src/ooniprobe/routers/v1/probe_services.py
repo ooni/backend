@@ -910,6 +910,9 @@ async def submit_measurement(
 
     check_measurement_meta(test_name, cc, asn)
 
+    # generate the new report_id
+    rid = generate_report_id(test_name, settings, cc, normalize_asn(asn))
+
     # Anonymous credentials verification
     verification_status, submit_error, submit_response = _verify_submit(
         submit_request, manifest, settings
@@ -920,6 +923,7 @@ async def submit_measurement(
     # Add verification-related data.
     # use one-letter code for DB, human readable for clients
     data["is_verified"] = verification_status.code
+    data["report_id"] = rid
     data_buff = io.BytesIO()
     stream = io.TextIOWrapper(data_buff, "utf-8")
     ujson.dump(data, stream)
