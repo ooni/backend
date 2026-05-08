@@ -249,7 +249,7 @@ def _process_measurement_body(
     metadata = metadata_from_measurement_content(content)
 
     json["is_verified"] = "u"
-    json["report_id"] = generate_report_id(
+    json["content"]["report_id"] = generate_report_id(
         metadata.test_name,
         settings,
         metadata.probe_cc,

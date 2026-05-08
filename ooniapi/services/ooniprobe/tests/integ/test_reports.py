@@ -179,7 +179,7 @@ async def test_fastpath_payload_has_report_id(client_with_mocked_fastpath):
     assert expected_url in mock_fastpath.uploads, mock_fastpath.uploads
 
     stored = ujson.loads(mock_fastpath.uploads[expected_url])
-    rid = stored.get("report_id")
+    rid = stored.get("content", {}).get("report_id")
     assert isinstance(rid, str) and rid, stored
     assert rid != og_rid
     # collector_id is "1" in test_settings; report id format:
