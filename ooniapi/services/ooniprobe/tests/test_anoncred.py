@@ -352,7 +352,7 @@ def test_manifest_parsing_preserves_important_fields():
     assert entry.match.probe_cc == "*"
     assert entry.match.probe_asn == "*"
     assert entry.policy.age == (2461110, 2826140)
-    assert entry.policy.measurement_count == (0, 10000000)
+    assert entry.policy.measurement_count == 0
 
 
 def test_manifest_rejects_ranges_with_invalid_length():
@@ -477,11 +477,11 @@ def test_manifest_requires_catch_all_rule():
 @pytest.mark.asyncio
 async def test_credential_update(client, client_with_original_manifest, second_manifest):
 
-    (user, manifest, _) = client_with_original_manifest
+    (user, manifest_version, _) = client_with_original_manifest
     new_manifest = getj(client, "/api/v1/manifest")
     user.set_public_params(new_manifest["manifest"]["public_parameters"])
     result = postj(client, "/api/v1/update_credential", json=dict(
-        old_manifest_version = manifest,
+        old_manifest_version = manifest_version,
         manifest_version = new_manifest['meta']['version'],
         update_request = user.make_credential_update_request()
     ))
