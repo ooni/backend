@@ -239,19 +239,19 @@ def test_get_ranges_from_policy_match_precedence():
     policy = [
         PolicyEntry(
             match=Match(probe_asn="AS15704", probe_cc="ES"),
-            policy=Policy(age=(9, 10), measurement_count=90),
+            policy=Policy(age=(9, 10), min_measurement_count=90),
         ),
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="ES"),
-            policy=Policy(age=(7, 8), measurement_count=70),
+            policy=Policy(age=(7, 8), min_measurement_count=70),
         ),
         PolicyEntry(
             match=Match(probe_asn="AS15704", probe_cc="*"),
-            policy=Policy(age=(5, 6), measurement_count=50),
+            policy=Policy(age=(5, 6), min_measurement_count=50),
         ),
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="*"),
-            policy=Policy(age=(3, 4), measurement_count=30),
+            policy=Policy(age=(3, 4), min_measurement_count=30),
         ),
     ]
 
@@ -274,7 +274,7 @@ def test_get_ranges_from_policy_match_precedence():
     no_catchall_policy = [
         PolicyEntry(
             match=Match(probe_asn="AS15704", probe_cc="ES"),
-            policy=Policy(age=(9, 10), measurement_count=90),
+            policy=Policy(age=(9, 10), min_measurement_count=90),
         )
     ]
     with pytest.raises(ValueError, match="No matching submission_policy entry"):
@@ -285,7 +285,7 @@ def test_get_ranges_from_policy_uses_wildcard_match():
     policy = [
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="*"),
-            policy=Policy(age=(11, 12), measurement_count=110),
+            policy=Policy(age=(11, 12), min_measurement_count=110),
         )
     ]
     age_range, msm_min = get_ranges_from_policy(policy, "BR", "AS28573")
@@ -297,22 +297,22 @@ def test_get_ranges_from_policy_requires_matching_entry():
     with pytest.raises(ValueError, match="No matching submission_policy entry"):
         get_ranges_from_policy([], "FR", "AS3215")
 
-def test_policy_requires_age_and_measurement_count():
+def test_policy_requires_age_and_min_measurement_count():
     with pytest.raises(ValidationError):
         Policy.model_validate({"age": [21, 22]})
     with pytest.raises(ValidationError):
-        Policy.model_validate({"measurement_count": 1})
+        Policy.model_validate({"min_measurement_count": 1})
 
 
 def test_get_ranges_from_policy_first_match_wins():
     policy = [
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="*"),
-            policy=Policy(age=(1, 1), measurement_count=1),
+            policy=Policy(age=(1, 1), min_measurement_count=1),
         ),
         PolicyEntry(
             match=Match(probe_asn="AS1234", probe_cc="IT"),
-            policy=Policy(age=(9, 9), measurement_count=9),
+            policy=Policy(age=(9, 9), min_measurement_count=9),
         ),
     ]
     age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS1234")
@@ -339,7 +339,7 @@ def test_manifest_parsing_preserves_important_fields():
                     "match": {"probe_cc": "*", "probe_asn": "*"},
                     "policy": {
                         "age": [2461110, 2826140],
-                        "measurement_count": 0,
+                        "min_measurement_count": 0,
                     },
                 }
             ]
@@ -352,7 +352,7 @@ def test_manifest_parsing_preserves_important_fields():
     assert entry.match.probe_cc == "*"
     assert entry.match.probe_asn == "*"
     assert entry.policy.age == (2461110, 2826140)
-    assert entry.policy.measurement_count == 0
+    assert entry.policy.min_measurement_count == 0
 
 
 def test_manifest_rejects_ranges_with_invalid_length():
@@ -364,7 +364,7 @@ def test_manifest_rejects_ranges_with_invalid_length():
                         "match": {"probe_cc": "*", "probe_asn": "*"},
                         "policy": {
                             "age": [2461110],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -378,7 +378,7 @@ def test_manifest_rejects_ranges_with_invalid_length():
                         "match": {"probe_cc": "*", "probe_asn": "*"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": [0, 10000000],
                         },
                     }
                 ]
@@ -395,7 +395,7 @@ def test_manifest_requires_probe_cc_and_probe_asn():
                         "match": {"probe_cc": "*"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -409,7 +409,7 @@ def test_manifest_requires_probe_cc_and_probe_asn():
                         "match": {"probe_asn": "*"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -429,7 +429,7 @@ def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
                     {
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         }
                     }
                 ]
@@ -445,7 +445,7 @@ def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
                         "match": "not-a-dict",
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -464,7 +464,7 @@ def test_manifest_requires_catch_all_rule():
                         "match": {"probe_cc": "IT", "probe_asn": "AS1234"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         },
                     }
                 ]

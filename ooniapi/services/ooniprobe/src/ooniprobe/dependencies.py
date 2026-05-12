@@ -64,7 +64,7 @@ class Policy(BaseModel):
     age: Tuple[int, int] = Field(
         description="Inclusive lower/upper bounds for the probe age accepted by this rule."
     )
-    measurement_count: int = Field(
+    min_measurement_count: int = Field(
         description="Minimum lower bound for the probe measurement count accepted by this rule."
     )
 

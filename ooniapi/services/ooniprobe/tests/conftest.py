@@ -118,7 +118,7 @@ def make_manifest_mock_fn(public_params: str):
                         "match": {"probe_cc": "*", "probe_asn": "*"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": 0,
+                            "min_measurement_count": 0,
                         },
                     }
                 ],

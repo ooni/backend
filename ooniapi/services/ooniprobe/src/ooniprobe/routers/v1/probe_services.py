@@ -1169,7 +1169,7 @@ def get_ranges_from_policy(
         asn_ok = match_asn == "*" or match_asn == probe_asn
 
         if cc_ok and asn_ok:
-            return item.policy.age, item.policy.measurement_count
+            return item.policy.age, item.policy.min_measurement_count
 
     raise ValueError(
         f"No matching submission_policy entry for probe_cc={probe_cc} probe_asn={probe_asn}"
