@@ -79,13 +79,24 @@ def group_by_date(since, until, time_grain, cols, colnames, group_by):
     return time_grain
 
 
+_param_cast = {
+    "hour": "toDateTime",
+    "day": "toDate",
+    "week": "toDateTime",
+    "month": "toDateTime",
+}
+
+
 def where_by_date(since, until, time_grain, cols, colnames, where_by):
     time_grain = _resolve_time_grain(since, until, time_grain)
     fun = gmap[time_grain]
+    cast = _param_cast[time_grain]
+
     if since:
-        where_by.append(sql_text(f"{fun}(measurement_start_time) >= {fun}(:since)"))
+        where_by.append(sql_text(f"{fun}(measurement_start_time) >= {fun}({cast}(:since))"))
     if until:
-        where_by.append(sql_text(f"{fun}(measurement_start_time) < {fun}(:until)"))
+        where_by.append(sql_text(f"{fun}(measurement_start_time) < {fun}({cast}(:until))"))
+
     return time_grain
 
 
