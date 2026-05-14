@@ -33,13 +33,20 @@ def set_dload(resp, fname: str):
     resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
 
 
-def group_by_date(since, until, time_grain, cols, colnames, group_by):
+gmap = dict(
+    hour="toStartOfHour",
+    day="toDate",
+    week="toStartOfWeek",
+    month="toStartOfMonth",
+)
+
+
+def _resolve_time_grain(since, until, time_grain):
     if since and until:
         delta = until - since
     else:
         delta = None
 
-    # on time_grain = "auto" or empty the smallest allowed gran. is used
     ranges = (
         (7, ("hour", "day", "auto")),
         (30, ("day", "week", "auto")),
@@ -54,25 +61,31 @@ def group_by_date(since, until, time_grain, cols, colnames, group_by):
             continue
         if time_grain not in allowed:
             a = ", ".join(allowed)
-            msg = f"Choose time_grain between {a} for the given time range"
-            raise Exception(msg)
+            raise Exception(f"Choose time_grain between {a} for the given time range")
         if time_grain == "auto":
             time_grain = allowed[0]
-        break
+        return time_grain
 
-    # TODO: check around query weight / response size.
-    # Also add support in CSV format.
-    gmap = dict(
-        hour="toStartOfHour",
-        day="toDate",
-        week="toStartOfWeek",
-        month="toStartOfMonth",
-    )
+    raise Exception("Unable to resolve time_grain")
+
+
+def group_by_date(since, until, time_grain, cols, colnames, group_by):
+    time_grain = _resolve_time_grain(since, until, time_grain)
     fun = gmap[time_grain]
-    tcol = "measurement_start_day"  # TODO: support dynamic axis names
+    tcol = "measurement_start_day"
     cols.append(sql_text(f"{fun}(measurement_start_time) AS {tcol}"))
     colnames.append(tcol)
     group_by.append(column(tcol))
+    return time_grain
+
+
+def where_by_date(since, until, time_grain, cols, colnames, where_by):
+    time_grain = _resolve_time_grain(since, until, time_grain)
+    fun = gmap[time_grain]
+    if since:
+        where_by.append(sql_text(f"{fun}(measurement_start_time) >= {fun}(:since)"))
+    if until:
+        where_by.append(sql_text(f"{fun}(measurement_start_time) < {fun}(:until)"))
     return time_grain
 
 
@@ -349,12 +362,12 @@ async def get_measurements(
         where.append(sql_text("ooni_run_link_id IN :ooni_run_link_id_s"))
         query_params["ooni_run_link_id_s"] = ooni_run_link_id_s
 
-    if since:
-        where.append(sql_text("measurement_start_time >= :since"))
-        query_params["since"] = since
+    time_grain = where_by_date(since, until, time_grain, cols, colnames, where)
 
+    # still need to set the query params (where_by_date uses :since / :until)
+    if since:
+        query_params["since"] = since
     if until:
-        where.append(sql_text("measurement_start_time < :until"))
         query_params["until"] = until
 
     if test_name_s:
