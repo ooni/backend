@@ -116,7 +116,7 @@ async def receive_measurement(
     setnocacheresponse(response)
     empty_measurement = {}
     try:
-            rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
+        rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
     except Exception as e:
         log.info(
             f"Unexpected report_id {report_id[:200]}. Error: {e}",
