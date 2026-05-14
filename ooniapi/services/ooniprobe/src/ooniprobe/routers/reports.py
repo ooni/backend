@@ -175,7 +175,7 @@ async def receive_measurement(
     # Raise an exception in case the report_id is not consistent with the body,
     # we flag this behavior as faulty data
     _compare_report_id_to_body_meta(cc, asn, test_name, metadata)
-    check_measurement_meta(test_name, cc, asn)
+    check_measurement_meta(metadata.test_name, metadata.probe_cc, metadata.probe_asn)
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
@@ -185,7 +185,6 @@ async def receive_measurement(
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
     # msmt_uid is a unique id based on upload time, cc, testname and hash
-    test_name = test_name.replace("_", "")
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
@@ -217,7 +216,7 @@ async def receive_measurement(
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
-        # submitted to the fastpath, so retries don't cause duplicate anomaly entries.
+        # submitted to the fastpath
         with Metrics.COMPARE_CC_TIMING.time():
             try:
                 await run_in_threadpool(

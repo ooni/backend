@@ -137,9 +137,9 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
 class MeasurementMetadata:
     """Metadata extracted from a measurement body's `content` object."""
 
-    test_name: str  # lowercase, underscores stripped (matches report id segment)
-    probe_cc: str  # uppercase, 2-letter or "ZZ" when unknown
-    probe_asn: str  # canonical "AS..." string or "AS0"
+    test_name: str
+    probe_cc: str
+    probe_asn: str
     platform: str
     software_name: str
     software_version: str
