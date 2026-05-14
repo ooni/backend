@@ -119,6 +119,35 @@ async def receive_measurement(
     """
     setnocacheresponse(response)
     empty_measurement = {}
+    try:
+            rid_timestamp, test_name, cc, asn, format_cid, rand = report_id.split("_")
+    except Exception as e:
+        log.info(
+            f"Unexpected report_id {report_id[:200]}. Error: {e}",
+        )
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_report_id").inc()
+        error("Incorrect format")
+
+    good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
+    if not good:
+        log.info("Unexpected report_id %r", report_id[:200])
+        error("Incorrect format")
+    try:
+        asn_i = int(asn)
+    except ValueError as e:
+        log.info(f"ASN value not parsable {asn}. Error: {e}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_asn").inc()
+        error("Incorrect format")
+
+    if asn_i == 0:
+        log.info("Discarding ASN == 0")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
+        return empty_measurement
+
+    if cc.upper() == "ZZ":
+        log.info("Discarding CC == ZZ")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
+        return empty_measurement
 
     with Metrics.READ_BODY_TIMING.time():
         data = await request.body()
@@ -135,7 +164,7 @@ async def receive_measurement(
 
     try:
         data, metadata = await run_in_threadpool(
-            _process_measurement_body, data, settings
+            _process_measurement_body, data
         )
     except Exception as e:
         log.info("Failed to parse and modify measurement body")
@@ -143,10 +172,9 @@ async def receive_measurement(
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
         error("Incorrect format")
 
-    test_name = metadata.test_name
-    cc = metadata.probe_cc
-    asn = metadata.probe_asn
-
+    # Raise an exception in case the report_id is not consistent with the body,
+    # we flag this behavior as faulty data
+    _compare_report_id_to_body_meta(cc, asn, test_name, metadata)
     check_measurement_meta(test_name, cc, asn)
 
     # Write the whole body of the measurement in a directory based on a 1-hour
@@ -229,13 +257,12 @@ async def receive_measurement(
             return empty_measurement
 
 def _process_measurement_body(
-    data: bytes, settings: Settings
+    data: bytes
 ) -> Tuple[bytes, MeasurementMetadata]:
     """
     - Parse the measurement body
     - extract some metadata fields
     - set `is_verified="u"`
-    - set report_id
     - re-serialize.
     """
 
@@ -250,16 +277,31 @@ def _process_measurement_body(
     metadata = metadata_from_measurement_content(content)
 
     json["is_verified"] = "u"
-    json["content"]["report_id"] = generate_report_id(
-        metadata.test_name,
-        settings,
-        metadata.probe_cc,
-        normalize_asn(metadata.probe_asn)
-    )
 
     with Metrics.SERIALIZE_BODY_TIMING.time():
         return ujson.dumps(json).encode("utf-8"), metadata
 
+def _compare_report_id_to_body_meta(cc: str, asn: str, test_name: str, metadata: MeasurementMetadata):
+    """
+    Compare the metadata reported by a report_id against the metadata in a
+    measurement body
+
+    Raise HTTPException on errors
+    """
+    if cc.upper() != metadata.probe_cc.upper():
+        log.info(f"CC mismatch: {cc} vs {metadata}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_mismatch").inc()
+        error("Inconsistent measurement")
+
+    if asn.upper().lstrip("AS") != metadata.probe_asn.upper().lstrip("AS"):
+        log.info(f"ASN mismatch: {asn} vs {metadata.probe_asn}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_mismatch").inc()
+        error("Inconsistent measurement")
+
+    if test_name != metadata.test_name.replace("_",""):
+        log.info(f"Test name mismatch: {test_name} vs {metadata.test_name}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="test_name_mismatch").inc()
+        error("Inconsistent measurement")
 
 def _check_and_register_geoip_anomaly(
     request: Request,
