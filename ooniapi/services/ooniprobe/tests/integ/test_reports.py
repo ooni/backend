@@ -1,4 +1,5 @@
 import json
+import re
 import zstd
 import pytest
 import ujson
@@ -86,6 +87,35 @@ async def test_collector_upload_msmt_valid(client):
 
     c = postj(client, f"/report/{rid}/close", json={})
     assert c == {}, c
+
+
+@pytest.mark.parametrize(
+    "content_overrides",
+    [
+        {"probe_cc": "DE"},
+        {"probe_asn": "AS2"},
+        {"test_name": "ndt"},
+    ],
+)
+@pytest.mark.asyncio
+async def test_collector_upload_msmt_rejects_body_path_metadata_mismatch(
+    client, content_overrides
+):
+    """_compare_report_id_to_body_meta must reject uploads when report_id and body disagree"""
+    rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
+    msmt_payload = {
+        "format": "json",
+        "content": {
+            "test_keys": {},
+            "probe_cc": "IT",
+            "probe_asn": "AS1",
+            "test_name": "integtest",
+            **content_overrides,
+        },
+    }
+    resp = client.post(f"/report/{rid}", json=msmt_payload)
+    assert resp.status_code == 400, resp.json()
+    assert resp.json()["detail"] == "Inconsistent measurement"
 
 
 @pytest.mark.asyncio
