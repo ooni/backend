@@ -112,10 +112,6 @@ async def receive_measurement(
 ) -> ReceiveMeasurementResponse | Dict[str, Any]:
     """
     Submit measurement.
-
-    The `report_id` path parameter is accepted for URL backwards
-    compatibility but is ignored: metadata used to identify
-    and validate the measurement is read from the body
     """
     setnocacheresponse(response)
     empty_measurement = {}
