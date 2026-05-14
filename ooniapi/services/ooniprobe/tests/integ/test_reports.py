@@ -98,10 +98,10 @@ async def test_collector_upload_msmt_valid(client):
     ],
 )
 @pytest.mark.asyncio
-async def test_collector_upload_msmt_rejects_body_path_metadata_mismatch(
+async def test_rejects_body_report_id_mismatch(
     client, content_overrides
 ):
-    """_compare_report_id_to_body_meta must reject uploads when report_id and body disagree"""
+    """Measurement upload must reject when report_id and body disagree"""
     rid = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
     msmt_payload = {
         "format": "json",
