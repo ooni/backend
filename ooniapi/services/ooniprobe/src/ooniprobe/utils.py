@@ -181,14 +181,13 @@ def check_measurement_meta(
         probe_cc.isupper() and
         probe_cc.isalnum()
     )
-    test_name_alnum_ok = test_name.isalnum()
     test_name_len_ok = 1 < len(test_name) < 30
     test_name_lower_ok = test_name.islower()
     asn_starts_as_ok = probe_asn.startswith("AS")
     asn_len_ok = len(probe_asn) >= 3 and len(probe_asn) <= 12
 
     if not (
-        cc_ok and test_name_alnum_ok and test_name_len_ok and
+        cc_ok and test_name_len_ok and
         test_name_lower_ok and asn_starts_as_ok and asn_len_ok
     ):
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_metadata").inc()
@@ -199,8 +198,6 @@ def check_measurement_meta(
         reasons = []
         if not cc_ok:
             reasons.append("bad_cc")
-        if not test_name_alnum_ok:
-            reasons.append("tn_not_alnum")
         if not test_name_len_ok:
             reasons.append("tn_len")
         if not test_name_lower_ok:
@@ -289,8 +286,7 @@ def normalize_asn(asn: str) -> int:
     """
     Return ASN as int (strip 'AS' prefix if present). Invalid values return 0.
     """
-    s = str(asn).strip().upper()
-    s = s[2:] if s.startswith("as") else s
+    s = str(asn).strip().upper().lstrip("AS")
     try:
         return int(s)
     except (ValueError, TypeError) as e:

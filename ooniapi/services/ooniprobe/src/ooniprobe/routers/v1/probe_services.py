@@ -944,6 +944,7 @@ async def submit_measurement(
     ts = now.strftime("%Y%m%d%H%M%S.%f")
 
     # msmt_uid is a unique id based on upload time, cc, testname and hash
+    test_name = test_name.replace("_","")
     msmt_uid = f"{ts}_{cc}_{test_name}_{h}"
     Metrics.MSMNT_RECEIVED_CNT.inc()
 
