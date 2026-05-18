@@ -373,7 +373,10 @@ async def get_measurements(
         where.append(sql_text("ooni_run_link_id IN :ooni_run_link_id_s"))
         query_params["ooni_run_link_id_s"] = ooni_run_link_id_s
 
-    time_grain = where_by_date(since, until, time_grain, cols, colnames, where)
+    try:
+        time_grain = where_by_date(since, until, time_grain, cols, colnames, where)
+    except Exception as e:
+        return jerror(str(e), v=0)
 
     # still need to set the query params (where_by_date uses :since / :until)
     if since:
