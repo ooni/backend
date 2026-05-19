@@ -10,6 +10,7 @@ from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
 
+from ..common.config import Settings
 from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
@@ -17,9 +18,12 @@ from ..common.utils import setnocacheresponse
 from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
+    MeasurementMetadata,
+    check_measurement_meta,
     error,
     generate_report_id,
     get_cc_asn,
+    metadata_from_measurement_content,
     normalize_asn,
     register_geoip_anomaly,
 )
@@ -107,7 +111,7 @@ async def receive_measurement(
     content_encoding: str = Header(default=None),
 ) -> ReceiveMeasurementResponse | Dict[str, Any]:
     """
-    Submit measurement
+    Submit measurement.
     """
     setnocacheresponse(response)
     empty_measurement = {}
@@ -118,14 +122,12 @@ async def receive_measurement(
             f"Unexpected report_id {report_id[:200]}. Error: {e}",
         )
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_report_id").inc()
-        raise error("Incorrect format")
+        error("Incorrect format")
 
-    # TODO validate the timestamp?
     good = len(cc) == 2 and test_name.isalnum() and 1 < len(test_name) < 30
     if not good:
         log.info("Unexpected report_id %r", report_id[:200])
         error("Incorrect format")
-
     try:
         asn_i = int(asn)
     except ValueError as e:
@@ -157,12 +159,19 @@ async def receive_measurement(
             error("Incorrect format")
 
     try:
-        data = await run_in_threadpool(_set_unverified_flag, data)
+        data, metadata = await run_in_threadpool(
+            _process_measurement_body, data
+        )
     except Exception as e:
         log.info("Failed to parse and modify measurement body")
         log.exception(e)
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_json").inc()
         error("Incorrect format")
+
+    # Raise an exception in case the report_id is not consistent with the body,
+    # we flag this behavior as faulty data
+    _compare_report_id_to_body_meta(cc, asn, test_name, metadata)
+    check_measurement_meta(metadata.test_name, metadata.probe_cc, metadata.probe_asn)
 
     # Write the whole body of the measurement in a directory based on a 1-hour
     # time window
@@ -205,7 +214,7 @@ async def receive_measurement(
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
-        # submitted to the fastpath, so retries don't cause duplicate anomaly entries.
+        # submitted to the fastpath
         with Metrics.COMPARE_CC_TIMING.time():
             try:
                 await run_in_threadpool(
@@ -216,7 +225,7 @@ async def receive_measurement(
                     cc,
                     asn,
                     msmt_uid,
-                    data,
+                    metadata,
                 )
             except Exception as e:
                 log.error(f"Error checking for geoip anomalies: {e}")
@@ -246,14 +255,52 @@ async def receive_measurement(
             Metrics.SEND_S3_CNT.labels(status="fail").inc()
             return empty_measurement
 
+def _process_measurement_body(
+    data: bytes
+) -> Tuple[bytes, MeasurementMetadata]:
+    """
+    - Parse the measurement body
+    - extract some metadata fields
+    - set `is_verified="u"`
+    - re-serialize.
+    """
 
-def _set_unverified_flag(data: bytes) -> bytes:
     with Metrics.DESERIALIZE_BODY_TIMING.time():
-        measurement = ujson.loads(data)
-    measurement["is_verified"] = "u"
-    with Metrics.SERIALIZE_BODY_TIMING.time():
-        return ujson.dumps(measurement).encode("utf-8")
+        json = ujson.loads(data)
 
+    assert isinstance(json, dict)
+
+    content = json.get("content")
+    assert isinstance(content, dict)
+
+    metadata = metadata_from_measurement_content(content)
+
+    json["is_verified"] = "u"
+
+    with Metrics.SERIALIZE_BODY_TIMING.time():
+        return ujson.dumps(json).encode("utf-8"), metadata
+
+def _compare_report_id_to_body_meta(cc: str, asn: str, test_name: str, metadata: MeasurementMetadata):
+    """
+    Compare the metadata reported by a report_id against the metadata in a
+    measurement body
+
+    Raise HTTPException on errors
+    """
+    if cc.upper() != metadata.probe_cc.upper():
+        log.info(f"CC mismatch: {cc} vs {metadata}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_mismatch").inc()
+        error("Inconsistent measurement")
+
+    if asn.upper().lstrip("AS") != metadata.probe_asn.upper().lstrip("AS"):
+        log.info(f"ASN mismatch: {asn} vs {metadata.probe_asn}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_mismatch").inc()
+        error("Inconsistent measurement")
+
+    if test_name != metadata.test_name.replace("_",""):
+        log.info(f"Test name mismatch: {test_name} vs {metadata.test_name}")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="test_name_mismatch").inc()
+        error("Inconsistent measurement")
 
 def _check_and_register_geoip_anomaly(
     request: Request,
@@ -262,12 +309,10 @@ def _check_and_register_geoip_anomaly(
     cc: str,
     asn: str,
     msmt_uid: str,
-    data: bytes,
+    metadata: MeasurementMetadata,
 ) -> None:
     actual_cc, actual_asn = get_cc_asn(request, asn_cc_reader)
     if actual_cc != cc or normalize_asn(actual_asn) != normalize_asn(asn):
-        # expensive: parses measurement body and sends anomaly to clickhouse
-        platform, software_name, software_version = _parse_metadata(data)
         register_geoip_anomaly(
             cc,
             actual_cc,
@@ -275,31 +320,12 @@ def _check_and_register_geoip_anomaly(
             actual_asn,
             clickhouse,
             msmt_uid,
-            platform,
-            software_name,
-            software_version,
+            metadata.platform,
+            metadata.software_name,
+            metadata.software_version,
         )
     else:
         Metrics.PROBE_CC_ASN_MATCH.inc()
-
-
-def _parse_metadata(data: bytes) -> Tuple[str, str, str]:
-    """
-    Parse measurement body, and return the following metadata:
-
-    platform, software_name, software_version
-    """
-    try:
-        body = ujson.loads(data.decode("utf-8"))
-    except Exception as e:
-        log.error(f"Couldn't parse json body: {e}")
-        return ("", "", "")
-    content = body.get("content", {})
-    annotations = content.get("annotations", {})
-    platform = annotations.get("platform", "")
-    software_name = content.get("software_name", "")
-    software_version = content.get("software_version", "")
-    return (platform, software_name, software_version)
 
 
 @timer(name="close_report")

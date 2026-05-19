@@ -1,6 +1,7 @@
 import json
 import pathlib
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -334,26 +335,18 @@ class MockFastpathClient:
         pass
 
 
-@pytest_asyncio.fixture
-async def client_with_mocked_fastpath(
-    clickhouse_server, test_settings, geoip_db_dir, test_creds
+@asynccontextmanager
+async def _client_with_mocked_fastpath_urls(
+    test_settings, geoip_db_dir, test_creds, fastpath_urls
 ):
     """
-    Client variant to test fastpath behaviour, see the mocked fastpath client
-    above.
-
-    Yields `(client, mock_fastpath, success_url)`.
+    Shared setup for the client_with_*_mocked_fastpath* fixtures: applies
+    dependency overrides, installs a `MockFastpathClient` on app state, and
+    yields `(client, mock_fastpath)` for the test to use.
     """
-    fail_url = "http://fastpath.ooni/bad"
-    success_url = "http://fastpath.ooni/good"
-
     _, public_key = test_creds
 
-    settings = test_settings().model_copy(
-        update={
-            "fastpath_urls": [fail_url, success_url],
-        }
-    )
+    settings = test_settings().model_copy(update={"fastpath_urls": fastpath_urls})
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_s3_client] = get_s3_client_mock
     app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
@@ -365,7 +358,41 @@ async def client_with_mocked_fastpath(
     async with lifespan(app, settings, repeating_tasks_active=False):
         with TestClient(app) as client:
             app.state.fastpath_client = mock_fastpath
-            yield client, mock_fastpath, success_url
+            yield client, mock_fastpath
+
+
+@pytest_asyncio.fixture
+async def client_with_mocked_fastpath(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client with one healthy mocked fastpath URL.
+
+    Yields `(client, mock_fastpath, url)`.
+    """
+    url = "http://fastpath.ooni/good"
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, [url]
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, url
+
+
+@pytest_asyncio.fixture
+async def client_with_one_good_mocked_fastpath(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client with one failing and one healthy mocked fastpath URL, used to
+    test the fallback path.
+
+    Yields `(client, mock_fastpath, success_url)`.
+    """
+    fail_url = "http://fastpath.ooni/bad"
+    success_url = "http://fastpath.ooni/good"
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, [fail_url, success_url]
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, success_url
 
 
 @pytest_asyncio.fixture
@@ -373,29 +400,13 @@ async def client_with_two_working_fastpaths(
     clickhouse_server, test_settings, geoip_db_dir, test_creds
 ):
     """
-    Client variant to test successful fastpath submissions with two healthy fastpath instances
+    Client with two healthy mocked fastpath URLs.
 
     Yields `(client, mock_fastpath, first_url, second_url)`.
     """
     first_url = "http://fastpath-a.ooni/good"
     second_url = "http://fastpath-b.ooni/good"
-
-    _, public_key = test_creds
-
-    settings = test_settings().model_copy(
-        update={
-            "fastpath_urls": [first_url, second_url],
-        }
-    )
-    app.dependency_overrides[get_settings] = lambda: settings
-    app.dependency_overrides[get_s3_client] = get_s3_client_mock
-    app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
-    app.dependency_overrides[get_psiphon_config_from_s3] = get_psiphon_config_from_s3_mock
-    app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
-    try_update(geoip_db_dir)
-
-    mock_fastpath = MockFastpathClient()
-    async with lifespan(app, settings, repeating_tasks_active=False):
-        with TestClient(app) as client:
-            app.state.fastpath_client = mock_fastpath
-            yield client, mock_fastpath, first_url, second_url
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, [first_url, second_url]
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, first_url, second_url
