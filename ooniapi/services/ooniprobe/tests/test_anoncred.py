@@ -266,42 +266,42 @@ def test_get_ranges_from_policy_match_precedence():
     policy = [
         PolicyEntry(
             match=Match(probe_asn="AS15704", probe_cc="ES"),
-            policy=Policy(age=(9, 10), measurement_count=(90, 100)),
+            policy=Policy(age=(9, 10), min_measurement_count=90),
         ),
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="ES"),
-            policy=Policy(age=(7, 8), measurement_count=(70, 80)),
+            policy=Policy(age=(7, 8), min_measurement_count=70),
         ),
         PolicyEntry(
             match=Match(probe_asn="AS15704", probe_cc="*"),
-            policy=Policy(age=(5, 6), measurement_count=(50, 60)),
+            policy=Policy(age=(5, 6), min_measurement_count=50),
         ),
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="*"),
-            policy=Policy(age=(3, 4), measurement_count=(30, 40)),
+            policy=Policy(age=(3, 4), min_measurement_count=30),
         ),
     ]
 
-    age_range, msm_range = get_ranges_from_policy(policy, "ES", "AS15704")
+    age_range, msm_min = get_ranges_from_policy(policy, "ES", "AS15704")
     assert age_range == (9, 10)
-    assert msm_range == (90, 100)
+    assert msm_min == 90
 
-    age_range, msm_range = get_ranges_from_policy(policy, "ES", "AS99999")
+    age_range, msm_min = get_ranges_from_policy(policy, "ES", "AS99999")
     assert age_range == (7, 8)
-    assert msm_range == (70, 80)
+    assert msm_min == 70
 
-    age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS15704")
+    age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS15704")
     assert age_range == (5, 6)
-    assert msm_range == (50, 60)
+    assert msm_min == 50
 
-    age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS99999")
+    age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS99999")
     assert age_range == (3, 4)
-    assert msm_range == (30, 40)
+    assert msm_min == 30
 
     no_catchall_policy = [
         PolicyEntry(
             match=Match(probe_asn="AS15704", probe_cc="ES"),
-            policy=Policy(age=(9, 10), measurement_count=(90, 100)),
+            policy=Policy(age=(9, 10), min_measurement_count=90),
         )
     ]
     with pytest.raises(ValueError, match="No matching submission_policy entry"):
@@ -312,37 +312,39 @@ def test_get_ranges_from_policy_uses_wildcard_match():
     policy = [
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="*"),
-            policy=Policy(age=(11, 12), measurement_count=(110, 120)),
+            policy=Policy(age=(11, 12), min_measurement_count=110),
         )
     ]
-    age_range, msm_range = get_ranges_from_policy(policy, "BR", "AS28573")
+    age_range, msm_min = get_ranges_from_policy(policy, "BR", "AS28573")
     assert age_range == (11, 12)
-    assert msm_range == (110, 120)
+    assert msm_min == 110
 
 
 def test_get_ranges_from_policy_requires_matching_entry():
     with pytest.raises(ValueError, match="No matching submission_policy entry"):
         get_ranges_from_policy([], "FR", "AS3215")
 
-def test_policy_entry_requires_both_ranges():
+def test_policy_requires_age_and_min_measurement_count():
     with pytest.raises(ValidationError):
         Policy.model_validate({"age": [21, 22]})
+    with pytest.raises(ValidationError):
+        Policy.model_validate({"min_measurement_count": 1})
 
 
 def test_get_ranges_from_policy_first_match_wins():
     policy = [
         PolicyEntry(
             match=Match(probe_asn="*", probe_cc="*"),
-            policy=Policy(age=(1, 1), measurement_count=(1, 1)),
+            policy=Policy(age=(1, 1), min_measurement_count=1),
         ),
         PolicyEntry(
             match=Match(probe_asn="AS1234", probe_cc="IT"),
-            policy=Policy(age=(9, 9), measurement_count=(9, 9)),
+            policy=Policy(age=(9, 9), min_measurement_count=9),
         ),
     ]
-    age_range, msm_range = get_ranges_from_policy(policy, "IT", "AS1234")
+    age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS1234")
     assert age_range == (1, 1)
-    assert msm_range == (1, 1)
+    assert msm_min == 1
 
 
 def _manifest_from_payload(payload):
@@ -364,7 +366,7 @@ def test_manifest_parsing_preserves_important_fields():
                     "match": {"probe_cc": "*", "probe_asn": "*"},
                     "policy": {
                         "age": [2461110, 2826140],
-                        "measurement_count": [0, 10000000],
+                        "min_measurement_count": 0,
                     },
                 }
             ]
@@ -377,7 +379,7 @@ def test_manifest_parsing_preserves_important_fields():
     assert entry.match.probe_cc == "*"
     assert entry.match.probe_asn == "*"
     assert entry.policy.age == (2461110, 2826140)
-    assert entry.policy.measurement_count == (0, 10000000)
+    assert entry.policy.min_measurement_count == 0
 
 
 def test_manifest_rejects_ranges_with_invalid_length():
@@ -389,7 +391,7 @@ def test_manifest_rejects_ranges_with_invalid_length():
                         "match": {"probe_cc": "*", "probe_asn": "*"},
                         "policy": {
                             "age": [2461110],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -401,7 +403,10 @@ def test_manifest_rejects_ranges_with_invalid_length():
                 "submission_policy": [
                     {
                         "match": {"probe_cc": "*", "probe_asn": "*"},
-                        "policy": {"age": [2461110, 2826140], "measurement_count": [0]},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": [0, 10000000],
+                        },
                     }
                 ]
             }
@@ -417,7 +422,7 @@ def test_manifest_requires_probe_cc_and_probe_asn():
                         "match": {"probe_cc": "*"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -431,7 +436,7 @@ def test_manifest_requires_probe_cc_and_probe_asn():
                         "match": {"probe_asn": "*"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -451,7 +456,7 @@ def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
                     {
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": 0,
                         }
                     }
                 ]
@@ -467,7 +472,7 @@ def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
                         "match": "not-a-dict",
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -486,7 +491,7 @@ def test_manifest_requires_catch_all_rule():
                         "match": {"probe_cc": "IT", "probe_asn": "AS1234"},
                         "policy": {
                             "age": [2461110, 2826140],
-                            "measurement_count": [0, 10000000],
+                            "min_measurement_count": 0,
                         },
                     }
                 ]
@@ -499,11 +504,11 @@ def test_manifest_requires_catch_all_rule():
 @pytest.mark.asyncio
 async def test_credential_update(client, client_with_original_manifest, second_manifest):
 
-    (user, manifest, _) = client_with_original_manifest
+    (user, manifest_version, _) = client_with_original_manifest
     new_manifest = getj(client, "/api/v1/manifest")
     user.set_public_params(new_manifest["manifest"]["public_parameters"])
     result = postj(client, "/api/v1/update_credential", json=dict(
-        old_manifest_version = manifest,
+        old_manifest_version = manifest_version,
         manifest_version = new_manifest['meta']['version'],
         update_request = user.make_credential_update_request()
     ))

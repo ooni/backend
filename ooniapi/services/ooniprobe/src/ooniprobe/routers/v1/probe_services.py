@@ -792,7 +792,13 @@ def _anonc_exc_to_str(error: ProtocolError | CredentialError | DeserializationFa
     """
     returns a short error string depending on the error type
     """
-    type_to_str = {
+    type_to_str: dict[
+            type[
+                ProtocolError |
+                CredentialError |
+                DeserializationFailed
+            ],
+            str] = {
         ProtocolError: "protocol_error",
         DeserializationFailed: "deserialization_failed",
         CredentialError: "credential_error",
@@ -1090,8 +1096,12 @@ def _verify_submit(
         )
         return VerificationStatus.UNVERIFIED, "invalid_protocol_version", None
 
-    # Get the limits in age range and measurement count for this request
-    age_range, count_range = get_ranges_from_policy(manifest.manifest.submission_policy, submit_request.content['probe_cc'], submit_request.content['probe_asn'])
+    # Get the age range and minimum measurement count for this request
+    age_range, min_msm_count = get_ranges_from_policy(
+        manifest.manifest.submission_policy,
+        submit_request.content["probe_cc"],
+        submit_request.content["probe_asn"],
+    )
 
     # Run verification
     try:
@@ -1103,8 +1113,8 @@ def _verify_submit(
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
             submit_request.content["probe_asn"],
-            list(age_range),
-            list(count_range),
+            age_range,
+            min_msm_count,
         )
         return (VerificationStatus.VERIFIED, None, submit_response)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
@@ -1120,14 +1130,14 @@ def _parse_version_tuple(version: str) -> tuple[int, ...]:
 
 def get_ranges_from_policy(
     policy: List[PolicyEntry], probe_cc: str, probe_asn: str
-) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+) -> Tuple[Tuple[int, int], int]:
     """
-    Gets the age and measurement count ranges from the specified policy.
+    Gets the age range and minimum measurement count from the specified policy.
 
     Matching order: first match in the list wins (highest priority first).
 
-    returns:
-    age_range, msm_range
+    Returns:
+        age_range, min_msm_count
     """
 
     for item in policy:
@@ -1138,7 +1148,7 @@ def get_ranges_from_policy(
         asn_ok = match_asn == "*" or match_asn == probe_asn
 
         if cc_ok and asn_ok:
-            return item.policy.age, item.policy.measurement_count
+            return item.policy.age, item.policy.min_measurement_count
 
     raise ValueError(
         f"No matching submission_policy entry for probe_cc={probe_cc} probe_asn={probe_asn}"
