@@ -65,7 +65,8 @@ ENGINE = MergeTree
 ORDER BY (report_id, input)
 SETTINGS index_granularity = 8192;
 
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` LowCardinality(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` LowCardinality(String) DEFAULT 'u';
+
 CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
 (
     `probe_asn` UInt32,

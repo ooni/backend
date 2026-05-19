@@ -37,6 +37,7 @@ from sqlalchemy.sql.expression import and_, column, select, text
 from starlette.concurrency import run_in_threadpool
 from typing_extensions import Annotated
 
+from ...common.anonymous_credentials import VerificationStatus
 from ...common.clickhouse_utils import async_query_click, query_click_one_row
 from ...common.config import Settings
 from ...common.dependencies import get_clickhouse_session, get_settings
@@ -551,7 +552,14 @@ class Measurement(MeasurementBase):
         default=None, title="start time of the measurement"
     )
     measurement_uid: Optional[str] = Field(default=None, title="uid of the measurement")
-
+    verification_status: Optional[VerificationStatus] = Field(
+        default=None,
+        title="Verification status",
+        description="Anonymous credentials verification status. A measurement "
+        "can be in the following status: verified, unverified, failed. "
+        "If set to None, we don't have information about the verification "
+        "status of this measurement"
+    )
 
 class ResultsMetadata(BaseModel):
     count: int = Field(title="")
@@ -907,6 +915,7 @@ async def list_measurements(
                     confirmed=row["confirmed"] == "t",
                     failure=row["msm_failure"] == "t",
                     scores=json.loads(row["scores"]),
+                    verification_status=VerificationStatus.from_code(row['is_verified'])
                 )
             )
 
