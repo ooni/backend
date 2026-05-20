@@ -60,14 +60,17 @@ def test_list_measurements_verification_status(client, db):
     for result in results:
         uid = result["measurement_uid"]
         assert "verification_status" in result
-        rows = ch.execute(
-            "SELECT is_verified FROM fastpath"
-            "WHERE measurement_uid = %(uid)s LIMIT 1",
+        row = query_click_one_row(
+            ch,
+            sql.text(
+                "SELECT is_verified FROM fastpath "
+                "WHERE measurement_uid = :uid LIMIT 1"
+            ),
             {"uid": uid},
         )
-        assert rows, f"no fastpath row for {uid}"
-        is_verified = rows[0][0]
-        expected = VerificationStatus.from_code(is_verified)
+        assert row, f"no fastpath row for {uid}"
+        is_verified = row["is_verified"]
+        expected = VerificationStatus.from_code(is_verified).value
         assert result["verification_status"] == expected, (
             f"{uid}: is_verified={is_verified} expected {expected}, "
             f"got {result['verification_status']}"
