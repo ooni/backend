@@ -181,7 +181,7 @@ def check_measurement_meta(
         probe_cc.isupper() and
         probe_cc.isalnum()
     )
-    test_name_len_ok = 1 < len(test_name) < 30
+    test_name_len_ok = 1 < len(test_name) <= 30
     test_name_lower_ok = test_name.islower()
     asn_starts_as_ok = probe_asn.startswith("AS")
     asn_len_ok = len(probe_asn) >= 3 and len(probe_asn) <= 12
