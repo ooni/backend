@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from freezegun import freeze_time
 from clickhouse_driver import Client as Clickhouse
+from oonimeasurements.common.anonymous_credentials import VerificationStatus
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
@@ -44,6 +45,33 @@ def test_list_measurements(client):
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
 
+
+
+@freeze_time("2024-01-30T00:00:00Z")
+def test_list_measurements_verification_status(client, db):
+    """List API verification_status must match fastpath.is_verified codes."""
+    ch = Clickhouse.from_url(db)
+    response = client.get(route, params={"limit": 50})
+    assert response.status_code == 200
+
+    results = response.json()["results"]
+    assert results
+
+    for result in results:
+        uid = result["measurement_uid"]
+        assert "verification_status" in result
+        rows = ch.execute(
+            "SELECT is_verified FROM fastpath"
+            "WHERE measurement_uid = %(uid)s LIMIT 1",
+            {"uid": uid},
+        )
+        assert rows, f"no fastpath row for {uid}"
+        is_verified = rows[0][0]
+        expected = VerificationStatus.from_code(is_verified)
+        assert result["verification_status"] == expected, (
+            f"{uid}: is_verified={is_verified} expected {expected}, "
+            f"got {result['verification_status']}"
+        )
 
 @freeze_time("2024-03-01T00:00:00Z")
 def test_list_measurements_with_since_and_until(client):
