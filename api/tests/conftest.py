@@ -30,21 +30,8 @@ def app():
 
 @pytest.fixture
 def client(app):
-    """
-    Overriding the `client` fixture from pytest_flask to fix this bug:
-    https://github.com/pytest-dev/pytest-flask/issues/42
-    """
     with app.test_client() as client:
-        yield client
-
-    # deprecated name _request_ctx_stack and marked as not a bug on issue #42
-    #while True:
-    #    top = flask._request_ctx_stack.top
-    #    if top is not None and top.preserved:
-    #        top.pop()
-    #    else:
-    #        break
-
+        return client
 
 @pytest.fixture(autouse=True)
 def disable_rate_limits(app):
