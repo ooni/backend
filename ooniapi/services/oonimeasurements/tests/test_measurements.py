@@ -358,6 +358,7 @@ def test_get_measurement_meta_basic(client):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
+        "verification_status" : "unverified"
     }
 
     # You can also query by measurment uid
