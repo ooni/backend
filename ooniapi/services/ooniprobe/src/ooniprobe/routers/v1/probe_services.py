@@ -27,6 +27,7 @@ from ooniauth_py import (
 from pydantic import Field, IPvAnyAddress
 from starlette.concurrency import run_in_threadpool
 
+from ...common.anonymous_credentials import VerificationStatus
 from ...common.auth import create_jwt, decode_jwt, jwt
 from ...common.dependencies import ClickhouseDep
 from ...common.errors import AddressNotFoundError
@@ -838,21 +839,6 @@ class SubmitMeasurementRequest(BaseModel):
         "`ooniauth-core` version used by the **probe** sending this request",
         default = None
         )
-
-
-class VerificationStatus(str, Enum):
-    VERIFIED = "verified"
-    FAILED = "failed"
-    UNVERIFIED = "unverified"
-
-    @property
-    def code(self) -> str:
-        return {
-            VerificationStatus.VERIFIED: "t",
-            VerificationStatus.FAILED: "f",
-            VerificationStatus.UNVERIFIED: "u",
-        }[self]
-
 
 class SubmitMeasurementResponse(BaseModel):
     """
