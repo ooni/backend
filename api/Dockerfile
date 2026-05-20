@@ -17,7 +17,7 @@ RUN ./ooni_download_geoip.py
 
 RUN rm -rf /scripts
 
-# The API codebase is mounted under /app by docker-compose
+# The API codebase is mounted under /app using `docker compose` command
 
 # Set our work directory to our app directory
 WORKDIR /app/
