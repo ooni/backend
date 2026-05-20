@@ -1,4 +1,5 @@
 import json
+import logging
 import pathlib
 import time
 from contextlib import asynccontextmanager
@@ -36,6 +37,10 @@ from ooniprobe.routers.v1.probe_services import TorTarget
 
 from .utils import setup_user
 
+
+@pytest.fixture
+def log():
+    return logging.getLogger(__name__)
 
 def make_override_get_settings(**kw):
     def override_get_settings():
