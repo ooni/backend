@@ -1,0 +1,147 @@
+{
+    "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+    "type": "app",
+    "name": "Grafana Metrics Drilldown",
+    "id": "grafana-metricsdrilldown-app",
+    "dependencies": {
+        "grafanaDependency": ">=11.6.11 <12 || >=12.0.10 <12.1 || >=12.1.7 <12.2 || >=12.2.5",
+        "plugins": [],
+        "extensions": {
+            "exposedComponents": [
+                "grafana/add-to-dashboard-form/v1",
+                "grafana/alerting/create-alert-from-panel/v1",
+                "grafana/prometheus-query-results/v1",
+                "grafana/query-library-context/v1"
+            ]
+        }
+    },
+    "preload": true,
+    "autoEnabled": true,
+    "languages": [
+        "en-US",
+        "cs-CZ",
+        "de-DE",
+        "es-ES",
+        "fr-FR",
+        "hu-HU",
+        "id-ID",
+        "it-IT",
+        "ja-JP",
+        "ko-KR",
+        "nl-NL",
+        "pl-PL",
+        "pt-BR",
+        "pt-PT",
+        "ru-RU",
+        "sv-SE",
+        "tr-TR",
+        "zh-Hans",
+        "zh-Hant"
+    ],
+    "info": {
+        "keywords": [
+            "drilldown",
+            "metrics",
+            "app",
+            "prometheus",
+            "mimir"
+        ],
+        "description": "Quickly find related metrics with a few clicks, without needing to write PromQL queries to retrieve metrics.",
+        "author": {
+            "name": "Grafana"
+        },
+        "logos": {
+            "small": "img/logo.svg",
+            "large": "img/logo.svg"
+        },
+        "screenshots": [
+            {
+                "name": "metricselect",
+                "path": "img/metrics-drilldown.png"
+            },
+            {
+                "name": "breakdown",
+                "path": "img/breakdown.png"
+            }
+        ],
+        "version": "2.0.2",
+        "updated": "2026-04-15",
+        "links": [
+            {
+                "name": "GitHub",
+                "url": "https://github.com/grafana/metrics-drilldown"
+            },
+            {
+                "name": "Report a bug",
+                "url": "https://github.com/grafana/metrics-drilldown/issues/new"
+            }
+        ]
+    },
+    "includes": [
+        {
+            "type": "page",
+            "name": "Grafana Metrics Drilldown",
+            "path": "/a/grafana-metricsdrilldown-app/drilldown",
+            "action": "datasources:explore",
+            "addToNav": true,
+            "defaultNav": true
+        }
+    ],
+    "extensions": {
+        "addedLinks": [
+            {
+                "targets": [
+                    "grafana/dashboard/panel/menu",
+                    "grafana/explore/toolbar/action",
+                    "grafana/alerting/alertingrule/queryeditor",
+                    "grafana-assistant-app/navigateToDrilldown/v1"
+                ],
+                "title": "Open in Grafana Metrics Drilldown",
+                "description": "Open current query in the Grafana Metrics Drilldown view"
+            },
+            {
+                "targets": [
+                    "grafana-metricsdrilldown-app/grafana-assistant-app/navigateToDrilldown/v0-alpha"
+                ],
+                "title": "Navigate to metrics drilldown",
+                "description": "Build a url path to the metrics drilldown"
+            },
+            {
+                "targets": [
+                    "grafana/datasources/config/actions",
+                    "grafana/datasources/config/status"
+                ],
+                "title": "Open in Metrics Drilldown",
+                "description": "Browse metrics in Grafana Metrics Drilldown"
+            }
+        ],
+        "extensionPoints": [
+            {
+                "id": "grafana-metricsdrilldown-app/open-in-logs-drilldown/v1"
+            }
+        ],
+        "exposedComponents": [
+            {
+                "id": "grafana-metricsdrilldown-app/label-breakdown-component/v1",
+                "title": "Label Breakdown",
+                "description": "A metrics label breakdown view from the Metrics Drilldown app."
+            },
+            {
+                "id": "grafana-metricsdrilldown-app/knowledge-graph-insight-metrics/v1",
+                "title": "Knowledge Graph Source Metrics",
+                "description": "Explore the underlying metrics related to a Knowledge Graph insight"
+            },
+            {
+                "id": "grafana-metricsdrilldown-app/mini-breakdown-component/v1",
+                "title": "Mini Label Breakdown Navigation",
+                "description": "A mini metrics label breakdown view from the Metrics Drilldown app used for navigation."
+            },
+            {
+                "id": "grafana-metricsdrilldown-app/entity-metrics-component/v1",
+                "title": "Entity Metrics",
+                "description": "A metrics exploration view for entity labels from the Metrics Drilldown app."
+            }
+        ]
+    },
+    "buildMode": "production"
+}

@@ -1,0 +1,413 @@
+{
+  "action-bar": {
+    "tab": {
+      "breakdown": "Разбивка",
+      "query-results": "",
+      "query-results-description": "",
+      "related-logs": "Связанные журналы",
+      "related-logs-description": "Журналы, соответствующие текущим фильтрам меток и временному диапазону",
+      "related-metrics": "Связанные метрики",
+      "related-metrics-description": "Метрики, соответствующие текущим фильтрам меток"
+    }
+  },
+  "breakdown": {
+    "add-to-filters": "Добавить к фильтрам",
+    "by-label": "По меткам",
+    "group-by": {
+      "label": "Группировать по"
+    },
+    "label-values-list": {
+      "error-title": "Ошибка при загрузке метрик.",
+      "no-values": "Значения меток, соответствующие текущим фильтрам и временному диапазону, не найдены.",
+      "search-aria-label": "",
+      "search-label": "Поиск",
+      "view-label": "Просмотр"
+    },
+    "labels-list": {
+      "breakdown-by-label": "Разбивка по {{label}}",
+      "error-title": "Ошибка при загрузке меток.",
+      "no-labels": "Метки, соответствующие текущим фильтрам и временному диапазону, не найдены.",
+      "view-label": "Просмотр"
+    },
+    "section-label": "Разбивка",
+    "select-label": "Выбрать"
+  },
+  "checkbox-list": {
+    "clear": "очистить",
+    "collapse": "Свернуть",
+    "expand": "Развернуть",
+    "no-results": "Нет результатов.",
+    "selected-count_one": "Выбрано: {{count}}",
+    "selected-count_few": "Выбрано: {{count}}",
+    "selected-count_many": "Выбрано: {{count}}",
+    "selected-count_other": "Выбрано: {{count}}"
+  },
+  "configure-panel": {
+    "apply": "Применить",
+    "cancel": "Отмена",
+    "restore-default": "Восстановить конфигурацию по умолчанию",
+    "restore-modal-body": "Вы действительно хотите восстановить конфигурацию по умолчанию для метрики {{metric}}?",
+    "restore-modal-confirm": "Восстановить",
+    "restore-modal-title": "Восстановить конфигурацию по умолчанию",
+    "select-function-message": "Выберите функцию Prometheus, которая будет использоваться по умолчанию для отображения метрики {{metricName}}."
+  },
+  "data-source-variable": {
+    "description": "Поддерживаются только источники данных Prometheus",
+    "label": "Источник данных"
+  },
+  "data-trail": {
+    "configure-drawer": {
+      "title": "Настроить функцию Prometheus"
+    },
+    "filters": {
+      "add-label": "Добавить метку",
+      "label": "Фильтры"
+    }
+  },
+  "error-view": {
+    "message": "<2>Попробуйте перезагрузить страницу.</2> Если проблема не исчезнет, обратитесь к администратору организации. Приносим извинения за неудобства.",
+    "stack-trace-label": "Просмотр трассировки стека",
+    "title": "Критическая ошибка"
+  },
+  "extreme-value-filter": {
+    "message": "Для обработки крайне малых значений в рядах выполнена повторная выборка данных дашборда с использованием более сложного запроса"
+  },
+  "fetch-alerting-metrics": {
+    "error": "Не удалось получить правила оповещения"
+  },
+  "fetch-dashboard-metrics": {
+    "error": "Не удалось получить метрики дашборда",
+    "limit-warning-body": "",
+    "limit-warning-title": ""
+  },
+  "filtered-metrics-variable": {
+    "label": "Отфильтрованные метрики"
+  },
+  "give-feedback": {
+    "button": "Отправить отзыв",
+    "tooltip": "Поделитесь своим мнением о метриках в Grafana."
+  },
+  "gmd-viz-panel": {
+    "native-histogram": "Встроенная гистограмма",
+    "variant": {
+      "heatmap": "тепловая карта",
+      "percentiles": "процентили"
+    }
+  },
+  "inline-banner": {
+    "unknown-error": "Неизвестная ошибка."
+  },
+  "kg-annotations": {
+    "layer": {
+      "name": ""
+    },
+    "query": {
+      "name": ""
+    },
+    "severity": {
+      "critical": "",
+      "info": "",
+      "warning": ""
+    },
+    "toggle": {
+      "description": "",
+      "disabled-tooltip": "",
+      "label": "",
+      "learn-more": ""
+    }
+  },
+  "labels-datasource": {
+    "none-option": "(нет)",
+    "test-success": "OK"
+  },
+  "labels-list": {
+    "clear": "очистить",
+    "no-results": "Нет результатов.",
+    "no-selection": "Ничего не выбрано",
+    "selected": "Выбрано: «{{selectedLabel}}»"
+  },
+  "labels-variable": {
+    "label": "Группировать по меткам",
+    "placeholder": "Группировать по меткам..."
+  },
+  "layout-switcher": {
+    "aria-label": "Переключатель макетов",
+    "option": {
+      "grid": "Сетка",
+      "rows": "Строки",
+      "single": "Один"
+    }
+  },
+  "lazy-loading": {
+    "fallback": "Загрузка…"
+  },
+  "list-controls": {
+    "search-aria-label": ""
+  },
+  "metrics": {
+    "metrics-drilldown": {
+      "load-query": {
+        "button-no-query-tooltip": "",
+        "button-tooltip": "",
+        "empty": "",
+        "load-error": "",
+        "load-type-error": "",
+        "modal-title": "",
+        "remove": "",
+        "saved-query-button-tooltip": "",
+        "select": ""
+      },
+      "save-query": {
+        "already-exists": {
+          "alert": ""
+        },
+        "button-tooltip": "",
+        "button-tooltip-saved-queries": "",
+        "cancel": "",
+        "description": "",
+        "error": "",
+        "modal-alert": "",
+        "modal-title": "",
+        "save": "",
+        "success": "",
+        "title": ""
+      }
+    }
+  },
+  "metrics-group-by-list": {
+    "error-title": "Ошибка при загрузке значений метки «{{labelName}}».",
+    "no-values": "Значения метки «{{labelName}}» не найдены."
+  },
+  "metrics-group-by-row": {
+    "error-title": "Ошибка при загрузке метрик.",
+    "no-metrics": "Метрики, соответствующие текущим фильтрам и временному диапазону, не найдены.",
+    "select": "Выбрать",
+    "select-tooltip": "Посмотреть метрики, где {{labelName}}={{labelValue}}",
+    "show-more-tooltip": "Показать больше метрик, где {{labelName}}=«{{labelValue}}»"
+  },
+  "metrics-list": {
+    "error-title": "Ошибка при загрузке метрик.",
+    "no-metrics": "Метрики, соответствующие текущим фильтрам и временному диапазону, не найдены."
+  },
+  "metrics-sorter": {
+    "error": {
+      "get-recent-metrics": "Не удалось получить последние метрики:"
+    },
+    "label": "Сортировать по",
+    "option": {
+      "alerting-usage": "Использование оповещений",
+      "alphabetical": "По алфавиту [A-Z]",
+      "alphabetical-reversed": "По алфавиту [Z-A]",
+      "dashboard-usage": "Использование дашбордов",
+      "default": "По умолчанию"
+    }
+  },
+  "metrics-variable": {
+    "label": "Метрики"
+  },
+  "onboarding": {
+    "learn-more": "Ознакомьтесь с <2>документацией</2>, чтобы узнать больше, или<5></5><6>протестируйте онлайн</6> с помощью Grafana Play.",
+    "no-datasource": "Источник данных Prometheus не настроен.<1></1>Для просмотра метрик добавьте <4>источник данных Prometheus</4>.",
+    "title": "Добро пожаловать в Grafana Metrics Drilldown"
+  },
+  "open-assistant": {
+    "explain-label": "Объяснить в Assistant",
+    "metric-metadata-title": "Метаданные метрик Prometheus"
+  },
+  "panel-menu": {
+    "action": {
+      "copy-url": "Копировать URL",
+      "copy-url-success": "URL-адрес скопирован в буфер обмена",
+      "explore": "Explore"
+    },
+    "group": {
+      "actions": "Действия",
+      "navigation": "Навигация"
+    }
+  },
+  "plugin-info": {
+    "button": {
+      "title": "О плагине",
+      "tooltip": "О плагине"
+    },
+    "header": {
+      "last-update": "Последнее обновление: {{updated}}",
+      "title": "Grafana Metrics Drilldown, версия {{version}}"
+    },
+    "menu": {
+      "changelog": "Журнал изменений",
+      "commit-sha": "Выполнить SHA-хеширование: {{sha}}",
+      "contribute": "Внести вклад",
+      "documentation": "Документация",
+      "grafana-version": "Grafana {{edition}}, версия {{version}} ({{env}})",
+      "prom-build-info": "{{application}}, {{version}} ({{buildDate}})",
+      "report-issue": "Сообщить о проблеме"
+    }
+  },
+  "prefix-filter": {
+    "all-metrics": "Имена всех метрик",
+    "tooltip": "Просмотр по префиксу метрики. Префикс — это одно слово в начале имени метрики, обозначающее домен, к которому она относится.",
+    "view-by-label": "Просмотр по"
+  },
+  "query-results": {
+    "aria-label": "",
+    "error-title": "",
+    "unavailable-message": "",
+    "unavailable-title": ""
+  },
+  "quick-search": {
+    "ask-assistant-aria-label": "Спросить Grafana Assistant",
+    "ask-assistant-tooltip": "Задайте вопрос Grafana Assistant",
+    "clear-search-tooltip": "Очистить поиск",
+    "placeholder": "",
+    "placeholder-question-mode": "Задайте вопрос Grafana Assistant и нажмите Enter",
+    "placeholder-with-assistant": "",
+    "placeholder-with-assistant-tab-enter": "",
+    "count-filtered_one": "",
+    "count-filtered_few": "",
+    "count-filtered_many": "",
+    "count-filtered_other": "",
+    "count-total_one": "",
+    "count-total_few": "",
+    "count-total_many": "",
+    "count-total_other": ""
+  },
+  "quick-search-assistant": {
+    "label-filters-title": "Текущие фильтры меток",
+    "time-range-title": "Временной диапазон"
+  },
+  "related-logs": {
+    "datasource-description": "В раскрывающемся списке могут отсутствовать некоторые источники данных Loki, если их время ответа превышает {{timeout}} сек. Для просмотра журналов всех источников данных Loki попробуйте использовать приложение Logs Drilldown.",
+    "datasource-label": "Источник данных журналов",
+    "experimental-note": "Примечание. Связанные журналы — это экспериментальная функция.",
+    "loading": "Загрузка…",
+    "no-logs-message": "Не удалось найти журналы, относящиеся к текущей метрике, с выбранными фильтрами.",
+    "no-logs-title": "Связанные журналы не найдены",
+    "open-drilldown": "Открыть Logs Drilldown",
+    "open-drilldown-tooltip": "Перейдите в приложение Logs Drilldown",
+    "open-in-drilldown": "Открыть в Logs Drilldown",
+    "open-in-drilldown-tooltip": "Для просмотра этих журналов используйте приложение Logs Drilldown",
+    "suggestions": "Чтобы найти связанные журналы, попробуйте следующее:<1><0>Настройте фильтры меток, добавив те, которые есть как в текущей метрике, так и в ваших журналах.</0><1>Выберите метрику, созданную с помощью <2>правила записи Loki</2>.</1><2>Расширьте временной диапазон, включив больше данных.</2></1>"
+  },
+  "related-metrics": {
+    "search-aria-label": ""
+  },
+  "select-action": {
+    "button": "Выбрать"
+  },
+  "select-new-metric": {
+    "button": "Выбрать новую метрику",
+    "metrics-drilldown": "Metrics Drilldown",
+    "open-in-drilldown-tooltip": "Откройте Metrics Drilldown"
+  },
+  "show-more-button": {
+    "text_one": "",
+    "text_few": "",
+    "text_many": "",
+    "text_other": ""
+  },
+  "sidebar": {
+    "bookmarks": {
+      "date-created": "Дата создания:",
+      "empty-state": "У вас еще нет закладок для<1></1>текущего источника данных.",
+      "remove-tooltip": "Удалите закладку"
+    },
+    "close-aria-label": "Закрыть",
+    "close-tooltip": "Закрыть",
+    "filter": {
+      "clear-search-tooltip": "Очистить поиск",
+      "hide-empty": "Скрыть пустые",
+      "search-aria-label": "",
+      "search-placeholder": "Поиск…"
+    },
+    "filter-type": {
+      "prefix": "префикс",
+      "recent": "недавние",
+      "rule-group": "группа правил",
+      "suffix": "суффикс"
+    },
+    "labels-browser": {
+      "clear-search-tooltip": "Очистить поиск",
+      "search-aria-label": "",
+      "search-placeholder": "Поиск…"
+    },
+    "recent-metrics": {
+      "all-time": "Все время",
+      "past-interval": "Последние {{interval}}"
+    },
+    "section": {
+      "bookmarks": "Закладки",
+      "bookmarks-description": "Используйте сохраненные метрики для быстрого просмотра информации",
+      "group-by-labels": "Группировать по меткам",
+      "group-by-labels-description": "Группировать метрики по значениям меток",
+      "prefix-filters": "Фильтры префиксов",
+      "prefix-filters-description": "Отфильтруйте метрики по префиксу (пространство имен Prometheus)",
+      "recent-metrics": "Фильтры последних метрик",
+      "recent-metrics-description": "Отфильтруйте метрики по времени начала их получения",
+      "rules-filters": "Фильтры правил",
+      "rules-filters-description": "Отфильтруйте метрики и правила записи",
+      "suffix-filters": "Фильтры суффиксов",
+      "suffix-filters-description": "Отфильтруйте метрики по суффиксу имени"
+    }
+  },
+  "sort-by": {
+    "label": "Сортировать по",
+    "option": {
+      "alphabetical": "Имя [A-Z]",
+      "alphabetical-description": "Алфавитный порядок",
+      "alphabetical-reversed": "Имя [Z-A]",
+      "alphabetical-reversed-description": "Обратный алфавитный порядок",
+      "outliers": "Нестандартные ряды",
+      "outliers-description": "Приоритет отдается значениям, которые отличаются от других значений данной метки"
+    },
+    "placeholder": "Выбрать критерии",
+    "tooltip": "Сортирует значения с использованием стандартных или управляемых вычислений временных рядов."
+  },
+  "trail": {
+    "breadcrumb": {
+      "all-metrics": "Все метрики",
+      "metrics": "Метрики"
+    }
+  },
+  "ui-text": {
+    "metric-select": {
+      "bookmark": "Закладка",
+      "copy-url": "Копировать URL",
+      "open-explore": "Открыть в Explore",
+      "select-new-metric-tooltip": "Удалите существующую метрику и выберите новую"
+    },
+    "search": {
+      "title": "Поиск метрик"
+    }
+  },
+  "usage-data": {
+    "metric-used-in-plural_one": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-plural_few": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-plural_many": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-plural_other": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-singular_one": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-singular_few": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-singular_many": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-in-singular_other": "Где используется метрика: {{count}} {{usageType}}",
+    "metric-used-plural_one": "Метрика используется {{count}} раз в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-plural_few": "Метрика используется {{count}} раза в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-plural_many": "Метрика используется {{count}} раз в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-plural_other": "Метрика используется {{count}} раза в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-singular_one": "Метрика используется {{count}} раз в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-singular_few": "Метрика используется {{count}} раза в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-singular_many": "Метрика используется {{count}} раз в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "metric-used-singular_other": "Метрика используется {{count}} раза в запросах дашборда. Нажмите, чтобы посмотреть дашборды.",
+    "used-time-plural_one": "Используется {{count}} раз ({{label}})",
+    "used-time-plural_few": "Используется {{count}} раза ({{label}})",
+    "used-time-plural_many": "Используется {{count}} раз ({{label}})",
+    "used-time-plural_other": "Используется {{count}} раза ({{label}})",
+    "used-time-singular_one": "Используется {{count}} раз ({{label}})",
+    "used-time-singular_few": "Используется {{count}} раза ({{label}})",
+    "used-time-singular_many": "Используется {{count}} раз ({{label}})",
+    "used-time-singular_other": "Используется {{count}} раза ({{label}})"
+  },
+  "with-config-panel-options": {
+    "click-to-select": "Нажмите, чтобы выбрать эту конфигурацию",
+    "current-config": "Текущая конфигурация"
+  }
+}

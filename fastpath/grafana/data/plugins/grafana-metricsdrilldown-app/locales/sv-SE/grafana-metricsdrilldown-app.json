@@ -1,0 +1,393 @@
+{
+  "action-bar": {
+    "tab": {
+      "breakdown": "Uppdelning",
+      "query-results": "",
+      "query-results-description": "",
+      "related-logs": "Relaterade loggar",
+      "related-logs-description": "Relevanta loggar baserat på aktuella etikettfilter och tidsintervall",
+      "related-metrics": "Relaterade mätvärden",
+      "related-metrics-description": "Relevanta mätvärden baserat på aktuella etikettfilter"
+    }
+  },
+  "breakdown": {
+    "add-to-filters": "Lägg till i filter",
+    "by-label": "Efter etikett",
+    "group-by": {
+      "label": "Gruppera efter"
+    },
+    "label-values-list": {
+      "error-title": "Fel vid laddning av mätvärden!",
+      "no-values": "Inga etikettvärden hittades för de aktuella filtren och tidsintervallet.",
+      "search-aria-label": "",
+      "search-label": "Sök",
+      "view-label": "Visa"
+    },
+    "labels-list": {
+      "breakdown-by-label": "Uppdelning efter {{label}}",
+      "error-title": "Fel vid laddning av etiketter!",
+      "no-labels": "Inga etiketter hittades för de aktuella filtren och tidsintervallet.",
+      "view-label": "Visa"
+    },
+    "section-label": "Uppdelning",
+    "select-label": "Välj"
+  },
+  "checkbox-list": {
+    "clear": "radera",
+    "collapse": "Dölj",
+    "expand": "Expandera",
+    "no-results": "Inga resultat.",
+    "selected-count_one": "{{count}} vald",
+    "selected-count_other": "{{count}} valda"
+  },
+  "configure-panel": {
+    "apply": "Tillämpa",
+    "cancel": "Avbryt",
+    "restore-default": "Återställ standardkonfigurationen",
+    "restore-modal-body": "Är du säker på att du vill återställa standardkonfigurationen för mätvärdet {{metric}}?",
+    "restore-modal-confirm": "Återställ",
+    "restore-modal-title": "Återställ standardkonfigurationen",
+    "select-function-message": "Välj en Prometheus-funktion som kommer att användas som standard för att visa mätvärdet {{metricName}}."
+  },
+  "data-source-variable": {
+    "description": "Endast Prometheus-datakällor stöds",
+    "label": "Datakälla"
+  },
+  "data-trail": {
+    "configure-drawer": {
+      "title": "Konfigurera Prometheus-funktionen"
+    },
+    "filters": {
+      "add-label": "Lägg till etikett",
+      "label": "Filter"
+    }
+  },
+  "error-view": {
+    "message": "<2>Prova att ladda om sidan</2> eller kontakta din organisationsadministratör om problemet kvarstår. Vi ber om ursäkt för besväret.",
+    "stack-trace-label": "Visa stackspårning",
+    "title": "Allvarligt fel!"
+  },
+  "extreme-value-filter": {
+    "message": "Paneldata hämtades på nytt med en mer komplex fråga för att hantera extremt små värden i serien"
+  },
+  "fetch-alerting-metrics": {
+    "error": "Det gick inte att hämta varningsregler"
+  },
+  "fetch-dashboard-metrics": {
+    "error": "Det gick inte att hämta instrumentpanelmätvärden",
+    "limit-warning-body": "",
+    "limit-warning-title": ""
+  },
+  "filtered-metrics-variable": {
+    "label": "Filtrerade mätvärden"
+  },
+  "give-feedback": {
+    "button": "Ge feedback",
+    "tooltip": "Berätta vad du tycker om Metrics i Grafana."
+  },
+  "gmd-viz-panel": {
+    "native-histogram": "Inbyggt histogram",
+    "variant": {
+      "heatmap": "värmekarta",
+      "percentiles": "percentiler"
+    }
+  },
+  "inline-banner": {
+    "unknown-error": "Okänt fel!"
+  },
+  "kg-annotations": {
+    "layer": {
+      "name": ""
+    },
+    "query": {
+      "name": ""
+    },
+    "severity": {
+      "critical": "",
+      "info": "",
+      "warning": ""
+    },
+    "toggle": {
+      "description": "",
+      "disabled-tooltip": "",
+      "label": "",
+      "learn-more": ""
+    }
+  },
+  "labels-datasource": {
+    "none-option": "(inget)",
+    "test-success": "OK"
+  },
+  "labels-list": {
+    "clear": "radera",
+    "no-results": "Inga resultat.",
+    "no-selection": "Inget val",
+    "selected": "Valt: ”{{selectedLabel}}”"
+  },
+  "labels-variable": {
+    "label": "Gruppera efter etikett",
+    "placeholder": "Gruppera efter etikett ..."
+  },
+  "layout-switcher": {
+    "aria-label": "Layoutväxlare",
+    "option": {
+      "grid": "Rutnät",
+      "rows": "Rader",
+      "single": "Singel"
+    }
+  },
+  "lazy-loading": {
+    "fallback": "Laddar …"
+  },
+  "list-controls": {
+    "search-aria-label": ""
+  },
+  "metrics": {
+    "metrics-drilldown": {
+      "load-query": {
+        "button-no-query-tooltip": "",
+        "button-tooltip": "",
+        "empty": "",
+        "load-error": "",
+        "load-type-error": "",
+        "modal-title": "",
+        "remove": "",
+        "saved-query-button-tooltip": "",
+        "select": ""
+      },
+      "save-query": {
+        "already-exists": {
+          "alert": ""
+        },
+        "button-tooltip": "",
+        "button-tooltip-saved-queries": "",
+        "cancel": "",
+        "description": "",
+        "error": "",
+        "modal-alert": "",
+        "modal-title": "",
+        "save": "",
+        "success": "",
+        "title": ""
+      }
+    }
+  },
+  "metrics-group-by-list": {
+    "error-title": "Fel vid laddning av etikett värden för ”{{labelName}}”!",
+    "no-values": "Inga etikettvärden hittades för etiketten ”{{labelName}}”."
+  },
+  "metrics-group-by-row": {
+    "error-title": "Fel vid laddning av mätvärden!",
+    "no-metrics": "Inga mätvärden hittades för de aktuella filtren och tidsintervallet.",
+    "select": "Välj",
+    "select-tooltip": "Se mätvärden med {{labelName}}={{labelValue}}",
+    "show-more-tooltip": "Visa fler mätvärden för {{labelName}}=”{{labelValue}}”"
+  },
+  "metrics-list": {
+    "error-title": "Fel vid laddning av mätvärden!",
+    "no-metrics": "Inga mätvärden hittades för de aktuella filtren och tidsintervallet."
+  },
+  "metrics-sorter": {
+    "error": {
+      "get-recent-metrics": "Det gick inte att hämta senaste mätvärden:"
+    },
+    "label": "Sortera efter",
+    "option": {
+      "alerting-usage": "Larmstatistik",
+      "alphabetical": "Alfabetiskt [A–Ö]",
+      "alphabetical-reversed": "Alfabetiskt [Ö–A]",
+      "dashboard-usage": "Användning av instrumentpanel",
+      "default": "Standard"
+    }
+  },
+  "metrics-variable": {
+    "label": "Mätvärden"
+  },
+  "onboarding": {
+    "learn-more": "Se <2>vår dokumentation</2> för att lära dig mer eller <5></5><6>prova det online</6> i Grafana Play!",
+    "no-datasource": "Vi märkte att det inte finns någon Prometheus-datakälla konfigurerad.<1></1>Lägg till en <4>Prometheus-datakälla</4> för att visa mätvärden.",
+    "title": "Välkommen till detaljanalys av Metrics i Grafana"
+  },
+  "open-assistant": {
+    "explain-label": "Förklara i Assistant",
+    "metric-metadata-title": "Prometheus metadata för mätvärden"
+  },
+  "panel-menu": {
+    "action": {
+      "copy-url": "Kopiera webbadress",
+      "copy-url-success": "URL kopierad till urklippet",
+      "explore": "Utforska"
+    },
+    "group": {
+      "actions": "Åtgärder",
+      "navigation": "Navigering"
+    }
+  },
+  "plugin-info": {
+    "button": {
+      "title": "Information om tillägg",
+      "tooltip": "Information om tillägg"
+    },
+    "header": {
+      "last-update": "Senaste uppdatering: {{updated}}",
+      "title": "Detaljanalys av Metrics i Grafana v{{version}}"
+    },
+    "menu": {
+      "changelog": "Ändringslogg",
+      "commit-sha": "Commit-SHA: {{sha}}",
+      "contribute": "Bidra",
+      "documentation": "Dokumentation",
+      "grafana-version": "Grafana {{edition}} v{{version}} ({{env}})",
+      "prom-build-info": "{{application}} {{version}} {{buildDate}}",
+      "report-issue": "Rapportera ett problem"
+    }
+  },
+  "prefix-filter": {
+    "all-metrics": "Alla mätvärdesnamn",
+    "tooltip": "Visa efter mätvärdesprefix. Ett mätvärdesprefix är ett enda ord i början av mätvärdesnamnet, relevant för den domän som mätvärdet tillhör.",
+    "view-by-label": "Visa efter"
+  },
+  "query-results": {
+    "aria-label": "",
+    "error-title": "",
+    "unavailable-message": "",
+    "unavailable-title": ""
+  },
+  "quick-search": {
+    "ask-assistant-aria-label": "Fråga Grafana-assistenten",
+    "ask-assistant-tooltip": "Fråga Grafana-assistenten",
+    "clear-search-tooltip": "Rensa sökningen",
+    "placeholder": "",
+    "placeholder-question-mode": "Ställ en fråga till Grafana-assistenten och tryck på enter",
+    "placeholder-with-assistant": "",
+    "placeholder-with-assistant-tab-enter": "",
+    "count-filtered_one": "",
+    "count-filtered_other": "",
+    "count-total_one": "",
+    "count-total_other": ""
+  },
+  "quick-search-assistant": {
+    "label-filters-title": "Nuvarande etikettfilter",
+    "time-range-title": "Tidsintervall"
+  },
+  "related-logs": {
+    "datasource-description": "Vissa Loki-datakällor kan saknas i rullgardinsmenyn om de inte svarade inom {{timeout}} sekunder. Om du vill visa loggar för alla Loki-datakällor kan du prova att använda Logs Drilldown för detaljanalys för loggar.",
+    "datasource-label": "Loggar datakälla",
+    "experimental-note": "Obs! Relaterade loggar är en experimentell funktion.",
+    "loading": "Laddar …",
+    "no-logs-message": "Vi kunde inte hitta några loggar relaterade till det aktuella mätvärdet med dina valda filter.",
+    "no-logs-title": "Inga relaterade loggar hittades",
+    "open-drilldown": "Öppna Logs Drilldown",
+    "open-drilldown-tooltip": "Navigera till appen Logs Drilldown",
+    "open-in-drilldown": "Öppna i Logs Drilldown",
+    "open-in-drilldown-tooltip": "Använd appen Logs Drilldown för att utforska dessa loggar",
+    "suggestions": "Hitta relaterade loggar genom att prova följande:<1><0>Justera etikettfiltren för att inkludera etiketter som finns i både den aktuella statistiken och dina loggar</0><1>Välj en statistik skapad av en <2>Loki-inspelningsregel</2></1><2>Bredda tidsintervallet för att inkludera mer data</2></1>"
+  },
+  "related-metrics": {
+    "search-aria-label": ""
+  },
+  "select-action": {
+    "button": "Välj"
+  },
+  "select-new-metric": {
+    "button": "Välj nytt mätvärde",
+    "metrics-drilldown": "Metrics Drilldown",
+    "open-in-drilldown-tooltip": "Öppna i Metrics Drilldown"
+  },
+  "show-more-button": {
+    "text_one": "",
+    "text_other": ""
+  },
+  "sidebar": {
+    "bookmarks": {
+      "date-created": "Datum skapat:",
+      "empty-state": "Inga bokmärken ännu för den<1></1>aktuella datakällan.",
+      "remove-tooltip": "Ta bort bokmärke"
+    },
+    "close-aria-label": "Stäng",
+    "close-tooltip": "Stäng",
+    "filter": {
+      "clear-search-tooltip": "Rensa sökningen",
+      "hide-empty": "Dölj tomma",
+      "search-aria-label": "",
+      "search-placeholder": "Sök …"
+    },
+    "filter-type": {
+      "prefix": "prefix",
+      "recent": "senaste",
+      "rule-group": "regelgrupp",
+      "suffix": "suffix"
+    },
+    "labels-browser": {
+      "clear-search-tooltip": "Rensa sökningen",
+      "search-aria-label": "",
+      "search-placeholder": "Sök …"
+    },
+    "recent-metrics": {
+      "all-time": "Hela tiden",
+      "past-interval": "Tidigare {{interval}}"
+    },
+    "section": {
+      "bookmarks": "Bokmärken",
+      "bookmarks-description": "Få åtkomst till dina sparade mätvärden för snabb referens",
+      "group-by-labels": "Gruppera efter etiketter",
+      "group-by-labels-description": "Gruppera mätvärden efter deras etikettvärden",
+      "prefix-filters": "Prefixfilter",
+      "prefix-filters-description": "Filtrera mätvärden baserat på deras namnprefix (Prometheus-namnrymd)",
+      "recent-metrics": "Senaste mätvärdesfilter",
+      "recent-metrics-description": "Filtrera mätvärden baserat på när insamlingen påbörjades",
+      "rules-filters": "Regelfilter",
+      "rules-filters-description": "Filtrera mätvärden och registreringsregler",
+      "suffix-filters": "Suffixfilter",
+      "suffix-filters-description": "Filtrera mätvärden baserat på deras namnsuffix"
+    }
+  },
+  "sort-by": {
+    "label": "Sortera efter",
+    "option": {
+      "alphabetical": "Namn [A–Ö]",
+      "alphabetical-description": "Alfabetisk ordning",
+      "alphabetical-reversed": "Namn [Ö–A]",
+      "alphabetical-reversed-description": "Omvänd alfabetisk ordning",
+      "outliers": "Avvikande serier",
+      "outliers-description": "Prioriterar värden som avviker tydligt från andra med samma etikett"
+    },
+    "placeholder": "Välj kriterier",
+    "tooltip": "Sorterar värden genom standardberäkningar eller smarta beräkningar för tidsserier."
+  },
+  "trail": {
+    "breadcrumb": {
+      "all-metrics": "Alla mätvärden",
+      "metrics": "Mätvärden"
+    }
+  },
+  "ui-text": {
+    "metric-select": {
+      "bookmark": "Bokmärke",
+      "copy-url": "Kopiera webbadress",
+      "open-explore": "Öppna i utforska",
+      "select-new-metric-tooltip": "Ta bort befintligt mätvärde och välj ett nytt"
+    },
+    "search": {
+      "title": "Sök mätvärden"
+    }
+  },
+  "usage-data": {
+    "metric-used-in-plural_one": "Mätvärdet används i {{count}} {{usageType}}",
+    "metric-used-in-plural_other": "Mätvärdet används i {{count}} {{usageType}}",
+    "metric-used-in-singular_one": "Mätvärdet används i {{count}} {{usageType}}",
+    "metric-used-in-singular_other": "Mätvärdet används i {{count}} {{usageType}}",
+    "metric-used-plural_one": "Mätvärdet används {{count}} gång i frågor i instrumentpanelen. Klicka för att visa instrumentpanelerna.",
+    "metric-used-plural_other": "Mätvärdet används {{count}} gånger i frågor i instrumentpanelen. Klicka för att visa instrumentpanelerna.",
+    "metric-used-singular_one": "Mätvärdet användes {{count}} gång i frågor i instrumentpanelen. Klicka för att visa instrumentpanelerna.",
+    "metric-used-singular_other": "Mätvärdet användes {{count}} gånger i frågor i instrumentpanelen. Klicka för att visa instrumentpanelerna.",
+    "used-time-plural_one": "Används {{count}} gång i {{label}}",
+    "used-time-plural_other": "Används {{count}} gånger i {{label}}",
+    "used-time-singular_one": "Används {{count}} gång i {{label}}",
+    "used-time-singular_other": "Används {{count}} gånger i {{label}}"
+  },
+  "with-config-panel-options": {
+    "click-to-select": "Klicka för att välja denna konfiguration",
+    "current-config": "Nuvarande konfiguration"
+  }
+}

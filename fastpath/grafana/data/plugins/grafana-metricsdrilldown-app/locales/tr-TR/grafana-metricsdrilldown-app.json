@@ -1,0 +1,393 @@
+{
+  "action-bar": {
+    "tab": {
+      "breakdown": "Kırılım",
+      "query-results": "",
+      "query-results-description": "",
+      "related-logs": "İlgili günlük kayıtları",
+      "related-logs-description": "Geçerli etiket filtrelerine ve zaman aralığına göre ilgili günlük kayıtları",
+      "related-metrics": "İlgili metrikler",
+      "related-metrics-description": "Geçerli etiket filtrelerine göre ilgili metrikler"
+    }
+  },
+  "breakdown": {
+    "add-to-filters": "Filtrelere ekle",
+    "by-label": "Etikete göre",
+    "group-by": {
+      "label": "Gruplandırma ölçütü"
+    },
+    "label-values-list": {
+      "error-title": "Metrikler yüklenirken hata oluştu.",
+      "no-values": "Geçerli filtreler ve zaman aralığı için etiket değeri bulunamadı.",
+      "search-aria-label": "",
+      "search-label": "Ara",
+      "view-label": "Göster"
+    },
+    "labels-list": {
+      "breakdown-by-label": "Kırılım ölçütü: {{label}}",
+      "error-title": "Etiketler yüklenirken hata oluştu.",
+      "no-labels": "Geçerli filtreler ve zaman aralığı için etiket bulunamadı.",
+      "view-label": "Göster"
+    },
+    "section-label": "Kırılım",
+    "select-label": "Seçin"
+  },
+  "checkbox-list": {
+    "clear": "temizle",
+    "collapse": "Daralt",
+    "expand": "Genişlet",
+    "no-results": "Sonuç yok.",
+    "selected-count_one": "{{count}} seçildi",
+    "selected-count_other": "{{count}} seçildi"
+  },
+  "configure-panel": {
+    "apply": "Uygula",
+    "cancel": "İptal et",
+    "restore-default": "Varsayılan yapılandırmayı geri yükle",
+    "restore-modal-body": "{{metric}} metriği için varsayılan yapılandırmayı geri yüklemek istediğinizden emin misiniz?",
+    "restore-modal-confirm": "Geri yükle",
+    "restore-modal-title": "Varsayılan yapılandırmayı geri yükle",
+    "select-function-message": "{{metricName}} metriğini görüntülemek için varsayılan olarak kullanılacak bir Prometheus işlevi seçin."
+  },
+  "data-source-variable": {
+    "description": "Yalnızca Prometheus veri kaynakları desteklenir",
+    "label": "Veri kaynağı"
+  },
+  "data-trail": {
+    "configure-drawer": {
+      "title": "Prometheus işlevini yapılandırın"
+    },
+    "filters": {
+      "add-label": "Etiket ekle",
+      "label": "Filtreler"
+    }
+  },
+  "error-view": {
+    "message": "Lütfen <2>sayfayı yeniden yüklemeyi deneyin</2> veya sorun devam ederse kuruluş yöneticinizle iletişime geçin. Verdiğimiz rahatsızlıktan dolayı özür dileriz.",
+    "stack-trace-label": "Yığın izlemesini göster",
+    "title": "Önemli hata!"
+  },
+  "extreme-value-filter": {
+    "message": "Panel verileri, serideki son derece küçük değerleri işlemek için daha karmaşık bir sorgu ile yeniden alındı"
+  },
+  "fetch-alerting-metrics": {
+    "error": "Uyarı sistemi kuralları alınamadı"
+  },
+  "fetch-dashboard-metrics": {
+    "error": "Pano metrikleri alınamadı",
+    "limit-warning-body": "",
+    "limit-warning-title": ""
+  },
+  "filtered-metrics-variable": {
+    "label": "Filtrelenmiş Metrikler"
+  },
+  "give-feedback": {
+    "button": "Geri bildirim gönder",
+    "tooltip": "Grafana'daki Metrikler hakkındaki düşüncelerinizi paylaşın."
+  },
+  "gmd-viz-panel": {
+    "native-histogram": "Yerel Histogram",
+    "variant": {
+      "heatmap": "ısı haritası",
+      "percentiles": "yüzdelikler"
+    }
+  },
+  "inline-banner": {
+    "unknown-error": "Bilinmeyen hata!"
+  },
+  "kg-annotations": {
+    "layer": {
+      "name": ""
+    },
+    "query": {
+      "name": ""
+    },
+    "severity": {
+      "critical": "",
+      "info": "",
+      "warning": ""
+    },
+    "toggle": {
+      "description": "",
+      "disabled-tooltip": "",
+      "label": "",
+      "learn-more": ""
+    }
+  },
+  "labels-datasource": {
+    "none-option": "(yok)",
+    "test-success": "Tamam"
+  },
+  "labels-list": {
+    "clear": "temizle",
+    "no-results": "Sonuç yok.",
+    "no-selection": "Seçim yok",
+    "selected": "Seçildi: \"{{selectedLabel}}\""
+  },
+  "labels-variable": {
+    "label": "Etikete göre grupla",
+    "placeholder": "Etikete göre grupla..."
+  },
+  "layout-switcher": {
+    "aria-label": "Düzen değiştirici",
+    "option": {
+      "grid": "Izgara",
+      "rows": "Satırlar",
+      "single": "Tek"
+    }
+  },
+  "lazy-loading": {
+    "fallback": "Yükleniyor..."
+  },
+  "list-controls": {
+    "search-aria-label": ""
+  },
+  "metrics": {
+    "metrics-drilldown": {
+      "load-query": {
+        "button-no-query-tooltip": "",
+        "button-tooltip": "",
+        "empty": "",
+        "load-error": "",
+        "load-type-error": "",
+        "modal-title": "",
+        "remove": "",
+        "saved-query-button-tooltip": "",
+        "select": ""
+      },
+      "save-query": {
+        "already-exists": {
+          "alert": ""
+        },
+        "button-tooltip": "",
+        "button-tooltip-saved-queries": "",
+        "cancel": "",
+        "description": "",
+        "error": "",
+        "modal-alert": "",
+        "modal-title": "",
+        "save": "",
+        "success": "",
+        "title": ""
+      }
+    }
+  },
+  "metrics-group-by-list": {
+    "error-title": "\"{{labelName}}\" etiketinin değerleri yüklenirken hata oluştu.",
+    "no-values": "\"{{labelName}}\" etiketi için etiket değeri bulunamadı."
+  },
+  "metrics-group-by-row": {
+    "error-title": "Metrikler yüklenirken hata oluştu.",
+    "no-metrics": "Geçerli filtreler ve zaman aralığı için metrik bulunamadı.",
+    "select": "Seçin",
+    "select-tooltip": "{{labelName}}={{labelValue}} olan metrikleri göster",
+    "show-more-tooltip": "{{labelName}}=\"{{labelValue}}\" için daha fazla metrik göster"
+  },
+  "metrics-list": {
+    "error-title": "Metrikler yüklenirken hata oluştu.",
+    "no-metrics": "Geçerli filtreler ve zaman aralığı için metrik bulunamadı."
+  },
+  "metrics-sorter": {
+    "error": {
+      "get-recent-metrics": "Son metrikler alınamadı:"
+    },
+    "label": "Sıralama ölçütü",
+    "option": {
+      "alerting-usage": "Uyarı Sistemi Kullanımı",
+      "alphabetical": "Alfabetik [A-Z]",
+      "alphabetical-reversed": "Alfabetik [Z-A]",
+      "dashboard-usage": "Pano Kullanımı",
+      "default": "Varsayılan"
+    }
+  },
+  "metrics-variable": {
+    "label": "Metrikler"
+  },
+  "onboarding": {
+    "learn-more": "Daha fazla bilgi edinmek için <2>belgelerimize</2> göz atın veya Grafana Play'de<5></5><6>çevrim içi olarak deneyin</6>!",
+    "no-datasource": "Yapılandırılmış bir Prometheus veri kaynağı olmadığını fark ettik.<1></1>Metrikleri görüntülemek için bir <4>Prometheus veri kaynağı</4> ekleyin.",
+    "title": "Grafana Metrics Drilldown'a hoş geldiniz"
+  },
+  "open-assistant": {
+    "explain-label": "Asistan'da açıklayın",
+    "metric-metadata-title": "Prometheus metrik meta verileri"
+  },
+  "panel-menu": {
+    "action": {
+      "copy-url": "URL'yi kopyala",
+      "copy-url-success": "URL panoya kopyalandı",
+      "explore": "Keşfet"
+    },
+    "group": {
+      "actions": "İşlemler",
+      "navigation": "Gezinme"
+    }
+  },
+  "plugin-info": {
+    "button": {
+      "title": "Eklenti bilgileri",
+      "tooltip": "Eklenti bilgileri"
+    },
+    "header": {
+      "last-update": "Son güncelleme: {{updated}}",
+      "title": "Grafana Metrics Drilldown {{version}} sürümü"
+    },
+    "menu": {
+      "changelog": "Değişiklik günlüğü",
+      "commit-sha": "SHA'yı işle: {{sha}}",
+      "contribute": "Katkıda bulunun",
+      "documentation": "Belgeler",
+      "grafana-version": "Grafana {{edition}} {{version}} sürümü ({{env}})",
+      "prom-build-info": "{{application}} {{version}} {{buildDate}}",
+      "report-issue": "Sorun bildir"
+    }
+  },
+  "prefix-filter": {
+    "all-metrics": "Tüm metrik adları",
+    "tooltip": "Metrik ön ekine göre görüntüleyin. Metrik ön eki, metrik adının başında yer alan ve ait olduğu alana göre anlam kazanan tek bir kelimedir.",
+    "view-by-label": "Görüntüleme ölçütü"
+  },
+  "query-results": {
+    "aria-label": "",
+    "error-title": "",
+    "unavailable-message": "",
+    "unavailable-title": ""
+  },
+  "quick-search": {
+    "ask-assistant-aria-label": "Grafana Asistanına sorun",
+    "ask-assistant-tooltip": "Grafana Asistanına sorun",
+    "clear-search-tooltip": "Aramayı temizle",
+    "placeholder": "",
+    "placeholder-question-mode": "Grafana Asistanına bir soru sorun ve Enter tuşuna basın",
+    "placeholder-with-assistant": "",
+    "placeholder-with-assistant-tab-enter": "",
+    "count-filtered_one": "",
+    "count-filtered_other": "",
+    "count-total_one": "",
+    "count-total_other": ""
+  },
+  "quick-search-assistant": {
+    "label-filters-title": "Geçerli etiket filtreleri",
+    "time-range-title": "Zaman aralığı"
+  },
+  "related-logs": {
+    "datasource-description": "Yanıt vermesi {{timeout}} saniyeden uzun sürdüyse bazı Loki veri kaynakları açılır listede görünmeyebilir. Tüm Loki veri kaynaklarının günlük kayıtlarını görüntülemek için Logs Drilldown'u kullanmayı deneyin.",
+    "datasource-label": "Günlük kayıtları veri kaynağı",
+    "experimental-note": "Not: İlgili günlük kayıtları deneysel bir özelliktir.",
+    "loading": "Yükleniyor...",
+    "no-logs-message": "Seçtiğiniz filtrelerle mevcut metriğe ilişkin herhangi bir günlük kaydı bulamadık.",
+    "no-logs-title": "İlgili günlük kayıtları bulunamadı",
+    "open-drilldown": "Logs Drilldown'u aç",
+    "open-drilldown-tooltip": "Logs Drilldown uygulamasına gidin",
+    "open-in-drilldown": "Logs Drilldown'da aç",
+    "open-in-drilldown-tooltip": "Bu günlük kayıtlarını incelemek için Logs Drilldown uygulamasını kullanın",
+    "suggestions": "İlgili günlük kayıtlarını bulmak için aşağıdakileri deneyin: <1><0>Etiket filtrelerinizi, hem mevcut metriktе hem de günlük kayıtlarınızda bulunan etiketleri içerecek şekilde ayarlayın.</0><1><2>Loki Kayıt Kuralı</2></1> ile oluşturulmuş bir metrik seçin.<2>Zaman aralığını genişleterek daha fazla veriyi dâhil edin.</2></1>"
+  },
+  "related-metrics": {
+    "search-aria-label": ""
+  },
+  "select-action": {
+    "button": "Seçin"
+  },
+  "select-new-metric": {
+    "button": "Yeni metrik seçin",
+    "metrics-drilldown": "Metrics Drilldown",
+    "open-in-drilldown-tooltip": "Metrics Drilldown'da aç"
+  },
+  "show-more-button": {
+    "text_one": "",
+    "text_other": ""
+  },
+  "sidebar": {
+    "bookmarks": {
+      "date-created": "Oluşturulma tarihi:",
+      "empty-state": "<1></1>Geçerli veri kaynağı için henüz yer imi yok.",
+      "remove-tooltip": "Yer imini kaldır"
+    },
+    "close-aria-label": "Kapat",
+    "close-tooltip": "Kapat",
+    "filter": {
+      "clear-search-tooltip": "Aramayı temizle",
+      "hide-empty": "Boş olanları gizle",
+      "search-aria-label": "",
+      "search-placeholder": "Ara..."
+    },
+    "filter-type": {
+      "prefix": "ön ek",
+      "recent": "son",
+      "rule-group": "kural grubu",
+      "suffix": "son ek"
+    },
+    "labels-browser": {
+      "clear-search-tooltip": "Aramayı temizle",
+      "search-aria-label": "",
+      "search-placeholder": "Ara..."
+    },
+    "recent-metrics": {
+      "all-time": "Tüm zamanlar",
+      "past-interval": "Geçen {{interval}}"
+    },
+    "section": {
+      "bookmarks": "Yer imleri",
+      "bookmarks-description": "Hızlı erişim için kaydedilen metriklere erişin",
+      "group-by-labels": "Etiketlere göre grupla",
+      "group-by-labels-description": "Metrikleri etiket değerlerine göre gruplandırın",
+      "prefix-filters": "Ön ek filtreleri",
+      "prefix-filters-description": "Metrikleri ad ön eklerine göre filtreleyin (Prometheus ad alanı)",
+      "recent-metrics": "Son metrik filtreleri",
+      "recent-metrics-description": "Metrikleri, alınmaya başladıkları zamana göre filtreleyin",
+      "rules-filters": "Kural filtreleri",
+      "rules-filters-description": "Metrikleri ve kayıt kurallarını filtreleyin",
+      "suffix-filters": "Son ek filtreleri",
+      "suffix-filters-description": "Metrikleri ad son eklerine göre filtreleyin"
+    }
+  },
+  "sort-by": {
+    "label": "Sıralama ölçütü",
+    "option": {
+      "alphabetical": "Ad [A-Z]",
+      "alphabetical-description": "Alfabetik sıralama",
+      "alphabetical-reversed": "Ad [Z-A]",
+      "alphabetical-reversed-description": "Ters alfabetik sıralama",
+      "outliers": "Aykırı seriler",
+      "outliers-description": "Aynı etiket içindeki diğerlerinden belirgin şekilde farklı davranış gösteren değerlere öncelik verir"
+    },
+    "placeholder": "Ölçüt seçin",
+    "tooltip": "Standart veya akıllı zaman serisi hesaplamalarını kullanarak değerleri sıralar."
+  },
+  "trail": {
+    "breadcrumb": {
+      "all-metrics": "Tüm metrikler",
+      "metrics": "Metrikler"
+    }
+  },
+  "ui-text": {
+    "metric-select": {
+      "bookmark": "Yer imi",
+      "copy-url": "URL'yi kopyala",
+      "open-explore": "Keşfet'te aç",
+      "select-new-metric-tooltip": "Mevcut metriği kaldırın ve yeni bir metrik seçin"
+    },
+    "search": {
+      "title": "Metrik ara"
+    }
+  },
+  "usage-data": {
+    "metric-used-in-plural_one": "Metrik, {{count}} {{usageType}} içinde kullanılıyor",
+    "metric-used-in-plural_other": "Metrik, {{count}} {{usageType}} içinde kullanılıyor",
+    "metric-used-in-singular_one": "Metrik, {{count}} {{usageType}} içinde kullanılıyor",
+    "metric-used-in-singular_other": "Metrik, {{count}} {{usageType}} içinde kullanılıyor",
+    "metric-used-plural_one": "Metrik, pano sorgularında {{count}} kez kullanıldı. Panoları görüntülemek için tıklayın.",
+    "metric-used-plural_other": "Metrik, pano sorgularında {{count}} kez kullanıldı. Panoları görüntülemek için tıklayın.",
+    "metric-used-singular_one": "Metrik, pano sorgularında {{count}} kez kullanıldı. Panoları görüntülemek için tıklayın.",
+    "metric-used-singular_other": "Metrik, pano sorgularında {{count}} kez kullanıldı. Panoları görüntülemek için tıklayın.",
+    "used-time-plural_one": "{{label}} içinde {{count}} kez kullanıldı",
+    "used-time-plural_other": "{{label}} içinde {{count}} kez kullanıldı",
+    "used-time-singular_one": "{{label}} içinde {{count}} kez kullanıldı",
+    "used-time-singular_other": "{{label}} içinde {{count}} kez kullanıldı"
+  },
+  "with-config-panel-options": {
+    "click-to-select": "Bu yapılandırmayı seçmek için tıklayın",
+    "current-config": "Geçerli yapılandırma"
+  }
+}
