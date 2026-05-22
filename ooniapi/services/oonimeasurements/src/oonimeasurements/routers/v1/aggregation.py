@@ -22,6 +22,7 @@ from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
 
 from ...common.routers import BaseModel
 from ...utils.api import normalize_datetime
+from ...utils.sql import group_by_date, where_by_date
 
 router = APIRouter()
 
@@ -31,73 +32,6 @@ log = logging.getLogger()
 def set_dload(resp, fname: str):
     """Add header to make response downloadable"""
     resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
-
-
-gmap = dict(
-    hour="toStartOfHour",
-    day="toDate",
-    week="toStartOfWeek",
-    month="toStartOfMonth",
-)
-
-
-def _resolve_time_grain(since, until, time_grain):
-    if since and until:
-        delta = until - since
-    else:
-        delta = None
-
-    ranges = (
-        (7, ("hour", "day", "auto")),
-        (30, ("day", "week", "auto")),
-        (365, ("day", "week", "month", "auto")),
-        (9999999, ("day", "week", "month", "year", "auto")),
-    )
-    if delta is None or delta <= timedelta():
-        raise Exception("Invalid since and until values")
-
-    for thresh, allowed in ranges:
-        if delta > timedelta(days=thresh):
-            continue
-        if time_grain not in allowed:
-            a = ", ".join(allowed)
-            raise Exception(f"Choose time_grain between {a} for the given time range")
-        if time_grain == "auto":
-            time_grain = allowed[0]
-        return time_grain
-
-    raise Exception("Unable to resolve time_grain")
-
-
-def group_by_date(since, until, time_grain, cols, colnames, group_by):
-    time_grain = _resolve_time_grain(since, until, time_grain)
-    fun = gmap[time_grain]
-    tcol = "measurement_start_day"
-    cols.append(sql_text(f"{fun}(measurement_start_time) AS {tcol}"))
-    colnames.append(tcol)
-    group_by.append(column(tcol))
-    return time_grain
-
-
-_param_cast = {
-    "hour": "toDateTime",
-    "day": "toDate",
-    "week": "toDateTime",
-    "month": "toDateTime",
-}
-
-
-def where_by_date(since, until, time_grain, cols, colnames, where_by):
-    time_grain = _resolve_time_grain(since, until, time_grain)
-    fun = gmap[time_grain]
-    cast = _param_cast[time_grain]
-
-    if since:
-        where_by.append(sql_text(f"{fun}(measurement_start_time) >= {fun}({cast}(:since))"))
-    if until:
-        where_by.append(sql_text(f"{fun}(measurement_start_time) < {fun}({cast}(:until))"))
-
-    return time_grain
 
 
 def validate_axis_name(axis):
@@ -374,7 +308,7 @@ async def get_measurements(
         query_params["ooni_run_link_id_s"] = ooni_run_link_id_s
 
     try:
-        time_grain = where_by_date(since, until, time_grain, cols, colnames, where)
+        time_grain = where_by_date(since, until, time_grain, where)
     except Exception as e:
         return jerror(str(e), v=0)
 
