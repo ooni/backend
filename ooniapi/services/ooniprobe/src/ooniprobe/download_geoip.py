@@ -12,6 +12,7 @@ import logging
 import maxminddb
 from pathlib import Path
 from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
@@ -63,11 +64,32 @@ def is_latest_available(url: str) -> bool:
         resp = get_request(url)
         return resp.status == 200
     except HTTPError as err:
-        if err.status == 404:  # type: ignore
+        if err.code == 404:
             log.info(f"{url} hasn't been updated yet")
             return False
         log.info(f"unexpected status code '{err.code}' in {url}")
         return False
+
+
+def geoip_release_url(release_date: datetime) -> tuple[str, str, str]:
+    ts = release_date.strftime("%Y-%m-01")
+    ver = release_date.strftime("%Y%m01")
+    url = (
+        "https://github.com/ooni/historical-geoip/releases/download/"
+        f"{ver}/{ver}-ip2country_as.mmdb.gz"
+    )
+    return ts, ver, url
+
+
+def has_valid_geoip_db(db_dir: Path) -> bool:
+    db_path = db_dir / "asn_cc.mmdb"
+    if not db_path.exists():
+        return False
+    try:
+        check_geoip_db(db_path)
+    except Exception:
+        return False
+    return True
 
 
 def check_geoip_db(path: Path) -> None:
@@ -119,24 +141,35 @@ def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> None:
     with (db_dir / "geoipdbts").open("w") as out_file:
         out_file.write(ts)
 
-    log.info("Updated GeoIP databases")
+    log.info("Updated GeoIP databases to time: " + ts)
     Metrics.GEOIP_UPDATED.inc()
 
 
-def try_update(db_dir: str):
+def try_update(db_dir: str, max_months_back: int = 1):
     db_dir_path = Path(db_dir)
+    now = datetime.now(timezone.utc)
+    current_ts, _, current_url = geoip_release_url(now)
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-01")
-    ver = datetime.now(timezone.utc).strftime("%Y%m01")
-
-    asn_cc_url = f"https://github.com/ooni/historical-geoip/releases/download/{ver}/{ver}-ip2country_as.mmdb.gz"
-
-    if is_already_updated(db_dir_path, ts):
+    if is_already_updated(db_dir_path, current_ts):
         log.debug("Database already updated. Exiting.")
         return
 
-    if not is_latest_available(asn_cc_url):
-        log.debug("Update not available yet. Exiting.")
+    if is_latest_available(current_url):
+        update_geoip(db_dir_path, current_ts, current_url)
         return
 
-    update_geoip(db_dir_path, ts, asn_cc_url)
+    if has_valid_geoip_db(db_dir_path):
+        log.debug(
+            "Current month GeoIP database not available yet; keeping existing database."
+        )
+        return
+
+    for months_back in range(1, max_months_back + 1):
+        release_date = now - relativedelta(months=months_back)
+        ts, _, url = geoip_release_url(release_date)
+        if not is_latest_available(url):
+            continue
+        update_geoip(db_dir_path, ts, url)
+        return
+
+    log.debug("No GeoIP update available. Exiting.")
