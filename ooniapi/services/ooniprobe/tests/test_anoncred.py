@@ -83,9 +83,7 @@ async def test_submission_basic(client):
     # Create user
     user, manifest_version, emission_day = setup_user(client)
 
-    submit_request = make_submit_request(user, "IE", "AS34245")
-
-    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+    msm = make_verified_measurement(user, manifest_version)
 
     c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "verified", c
@@ -105,8 +103,7 @@ async def test_fastpath_fallback(client_with_one_good_mocked_fastpath):
 
     # build a verifiable submission
     user, manifest_version, _ = setup_user(client)
-    submit_request = make_submit_request(user, "IE", "AS34245")
-    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+    msm = make_verified_measurement(user, manifest_version)
 
     c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "verified", c
@@ -140,10 +137,7 @@ async def test_fastpath_payload_has_report_id(client_with_mocked_fastpath):
 
     # 1) Verified anonymous-credentials submission
     user, manifest_version, _ = setup_user(client)
-    submit_request = make_submit_request(user, "IE", "AS34245")
-    msm_verified = make_measurement(
-        submit_request.nym, submit_request.request, manifest_version
-    )
+    msm_verified = make_verified_measurement(user, manifest_version)
     c = postj(client, "/api/v1/submit_measurement", msm_verified)
     assert c["verification_status"] == "verified", c
     verified_uid = c["measurement_uid"]
@@ -151,12 +145,14 @@ async def test_fastpath_payload_has_report_id(client_with_mocked_fastpath):
     # 2) Unverified submission (missing anoncred fields)
     msm_unverified = {
         "format": "json",
-        "content": {
-            "test_name": "web_connectivity",
-            "probe_asn": "AS34245",
-            "probe_cc": "IE",
-            "test_start_time": "2020-09-09 14:11:11",
-        },
+        "content": ujson.dumps(
+            {
+                "test_name": "web_connectivity",
+                "probe_asn": "AS34245",
+                "probe_cc": "IE",
+                "test_start_time": "2020-09-09 14:11:11",
+            }
+        ),
     }
     c = postj(client, "/api/v1/submit_measurement", msm_unverified)
     assert c["verification_status"] == "unverified", c
@@ -184,8 +180,7 @@ async def test_fastpath_only_submits_once_on_success(client_with_two_working_fas
 
     # build a verifiable submission
     user, manifest_version, _ = setup_user(client)
-    submit_request = make_submit_request(user, "IE", "AS34245")
-    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+    msm = make_verified_measurement(user, manifest_version)
 
     c = postj(client, "/api/v1/submit_measurement", msm)
     assert c["verification_status"] == "verified", c
@@ -211,14 +206,10 @@ async def test_submission_non_verified(client):
     """
 
     """
+    body = make_measurement_body(probe_asn="AS34245", probe_cc="IE")
     msm = {
         "format": "json",
-        "content": {
-            "test_name": "web_connectivity",
-            "probe_asn": "AS34245",
-            "probe_cc": "IE",
-            "test_start_time": "2020-09-09 14:11:11",
-        },
+        "content": ujson.dumps(body),
     }
 
     # no anoncred fields -> processed but not verified, no error
@@ -244,7 +235,7 @@ async def test_submission_non_verified(client):
     assert c["error"] == "incomplete_anonc_fields"
 
     # old protocol version -> protocol-version error
-    submit_request = make_submit_request(user, "IE", "AS34245")
+    submit_request = make_submit_request(user, "IE", "AS34245", ujson.dumps(body))
     msm["nym"] = submit_request.nym
     msm["zkp_request"] = submit_request.request
     msm["manifest_version"] = manifest_version
@@ -522,9 +513,7 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     (user, manifest_version, emission_day) = client_with_original_manifest
 
     # first submit: should just work out of the box
-    submit_request = make_submit_request(user, "IE", "AS34245")
-
-    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+    msm = make_verified_measurement(user, manifest_version)
 
     c = postj(client, "/api/v1/submit_measurement", msm)
 
@@ -542,11 +531,37 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     assert 'update_response' in result
     user.handle_credential_update_response(result['update_response']) # should not crash
 
-    submit_request = make_submit_request(user, "IE", "AS34245")
-
-    msm = make_measurement(submit_request.nym, submit_request.request, manifest_version)
+    body = make_measurement_body(probe_asn="AS34245", probe_cc="IE")
+    msm = make_verified_measurement(user, manifest_version, body=body)
 
     c = postj(client, "/api/v1/submit_measurement", msm)
+
+def make_measurement_body(probe_asn: str, probe_cc: str) -> dict:
+    return {
+        "test_name": "web_connectivity",
+        "probe_asn": probe_asn,
+        "probe_cc": probe_cc,
+        "test_start_time": "2020-09-09 14:11:11",
+    }
+
+
+def make_verified_measurement(
+    user: UserState,
+    manifest_version: str,
+    probe_cc: str = "IE",
+    probe_asn: str = "AS34245",
+    body: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    body = body or make_measurement_body(probe_asn, probe_cc)
+    submit_request = make_submit_request(user, probe_cc, probe_asn, ujson.dumps(body))
+    return make_measurement(
+        submit_request.nym,
+        submit_request.request,
+        manifest_version,
+        probe_cc=probe_cc,
+        probe_asn=probe_asn,
+        content=body,
+    )
 
 
 def make_measurement(
@@ -556,15 +571,11 @@ def make_measurement(
     probe_cc: str = "IE",
     probe_asn: str = "AS34245",
     protocol_version: str = ooniauth_py.get_protocol_version(),
+    content : dict | None = None
 ) -> Dict[str, Any]:
     return {
         "format": "json",
-        "content": {
-            "test_name": "web_connectivity",
-            "probe_asn": probe_asn,
-            "probe_cc": probe_cc,
-            "test_start_time": "2020-09-09 14:11:11",
-        },
+        "content": ujson.dumps(content or make_measurement_body(probe_asn, probe_cc)),
         "nym": nym,
         "zkp_request": zkp_request,
         "manifest_version": manifest_version,
