@@ -63,7 +63,7 @@ def is_latest_available(url: str) -> bool:
         resp = get_request(url)
         return resp.status == 200
     except HTTPError as err:
-        if resp.status == 404:  # type: ignore
+        if err.code == 404:
             log.info(f"{url} hasn't been updated yet")
             return False
         log.info(f"unexpected status code '{err.code}' in {url}")
