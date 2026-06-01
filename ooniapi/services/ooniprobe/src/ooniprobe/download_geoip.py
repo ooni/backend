@@ -164,6 +164,11 @@ def try_update(db_dir: str, max_months_back: int = 1):
         )
         return
 
+    log.warning(
+        "No existent geoip found and no new version available: "
+        "falling back to older versions"
+    )
+
     for months_back in range(1, max_months_back + 1):
         release_date = now - relativedelta(months=months_back)
         ts, _, url = geoip_release_url(release_date)
