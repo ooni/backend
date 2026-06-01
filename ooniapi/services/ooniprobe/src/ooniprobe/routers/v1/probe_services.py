@@ -825,7 +825,7 @@ def to_http_exception(error: ProtocolError | CredentialError | DeserializationFa
 
 class SubmitMeasurementRequest(BaseModel):
     format: str
-    content: Dict[str, Any]
+    content: str
     # -- < Anonymous Credentials > ----------------------
     # not post quantum, in the future we might want to use a hashed key for storage
     nym: str | None = None
@@ -901,7 +901,23 @@ async def submit_measurement(
     """
     setnocacheresponse(response)
 
-    metadata = metadata_from_measurement_content(submit_request.content)
+    # Parse content string
+    try:
+        content : dict[str, Any] = await run_in_threadpool(
+            ujson.loads,
+            submit_request.content
+        )
+        assert isinstance(content, dict), "'content' should be a json encoded as a string"
+    except Exception as e:
+        log.error(f"invalid content: {e}")
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = {
+                "error" : str(e)
+            }
+        )
+
+    metadata = metadata_from_measurement_content(content)
 
     test_name = metadata.test_name
     cc = metadata.probe_cc
@@ -912,14 +928,17 @@ async def submit_measurement(
     # generate the new report_id
     rid = generate_report_id(test_name, settings, cc, normalize_asn(asn))
 
-    json_bytes = await request.body()
-
     # Anonymous credentials verification
     verification_status, submit_error, submit_response = _verify_submit(
-        json_bytes, submit_request, manifest, settings
+        submit_request, manifest, settings,
+        content.get('probe_cc'), content.get('probe_asn')
     )
 
     data = submit_request.model_dump()
+    data["content"] = content # change from string to dict
+
+    # Clear sensible data before sending it to fastpath
+    data = _clear_sensible_data(data)
 
     # Add verification-related data.
     # use one-letter code for DB, human readable for clients
@@ -1027,10 +1046,11 @@ async def submit_measurement(
     )
 
 def _verify_submit(
-    json_bytes: bytes,
     submit_request: SubmitMeasurementRequest,
     manifest: ManifestDep,
     settings: SettingsDep,
+    probe_cc: str | None,
+    probe_asn: str | None
 ) -> tuple[VerificationStatus, str | None, str | None]:
     """
     Run the anonymous credentials verification when the relevant fields are present.
@@ -1063,8 +1083,8 @@ def _verify_submit(
         or submit_request.zkp_request is None
         or submit_request.manifest_version is None
         or submit_request.protocol_version is None
-        or "probe_cc" not in submit_request.content
-        or "probe_asn" not in submit_request.content
+        or probe_cc is None
+        or probe_asn is None
     ):
         log.error("Incomplete anonymous credentials fields in submission request")
         return VerificationStatus.UNVERIFIED, "incomplete_anonc_fields", None
@@ -1089,11 +1109,17 @@ def _verify_submit(
     # Get the age range and minimum measurement count for this request
     age_range, min_msm_count = get_ranges_from_policy(
         manifest.manifest.submission_policy,
-        submit_request.content["probe_cc"],
-        submit_request.content["probe_asn"],
+        probe_cc,
+        probe_asn,
     )
 
-    measurement_hash = b64encode(sha256(json_bytes).digest()).decode()
+    measurement_hash = b64encode(
+        sha256(
+            submit_request.content.encode()
+        )
+        .digest()
+    ).decode()
+
     # Run verification
     try:
         protocol_state = ServerState.from_creds(
@@ -1102,8 +1128,8 @@ def _verify_submit(
         submit_response = protocol_state.handle_submit_request(
             submit_request.nym,
             submit_request.zkp_request,
-            submit_request.content["probe_cc"],
-            submit_request.content["probe_asn"],
+            probe_cc,
+            probe_asn,
             measurement_hash,
             age_range,
             min_msm_count,
@@ -1115,6 +1141,19 @@ def _verify_submit(
     except Exception as e:
         log.error(f"Unexpected anonc error: {e}")
         return (VerificationStatus.FAILED, "unknown_error", None)
+
+def _clear_sensible_data(data : dict[str, Any]):
+    """
+    `data` encodes a SubmitMeasurementRequest as dict, this function
+    will create a new dict without fields with sensible information
+    """
+
+    d = {
+        "content": data.get("content"),
+        "format": data.get("format"),
+    }
+
+    return d
 
 
 def _parse_version_tuple(version: str) -> tuple[int, ...]:
