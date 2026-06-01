@@ -5,7 +5,8 @@ import random
 import time
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from hashlib import sha512
+from base64 import b64encode
+from hashlib import sha512, sha256
 from typing import (
     List,
     Any,
@@ -911,9 +912,11 @@ async def submit_measurement(
     # generate the new report_id
     rid = generate_report_id(test_name, settings, cc, normalize_asn(asn))
 
+    json_bytes = await request.body()
+
     # Anonymous credentials verification
     verification_status, submit_error, submit_response = _verify_submit(
-        submit_request, manifest, settings
+        json_bytes, submit_request, manifest, settings
     )
 
     data = submit_request.model_dump()
@@ -1024,6 +1027,7 @@ async def submit_measurement(
     )
 
 def _verify_submit(
+    json_bytes: bytes,
     submit_request: SubmitMeasurementRequest,
     manifest: ManifestDep,
     settings: SettingsDep,
@@ -1089,6 +1093,7 @@ def _verify_submit(
         submit_request.content["probe_asn"],
     )
 
+    measurement_hash = b64encode(sha256(json_bytes).digest()).decode()
     # Run verification
     try:
         protocol_state = ServerState.from_creds(
@@ -1099,6 +1104,7 @@ def _verify_submit(
             submit_request.zkp_request,
             submit_request.content["probe_cc"],
             submit_request.content["probe_asn"],
+            measurement_hash,
             age_range,
             min_msm_count,
         )
