@@ -117,11 +117,20 @@ def download_geoip_db_dir(tmp_path):
 
 @pytest.fixture
 def last_month_geoip_db(download_geoip_db_dir):
+    from datetime import datetime, timezone
+
+    from dateutil.relativedelta import relativedelta
+    from ooniprobe.download_geoip import geoip_release_url
+
     download_geoip_db_dir.mkdir(parents=True, exist_ok=True)
     path = download_geoip_db_dir / "asn_cc.mmdb"
     path.touch()
+    last_month = datetime.now(timezone.utc) - relativedelta(months=1)
+    ts, _, _ = geoip_release_url(last_month)
+    (download_geoip_db_dir / "geoipdbts").write_text(ts)
     yield path
-    path.unlink()
+    path.unlink(missing_ok=True)
+    (download_geoip_db_dir / "geoipdbts").unlink(missing_ok=True)
 
 
 @pytest.fixture

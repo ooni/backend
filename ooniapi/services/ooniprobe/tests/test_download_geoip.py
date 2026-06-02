@@ -12,6 +12,18 @@ from ooniprobe.download_geoip import (
 FROZEN_NOW = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
 
 
+def _current_month_ts() -> str:
+    return geoip_release_url(FROZEN_NOW)[0]
+
+
+def _last_month_ts() -> str:
+    return geoip_release_url(FROZEN_NOW - relativedelta(months=1))[0]
+
+
+def _geoipdbts(db_dir: Path) -> str:
+    return (db_dir / "geoipdbts").read_text()
+
+
 def _availability(current: bool, last_month: bool):
     last_month_date = FROZEN_NOW - relativedelta(months=1)
     current_url = geoip_release_url(FROZEN_NOW)[2]
@@ -56,7 +68,7 @@ def test_old_present_new_available(
     assert downloaded is True
     assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
     assert (download_geoip_db_dir / "asn_cc.mmdb").exists()
-    assert (download_geoip_db_dir / "geoipdbts").exists()
+    assert _geoipdbts(download_geoip_db_dir) == _current_month_ts()
 
 
 @freeze_time(FROZEN_NOW)
@@ -72,7 +84,7 @@ def test_old_not_present_new_unavailable(
     assert downloaded is True
     assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
     assert (download_geoip_db_dir / "asn_cc.mmdb").exists()
-    assert (download_geoip_db_dir / "geoipdbts").exists()
+    assert _geoipdbts(download_geoip_db_dir) == _last_month_ts()
 
 
 @freeze_time(FROZEN_NOW)
@@ -91,8 +103,7 @@ def test_old_present_new_unavailable(
 
     assert downloaded is False
     assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
-    assert last_month_geoip_db.exists()
-    assert not (download_geoip_db_dir / "geoipdbts").exists()
+    assert _geoipdbts(download_geoip_db_dir) == _last_month_ts()
 
 
 @freeze_time(FROZEN_NOW)
@@ -109,8 +120,7 @@ def test_already_updated_current_month(
 
     assert downloaded is False
     assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
-    assert current_month_geoip_db.exists()
-    assert (download_geoip_db_dir / "geoipdbts").exists()
+    assert _geoipdbts(download_geoip_db_dir) == _current_month_ts()
 
 
 @freeze_time(FROZEN_NOW)
