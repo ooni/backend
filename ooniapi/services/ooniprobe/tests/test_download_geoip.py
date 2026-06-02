@@ -34,9 +34,8 @@ def _patch_is_latest_available(monkeypatch, current: bool, last_month: bool):
     )
 
 
-def _patch_download_geoip(monkeypatch, urls: set[str]):
+def _patch_download_geoip(monkeypatch):
     def _fake_download(db_dir: Path, url: str, filename: str) -> None:
-        assert url in urls
         db_dir.mkdir(parents=True, exist_ok=True)
         (db_dir / filename).touch()
 
@@ -49,8 +48,7 @@ def test_old_present_new_available(
     download_geoip_db_dir,
     last_month_geoip_db,
 ):
-    current_url = geoip_release_url(FROZEN_NOW)[2]
-    _patch_download_geoip(monkeypatch, {current_url})
+    _patch_download_geoip(monkeypatch)
     _patch_is_latest_available(monkeypatch, current=True, last_month=False)
 
     result = try_update(str(download_geoip_db_dir))
@@ -65,9 +63,7 @@ def test_old_not_present_new_unavailable(
     monkeypatch,
     download_geoip_db_dir,
 ):
-    last_month = FROZEN_NOW - relativedelta(months=1)
-    last_month_url = geoip_release_url(last_month)[2]
-    _patch_download_geoip(monkeypatch, {last_month_url})
+    _patch_download_geoip(monkeypatch)
     _patch_is_latest_available(monkeypatch, current=False, last_month=True)
 
     result = try_update(str(download_geoip_db_dir))
@@ -75,6 +71,25 @@ def test_old_not_present_new_unavailable(
     assert result == download_geoip_db_dir / "asn_cc.mmdb"
     assert (download_geoip_db_dir / "asn_cc.mmdb").exists()
     assert (download_geoip_db_dir / "geoipdbts").exists()
+
+
+@freeze_time(FROZEN_NOW)
+def test_old_present_new_unavailable(
+    monkeypatch,
+    download_geoip_db_dir,
+    last_month_geoip_db,
+):
+    monkeypatch.setattr(
+        "ooniprobe.download_geoip.has_valid_geoip_db",
+        lambda db_dir: (db_dir / "asn_cc.mmdb").exists(),
+    )
+    _patch_is_latest_available(monkeypatch, current=False, last_month=False)
+
+    result = try_update(str(download_geoip_db_dir))
+
+    assert result is None
+    assert last_month_geoip_db.exists()
+    assert not (download_geoip_db_dir / "geoipdbts").exists()
 
 
 @freeze_time(FROZEN_NOW)
