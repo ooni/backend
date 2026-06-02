@@ -124,6 +124,22 @@ def last_month_geoip_db(download_geoip_db_dir):
     path.unlink()
 
 
+@pytest.fixture
+def current_month_geoip_db(download_geoip_db_dir):
+    from datetime import datetime, timezone
+
+    from ooniprobe.download_geoip import geoip_release_url
+
+    download_geoip_db_dir.mkdir(parents=True, exist_ok=True)
+    path = download_geoip_db_dir / "asn_cc.mmdb"
+    path.touch()
+    ts, _, _ = geoip_release_url(datetime.now(timezone.utc))
+    (download_geoip_db_dir / "geoipdbts").write_text(ts)
+    yield path
+    path.unlink(missing_ok=True)
+    (download_geoip_db_dir / "geoipdbts").unlink(missing_ok=True)
+
+
 def make_manifest_mock_fn(public_params: str):
     def get_manifest_mock():
         return ManifestResponse(

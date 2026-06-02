@@ -51,9 +51,10 @@ def test_old_present_new_available(
     _patch_download_geoip(monkeypatch)
     _patch_is_latest_available(monkeypatch, current=True, last_month=False)
 
-    result = try_update(str(download_geoip_db_dir))
+    db_path, downloaded = try_update(str(download_geoip_db_dir))
 
-    assert result == download_geoip_db_dir / "asn_cc.mmdb"
+    assert downloaded is True
+    assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
     assert (download_geoip_db_dir / "asn_cc.mmdb").exists()
     assert (download_geoip_db_dir / "geoipdbts").exists()
 
@@ -66,9 +67,10 @@ def test_old_not_present_new_unavailable(
     _patch_download_geoip(monkeypatch)
     _patch_is_latest_available(monkeypatch, current=False, last_month=True)
 
-    result = try_update(str(download_geoip_db_dir))
+    db_path, downloaded = try_update(str(download_geoip_db_dir))
 
-    assert result == download_geoip_db_dir / "asn_cc.mmdb"
+    assert downloaded is True
+    assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
     assert (download_geoip_db_dir / "asn_cc.mmdb").exists()
     assert (download_geoip_db_dir / "geoipdbts").exists()
 
@@ -85,11 +87,30 @@ def test_old_present_new_unavailable(
     )
     _patch_is_latest_available(monkeypatch, current=False, last_month=False)
 
-    result = try_update(str(download_geoip_db_dir))
+    db_path, downloaded = try_update(str(download_geoip_db_dir))
 
-    assert result is None
+    assert downloaded is False
+    assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
     assert last_month_geoip_db.exists()
     assert not (download_geoip_db_dir / "geoipdbts").exists()
+
+
+@freeze_time(FROZEN_NOW)
+def test_already_updated_current_month(
+    monkeypatch,
+    download_geoip_db_dir,
+    current_month_geoip_db,
+):
+    monkeypatch.setattr(
+        "ooniprobe.download_geoip.has_valid_geoip_db",
+        lambda db_dir: (db_dir / "asn_cc.mmdb").exists(),
+    )
+    db_path, downloaded = try_update(str(download_geoip_db_dir))
+
+    assert downloaded is False
+    assert db_path == download_geoip_db_dir / "asn_cc.mmdb"
+    assert current_month_geoip_db.exists()
+    assert (download_geoip_db_dir / "geoipdbts").exists()
 
 
 @freeze_time(FROZEN_NOW)
@@ -99,8 +120,9 @@ def test_download_nothing_no_db(
 ):
     _patch_is_latest_available(monkeypatch, current=False, last_month=False)
 
-    result = try_update(str(download_geoip_db_dir))
+    db_path, downloaded = try_update(str(download_geoip_db_dir))
 
-    assert result is None
+    assert downloaded is False
+    assert db_path is None
     assert not (download_geoip_db_dir / "asn_cc.mmdb").exists()
     assert not (download_geoip_db_dir / "geoipdbts").exists()

@@ -134,6 +134,12 @@ def download_geoip(db_dir: Path, url: str, filename: str) -> None:
     Metrics.GEOIP_DOWNLOAD_TIME.observe(endtime - start_time)
 
 
+def current_geoip_db(db_dir: Path) -> Path | None:
+    if has_valid_geoip_db(db_dir):
+        return db_dir / "asn_cc.mmdb"
+    return None
+
+
 def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> Path:
     db_dir.mkdir(parents=True, exist_ok=True)
     download_geoip(db_dir, asn_cc_url, "asn_cc.mmdb")
@@ -146,23 +152,28 @@ def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> Path:
     return db_dir / "asn_cc.mmdb"
 
 
-def try_update(db_dir: str, max_months_back: int = 1) -> Path | None:
+def try_update(db_dir: str, max_months_back: int = 1) -> tuple[Path | None, bool]:
+    """
+    Returns:
+        (db path, downloaded): path to the currently used database, and whether
+        a new file was downloaded in this call.
+    """
     db_dir_path = Path(db_dir)
     now = datetime.now(timezone.utc)
     current_ts, _, current_url = geoip_release_url(now)
 
     if is_already_updated(db_dir_path, current_ts):
         log.debug("Database already updated. Exiting.")
-        return None
+        return current_geoip_db(db_dir_path), False
 
     if is_latest_available(current_url):
-        return update_geoip(db_dir_path, current_ts, current_url)
+        return update_geoip(db_dir_path, current_ts, current_url), True
 
     if has_valid_geoip_db(db_dir_path):
         log.debug(
             "Current month GeoIP database not available yet; keeping existing database."
         )
-        return None
+        return current_geoip_db(db_dir_path), False
 
     log.warning(
         "No existent geoip found and no new version available: "
@@ -174,7 +185,7 @@ def try_update(db_dir: str, max_months_back: int = 1) -> Path | None:
         ts, _, url = geoip_release_url(release_date)
         if not is_latest_available(url):
             continue
-        return update_geoip(db_dir_path, ts, url)
+        return update_geoip(db_dir_path, ts, url), True
 
     log.debug("No GeoIP update available. Exiting.")
-    return None
+    return None, False
