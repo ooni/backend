@@ -42,11 +42,10 @@ def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, 
 
 
 def make_submit_request(user: UserState, probe_cc: str, probe_asn: str, msm : str):
-    msm_hash = base64.b64encode(sha256(msm.encode()).digest()).decode()
-    return user.make_submit_request(
+    return user.make_submit_request_with_hash(
         probe_cc,
         probe_asn,
-        msm_hash,
+        msm,
         (2461110, 2826140),
         0,
     )
