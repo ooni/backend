@@ -110,6 +110,20 @@ def geoip_db_dir(fixture_path):
     return str(ooni_tempdir)
 
 
+@pytest.fixture
+def download_geoip_db_dir(tmp_path):
+    return tmp_path / "geoip"
+
+
+@pytest.fixture
+def last_month_geoip_db(download_geoip_db_dir):
+    download_geoip_db_dir.mkdir(parents=True, exist_ok=True)
+    path = download_geoip_db_dir / "asn_cc.mmdb"
+    path.touch()
+    yield path
+    path.unlink()
+
+
 def make_manifest_mock_fn(public_params: str):
     def get_manifest_mock():
         return ManifestResponse(

@@ -134,7 +134,7 @@ def download_geoip(db_dir: Path, url: str, filename: str) -> None:
     Metrics.GEOIP_DOWNLOAD_TIME.observe(endtime - start_time)
 
 
-def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> None:
+def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> Path:
     db_dir.mkdir(parents=True, exist_ok=True)
     download_geoip(db_dir, asn_cc_url, "asn_cc.mmdb")
 
@@ -143,26 +143,26 @@ def update_geoip(db_dir: Path, ts: str, asn_cc_url) -> None:
 
     log.info("Updated GeoIP databases to time: " + ts)
     Metrics.GEOIP_UPDATED.inc()
+    return db_dir / "asn_cc.mmdb"
 
 
-def try_update(db_dir: str, max_months_back: int = 1):
+def try_update(db_dir: str, max_months_back: int = 1) -> Path | None:
     db_dir_path = Path(db_dir)
     now = datetime.now(timezone.utc)
     current_ts, _, current_url = geoip_release_url(now)
 
     if is_already_updated(db_dir_path, current_ts):
         log.debug("Database already updated. Exiting.")
-        return
+        return None
 
     if is_latest_available(current_url):
-        update_geoip(db_dir_path, current_ts, current_url)
-        return
+        return update_geoip(db_dir_path, current_ts, current_url)
 
     if has_valid_geoip_db(db_dir_path):
         log.debug(
             "Current month GeoIP database not available yet; keeping existing database."
         )
-        return
+        return None
 
     log.warning(
         "No existent geoip found and no new version available: "
@@ -174,7 +174,7 @@ def try_update(db_dir: str, max_months_back: int = 1):
         ts, _, url = geoip_release_url(release_date)
         if not is_latest_available(url):
             continue
-        update_geoip(db_dir_path, ts, url)
-        return
+        return update_geoip(db_dir_path, ts, url)
 
     log.debug("No GeoIP update available. Exiting.")
+    return None
