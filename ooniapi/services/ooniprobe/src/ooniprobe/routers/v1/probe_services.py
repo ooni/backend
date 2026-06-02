@@ -1113,24 +1113,17 @@ def _verify_submit(
         probe_asn,
     )
 
-    measurement_hash = b64encode(
-        sha256(
-            submit_request.content.encode()
-        )
-        .digest()
-    ).decode()
-
     # Run verification
     try:
         protocol_state = ServerState.from_creds(
             manifest.manifest.public_parameters, settings.anonc_secret_key
         )
-        submit_response = protocol_state.handle_submit_request(
+        submit_response = protocol_state.handle_submit_request_with_hash(
             submit_request.nym,
             submit_request.zkp_request,
             probe_cc,
             probe_asn,
-            measurement_hash,
+            submit_request.content,
             age_range,
             min_msm_count,
         )
