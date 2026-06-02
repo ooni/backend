@@ -1138,13 +1138,25 @@ def _verify_submit(
 def _clear_sensible_data(data : dict[str, Any]):
     """
     `data` encodes a SubmitMeasurementRequest as dict, this function
-    will create a new dict without fields with sensible information
+    will create a new dict without fields with sensible information.
+
+    The fields that should not be present in the measurement body are:
+        - zkp_request
+        - nym
+
+    These should only be used during verification, don't store them long term
     """
 
     d = {
         "content": data.get("content"),
         "format": data.get("format"),
     }
+
+    if 'protocol_version' in data:
+        d['protocol_version'] = data['protocol_version']
+
+    if 'manifest_version' in data:
+        d['manifest_version'] = data['manifest_version']
 
     return d
 
