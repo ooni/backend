@@ -937,8 +937,8 @@ async def submit_measurement(
     data = submit_request.model_dump()
     data["content"] = content # change from string to dict
 
-    # Clear sensible data before sending it to fastpath
-    data = _clear_sensible_data(data)
+    # Clear sensitive data before sending it to fastpath
+    data = _clear_sensitive_data(data)
 
     # Add verification-related data.
     # use one-letter code for DB, human readable for clients
@@ -1135,16 +1135,17 @@ def _verify_submit(
         log.error(f"Unexpected anonc error: {e}")
         return (VerificationStatus.FAILED, "unknown_error", None)
 
-def _clear_sensible_data(data : dict[str, Any]):
+def _clear_sensitive_data(data : dict[str, Any]):
     """
     `data` encodes a SubmitMeasurementRequest as dict, this function
-    will create a new dict without fields with sensible information.
+    will create a new dict without fields with sensitive information.
 
     The fields that should not be present in the measurement body are:
         - zkp_request
         - nym
 
-    These should only be used during verification, don't store them long term
+    These should only be used during verification, they can leak identifying
+    data, don't store them long term.
     """
 
     d = {

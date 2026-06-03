@@ -8,7 +8,7 @@ from ooniauth_py import UserState, ServerState
 from pydantic import ValidationError
 from ooniprobe.dependencies import Manifest, Match, Policy, PolicyEntry
 from ooniprobe.routers.v1.probe_services import (
-    _clear_sensible_data,
+    _clear_sensitive_data,
     get_ranges_from_policy,
 )
 from .utils import get_msmt_hash, getj, make_submit_request, postj, setup_user
@@ -599,7 +599,7 @@ def make_report_request(probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dic
     }
 
 
-def test_clear_sensible_data_strips_nym_and_zkp_request():
+def test_clear_sensitive_data_strips_nym_and_zkp_request():
     data = {
         "format": "json",
         "content": {"test_name": "web_connectivity"},
@@ -609,7 +609,7 @@ def test_clear_sensible_data_strips_nym_and_zkp_request():
         "manifest_version": "abc123",
     }
 
-    result = _clear_sensible_data(data)
+    result = _clear_sensitive_data(data)
 
     assert "nym" not in result
     assert "zkp_request" not in result
@@ -621,7 +621,7 @@ def test_clear_sensible_data_strips_nym_and_zkp_request():
     }
 
 
-def test_clear_sensible_data_omits_versions():
+def test_clear_sensitive_data_omits_versions():
     data = {
         "format": "json",
         "content": {"test_name": "dummy"},
@@ -629,7 +629,7 @@ def test_clear_sensible_data_omits_versions():
         "zkp_request": "secret-zkp",
     }
 
-    result = _clear_sensible_data(data)
+    result = _clear_sensitive_data(data)
 
     assert "nym" not in result
     assert "zkp_request" not in result
