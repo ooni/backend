@@ -1,5 +1,6 @@
+import base64
 import copy
-from hashlib import sha512
+from hashlib import sha512, sha256
 from httpx import Client
 from typing import Dict, Any
 from fastapi import status
@@ -40,10 +41,11 @@ def setup_user(client) -> Tuple[UserState, str, int]: # user, manifest version, 
     return (user, manifest['meta']['version'], resp['emission_day'])
 
 
-def make_submit_request(user: UserState, probe_cc: str, probe_asn: str):
-    return user.make_submit_request(
+def make_submit_request(user: UserState, probe_cc: str, probe_asn: str, msm : str):
+    return user.make_submit_request_with_hash(
         probe_cc,
         probe_asn,
+        msm,
         (2461110, 2826140),
         0,
     )
