@@ -37,6 +37,7 @@ from sqlalchemy.sql.expression import and_, column, select, text
 from starlette.concurrency import run_in_threadpool
 from typing_extensions import Annotated
 
+from ...common.anonymous_credentials import VerificationStatus
 from ...common.clickhouse_utils import async_query_click, query_click_one_row
 from ...common.config import Settings
 from ...common.dependencies import get_clickhouse_session, get_settings
@@ -62,6 +63,15 @@ AbortMeasurementList = HTTPException(
 )
 Abort504 = HTTPException(status_code=504, detail="Error in list_measurements")
 
+
+_VerificationStatusField = Field(
+        default=None,
+        title="Verification status",
+        description="Anonymous credentials verification status. A measurement "
+        "can be in the following status: verified, unverified, failed. "
+        "If set to None, we don't have information about the verification "
+        "status of this measurement"
+    )
 
 @router.get(
     "/v1/files",
@@ -285,6 +295,7 @@ class MeasurementMeta(BaseModel):
     failure: Optional[bool] = None
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
+    verification_status: Optional[VerificationStatus] = _VerificationStatusField
 
     @field_serializer("measurement_start_time", "test_start_time")
     def format_ts(self, v: datetime) -> str:
@@ -306,6 +317,9 @@ def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
         confirmed=(msmt_meta["confirmed"] == "t"),
         failure=(msmt_meta["msm_failure"] == "t"),
         category_code=msmt_meta.get("category_code", None),
+        verification_status=VerificationStatus.from_code(
+            msmt_meta["is_verified"]
+        )
     )
     return formatted_msmt_meta
 
@@ -551,7 +565,7 @@ class Measurement(MeasurementBase):
         default=None, title="start time of the measurement"
     )
     measurement_uid: Optional[str] = Field(default=None, title="uid of the measurement")
-
+    verification_status: Optional[VerificationStatus] = _VerificationStatusField
 
 class ResultsMetadata(BaseModel):
     count: int = Field(title="")
@@ -907,6 +921,7 @@ async def list_measurements(
                     confirmed=row["confirmed"] == "t",
                     failure=row["msm_failure"] == "t",
                     scores=json.loads(row["scores"]),
+                    verification_status=VerificationStatus.from_code(row['is_verified'])
                 )
             )
 

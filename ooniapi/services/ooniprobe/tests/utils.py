@@ -1,7 +1,10 @@
+import copy
+from hashlib import sha512
 from httpx import Client
 from typing import Dict, Any
 from fastapi import status
 from typing import Tuple
+import ujson
 from ooniauth_py import UserState
 
 def getj(client : Client, url: str, params: Dict[str, Any] = {}) -> Dict[str, Any]:
@@ -42,5 +45,11 @@ def make_submit_request(user: UserState, probe_cc: str, probe_asn: str):
         probe_cc,
         probe_asn,
         (2461110, 2826140),
-        (0, 10000000),
+        0,
     )
+
+
+def get_msmt_hash(msmt: Dict[str, Any], is_verified: str = "u") -> str:
+    payload = copy.deepcopy(msmt)
+    payload["is_verified"] = is_verified
+    return sha512(ujson.dumps(payload).encode()).hexdigest()[:16]

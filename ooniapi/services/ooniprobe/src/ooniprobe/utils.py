@@ -7,14 +7,15 @@ Insert VPN credentials into database.
 import io
 import itertools
 import logging
-import ujson
 from base64 import b64encode
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from os import urandom
 from typing import Any, Dict, List, Tuple, TypedDict
 
-import requests
 import pem
+import requests
+import ujson
 from fastapi import HTTPException, Request
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.orm import Session
@@ -132,6 +133,126 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
     return rid
 
 
+@dataclass
+class MeasurementMetadata:
+    """Metadata extracted from a measurement body's `content` object."""
+
+    test_name: str
+    probe_cc: str
+    probe_asn: str
+    platform: str
+    software_name: str
+    software_version: str
+
+
+def metadata_from_measurement_content(content: dict[str, Any]) -> MeasurementMetadata:
+    """
+    Parses metadata from the `content` key in a measurement body, then
+    formats fields the same way as `generate_report_id` / `open_report` do.
+    """
+
+    annotations = content.get("annotations", {})
+    if not isinstance(annotations, dict):
+        annotations = {}
+
+    return MeasurementMetadata(
+        test_name=content.get("test_name", ""),
+        probe_cc=content.get("probe_cc", ""),
+        probe_asn=content.get("probe_asn", ""),
+        platform=annotations.get("platform", ""),
+        software_name=content.get("software_name", ""),
+        software_version=content.get("software_version", ""),
+    )
+
+def check_measurement_meta(
+    test_name: str,
+    probe_cc: str,
+    probe_asn: str,
+):
+    """
+    Checks metadata consistency, raising an HTTPException and stopping
+    ingestion when an inconsistency is detected.
+
+    This metadata is expected to come from the measurement body
+    """
+
+    cc_ok = (
+        len(probe_cc) == 2 and
+        probe_cc.isupper() and
+        probe_cc.isalnum()
+    )
+    test_name_len_ok = 1 < len(test_name) <= 30
+    test_name_lower_ok = test_name.islower()
+    asn_starts_as_ok = probe_asn.startswith("AS")
+    asn_len_ok = len(probe_asn) >= 3 and len(probe_asn) <= 12
+
+    if not (
+        cc_ok and test_name_len_ok and
+        test_name_lower_ok and asn_starts_as_ok and asn_len_ok
+    ):
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_metadata").inc()
+        log.error(
+            "Bad metadata in measurement body: test_name="
+            f"{test_name[:30]}, cc={probe_cc}"
+        )
+        reasons = []
+        if not cc_ok:
+            reasons.append("bad_cc")
+        if not test_name_len_ok:
+            reasons.append("tn_len")
+        if not test_name_lower_ok:
+            reasons.append("tn_no_lower")
+        if not asn_len_ok:
+            reasons.append("asn_len")
+        if not asn_starts_as_ok:
+            reasons.append("asn_no_as_prefix")
+
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "bad_metadata",
+                "message": f"Errors: {reasons}"
+            },
+        )
+
+    error = None
+    asn = str(probe_asn).strip().upper().lstrip("AS")
+    try:
+        asn_i = int(asn)
+        if asn_i == 0:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
+            Metrics.MSMNT_DISCARD_ASN0.inc()
+            log.info("Discarding ASN == 0")
+            error = "asn_0"
+            message = "Measurement discarded, ASN == 0"
+    except Exception as e:
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_invalid").inc()
+        log.info(f"Discarding ASN == {probe_asn}, error: {e}")
+        error = "asn_invalid"
+        message = f"Measurement discarded, ASN == {probe_asn}"
+
+    if error:
+        raise HTTPException(
+            400,
+            detail={
+                "error": error,
+                "message" : message
+            }
+        )
+
+    # Check probe_cc for ZZ cases
+    if probe_cc == "ZZ":
+        log.info("Discarding CC == ZZ")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
+        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        raise HTTPException(
+            400,
+            detail={
+                "error": "cc_zz",
+                "message": "Measurement discarded, CC == ZZ",
+            },
+        )
+
 def extract_probe_ipaddr(request: Request) -> str:
 
     real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
@@ -162,20 +283,21 @@ def error(msg: str | Dict[str, Any], status_code: int = 400):
 
 
 def normalize_asn(asn: str) -> int:
-    """Return ASN as int (strip 'AS' prefix if present). Invalid values return 0."""
-    s = str(asn).strip()
-    s = s[2:] if s.startswith("AS") else s
+    """
+    Return ASN as int (strip 'AS' prefix if present). Invalid values return 0.
+    """
+    s = str(asn).strip().upper().lstrip("AS")
     try:
         return int(s)
     except (ValueError, TypeError) as e:
         log.error(f"Invalid asn: {e}")
         return 0
 
-
 def get_cc_asn(
     request: Request, asn_cc_reader: ASNCCReaderDep
 ) -> Tuple[str, str]:
-    """Geo-lookup the request's source IP and return (cc, asn).
+    """
+    Geo-lookup the request's source IP and return (cc, asn).
 
     Falls back to ("ZZ", "AS0") when the lookup fails.
     """
@@ -198,7 +320,9 @@ def register_geoip_anomaly(
     software_name: str,
     software_version: str,
 ) -> None:
-    """Record a geoip mismatch in faulty_measurements."""
+    """
+    Record a geoip mismatch in faulty_measurements.
+    """
     sub_asn = normalize_asn(asn)
     actual_asn_int = normalize_asn(actual_asn)
     if actual_cc != cc:

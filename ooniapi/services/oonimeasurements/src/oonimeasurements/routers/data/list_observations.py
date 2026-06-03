@@ -194,9 +194,9 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
-    if since is None:
+    if since is None and report_id is None:
         since = date.today() - timedelta(days=7)
-    if until is None:
+    if until is None and report_id is None:
         until = date.today()
 
     q_args = {}

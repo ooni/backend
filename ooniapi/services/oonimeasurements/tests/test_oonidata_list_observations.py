@@ -11,6 +11,28 @@ def test_oonidata_list_observations(client):
     assert len(json["results"]) == 0
 
 
+def test_list_obs_report_id_only_skips_default_date_window(client):
+    """
+    Without report_id, since/until default to the last 7 days (fixture data is older).
+
+    With only report_id, those defaults must not apply, so rows still match by report_id
+    even when their measurement_start_time falls outside the usual default window.
+    """
+    report_id = "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"
+
+    default_response = client.get(route)
+    assert default_response.status_code == 200
+    assert len(default_response.json()["results"]) == 0
+
+    by_report = client.get(route, params={"report_id": report_id})
+    assert by_report.status_code == 200
+    j = by_report.json()
+    assert isinstance(j["results"], list), j
+    assert len(j["results"]) > 0
+    for row in j["results"]:
+        assert row["report_id"] == report_id, row
+
+
 def test_oonidata_list_observations_with_since_and_until(
     client, params_since_and_until_with_two_days
 ):
