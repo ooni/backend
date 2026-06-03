@@ -8,7 +8,8 @@ import argparse
 import boto3
 import os
 import requests
-
+import logging
+import sys
 from pathlib import Path
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
 
@@ -22,17 +23,33 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")                    # required
 PREFIX = os.getenv("S3_PREFIX", "")
 FASTPATH_API = os.getenv("FASTPATH_API", "")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 parser = argparse.ArgumentParser(description="List/process S3 objects")
 parser.add_argument("--dry-run", action="store_true", help="List objects and print POSTs without downloading or sending them")
 args = parser.parse_args()
 
+def get_logger(name=__name__):
+    """
+    Configure and return a logger.
+    """
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        fmt = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+        formatter = logging.Formatter(fmt, datefmt="%Y-%m-%dT%H:%M:%S%z")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    logger.setLevel(LOG_LEVEL)
+    return logger
+
+logger = get_logger("reuploader")
+
 def assume_role_and_get_credentials(role_arn, session_name, duration_seconds=3600):
     """
-    Assume the given role and return temporary credentials dict:
-    { aws_access_key_id, aws_secret_access_key, aws_session_token }
+    Assume the given role and return temporary credentials dict.
     """
-    # Use provided long-term creds or default chain to call STS
+    logger.debug("Assuming role %s (session=%s, duration=%s)", role_arn, session_name, duration_seconds)
     sts_kwargs = {"region_name": AWS_REGION,
                   "aws_access_key_id": AWS_ACCESS_KEY_ID,
                   "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
@@ -44,6 +61,7 @@ def assume_role_and_get_credentials(role_arn, session_name, duration_seconds=360
         DurationSeconds=duration_seconds
     )
     creds = resp["Credentials"]
+    logger.info("Assumed role %s successfully; expires at %s", role_arn, creds.get("Expiration"))
     return {
         "aws_access_key_id": creds["AccessKeyId"],
         "aws_secret_access_key": creds["SecretAccessKey"],
@@ -61,7 +79,7 @@ def get_s3_client():
             temp = assume_role_and_get_credentials(ROLE_ARN, ROLE_SESSION_NAME, ROLE_DURATION_SECONDS)
             client_kwargs.update(temp)
         except ClientError as e:
-            print(f"Error assuming role: {e.response.get('Error', {}).get('Message')}")
+            logger.error("Error assuming role: %s", e.response.get("Error", {}).get("Message"), exc_info=True)
             raise
     else:
         if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
@@ -69,6 +87,8 @@ def get_s3_client():
                 "aws_access_key_id": AWS_ACCESS_KEY_ID,
                 "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
             })
+            logger.debug("Using explicit AWS credentials from environment")
+    logger.debug("Creating S3 client with region %s", AWS_REGION)
     return boto3.client("s3", **client_kwargs)
 
 def walk(s3, client, bucket_name, start_prefix=''):
@@ -79,12 +99,15 @@ def walk(s3, client, bucket_name, start_prefix=''):
       - subprefixes: list of child prefixes (each ends with '/')
       - objects: list of object keys directly under this prefix (no trailing '/')
     """
+    logger.debug("Walk called with prefix=%r", start_prefix)
     paginator = s3.get_paginator("list_objects_v2")
     page_iter = paginator.paginate(Bucket=bucket_name, Prefix=start_prefix, Delimiter='/')
     subprefixes = []
     objects = []
     for page in page_iter:
-        subprefixes.extend([cp["Prefix"] for cp in page.get("CommonPrefixes", [])])
+        subprefixes_page = [cp["Prefix"] for cp in page.get("CommonPrefixes", [])]
+        subprefixes.extend(subprefixes_page)
+        logger.debug("Found subprefixes: %s", subprefixes_page)
         for obj in page.get("Contents", []):
             key = obj["Key"]
             if key == start_prefix:
@@ -98,39 +121,52 @@ def process_postcan(s3, client, bucket, key):
     try:
         p = Path(key)
         msmt_id = p.stem
-        print(f"msmt_id: {p.stem}")
+        logger.debug("Processing key=%s msmt_id=%s", key, msmt_id)
         endpoint = f"{FASTPATH_API}/{msmt_id}"
 
         if args.dry_run:
-            print(f"DRY RUN: s3://{bucket}/{key} -> {endpoint}")
+            logger.info("DRY RUN: s3://%s/%s -> %s", bucket, key, endpoint)
             return key, None
 
-        print(f"SEND: s3://{bucket}/{key} -> {endpoint}")
+        logger.info("Sending s3://%s/%s -> %s", bucket, key, endpoint)
         resp_obj = s3.get_object(Bucket=bucket, Key=key)
         body = resp_obj["Body"]
         headers = {"Content-Type": "application/octet-stream"}
+        # stream the body to the POST
         r = client.post(endpoint, data=body.iter_chunks(chunk_size=16 * 1024), headers=headers, timeout=60)
         with r:
             r.raise_for_status()
-        # XXX: remove file from s3 if everything went OK
+        logger.info("Successfully submitted %s", key)
+        # TODO: optionally remove file from S3 here
         return key, None
     except Exception as e:
+        logger.exception("Failed to process %s", key)
         return key, str(e)
 
 def main():
     if not BUCKET_NAME:
-        print("S3_BUCKET_NAME environment variable is required.")
+        logger.error("S3_BUCKET_NAME environment variable is required.")
         return
-    s3 = get_s3_client()
+    try:
+        s3 = get_s3_client()
+    except (NoCredentialsError, ClientError) as e:
+        logger.error("Unable to create S3 client: %s", e, exc_info=True)
+        return
+
     with requests.Session() as client:
-        for prefix, subs, objs in walk(s3, client, BUCKET_NAME, ""):
-            print(f"PREFIX: {prefix}  subdirs={len(subs)} objects={len(objs)}")
-            for key in objs:
-                key, err = process_postcan(s3, client, BUCKET_NAME, key)
-                if err:
-                    print(f"Failed to process {key}: {err}")
-                else:
-                    print(f"Submitted {key} to fastpath")
-            
+        try:
+            for prefix, subs, objs in walk(s3, client, BUCKET_NAME, ""):
+                logger.info("PREFIX: %s  subdirs=%d objects=%d", prefix, len(subs), len(objs))
+                for key in objs:
+                    key, err = process_postcan(s3, client, BUCKET_NAME, key)
+                    if err:
+                        logger.warning("Failed to process %s: %s", key, err)
+                    else:
+                        logger.debug("Submitted %s to fastpath", key)
+        except EndpointConnectionError as e:
+            logger.error("Endpoint connection error: %s", e, exc_info=True)
+        except Exception as e:
+            logger.exception("Unexpected error in main loop")
+
 if __name__ == "__main__":
     main()
