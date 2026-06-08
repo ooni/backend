@@ -18,7 +18,7 @@ docker-build:
 		--build-arg BUILD_LABEL=${BUILD_LABEL} \
 		-t ${IMAGE_NAME}:${BUILD_LABEL} \
 		-t ${IMAGE_NAME}:${ENV_LABEL} \
-		-
+		.
 	echo "built image: ${IMAGE_NAME}:${BUILD_LABEL} (${IMAGE_NAME}:${ENV_LABEL})"
 
 docker-push:
