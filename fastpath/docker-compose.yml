@@ -7,10 +7,16 @@ services:
     ports:
       - "5000:5000"
       - "8472:8472"
-    volumes:
-      - .:/app
-    working_dir: /app
+    working_dir: /home/fastpath/app
     command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk", "--debug"]
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./fastpath
+          target: /home/fastpath/app/fastpath
+          ignore:
+            - __pycache__/
+            - "*.pyc"
     depends_on:
       clickhouse-server:
         condition: service_healthy

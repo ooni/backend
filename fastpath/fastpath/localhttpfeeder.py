@@ -50,5 +50,5 @@ def start_http_api(queue):
         "timeout": WORKER_TIMEOUT,
     }
     print(f"starting localhttpfeeder with worker_timeout: {WORKER_TIMEOUT} and"
-          " queue_put_timeout: {QUEUE_PUT_TIMEOUT}")
+          f" queue_put_timeout: {QUEUE_PUT_TIMEOUT}")
     MsmtFeeder(handler_app, options).run()
