@@ -3,13 +3,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ooni-fastpath 
+    container_name: ooni-fastpath
     ports:
       - "5000:5000"
       - "8472:8472"
     volumes:
       - .:/app
     working_dir: /app
+    command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk", "--debug"]
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
     profiles:
       - default
       - all
@@ -36,7 +40,7 @@ services:
       timeout: 10s
     profiles:
       - all
-      - clickhouse 
+      - clickhouse
 
 volumes:
   clickhouse-data:
