@@ -10,8 +10,7 @@ This API is deprecated, you really should be looking at https://github.com/ooni/
 
 ## Local development
 
-You can run the OONI API locally in a development environment using `docker`
-and `docker-compose`. Follow the instructions below to set it up.
+You can run the OONI API locally in a development environment using `docker`. Follow the instructions below to set it up.
 
 ### Quickstart
 

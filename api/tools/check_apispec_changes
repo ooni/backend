@@ -1,5 +1,5 @@
 #!/bin/bash
-docker-compose run --rm api python3 ooniapi/app.py
+docker compose run --rm api python3 ooniapi/app.py
 if diff apispec.json docs/apispec.json; then
   echo docs/apispec.json is up to date
 else
