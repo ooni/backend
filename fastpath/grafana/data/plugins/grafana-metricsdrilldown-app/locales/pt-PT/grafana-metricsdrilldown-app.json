@@ -1,0 +1,393 @@
+{
+  "action-bar": {
+    "tab": {
+      "breakdown": "Discriminação de custos",
+      "query-results": "",
+      "query-results-description": "",
+      "related-logs": "Registos relacionados",
+      "related-logs-description": "Registos relevantes com base nos filtros de etiqueta e intervalo de tempo atuais",
+      "related-metrics": "Métricas relacionadas",
+      "related-metrics-description": "Métricas relevantes com base nos filtros de etiquetas atuais"
+    }
+  },
+  "breakdown": {
+    "add-to-filters": "Adicionar aos filtros",
+    "by-label": "Por etiqueta",
+    "group-by": {
+      "label": "Agrupar por"
+    },
+    "label-values-list": {
+      "error-title": "Erro ao carregar métricas!",
+      "no-values": "Nenhum valor de etiqueta encontrado para os filtros e intervalo de tempo atuais.",
+      "search-aria-label": "",
+      "search-label": "Pesquisar",
+      "view-label": "Ver"
+    },
+    "labels-list": {
+      "breakdown-by-label": "Discriminação por {{label}}",
+      "error-title": "Erro ao carregar etiquetas!",
+      "no-labels": "Nenhuma etiqueta encontrada para os filtros e intervalo de tempo atuais.",
+      "view-label": "Ver"
+    },
+    "section-label": "Discriminação de custos",
+    "select-label": "Selecionar"
+  },
+  "checkbox-list": {
+    "clear": "limpar",
+    "collapse": "Recolher",
+    "expand": "Expandir",
+    "no-results": "Sem resultados.",
+    "selected-count_one": "{{count}} selecionado",
+    "selected-count_other": "{{count}} selecionados"
+  },
+  "configure-panel": {
+    "apply": "Aplicar",
+    "cancel": "Cancelar",
+    "restore-default": "Restaurar configuração predefinida",
+    "restore-modal-body": "Tem a certeza de que pretende restaurar a configuração predefinida para a métrica {{metric}}?",
+    "restore-modal-confirm": "Restaurar",
+    "restore-modal-title": "Restaurar configuração predefinida",
+    "select-function-message": "Selecione uma função Prometheus que será usada por predefinição para exibir a métrica {{metricName}}."
+  },
+  "data-source-variable": {
+    "description": "Apenas as origens de dados do Prometheus são suportadas",
+    "label": "Origem dos dados"
+  },
+  "data-trail": {
+    "configure-drawer": {
+      "title": "Configurar a função Prometheus"
+    },
+    "filters": {
+      "add-label": "Adicionar etiqueta",
+      "label": "Filtros"
+    }
+  },
+  "error-view": {
+    "message": "<2>Tente recarregar a página</2> ou, se o problema persistir, contacte o administrador da sua organização. Lamentamos o incómodo.",
+    "stack-trace-label": "Ver sequência da pilha",
+    "title": "Erro fatal!"
+  },
+  "extreme-value-filter": {
+    "message": "Os dados do painel foram novamente obtidos com uma consulta mais complexa para lidar com valores extremamente pequenos na série"
+  },
+  "fetch-alerting-metrics": {
+    "error": "Falha ao obter regras de alerta"
+  },
+  "fetch-dashboard-metrics": {
+    "error": "Falha ao obter as métricas do painel de controlo",
+    "limit-warning-body": "",
+    "limit-warning-title": ""
+  },
+  "filtered-metrics-variable": {
+    "label": "Métricas filtradas"
+  },
+  "give-feedback": {
+    "button": "Dar feedback",
+    "tooltip": "Partilhe a sua opinião sobre as métricas na Grafana."
+  },
+  "gmd-viz-panel": {
+    "native-histogram": "Histograma nativo",
+    "variant": {
+      "heatmap": "mapa de calor",
+      "percentiles": "percentis"
+    }
+  },
+  "inline-banner": {
+    "unknown-error": "Erro desconhecido!"
+  },
+  "kg-annotations": {
+    "layer": {
+      "name": ""
+    },
+    "query": {
+      "name": ""
+    },
+    "severity": {
+      "critical": "",
+      "info": "",
+      "warning": ""
+    },
+    "toggle": {
+      "description": "",
+      "disabled-tooltip": "",
+      "label": "",
+      "learn-more": ""
+    }
+  },
+  "labels-datasource": {
+    "none-option": "(nenhum)",
+    "test-success": "OK"
+  },
+  "labels-list": {
+    "clear": "limpar",
+    "no-results": "Sem resultados.",
+    "no-selection": "Nenhuma seleção",
+    "selected": "Selecionados: \"{{selectedLabel}}\""
+  },
+  "labels-variable": {
+    "label": "Agrupar por etiqueta",
+    "placeholder": "Agrupar por etiqueta..."
+  },
+  "layout-switcher": {
+    "aria-label": "Alternador de layout",
+    "option": {
+      "grid": "Grelha",
+      "rows": "Linhas",
+      "single": "Único"
+    }
+  },
+  "lazy-loading": {
+    "fallback": "A carregar..."
+  },
+  "list-controls": {
+    "search-aria-label": ""
+  },
+  "metrics": {
+    "metrics-drilldown": {
+      "load-query": {
+        "button-no-query-tooltip": "",
+        "button-tooltip": "",
+        "empty": "",
+        "load-error": "",
+        "load-type-error": "",
+        "modal-title": "",
+        "remove": "",
+        "saved-query-button-tooltip": "",
+        "select": ""
+      },
+      "save-query": {
+        "already-exists": {
+          "alert": ""
+        },
+        "button-tooltip": "",
+        "button-tooltip-saved-queries": "",
+        "cancel": "",
+        "description": "",
+        "error": "",
+        "modal-alert": "",
+        "modal-title": "",
+        "save": "",
+        "success": "",
+        "title": ""
+      }
+    }
+  },
+  "metrics-group-by-list": {
+    "error-title": "Erro ao carregar valores de etiqueta \"{{labelName}}\"!",
+    "no-values": "Nenhum valor de etiqueta encontrado para a etiqueta \"{{labelName}}\"."
+  },
+  "metrics-group-by-row": {
+    "error-title": "Erro ao carregar métricas!",
+    "no-metrics": "Nenhuma métrica encontrada para os filtros e intervalo de tempo atuais.",
+    "select": "Selecionar",
+    "select-tooltip": "Ver métricas com {{labelName}}={{labelValue}}",
+    "show-more-tooltip": "Mostrar mais métricas para {{labelName}}=\"{{labelValue}}\""
+  },
+  "metrics-list": {
+    "error-title": "Erro ao carregar métricas!",
+    "no-metrics": "Nenhuma métrica encontrada para os filtros e intervalo de tempo atuais."
+  },
+  "metrics-sorter": {
+    "error": {
+      "get-recent-metrics": "Falha ao obter métricas recentes:"
+    },
+    "label": "Ordenar por",
+    "option": {
+      "alerting-usage": "Uso de alertas",
+      "alphabetical": "Ordem alfabética [A-Z]",
+      "alphabetical-reversed": "Ordem alfabética [Z-A]",
+      "dashboard-usage": "Utilização do painel de controlo",
+      "default": "Predefinição"
+    }
+  },
+  "metrics-variable": {
+    "label": "Métricas"
+  },
+  "onboarding": {
+    "learn-more": "Consulte <2>os nossos documentos</2> para saber mais ou<5></5><6>experimente online</6> no Grafana Play!",
+    "no-datasource": "Reparámos que não existe uma origem de dados Prometheus configurada.<1></1>Adicione uma <4>origem de dados Prometheus</4> para ver as métricas.",
+    "title": "Boas-vindas à Grafana Metrics Drilldown"
+  },
+  "open-assistant": {
+    "explain-label": "Explicar no Assistente",
+    "metric-metadata-title": "Metadados métricos do Prometheus"
+  },
+  "panel-menu": {
+    "action": {
+      "copy-url": "Copiar o URL",
+      "copy-url-success": "URL copiado para a área de transferência",
+      "explore": "Explorar"
+    },
+    "group": {
+      "actions": "Ações",
+      "navigation": "Navegação"
+    }
+  },
+  "plugin-info": {
+    "button": {
+      "title": "Informações do plugin",
+      "tooltip": "Informações do plugin"
+    },
+    "header": {
+      "last-update": "Última atualização: {{updated}}",
+      "title": "Grafana Metrics Drilldown v{{version}}"
+    },
+    "menu": {
+      "changelog": "Registo de alterações",
+      "commit-sha": "Confirmar SHA: {{sha}}",
+      "contribute": "Contribuir",
+      "documentation": "Documentação",
+      "grafana-version": "Grafana {{edition}} v{{version}} ({{env}})",
+      "prom-build-info": "{{application}} {{version}} {{buildDate}}",
+      "report-issue": "Comunicar um problema"
+    }
+  },
+  "prefix-filter": {
+    "all-metrics": "Todos os nomes de métricas",
+    "tooltip": "Visualizar pelo prefixo da métrica. Um prefixo de métrica é uma única palavra no início do nome da métrica, relevante para o domínio ao qual a métrica pertence.",
+    "view-by-label": "Visualizar por"
+  },
+  "query-results": {
+    "aria-label": "",
+    "error-title": "",
+    "unavailable-message": "",
+    "unavailable-title": ""
+  },
+  "quick-search": {
+    "ask-assistant-aria-label": "Perguntar ao Assistente Grafana",
+    "ask-assistant-tooltip": "Perguntar ao Assistente Grafana",
+    "clear-search-tooltip": "Limpar a pesquisa",
+    "placeholder": "",
+    "placeholder-question-mode": "Faça uma pergunta ao Assistente Grafana e prima Enter",
+    "placeholder-with-assistant": "",
+    "placeholder-with-assistant-tab-enter": "",
+    "count-filtered_one": "",
+    "count-filtered_other": "",
+    "count-total_one": "",
+    "count-total_other": ""
+  },
+  "quick-search-assistant": {
+    "label-filters-title": "Filtros de etiquetas atuais",
+    "time-range-title": "Intervalo de tempo"
+  },
+  "related-logs": {
+    "datasource-description": "Algumas origens de dados Loki podem estar ausentes do menu suspenso se demorarem mais de {{timeout}} segundos a responder. Para ver os registos de todas as fontes de dados do Loki, tente usar o Logs Drilldown.",
+    "datasource-label": "Origem de dados de registos",
+    "experimental-note": "Nota: os registos relacionados são uma funcionalidade experimental.",
+    "loading": "A carregar...",
+    "no-logs-message": "Não foi possível encontrar nenhum registo relacionado com a métrica atual com os filtros selecionados.",
+    "no-logs-title": "Não foram encontrados registos relacionados",
+    "open-drilldown": "Abrir o Logs Drilldown",
+    "open-drilldown-tooltip": "Navegue até à aplicação Logs Drilldown",
+    "open-in-drilldown": "Abrir na Logs Drilldown",
+    "open-in-drilldown-tooltip": "Utilize a aplicação Logs Drilldown para explorar estes registos",
+    "suggestions": "Para encontrar registos relacionados, experimente fazer o seguinte:<1><0>Ajuste os seus filtros de etiquetas para incluir etiquetas que existem tanto na métrica atual como nos seus registos</0><1>Selecione uma métrica criada por uma <2>Regra de gravação do Loki</2></1><2>Amplie o intervalo de tempo para incluir mais dados</2></1>"
+  },
+  "related-metrics": {
+    "search-aria-label": ""
+  },
+  "select-action": {
+    "button": "Selecionar"
+  },
+  "select-new-metric": {
+    "button": "Selecionar nova métrica",
+    "metrics-drilldown": "Metrics Drilldown",
+    "open-in-drilldown-tooltip": "Abrir na Metrics Drilldown"
+  },
+  "show-more-button": {
+    "text_one": "",
+    "text_other": ""
+  },
+  "sidebar": {
+    "bookmarks": {
+      "date-created": "Data de criação:",
+      "empty-state": "Ainda não há marcadores para a<1></1>fonte de dados atual.",
+      "remove-tooltip": "Remover marcador"
+    },
+    "close-aria-label": "Fechar",
+    "close-tooltip": "Fechar",
+    "filter": {
+      "clear-search-tooltip": "Limpar a pesquisa",
+      "hide-empty": "Ocultar vazio",
+      "search-aria-label": "",
+      "search-placeholder": "Pesquisar..."
+    },
+    "filter-type": {
+      "prefix": "prefixo",
+      "recent": "recente",
+      "rule-group": "grupo de regras",
+      "suffix": "sufixo"
+    },
+    "labels-browser": {
+      "clear-search-tooltip": "Limpar a pesquisa",
+      "search-aria-label": "",
+      "search-placeholder": "Pesquisar..."
+    },
+    "recent-metrics": {
+      "all-time": "Todo o tempo",
+      "past-interval": "Entre {{interval}}"
+    },
+    "section": {
+      "bookmarks": "Marcadores",
+      "bookmarks-description": "Aceda às suas métricas guardadas para referência rápida",
+      "group-by-labels": "Agrupar por etiquetas",
+      "group-by-labels-description": "Agrupar métricas pelos seus valores de etiqueta",
+      "prefix-filters": "Filtros de prefixo",
+      "prefix-filters-description": "Filtrar métricas com base no seu prefixo de nome (namespace Prometheus)",
+      "recent-metrics": "Filtros de métricas recentes",
+      "recent-metrics-description": "Filtrar métricas com base em quando começaram a ser ingeridas",
+      "rules-filters": "Filtros de regras",
+      "rules-filters-description": "Filtrar métricas e regras de gravação",
+      "suffix-filters": "Filtros de sufixo",
+      "suffix-filters-description": "Filtrar métricas com base no seu sufixo de nome"
+    }
+  },
+  "sort-by": {
+    "label": "Ordenar por",
+    "option": {
+      "alphabetical": "Nome [A-Z]",
+      "alphabetical-description": "Ordem alfabética",
+      "alphabetical-reversed": "Nome [Z-A]",
+      "alphabetical-reversed-description": "Ordem alfabética inversa",
+      "outliers": "Séries periféricas",
+      "outliers-description": "Prioriza valores que mostram comportamento distinto de outros dentro da mesma etiqueta"
+    },
+    "placeholder": "Escolher critérios",
+    "tooltip": "Ordena os valores usando cálculos de séries temporais padrão ou inteligentes."
+  },
+  "trail": {
+    "breadcrumb": {
+      "all-metrics": "Todas as métricas",
+      "metrics": "Métricas"
+    }
+  },
+  "ui-text": {
+    "metric-select": {
+      "bookmark": "Marcador",
+      "copy-url": "Copiar URL",
+      "open-explore": "Abrir em explorar",
+      "select-new-metric-tooltip": "Remover a métrica existente e escolher uma nova métrica"
+    },
+    "search": {
+      "title": "Pesquisar métricas"
+    }
+  },
+  "usage-data": {
+    "metric-used-in-plural_one": "A métrica é usada em {{count}} {{usageType}}",
+    "metric-used-in-plural_other": "A métrica é usada em {{count}} {{usageType}}",
+    "metric-used-in-singular_one": "A métrica é usada em {{count}} {{usageType}}",
+    "metric-used-in-singular_other": "A métrica é usada em {{count}} {{usageType}}",
+    "metric-used-plural_one": "Métrica usada {{count}} vezes em consultas de painel de controlo. Clique para ver os painéis de controlo.",
+    "metric-used-plural_other": "Métrica usada {{count}} vezes em consultas de painel de controlo. Clique para ver os painéis de controlo.",
+    "metric-used-singular_one": "Métrica usada {{count}} vez em consultas de painel de controlo. Clique para ver os painéis de controlo.",
+    "metric-used-singular_other": "Métrica usada {{count}} vez em consultas de painel de controlo. Clique para ver os painéis de controlo.",
+    "used-time-plural_one": "Utilizada {{count}} vezes em {{label}}",
+    "used-time-plural_other": "Utilizada {{count}} vezes em {{label}}",
+    "used-time-singular_one": "Utilizada {{count}} vez em {{label}}",
+    "used-time-singular_other": "Utilizada {{count}} vez em {{label}}"
+  },
+  "with-config-panel-options": {
+    "click-to-select": "Clique para selecionar esta configuração",
+    "current-config": "Configuração atual"
+  }
+}

@@ -1,0 +1,658 @@
+{
+  "actions": {
+    "exemplar-toggle": {
+      "hide": "",
+      "label": "",
+      "show": ""
+    },
+    "fav": {
+      "favorite": "",
+      "unfavorite": ""
+    }
+  },
+  "ad-hoc": {
+    "profile-type-selector": {
+      "label": ""
+    },
+    "tabs": {
+      "comparison-view": "",
+      "single-view": ""
+    },
+    "view": {
+      "title": ""
+    }
+  },
+  "ai-panel": {
+    "analyzing": "",
+    "close": "",
+    "fetch-error": "",
+    "fetch-error-message": "",
+    "follow-up": {
+      "placeholder": "",
+      "send": ""
+    },
+    "llm-error": "",
+    "llm-error-message": "",
+    "reply": {
+      "search-node": ""
+    },
+    "retry": "",
+    "title": "",
+    "validation-error": ""
+  },
+  "analyze-diff": {
+    "context": {
+      "title": ""
+    },
+    "error": "",
+    "prompt": ""
+  },
+  "back-button": {
+    "aria-label": "",
+    "label": ""
+  },
+  "create-recording-rule": {
+    "cancel": "",
+    "create": "",
+    "filters": {
+      "description": "",
+      "label": "",
+      "none": ""
+    },
+    "function-name": {
+      "aria-label": "",
+      "description": "",
+      "label": "",
+      "placeholder": ""
+    },
+    "labels": {
+      "description": "",
+      "label": ""
+    },
+    "menu-option": "",
+    "metric-name": {
+      "aria-label": "",
+      "description": "",
+      "invalid": "",
+      "label": "",
+      "pattern-alphanumeric": "",
+      "pattern-error": "",
+      "pattern-no-number": "",
+      "required": ""
+    },
+    "profile-type": {
+      "label": ""
+    },
+    "service-name": {
+      "all": "",
+      "label": ""
+    },
+    "title": ""
+  },
+  "diff-flame-graph": {
+    "compare-panel": {
+      "annotation-title": "",
+      "baseline": "",
+      "comparison": "",
+      "flame-graph": "",
+      "range-selection-mode": "",
+      "sync-time-ranges": "",
+      "time-picker": "",
+      "tooltip-description": "",
+      "tooltip-flame-graph": "",
+      "tooltip-flame-graph-description": "",
+      "tooltip-time-picker": "",
+      "tooltip-time-picker-description": ""
+    },
+    "error-loading-profile": "",
+    "explain-button": "",
+    "missing-selections": {
+      "auto-select": "",
+      "how-to-alt": "",
+      "learn-how": "",
+      "step-1": "",
+      "step-2": "",
+      "title": ""
+    },
+    "no-profile-data": "",
+    "no-profile-data-message": "",
+    "presets": {
+      "1h-ago-vs-now": "",
+      "1h-ago-vs-now-description": "",
+      "24h-ago-vs-now": "",
+      "6h-ago-vs-now": "",
+      "label": "",
+      "placeholder": ""
+    },
+    "settings-error": {
+      "message": "",
+      "title": ""
+    },
+    "title": ""
+  },
+  "error-page": {
+    "banner-message": "",
+    "banner-title": "",
+    "title": ""
+  },
+  "explorer": {
+    "exploration-type": {
+      "all-services": "",
+      "all-services-description": "",
+      "diff-flame-graph": "",
+      "diff-flame-graph-description": "",
+      "favorites": "",
+      "favorites-description": "",
+      "flame-graph": "",
+      "flame-graph-description": "",
+      "label": "",
+      "labels": "",
+      "labels-description": "",
+      "profile-types": "",
+      "profile-types-description": ""
+    },
+    "header": {
+      "add-recording-rule": "",
+      "recording-rules-tooltip": "",
+      "settings-tooltip": "",
+      "share-tooltip": "",
+      "upload-tooltip": "",
+      "view-recording-rules": ""
+    }
+  },
+  "export-data": {
+    "aria-label": "",
+    "tooltip": ""
+  },
+  "export-menu": {
+    "aria-label": "",
+    "error-flamegraph-com": "",
+    "error-loading-profile": "",
+    "error-png": "",
+    "error-pprof": "",
+    "json": "",
+    "json-label": "",
+    "png": "",
+    "png-label": "",
+    "pprof": "",
+    "tooltip": ""
+  },
+  "exposed-components": {
+    "loading": ""
+  },
+  "favorites": {
+    "data-source": {
+      "test-success": ""
+    }
+  },
+  "flame-graph": {
+    "error-loading-profile": "",
+    "explain-button": "",
+    "profile-id-selector": {
+      "filter-label": "",
+      "filter-operator": "",
+      "filter-value": "",
+      "name": "",
+      "remove": "",
+      "tooltip": ""
+    },
+    "settings-error": {
+      "message": "",
+      "title": ""
+    },
+    "span-selector": {
+      "added": "",
+      "remove": "",
+      "tooltip": ""
+    },
+    "title": ""
+  },
+  "function-details": {
+    "ai-suggestions": {
+      "analyzing": "",
+      "fetch-error": "",
+      "fetch-error-message": "",
+      "llm-error": "",
+      "llm-error-message": "",
+      "title": ""
+    },
+    "close": "",
+    "code": {
+      "breakdown-per-line": "",
+      "file-unavailable": "",
+      "optimize": "",
+      "view-on-github": ""
+    },
+    "commit": "",
+    "commit-option": {
+      "author-date": ""
+    },
+    "commit-select": {
+      "no-options": ""
+    },
+    "commit-tooltip": "",
+    "context-menu": {
+      "label": ""
+    },
+    "copy-to-clipboard": "",
+    "fetch-error": "",
+    "file": "",
+    "file-path-copied": "",
+    "file-tooltip": "",
+    "function-name": "",
+    "github": {
+      "banner-dismiss": "",
+      "banner-git-ref": "",
+      "banner-labels": "",
+      "banner-language-support": "",
+      "banner-learn-more": "",
+      "banner-title": "",
+      "connect-button": "",
+      "connect-tooltip": "",
+      "connecting": "",
+      "disconnect": "",
+      "view-commit": ""
+    },
+    "github-callback": {
+      "logging-in": "",
+      "title": ""
+    },
+    "not-available": "",
+    "override": {
+      "add": "",
+      "add-title": "",
+      "alert-debug": "",
+      "alert-labels": "",
+      "alert-title": "",
+      "aria-label": "",
+      "data-source": "",
+      "delete": "",
+      "edit": "",
+      "edit-title": "",
+      "git-ref-label": "",
+      "git-ref-placeholder": "",
+      "remove-all": "",
+      "remove-all-confirm": "",
+      "repository-label": "",
+      "repository-placeholder": "",
+      "repository-required": "",
+      "root-path": "",
+      "root-path-placeholder": "",
+      "service-name": "",
+      "user-set": ""
+    },
+    "repository": "",
+    "repository-tooltip": "",
+    "start-line": "",
+    "start-line-tooltip": "",
+    "title": ""
+  },
+  "give-feedback": {
+    "button": "",
+    "tooltip": ""
+  },
+  "grid": {
+    "empty-state": {
+      "no-results": ""
+    },
+    "error": {
+      "title": ""
+    },
+    "exemplars": {
+      "view-profile": ""
+    },
+    "layout": {
+      "aria-label": "",
+      "grid": "",
+      "rows": ""
+    },
+    "no-data": {
+      "label": ""
+    },
+    "panel-type": {
+      "aria-label": "",
+      "histograms": "",
+      "maxima": "",
+      "time-series": "",
+      "totals": ""
+    },
+    "quick-filter": {
+      "aria-label": "",
+      "clear": ""
+    }
+  },
+  "labels": {
+    "compare": {
+      "clear-tooltip": "",
+      "tooltip-empty": "",
+      "tooltip-ready": "",
+      "tooltip-select-baseline": "",
+      "tooltip-select-comparison": "",
+      "button_other": ""
+    },
+    "data-source": {
+      "all": "",
+      "test-success": ""
+    },
+    "filter": {
+      "clear-tooltip": "",
+      "exclude": "",
+      "exclude-tooltip": "",
+      "include": "",
+      "include-tooltip": ""
+    },
+    "grid": {
+      "no-results": "",
+      "refresh-tooltip": ""
+    },
+    "stats-panel": {
+      "baseline": "",
+      "baseline-description": "",
+      "comparison": "",
+      "comparison-description": "",
+      "total": ""
+    }
+  },
+  "onboarding": {
+    "empty-loading": {
+      "title": ""
+    },
+    "modal": {
+      "billing": {
+        "description": "",
+        "title": ""
+      },
+      "cloud": {
+        "step1": {
+          "description": "",
+          "title": ""
+        },
+        "step2": {
+          "description": "",
+          "title": ""
+        },
+        "step3": {
+          "description": "",
+          "title": ""
+        }
+      },
+      "decrease-latency": {
+        "description": "",
+        "title": ""
+      },
+      "how-to-get-started": "",
+      "reduce-costs": {
+        "description": "",
+        "title": ""
+      },
+      "resolve-incidents": {
+        "description": "",
+        "title": ""
+      },
+      "self-hosted": {
+        "step1": {
+          "description": "",
+          "title": ""
+        },
+        "step2": {
+          "description": "",
+          "title": ""
+        },
+        "step3": {
+          "description": "",
+          "title": ""
+        }
+      },
+      "subtitle": "",
+      "title": "",
+      "what-you-can-do": ""
+    },
+    "no-data-source": {
+      "alert-message": "",
+      "alert-title": "",
+      "title": ""
+    },
+    "page": {
+      "close": "",
+      "nav": ""
+    }
+  },
+  "panel-box": {
+    "cancel-query": "",
+    "loading-bar": "",
+    "panel-status": "",
+    "stop-streaming": "",
+    "streaming": "",
+    "untitled": ""
+  },
+  "panel-menu": {
+    "aria-label-no-title": "",
+    "aria-label-with-title": "",
+    "title": ""
+  },
+  "plugin-info": {
+    "aria-label": "",
+    "changelog": "",
+    "commit-sha": "",
+    "contribute": "",
+    "documentation": "",
+    "grafana-version": "",
+    "last-update": "",
+    "report-issue": "",
+    "title": "",
+    "version": ""
+  },
+  "query-analysis": {
+    "blocks": "",
+    "data-in-time-range": "",
+    "deduplication": "",
+    "index-store": "",
+    "no": "",
+    "profiles": "",
+    "profiles-store": "",
+    "query-info-aria-label": "",
+    "replicas": "",
+    "samples": "",
+    "series": "",
+    "series-in-query": "",
+    "stored-data-in-time-range": "",
+    "symbols-store": "",
+    "yes": ""
+  },
+  "query-builder": {
+    "chiclet": {
+      "edit-attribute": "",
+      "edit-operator": "",
+      "filter": "",
+      "filter-label": "",
+      "filter-operator": "",
+      "filter-value": "",
+      "partial-filter": "",
+      "remove-filter": ""
+    },
+    "error-load": "",
+    "execute": "",
+    "execute-tooltip": "",
+    "loading": "",
+    "no-value": "",
+    "nothing-to-execute-tooltip": "",
+    "operators": {
+      "in": "",
+      "in-description": "",
+      "is-empty": "",
+      "not-in": "",
+      "not-in-description": "",
+      "regex-match-description": "",
+      "regex-not-match-description": ""
+    },
+    "placeholder": {
+      "filter-add": "",
+      "select-label": "",
+      "select-operator": "",
+      "select-value": "",
+      "select-values": "",
+      "type-value": ""
+    },
+    "suggestions-disabled": "",
+    "suggestions-none": ""
+  },
+  "recording-rules": {
+    "delete": {
+      "aria-label": "",
+      "body": "",
+      "confirm": "",
+      "title": ""
+    },
+    "details": {
+      "filters": "",
+      "no": "",
+      "no-labels": "",
+      "read-only": "",
+      "yes": ""
+    },
+    "empty": {
+      "description": "",
+      "message": ""
+    },
+    "error": {
+      "feature-required": "",
+      "message": "",
+      "title": ""
+    },
+    "table": {
+      "actions": "",
+      "all-services": "",
+      "function-name": "",
+      "labels": "",
+      "name": "",
+      "none": "",
+      "profile-type": "",
+      "readonly-tooltip": "",
+      "service-name": "",
+      "total-all-functions": ""
+    },
+    "title": ""
+  },
+  "saved-searches": {
+    "load": {
+      "no-searches": "",
+      "no-searches-tooltip": "",
+      "remove-tooltip": "",
+      "saved-query-tooltip": "",
+      "select": "",
+      "select-pyroscope-query": "",
+      "title": "",
+      "tooltip": ""
+    },
+    "save": {
+      "cancel": "",
+      "close": "",
+      "description-label": "",
+      "error-message": "",
+      "existing-search-warning": "",
+      "info-message": "",
+      "save": "",
+      "saved-queries-tooltip": "",
+      "success-body": "",
+      "success-message": "",
+      "success-title": "",
+      "title": "",
+      "title-label": "",
+      "tooltip": ""
+    }
+  },
+  "series": {
+    "data-source": {
+      "test-success": ""
+    }
+  },
+  "settings": {
+    "loading": "",
+    "save-button": "",
+    "tabs": {
+      "ui-settings": "",
+      "unknown-extension": ""
+    },
+    "title": "",
+    "ui": {
+      "collapsed-flame-graphs": {
+        "label": "",
+        "toggle": ""
+      },
+      "enable-function-details": {
+        "label": "",
+        "learn-more": "",
+        "toggle": "",
+        "tooltip": ""
+      },
+      "fetch-error": {
+        "message": "",
+        "title": ""
+      },
+      "flame-graph": {
+        "label": ""
+      },
+      "function-details": {
+        "label": ""
+      },
+      "max-nodes": {
+        "label": ""
+      },
+      "metrics-from-profiles": {
+        "disable-hint": "",
+        "disable-warning": "",
+        "enable-warning": "",
+        "label": "",
+        "toggle": "",
+        "toggle-label": "",
+        "tooltip": ""
+      }
+    }
+  },
+  "timeseries": {
+    "menu": {
+      "exemplars": "",
+      "open-in-explore": "",
+      "scale-linear": "",
+      "scale-log2": "",
+      "scale-type": ""
+    }
+  },
+  "variables": {
+    "data-source": {
+      "label": ""
+    },
+    "favorite": {
+      "label": ""
+    },
+    "filters": {
+      "label": ""
+    },
+    "group-by": {
+      "label": "",
+      "labels-selector": "",
+      "other-labels-placeholder": "",
+      "other-labels-selector": "",
+      "refresh-tooltip": "",
+      "select-label-placeholder": ""
+    },
+    "profile-id-selector": {
+      "label": ""
+    },
+    "profile-metric": {
+      "aria-label": "",
+      "label": "",
+      "loading": "",
+      "placeholder_other": ""
+    },
+    "service-name": {
+      "aria-label": "",
+      "label": "",
+      "loading": "",
+      "placeholder_other": ""
+    },
+    "span-selector": {
+      "label": ""
+    }
+  }
+}

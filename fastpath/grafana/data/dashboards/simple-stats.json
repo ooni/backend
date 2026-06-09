@@ -1,0 +1,37 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "simple-stats",
+    "title": "Simple Metrics",
+    "schemaVersion": 36,
+    "version": 1,
+    "panels": [
+      {
+        "id": 1,
+        "type": "stat",
+        "title": "Example: statsd_exporter metric",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "statsd_metric_total",
+            "refId": "A"
+          }
+        ],
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "type": "graph",
+        "title": "statsd_exporter: requests over time",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(statsd_metric_total[1m])",
+            "refId": "A"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+      }
+    ]
+  }
+}

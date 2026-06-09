@@ -1,0 +1,413 @@
+{
+  "action-bar": {
+    "tab": {
+      "breakdown": "Rozpis",
+      "query-results": "",
+      "query-results-description": "",
+      "related-logs": "Související protokoly",
+      "related-logs-description": "Související protokoly založené na aktuálních filtrech štítků a časovém rozsahu",
+      "related-metrics": "Související metriky",
+      "related-metrics-description": "Související metriky založené na aktuálních filtrech štítků"
+    }
+  },
+  "breakdown": {
+    "add-to-filters": "Přidat do filtrů",
+    "by-label": "Podle štítku",
+    "group-by": {
+      "label": "Seřadit podle"
+    },
+    "label-values-list": {
+      "error-title": "Při načítání metrik došlo k chybě!",
+      "no-values": "Nebyly nalezeny žádné hodnoty štítků pro aktuální filtry a časový rozsah.",
+      "search-aria-label": "",
+      "search-label": "Hledat",
+      "view-label": "Zobrazit"
+    },
+    "labels-list": {
+      "breakdown-by-label": "Rozpis podle {{label}}",
+      "error-title": "Při načítání štítků došlo k chybě!",
+      "no-labels": "Nebyly nalezeny žádné štítky pro aktuální filtry a časový rozsah.",
+      "view-label": "Zobrazit"
+    },
+    "section-label": "Rozpis",
+    "select-label": "Vybrat"
+  },
+  "checkbox-list": {
+    "clear": "vymazat",
+    "collapse": "Sbalit",
+    "expand": "Rozbalit",
+    "no-results": "Žádné výsledky.",
+    "selected-count_one": "Vybráno: {{count}}",
+    "selected-count_few": "Vybráno: {{count}}",
+    "selected-count_many": "Vybráno: {{count}}",
+    "selected-count_other": "Vybráno: {{count}}"
+  },
+  "configure-panel": {
+    "apply": "Použít",
+    "cancel": "Zrušit",
+    "restore-default": "Obnovit výchozí konfiguraci",
+    "restore-modal-body": "Opravdu chcete obnovit výchozí konfiguraci pro metriku {{metric}}?",
+    "restore-modal-confirm": "Obnovit",
+    "restore-modal-title": "Obnovit výchozí konfiguraci",
+    "select-function-message": "Vyberte funkci Prometheus, která bude ve výchozím nastavení použita k zobrazení metriky {{metricName}}."
+  },
+  "data-source-variable": {
+    "description": "Podporovány jsou pouze zdroje dat Prometheus",
+    "label": "Zdroj dat"
+  },
+  "data-trail": {
+    "configure-drawer": {
+      "title": "Konfigurovat funkci Prometheus"
+    },
+    "filters": {
+      "add-label": "Přidat štítek",
+      "label": "Filtry"
+    }
+  },
+  "error-view": {
+    "message": "<2>Zkuste stránku znovu načíst</2> nebo, pokud problém přetrvává, kontaktujte správce organizace. Omlouváme se za nepříjemnosti.",
+    "stack-trace-label": "Zobrazit trasování stacků",
+    "title": "Závažná chyba!"
+  },
+  "extreme-value-filter": {
+    "message": "Data panelu byla znovu načtena pomocí složitějšího dotazu pro zpracování extrémně malých hodnot v řadě"
+  },
+  "fetch-alerting-metrics": {
+    "error": "Nepodařilo se načíst pravidla pro upozorňování"
+  },
+  "fetch-dashboard-metrics": {
+    "error": "Nepodařilo se načíst metriky nástěnky",
+    "limit-warning-body": "",
+    "limit-warning-title": ""
+  },
+  "filtered-metrics-variable": {
+    "label": "Filtrované metriky"
+  },
+  "give-feedback": {
+    "button": "Poskytnout zpětnou vazbu",
+    "tooltip": "Podělte se o svůj názor na metriky v Grafaně."
+  },
+  "gmd-viz-panel": {
+    "native-histogram": "Nativní histogram",
+    "variant": {
+      "heatmap": "teplotní mapa",
+      "percentiles": "percentily"
+    }
+  },
+  "inline-banner": {
+    "unknown-error": "Neznámá chyba!"
+  },
+  "kg-annotations": {
+    "layer": {
+      "name": ""
+    },
+    "query": {
+      "name": ""
+    },
+    "severity": {
+      "critical": "",
+      "info": "",
+      "warning": ""
+    },
+    "toggle": {
+      "description": "",
+      "disabled-tooltip": "",
+      "label": "",
+      "learn-more": ""
+    }
+  },
+  "labels-datasource": {
+    "none-option": "(žádné)",
+    "test-success": "OK"
+  },
+  "labels-list": {
+    "clear": "vymazat",
+    "no-results": "Žádné výsledky.",
+    "no-selection": "Žádný výběr",
+    "selected": "Vybrané: „{{selectedLabel}}“"
+  },
+  "labels-variable": {
+    "label": "Seřadit podle štítku",
+    "placeholder": "Seřadit podle štítku…"
+  },
+  "layout-switcher": {
+    "aria-label": "Přepínač rozvržení",
+    "option": {
+      "grid": "Mřížka",
+      "rows": "Řádky",
+      "single": "Jednorázový"
+    }
+  },
+  "lazy-loading": {
+    "fallback": "Načítání…"
+  },
+  "list-controls": {
+    "search-aria-label": ""
+  },
+  "metrics": {
+    "metrics-drilldown": {
+      "load-query": {
+        "button-no-query-tooltip": "",
+        "button-tooltip": "",
+        "empty": "",
+        "load-error": "",
+        "load-type-error": "",
+        "modal-title": "",
+        "remove": "",
+        "saved-query-button-tooltip": "",
+        "select": ""
+      },
+      "save-query": {
+        "already-exists": {
+          "alert": ""
+        },
+        "button-tooltip": "",
+        "button-tooltip-saved-queries": "",
+        "cancel": "",
+        "description": "",
+        "error": "",
+        "modal-alert": "",
+        "modal-title": "",
+        "save": "",
+        "success": "",
+        "title": ""
+      }
+    }
+  },
+  "metrics-group-by-list": {
+    "error-title": "Při načítání hodnot štítku „{{labelName}}“ došlo k chybě!",
+    "no-values": "Nebyly nalezeny žádné hodnoty štítků pro štítek „{{labelName}}“."
+  },
+  "metrics-group-by-row": {
+    "error-title": "Při načítání metrik došlo k chybě!",
+    "no-metrics": "Nebyly nalezeny žádné metriky pro aktuální filtry a časový rozsah.",
+    "select": "Vybrat",
+    "select-tooltip": "Zobrazit metriky s {{labelName}} = {{labelValue}}",
+    "show-more-tooltip": "Zobrazit více metrik pro {{labelName}} = „{{labelValue}}“"
+  },
+  "metrics-list": {
+    "error-title": "Při načítání metrik došlo k chybě!",
+    "no-metrics": "Nebyly nalezeny žádné metriky pro aktuální filtry a časový rozsah."
+  },
+  "metrics-sorter": {
+    "error": {
+      "get-recent-metrics": "Nepodařilo se načíst poslední metriky:"
+    },
+    "label": "Seřadit podle",
+    "option": {
+      "alerting-usage": "Využití upozorňování",
+      "alphabetical": "Abecedně [A–Z]",
+      "alphabetical-reversed": "Abecedně [Z–A]",
+      "dashboard-usage": "Využití nástěnky",
+      "default": "Výchozí"
+    }
+  },
+  "metrics-variable": {
+    "label": "Metriky"
+  },
+  "onboarding": {
+    "learn-more": "Přečtěte si <2>naši dokumentaci</2> a zjistěte víc nebo<5></5><6>to vyzkoušejte online</6> v Grafana Play.",
+    "no-datasource": "Všimli jsme si, že není nakonfigurován žádný zdroj dat Prometheus.<1></1>Přidejte <4>zdroj dat Prometheus</4> pro zobrazení metrik.",
+    "title": "Vítejte v Podrobném rozpisu metrik Grafana"
+  },
+  "open-assistant": {
+    "explain-label": "Vysvětlit v asistentovi",
+    "metric-metadata-title": "Metadata metriky Prometheus"
+  },
+  "panel-menu": {
+    "action": {
+      "copy-url": "Kopírovat adresu URL",
+      "copy-url-success": "Adresa URL byla zkopírována do schránky",
+      "explore": "Prozkoumat"
+    },
+    "group": {
+      "actions": "Akce",
+      "navigation": "Navigace"
+    }
+  },
+  "plugin-info": {
+    "button": {
+      "title": "Informace o pluginu",
+      "tooltip": "Informace o pluginu"
+    },
+    "header": {
+      "last-update": "Poslední aktualizace: {{updated}}",
+      "title": "Podrobný rozpis metrik Grafana, verze {{version}}"
+    },
+    "menu": {
+      "changelog": "Seznam změn",
+      "commit-sha": "Provést SHA: {{sha}}",
+      "contribute": "Přispět",
+      "documentation": "Dokumentace",
+      "grafana-version": "Grafana {{edition}} verze {{version}} ({{env}})",
+      "prom-build-info": "{{application}} {{version}} {{buildDate}}",
+      "report-issue": "Nahlásit problém"
+    }
+  },
+  "prefix-filter": {
+    "all-metrics": "Všechny názvy metrik",
+    "tooltip": "Zobrazit podle předpony metriky. Předpona metriky je jedno slovo na začátku názvu metriky, které je relevantní pro doménu, do které metrika patří.",
+    "view-by-label": "Zobrazit podle"
+  },
+  "query-results": {
+    "aria-label": "",
+    "error-title": "",
+    "unavailable-message": "",
+    "unavailable-title": ""
+  },
+  "quick-search": {
+    "ask-assistant-aria-label": "Zeptejte se asistenta Grafana",
+    "ask-assistant-tooltip": "Zeptejte se asistenta Grafana",
+    "clear-search-tooltip": "Vymazat vyhledávání",
+    "placeholder": "",
+    "placeholder-question-mode": "Zeptejte se asistenta Grafana a stiskněte klávesu Enter",
+    "placeholder-with-assistant": "",
+    "placeholder-with-assistant-tab-enter": "",
+    "count-filtered_one": "",
+    "count-filtered_few": "",
+    "count-filtered_many": "",
+    "count-filtered_other": "",
+    "count-total_one": "",
+    "count-total_few": "",
+    "count-total_many": "",
+    "count-total_other": ""
+  },
+  "quick-search-assistant": {
+    "label-filters-title": "Aktuální filtry štítků",
+    "time-range-title": "Časový rozsah"
+  },
+  "related-logs": {
+    "datasource-description": "Některé zdroje dat Loki mohou v rozevírací nabídce chybět, pokud jejich odezva trvala déle než {{timeout}} sek. Chcete-li zobrazit protokoly pro všechny zdroje dat Loki, zkuste použít Podrobný rozpis protokolů.",
+    "datasource-label": "Zdroj dat protokolů",
+    "experimental-note": "Poznámka: Související protokoly je experimentální funkce.",
+    "loading": "Načítání…",
+    "no-logs-message": "Nepodařilo se nám najít žádné protokoly související s aktuální metrikou a vybranými filtry.",
+    "no-logs-title": "Nebyly nalezeny žádné související protokoly",
+    "open-drilldown": "Otevřít Podrobný rozpis protokolů",
+    "open-drilldown-tooltip": "Přejít do aplikace Podrobný rozpis protokolů",
+    "open-in-drilldown": "Otevřít v Podrobném rozpisu protokolů",
+    "open-in-drilldown-tooltip": "K prozkoumání těchto protokolů použijte aplikaci Podrobný rozpis protokolů",
+    "suggestions": "Chcete-li najít související protokoly, zkuste následující:<1><0>Upravte filtry štítků tak, aby zahrnovaly štítky, které existují v aktuální metrice i ve vašich protokolech</0><1>Vyberte metriku vytvořenou <2>pravidlem nahrávání Loki</2></1><2>Rozšiřte časový rozsah tak, aby zahrnoval více dat</2></1>"
+  },
+  "related-metrics": {
+    "search-aria-label": ""
+  },
+  "select-action": {
+    "button": "Vybrat"
+  },
+  "select-new-metric": {
+    "button": "Vyberte novou metriku",
+    "metrics-drilldown": "Podrobný rozpis metrik",
+    "open-in-drilldown-tooltip": "Otevřít v Podrobném rozpisu metrik"
+  },
+  "show-more-button": {
+    "text_one": "",
+    "text_few": "",
+    "text_many": "",
+    "text_other": ""
+  },
+  "sidebar": {
+    "bookmarks": {
+      "date-created": "Datum vytvoření:",
+      "empty-state": "Nejsou k dispozici žádné záložky pro<1></1>aktuální zdroj dat.",
+      "remove-tooltip": "Odebrat záložku"
+    },
+    "close-aria-label": "Zavřít",
+    "close-tooltip": "Zavřít",
+    "filter": {
+      "clear-search-tooltip": "Vymazat vyhledávání",
+      "hide-empty": "Skrýt prázdné",
+      "search-aria-label": "",
+      "search-placeholder": "Vyhledávání…"
+    },
+    "filter-type": {
+      "prefix": "předpona",
+      "recent": "nedávné",
+      "rule-group": "skupina pravidel",
+      "suffix": "přípona"
+    },
+    "labels-browser": {
+      "clear-search-tooltip": "Vymazat vyhledávání",
+      "search-aria-label": "",
+      "search-placeholder": "Vyhledávání…"
+    },
+    "recent-metrics": {
+      "all-time": "Kdykoliv",
+      "past-interval": "Minulý {{interval}}"
+    },
+    "section": {
+      "bookmarks": "Záložky",
+      "bookmarks-description": "Přístup k uloženým metrikám pro rychlou referenci",
+      "group-by-labels": "Seřadit podle štítků",
+      "group-by-labels-description": "Seřadit metriky podle hodnot štítků",
+      "prefix-filters": "Filtry předpon",
+      "prefix-filters-description": "Filtrovat metriky na základě jejich předpony názvu (jmenný prostor Prometheus)",
+      "recent-metrics": "Filtry nedávných metrik",
+      "recent-metrics-description": "Filtrovat metriky na základě toho, kdy začaly být přijímány",
+      "rules-filters": "Filtry pravidel",
+      "rules-filters-description": "Filtrovat metriky a pravidla nahrávání",
+      "suffix-filters": "Filtry přípon",
+      "suffix-filters-description": "Filtrovat metriky na základě jejich přípony názvu"
+    }
+  },
+  "sort-by": {
+    "label": "Seřadit podle",
+    "option": {
+      "alphabetical": "Název [A–Z]",
+      "alphabetical-description": "Abecední pořadí",
+      "alphabetical-reversed": "Název [Z–A]",
+      "alphabetical-reversed-description": "Obrácené abecední pořadí",
+      "outliers": "Okrajové řady",
+      "outliers-description": "Upřednostňuje hodnoty, které vykazují odlišné chování od ostatních v rámci stejného štítku"
+    },
+    "placeholder": "Vyberte kritéria",
+    "tooltip": "Seřadí hodnoty pomocí standardních nebo inteligentních výpočtů časových řad."
+  },
+  "trail": {
+    "breadcrumb": {
+      "all-metrics": "Všechny metriky",
+      "metrics": "Metriky"
+    }
+  },
+  "ui-text": {
+    "metric-select": {
+      "bookmark": "Záložka",
+      "copy-url": "Kopírovat adresu URL",
+      "open-explore": "Otevřít v Prozkoumat",
+      "select-new-metric-tooltip": "Odebrat stávající metriku a vybrat novou metriku"
+    },
+    "search": {
+      "title": "Hledat metriky"
+    }
+  },
+  "usage-data": {
+    "metric-used-in-plural_one": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-plural_few": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-plural_many": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-plural_other": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-singular_one": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-singular_few": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-singular_many": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-in-singular_other": "Metrika se používá v {{count}} {{usageType}}",
+    "metric-used-plural_one": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-plural_few": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-plural_many": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-plural_other": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-singular_one": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-singular_few": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-singular_many": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "metric-used-singular_other": "Metrika byla použita {{count}}krát v dotazech na nástěnce. Kliknutím zobrazíte nástěnky.",
+    "used-time-plural_one": "Použito {{count}}krát v {{label}}",
+    "used-time-plural_few": "Použito {{count}}krát v {{label}}",
+    "used-time-plural_many": "Použito {{count}}krát v {{label}}",
+    "used-time-plural_other": "Použito {{count}}krát v {{label}}",
+    "used-time-singular_one": "Použito {{count}}krát v {{label}}",
+    "used-time-singular_few": "Použito {{count}}krát v {{label}}",
+    "used-time-singular_many": "Použito {{count}}krát v {{label}}",
+    "used-time-singular_other": "Použito {{count}}krát v {{label}}"
+  },
+  "with-config-panel-options": {
+    "click-to-select": "Kliknutím vyberte tuto konfiguraci",
+    "current-config": "Aktuální konfigurace"
+  }
+}
