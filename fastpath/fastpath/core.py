@@ -11,14 +11,14 @@ See README.adoc
 # Compatible with Python3.6 and 3.7 - linted with Black
 # debdeps: python3-setuptools
 
-from datetime import datetime, timezone
+from difflib import restore
+import json
+from datetime import datetime
 from argparse import ArgumentParser, Namespace
 from base64 import b64decode
 from configparser import ConfigParser
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
-from hashlib import sha512
+from typing import Any, Dict, List, TypedDict
 import binascii
 import logging
 import multiprocessing as mp
@@ -136,6 +136,7 @@ def setup() -> None:
     ap.add_argument("--testnames", help=h)
     h = "Allow writing measurements to spool dir, see: https://github.com/ooni/backend/pull/971"
     ap.add_argument("--write-to-disk", action="store_true", help=h)
+    ap.add_argument("--queue-file", help=h, nargs=1, type=str)
 
     conf = ap.parse_args()
 
@@ -173,6 +174,9 @@ def setup() -> None:
 
         if conf.clickhouse_url is None:
             conf.clickhouse_url = cp["DEFAULT"]["clickhouse_url"].strip()
+
+        if conf.queue_file is None:
+            conf.queue_file = cp["DEFAULT"]["queue_file"].strip()
 
     setup_dirs(conf, root)
 
@@ -1689,17 +1693,17 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         inp = measurement.get("input")
         log.debug(f"Processing {msmt_uid} {rid} {inp}")
         if rid is None:
-            log.debug(f"Ignoring measurement without report_id")
+            log.debug("Ignoring measurement without report_id")
             metrics.incr("discarded_measurement")
             return
 
         if measurement.get("probe_cc", "").upper() == "ZZ":
-            log.debug(f"Ignoring measurement with probe_cc=ZZ")
+            log.debug("Ignoring measurement with probe_cc=ZZ")
             metrics.incr("discarded_measurement")
             return
 
         if measurement.get("probe_asn", "").upper() == "AS0":
-            log.debug(f"Ignoring measurement with ASN 0")
+            log.debug("Ignoring measurement with ASN 0")
             metrics.incr("discarded_measurement")
             return
 
@@ -1807,6 +1811,8 @@ def core():
         process_measurements_from_s3()
         return
 
+    restore_queue_content(queue, Path(conf.queue_file))
+
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module
     parent_pid = os.getpid()
@@ -1828,6 +1834,9 @@ def core():
         # to create children processes
         if os.getpid() != parent_pid:
             return
+
+        save_queue_content(queue, Path(conf.queue_file))
+
         log.info("Shutting down workers")
         time.sleep(1)
         shut_down(queue)
@@ -1840,6 +1849,51 @@ def core():
         log.info("Join done")
         clean_caches()
 
+def save_queue_content(queue: mp.Queue, disk_file: Path):
+    """
+    Saves the queue content to disk
+    """
+
+    if queue.empty():
+        return
+
+    content = []
+    while not queue.empty():
+        content.append(queue.get())
+
+    if not disk_file.exists():
+        disk_file.touch()
+
+    with disk_file.open('w') as f:
+        json.dump(content, f)
+
+    log.info(f"Saved {len(content)} measurements to disk")
+
+def restore_queue_content(queue: mp.Queue, disk_file: Path):
+    """
+    Restores queue content from disk
+    """
+
+    if not disk_file.exists():
+        return # queue file does not exists, nothing to do
+
+    try:
+        # parse
+        with disk_file.open('r') as f:
+            content = json.load(f)
+
+        assert isinstance(content, list)
+
+        # fill queue
+        for item in content:
+            queue.put(item)
+
+        # clean queue file
+        disk_file.unlink()
+
+    except Exception as e:
+        log.error("Unable to restore queue from disk")
+        log.exception(e)
 
 def extract_expected_countries(ec):
     ecs = set(cc.upper() for cc in ec.strip().split(","))
