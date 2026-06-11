@@ -4,7 +4,6 @@ List objects in an S3 bucket using boto3.
 Configuration is read from environment variables (see defaults below).
 """
 
-import argparse
 import boto3
 import os
 import requests
@@ -22,13 +21,10 @@ ROLE_DURATION_SECONDS = int(os.getenv("ROLE_DURATION_SECONDS", "3600"))  # optio
 AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", 1000))              # number of items to process before exiting
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")                    # required
+DRY_RUN = os.getenv("DRY_RUN")
 PREFIX = os.getenv("S3_PREFIX", "")
 FASTPATH_API = os.getenv("FASTPATH_API", "")
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-
-parser = argparse.ArgumentParser(description="List/process S3 objects")
-parser.add_argument("--dry-run", action="store_true", help="List objects and print POSTs without downloading or sending them")
-args = parser.parse_args()
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()           # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 def get_logger(name=__name__):
     """
@@ -125,7 +121,7 @@ def process_postcan(s3, client, bucket, key):
         logger.debug("Processing key=%s msmt_id=%s", key, msmt_id)
         endpoint = f"{FASTPATH_API}/{msmt_id}"
 
-        if args.dry_run:
+        if DRY_RUN:
             logger.info("DRY RUN: s3://%s/%s -> %s", bucket, key, endpoint)
             return key, None
 
