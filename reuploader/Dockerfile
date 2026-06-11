@@ -28,11 +28,11 @@ ENV ROLE_ARN=
 ENV ROLE_SESSION_NAME="assume-role-session"
 # optional
 ENV ROLE_DURATION_SECONDS="3600"
-ENV AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
+ENV AWS_REGION = "eu-central-1"
 # required
 ENV BUCKET_NAME=
 # s3 path prefix
-ENV PREFIX = os.getenv("S3_PREFIX", "")
+ENV PREFIX = ""
 # fastpath API endpoint
 ENV FASTPATH_API=
 
