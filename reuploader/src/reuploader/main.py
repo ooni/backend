@@ -20,6 +20,7 @@ ROLE_ARN = os.getenv("ROLE_ARN")
 ROLE_SESSION_NAME = os.getenv("ROLE_SESSION_NAME", "assume-role-session")
 ROLE_DURATION_SECONDS = int(os.getenv("ROLE_DURATION_SECONDS", "3600"))  # optional
 AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 1000))              # number of items to process before exiting
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")                    # required
 PREFIX = os.getenv("S3_PREFIX", "")
 FASTPATH_API = os.getenv("FASTPATH_API", "")
@@ -154,6 +155,7 @@ def main():
         return
 
     with requests.Session() as client:
+        remaining = BATCH_SIZE
         try:
             for prefix, subs, objs in walk(s3, client, BUCKET_NAME, ""):
                 logger.info("PREFIX: %s  subdirs=%d objects=%d", prefix, len(subs), len(objs))
@@ -163,6 +165,10 @@ def main():
                         logger.warning("Failed to process %s: %s", key, err)
                     else:
                         logger.debug("Submitted %s to fastpath", key)
+                    remaining = remaining - 1
+                    if remaining <= 0:
+                        return
+                    logger.debug(f"{remaining} entries left this batch")
         except EndpointConnectionError as e:
             logger.error("Endpoint connection error: %s", e, exc_info=True)
         except Exception as e:
