@@ -10,7 +10,7 @@ import requests
 import logging
 import sys
 from pathlib import Path
-from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
+from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError, LoginInsufficientPermissions
 
 # Configuration from environment (set these in your shell)
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")           # required if not using IAM role/profile
@@ -167,6 +167,8 @@ def main():
                     logger.debug(f"{remaining} entries left this batch")
         except EndpointConnectionError as e:
             logger.error("Endpoint connection error: %s", e, exc_info=True)
+        except LoginInsufficientPermissions as e:
+            logger.error("Invalid credentials error: %s", e, exc_info=True)
         except Exception as e:
             logger.exception("Unexpected error in main loop")
 
