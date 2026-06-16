@@ -13,8 +13,6 @@ from pathlib import Path
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError, LoginInsufficientPermissions
 
 # Configuration from environment (set these in your shell)
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")           # required if not using IAM role/profile
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")   # required if not using IAM role/profile
 ROLE_ARN = os.getenv("ROLE_ARN")
 ROLE_SESSION_NAME = os.getenv("ROLE_SESSION_NAME", "assume-role-session")
 ROLE_DURATION_SECONDS = int(os.getenv("ROLE_DURATION_SECONDS", "3600"))  # optional
@@ -47,11 +45,7 @@ def assume_role_and_get_credentials(role_arn, session_name, duration_seconds=360
     Assume the given role and return temporary credentials dict.
     """
     logger.debug("Assuming role %s (session=%s, duration=%s)", role_arn, session_name, duration_seconds)
-    sts_kwargs = {"region_name": AWS_REGION,
-                  "aws_access_key_id": AWS_ACCESS_KEY_ID,
-                  "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
-                  }
-    sts_client = boto3.client("sts", **sts_kwargs)
+    sts_client = boto3.client("sts", region_name=AWS_REGION)
     resp = sts_client.assume_role(
         RoleArn=role_arn,
         RoleSessionName=session_name,
