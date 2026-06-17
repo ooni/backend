@@ -72,15 +72,9 @@ def get_s3_client():
         except ClientError as e:
             logger.error("Error assuming role: %s", e.response.get("Error", {}).get("Message"), exc_info=True)
             raise
-    else:
-        if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
-            client_kwargs.update({
-                "aws_access_key_id": AWS_ACCESS_KEY_ID,
-                "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
-            })
-            logger.debug("Using explicit AWS credentials from environment")
     logger.debug("Creating S3 client with region %s", AWS_REGION)
     return boto3.client("s3", **client_kwargs)
+
 
 def walk(s3, client, bucket_name, start_prefix=''):
     """
