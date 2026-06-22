@@ -895,7 +895,7 @@ async def submit_measurement(
 
     Note that even if `error` is not null in the response, the measurement might still be processed.
 
-    If any of probe_cc, asn or test_name metadata has an invalid
+    If any of probe_cc, probe_asn or test_name metadata has an invalid
     format, the measurement will be rejected
 
     Expected format:
