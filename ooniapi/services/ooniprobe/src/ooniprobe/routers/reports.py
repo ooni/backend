@@ -117,14 +117,16 @@ async def receive_measurement(
     format, the measurement will be rejected
 
     Expected format:
-        - probe_cc = two letters, uppercase, alpha-numeric
-        - probe_asn = AS-prefixed, 3 <= len(probe_asn) <= 12, int value after AS
-        - test_name = 1 <= len(test_name) <= 30, lowercase
+
+    - probe_cc = two letters, uppercase, alpha-numeric
+    - probe_asn = AS-prefixed, 3 <= len(probe_asn) <= 12, int value after AS
+    - test_name = 1 <= len(test_name) <= 30, lowercase
 
     Examples:
-        - probe_cc = `VE`
-        - probe_asn = `AS1234`
-        - test_name = `web_connectivity`
+
+    - probe_cc = `VE`
+    - probe_asn = `AS1234`
+    - test_name = `web_connectivity`
     """
     setnocacheresponse(response)
     empty_measurement = {}
