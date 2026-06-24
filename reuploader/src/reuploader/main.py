@@ -121,11 +121,9 @@ def process_postcan(s3, client, bucket, key):
         r = client.post(endpoint, data=body.iter_chunks(chunk_size=16 * 1024), headers=headers, timeout=60)
         with r:
             r.raise_for_status()
-        logger.info("Successfully submitted %s", key)
         # TODO: optionally remove file from S3 here
         return key, None
     except Exception as e:
-        logger.exception("Failed to process %s", key)
         return key, str(e)
 
 def main():
@@ -148,7 +146,7 @@ def main():
                     if err:
                         logger.warning("Failed to process %s: %s", key, err)
                     else:
-                        logger.debug("Submitted %s to fastpath", key)
+                        logger.info("Submitted %s to fastpath", key)
 
                 # ignore paths without reports, e.g. parent dirs
                 if len(obs) > 0:
