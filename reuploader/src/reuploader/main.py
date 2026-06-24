@@ -122,9 +122,7 @@ def process_postcan(s3, client, bucket, key):
         with r:
             r.raise_for_status()
         # remove file from S3
-        r = s3.delete_object(Bucket=bucket, Key=key)
-        with r:
-            r.raise_for_status()
+        s3.delete_object(Bucket=bucket, Key=key)
         return key, None
     except Exception as e:
         return key, str(e)
