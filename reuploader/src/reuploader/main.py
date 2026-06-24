@@ -17,7 +17,7 @@ ROLE_ARN = os.getenv("ROLE_ARN")
 ROLE_SESSION_NAME = os.getenv("ROLE_SESSION_NAME", "assume-role-session")
 ROLE_DURATION_SECONDS = int(os.getenv("ROLE_DURATION_SECONDS", "3600"))  # optional
 AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", 1000))              # number of items to process before exiting
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 1000))              # number of hours of reports to process before exiting
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")                    # required
 DRY_RUN = os.getenv("DRY_RUN")
 PREFIX = os.getenv("S3_PREFIX", "")
@@ -149,6 +149,9 @@ def main():
                         logger.warning("Failed to process %s: %s", key, err)
                     else:
                         logger.debug("Submitted %s to fastpath", key)
+
+                # ignore paths without reports, e.g. parent dirs
+                if len(obs) > 0:
                     remaining = remaining - 1
                     if remaining <= 0:
                         return
