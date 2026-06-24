@@ -149,7 +149,7 @@ def main():
                         logger.info("Submitted %s to fastpath", key)
 
                 # ignore paths without reports, e.g. parent dirs
-                if len(obs) > 0:
+                if len(objs) > 0:
                     remaining = remaining - 1
                     if remaining <= 0:
                         return
