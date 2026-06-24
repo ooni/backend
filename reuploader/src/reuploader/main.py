@@ -121,7 +121,10 @@ def process_postcan(s3, client, bucket, key):
         r = client.post(endpoint, data=body.iter_chunks(chunk_size=16 * 1024), headers=headers, timeout=60)
         with r:
             r.raise_for_status()
-        # TODO: optionally remove file from S3 here
+        # remove file from S3
+        r = s3.delete_object(Bucket=bucket, Key=key)
+        with r:
+            r.raise_for_status()
         return key, None
     except Exception as e:
         return key, str(e)
