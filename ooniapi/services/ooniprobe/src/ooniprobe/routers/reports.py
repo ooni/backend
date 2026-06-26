@@ -116,10 +116,10 @@ async def receive_measurement(
     If any of probe_cc, probe_asn or test_name metadata has an invalid
     format, the measurement will be rejected
 
-    Expected format:
+    pected format:
 
     - probe_cc = two letters, uppercase, alpha-numeric
-    - probe_asn = AS-prefixed, 3 <= len(probe_asn) <= 12, int value after AS
+    - probe_asn = AS-prefixed, 3 <= len(probe_asn) <= 12, int value after AS, no leading 0s after AS
     - test_name = 1 <= len(test_name) <= 30, lowercase
 
     Examples:
