@@ -8,8 +8,8 @@ from ooniprobe import utils
 from ooniprobe.dependencies import ASNCCReaderDep
 from ooniprobe.common.clickhouse_utils import query_click_one_row
 from clickhouse_driver import Client as Clickhouse
-from ..utils import make_submit_request, postj, setup_user
-from ..test_anoncred import make_measurement, make_report_request
+from ..utils import postj, setup_user
+from ..test_anoncred import make_measurement_body, make_report_request, make_verified_measurement
 
 
 def fake_geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple:
@@ -156,21 +156,18 @@ async def test_geoip_mismatch_anoncred(client, clickhouse_db, clean_faulty_measu
 
     # Create anoncred user and submit_request
     user, manifest_version, emission_day = setup_user(client)
-    submit_request = make_submit_request(user, "VE", "AS65550")
+    body = make_measurement_body(probe_asn="AS65550", probe_cc="VE")
+    body["software_name"] = "ooni-integ-test"
+    body["software_version"] = "0.0.0"
+    body["annotations"] = {"platform": "linux"}
 
-    # Build measurement body for `/api/v1/submit_measurement`
-    msm = make_measurement(
-        submit_request.nym,
-        submit_request.request,
+    msm = make_verified_measurement(
+        user,
         manifest_version,
         probe_cc="VE",
         probe_asn="AS65550",
+        body=body,
     )
-    msm_content = msm.setdefault("content", {})
-    msm_content["software_name"] = "ooni-integ-test"
-    msm_content["software_version"] = "0.0.0"
-    msm_content["annotations"] = {"platform": "linux"}
-
 
     # matching cc and asn
     postj(

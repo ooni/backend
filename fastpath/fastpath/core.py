@@ -1809,6 +1809,7 @@ def core():
 
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module
+    parent_pid = os.getpid()
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]
@@ -1823,6 +1824,10 @@ def core():
         log.exception(e)
 
     finally:
+        # Not a parent PID. Note that gunicorn forks on start_http_api
+        # to create children processes
+        if os.getpid() != parent_pid:
+            return
         log.info("Shutting down workers")
         time.sleep(1)
         shut_down(queue)
