@@ -119,7 +119,7 @@ async def receive_measurement(
     Expected format:
 
     - probe_cc = two letters, uppercase, alpha-numeric
-    - probe_asn = AS-prefixed, 3 <= len(probe_asn) <= 12, int value after AS
+    - probe_asn = AS-prefixed, 3 <= len(probe_asn) <= 12, int value after AS, no leading 0s after AS
     - test_name = 1 <= len(test_name) <= 30, lowercase
 
     Examples:

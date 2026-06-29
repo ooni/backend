@@ -185,10 +185,12 @@ def check_measurement_meta(
     test_name_lower_ok = test_name.islower()
     asn_starts_as_ok = probe_asn.startswith("AS")
     asn_len_ok = len(probe_asn) >= 3 and len(probe_asn) <= 12
+    asn_no_leading_zero_ok = not (len(probe_asn) > 3 and probe_asn.startswith("AS0"))
 
     if not (
         cc_ok and test_name_len_ok and
-        test_name_lower_ok and asn_starts_as_ok and asn_len_ok
+        test_name_lower_ok and asn_starts_as_ok and asn_len_ok and
+        asn_no_leading_zero_ok
     ):
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_metadata").inc()
         log.error(
@@ -206,6 +208,8 @@ def check_measurement_meta(
             reasons.append("asn_len")
         if not asn_starts_as_ok:
             reasons.append("asn_no_as_prefix")
+        if not asn_no_leading_zero_ok:
+            reasons.append("asn_leading_zero")
 
         raise HTTPException(
             status_code=400,
