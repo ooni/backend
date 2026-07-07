@@ -375,11 +375,15 @@ class MeasurementsByASN(BaseModel):
     probe_asn: str = Field(..., description="Autonomous System Number")
 
 
+class WebsiteNetworksResponse(BaseModel):
+    results: List[MeasurementsByASN] = Field(..., description="List of number of measurements per ASN")
+
+
 @router.get("/website_networks", response_model=List[MeasurementsByASN], tags=["private"])
 def api_private_website_network_tests(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
-) -> List[MeasurementsByASN]:
+    ) -> WebsiteNetworksResponse:
     """Daily counts of website measurements per ASN for the past 31 days, returned as a list of (probe_asn, count) ordered by count descending."""
     s = """SELECT
         COUNT() AS count,
@@ -393,7 +397,7 @@ def api_private_website_network_tests(
         ORDER BY count DESC
         """
     results = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc})
-    validated: List[MeasurementsByASN] = [MeasurementsByASN(**x) for x in results]
+    validated: WebsiteNetworksResponse(results=[MeasurementsByASN(**x) for x in results])
     return validated
 
 
