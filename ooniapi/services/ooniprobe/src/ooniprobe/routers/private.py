@@ -700,6 +700,8 @@ def api_private_im_stats(
 
     probe_asn = int(probe_asn.upper().replace("AS", ""))
 
+    # XXX: this method never queries anomaly_count and always returns anomaly_count=None. Why?
+
     s = """SELECT
         COUNT() as total_count,
         toDate(measurement_start_time) AS test_day
