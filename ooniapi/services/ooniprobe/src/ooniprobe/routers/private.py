@@ -424,8 +424,7 @@ def api_private_website_stats(
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
-    url = input
-
+    url = str(input)
     s = """
     SELECT
         toDate(measurement_start_time) AS test_day,
@@ -437,9 +436,9 @@ def api_private_website_stats(
     WHERE
         measurement_start_time >= (today() - INTERVAL 31 DAY)
         AND measurement_start_time < today()
-        AND probe_cc = %(probe_cc)s
-        AND probe_asn = %(probe_asn)s
-        AND input = %(input)s
+        AND probe_cc = {probe_cc:String}
+        AND probe_asn = {probe_asn:Int64}
+        AND input = {input:String}
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
