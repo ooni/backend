@@ -926,7 +926,7 @@ def pivot_circumvention_runtime_stats(rows) -> List[CircumventionRuntimeStat]:
     test_names = sorted(test_names)
     no_data = ()
     result = [
-        CircumventionRuntimeStat(test_name=k[0], probe_cc=k[1], date=k[2], v=tmp.get(k, no_data))
+        CircumventionRuntimeStat(test_name=k[0], probe_cc=k[1], metric_date=k[2], v=tmp.get(k, no_data))
         for k in product(test_names, ccs, dates)
     ]
     return result
