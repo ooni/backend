@@ -895,7 +895,7 @@ def api_private_circumvention_stats_by_country(
     """
     try:
         result = query_click(clickhouse, sql.text(q), {})
-        return CountryCircumVentionStatsResponse(results=result)
+        return CircumventionStatsResponse(results=result)
 
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
@@ -926,7 +926,7 @@ def pivot_circumvention_runtime_stats(rows) -> List[CircumventionRuntimeStat]:
     test_names = sorted(test_names)
     no_data = ()
     result = [
-        RuntimeStat(test_name=k[0], probe_cc=k[1], date=k[2], v=tmp.get(k, no_data))
+        CircumventionRuntimeStat(test_name=k[0], probe_cc=k[1], date=k[2], v=tmp.get(k, no_data))
         for k in product(test_names, ccs, dates)
     ]
     return result
