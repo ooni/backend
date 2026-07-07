@@ -428,14 +428,15 @@ def api_private_website_stats(
 
     s = """SELECT
         toDate(measurement_start_time) AS test_day,
-        countIf(anomaly = 't') as anomaly_count,
-        countIf(confirmed = 't') as confirmed_count,
-        countIf(msm_failure = 't') as failure_count,
-        COUNT() AS total_count
+        countIf(anomaly = 't') AS anomaly_count,
+        countIf(confirmed = 't') AS confirmed_count,
+        countIf(msm_failure = 't') AS failure_count,
+        count() AS total_count
         FROM fastpath
-        WHERE measurement_start_time >= today() - interval '31 day'
+        WHERE
+        measurement_start_time >= (today() - INTERVAL 31 DAY)
         AND measurement_start_time < today()
-        AND probe_cc =  :probe_cc
+        AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
         AND input = :input
         GROUP BY test_day ORDER BY test_day
