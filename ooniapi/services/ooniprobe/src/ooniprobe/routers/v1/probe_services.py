@@ -695,14 +695,68 @@ class GeoLookupResponse(BaseModel):
         description="Dict of IP addresses to GeoLookupResult"
     )
 
+# Rolling window: 60 seconds; limit: 5 per minute
+_RATE_LIMIT_WINDOW_S = 60
+_RATE_LIMIT_MAX = 5
+
+# Tarpit delay (seconds). Pick a value that effectively discourages abuse.
+_TARPIT_DELAY_S = 30
+
+# In-memory store: {client_ip: deque[timestamps]}
+_rate_store: Dict[str, Deque[float]] = {}
+_rate_lock = asyncio.Lock()
+
+
+async def _should_tarpit(client_ip: str) -> bool:
+    now = time.time()
+    cutoff = now - _RATE_LIMIT_WINDOW_S
+
+    async with _rate_lock:
+        q = _rate_store.get(client_ip)
+        if q is None:
+            q = deque()
+            _rate_store[client_ip] = q
+
+        # Drop old entries
+        while q and q[0] < cutoff:
+            q.popleft()
+
+        # If they already hit the limit, tarpit
+        if len(q) >= _RATE_LIMIT_MAX:
+            return True
+
+        # Record this request
+        q.append(now)
+        return False
+
+
+def _client_ip(request: Request) -> str:
+    # behind load balancer; use the original client from XFF
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        first = xff.split(",")[0].strip()
+        try:
+            return str(ipaddress.ip_address(first))
+        except Exception:
+            pass
+    return "unknown"
+
 
 @router.post("/geolookup", tags=["ooniprobe"])
 async def geolookup(
     data: GeoLookupRequest,
+    request: Request,
     response: Response,
     asn_cc_reader: ASNCCReaderDep,
 ) -> GeoLookupResponse:
     geolocation = dict()
+
+    client_ip = _client_ip(request)
+
+    # Tarpit if over limit
+    if await _should_tarpit(client_ip):
+        await asyncio.sleep(_TARPIT_DELAY_S)
+        raise HTTPException(status_code=429, detail="Rate Limited")
 
     log.debug(f"GeoLookupRequest: {data}")
     # for each address provided, call probe_geoip and add the data to our response
