@@ -440,10 +440,8 @@ def api_private_website_stats(
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
         AND input = :input
-    GROUP BY
-        toDate(measurement_start_time)
-    ORDER BY
-        test_day
+    GROUP BY toDate(measurement_start_time)
+    ORDER BY toDate(measurement_start_time)
     """
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
     results = query_click(clickhouse, sql.text(s), d)
