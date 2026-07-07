@@ -659,7 +659,7 @@ def api_private_im_networks(
         # XXX: anomaly_networks appears unused
 
         # update last_tested if it is the latest measurement
-        if stats.last_tested < entry.last_tested:
+        if stats.last_tested is None or stats.last_tested < entry.last_tested:
             stats.last_tested = entry.last_tested
 
         # save the object in results
