@@ -371,7 +371,7 @@ def api_private_test_coverage(
 
 
 class MeasurementsByASN(BaseModel):
-    count: int = Field(..., description="Number of measurments for eachnetworks in country")
+    count: int = Field(..., description="Number of measurements for each network in country")
     probe_asn: str = Field(..., description="Autonomous System Number")
 
 
