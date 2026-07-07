@@ -438,7 +438,7 @@ def api_private_website_stats(
     """
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
     results = query_click(clickhouse, sql.text(s), d)
-    return WebsiteStatsResponse(result=results)
+    return WebsiteStatsResponse(results=results)
 
 
 class WebsiteURLItem(BaseModel):
