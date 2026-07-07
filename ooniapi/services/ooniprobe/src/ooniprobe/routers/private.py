@@ -379,7 +379,7 @@ class WebsiteNetworksResponse(BaseModel):
     results: List[MeasurementsByASN] = Field(..., description="List of number of measurements per ASN")
 
 
-@router.get("/website_networks", response_model=List[MeasurementsByASN], tags=["private"])
+@router.get("/website_networks", response_model=WebsiteNetworksResponse, tags=["private"])
 def api_private_website_network_tests(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
