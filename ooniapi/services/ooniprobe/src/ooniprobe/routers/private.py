@@ -437,9 +437,9 @@ def api_private_website_stats(
     WHERE
         measurement_start_time >= (today() - INTERVAL 31 DAY)
         AND measurement_start_time < today()
-        AND probe_cc = :probe_cc
-        AND probe_asn = :probe_asn
-        AND input = :input
+        AND probe_cc = %(probe_cc)s
+        AND probe_asn = %(probe_asn)s
+        AND input = %(input)s
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
