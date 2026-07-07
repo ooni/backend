@@ -116,7 +116,6 @@ class CountryCount(BaseModel):
     }
 
 
-
 @router.get("/countries_by_month", tags=["private"], response_model=List[CountryCount])
 def api_private_countries_by_month(
     clickhouse: ClickhouseDep,
