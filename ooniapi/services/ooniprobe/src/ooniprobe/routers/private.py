@@ -397,7 +397,7 @@ def api_private_website_network_tests(
         ORDER BY count DESC
         """
     results = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc})
-    validated: WebsiteNetworksResponse(results=[MeasurementsByASN(**x) for x in results])
+    validated = WebsiteNetworksResponse(results=[MeasurementsByASN(**x) for x in results])
     return validated
 
 
