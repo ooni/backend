@@ -464,6 +464,7 @@ class WebsiteURLsResponse(BaseModel):
 
 @router.get("/website_urls", response_model=WebsiteURLsResponse, tags=["private"])
 def api_private_website_test_urls(
+    request: Request,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
@@ -534,8 +535,8 @@ def api_private_website_test_urls(
         )
         # TODO: remove BASE_URL?
         next_url = urljoin(
-            current_app.config["BASE_URL"],
-            "/api/_/website_urls?%s" % urlencode(args),
+            request.base_url.rstrip("/"),
+            f"/api/_/website_urls?{urlencode(args)}",
         )
         metadata["next_url"] = next_url
 
