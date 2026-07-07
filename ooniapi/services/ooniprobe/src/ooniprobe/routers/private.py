@@ -426,20 +426,24 @@ def api_private_website_stats(
     # made queries go from full scan to 50ms
     url = input
 
-    s = """SELECT
+    s = """
+    SELECT
         toDate(measurement_start_time) AS test_day,
         countIf(anomaly = 't') AS anomaly_count,
         countIf(confirmed = 't') AS confirmed_count,
         countIf(msm_failure = 't') AS failure_count,
         count() AS total_count
-        FROM fastpath
-        WHERE
+    FROM fastpath
+    WHERE
         measurement_start_time >= (today() - INTERVAL 31 DAY)
         AND measurement_start_time < today()
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
         AND input = :input
-        GROUP BY test_day ORDER BY test_day
+    GROUP BY
+        toDate(measurement_start_time)
+    ORDER BY
+        test_day
     """
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
     results = query_click(clickhouse, sql.text(s), d)
