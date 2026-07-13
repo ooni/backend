@@ -41,6 +41,11 @@ def utc_30_days_ago():
         datetime.now(timezone.utc) - timedelta(days=30), datetime.min.time()
     ).replace(tzinfo=None)
 
+def utc_7_days_ago():
+    return datetime.combine(
+        datetime.now(timezone.utc) - timedelta(days=7), datetime.min.time()
+    ).replace(tzinfo=None)
+
 
 def utc_today():
     return datetime.combine(datetime.now(timezone.utc), datetime.min.time()).replace(

@@ -14,7 +14,7 @@ from ...dependencies import get_clickhouse_session
 from .utils import (
     SinceUntil,
     parse_probe_asn_to_int,
-    utc_30_days_ago,
+    utc_7_days_ago,
     utc_today,
 )
 
@@ -73,7 +73,7 @@ async def list_measurements(
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
+    since: SinceUntil = utc_7_days_ago(),
     until: SinceUntil = utc_today(),
     order_by: Annotated[
         Literal[
