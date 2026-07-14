@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from tests.conftest import GEOIP_FROZEN_TIME
 from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
@@ -9,15 +9,14 @@ from ooniprobe.download_geoip import (
     try_update,
 )
 
-FROZEN_NOW = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
 
 
 def _current_month_ts() -> str:
-    return geoip_release_url(FROZEN_NOW)[0]
+    return geoip_release_url(GEOIP_FROZEN_TIME)[0]
 
 
 def _last_month_ts() -> str:
-    return geoip_release_url(FROZEN_NOW - relativedelta(months=1))[0]
+    return geoip_release_url(GEOIP_FROZEN_TIME- relativedelta(months=1))[0]
 
 
 def _geoipdbts(db_dir: Path) -> str:
@@ -25,8 +24,8 @@ def _geoipdbts(db_dir: Path) -> str:
 
 
 def _availability(current: bool, last_month: bool):
-    last_month_date = FROZEN_NOW - relativedelta(months=1)
-    current_url = geoip_release_url(FROZEN_NOW)[2]
+    last_month_date = GEOIP_FROZEN_TIME - relativedelta(months=1)
+    current_url = geoip_release_url(GEOIP_FROZEN_TIME)[2]
     last_month_url = geoip_release_url(last_month_date)[2]
 
     def _is_latest_available(url: str) -> bool:
@@ -54,7 +53,7 @@ def _patch_download_geoip(monkeypatch):
     monkeypatch.setattr("ooniprobe.download_geoip.download_geoip", _fake_download)
 
 
-@freeze_time(FROZEN_NOW)
+@freeze_time(GEOIP_FROZEN_TIME)
 def test_old_present_new_available(
     monkeypatch,
     download_geoip_db_dir,
@@ -71,7 +70,7 @@ def test_old_present_new_available(
     assert _geoipdbts(download_geoip_db_dir) == _current_month_ts()
 
 
-@freeze_time(FROZEN_NOW)
+@freeze_time(GEOIP_FROZEN_TIME)
 def test_old_not_present_new_unavailable(
     monkeypatch,
     download_geoip_db_dir,
@@ -87,7 +86,7 @@ def test_old_not_present_new_unavailable(
     assert _geoipdbts(download_geoip_db_dir) == _last_month_ts()
 
 
-@freeze_time(FROZEN_NOW)
+@freeze_time(GEOIP_FROZEN_TIME)
 def test_old_present_new_unavailable(
     monkeypatch,
     download_geoip_db_dir,
@@ -106,7 +105,7 @@ def test_old_present_new_unavailable(
     assert _geoipdbts(download_geoip_db_dir) == _last_month_ts()
 
 
-@freeze_time(FROZEN_NOW)
+@freeze_time(GEOIP_FROZEN_TIME)
 def test_already_updated_current_month(
     monkeypatch,
     download_geoip_db_dir,
@@ -123,7 +122,7 @@ def test_already_updated_current_month(
     assert _geoipdbts(download_geoip_db_dir) == _current_month_ts()
 
 
-@freeze_time(FROZEN_NOW)
+@freeze_time(GEOIP_FROZEN_TIME)
 def test_download_nothing_no_db(
     monkeypatch,
     download_geoip_db_dir,
