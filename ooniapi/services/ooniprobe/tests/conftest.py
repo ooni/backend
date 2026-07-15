@@ -1,9 +1,10 @@
+from freezegun import freeze_time
 import json
 import logging
 import pathlib
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 from urllib.request import urlopen
@@ -119,9 +120,20 @@ def geoip_db_dir(fixture_path):
 def download_geoip_db_dir(tmp_path):
     return tmp_path / "geoip"
 
+# A date used on several geoip tests:
+GEOIP_FROZEN_TIME = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+@pytest.fixture
+def frozen_time():
+    """
+    Used for geoip download tests.
+
+    This function will freeze the time for fixtures that have it as dependency
+    """
+    with freeze_time(GEOIP_FROZEN_TIME) as ft:
+        yield ft
 
 @pytest.fixture
-def last_month_geoip_db(download_geoip_db_dir):
+def last_month_geoip_db(frozen_time, download_geoip_db_dir):
     from datetime import datetime, timezone
 
     from dateutil.relativedelta import relativedelta
@@ -139,7 +151,7 @@ def last_month_geoip_db(download_geoip_db_dir):
 
 
 @pytest.fixture
-def current_month_geoip_db(download_geoip_db_dir):
+def current_month_geoip_db(frozen_time, download_geoip_db_dir):
     from datetime import datetime, timezone
 
     from ooniprobe.download_geoip import geoip_release_url
