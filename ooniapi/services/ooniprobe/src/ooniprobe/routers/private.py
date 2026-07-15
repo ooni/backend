@@ -539,9 +539,8 @@ def api_private_website_test_urls(
             probe_asn=probe_asn,
             probe_cc=probe_cc,
         )
-        # TODO: remove BASE_URL?
         next_url = urljoin(
-            request.base_url,
+            str(request.base_url).rstrip("/"),
             f"/api/_/website_urls?{urlencode(args)}",
         )
         metadata["next_url"] = next_url
