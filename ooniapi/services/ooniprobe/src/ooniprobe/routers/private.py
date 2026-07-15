@@ -539,9 +539,10 @@ def api_private_website_test_urls(
             probe_asn=probe_asn,
             probe_cc=probe_cc,
         )
+        next_url_base = request.base_url.replace(scheme="https")
         next_url = urljoin(
-            str(request.base_url).rstrip("/"),
-            f"/api/_/website_urls?{urlencode(args)}",
+            str(next_url_base),
+            f"api/_/website_urls?{urlencode(args)}",
         )
         metadata["next_url"] = next_url
 
