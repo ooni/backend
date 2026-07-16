@@ -12,9 +12,6 @@ def privapi(client, subpath):
     return response.json()
 
 
-# TODO: improve tests
-
-
 def test_private_api_asn_by_month(client):
     url = "asn_by_month"
     response = privapi(client, url)
@@ -133,11 +130,10 @@ def test_private_api_domain_metadata4(client):
     assert resp["canonical_domain"] == exp
 
 
-@pytest.mark.skip("FIXME not deterministic")
-def test_private_api_website_networks(client, log):
+def test_private_api_website_networks(client, log, fixed_time):
     url = "website_networks?probe_cc=US"
     resp = privapi(client, url)
-    assert len(resp["results"]) > 100
+    assert len(resp["results"]) == 9
 
 
 @pytest.mark.skip("FIXME not deterministic")

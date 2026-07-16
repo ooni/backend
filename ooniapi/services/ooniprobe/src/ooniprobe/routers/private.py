@@ -379,26 +379,36 @@ class WebsiteNetworksResponse(BaseModel):
     results: List[MeasurementsByASN] = Field(..., description="List of number of measurements per ASN")
 
 
+def real_now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 @router.get("/website_networks", response_model=WebsiteNetworksResponse, tags=["private"])
 def api_private_website_network_tests(
     clickhouse: ClickhouseDep,
-    probe_cc: CountryAlpha2 = Query(..., description="Country Code")
-    ) -> WebsiteNetworksResponse:
-    """Daily counts of website measurements per ASN for the past 31 days, returned as a list of (probe_asn, count) ordered by count descending."""
-    s = """SELECT
+    probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    now_utc: datetime = Depends(real_now_utc),
+) -> WebsiteNetworksResponse:
+    """Counts of website measurements per ASN for the 31-day window ending at now()."""
+
+    end = now_utc
+    start = end - timedelta(days=31)
+
+    s = """
+    SELECT
         COUNT() AS count,
         probe_asn
-        FROM fastpath
-        WHERE
-            measurement_start_time >= today() - interval '31 day'
-        AND measurement_start_time < today()
+    FROM fastpath
+    WHERE
+        measurement_start_time >= toDateTime(:start)
+        AND measurement_start_time <  toDateTime(:end)
         AND probe_cc = :probe_cc
-        GROUP BY probe_asn
-        ORDER BY count DESC
-        """
-    results = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc})
-    validated = WebsiteNetworksResponse(results=[MeasurementsByASN(**x) for x in results])
-    return validated
+    GROUP BY probe_asn
+    ORDER BY count DESC
+    """
+
+    results = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "start": start, "end": end})
+    return WebsiteNetworksResponse(results=[MeasurementsByASN(**x) for x in results])
 
 
 class DayStats(BaseModel):
