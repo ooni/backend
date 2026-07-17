@@ -1133,15 +1133,17 @@ def _verify_submit(
         protocol_state = ServerState.from_creds(
             manifest.manifest.public_parameters, settings.anonc_secret_key
         )
-        submit_response = protocol_state.handle_submit_request_with_hash(
-            submit_request.nym,
-            submit_request.zkp_request,
-            probe_cc,
-            probe_asn,
-            submit_request.content,
-            age_range,
-            min_msm_count,
-        )
+
+        with Metrics.ANONC_VERIFICATION_TIMING.time():
+            submit_response = protocol_state.handle_submit_request_with_hash(
+                submit_request.nym,
+                submit_request.zkp_request,
+                probe_cc,
+                probe_asn,
+                submit_request.content,
+                age_range,
+                min_msm_count,
+            )
         return (VerificationStatus.VERIFIED, None, submit_response)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         log.error(f"ZKP Failed: {e}")
