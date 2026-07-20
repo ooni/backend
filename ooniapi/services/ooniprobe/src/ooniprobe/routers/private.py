@@ -695,9 +695,17 @@ def api_private_im_networks(
     return results
 
 
-def isomid(d) -> str:
-    """Returns 2020-08-01T00:00:00+00:00"""
-    return f"{d}T00:00:00+00:00"
+def isomid(d: date | datetime) -> datetime:
+    if isinstance(d, datetime):
+        # Normalize via UTC calendar day
+        dt_utc = d if d.tzinfo is not None else d.replace(tzinfo=timezone.utc)
+        if dt_utc.tzinfo != timezone.utc:
+            dt_utc = dt_utc.astimezone(timezone.utc)
+
+        return datetime(dt_utc.year, dt_utc.month, dt_utc.day, 0, 0, 0, tzinfo=timezone.utc)
+
+    # It's a date: interpret it as midnight UTC
+    return datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone.utc)
 
 
 class IMStatsItem(BaseModel):
@@ -718,6 +726,7 @@ def api_private_im_stats(
     clickhouse: ClickhouseDep,
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
+    now_utc: datetime = Depends(real_now_utc),
     test_name: str = Query(..., description="Test name")
 ) -> IMStatsResponse:
     """Daily instant messaging measurement totals (and optional anomaly counts) for the past 31 days, for the given ASN, country, and test."""
@@ -726,6 +735,9 @@ def api_private_im_stats(
         raise HTTPException(status_code=400, detail="Invalid test_name")
 
     probe_asn = int(probe_asn.upper().replace("AS", ""))
+
+    end = now_utc
+    start = end - timedelta(days=31)
 
     # XXX: this method never queries anomaly_count and always returns anomaly_count=None. Why?
 
@@ -736,8 +748,8 @@ def api_private_im_stats(
         WHERE probe_cc = :probe_cc
         AND test_name = :test_name
         AND probe_asn = :probe_asn
-        AND measurement_start_time >= today() - interval '31 day'
-        AND measurement_start_time < today()
+        AND measurement_start_time >= toDate(:start)
+        AND measurement_start_time < toDate(:end)
         GROUP BY test_day
         ORDER BY test_day
     """
@@ -745,11 +757,13 @@ def api_private_im_stats(
         "probe_cc": probe_cc,
         "probe_asn": probe_asn,
         "test_name": test_name,
+        "start": start,
+        "end": end,
     }
     q = query_click(clickhouse, sql.text(s), query_params)
     tmp = {r["test_day"]: r for r in q}
     items: List[IMStatsItem] = []
-    days = [date.today() + timedelta(days=(d - 31)) for d in range(32)]
+    days = [datetime.date(end) + timedelta(days=(d - 31)) for d in range(32)]
     for d in days:
         if d in tmp:
             test_day = isomid(tmp[d]["test_day"])

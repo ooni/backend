@@ -211,7 +211,7 @@ def test_private_api_im_stats_basic(client):
     assert len(resp["results"][0]["test_day"]) == 25
 
 
-def test_private_api_im_stats(client):
+def test_private_api_im_stats(client, fixed_time):
     url = "im_stats?probe_cc=DE&probe_asn=680&test_name=signal"
     resp = privapi(client, url)
     assert len(resp["results"]) > 10
