@@ -113,7 +113,7 @@ def fixture_path(tmp_path_factory):
 
 @pytest.fixture()
 def fixed_time():
-    fixed_now = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
     app.dependency_overrides[real_now_utc] = lambda: fixed_now
 
 

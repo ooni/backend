@@ -429,12 +429,17 @@ def api_private_website_stats(
     input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: int = Query(..., description="ASN (integer)"),
+    now_utc: datetime = Depends(real_now_utc),
 ) -> WebsiteStatsResponse:
     """Daily aggregated website measurement statistics (anomalies, confirmations, failures, and totals) for the past 31 days."""
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
     url = str(input)
+
+    end = now_utc
+    start = end - timedelta(days=31)
+
     s = """
     SELECT
         toDate(measurement_start_time) AS test_day,
@@ -444,15 +449,15 @@ def api_private_website_stats(
         count() AS total_count
     FROM fastpath
     WHERE
-        measurement_start_time >= (today() - INTERVAL 31 DAY)
-        AND measurement_start_time < today()
+        measurement_start_time >= toDate(:start)
+        AND measurement_start_time < toDate(:end)
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
         AND input = :input
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
-    d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url}
+    d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url, "start": start, "end": end}
     results = query_click(clickhouse, sql.text(s), d)
     return WebsiteStatsResponse(results=results)
 
@@ -485,12 +490,16 @@ def api_private_website_test_urls(
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     limit: int = Query(10, description="Limit results"),
-    offset: int = Query(0, description="Offset results")
+    offset: int = Query(0, description="Offset results"),
+    now_utc: datetime = Depends(real_now_utc),
 ) -> WebsiteURLsResponse:
     """Paginated list of tested URLs with per-URL counts (anomalies, confirmations, failures, totals) for the past 31 days."""
     # TODO optimize or remove
     if limit <= 0:
         limit = 10
+
+    end = now_utc
+    start = end - timedelta(days=31)
 
     probe_asn = int(probe_asn.replace("AS", ""))
 
@@ -498,13 +507,13 @@ def api_private_website_test_urls(
     s = """
         SELECT COUNT(DISTINCT(input)) as input_count
         FROM fastpath
-        WHERE measurement_start_time >= today() - interval '31 day'
-        AND measurement_start_time < today()
+        WHERE measurement_start_time >= toDate(:start)
+        AND measurement_start_time < toDate(:end)
         AND test_name = 'web_connectivity'
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
     """
-    q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn))
+    q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn, start=start, end=end))
     total_count = q["input_count"] if q else 0
 
     # Group msmts by CC / ASN / period with LIMIT and OFFSET
@@ -514,8 +523,8 @@ def api_private_website_test_urls(
         countIf(msm_failure = 't') as failure_count,
         COUNT() AS total_count
         FROM fastpath
-        WHERE measurement_start_time >= today() - interval '31 day'
-        AND measurement_start_time < today()
+        WHERE measurement_start_time >= toDate(:start)
+        AND measurement_start_time < toDate(:end)
         AND test_name = 'web_connectivity'
         AND probe_cc =  :probe_cc
         AND probe_asn = :probe_asn
@@ -526,6 +535,8 @@ def api_private_website_test_urls(
         OFFSET :offset
         """
     d = {
+        "start": start,
+        "end": end,
         "probe_cc": probe_cc,
         "probe_asn": probe_asn,
         "limit": limit,
