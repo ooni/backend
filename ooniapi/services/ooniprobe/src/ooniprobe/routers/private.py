@@ -18,7 +18,7 @@ from sqlalchemy import sql
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
 from pydantic_extra_types.country import CountryAlpha2
-from pydantic import AnyUrl, Field
+from pydantic import AnyUrl, Field, StringConstraints
 
 from .v1.probe_services import probe_geoip, generate_test_helpers_conf
 from ..common.clickhouse_utils import query_click, query_click_one_row
@@ -982,7 +982,7 @@ def api_private_circumvention_runtime_stats(
 
 DomainStr = Annotated[
     str,
-    Field(
+    StringConstraints(
         strip_whitespace=True,
         pattern=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[A-Za-z]{2,}$"
     )
