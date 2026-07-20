@@ -133,7 +133,11 @@ def test_private_api_domain_metadata4(client):
 def test_private_api_website_networks(client, log, fixed_time):
     url = "website_networks?probe_cc=US"
     resp = privapi(client, url)
-    assert len(resp["results"]) == 9
+    assert len(resp["results"]) == 19
+    assert "count" in resp["results"][0]
+    assert "probe_asn" in resp["results"][0]
+    assert isinstance(resp["results"][0]["probe_asn"], int)
+    assert isinstance(resp["results"][0]["count"], int)
 
 
 def test_private_api_website_stats(client, log, fixed_time):
