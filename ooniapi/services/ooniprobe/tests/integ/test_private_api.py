@@ -193,11 +193,11 @@ def test_private_api_vanilla_tor_stats_empty(client):
 
 
 def test_private_api_im_networks(client):
-    url = "im_networks?probe_cc=BR"
+    url = "im_networks?probe_cc=DE"
     resp = privapi(client, url)
     return  # FIXME: implement tests with mocked db
     assert len(resp) > 1
-    assert len(resp["facebook_messenger"]["ok_networks"]) > 5
+    assert len(resp["signal"]["ok_networks"]) > 5
     if "telegram" in resp:
         assert len(resp["telegram"]["ok_networks"]) > 5
     assert len(resp["signal"]["ok_networks"]) > 5
