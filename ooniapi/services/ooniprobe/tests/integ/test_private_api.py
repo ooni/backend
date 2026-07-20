@@ -4,7 +4,7 @@
 #
 
 import pytest
-
+from urllib.parse import urljoin, urlencode
 
 def privapi(client, subpath):
     response = client.get(f"/api/_/{subpath}")
@@ -136,9 +136,8 @@ def test_private_api_website_networks(client, log, fixed_time):
     assert len(resp["results"]) == 9
 
 
-@pytest.mark.skip("FIXME not deterministic")
-def test_private_api_website_stats(client, log):
-    url = "website_stats?probe_cc=DE&probe_asn=3320&input=http:%2F%2Fwww.backtrack-linux.org%2F"
+def test_private_api_website_stats(client, log, fixed_time):
+    url = urljoin("website_stats", "?" + urlencode({"probe_cc": "CN", "probe_asn": 9808, "input": "https://www.x.com"}))
     resp = privapi(client, url)
     assert len(resp["results"]) > 2
     assert sorted(resp["results"][0].keys()) == [
@@ -150,9 +149,8 @@ def test_private_api_website_stats(client, log):
     ]
 
 
-@pytest.mark.skip("FIXME not deterministic")
-def test_private_api_website_urls(client, log):
-    url = "website_urls?probe_cc=US&probe_asn=209"
+def test_private_api_website_urls(client, log, fixed_time):
+    url = "website_urls?probe_cc=CN&probe_asn=9808"
     response = privapi(client, url)
     r = response["metadata"]
     assert r["total_count"] > 0
@@ -160,7 +158,7 @@ def test_private_api_website_urls(client, log):
     assert r == {
         "current_page": 1,
         "limit": 10,
-        "next_url": "https://api.ooni.io/api/_/website_urls?limit=10&offset=10&probe_asn=209&probe_cc=US",
+        "next_url": "https://testserver/api/_/website_urls?limit=10&offset=10&probe_asn=9808&probe_cc=CN",
         "offset": 0,
     }
     assert len(response["results"]) == 10
@@ -215,9 +213,8 @@ def test_private_api_im_stats_basic(client):
     assert len(resp["results"][0]["test_day"]) == 25
 
 
-@pytest.mark.skip("FIXME not deterministic")
 def test_private_api_im_stats(client):
-    url = "im_stats?probe_cc=CH&probe_asn=3303&test_name=facebook_messenger"
+    url = "im_stats?probe_cc=DE&probe_asn=680&test_name=signal"
     resp = privapi(client, url)
     assert len(resp["results"]) > 10
     assert resp["results"][0]["total_count"] > -1
@@ -267,7 +264,6 @@ def test_private_api_global_overview_by_month(client):
     assert resp["networks_by_month"][0]["date"].endswith("T00:00:00+00:00")
 
 
-@pytest.mark.skip(reason="cannot be tested")
 def test_private_api_quotas_summary(client):
     resp = privapi(client, "quotas_summary")
 
@@ -289,7 +285,6 @@ def test_private_api_check_bogus_report_id_is_found(client, log):
 # # /circumvention_stats_by_country
 
 
-@pytest.mark.skip(reason="depends on fresh data")
 def test_private_api_circumvention_stats_by_country(client, log):
     url = "circumvention_stats_by_country"
     resp = privapi(client, url)
@@ -300,7 +295,6 @@ def test_private_api_circumvention_stats_by_country(client, log):
 # # /circumvention_runtime_stats
 
 
-@pytest.mark.skip(reason="depends on fresh data")
 def test_private_api_circumvention_runtime_stats(client, log):
     url = "circumvention_runtime_stats"
     resp = privapi(client, url)
