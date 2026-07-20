@@ -435,7 +435,7 @@ def api_private_website_stats(
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
-    url = str(input)
+    url = str(input).rstrip('/') # strip trailing / from AnyURL validator
 
     end = now_utc
     start = end - timedelta(days=31)
