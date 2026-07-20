@@ -591,6 +591,7 @@ class TorStatsResponse(BaseModel):
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
 def api_private_vanilla_tor_stats(
     clickhouse: ClickhouseDep,
+    now_utc: datetime = Depends(real_now_utc),
     probe_cc: str = Query(..., description="Country Code")
 ) -> TorStatsResponse:
     """Per-ASN Tor measurement statistics for the given country over the last 6 months, including counts, last-tested date, and a tally of networks with low success rates."""
@@ -598,6 +599,9 @@ def api_private_vanilla_tor_stats(
         CountryAlpha2(probe_cc)
     except Exception:
         raise
+
+    end = now_utc
+
     blocked = 0
     nets = []
     s = """SELECT
@@ -607,11 +611,12 @@ def api_private_vanilla_tor_stats(
         COUNT() as total_count,
         total_count - countIf(anomaly = 't') AS success_count
         FROM fastpath
-        WHERE measurement_start_time > today() - INTERVAL 6 MONTH
+        WHERE measurement_start_time >= addMonths(toDate(:end), -6)
+        AND measurement_start_time < toDate(:end)
         AND probe_cc =  :probe_cc
         GROUP BY probe_asn
     """
-    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc})
+    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "end": end})
     extras = {
         "test_runtime_avg": None,
         "test_runtime_max": None,

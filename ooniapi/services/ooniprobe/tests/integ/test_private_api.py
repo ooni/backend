@@ -164,12 +164,12 @@ def test_private_api_website_urls(client, log, fixed_time):
     assert len(response["results"]) == 10
 
 
-def test_private_api_vanilla_tor_stats(client):
-    url = "vanilla_tor_stats?probe_cc=BR"
+def test_private_api_vanilla_tor_stats(client, fixed_time):
+    url = "vanilla_tor_stats?probe_cc=DE"
     resp = privapi(client, url)
     assert "notok_networks" in resp
     assert resp["notok_networks"] >= 0
-    assert len(resp["networks"]) > 10
+    assert len(resp["networks"]) == 6
     assert sorted(resp["networks"][0].keys()) == [
         "failure_count",
         "last_tested",
