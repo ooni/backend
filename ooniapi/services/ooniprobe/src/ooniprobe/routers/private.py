@@ -133,11 +133,11 @@ def api_private_countries_by_month(
         COUNT(DISTINCT(probe_cc)) AS value,
         toStartOfMonth(measurement_start_time) AS date
     FROM fastpath
-    WHERE measurement_start_time < toStartOfMonth(addMonths(:end, 1))
-    AND measurement_start_time > toStartOfMonth(subtractMonths(:end, 24))
+    WHERE measurement_start_time < toStartOfMonth(toDate(:end) + interval 1 month)
+    AND measurement_start_time > toStartOfMonth(toDate(:end) - interval 2 year)
     GROUP BY date ORDER BY date
     """
-    li = list(query_click(clickhouse, q, {"end": end}))
+    li = list(query_click(clickhouse, sql.text(q), {"end": end}))
     expand_dates(li)
     return [CountryCount(**item) for item in li]
 
