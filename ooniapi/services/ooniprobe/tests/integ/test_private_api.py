@@ -282,7 +282,7 @@ def test_private_api_check_bogus_report_id_is_found(client, log):
 # # /circumvention_stats_by_country
 
 
-def test_private_api_circumvention_stats_by_country(client, log):
+def test_private_api_circumvention_stats_by_country(client, log, fixed_time):
     url = "circumvention_stats_by_country"
     resp = privapi(client, url)
     assert resp["v"] == 0
@@ -292,7 +292,7 @@ def test_private_api_circumvention_stats_by_country(client, log):
 # # /circumvention_runtime_stats
 
 
-def test_private_api_circumvention_runtime_stats(client, log):
+def test_private_api_circumvention_runtime_stats(client, log, fixed_time):
     url = "circumvention_runtime_stats"
     resp = privapi(client, url)
     assert resp["v"] == 0

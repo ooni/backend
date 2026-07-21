@@ -931,18 +931,23 @@ class CircumventionStatsResponse(BaseModel):
 @router.get("/circumvention_stats_by_country", response_model=CircumventionStatsResponse, tags=["private"])
 def api_private_circumvention_stats_by_country(
     clickhouse: ClickhouseDep,
+    now_utc: datetime = Depends(real_now_utc),
 ) -> CircumventionStatsResponse:
     """Aggregated statistics on protocols used for circumvention, grouped by country. """
+
+    end = now_utc
+
     q = """SELECT probe_cc, COUNT(*) as cnt
         FROM fastpath
-        WHERE measurement_start_time > today() - interval 6 month
-        AND measurement_start_time < today() - interval 1 day
+        WHERE measurement_start_time >= toDate(:end) - interval 6 month
+        AND measurement_start_time < toDate(:end) - interval 1 day
+
         AND test_name IN ['torsf', 'tor', 'stunreachability', 'psiphon','riseupvpn']
         GROUP BY probe_cc ORDER BY probe_cc
     """
     try:
-        result = query_click(clickhouse, sql.text(q), {})
-        return CircumventionStatsResponse(results=result)
+        result = query_click(clickhouse, sql.text(q), {"end": end})
+        return CircumventionStatsResponse(v=0, results=result)
 
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
@@ -987,8 +992,12 @@ class CircumventionRuntimeStatsResponse(BaseModel):
 @router.get("/circumvention_runtime_stats", response_model=CircumventionRuntimeStatsResponse, tags=["private"])
 def api_private_circumvention_runtime_stats(
     clickhouse: ClickhouseDep,
+    now_utc: datetime = Depends(real_now_utc),
 ) -> CircumventionRuntimeStatsResponse:
     """Runtime statistics on protocols used for circumvention, grouped by date, country, test_name. """
+
+    end = now_utc
+
     q = """SELECT
         toDate(measurement_start_time) AS date,
         test_name,
@@ -998,13 +1007,13 @@ def api_private_circumvention_runtime_stats(
         count() as cnt
     FROM fastpath
     WHERE test_name IN ['torsf', 'tor', 'stunreachability', 'psiphon','riseupvpn']
-    AND measurement_start_time > today() - interval 6 month
-    AND measurement_start_time < today() - interval 1 day
+    AND measurement_start_time > toDate(:end) - interval 6 month
+    AND measurement_start_time < toDate(:end) - interval 1 day
     AND JSONHas(scores, 'extra', 'test_runtime')
     GROUP BY date, probe_cc, test_name
     """
     try:
-        r = query_click(clickhouse, sql.text(q), {})
+        r = query_click(clickhouse, sql.text(q), {"end": end})
         return CircumventionRuntimeStatsResponse(results=pivot_circumvention_runtime_stats(r), v=0)
 
     except Exception as e:
