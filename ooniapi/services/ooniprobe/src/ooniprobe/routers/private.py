@@ -652,7 +652,6 @@ class NetworkEntry(BaseModel):
 
 
 class IMNetworkStats(BaseModel):
-    test_name: str = Field(..., description="Name of the test")
     anomaly_networks: List[NetworkEntry] = Field(..., description="List of networks showing anomalous behaviour for this test")
     ok_networks: List[NetworkEntry] = Field(..., description="List of networks considered OK for this test")
     last_tested: Optional[date] = Field(None, description="Most recent measurement date across networks for this test")
@@ -684,7 +683,7 @@ def api_private_im_networks(
     results: Dict[str, IMNetworkStats] = {}
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
-        stats = results.get(r["test_name"], IMNetworkStats(test_name=r["test_name"], anomaly_networks=[], ok_networks=[], last_tested=None))
+        stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested=None))
 
         # create and add a new entry
         entry = NetworkEntry(asn=r["probe_asn"], name="", total_count=r["total_count"], last_tested=r["last_tested"])
