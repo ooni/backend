@@ -68,6 +68,10 @@ TEST_GROUPS = {
 }
 
 
+def real_now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
         yield start_date + timedelta(n)
@@ -380,10 +384,6 @@ class MeasurementsByASN(BaseModel):
 
 class WebsiteNetworksResponse(BaseModel):
     results: List[MeasurementsByASN] = Field(..., description="List of number of measurements per ASN")
-
-
-def real_now_utc() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 @router.get("/website_networks", response_model=WebsiteNetworksResponse, tags=["private"])
