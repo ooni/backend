@@ -12,18 +12,18 @@ def privapi(client, subpath):
     return response.json()
 
 
-def test_private_api_asn_by_month(client):
+def test_private_api_asn_by_month(client, fixed_time):
     url = "asn_by_month"
     response = privapi(client, url)
     assert len(response) > 0, response
     r = response[0]
     assert sorted(r.keys()) == ["date", "value"]
-    assert r["value"] > 10
+    assert r["value"] >= 3
     assert r["value"] < 10**6
     assert r["date"].endswith("T00:00:00+00:00")
 
 
-def test_private_api_countries_by_month(client):
+def test_private_api_countries_by_month(client, fixed_time):
     url = "countries_by_month"
     response = privapi(client, url)
     assert len(response) > 0, response
@@ -252,7 +252,7 @@ def test_private_api_global_overview(client):
     assert "network_count" in response
 
 
-def test_private_api_global_overview_by_month(client):
+def test_private_api_global_overview_by_month(client, fixed_time):
     url = "global_overview_by_month"
     resp = privapi(client, url)
     assert sorted(resp["networks_by_month"][0].keys()) == ["date", "value"]

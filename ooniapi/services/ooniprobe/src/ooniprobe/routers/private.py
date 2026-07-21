@@ -119,18 +119,21 @@ class CountryCount(BaseModel):
 @router.get("/countries_by_month", tags=["private"], response_model=List[CountryCount])
 def api_private_countries_by_month(
     clickhouse: ClickhouseDep,
+    now_utc: datetime = Depends(real_now_utc),
 ) -> List[CountryCount]:
     """Countries count by month
     """
+
+    end = now_utc
     q = """SELECT
         COUNT(DISTINCT(probe_cc)) AS value,
         toStartOfMonth(measurement_start_time) AS date
     FROM fastpath
-    WHERE measurement_start_time < toStartOfMonth(addMonths(now(), 1))
-    AND measurement_start_time > toStartOfMonth(subtractMonths(now(), 24))
+    WHERE measurement_start_time < toStartOfMonth(addMonths(:end, 1))
+    AND measurement_start_time > toStartOfMonth(subtractMonths(:end, 24))
     GROUP BY date ORDER BY date
     """
-    li = list(query_click(clickhouse, q, {}))
+    li = list(query_click(clickhouse, q, {"end": end}))
     expand_dates(li)
     return [CountryCount(**item) for item in li]
 
@@ -893,16 +896,20 @@ class GlobalOverviewMonthResponse(BaseModel):
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
 def api_private_global_by_month(
     clickhouse: ClickhouseDep,
+    now_utc: datetime = Depends(real_now_utc),
 ) -> GlobalOverviewMonthResponse:
     """Monthly global time series for the last two years: distinct networks (ASNs), distinct countries, and total measurements per month (month timestamps are start-of-month)."""
+
+    end = now_utc
+
     q = """SELECT
         COUNT(DISTINCT probe_asn) AS networks_by_month,
         COUNT(DISTINCT probe_cc) AS countries_by_month,
         COUNT() AS measurements_by_month,
         toStartOfMonth(measurement_start_time) AS month
         FROM fastpath
-        WHERE measurement_start_time > toStartOfMonth(today() - interval 2 year)
-        AND measurement_start_time < toStartOfMonth(today() + interval 1 month)
+        WHERE measurement_start_time > toStartOfMonth(:end - interval 2 year)
+        AND measurement_start_time < toStartOfMonth(:end) + interval 1 month)
         GROUP BY month ORDER BY month
     """
     rows = query_click(clickhouse, sql.text(q), {})
