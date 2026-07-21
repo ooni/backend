@@ -16,7 +16,7 @@ import math
 
 from sqlalchemy import sql
 
-from fastapi import APIRouter, Depends, Header, Request, Response, Query
+from fastapi import APIRouter, Depends, Header, Request, Response, Query, HTTPException
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic import AnyUrl, Field, StringConstraints
 
