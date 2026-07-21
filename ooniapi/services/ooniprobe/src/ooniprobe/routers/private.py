@@ -652,14 +652,16 @@ class NetworkEntry(BaseModel):
 
 
 class IMNetworkStats(BaseModel):
+    test_name: str = Field(..., description="Name of the test")
     anomaly_networks: List[NetworkEntry] = Field(..., description="List of networks showing anomalous behaviour for this test")
     ok_networks: List[NetworkEntry] = Field(..., description="List of networks considered OK for this test")
-    last_tested: date = Field(..., description="Most recent measurement date across networks for this test")
+    last_tested: Optional[date] = Field(None, description="Most recent measurement date across networks for this test")
 
 
 @router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
 def api_private_im_networks(
     clickhouse: ClickhouseDep,
+    now_utc: datetime = Depends(real_now_utc),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> Dict[str, IMNetworkStats]:
     """Per-test instant messaging network statistics (per-ASN totals and last-tested date) for the past 31 days, keyed by test name."""
@@ -670,19 +672,19 @@ def api_private_im_networks(
     probe_asn,
     test_name
     FROM fastpath
-    WHERE measurement_start_time >= today() - interval 31 day
-    AND measurement_start_time < today()
+    WHERE measurement_start_time >= toDate(:end) - interval 31 day
+    AND measurement_start_time < toDate(:end)
     AND probe_cc = :probe_cc
     AND test_name IN :test_names
     GROUP BY test_name, probe_asn
     ORDER BY test_name ASC, total_count DESC
     """
     test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
-    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names})
+    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names, "end": now_utc})
     results: Dict[str, IMNetworkStats] = {}
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
-        stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested=None))
+        stats = results.get(r["test_name"], IMNetworkStats(test_name=r["test_name"], anomaly_networks=[], ok_networks=[], last_tested=None))
 
         # create and add a new entry
         entry = NetworkEntry(asn=r["probe_asn"], name="", total_count=r["total_count"], last_tested=r["last_tested"])

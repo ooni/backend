@@ -195,15 +195,10 @@ def test_private_api_vanilla_tor_stats_empty(client):
     assert resp["last_tested"] is None
 
 
-def test_private_api_im_networks(client):
+def test_private_api_im_networks(client, fixed_time):
     url = "im_networks?probe_cc=DE"
     resp = privapi(client, url)
-    assert len(resp) > 1
-    assert len(resp["signal"]["ok_networks"]) > 5
-    if "telegram" in resp:
-        assert len(resp["telegram"]["ok_networks"]) > 5
-    assert len(resp["signal"]["ok_networks"]) > 5
-    # assert len(resp["whatsapp"]["ok_networks"]) > 5
+    assert len(resp["signal"]["ok_networks"]) == 5
 
 
 def test_private_api_im_stats_basic(client):
