@@ -686,7 +686,8 @@ def api_private_im_networks(
     results: Dict[str, IMNetworkStats] = {}
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
-        stats = results.get(r["test_name"], IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested=None))
+        test_name = r["test_name"]
+        stats = results.get(test_name, IMNetworkStats(anomaly_networks=[], ok_networks=[], last_tested=None))
 
         # create and add a new entry
         entry = NetworkEntry(asn=r["probe_asn"], name="", total_count=r["total_count"], last_tested=r["last_tested"])
@@ -699,7 +700,7 @@ def api_private_im_networks(
             stats.last_tested = entry.last_tested
 
         # save the object in results
-        results[stats.test_name] = stats
+        results[test_name] = stats
 
     return results
 
