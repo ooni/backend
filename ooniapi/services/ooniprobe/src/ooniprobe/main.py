@@ -91,7 +91,7 @@ app.add_middleware(
 settings = get_settings()
 app.add_middleware(
     ProfileMiddleware,
-    profile_active = settings.profiling_active,
+    profiling_active = settings.profiling_active,
     report_path = settings.profiling_report_path,
     whitelist = ("/api/v1/submit_measurement",)
 )
