@@ -910,10 +910,10 @@ def api_private_global_by_month(
         toStartOfMonth(measurement_start_time) AS month
         FROM fastpath
         WHERE measurement_start_time > toStartOfMonth(:end - interval 2 year)
-        AND measurement_start_time < toStartOfMonth(:end) + interval 1 month)
+        AND measurement_start_time < toStartOfMonth(:end + interval 1 month)
         GROUP BY month ORDER BY month
     """
-    rows = query_click(clickhouse, sql.text(q), {})
+    rows = query_click(clickhouse, sql.text(q), {"end": end})
     rows = list(rows)
 
     n = [{"date": r["month"], "value": r["networks_by_month"]} for r in rows]
