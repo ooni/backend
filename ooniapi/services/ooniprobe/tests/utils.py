@@ -55,3 +55,13 @@ def get_msmt_hash(msmt: Dict[str, Any], is_verified: str = "u") -> str:
     payload = copy.deepcopy(msmt)
     payload["is_verified"] = is_verified
     return sha512(ujson.dumps(payload).encode()).hexdigest()[:16]
+
+def set_middleware_params(app, middleware_class, **kwargs):
+    old = None
+    for m in app.user_middleware:
+        if m.cls is middleware_class:
+            old = m.options.copy()
+            m.options.update(kwargs)
+            app.middleware_stack = None  # force Starlette to rebuild on next request
+            break
+    return old

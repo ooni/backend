@@ -19,6 +19,7 @@ import pytest_asyncio
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from ooniprobe.common.profile_middleware import ProfileMiddleware
 from ooniprobe.common.clickhouse_utils import insert_click
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
@@ -35,7 +36,7 @@ from ooniprobe.download_geoip import try_update
 from ooniprobe.main import app, lifespan
 from ooniprobe.routers.v1.probe_services import TorTarget
 
-from .utils import setup_user
+from .utils import setup_user, set_middleware_params
 
 
 def make_override_get_settings(**kw):
@@ -461,3 +462,28 @@ async def client_with_two_working_fastpaths(
         test_settings, geoip_db_dir, test_creds, [first_url, second_url]
     ) as (client, mock_fastpath):
         yield client, mock_fastpath, first_url, second_url
+
+
+@pytest_asyncio.fixture(scope='function')
+def profiling_enabled(tmp_path):
+    old = set_middleware_params(app, ProfileMiddleware,
+        profiling_active = True,
+        report_path = str(tmp_path / "report.html"),
+        whitelist = ("/api/v1/manifest",)
+    ) or {}
+
+    yield
+
+    set_middleware_params(app, ProfileMiddleware, **old)
+
+@pytest_asyncio.fixture(scope='function')
+def profiling_disabled(tmp_path):
+    old = set_middleware_params(app, ProfileMiddleware,
+        profiling_active = False,
+        report_path = str(tmp_path / "report.html"),
+        whitelist = ("/api/v1/manifest",)
+    ) or {}
+
+    yield
+
+    set_middleware_params(app, ProfileMiddleware, **old)
