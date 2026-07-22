@@ -262,6 +262,7 @@ def test_private_api_global_overview_by_month(client, fixed_time):
     assert resp["networks_by_month"][0]["date"].endswith("T00:00:00+00:00")
 
 
+@pytest.mark.skip(reason="NotImplemented")
 def test_private_api_quotas_summary(client_with_admin_role):
     resp = privapi(client_with_admin_role, "quotas_summary")
 

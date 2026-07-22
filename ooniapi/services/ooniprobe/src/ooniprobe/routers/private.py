@@ -230,9 +230,8 @@ def api_private_quotas_summary() -> List[CountryStat]:
     """Summary on rate-limiting quotas.
     [(first ipaddr octet, remaining daily quota), ... ]
     """
-    # XXX: add limiter to ooniapi
-    #return nocachejson(current_app.limiter.get_lowest_daily_quotas_summary())
-    raise NotImplemented
+    # XXX: the new limiter does not provide a way to get summaries by IP
+    raise HTTPException(status_code=501, detail="quotas_summary not implemented yet")
 
 
 class CheckReportIDResponse(BaseModel):
