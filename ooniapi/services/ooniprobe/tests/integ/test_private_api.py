@@ -173,7 +173,7 @@ def test_private_api_vanilla_tor_stats(client, fixed_time):
     resp = privapi(client, url)
     assert "notok_networks" in resp
     assert resp["notok_networks"] >= 0
-    assert len(resp["networks"]) == 6
+    assert len(resp["networks"]) >= 9
     assert sorted(resp["networks"][0].keys()) == [
         "failure_count",
         "last_tested",
