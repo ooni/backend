@@ -75,6 +75,7 @@ dependencies = [
   "pytest-asyncio",
   "freezegun",
   "pytest-docker",
+  "pyinstrument"
 ]
 path = ".venv/"
 
