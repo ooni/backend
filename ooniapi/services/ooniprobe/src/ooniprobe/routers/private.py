@@ -964,7 +964,7 @@ class CircumventionRuntimeStat(BaseModel):
     test_name: str = Field(..., description="Name of test")
     probe_cc: CountryAlpha2 = Field(..., description="Country code of probe")
     metric_date: date = Field(..., alias="date", description="Date of metric")
-    v: Tuple[float, float, int] = Field((), description="(p50, p90, cnt)")
+    v: Tuple[float, float, int] = Field(..., description="(p50, p90, cnt)")
 
 
 def pivot_circumvention_runtime_stats(rows) -> List[CircumventionRuntimeStat]:
@@ -983,9 +983,9 @@ def pivot_circumvention_runtime_stats(rows) -> List[CircumventionRuntimeStat]:
     dates = sorted(dates)
     ccs = sorted(ccs)
     test_names = sorted(test_names)
-    no_data = ()
+    no_data = (0.0, 0.0, 0)
     result = [
-        CircumventionRuntimeStat(test_name=k[0], probe_cc=k[1], metric_date=k[2], v=tmp.get(k, no_data))
+        CircumventionRuntimeStat(test_name=k[0], probe_cc=k[1], date=k[2], v=tmp.get(k, no_data))
         for k in product(test_names, ccs, dates)
     ]
     return result
