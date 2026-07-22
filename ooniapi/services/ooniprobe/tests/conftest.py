@@ -1,5 +1,6 @@
 from freezegun import freeze_time
 import json
+import jwt
 import logging
 import pathlib
 import time
@@ -214,6 +215,31 @@ async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
     async with lifespan(app, settings, repeating_tasks_active=False):
         with TestClient(app) as client:
             yield client
+
+
+def create_jwt(payload: dict) -> str:
+    return jwt.encode(payload, JWT_ENCRYPTION_KEY, algorithm="HS256")
+
+
+def create_session_token(account_id: str, role: str) -> str:
+    now = int(time.time())
+    payload = {
+        "nbf": now,
+        "iat": now,
+        "exp": now + 10 * 86400,
+        "aud": "user_auth",
+        "account_id": account_id,
+        "login_time": None,
+        "role": role,
+    }
+    return create_jwt(payload)
+
+
+@pytest.fixture
+def client_with_admin_role(client):
+    jwt_token = create_session_token("0" * 16, "admin")
+    client.headers = {"Authorization": f"Bearer {jwt_token}"}
+    yield client
 
 
 @pytest.fixture
