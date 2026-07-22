@@ -1038,7 +1038,7 @@ async def submit_measurement(
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")
-    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{tn}/{msmt_uid}.post"
+    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{test_name}/{msmt_uid}.post"
     try:
         await run_in_threadpool(
             request.app.state.s3_client.upload_fileobj,
