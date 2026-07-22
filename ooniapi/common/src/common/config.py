@@ -106,3 +106,7 @@ class Settings(BaseSettings):
     github_token: str = ""
     origin_repo: str = ""
     push_repo: str = ""
+
+    # Profiling settings
+    profiling_active: bool = False
+    profiling_report_path: str = ""
