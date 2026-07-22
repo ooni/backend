@@ -2,7 +2,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 from pathlib import Path
+import logging
 
+log = logging.getLogger(__name__)
 
 class ProfileMiddleware(BaseHTTPMiddleware):
     """
@@ -28,6 +30,8 @@ class ProfileMiddleware(BaseHTTPMiddleware):
         # Pyinstrument is only available on development modes
         from pyinstrument import Profiler
 
+        log.debug(f"Profiling: {request.url.path}")
+
         profiler = Profiler()
         profiler.start()
         response = await call_next(request)
@@ -41,6 +45,7 @@ class ProfileMiddleware(BaseHTTPMiddleware):
 
         with report_path.open("w") as f:
             f.write(report)
+            log.debug(f"Report saved to: {report_path.absolute()}")
 
         return response
 
