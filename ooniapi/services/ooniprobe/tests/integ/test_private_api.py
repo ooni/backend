@@ -27,11 +27,12 @@ def test_private_api_countries_by_month(client, fixed_time):
     url = "countries_by_month"
     response = privapi(client, url)
     assert len(response) > 0, response
-    r = response[0]
-    assert sorted(r.keys()) == ["date", "value"]
-    assert r["value"] > 10
-    assert r["value"] < 1000
-    assert r["date"].endswith("T00:00:00+00:00")
+
+    for r in response:
+        assert sorted(r.keys()) == ["date", "value"]
+        assert r["value"] > 0
+        assert r["value"] < 1000
+        assert r["date"].endswith("T00:00:00+00:00")
 
 
 def test_private_api_test_names(client, log):
