@@ -31,14 +31,15 @@ CREATE TABLE default.fastpath
     `server_as_name` String,
     `update_time` DateTime64(3) MATERIALIZED now64(),
     `test_version` String,
-    `test_runtime` Float32,
     `architecture` String,
     `engine_name` String,
     `engine_version` String,
+    `test_runtime` Float32,
     `blocking_type` String,
     `test_helper_address` LowCardinality(String),
     `test_helper_type` LowCardinality(String),
-    `ooni_run_link_id` Nullable(UInt64)
+    `ooni_run_link_id` Nullable(UInt64),
+    `is_verified` LowCardinality(String) DEFAULT 'u'
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (measurement_start_time, report_id, input)

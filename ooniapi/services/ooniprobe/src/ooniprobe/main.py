@@ -22,7 +22,7 @@ from .common.metrics import mount_metrics
 from .common.version import get_build_label
 from .dependencies import PostgresSessionDep, S3ClientDep, get_manifest
 from .download_geoip import try_update
-from .routers import bouncer, prio_crud, reports
+from .routers import bouncer, prio_crud, reports, private
 from .routers.v1 import probe_services
 from .routers.v2 import vpn
 
@@ -92,6 +92,7 @@ app.include_router(probe_services.router, prefix="/api")
 app.include_router(reports.router)
 app.include_router(bouncer.router)
 app.include_router(prio_crud.router, prefix="/api")
+app.include_router(private.router, prefix="/api")
 
 
 @app.get("/version")
