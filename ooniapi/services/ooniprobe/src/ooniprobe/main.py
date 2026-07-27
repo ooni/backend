@@ -149,9 +149,13 @@ async def health(
 
     try:
         check_ooniauth_health()
+    except Exception as exc:
+        # see if this library raises Exception or something inheriting from BaseException instead
+        log.error(f"Usertauth health error: {exc}")
+        errors.append("bad_ooniauth_health")
     except BaseException as exc:
         log.error(f"Usertauth health error: {exc}")
-        errors.append("bad_ooniauth_heatlh")
+        errors.append("bad_ooniauth_health")
 
     if settings.jwt_encryption_key == "CHANGEME":
         errors.append("bad_jwt_secret")
