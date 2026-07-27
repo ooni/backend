@@ -1,4 +1,5 @@
 from sqlalchemy import desc
+import asyncio
 import io
 import logging
 import random
@@ -923,6 +924,9 @@ async def submit_measurement(
             submit_request.content
         )
         assert isinstance(content, dict), "'content' should be a json encoded as a string"
+    except asyncio.CancelledError:
+        log.exception("Handler cancelled (client disconnect/timeout)")
+        raise
     except Exception as e:
         log.error(f"invalid content: {e}")
         raise HTTPException(
@@ -931,6 +935,9 @@ async def submit_measurement(
                 "error" : str(e)
             }
         )
+    except BaseException as e:
+        log.exception("Unexpected BaseException: %r", e)
+        raise
 
     metadata = metadata_from_measurement_content(content)
 
@@ -997,11 +1004,17 @@ async def submit_measurement(
                 success = True
                 break
 
+            except asyncio.CancelledError:
+                log.exception("Handler cancelled (client disconnect/timeout)")
+                raise
             except Exception as e:
                 log.exception(
                     f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
                     f"({fastpath_url}): {e}"
                 )
+            except BaseException as e:
+                log.exception("Unexpected BaseException: %r", e)
+                raise
 
         Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
@@ -1022,9 +1035,16 @@ async def submit_measurement(
                     metadata.software_name,
                     metadata.software_version,
                 )
+            except asyncio.CancelledError:
+                log.exception("Handler cancelled (client disconnect/timeout)")
+                raise
             except Exception as e:
                 log.error(f"Error checking for geoip anomalies: {e}")
                 Metrics.COMPARE_CC_FAILURE.inc()
+            except BaseException as e:
+                log.exception("Unexpected BaseException: %r", e)
+                raise
+
 
         return SubmitMeasurementResponse(
             measurement_uid=msmt_uid,
@@ -1046,9 +1066,15 @@ async def submit_measurement(
             Bucket=settings.failed_reports_bucket,
             Key=s3_key,
         )
+    except asyncio.CancelledError:
+        log.exception("Handler cancelled (client disconnect/timeout)")
+        raise
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
         Metrics.SEND_S3_FAILURE.inc()
+    except BaseException as e:
+        log.exception("Unexpected BaseException: %r", e)
+        raise
 
     log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
     Metrics.MISSED_MSMNTS.inc()
