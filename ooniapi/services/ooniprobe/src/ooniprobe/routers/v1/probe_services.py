@@ -1176,8 +1176,11 @@ def _verify_submit(
         log.error(f"ZKP Failed: {e}")
         return (VerificationStatus.FAILED, _anonc_exc_to_str(e), None)
     except Exception as e:
-        log.error(f"Unexpected anonc error: {e}")
+        log.error(f"Unexpected (Exception) anonc error: {e}")
         return (VerificationStatus.FAILED, "unknown_error", None)
+    except BaseException as e:
+        log.error(f"Unexpected (BaseException) anonc error: {e}")
+        raise
 
 def _clear_sensitive_data(data : dict[str, Any]):
     """
