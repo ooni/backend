@@ -18,6 +18,7 @@ from sqlalchemy import sql
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query, HTTPException
 from pydantic_extra_types.country import CountryAlpha2
+from pydantic_extra_types.domain import DomainStr
 from pydantic import AnyUrl, Field, StringConstraints, IPvAnyAddress
 
 from .v1.probe_services import probe_geoip, generate_test_helpers_conf
@@ -1025,15 +1026,6 @@ def api_private_circumvention_runtime_stats(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
-
-
-DomainStr = Annotated[
-    str,
-    StringConstraints(
-        strip_whitespace=True,
-        pattern=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[A-Za-z]{2,}$"
-    )
-]
 
 
 class DomainMetadataResponse(BaseModel):
