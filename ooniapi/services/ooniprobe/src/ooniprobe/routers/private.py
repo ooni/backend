@@ -19,7 +19,7 @@ from sqlalchemy import sql
 from fastapi import APIRouter, Depends, Header, Request, Response, Query, HTTPException
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.domain import DomainStr
-from pydantic import AnyUrl, Field, StringConstraints, IPvAnyAddress
+from pydantic import AnyUrl, Field, StringConstraints, IPvAnyAddress, field_validator
 
 from .v1.probe_services import probe_geoip, generate_test_helpers_conf
 from ..common.clickhouse_utils import query_click, query_click_one_row
@@ -1162,6 +1162,13 @@ class MeasuredDomainStat(BaseModel):
     category_code: str = Field(..., description="Citizenlab Category Code")
     domain_name: Union[DomainStr, IPvAnyAddress] = Field(..., description="Domain Name or IP")
     measurement_count: int = Field(..., description="Number of measurements")
+
+    @field_validator("domain_name", mode="before")
+    @classmethod
+    def strip_strailing_dot(cls, v):
+        if isinstance(v, str):
+            return v.rstrip(".")
+        return v
 
 
 class DomainsMeasuredResponse(BaseModel):
