@@ -18,6 +18,7 @@ from .routers.data import (
     list_observations,
 )
 from .routers.v1 import aggregation, measurements
+from .routers import labeling
 
 pkg_name = "oonimeasurements"
 
@@ -60,6 +61,7 @@ def setup_router(app: FastAPI):
     app.include_router(list_observations.router, prefix="/api")
     app.include_router(aggregate_observations.router, prefix="/api")
     app.include_router(aggregate_analysis.router, prefix="/api")
+    app.include_router(labeling.router)
 
     instrumentor = Instrumentator().instrument(
         app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"
