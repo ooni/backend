@@ -50,20 +50,17 @@ router = APIRouter(prefix="/api/v1/labeling", tags=["labeling"])
 # refit can tell proxy-screened rows from B1-screened ones and, if needed,
 # drop the former.
 
-BLOCKED_MAX = "greatest(dns_blocked, tcp_blocked, tls_blocked)"
 
 STRATA: Dict[str, Dict[str, Any]] = {
     "screen_positive": {
         "table": "fastpath",
         "predicate": f"anomaly = 't' AND msm_failure = 'f'",
-        "default_rate": 0.1,
         "screen_kind": "fastpath_proxy",
         "note": "Proxy for B1's blocked-leaning-rule screen. LR numerator.",
     },
     "screen_negative": {
         "table": "fastpath",
         "predicate": f"confirmed = 'f' AND anomaly = 'f' AND msm_failure = 'f'",
-        "default_rate": 0.0002,
         "screen_kind": "fastpath_proxy",
         "note": "Bounds false negatives and carries the base rate. Small, "
                 "and the first thing cut under pressure. Do not cut it.",
@@ -71,7 +68,6 @@ STRATA: Dict[str, Dict[str, Any]] = {
     "fingerprint_match": {
         "table": "fastpath",
         "predicate": "confirmed = 't' AND msm_failure = 'f'",
-        "default_rate": 1.0,
         "screen_kind": "fingerprint",
         "note": "Census, not a sample. High-precision positives; tag the "
                 "labels so LRs can be refit without them as a circularity "
@@ -80,7 +76,6 @@ STRATA: Dict[str, Dict[str, Any]] = {
     "incident_window": {
         "table": "analysis_web_measurement",
         "predicate": "1",  # scoped entirely by the cc/domain/time params
-        "default_rate": 0.2,
         "screen_kind": "incident_scope",
         "note": "Draw inside a known event. Label the MEASUREMENT: rows here "
                 "that are genuinely ok are the most valuable in the corpus.",
@@ -91,8 +86,6 @@ STRATA: Dict[str, Dict[str, Any]] = {
 # obs_web_ctrl join with per-layer agreement predicates. Left out on purpose
 # rather than half-built: a negative stratum with a wrong predicate is worse
 # than one that is absent, because it silently deflates every LR denominator.
-
-HASH_SPACE = 1_000_000
 
 # Bump when STRATA definitions or the fingerprint's shape change: it forces new
 # design ids, so old weights are never silently reinterpreted under new rules.
@@ -150,17 +143,6 @@ def _frame(since: Optional[datetime], until: Optional[datetime]):
     if since >= until:
         raise HTTPException(400, "since must be before until")
     return since, until
-
-
-@router.get("/design")
-def get_design() -> Dict[str, Any]:
-    """The sampling design, verbatim.
-
-    The UI copies this into the export so weights can be checked against the
-    predicate that produced them. Edit a stratum here and you have a new
-    design: bump design_id at draw time, never reuse it.
-    """
-    return {"strata": STRATA, "hash_space": HASH_SPACE}
 
 
 @router.get("/test_names")
@@ -243,11 +225,6 @@ def draw_sample(
                     "Empty string means every test.",
     ),
     limit: int = Query(50, ge=1, le=500),
-    rate_override: Optional[float] = Query(
-        None, gt=0, le=1,
-        description="Overrides every named stratum's rate. Using this makes a "
-                    "new design; change design_id too.",
-    ),
 ) -> SampleResponse:
     since_dt, until_dt = _frame(since, until)
     wanted = sorted({s.strip() for s in strata.split(",") if s.strip()})
@@ -272,7 +249,6 @@ def draw_sample(
             "table": STRATA[s]["table"],
             "predicate": STRATA[s]["predicate"],
             "screen_kind": STRATA[s]["screen_kind"],
-            "sample_rate": rate_override or STRATA[s]["default_rate"],
         }
         for s in wanted
     }
@@ -296,7 +272,6 @@ def draw_sample(
 
     for stratum in wanted:
         spec_s = STRATA[stratum]
-        rate = resolved[stratum]["sample_rate"]
         table = spec_s["table"]
 
         where = [
@@ -308,7 +283,6 @@ def draw_sample(
             "since": since_dt,
             "until": until_dt,
             "salt": f"{derived_id}:{stratum}",
-            "cutoff": int(rate * HASH_SPACE),
             "limit": per_stratum,
         }
         if probe_cc:
@@ -348,11 +322,7 @@ def draw_sample(
                    test_name
             FROM {table}
             WHERE {where_sql}
-              AND modulo(
-                    cityHash64(concat(measurement_uid, %(salt)s)),
-                    {HASH_SPACE}
-                  ) < %(cutoff)s
-            ORDER BY cityHash64(measurement_uid)
+            ORDER BY cityHash64(concat(measurement_uid, %(salt)s))
             LIMIT %(limit)s
             """,
             params,
@@ -361,7 +331,6 @@ def draw_sample(
         used[stratum] = {
             "predicate": spec_s["predicate"],
             "table": table,
-            "sample_rate": rate,
             "screen_kind": spec_s["screen_kind"],
             "population_estimate": population,
             "drawn": len(rows),
@@ -380,7 +349,7 @@ def draw_sample(
                 input=r[6],
                 test_name=r[7] or "",
                 sampling_stratum=stratum,
-                sampling_weight=1.0 / rate,
+                sampling_weight=population / len(rows),
                 sampling_design_id=derived_id,
                 screen_kind=spec_s["screen_kind"],
             )
