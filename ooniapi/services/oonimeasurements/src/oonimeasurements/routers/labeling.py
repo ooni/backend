@@ -123,6 +123,8 @@ class SampleRow(BaseModel):
     # sampling provenance, carried through to the label
     sampling_stratum: str
     sampling_weight: float
+    sample_population: int
+    sample_rows: int
     sampling_design_id: str
     screen_kind: str
 
@@ -350,6 +352,8 @@ def draw_sample(
                 test_name=r[7] or "",
                 sampling_stratum=stratum,
                 sampling_weight=population / len(rows),
+                sample_population=population,
+                sample_rows=len(rows),
                 sampling_design_id=derived_id,
                 screen_kind=spec_s["screen_kind"],
             )
