@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
-from typing import Annotated, Dict, Any, Tuple, List, Optional
+from typing import Annotated, Dict, Any, Tuple, List, Optional, Union
 
 import logging
 import math
@@ -18,7 +18,7 @@ from sqlalchemy import sql
 
 from fastapi import APIRouter, Depends, Header, Request, Response, Query, HTTPException
 from pydantic_extra_types.country import CountryAlpha2
-from pydantic import AnyUrl, Field, StringConstraints
+from pydantic import AnyUrl, Field, StringConstraints, IPvAnyAddress
 
 from .v1.probe_services import probe_geoip, generate_test_helpers_conf
 from ..common.clickhouse_utils import query_click, query_click_one_row
@@ -1168,7 +1168,7 @@ def api_private_networks(
 
 class MeasuredDomainStat(BaseModel):
     category_code: str = Field(..., description="Citizenlab Category Code")
-    domain_name: DomainStr = Field(..., description="Domain Name")
+    domain_name: Union[DomainStr, IPvAnyAddress] = Field(..., description="Domain Name or IP")
     measurement_count: int = Field(..., description="Number of measurements")
 
 
