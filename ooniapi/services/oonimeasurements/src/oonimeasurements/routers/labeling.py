@@ -14,9 +14,11 @@ Two invariants this module exists to enforce:
    is not a pipeline judgment in disguise.
 
 2. SAMPLING IS RECORDED, NOT REMEMBERED. Every draw is deterministic given
-   (design_id, stratum, frame, rate), and /sample returns the predicate it ran
+   (design_id, stratum, frame, quota), and /sample returns the predicate it ran
    and the population it ran against, so the weights are reconstructable from
-   the export alone.
+   the export alone. A weight is measured (population / drawn), never declared:
+   any knob that only *describes* the sampling will eventually disagree with
+   what the query did, and disagree silently.
 """
 
 import hashlib
@@ -50,20 +52,18 @@ router = APIRouter(prefix="/api/v1/labeling", tags=["labeling"])
 # refit can tell proxy-screened rows from B1-screened ones and, if needed,
 # drop the former.
 
-BLOCKED_MAX = "greatest(dns_blocked, tcp_blocked, tls_blocked)"
-
 STRATA: Dict[str, Dict[str, Any]] = {
     "screen_positive": {
         "table": "fastpath",
-        "predicate": f"anomaly = 't' AND msm_failure = 'f'",
-        "default_rate": 0.1,
+        "predicate": "anomaly = 't' AND msm_failure = 'f'",
+        "default_share": 0.40,
         "screen_kind": "fastpath_proxy",
         "note": "Proxy for B1's blocked-leaning-rule screen. LR numerator.",
     },
     "screen_negative": {
         "table": "fastpath",
-        "predicate": f"confirmed = 'f' AND anomaly = 'f' AND msm_failure = 'f'",
-        "default_rate": 0.0002,
+        "predicate": "confirmed = 'f' AND anomaly = 'f' AND msm_failure = 'f'",
+        "default_share": 0.35,
         "screen_kind": "fastpath_proxy",
         "note": "Bounds false negatives and carries the base rate. Small, "
                 "and the first thing cut under pressure. Do not cut it.",
@@ -71,35 +71,28 @@ STRATA: Dict[str, Dict[str, Any]] = {
     "fingerprint_match": {
         "table": "fastpath",
         "predicate": "confirmed = 't' AND msm_failure = 'f'",
-        "default_rate": 1.0,
+        "default_share": 0.15,
         "screen_kind": "fingerprint",
-        "note": "Census, not a sample. High-precision positives; tag the "
-                "labels so LRs can be refit without them as a circularity "
-                "check.",
+        "note": "High-precision positives; tag the labels so LRs can be refit "
+                "without them as a circularity check.",
     },
     "incident_window": {
         "table": "analysis_web_measurement",
         "predicate": "1",  # scoped entirely by the cc/domain/time params
-        "default_rate": 0.2,
+        "default_share": 0.10,
         "screen_kind": "incident_scope",
         "note": "Draw inside a known event. Label the MEASUREMENT: rows here "
                 "that are genuinely ok are the most valuable in the corpus.",
     },
 }
 
-# control_agreement (cheap negatives from probe/control agreement) needs an
-# obs_web_ctrl join with per-layer agreement predicates. Left out on purpose
-# rather than half-built: a negative stratum with a wrong predicate is worse
-# than one that is absent, because it silently deflates every LR denominator.
-
-HASH_SPACE = 1_000_000
-
 # Bump when STRATA definitions or the fingerprint's shape change: it forces new
 # design ids, so old weights are never silently reinterpreted under new rules.
-DESIGN_SCHEMA_VERSION = "1"
+# 2: rates became shares, and selection became ORDER BY hash + OFFSET.
+DESIGN_SCHEMA_VERSION = "2"
 
 
-def _design_fingerprint(spec: Dict[str, Any]) -> str:
+def _fingerprint(spec: Dict[str, Any], prefix: str = "d") -> str:
     """Content-address a sampling design.
 
     The id is derived from the design so that there is never the same id used
@@ -111,11 +104,79 @@ def _design_fingerprint(spec: Dict[str, Any]) -> str:
     inter-rater agreement gets measured without any coordination service.
 
     Want genuinely fresh rows from the same population? Increment `replicate`.
-    It is part of the spec, so it produces a different id and an independent
-    draw, on purpose and on the record.
+    It is part of the spec, so it produces a different id and a draw that is
+    disjoint from the previous one, on purpose and on the record.
     """
     blob = json.dumps(spec, sort_keys=True, separators=(",", ":"), default=str)
-    return "d" + hashlib.sha256(blob.encode()).hexdigest()[:10]
+    return prefix + hashlib.sha256(blob.encode()).hexdigest()[:10]
+
+
+def _resolve_shares(
+    wanted: List[str], override: Optional[str]
+) -> Dict[str, float]:
+    """Queue share per stratum, normalised over the strata actually asked for.
+
+    `override` is "stratum=share,..." with shares in (0, 1]; unnamed strata keep
+    their default. Normalising means dropping a stratum redistributes its share
+    instead of quietly shrinking the queue, and it means the shares are readable
+    as "what fraction of what I am about to label", which is the whole point.
+    """
+    shares = {s: float(STRATA[s]["default_share"]) for s in wanted}
+    if override:
+        for part in override.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            key, _, val = part.partition("=")
+            key = key.strip()
+            if key not in shares:
+                raise HTTPException(
+                    400, f"share for unselected or unknown stratum: {key}"
+                )
+            try:
+                share = float(val)
+            except ValueError:
+                raise HTTPException(400, f"share for {key} is not a number")
+            if not 0 < share <= 1:
+                raise HTTPException(400, f"share for {key} must be in (0, 1]")
+            shares[key] = share
+
+    total = sum(shares.values())
+    if total <= 0:
+        raise HTTPException(400, "shares sum to zero")
+    return {s: v / total for s, v in shares.items()}
+
+
+def _quotas(shares: Dict[str, float], limit: int) -> Dict[str, int]:
+    """Turn shares into whole row counts that sum to exactly `limit`.
+
+    Largest-remainder, so the rounding error lands on the biggest strata rather
+    than starving a small one. Every selected stratum gets at least one row: a
+    stratum present in the design but absent from the queue is indistinguishable
+    from one that was never asked for, and `screen_negative` is small enough to
+    be the one that vanishes.
+    """
+    order = sorted(shares)
+    exact = {s: shares[s] * limit for s in order}
+    base = {s: max(1, int(exact[s])) for s in order}
+
+    # Give away, or claw back, whatever the flooring left over.
+    drift = limit - sum(base.values())
+    while drift != 0:
+        step = 1 if drift > 0 else -1
+        movable = [
+            s for s in order
+            if step > 0 or base[s] > 1  # never take a stratum below one row
+        ]
+        if not movable:
+            break
+        pick = max(
+            movable,
+            key=lambda s: (exact[s] - base[s]) * step,
+        )
+        base[pick] += step
+        drift -= step
+    return base
 
 
 class SampleRow(BaseModel):
@@ -129,7 +190,7 @@ class SampleRow(BaseModel):
     test_name: str
     # sampling provenance, carried through to the label
     sampling_stratum: str
-    sampling_weight: float
+    sampling_weight: Optional[float]
     sampling_design_id: str
     screen_kind: str
 
@@ -146,7 +207,10 @@ class SampleResponse(BaseModel):
 
 def _frame(since: Optional[datetime], until: Optional[datetime]):
     until = until or datetime.now(timezone.utc).replace(tzinfo=None)
-    since = since or (until - timedelta(days=30))
+    # Matches the UI's default. A wide frame is the point: rows are drawn in
+    # hash order, not time order, so widening spreads the queue across the
+    # period instead of concentrating it on last month.
+    since = since or (until - timedelta(days=365))
     if since >= until:
         raise HTTPException(400, "since must be before until")
     return since, until
@@ -160,7 +224,13 @@ def get_design() -> Dict[str, Any]:
     predicate that produced them. Edit a stratum here and you have a new
     design: bump design_id at draw time, never reuse it.
     """
-    return {"strata": STRATA, "hash_space": HASH_SPACE}
+    return {
+        "strata": STRATA,
+        "schema": DESIGN_SCHEMA_VERSION,
+        "selection": "ORDER BY cityHash64(measurement_uid + design salt), "
+                     "LIMIT quota OFFSET (replicate-1)*quota",
+        "weighting": "population / drawn, per stratum",
+    }
 
 
 @router.get("/test_names")
@@ -225,10 +295,11 @@ def draw_sample(
     ),
     replicate: int = Query(
         1, ge=1,
-        description="Independent draws of the same design. Same replicate = "
+        description="Successive draws of the same design. Same replicate = "
                     "same rows (reproducible, extendable, comparable across "
-                    "analysts). Increment it to sample rows the previous "
-                    "replicate did not cover.",
+                    "analysts). Increment it for rows the previous replicate "
+                    "did not cover: replicates are disjoint by construction, "
+                    "being successive slices of one deterministic ordering.",
     ),
     since: Optional[datetime] = None,
     until: Optional[datetime] = None,
@@ -243,10 +314,12 @@ def draw_sample(
                     "Empty string means every test.",
     ),
     limit: int = Query(50, ge=1, le=500),
-    rate_override: Optional[float] = Query(
-        None, gt=0, le=1,
-        description="Overrides every named stratum's rate. Using this makes a "
-                    "new design; change design_id too.",
+    shares: Optional[str] = Query(
+        None,
+        description="Override queue composition: 'screen_positive=0.5,"
+                    "screen_negative=0.5'. Shares are normalised over the "
+                    "selected strata, so they are fractions of your queue, not "
+                    "sampling rates. Part of the design, so it changes the id.",
     ),
 ) -> SampleResponse:
     since_dt, until_dt = _frame(since, until)
@@ -267,16 +340,24 @@ def draw_sample(
     # or what a weight means, has to be in here — otherwise two different
     # populations could collide onto one id, which is the failure this exists
     # to make impossible.
+    share_by_stratum = _resolve_shares(wanted, shares)
+    quota = _quotas(share_by_stratum, limit)
+
     resolved = {
         s: {
             "table": STRATA[s]["table"],
             "predicate": STRATA[s]["predicate"],
             "screen_kind": STRATA[s]["screen_kind"],
-            "sample_rate": rate_override or STRATA[s]["default_rate"],
+            "queue_share": round(share_by_stratum[s], 6),
+            "quota": quota[s],
         }
         for s in wanted
     }
-    spec = {
+    # The population a draw addresses, and therefore what a weight means, is
+    # fixed by everything except the replicate. Ordering is salted from that
+    # part alone, so replicate 2 can take the next slice of the same ordering
+    # rather than reshuffling into an independent (and overlapping) sample.
+    population_spec = {
         "schema": DESIGN_SCHEMA_VERSION,
         "strata": resolved,
         "frame": [since_dt.isoformat(), until_dt.isoformat()],
@@ -286,30 +367,41 @@ def draw_sample(
             "domain": domain,
             "test_names": tests or "all",
         },
-        "replicate": replicate,
     }
-    derived_id = _design_fingerprint(spec)
+    spec = {**population_spec, "replicate": replicate}
+    derived_id = _fingerprint(spec)
+    order_salt = _fingerprint(population_spec, prefix="o")
 
-    per_stratum = max(1, limit // len(wanted))
     used: Dict[str, Dict[str, Any]] = {}
     buckets: List[List[SampleRow]] = []
 
     for stratum in wanted:
         spec_s = STRATA[stratum]
-        rate = resolved[stratum]["sample_rate"]
         table = spec_s["table"]
 
         where = [
             "measurement_start_time >= %(since)s",
             "measurement_start_time < %(until)s",
             f"({spec_s['predicate']})",
+            # Only rows that can actually be labelled. The screens read
+            # fastpath, but /candidate reads obs_web, so without this a draw
+            # yields rows that 404 on open. It also keeps the weight honest:
+            # `population` below counts the same set the draw samples from, and
+            # rows missing from obs_web are missing non-randomly (they track
+            # test and pipeline coverage), so excluding them from both is the
+            # only way the ratio stays an inclusion probability.
+            "measurement_uid IN ("
+            "  SELECT measurement_uid FROM obs_web"
+            "  WHERE measurement_start_time >= %(since)s"
+            "    AND measurement_start_time < %(until)s"
+            ")",
         ]
         params: Dict[str, Any] = {
             "since": since_dt,
             "until": until_dt,
-            "salt": f"{derived_id}:{stratum}",
-            "cutoff": int(rate * HASH_SPACE),
-            "limit": per_stratum,
+            "salt": f"{order_salt}:{stratum}",
+            "limit": quota[stratum],
+            "offset": (replicate - 1) * quota[stratum],
         }
         if probe_cc:
             where.append("probe_cc = %(probe_cc)s")
@@ -325,8 +417,11 @@ def draw_sample(
             params["test_names"] = tests
         where_sql = " AND ".join(where)
 
-        # Population first: the weight is 1/rate by construction, but the
-        # population is what lets anyone check that later.
+        # Population first, because it *is* the weight. Not 1/share: the queue
+        # is cut to a quota, so what a labelled row stands for is however many
+        # eligible rows there were divided by however many were drawn. Taking
+        # 20 of 5,000,000 makes each one worth 250,000, whatever share of the
+        # queue the stratum was given.
         pop = db.execute(
             f"SELECT count() FROM {table} WHERE {where_sql}", params
         )
@@ -335,6 +430,13 @@ def draw_sample(
         resolver = (
             "resolver_asn" if table == "analysis_web_measurement" else "0"
         )
+        # Ordering by a salted hash of the uid puts the eligible rows in a
+        # deterministic pseudo-random order, so the first N are a uniform
+        # sample of size N and OFFSET walks disjoint slices for successive
+        # replicates. The salt has to be in the ORDER BY rather than in a
+        # separate filter: unsalted, the same globally-low-hash measurements
+        # sit at the head of every design's queue forever.
+        #
         # NOTE: no blocked/down/ok, no anomaly, no confirmed, no scores.
         rows = db.execute(
             f"""
@@ -348,23 +450,28 @@ def draw_sample(
                    test_name
             FROM {table}
             WHERE {where_sql}
-              AND modulo(
-                    cityHash64(concat(measurement_uid, %(salt)s)),
-                    {HASH_SPACE}
-                  ) < %(cutoff)s
-            ORDER BY cityHash64(measurement_uid)
-            LIMIT %(limit)s
+            ORDER BY cityHash64(concat(measurement_uid, %(salt)s))
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
             params,
         )
 
+        # An empty stratum is not an error (a narrow scope, or a replicate past
+        # the end of the population), but it has no weight either: dividing by
+        # a zero draw would be a crash, and inventing a weight for rows that do
+        # not exist would be worse.
+        weight = (population / len(rows)) if rows else None
+
         used[stratum] = {
             "predicate": spec_s["predicate"],
             "table": table,
-            "sample_rate": rate,
+            "queue_share": resolved[stratum]["queue_share"],
+            "quota": quota[stratum],
             "screen_kind": spec_s["screen_kind"],
             "population_estimate": population,
             "drawn": len(rows),
+            "sampling_weight": weight,
+            "exhausted": bool(rows) and len(rows) < quota[stratum],
             "frame_start": since_dt.isoformat(),
             "frame_end": until_dt.isoformat(),
             "scope": spec["scope"],
@@ -380,7 +487,7 @@ def draw_sample(
                 input=r[6],
                 test_name=r[7] or "",
                 sampling_stratum=stratum,
-                sampling_weight=1.0 / rate,
+                sampling_weight=weight,
                 sampling_design_id=derived_id,
                 screen_kind=spec_s["screen_kind"],
             )
@@ -428,9 +535,15 @@ def get_candidate(
     analyst who sees them first is anchored, and every LR fit from those
     labels is inflated by an amount nobody can measure. See /reveal.
     """
+    # EXCEPT, not SELECT *: obs_web carries `probe_analysis`, which is the
+    # probe's own blocking verdict (web_connectivity's test_keys.blocking).
+    # It is the same judgment /reveal exposes as top_probe_analysis, one row
+    # down, and shipping it here would anchor the analyst against exactly what
+    # the corpus exists to evaluate. Everything else is passed through, so the
+    # client keeps field-matching across pipeline versions.
     obs = db.execute(
         """
-        SELECT * FROM obs_web
+        SELECT * EXCEPT (probe_analysis) FROM obs_web
         WHERE measurement_uid = %(uid)s
         ORDER BY observation_idx
         """,
