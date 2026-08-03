@@ -460,6 +460,9 @@ def api_private_website_stats(
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
+    # input_normalized is so that this query will match input that does not contain the trailing /
+    # https://github.com/ooni/devops/issues/471
+
     d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url, "input_normalized": url.rstrip('/'), "start": start, "end": end}
     results = query_click(clickhouse, sql.text(s), d)
     return WebsiteStatsResponse(results=results)
