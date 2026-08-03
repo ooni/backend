@@ -1158,7 +1158,7 @@ def api_private_networks(
         raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
 
 
-def strip_strailing_dot(v: str) -> DomainStr:
+def strip_trailing_dot(v: str) -> DomainStr:
     return v.rstrip(".")
 
 
