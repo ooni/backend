@@ -438,7 +438,7 @@ def api_private_website_stats(
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
-    url = str(input).rstrip('/') # strip trailing / from AnyURL validator
+    url = str(input)
 
     end = now_utc
     start = end - timedelta(days=31)
@@ -456,7 +456,7 @@ def api_private_website_stats(
         AND measurement_start_time < toDate(:end)
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
-        AND input = :input
+        AND input IN (:input, RTRIM(:input, '/'))
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
