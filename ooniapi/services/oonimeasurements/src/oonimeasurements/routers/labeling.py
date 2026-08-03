@@ -30,6 +30,7 @@ from pydantic import BaseModel
 # ooni/backend wires this up already; the import path is the one used by the
 # existing data routers.
 from ..dependencies import get_clickhouse_session  # type: ignore
+from ..scoring import BLOCKING_THRESHOLD, SCORING_VERSION, any_blocked, attributed_to
 
 router = APIRouter(prefix="/api/v1/labeling", tags=["labeling"])
 
@@ -70,19 +71,19 @@ STRATA: Dict[str, Dict[str, Any]] = {
     # populations do not overlap and weights stay clean.
     "screen_dns": {
         "table": "analysis_web_measurement",
-        "predicate": "dns_blocked >= 0.5",
+        "predicate": attributed_to("dns"),
         "screen_kind": "loni_layer_proxy",
         "note": "DNS-attributed positives.",
     },
     "screen_tcp": {
         "table": "analysis_web_measurement",
-        "predicate": "tcp_blocked >= 0.5 AND dns_blocked < 0.5",
+        "predicate": attributed_to("tcp"),
         "screen_kind": "loni_layer_proxy",
         "note": "TCP-attributed positives, DNS quiet.",
     },
     "screen_tls": {
         "table": "analysis_web_measurement",
-        "predicate": "tls_blocked >= 0.5 AND dns_blocked < 0.5 AND tcp_blocked < 0.5",
+        "predicate": attributed_to("tls"),
         "screen_kind": "loni_layer_proxy",
         "note": "TLS-attributed positives, DNS and TCP quiet.",
     },
@@ -244,7 +245,7 @@ def list_test_names(
         f"""
         SELECT test_name,
                count() AS n,
-               countIf(greatest(dns_blocked, tcp_blocked, tls_blocked) >= 0.5)
+               countIf({any_blocked()})
                    AS n_screen_positive
         FROM analysis_web_measurement
         WHERE {' AND '.join(where)}
@@ -333,6 +334,13 @@ def draw_sample(
     }
     spec = {
         "schema": DESIGN_SCHEMA_VERSION,
+        # The layer strata are defined by BLOCKING_THRESHOLD, so a threshold
+        # change redefines what "DNS-blocked" means and the labels drawn either
+        # side are not one population. The predicates below already carry the
+        # number, but recording the version states it, and keeps the id
+        # sensitive to a scoring change that happens to render identically.
+        "scoring_version": SCORING_VERSION,
+        "blocking_threshold": BLOCKING_THRESHOLD,
         "strata": resolved,
         "frame": [since_dt.isoformat(), until_dt.isoformat()],
         "scope": {

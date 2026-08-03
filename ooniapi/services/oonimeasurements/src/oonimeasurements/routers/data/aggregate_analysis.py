@@ -12,6 +12,7 @@ from typing_extensions import Annotated
 
 from ...common.clickhouse_utils import async_query_click
 from ...dependencies import ClickhouseDep, get_clickhouse_session
+from ...scoring import BLOCKING_THRESHOLD, SCORING_VERSION
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
@@ -50,6 +51,9 @@ class Loni(BaseModel):
     tls_down: Optional[float]
     tls_ok: Optional[float]
 
+    # Which layers cleared BLOCKING_THRESHOLD. Reading this needs to know the
+    # threshold that produced it, so the response carries both — see
+    # scoring_version / blocking_threshold on the response body.
     likely_blocked_protocols: List[Tuple[str, float]]
     blocked_max_outcome: Optional[str]
     blocked_max: Optional[float]
@@ -78,6 +82,11 @@ class AggregationResponse(BaseModel):
     db_stats: DBStats
     dimension_count: int
     results: List[AggregationEntry]
+    # The scoring regime behind likely_blocked_protocols. Two responses with
+    # different scoring_version are not comparable, so it travels with the
+    # verdicts rather than living only in a deploy log.
+    blocking_threshold: float = BLOCKING_THRESHOLD
+    scoring_version: str = SCORING_VERSION
 
 
 # editable chart link: https://excalidraw.com/#json=mnoOrMXdSDLVirr8Albuu,xRyHC8-8JlsTTEovwNxOdQ
@@ -214,7 +223,10 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         arraySort(
             x -> -x.1,
             arrayFilter(
-                x -> x.1 > 0.5,
+                -- Threshold from scoring.BLOCKING_THRESHOLD. Was a literal
+                -- `> 0.5` here and `>= 0.5` in the labeling router; they
+                -- disagreed at exactly 0.5, which dns.failure_no_ctrl hits.
+                x -> x.1 >= {BLOCKING_THRESHOLD},
                 [
                     (dns_blocked, 'dns'),
                     (tcp_blocked, 'tcp'),
@@ -426,6 +438,8 @@ async def get_aggregation_analysis(
         ),
         dimension_count=dimension_count,
         results=results,
+        blocking_threshold=BLOCKING_THRESHOLD,
+        scoring_version=SCORING_VERSION,
     )
 
 
