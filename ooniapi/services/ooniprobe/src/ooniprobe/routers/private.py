@@ -456,7 +456,7 @@ def api_private_website_stats(
         AND measurement_start_time < toDate(:end)
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
-        AND input IN (:input, RTRIM(:input, '/'))
+        AND input IN (:input, RTRIM(:input, '\/'))
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
