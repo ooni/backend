@@ -456,11 +456,11 @@ def api_private_website_stats(
         AND measurement_start_time < toDate(:end)
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
-        AND input IN (:input, trimRight(:input, '/'))
+        AND input IN (:input, :input_normalized)
     GROUP BY toDate(measurement_start_time)
     ORDER BY toDate(measurement_start_time)
     """
-    d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url, "start": start, "end": end}
+    d = {"probe_cc": probe_cc, "probe_asn": probe_asn, "input": url, "input_normalized": url.rstrip('/'), "start": start, "end": end}
     results = query_click(clickhouse, sql.text(s), d)
     return WebsiteStatsResponse(results=results)
 
