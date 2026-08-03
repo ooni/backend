@@ -54,9 +54,37 @@ router = APIRouter(prefix="/api/v1/labeling", tags=["labeling"])
 STRATA: Dict[str, Dict[str, Any]] = {
     "screen_positive": {
         "table": "fastpath",
-        "predicate": f"anomaly = 't' AND msm_failure = 'f'",
+        # confirmed rows are excluded: they are certain blocking with a known
+        # artefact, so a label on one adds almost nothing, and they were eating
+        # the positive quota. They keep their own census stratum below.
+        "predicate": f"anomaly = 't' AND confirmed = 'f' AND msm_failure = 'f'",
         "screen_kind": "fastpath_proxy",
         "note": "Proxy for B1's blocked-leaning-rule screen. LR numerator.",
+    },
+    # Layer-attributed positives. A uniform draw from anomaly='t' oversamples
+    # whichever mechanism dominates globally (in practice TLS resets), so a
+    # corpus built from it calibrates one layer and starves the others. These
+    # read the pipeline's own layer scores, which means they oversample what
+    # the pipeline can already see — screen_negative stays the only stratum
+    # that can discover what it misses. Predicates are mutually exclusive so
+    # populations do not overlap and weights stay clean.
+    "screen_dns": {
+        "table": "analysis_web_measurement",
+        "predicate": "dns_blocked >= 0.5",
+        "screen_kind": "loni_layer_proxy",
+        "note": "DNS-attributed positives.",
+    },
+    "screen_tcp": {
+        "table": "analysis_web_measurement",
+        "predicate": "tcp_blocked >= 0.5 AND dns_blocked < 0.5",
+        "screen_kind": "loni_layer_proxy",
+        "note": "TCP-attributed positives, DNS quiet.",
+    },
+    "screen_tls": {
+        "table": "analysis_web_measurement",
+        "predicate": "tls_blocked >= 0.5 AND dns_blocked < 0.5 AND tcp_blocked < 0.5",
+        "screen_kind": "loni_layer_proxy",
+        "note": "TLS-attributed positives, DNS and TCP quiet.",
     },
     "screen_negative": {
         "table": "fastpath",
@@ -89,7 +117,48 @@ STRATA: Dict[str, Dict[str, Any]] = {
 
 # Bump when STRATA definitions or the fingerprint's shape change: it forces new
 # design ids, so old weights are never silently reinterpreted under new rules.
-DESIGN_SCHEMA_VERSION = "1"
+DESIGN_SCHEMA_VERSION = "2"
+
+
+def _quotas(wanted: List[str], shares: Optional[str], limit: int) -> Dict[str, int]:
+    """How many rows each stratum contributes to the queue.
+
+    Default is an equal split. `shares` reweights it — "screen_negative=0.5"
+    gives that stratum half the queue and splits the rest equally. Shares only
+    steer analyst effort; the weights on the rows are population/drawn either
+    way, so no share choice can bias an estimate, only its variance.
+    """
+    fractions = {s: 1.0 for s in wanted}
+    if shares:
+        for part in shares.split(","):
+            name, _, value = part.partition("=")
+            name = name.strip()
+            if name not in wanted:
+                raise HTTPException(400, f"share for unknown stratum: {name}")
+            try:
+                fractions[name] = float(value)
+            except ValueError:
+                raise HTTPException(400, f"bad share: {part}")
+            if fractions[name] <= 0:
+                raise HTTPException(400, f"share must be positive: {part}")
+    total = sum(fractions.values())
+    exact = {s: limit * f / total for s, f in fractions.items()}
+    quotas = {s: max(1, int(e)) for s, e in exact.items()}
+    # Hand out what rounding left over, largest remainder first.
+    leftover = limit - sum(quotas.values())
+    for s in sorted(exact, key=lambda s: exact[s] - int(exact[s]), reverse=True):
+        if leftover <= 0:
+            break
+        quotas[s] += 1
+        leftover -= 1
+    # The min-1 floors can overshoot under an extreme share; trim the largest
+    # quotas back so the recorded drawn counts always match the returned queue.
+    while sum(quotas.values()) > limit:
+        biggest = max(quotas, key=lambda s: quotas[s])
+        if quotas[biggest] == 1:
+            break  # limit < number of strata; nothing sensible to trim
+        quotas[biggest] -= 1
+    return quotas
 
 
 def _design_fingerprint(spec: Dict[str, Any]) -> str:
@@ -226,6 +295,14 @@ def draw_sample(
                     "test scope — change design_id when you change this. "
                     "Empty string means every test.",
     ),
+    shares: Optional[str] = Query(
+        None,
+        description="Optional stratum=share pairs, e.g. "
+                    "'screen_negative=0.5'. Reweights how the queue is split "
+                    "across the selected strata; omitted strata share the "
+                    "remainder equally. Steers effort only — row weights stay "
+                    "population/drawn regardless.",
+    ),
     limit: int = Query(50, ge=1, le=500),
 ) -> SampleResponse:
     since_dt, until_dt = _frame(since, until)
@@ -268,13 +345,20 @@ def draw_sample(
     }
     derived_id = _design_fingerprint(spec)
 
-    per_stratum = max(1, limit // len(wanted))
+    # Shares, like limit, set how far down each stratum's fixed ordering the
+    # draw goes. They are deliberately not part of the spec: the same design
+    # with a bigger share returns a superset of the same stratum rows.
+    quotas = _quotas(wanted, shares, limit)
     used: Dict[str, Dict[str, Any]] = {}
     buckets: List[List[SampleRow]] = []
 
     for stratum in wanted:
         spec_s = STRATA[stratum]
         table = spec_s["table"]
+        # analysis_web_measurement is a ReplacingMergeTree; during a reprocess
+        # the same uid exists in old and new versions until the merge runs,
+        # which would inflate the population and can draw a uid twice.
+        from_clause = f"{table} FINAL" if table == "analysis_web_measurement" else table
 
         where = [
             "measurement_start_time >= %(since)s",
@@ -285,7 +369,7 @@ def draw_sample(
             "since": since_dt,
             "until": until_dt,
             "salt": f"{derived_id}:{stratum}",
-            "limit": per_stratum,
+            "limit": quotas[stratum],
         }
         if probe_cc:
             where.append("probe_cc = %(probe_cc)s")
@@ -304,7 +388,7 @@ def draw_sample(
         # Population first: the weight is 1/rate by construction, but the
         # population is what lets anyone check that later.
         pop = db.execute(
-            f"SELECT count() FROM {table} WHERE {where_sql}", params
+            f"SELECT count() FROM {from_clause} WHERE {where_sql}", params
         )
         population = int(pop[0][0]) if pop else 0
 
@@ -322,7 +406,7 @@ def draw_sample(
                    domain,
                    input,
                    test_name
-            FROM {table}
+            FROM {from_clause}
             WHERE {where_sql}
             ORDER BY cityHash64(concat(measurement_uid, %(salt)s))
             LIMIT %(limit)s
