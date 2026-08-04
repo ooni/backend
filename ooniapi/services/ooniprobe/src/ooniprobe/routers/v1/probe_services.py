@@ -944,7 +944,8 @@ async def submit_measurement(
     rid = generate_report_id(test_name, settings, cc, normalize_asn(asn))
 
     # Anonymous credentials verification
-    verification_status, submit_error, submit_response = _verify_submit(
+    verification_status, submit_error, submit_response = await run_in_threadpool(
+        _verify_submit,
         submit_request, manifest, settings,
         content.get('probe_cc'), content.get('probe_asn')
     )
