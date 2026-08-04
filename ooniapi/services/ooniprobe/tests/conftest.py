@@ -36,7 +36,6 @@ from ooniprobe.dependencies import (
 from ooniprobe.download_geoip import try_update
 from ooniprobe.main import app, lifespan
 from ooniprobe.routers.v1.probe_services import TorTarget
-from ooniprobe.routers.private import real_now_utc
 
 from .utils import setup_user
 
@@ -110,12 +109,6 @@ def fixture_path(tmp_path_factory):
     deleted after the tests are finished
     """
     yield tmp_path_factory.mktemp("fixtures")
-
-
-@pytest.fixture()
-def fixed_time():
-    fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
-    app.dependency_overrides[real_now_utc] = lambda: fixed_now
 
 
 @pytest.fixture()
