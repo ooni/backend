@@ -11,6 +11,7 @@ from typing_extensions import Annotated
 from ...common.clickhouse_utils import async_query_click
 from ...common.dependencies import get_settings
 from ...dependencies import get_clickhouse_session
+from ...scoring import SCORING_VERSION, blocked_probability_sql
 from .utils import (
     SinceUntil,
     parse_probe_asn_to_int,
@@ -59,11 +60,18 @@ class AnalysisEntry(BaseModel):
     tls_blocked: float
     tls_down: float
     tls_ok: float
+    # Calibrated P(blocked) for this measurement, from scoring.Calibration.
+    # Computed in the query rather than stored, so a recalibration is a deploy
+    # and not a reprocess.
+    blocked_probability: float
 
 
 class ListAnalysisResponse(BaseModel):
     metadata: ResponseMetadata
     results: List[AnalysisEntry]
+    # Which calibration produced blocked_probability. A probability is only
+    # interpretable next to the fit behind it.
+    scoring_version: str = SCORING_VERSION
 
 
 @router.get("/v1/analysis", tags=["analysis", "list_data"])
@@ -117,7 +125,13 @@ async def list_measurements(
         and_clauses.append("measurement_start_time <= %(until)s")
         q_args["until"] = until
 
-    cols = list(AnalysisEntry.model_json_schema()["properties"].keys())
+    # Every field is a column except the calibrated probability, which is
+    # derived. Keep the alias so the row still maps onto AnalysisEntry.
+    derived = {"blocked_probability": blocked_probability_sql()}
+    cols = [
+        f"{derived[c]} AS {c}" if c in derived else c
+        for c in AnalysisEntry.model_json_schema()["properties"].keys()
+    ]
     q = f"SELECT {','.join(cols)} FROM analysis_web_measurement"
     if len(and_clauses) > 0:
         q += " WHERE "

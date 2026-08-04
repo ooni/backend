@@ -42,14 +42,99 @@ from typing import List, Optional
 # The line between blocked-leaning and not, applied to a `*_blocked` score.
 BLOCKING_THRESHOLD = 0.5
 
-# Identifies the (rule weights, threshold) pair a verdict was produced under.
-# Bump on any change to BLOCKING_THRESHOLD, or when the pipeline's
-# RULES_VERSION changes, so a stored or exported verdict can always name the
-# scoring regime that produced it. Two verdicts with different values here are
-# not comparable, however similar they look.
-SCORING_VERSION = "1"
+# Identifies the (rule weights, threshold, calibration) triple a verdict was
+# produced under. Bump on any change to BLOCKING_THRESHOLD or CALIBRATION, or
+# when the pipeline's RULES_VERSION changes, so a stored or exported verdict
+# can always name the scoring regime that produced it. Two verdicts with
+# different values here are not comparable, however similar they look.
+SCORING_VERSION = "2"
 
 LAYERS = ("dns", "tcp", "tls")
+
+
+# --------------------------------------------------------------------------
+# Calibration: turning the score into a probability that means something
+# --------------------------------------------------------------------------
+#
+# `greatest(dns_blocked, tcp_blocked, tls_blocked)` is a fuzzy-logic score built
+# from hand-set constants. It ranks measurements sensibly but its magnitude is
+# not a probability, and shipping it as though it were is the misreading
+# ontology.md warns about.
+#
+# So map it through a fitted logistic:
+#
+#     log10-odds(blocked) = INTERCEPT + SLOPE * score
+#     P(blocked)          = 1 / (1 + 10^-(log10-odds))
+#
+# Two properties this buys, neither of which the raw score has: the number is
+# comparable across measurements and over time, and it is falsifiable — group
+# everything reported at 0.9 and roughly 90% of it should be blocked.
+
+
+class Calibration:
+    """Logistic map from the fuzzy score to a population probability.
+
+    Fitted in `docs/analysis-evaluation.ipynb` (pipeline repo) against the
+    adjudicated corpus. Refit there and paste the result here; do not tune by
+    hand, the whole point is that these are measured.
+    """
+
+    __slots__ = ()
+
+    # log10-odds units. Fitted with SAMPLING WEIGHTS: the corpus oversamples
+    # positives by design, so an unweighted fit describes the corpus rather
+    # than the network and reports roughly 10x too much blocking.
+    INTERCEPT = -2.3594
+    SLOPE = 4.7413
+
+    # 95% bootstrap intervals, 400 resamples within stratum.
+    INTERCEPT_CI = (-2.563, -2.149)
+    SLOPE_CI = (4.094, 5.688)
+
+    # The classes are nearly separable at this corpus size, which sends an
+    # unpenalised logistic slope to infinity — the unregularised fit had a
+    # bootstrap CI on SLOPE of [4.7, 6521] and a leave-one-out log loss of 8.2
+    # against 0.025 here. RIDGE is the L2 penalty on the slope that minimised
+    # leave-one-out weighted log loss, so it is selected, not chosen.
+    RIDGE = 0.0005
+    LOO_LOG_LOSS = 0.02533
+
+    CORPUS = "2026-08-03, 89 adjudicated labels (27 blocked)"
+
+    # What the numbers can and cannot support. The middle of the curve is
+    # constrained by data; the tails are extrapolation from a handful of
+    # points, so 0.995 and 0.95 are not meaningfully different claims and
+    # should not be presented as if they were.
+    TRUSTWORTHY_RANGE = (0.05, 0.95)
+
+
+def log10_odds_to_prob(log10_odds: float) -> float:
+    """Inverse logit for log10-odds. NOT the natural-log sigmoid.
+
+    Applying `1 / (1 + exp(-x))` to one of these fails silently: it agrees at
+    0, stays inside [0, 1] everywhere, and is simply wrong in between (at
+    log10-odds 1.0, 0.73 instead of 0.91). Every score in this module is
+    log10; nothing here should ever reach `math.exp`.
+    """
+    return 1.0 / (1.0 + 10.0 ** (-log10_odds))
+
+
+def blocked_probability(score: float) -> float:
+    """P(blocked) for one measurement, from its fuzzy blocking score."""
+    return log10_odds_to_prob(Calibration.INTERCEPT + Calibration.SLOPE * score)
+
+
+def blocked_probability_sql(score_expr: Optional[str] = None) -> str:
+    """The same map as ClickHouse SQL.
+
+    Written as `1 / (1 + pow(10, -x))` rather than `pow(10,x)/(1+pow(10,x))`
+    so it cannot overflow to nan at the top of the range.
+    """
+    score = score_expr or f"greatest({', '.join(f'{l}_blocked' for l in LAYERS)})"
+    return (
+        f"1 / (1 + pow(10, -({Calibration.INTERCEPT} + "
+        f"{Calibration.SLOPE} * ({score}))))"
+    )
 
 
 def _resolve(threshold: Optional[float]) -> float:

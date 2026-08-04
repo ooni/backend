@@ -12,7 +12,12 @@ from typing_extensions import Annotated
 
 from ...common.clickhouse_utils import async_query_click
 from ...dependencies import ClickhouseDep, get_clickhouse_session
-from ...scoring import BLOCKING_THRESHOLD, SCORING_VERSION
+from ...scoring import (
+    BLOCKING_THRESHOLD,
+    SCORING_VERSION,
+    Calibration,
+    blocked_probability_sql,
+)
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
@@ -62,6 +67,13 @@ class Loni(BaseModel):
     tcp_blocked_outcome: Optional[str]
     tls_blocked_outcome: Optional[str]
 
+    # Mean calibrated P(blocked) over the measurements in this cell, i.e. the
+    # estimated share of them that are blocked. Deliberately the mean of the
+    # per-measurement probabilities and not the probability of the aggregated
+    # score: the latter would answer "is the 99th-percentile measurement
+    # blocked", which is not a question anyone asks.
+    blocked_probability_mean: Optional[float]
+
 
 class AggregationEntry(BaseModel):
     count: float
@@ -87,6 +99,10 @@ class AggregationResponse(BaseModel):
     # verdicts rather than living only in a deploy log.
     blocking_threshold: float = BLOCKING_THRESHOLD
     scoring_version: str = SCORING_VERSION
+    # The corpus the probabilities were calibrated against, and the range over
+    # which that corpus actually constrains them.
+    calibration_corpus: str = Calibration.CORPUS
+    calibration_trustworthy_range: Tuple[float, float] = Calibration.TRUSTWORTHY_RANGE
 
 
 # editable chart link: https://excalidraw.com/#json=mnoOrMXdSDLVirr8Albuu,xRyHC8-8JlsTTEovwNxOdQ
@@ -191,6 +207,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     {",".join(extra_cols.keys())},
     probe_analysis,
     count,
+    blocked_probability_mean,
 
     dns_blocked_q99 as dns_blocked,
     dns_down_q99 as dns_down,
@@ -253,6 +270,8 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         SELECT
             {",".join(extra_cols.values())},
             COUNT() as count,
+
+            avg({blocked_probability_sql()}) as blocked_probability_mean,
 
             anyHeavy(top_probe_analysis) as probe_analysis,
 
@@ -416,6 +435,7 @@ async def get_aggregation_analysis(
             dns_blocked_outcome=d["dns_blocked_outcome"],
             tcp_blocked_outcome=d["tcp_blocked_outcome"],
             tls_blocked_outcome=d["tls_blocked_outcome"],
+            blocked_probability_mean=nan_to_none(d.get("blocked_probability_mean")),
         )
 
         entry = AggregationEntry(

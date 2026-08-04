@@ -72,3 +72,71 @@ def test_unknown_layers_are_rejected(bad):
                scoring.attributed_to):
         with pytest.raises(ValueError):
             fn(bad)
+
+
+# ------------------------------------------------------------- calibration
+
+def test_probability_is_monotone_and_bounded():
+    ps = [scoring.blocked_probability(s) for s in
+          [i / 100 for i in range(0, 101)]]
+    assert all(0.0 < p < 1.0 for p in ps)
+    assert all(a < b for a, b in zip(ps, ps[1:]))
+
+
+def test_threshold_sits_near_even_odds():
+    """The fitted calibration puts the deployed threshold at roughly a 50%
+    posterior, which is why publishing probabilities moves no decisions. If a
+    refit breaks this the two knobs have drifted apart and one of them needs
+    revisiting -- deliberately, not by surprise."""
+    p = scoring.blocked_probability(scoring.BLOCKING_THRESHOLD)
+    assert 0.4 < p < 0.6, p
+
+
+def test_sql_and_python_agree():
+    """The API computes this in ClickHouse and the notebook in Python. They
+    are two implementations of one formula and must not drift."""
+    sql = scoring.blocked_probability_sql("SCORE")
+    for s in (0.0, 0.2, 0.5, 0.75, 1.0):
+        # ClickHouse pow(a,b) and Python a**b agree on these operands.
+        expr = sql.replace("SCORE", repr(s)).replace("pow(", "__pow(")
+        got = eval(expr, {"__pow": lambda a, b: a ** b}, {})
+        assert abs(got - scoring.blocked_probability(s)) < 1e-12, s
+
+
+def test_sql_does_not_overflow_at_the_extremes():
+    """`pow(10,x)/(1+pow(10,x))` returns nan for large x; the reciprocal form
+    used here does not. Worth pinning: it fails only on the rows that matter."""
+    def ch_pow(a, b):
+        # ClickHouse evaluates in float64: overflow saturates to inf rather
+        # than raising, which is what makes the reciprocal form safe.
+        try:
+            return float(a) ** float(b)
+        except OverflowError:
+            return float("inf")
+
+    sql = scoring.blocked_probability_sql("SCORE")
+    for s in (-50.0, 50.0, 1e6, -1e6):
+        expr = sql.replace("SCORE", repr(s)).replace("pow(", "__pow(")
+        p = eval(expr, {"__pow": ch_pow}, {})
+        assert 0.0 <= p <= 1.0 and p == p, (s, p)
+
+
+def test_calibration_carries_its_own_uncertainty():
+    """A published probability without the fit behind it is a number with no
+    provenance. These are what the response advertises."""
+    lo, hi = scoring.Calibration.INTERCEPT_CI
+    assert lo < scoring.Calibration.INTERCEPT < hi
+    lo, hi = scoring.Calibration.SLOPE_CI
+    assert lo < scoring.Calibration.SLOPE < hi
+    assert scoring.Calibration.CORPUS
+    assert scoring.Calibration.RIDGE > 0, (
+        "an unpenalised fit on this corpus is separable and the slope runs away")
+
+
+def test_natural_log_sigmoid_would_be_wrong():
+    """Guards the silent-failure mode: exp() on a log10 score agrees at 0 and
+    stays in [0,1], so nothing else would catch it."""
+    import math
+    for s in (-1.0, 1.0):
+        assert abs(scoring.log10_odds_to_prob(s) - 1 / (1 + math.exp(-s))) > 0.15
+    assert scoring.log10_odds_to_prob(0.0) == pytest.approx(0.5)
