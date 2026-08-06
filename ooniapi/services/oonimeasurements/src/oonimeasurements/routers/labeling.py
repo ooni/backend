@@ -968,9 +968,8 @@ def draw_interval_sample(
     }
     derived_id = _design_fingerprint(spec)
 
-    # analysis_web_measurement is a ReplacingMergeTree; without FINAL a
-    # reprocess in flight double-counts a cell-week and moves it up a volume
-    # band. No test_name filter: the detector does not have one either, and the
+    # MUST not be run while a reprocess is in progress due to lack of FINAL
+    # No test_name filter: the detector does not have one either, and the
     # frame has to be the population the detector actually runs over.
     cells_sql = f"""
         SELECT probe_cc,
@@ -979,7 +978,7 @@ def draw_interval_sample(
                toStartOfWeek(measurement_start_time, 1) AS week,
                count() AS n,
                max(greatest(dns_blocked, tcp_blocked, tls_blocked)) AS blocked_max
-        FROM analysis_web_measurement FINAL
+        FROM analysis_web_measurement
         WHERE measurement_start_time >= %(since)s
           AND measurement_start_time < %(until)s
           {''.join(' AND ' + s for s in scope_sql)}
