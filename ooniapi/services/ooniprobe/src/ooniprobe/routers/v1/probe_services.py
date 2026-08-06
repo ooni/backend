@@ -703,7 +703,6 @@ async def geolookup(
 ) -> GeoLookupResponse:
     geolocation = dict()
 
-    log.debug(f"GeoLookupRequest: {data}")
     # for each address provided, call probe_geoip and add the data to our response
     for ipaddr in data.addresses:
         try:
