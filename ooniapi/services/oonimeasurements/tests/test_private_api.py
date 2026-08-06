@@ -189,7 +189,8 @@ def test_private_api_vanilla_tor_stats(client, fixed_time):
 
 
 def test_private_api_vanilla_tor_stats_empty(client):
-    url = "vanilla_tor_stats?probe_cc=XY"
+    # sample data does not contain rows for probe_cc=LI
+    url = "vanilla_tor_stats?probe_cc=LI"
     resp = privapi(client, url)
     assert resp["notok_networks"] == 0
     assert len(resp["networks"]) == 0
