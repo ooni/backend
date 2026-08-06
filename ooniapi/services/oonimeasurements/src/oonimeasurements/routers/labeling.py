@@ -13,9 +13,11 @@ Two grains are served, and they answer different questions.
 - INTERVAL (/interval_sample, /interval_reveal). One row per
   (probe_cc, probe_asn, domain) x ISO week — the detector's own cell, keyed
   exactly as `event_detector_cusums` is. Supplies the *denominator* the event
-  grain cannot: "false alerts per quiet series-week" is a rate over a
+  grain cannot: "false alerts per silent series-week" is a rate over a
   population of cell-weeks, and a population can only be counted if it was
-  sampled from a frame.
+  sampled from a frame. Silent, not quiet: a week inside an ongoing block also
+  contains no transition for a changepoint detector to find, so it belongs in
+  the denominator too.
 
 Two invariants this module exists to enforce, in both grains:
 
@@ -675,12 +677,13 @@ def reveal(
 
 
 # --------------------------------------------------------------------------
-# Interval grain: the quiet-time denominator
+# Interval grain: the silent-time denominator
 # --------------------------------------------------------------------------
 #
 # The event corpus is curated, so event recall is a coverage statement about a
-# hand-built set. Nothing in it defines quiet time, so the harness's "false
-# alerts per quiet series-week" had no frame behind it. This is that frame.
+# hand-built set. Nothing in it defines a week the detector should have been
+# silent through, so the harness's "false alerts per series-week" had no frame
+# behind it. This is that frame.
 #
 # The unit is the detector's own unit. `event_detector_cusums` keys on
 # (probe_cc, probe_asn, domain), so anything coarser here would estimate a rate
@@ -904,14 +907,20 @@ def draw_interval_sample(
     ),
     limit: int = Query(40, ge=1, le=500),
 ) -> IntervalSampleResponse:
-    """Draw cell-weeks to adjudicate as quiet, or not.
+    """Draw cell-weeks to adjudicate.
 
-    The verdict an analyst writes against these rows is `quiet_observed`, never
-    `quiet`: the week is judged from the same OONI data the detector reads, so
-    an unmeasured block is indistinguishable from calm. That caps the claim at
-    "no interference visible in OONI's data", which is the honest ceiling, and
-    it is why a better candidate that finds subtle real events is not silently
-    charged a false alarm.
+    What the analyst decides about each is whether the state *changed* inside
+    it, which is the only thing a changepoint detector can be right or wrong
+    about. Two of the verdicts mean it did not — `quiet_observed` for a week
+    where OONI saw nothing wrong, `blocked_throughout` for a week inside a
+    block that started earlier — and both belong in the false-alarm
+    denominator, because the detector should be silent in either.
+
+    `quiet_observed`, never `quiet`: the week is judged from the same OONI data
+    the detector reads, so an unmeasured block is indistinguishable from calm.
+    That caps the claim at "no interference visible in OONI's data", which is
+    the honest ceiling, and it is why a better candidate that finds subtle real
+    events is not silently charged a false alarm.
     """
     since_dt, until_dt = _week_frame(since, until)
     wanted = sorted({s.strip() for s in strata.split(",") if s.strip()})
@@ -1124,6 +1133,10 @@ def interval_reveal(
         params,
     )
 
+    # No FINAL here, unlike the sampler's frame query. This one is read to draw
+    # a chart, not to size a population: an unmerged duplicate during a
+    # reprocess nudges a median, where in the frame it would move a cell-week
+    # into another volume band and corrupt a weight.
     signal = db.execute(
         """
         WITH IF(resolver_asn = probe_asn, 1, 0) AS is_isp_resolver
@@ -1133,7 +1146,7 @@ def interval_reveal(
                quantileIf(0.5)(dns_blocked, is_isp_resolver = 0) AS dns_other_blocked,
                quantile(0.5)(tcp_blocked) AS tcp_blocked,
                quantile(0.5)(tls_blocked) AS tls_blocked
-        FROM analysis_web_measurement FINAL
+        FROM analysis_web_measurement
         WHERE probe_cc = %(cc)s AND probe_asn = %(asn)s AND domain = %(domain)s
           AND measurement_start_time >= %(lo)s
           AND measurement_start_time < %(hi)s
