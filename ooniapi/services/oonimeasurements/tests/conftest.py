@@ -216,3 +216,5 @@ def set_since_and_until_params(since, until):
 def fixed_time(app):
     fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
     app.dependency_overrides[real_now_utc] = lambda: fixed_now
+    yield fixed_now
+    del app.dependency_overrides[real_now_utc]
