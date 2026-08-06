@@ -252,8 +252,6 @@ ENGINE = ReplacingMergeTree(translation_creation_time)
 ORDER BY (ooni_run_link_id, descriptor_creation_time)
 SETTINGS index_granularity = 1;
 
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` LowCardinality(String);
-
 CREATE TABLE
     analysis_web_measurement (
         `domain` String,
