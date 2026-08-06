@@ -1,22 +1,38 @@
 """
 Labeling corpus API.
 
-Read-only ClickHouse queries backing the measurement adjudication UI. There is
-no write path: labels live in the analyst's browser and leave it by copy-paste,
-so this router adds no storage, no auth surface, and no migration.
+Read-only ClickHouse queries backing the adjudication UIs. There is no write
+path: labels live in the analyst's browser and leave it by copy-paste, so this
+router adds no storage, no auth surface, and no migration.
 
-Two invariants this module exists to enforce:
+Two grains are served, and they answer different questions.
 
-1. BLINDING. /candidate returns what the probe and the control saw, and nothing
-   the pipeline concluded. analysis_web_measurement and fastpath's anomaly /
-   confirmed / scores columns are queried ONLY by /reveal, which the UI calls
-   after the analyst has committed. If you add a field to /candidate, check it
-   is not a pipeline judgment in disguise.
+- MEASUREMENT (/sample, /candidate, /context, /reveal). One row per
+  measurement. Calibrates *scoring*: the per-rule likelihood ratios are fitted
+  from it.
+- INTERVAL (/interval_sample, /interval_reveal). One row per
+  (probe_cc, probe_asn, domain) x ISO week — the detector's own cell, keyed
+  exactly as `event_detector_cusums` is. Supplies the *denominator* the event
+  grain cannot: "false alerts per quiet series-week" is a rate over a
+  population of cell-weeks, and a population can only be counted if it was
+  sampled from a frame.
+
+Two invariants this module exists to enforce, in both grains:
+
+1. BLINDING. The candidate views return what the probes got and nothing the
+   pipeline concluded. analysis_web_measurement and fastpath's anomaly /
+   confirmed / scores columns are queried ONLY by /reveal, and
+   event_detector_changepoints ONLY by /interval_reveal, which the UIs call
+   after the analyst has committed. If you add a field to a candidate view,
+   check it is not a pipeline judgment in disguise. The interval grain makes
+   this sharper than the measurement grain does: one of its strata *is* the
+   detector's output, so an unblinded alert state does not merely anchor the
+   analyst, it hands them the answer.
 
 2. SAMPLING IS RECORDED, NOT REMEMBERED. Every draw is deterministic given
-   (design_id, stratum, frame, rate), and /sample returns the predicate it ran
-   and the population it ran against, so the weights are reconstructable from
-   the export alone.
+   (design_id, stratum, frame, rate), and the sample endpoints return the
+   predicate they ran and the population they ran against, so the weights are
+   reconstructable from the export alone.
 """
 
 import hashlib
@@ -655,4 +671,519 @@ def reveal(
         "fastpath": fastpath,
         "caveat": "The LoNI triple is hand-set and uncalibrated. It is shown "
                   "as a claim to check, not a reference answer.",
+    }
+
+
+# --------------------------------------------------------------------------
+# Interval grain: the quiet-time denominator
+# --------------------------------------------------------------------------
+#
+# The event corpus is curated, so event recall is a coverage statement about a
+# hand-built set. Nothing in it defines quiet time, so the harness's "false
+# alerts per quiet series-week" had no frame behind it. This is that frame.
+#
+# The unit is the detector's own unit. `event_detector_cusums` keys on
+# (probe_cc, probe_asn, domain), so anything coarser here would estimate a rate
+# over a different population than the one the detector runs on.
+#
+# WHY THE STRATA PARTITION THE FRAME. The design note describes two draws — one
+# over the intervals where the incumbent alerted, one random over covered
+# cell-weeks. Taken literally they overlap: an alerted cell-week is also in the
+# random stratum's population, so it has two selection probabilities and no
+# single weight is correct for it. Here the strata are a partition instead, and
+# `random_covered`'s predicate is resolved against the *set of strata being
+# drawn* so the partition stays exhaustive whichever subset you ask for. That
+# resolved predicate goes into the design spec, so a weight can never be
+# reinterpreted under a different partition than the one it was drawn under.
+#
+# WHY THE ALERTED STRATUM IS NOT CIRCULAR. On its own it would be: it estimates
+# the incumbent's precision conditional on having fired, which says nothing
+# about quiet time, and a *candidate* detector's alerts in cells the incumbent
+# never flagged would land on intervals nobody adjudicated. As a stratum with a
+# recorded screen and a weight it is fine — the weight states how much of the
+# frame it stands for. Note this uses the historical alert log as a screen; it
+# does not replay the incumbent, which the harness cannot do anyway.
+
+# ISO weeks: toStartOfWeek(t, 1) is Monday-based, matching the `x ISO week`
+# unit. A partial week at either end of the frame is a shorter observation
+# window with fewer measurements in it, which is not the same unit at all, so
+# frames are snapped to whole weeks rather than truncated.
+_WEEK = timedelta(days=7)
+
+# Cell-weeks below this many measurements are not in the frame. Uniform draws
+# over *all* cell-weeks are dominated by cells too thin for any detector to
+# fire, and including them makes every detector score well by measuring mostly
+# arithmetic. The floor is recorded in the spec and reported per volume band,
+# so the exclusion is visible rather than baked in.
+DEFAULT_VOLUME_FLOOR = 20
+
+# Bands are derived from the measurement count on read, never entered — the
+# same rule `ongoing` and `size_band` follow in the event grain. Edges are in
+# the spec because they define what a per-band rate means.
+VOLUME_BAND_EDGES = ((100, "low"), (1000, "medium"), (None, "high"))
+
+INTERVAL_DESIGN_SCHEMA_VERSION = "1"
+
+
+def volume_band(n: int) -> str:
+    for edge, name in VOLUME_BAND_EDGES:
+        if edge is None or n < edge:
+            return name
+    return VOLUME_BAND_EDGES[-1][1]
+
+
+# The detector runs on the citizenlab global list plus twitter.com
+# (`detector.get_domain_list`), so a frame over every domain would count quiet
+# time in cells the detector never watches and flatter it for free. `detector`
+# is the default for that reason; `all` is available for scoring a candidate
+# with a wider remit, and which one was used is in the spec.
+DETECTOR_DOMAINS_SQL = (
+    "(domain IN (SELECT domain FROM citizenlab "
+    "WHERE category_code = 'GRP' AND cc = 'ZZ') OR domain = 'twitter.com')"
+)
+
+# Cell key as a string on both sides of the alert join. The tuple form reads
+# better but compares a UInt32 probe_asn against whatever width the other table
+# declares, and a type mismatch there fails as an empty alerted set — which
+# looks exactly like "the detector never fired", i.e. a wrong answer rather
+# than an error.
+_CELL_KEY = "concat({cc}, '|', toString({asn}), '|', {dom}, '|', toString({wk}))"
+
+ALERTED_CELLS_SQL = f"""
+    SELECT {_CELL_KEY.format(cc='probe_cc', asn='probe_asn', dom='domain',
+                             wk='toStartOfWeek(ts, 1)')}
+    FROM event_detector_changepoints
+    WHERE ts >= %(since)s AND ts < %(until)s AND change_dir > 0
+"""
+
+_IS_ALERTED = (
+    _CELL_KEY.format(cc="probe_cc", asn="probe_asn", dom="domain", wk="week")
+    + f" IN ({ALERTED_CELLS_SQL})"
+)
+
+# `blocked_max` is the cell-week's loudest measurement. It is used to define
+# the near-miss stratum and is NEVER returned to the client: it is a pipeline
+# judgment, and on this grain it is close to the verdict itself.
+INTERVAL_STRATA: Dict[str, Dict[str, Any]] = {
+    "detector_alerted": {
+        "predicate": _IS_ALERTED,
+        "screen_kind": "incumbent_alert",
+        "note": "Cell-weeks the deployed detector fired in. The historical "
+                "alert log used as a screen, not replayed.",
+    },
+    "near_miss": {
+        # Importance sampling, not a separate population: most random
+        # cell-weeks are trivially quiet and carry almost no information per
+        # minute of analyst time. Oversampling cells that had blocked-leaning
+        # measurements without alerting is where the disagreements live, and
+        # the weights correct for it. This is the whole reason to record a
+        # design rather than draw uniformly.
+        "predicate": f"NOT ({_IS_ALERTED}) AND blocked_max >= {BLOCKING_THRESHOLD}",
+        "screen_kind": "near_miss_score",
+        "note": "Did not alert, but something in the week scored "
+                "blocked-leaning. Optional; when omitted these cells stay in "
+                "random_covered.",
+    },
+    "random_covered": {
+        # Resolved at draw time against the selected strata — see the note at
+        # the top of this section.
+        "predicate": None,
+        "screen_kind": "volume_stratified_random",
+        "note": "The denominator. Everything in the frame the other selected "
+                "strata did not take.",
+    },
+}
+
+
+def _resolve_interval_predicates(wanted: List[str]) -> Dict[str, str]:
+    """Turn the selected strata into an exhaustive, disjoint partition.
+
+    `random_covered` is the complement of whatever else was selected, so the
+    frame is covered exactly once however the queue is composed. Drawing
+    `near_miss` alone, with no complement stratum, is allowed and estimates
+    nothing on its own — the weights say so, since the population it names is
+    not the frame.
+    """
+    taken = [
+        f"({INTERVAL_STRATA[s]['predicate']})"
+        for s in ("detector_alerted", "near_miss")
+        if s in wanted
+    ]
+    resolved = {
+        s: INTERVAL_STRATA[s]["predicate"] for s in wanted if s != "random_covered"
+    }
+    if "random_covered" in wanted:
+        resolved["random_covered"] = (
+            " AND ".join(f"NOT {t}" for t in taken) if taken else "1"
+        )
+    return resolved
+
+
+def _week_frame(since: Optional[datetime], until: Optional[datetime]):
+    """Snap the frame to whole Monday-based weeks."""
+    since_dt, until_dt = _frame(since, until)
+    lo = since_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    lo -= timedelta(days=lo.weekday())
+    if lo < since_dt:
+        lo += _WEEK
+    hi = until_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    hi -= timedelta(days=hi.weekday())
+    if hi <= lo:
+        raise HTTPException(
+            400,
+            "frame contains no whole ISO week — a partial week is a shorter "
+            "observation window, not a smaller one",
+        )
+    return lo, hi
+
+
+class IntervalRow(BaseModel):
+    probe_cc: str
+    probe_asn: int
+    domain: str
+    window_start: datetime
+    window_end: datetime
+    # From the coverage query, not a guess. The band is derived from it, and
+    # the harness re-derives rather than trusting the stored band.
+    measurements_in_window: int
+    volume_band: str
+    # sampling provenance, carried through to the label
+    sampling_stratum: str
+    sampling_weight: float
+    sample_population: int
+    sample_rows: int
+    sampling_design_id: str
+    screen_kind: str
+
+
+class IntervalSampleResponse(BaseModel):
+    design_id: str
+    replicate: int
+    spec: Dict[str, Any]
+    frame_start: datetime
+    frame_end: datetime
+    strata: Dict[str, Dict[str, Any]]
+    rows: List[IntervalRow]
+
+
+@router.get("/interval_sample", response_model=IntervalSampleResponse)
+def draw_interval_sample(
+    db=Depends(get_clickhouse_session),
+    strata: str = Query(
+        "detector_alerted,random_covered",
+        description="Comma-separated. Drawn separately and interleaved, so "
+                    "the analyst cannot infer from a row's position whether "
+                    "the incumbent alerted in it.",
+    ),
+    replicate: int = Query(
+        1, ge=1,
+        description="Independent draws of the same design. Same replicate = "
+                    "same cell-weeks, so two analysts can be given an overlap "
+                    "set without any coordination service.",
+    ),
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    probe_cc: Optional[str] = Query(None, min_length=2, max_length=2),
+    probe_asn: Optional[int] = None,
+    domain: Optional[str] = None,
+    domain_list: str = Query(
+        "detector",
+        description="'detector' restricts the frame to the domains the "
+                    "deployed detector runs on; 'all' widens it. Counting "
+                    "quiet time in cells nothing watches inflates the "
+                    "denominator.",
+    ),
+    min_measurements: int = Query(
+        DEFAULT_VOLUME_FLOOR, ge=1,
+        description="Volume floor. Cell-weeks below it are not in the frame.",
+    ),
+    shares: Optional[str] = Query(
+        None,
+        description="Optional stratum=share pairs. Steers analyst effort "
+                    "only — row weights stay population/drawn regardless.",
+    ),
+    limit: int = Query(40, ge=1, le=500),
+) -> IntervalSampleResponse:
+    """Draw cell-weeks to adjudicate as quiet, or not.
+
+    The verdict an analyst writes against these rows is `quiet_observed`, never
+    `quiet`: the week is judged from the same OONI data the detector reads, so
+    an unmeasured block is indistinguishable from calm. That caps the claim at
+    "no interference visible in OONI's data", which is the honest ceiling, and
+    it is why a better candidate that finds subtle real events is not silently
+    charged a false alarm.
+    """
+    since_dt, until_dt = _week_frame(since, until)
+    wanted = sorted({s.strip() for s in strata.split(",") if s.strip()})
+    unknown = [s for s in wanted if s not in INTERVAL_STRATA]
+    if unknown:
+        raise HTTPException(400, f"unknown strata: {unknown}")
+    if not wanted:
+        raise HTTPException(400, "no strata selected")
+    if domain_list not in ("detector", "all"):
+        raise HTTPException(400, "domain_list must be 'detector' or 'all'")
+
+    predicates = _resolve_interval_predicates(wanted)
+
+    scope_sql: List[str] = []
+    scope_params: Dict[str, Any] = {}
+    if probe_cc:
+        scope_sql.append("probe_cc = %(probe_cc)s")
+        scope_params["probe_cc"] = probe_cc.upper()
+    if probe_asn:
+        scope_sql.append("probe_asn = %(probe_asn)s")
+        scope_params["probe_asn"] = probe_asn
+    if domain:
+        scope_sql.append("domain = %(domain)s")
+        scope_params["domain"] = domain
+    if domain_list == "detector":
+        scope_sql.append(DETECTOR_DOMAINS_SQL)
+
+    # Everything that changes which cell-weeks are eligible, or what a weight
+    # means, is in the spec — including the resolved partition and the volume
+    # floor, so two different frames can never collide onto one design id.
+    spec = {
+        "schema": INTERVAL_DESIGN_SCHEMA_VERSION,
+        "grain": "interval",
+        "unit": "probe_cc,probe_asn,domain x iso_week",
+        "scoring_version": SCORING_VERSION,
+        "blocking_threshold": BLOCKING_THRESHOLD,
+        "strata": {
+            s: {
+                "predicate": predicates[s],
+                "screen_kind": INTERVAL_STRATA[s]["screen_kind"],
+            }
+            for s in wanted
+        },
+        "frame": [since_dt.isoformat(), until_dt.isoformat()],
+        "volume_floor": min_measurements,
+        "volume_band_edges": [[e, n] for e, n in VOLUME_BAND_EDGES],
+        "domain_list": domain_list,
+        "scope": {
+            "probe_cc": probe_cc.upper() if probe_cc else None,
+            "probe_asn": probe_asn,
+            "domain": domain,
+        },
+        "replicate": replicate,
+    }
+    derived_id = _design_fingerprint(spec)
+
+    # analysis_web_measurement is a ReplacingMergeTree; without FINAL a
+    # reprocess in flight double-counts a cell-week and moves it up a volume
+    # band. No test_name filter: the detector does not have one either, and the
+    # frame has to be the population the detector actually runs over.
+    cells_sql = f"""
+        SELECT probe_cc,
+               probe_asn,
+               domain,
+               toStartOfWeek(measurement_start_time, 1) AS week,
+               count() AS n,
+               max(greatest(dns_blocked, tcp_blocked, tls_blocked)) AS blocked_max
+        FROM analysis_web_measurement FINAL
+        WHERE measurement_start_time >= %(since)s
+          AND measurement_start_time < %(until)s
+          {''.join(' AND ' + s for s in scope_sql)}
+        GROUP BY probe_cc, probe_asn, domain, week
+        HAVING n >= %(floor)s
+    """
+
+    quotas = _quotas(wanted, shares, limit)
+    used: Dict[str, Dict[str, Any]] = {}
+    buckets: List[List[IntervalRow]] = []
+
+    for stratum in wanted:
+        params: Dict[str, Any] = {
+            "since": since_dt,
+            "until": until_dt,
+            "floor": min_measurements,
+            "salt": f"{derived_id}:{stratum}",
+            "limit": quotas[stratum],
+            **scope_params,
+        }
+        where = predicates[stratum]
+
+        pop = db.execute(
+            f"SELECT count() FROM ({cells_sql}) AS cells WHERE {where}", params
+        )
+        population = int(pop[0][0]) if pop else 0
+        if not population:
+            used[stratum] = {
+                "predicate": where,
+                "table": "analysis_web_measurement",
+                "screen_kind": INTERVAL_STRATA[stratum]["screen_kind"],
+                "population_estimate": 0,
+                "drawn": 0,
+                "frame_start": since_dt.isoformat(),
+                "frame_end": until_dt.isoformat(),
+                "volume_floor": min_measurements,
+                "scope": spec["scope"],
+            }
+            continue
+
+        # NOTE: no blocked_max, no alert state, no changepoints. The cell key,
+        # the window and how much data is in it — that is all an analyst gets
+        # before committing.
+        rows = db.execute(
+            f"""
+            SELECT probe_cc, probe_asn, domain, week, n
+            FROM ({cells_sql}) AS cells
+            WHERE {where}
+            ORDER BY cityHash64(concat(
+                {_CELL_KEY.format(cc='probe_cc', asn='probe_asn',
+                                  dom='domain', wk='week')}, %(salt)s))
+            LIMIT %(limit)s
+            """,
+            params,
+        )
+
+        used[stratum] = {
+            "predicate": where,
+            "table": "analysis_web_measurement",
+            "screen_kind": INTERVAL_STRATA[stratum]["screen_kind"],
+            "population_estimate": population,
+            "drawn": len(rows),
+            "frame_start": since_dt.isoformat(),
+            "frame_end": until_dt.isoformat(),
+            "volume_floor": min_measurements,
+            "scope": spec["scope"],
+        }
+        buckets.append([
+            IntervalRow(
+                probe_cc=r[0] or "",
+                probe_asn=int(r[1] or 0),
+                domain=r[2] or "",
+                window_start=datetime(r[3].year, r[3].month, r[3].day),
+                window_end=datetime(r[3].year, r[3].month, r[3].day) + _WEEK,
+                measurements_in_window=int(r[4]),
+                volume_band=volume_band(int(r[4])),
+                sampling_stratum=stratum,
+                sampling_weight=population / len(rows),
+                sample_population=population,
+                sample_rows=len(rows),
+                sampling_design_id=derived_id,
+                screen_kind=INTERVAL_STRATA[stratum]["screen_kind"],
+            )
+            for r in rows
+        ])
+
+    interleaved: List[IntervalRow] = []
+    for i in range(max((len(b) for b in buckets), default=0)):
+        for b in buckets:
+            if i < len(b):
+                interleaved.append(b[i])
+
+    return IntervalSampleResponse(
+        design_id=derived_id,
+        replicate=replicate,
+        spec=spec,
+        frame_start=since_dt,
+        frame_end=until_dt,
+        strata=used,
+        rows=interleaved[:limit],
+    )
+
+
+@router.get("/interval_reveal")
+def interval_reveal(
+    probe_cc: str = Query(..., min_length=2, max_length=2),
+    probe_asn: int = Query(...),
+    domain: str = Query(...),
+    window_start: datetime = Query(...),
+    window_end: datetime = Query(...),
+    pad_days: int = Query(7, ge=0, le=28),
+    db=Depends(get_clickhouse_session),
+) -> Dict[str, Any]:
+    """What the detector did in this cell-week. Shown after commit, never
+    before.
+
+    Two things, because a bare alert flag is not diagnosable: the changepoints
+    themselves, and the hourly signal the detector consumed to produce them.
+    The signal is a median per cell-hour, exactly as `detector.get_observations`
+    computes it, so an analyst who disagrees with an alert can see whether the
+    detector saw something they did not or scored what they saw differently.
+    """
+    lo = window_start - timedelta(days=pad_days)
+    hi = window_end + timedelta(days=pad_days)
+    params = {
+        "cc": probe_cc.upper(),
+        "asn": probe_asn,
+        "domain": domain,
+        "lo": lo,
+        "hi": hi,
+        "ws": window_start,
+        "we": window_end,
+    }
+
+    cps = db.execute(
+        """
+        SELECT ts, block_type, change_dir, s_pos, s_neg, current_state, h
+        FROM event_detector_changepoints
+        WHERE probe_cc = %(cc)s AND probe_asn = %(asn)s AND domain = %(domain)s
+          AND ts >= %(lo)s AND ts < %(hi)s
+        ORDER BY ts
+        """,
+        params,
+    )
+
+    signal = db.execute(
+        """
+        WITH IF(resolver_asn = probe_asn, 1, 0) AS is_isp_resolver
+        SELECT toStartOfHour(measurement_start_time) AS ts,
+               count() AS n,
+               quantileIf(0.5)(dns_blocked, is_isp_resolver = 1) AS dns_isp_blocked,
+               quantileIf(0.5)(dns_blocked, is_isp_resolver = 0) AS dns_other_blocked,
+               quantile(0.5)(tcp_blocked) AS tcp_blocked,
+               quantile(0.5)(tls_blocked) AS tls_blocked
+        FROM analysis_web_measurement FINAL
+        WHERE probe_cc = %(cc)s AND probe_asn = %(asn)s AND domain = %(domain)s
+          AND measurement_start_time >= %(lo)s
+          AND measurement_start_time < %(hi)s
+        GROUP BY ts
+        ORDER BY ts
+        """,
+        params,
+    )
+
+    changepoints = [
+        {
+            "ts": r[0],
+            "block_type": r[1],
+            "change_dir": int(r[2] or 0),
+            "s_pos": r[3],
+            "s_neg": r[4],
+            "current_state": r[5],
+            "h": r[6],
+            # Whether it lands in the adjudicated week is the whole question,
+            # so the client is not left to redo the comparison in local time.
+            "in_window": window_start <= r[0].replace(tzinfo=None) < window_end,
+        }
+        for r in cps
+    ]
+
+    return {
+        "probe_cc": probe_cc.upper(),
+        "probe_asn": probe_asn,
+        "domain": domain,
+        "window_start": window_start,
+        "window_end": window_end,
+        "pad_days": pad_days,
+        "changepoints": changepoints,
+        "alerts_in_window": sum(
+            1 for c in changepoints if c["in_window"] and c["change_dir"] > 0
+        ),
+        "signal": [
+            {
+                "ts": r[0],
+                "count": int(r[1]),
+                "dns_isp_blocked": r[2],
+                "dns_other_blocked": r[3],
+                "tcp_blocked": r[4],
+                "tls_blocked": r[5],
+            }
+            for r in signal
+        ],
+        "caveat": "The deployed detector is online: this is the alert log it "
+                  "actually emitted, under whatever state it carried at the "
+                  "time. It is not a replay and cannot be reproduced from "
+                  "this window alone.",
     }
