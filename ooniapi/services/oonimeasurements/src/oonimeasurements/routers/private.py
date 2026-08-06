@@ -505,7 +505,10 @@ def api_private_website_test_urls(
     end = now_utc
     start = end - timedelta(days=31)
 
-    probe_asn = int(probe_asn.replace("AS", ""))
+    try:
+        probe_asn = int(probe_asn.upper().replace("AS", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid probe_asn")
 
     # Count how many distinct inputs we have in this CC / ASN / period
     s = """
@@ -741,7 +744,10 @@ def api_private_im_stats(
     if test_name not in test_names:
         raise HTTPException(status_code=400, detail="Invalid test_name")
 
-    probe_asn = int(probe_asn.upper().replace("AS", ""))
+    try:
+        probe_asn = int(probe_asn.upper().replace("AS", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid probe_asn")
 
     end = now_utc
     start = end - timedelta(days=31)
