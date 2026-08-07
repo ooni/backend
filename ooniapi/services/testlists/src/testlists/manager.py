@@ -617,32 +617,56 @@ class URLListManager:
     def _push_to_repo(self, account_id):
         with git.Repo(self.repo_dir) as repo:
             branch_name = self._get_user_branchname(account_id)
-
             local_head = _read_ref(repo, f"refs/heads/{branch_name}")
-            worktree_head = None
+
+            # NOTE: comparing refs/heads/<branch> in the shared repo against
+            # HEAD in the user's worktree is *not* a useful check on its
+            # own: HEAD in a worktree is a symref pointing at the exact
+            # same ref storage in the shared commondir, so the two always
+            # agree by construction - they're two views of one ref file,
+            # not two independent copies. The actual failure mode we're
+            # guarding against (git.add()/git.commit() raising after the
+            # CSV rename, per the original bug report) leaves the change
+            # sitting uncommitted in the worktree's index/working tree,
+            # which a ref comparison can never see. Check the worktree's
+            # status instead.
             user_repo_path = self._get_user_repo_path(account_id)
             if os.path.exists(user_repo_path):
                 with git.Repo(user_repo_path) as user_repo:
                     worktree_head = _read_ref(user_repo, "HEAD")
-
-            log.debug(
-                f"[git-debug] account={account_id} pushing {branch_name} to "
-                f"GitHub, local_head={local_head} worktree_head={worktree_head}"
-            )
-            if worktree_head is not None and local_head != worktree_head:
-                # This is exactly the failure mode we're guarding against:
-                # the user's worktree has a commit that never made it onto
-                # refs/heads/<branch> in the shared repo (e.g. because a
-                # previous update() call raised partway through git.add()/
-                # git.commit()). Pushing now would silently re-open a PR
-                # that is missing the user's latest change.
-                log.error(
-                    f"[git-debug] account={account_id} branch {branch_name} "
-                    f"ref ({local_head!r}) does not match the worktree HEAD "
-                    f"({worktree_head!r}) - refusing to push a stale branch"
-                )
-                raise CannotUpdateList(
-                    description="Local branch is out of sync with the user's worktree"
+                    dirty = git.status(user_repo)
+                    log.debug(
+                        f"[git-debug] account={account_id} pushing {branch_name} "
+                        f"to GitHub, local_head={local_head} "
+                        f"worktree_head={worktree_head} status={dirty}"
+                    )
+                    has_uncommitted = bool(
+                        any(dirty.staged.values()) or dirty.unstaged
+                    )
+                    if has_uncommitted:
+                        # This is exactly the failure mode from the original
+                        # bug report: a CSV edit landed on disk in the
+                        # user's worktree (git.add() and/or git.commit()
+                        # raised right after the rename) but was never
+                        # committed, so it never reached refs/heads/<branch>
+                        # in the shared repo. Pushing now would silently
+                        # open/update a PR that's missing this change.
+                        log.error(
+                            f"[git-debug] account={account_id} branch "
+                            f"{branch_name} worktree has uncommitted changes "
+                            f"(staged={dirty.staged} unstaged={dirty.unstaged}) "
+                            "- refusing to push, this change was never "
+                            "actually committed"
+                        )
+                        raise CannotUpdateList(
+                            description="The user's worktree has uncommitted "
+                            "changes that never made it into a commit"
+                        )
+            else:
+                log.debug(
+                    f"[git-debug] account={account_id} pushing {branch_name} "
+                    f"to GitHub, local_head={local_head} (no worktree checked "
+                    "out - nothing to verify)"
                 )
 
             refspec = f"refs/heads/{branch_name}:refs/heads/{branch_name}"
