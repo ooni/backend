@@ -15,10 +15,9 @@ from ...dependencies import ClickhouseDep, get_clickhouse_session
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
-    utc_30_days_ago,
     utc_today,
 )
-from .utils import TimeGrains, get_measurement_start_day_agg, parse_probe_asn_to_int
+from .utils import TimeGrains, get_measurement_start_day_agg, parse_probe_asn_to_int, utc_7_days_ago
 
 router = APIRouter()
 
@@ -303,7 +302,7 @@ async def get_aggregation_analysis(
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
+    since: SinceUntil = utc_7_days_ago(),
     until: SinceUntil = utc_today(),
     time_grain: Annotated[TimeGrains, Query()] = "day",
     anomaly_sensitivity: Annotated[float, Query()] = 0.9,
@@ -522,7 +521,7 @@ async def list_changepoints(
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
     domain: str | None = Query(default=None),
-    since: SinceUntil = utc_30_days_ago(),
+    since: SinceUntil = utc_7_days_ago(),
     until: SinceUntil = utc_today(),
 ) -> ListChangePointsResponse:
     conditions = []

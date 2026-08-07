@@ -11,7 +11,7 @@ from .utils import (
     SinceUntil,
     TimeGrains,
     get_measurement_start_day_agg,
-    utc_30_days_ago,
+    utc_7_days_ago,
     utc_today,
 )
 
@@ -64,7 +64,7 @@ async def get_aggregation_observations(
     probe_cc: Annotated[List[str] | None, Query()] = None,
     ip: Annotated[List[str] | None, Query()] = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
+    since: SinceUntil = utc_7_days_ago(),
     until: SinceUntil = utc_today(),
     time_grain: Annotated[TimeGrains, Query()] = "day",
     db=Depends(get_clickhouse_session),
