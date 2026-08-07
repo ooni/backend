@@ -23,6 +23,7 @@ from dulwich import porcelain as dulwich_git
 from filelock import FileLock
 
 import testlists.manager
+from tests.conftest import create_session_token
 
 
 def test_no_auth(client):
@@ -434,18 +435,24 @@ def use_local_git_remotes(monkeypatch, local_test_lists_remotes):
     monkeypatch.setattr(testlists.manager.URLListManager, "_init_repo", fake_init_repo)
 
 
-def _read_pushed_csv(local_test_lists_remotes, branch, cc):
-    """Read a file's content directly off a branch in the local bare
-    "push" repo - i.e. bypass the API/manager entirely and inspect exactly
-    what was actually pushed, the same way a GitHub PR review would see
-    it."""
-    with dulwich_git.Repo(local_test_lists_remotes["push"]) as repo:
+def _read_csv_from_repo(repo_path, branch, cc):
+    """Read a file's content directly off a branch in a local bare repo -
+    i.e. bypass the API/manager entirely and inspect exactly what's
+    actually there, the same way a GitHub PR review (or a post-merge
+    checkout of master) would see it."""
+    with dulwich_git.Repo(repo_path) as repo:
         commit = repo[f"refs/heads/{branch}".encode()]
         tree = repo[commit.tree]
         _mode, blob_sha = tree.lookup_path(
             repo.object_store.__getitem__, f"lists/{cc}.csv".encode()
         )
         return repo[blob_sha].data.decode()
+
+
+def _read_pushed_csv(local_test_lists_remotes, branch, cc):
+    """Read a file's content directly off a branch in the local bare
+    "push" repo (i.e. the bot's fork, what a PR is opened from)."""
+    return _read_csv_from_repo(local_test_lists_remotes["push"], branch, cc)
 
 
 def test_submit_then_add_more_urls_then_resubmit_pushes_all_changes(
@@ -495,6 +502,136 @@ def test_submit_then_add_more_urls_then_resubmit_pushes_all_changes(
     pushed_again = _read_pushed_csv(local_test_lists_remotes, branch, "us")
     assert url_a in pushed_again, "first URL missing from the re-pushed branch"
     assert url_b in pushed_again, "second URL missing from the re-pushed branch"
+
+
+def test_second_users_branch_misses_first_users_merged_change(
+    client,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """Documents a known limitation, not a regression: URLListManager
+    never rebases a user's long-lived worktree branch onto the latest
+    origin master before pushing.
+
+    Scenario: user A submits and their PR gets merged. User B has their
+    own in-progress submission whose worktree/branch was cut *before* A's
+    merge, adds more changes to it, and only then submits. Because the
+    service never updates B's branch against the new master in between,
+    B's pushed branch is missing A's already-merged change even though
+    it's sitting right there on master - exactly the kind of drift that
+    turns into a real merge conflict (or a silent, wrong resolution) once
+    a human tries to merge B's PR too. Rebasing (or at least fast-forward
+    merging) each user's branch onto origin's current master before
+    pushing would avoid this class of problem; this test exists to make
+    the current behavior visible and catch it if it silently changes.
+    """
+    account_a = "0" * 16
+    account_b = "1" * 16
+    branch_a = f"user-contribution/{account_a}"
+    branch_b = f"user-contribution/{account_b}"
+    headers_a = {"Authorization": f"Bearer {create_session_token(account_a, 'user')}"}
+    headers_b = {"Authorization": f"Bearer {create_session_token(account_b, 'user')}"}
+
+    # mock_github_pr_api always reports PRs as open; here we need to flip
+    # that to "closed" (merged) specifically for account A once we
+    # simulate the merge below, while account B's own flow never checks
+    # PR resolution (it never gets far enough to have an open PR of its
+    # own to check until the very end).
+    pr_a_merged = {"value": False}
+
+    def fake_get(*a, **kw):
+        return MKClosed() if pr_a_merged["value"] else MKOpen()
+
+    monkeypatch.setattr(testlists.manager.requests, "get", fake_get)
+
+    def add(headers, url, notes):
+        d = dict(
+            country_code="US",
+            new_entry={
+                "url": url,
+                "category_code": "FILE",
+                "date_added": "2017-04-12",
+                "source": "",
+                "notes": notes,
+            },
+            comment=f"add {url}",
+        )
+        r = client.post("/api/v1/url-submission/update-url", json=d, headers=headers)
+        assert r.status_code == 200, r.json()
+
+    def state(headers, cc="ie"):
+        r = client.get(f"/api/_/url-submission/test-list/{cc}", headers=headers)
+        assert r.status_code == 200, r.json()
+        return r.json()["state"]
+
+    def submit(headers):
+        r = client.post("/api/v1/url-submission/submit", headers=headers)
+        assert r.status_code == 200, r.json()
+        return r.json()["pr_id"]
+
+    # --- User A creates and submits their change first.
+    assert state(headers_a) == "CLEAN"
+    url_a = "https://user-a-first.org/"
+    add(headers_a, url_a, "A")
+    assert state(headers_a) == "IN_PROGRESS"
+    submit(headers_a)
+    assert state(headers_a) == "PR_OPEN"
+
+    # --- User B starts their own in-progress submission. B's worktree is
+    # cut from master as it stands *right now* - before A's PR is merged.
+    assert state(headers_b) == "CLEAN"
+    url_b1 = "https://user-b-first.org/"
+    add(headers_b, url_b1, "B1")
+    assert state(headers_b) == "IN_PROGRESS"
+
+    # --- A's PR is accepted and merged into origin's master. Simulate
+    # this the same way GitHub would: land A's pushed branch tip directly
+    # onto origin's master ref.
+    dulwich_git.push(
+        local_test_lists_remotes["push"],
+        local_test_lists_remotes["origin"],
+        refspecs=[f"refs/heads/{branch_a}:refs/heads/master"],
+    )
+    pr_a_merged["value"] = True
+
+    # A GET for account A makes sync_state() notice the PR is resolved and
+    # clean up A's worktree/branch - the normal post-merge cleanup path.
+    assert state(headers_a) == "CLEAN"
+
+    # --- User B adds MORE changes to their still-open submission *after*
+    # A's change has already landed on master, then finally submits.
+    url_b2 = "https://user-b-second.org/"
+    add(headers_b, url_b2, "B2")
+    assert state(headers_b) == "IN_PROGRESS"
+    submit(headers_b)
+    assert state(headers_b) == "PR_OPEN"
+
+    # Sanity check: A's change really is on origin's master by now.
+    master_content = _read_csv_from_repo(
+        local_test_lists_remotes["origin"], "master", "us"
+    )
+    assert url_a in master_content
+
+    # This is the known issue: B's branch never picked up A's change, even
+    # though B added more to their submission and submitted well after
+    # A's PR merged. If a human merged B's PR as-is, the result depends on
+    # exactly where in the file each line landed - best case, git resolves
+    # it automatically; worst case, it's a conflict a maintainer has to
+    # untangle by hand. Rebasing B's branch onto master before this push
+    # would have avoided the question entirely.
+    pushed_b = _read_pushed_csv(local_test_lists_remotes, branch_b, "us")
+    assert url_b1 in pushed_b
+    assert url_b2 in pushed_b
+    assert url_a not in pushed_b, (
+        "expected B's branch to still be missing A's merged change "
+        "(documents the known stale-base/needs-rebase limitation); if "
+        "this now fails because url_a IS present, someone has added "
+        "rebase-onto-master behavior and this test should be updated "
+        "to assert the fixed behavior instead"
+    )
 
 
 def test_update_url_succeeds_without_ambient_git_identity(
