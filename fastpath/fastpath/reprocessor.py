@@ -51,7 +51,7 @@ import statsd  # debdeps: python3-statsd
 import fastpath.db as db
 import fastpath.s3feeder as s3f
 from fastpath.db import extract_input_domain
-from fastpath.core import score_measurement, setup_fingerprints, unwrap_msmt
+from fastpath.core import score_measurement, update_fingerprints_if_needed, unwrap_msmt
 
 metrics = statsd.StatsClient("127.0.0.1", 8125, prefix="reprocessor")
 log = logging.getLogger("reprocessor")
@@ -381,7 +381,7 @@ def main():
         log.info(f"Connecting to CH at {conf.clickhouse_url}")
         db.setup_clickhouse(conf)
         db_conn = db.click_client
-    setup_fingerprints()
+    update_fingerprints_if_needed()
 
     # s3_check(s3sig, "ooni-data-eu-fra", "none", "jsonl/tor/VE/20200827/00/20200827_VE_tor.l.0.jsonl.gz")
     # Fetch msmts for one day
