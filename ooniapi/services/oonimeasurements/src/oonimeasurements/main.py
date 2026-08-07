@@ -18,6 +18,7 @@ from .routers.data import (
     list_observations,
 )
 from .routers.v1 import aggregation, measurements
+from .routers import labeling
 
 pkg_name = "oonimeasurements"
 
@@ -37,7 +38,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         # allow from observable notebooks
-        allow_origin_regex=r"^https://[-A-Za-z0-9]+(\.(test|dev))?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+        #allow_origin_regex=r"^https://[-A-Za-z0-9]+(\.(test|dev))?\.ooni\.(org|io)$|^https://.*\.observableusercontent\.com$",
+        allow_origins=["*"],
         # allow_origin_regex="^https://[-A-Za-z0-9]+(\.test)?\.ooni\.(org|io)$",
         allow_credentials=True,
         allow_methods=["*"],
@@ -60,6 +62,7 @@ def setup_router(app: FastAPI):
     app.include_router(list_observations.router, prefix="/api")
     app.include_router(aggregate_observations.router, prefix="/api")
     app.include_router(aggregate_analysis.router, prefix="/api")
+    app.include_router(labeling.router)
 
     instrumentor = Instrumentator().instrument(
         app, metric_namespace="ooniapi", metric_subsystem="oonimeasurements"

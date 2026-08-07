@@ -12,6 +12,12 @@ from typing_extensions import Annotated
 
 from ...common.clickhouse_utils import async_query_click
 from ...dependencies import ClickhouseDep, get_clickhouse_session
+from ...scoring import (
+    BLOCKING_THRESHOLD,
+    SCORING_VERSION,
+    Calibration,
+    blocked_probability_sql,
+)
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
@@ -50,6 +56,9 @@ class Loni(BaseModel):
     tls_down: Optional[float]
     tls_ok: Optional[float]
 
+    # Which layers cleared BLOCKING_THRESHOLD. Reading this needs to know the
+    # threshold that produced it, so the response carries both — see
+    # scoring_version / blocking_threshold on the response body.
     likely_blocked_protocols: List[Tuple[str, float]]
     blocked_max_outcome: Optional[str]
     blocked_max: Optional[float]
@@ -57,6 +66,13 @@ class Loni(BaseModel):
     dns_blocked_outcome: Optional[str]
     tcp_blocked_outcome: Optional[str]
     tls_blocked_outcome: Optional[str]
+
+    # Mean calibrated P(blocked) over the measurements in this cell, i.e. the
+    # estimated share of them that are blocked. Deliberately the mean of the
+    # per-measurement probabilities and not the probability of the aggregated
+    # score: the latter would answer "is the 99th-percentile measurement
+    # blocked", which is not a question anyone asks.
+    blocked_probability_mean: Optional[float]
 
 
 class AggregationEntry(BaseModel):
@@ -78,6 +94,15 @@ class AggregationResponse(BaseModel):
     db_stats: DBStats
     dimension_count: int
     results: List[AggregationEntry]
+    # The scoring regime behind likely_blocked_protocols. Two responses with
+    # different scoring_version are not comparable, so it travels with the
+    # verdicts rather than living only in a deploy log.
+    blocking_threshold: float = BLOCKING_THRESHOLD
+    scoring_version: str = SCORING_VERSION
+    # The corpus the probabilities were calibrated against, and the range over
+    # which that corpus actually constrains them.
+    calibration_corpus: str = Calibration.CORPUS
+    calibration_trustworthy_range: Tuple[float, float] = Calibration.TRUSTWORTHY_RANGE
 
 
 # editable chart link: https://excalidraw.com/#json=mnoOrMXdSDLVirr8Albuu,xRyHC8-8JlsTTEovwNxOdQ
@@ -182,6 +207,7 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
     {",".join(extra_cols.keys())},
     probe_analysis,
     count,
+    blocked_probability_mean,
 
     dns_blocked_q99 as dns_blocked,
     dns_down_q99 as dns_down,
@@ -214,7 +240,10 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         arraySort(
             x -> -x.1,
             arrayFilter(
-                x -> x.1 > 0.5,
+                -- Threshold from scoring.BLOCKING_THRESHOLD. Was a literal
+                -- `> 0.5` here and `>= 0.5` in the labeling router; they
+                -- disagreed at exactly 0.5, which dns.failure_no_ctrl hits.
+                x -> x.1 >= {BLOCKING_THRESHOLD},
                 [
                     (dns_blocked, 'dns'),
                     (tcp_blocked, 'tcp'),
@@ -241,6 +270,8 @@ def format_aggregate_query(extra_cols: Dict[str, str], where: str):
         SELECT
             {",".join(extra_cols.values())},
             COUNT() as count,
+
+            avg({blocked_probability_sql()}) as blocked_probability_mean,
 
             anyHeavy(top_probe_analysis) as probe_analysis,
 
@@ -404,6 +435,7 @@ async def get_aggregation_analysis(
             dns_blocked_outcome=d["dns_blocked_outcome"],
             tcp_blocked_outcome=d["tcp_blocked_outcome"],
             tls_blocked_outcome=d["tls_blocked_outcome"],
+            blocked_probability_mean=nan_to_none(d.get("blocked_probability_mean")),
         )
 
         entry = AggregationEntry(
@@ -426,6 +458,8 @@ async def get_aggregation_analysis(
         ),
         dimension_count=dimension_count,
         results=results,
+        blocking_threshold=BLOCKING_THRESHOLD,
+        scoring_version=SCORING_VERSION,
     )
 
 
