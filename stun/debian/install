@@ -1,0 +1,3 @@
+debian/ooni-stun.service /lib/systemd/system/
+debian/udp_3478.nft /etc/ooni/nftables/
+ooni-stun.py /usr/bin/
