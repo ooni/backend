@@ -403,7 +403,22 @@ def use_local_git_remotes(monkeypatch, local_test_lists_remotes):
     push_repo/origin_repo strings in test_settings (conftest.py) are left
     as-is; they're only used to build the GitHub API URLs, which are
     themselves mocked out by mock_github_pr_api.
+
+    Also pins a stable git identity via LOGNAME/EMAIL env vars. This is a
+    *different* code path from the author=/committer= manager.update() now
+    passes explicitly to git.commit(): dulwich also writes a reflog entry
+    for every ref imported during clone()/fetch() (and for new branches
+    created by worktree_add()), and that reflog write resolves identity
+    via get_user_identity(config) with no kind= argument - which skips the
+    GIT_AUTHOR_*/GIT_COMMITTER_* env var check entirely and falls straight
+    to git config, then LOGNAME/USER/EMAIL + /etc/passwd. A CI runner with
+    none of those configured hits dulwich.repo.DefaultIdentityNotFound on
+    the very first clone, independent of anything manager.py does - this
+    showed up as a real CI failure once these tests started actually
+    exercising git.clone() instead of mocking it away.
     """
+    monkeypatch.setenv("LOGNAME", "testlists-ci")
+    monkeypatch.setenv("EMAIL", "testlists-ci@example.com")
 
     def fake_init_repo(self):
         if not os.path.exists(self.repo_dir):
@@ -501,8 +516,24 @@ def test_update_url_succeeds_without_ambient_git_identity(
     silently leaving the branch stuck on the old commit. manager.update()
     now passes an explicit author=/committer= to git.commit(), so it no
     longer depends on any of this.
+
+    NOTE: this test is scoped narrowly to that one call. Cloning the repo
+    and creating the user's worktree/branch for the first time *also* need
+    a resolvable identity (see use_local_git_remotes's docstring), but via
+    a completely different dulwich code path (reflog writes) that isn't,
+    and shouldn't need to be, covered by manager.py's fix - that's
+    dulwich's own internal bookkeeping, not something this service's code
+    controls. So the identity is wiped only *after* a first add_url()
+    warms up the clone + worktree/branch creation with use_local_git_
+    remotes' pinned identity still in place, isolating this test to
+    exactly the claim it's making: that the actual git.commit() call in
+    update() no longer depends on ambient identity.
     """
     import pwd
+
+    assert get_state(client_with_user_role) == "CLEAN"
+    add_url(client_with_user_role, "https://example-warmup.org/", tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
 
     for name in (
         "LOGNAME",
@@ -522,7 +553,10 @@ def test_update_url_succeeds_without_ambient_git_identity(
 
     monkeypatch.setattr(pwd, "getpwuid", no_passwd_entry)
 
-    assert get_state(client_with_user_role) == "CLEAN"
+    # The repo and the user's worktree/branch already exist from the
+    # warm-up add_url() above, so this second update() only needs
+    # git.pull() (a no-op fast path here, since nothing upstream changed)
+    # and git.commit() - which is exactly the call this test is verifying.
     add_url(client_with_user_role, "https://example-no-identity.org/", tmp_path)
     assert get_state(client_with_user_role) == "IN_PROGRESS"
 
