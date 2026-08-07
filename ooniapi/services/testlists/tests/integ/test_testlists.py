@@ -11,9 +11,16 @@ Test using:
     hatch run test
 """
 
+import os
+
+from pathlib import Path
+
 import pytest
 
 # debdeps: python3-pytest-mock
+
+from dulwich import porcelain as dulwich_git
+from filelock import FileLock
 
 import testlists.manager
 
@@ -316,6 +323,306 @@ def test_propose_changes_then_update(
     assert r.status_code == 200
 
     assert get_state(client_with_user_role) == "PR_OPEN"
+
+
+# # Regression tests for the "PR missing the latest change" bug # #
+#
+# test_propose_changes_then_update above already exercises the
+# create-submission -> add-more-urls -> resubmit state machine, but it uses
+# mock_requests_open, which stubs out URLListManager._push_to_repo
+# entirely (see mock_requests_open/mock_requests_closed above). That means
+# none of the existing tests in this file - including the default (no
+# --ghpr) CI run - ever look at what actually lands on the pushed branch.
+# That's exactly the layer the "worktree has the change, but the branch/PR
+# doesn't" bug lived in, and why it shipped unnoticed. The fixtures and
+# tests below exercise the real dulwich clone/worktree/commit/push
+# mechanics against local bare repos (no network/GitHub credentials
+# needed) so this class of bug gets caught by the regular test suite.
+
+
+@pytest.fixture
+def mock_github_pr_api(monkeypatch):
+    """Mock only the GitHub REST calls used to open/close/poll a PR
+    (POST .../pulls, PATCH .../pulls/N, GET .../pulls/N).
+
+    Unlike mock_requests_open/mock_requests_closed above, this does NOT
+    stub out _push_to_repo, so tests using this fixture exercise the real
+    dulwich commit/push path.
+    """
+
+    def req(*a, **kw):
+        return MKOpen()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", req)
+    monkeypatch.setattr(testlists.manager.requests, "patch", req)
+    monkeypatch.setattr(testlists.manager.requests, "get", req)
+
+
+@pytest.fixture
+def local_test_lists_remotes(tmp_path_factory):
+    """Stand-in for citizenlab/test-lists ("origin") and ooni-bot/test-lists
+    ("push", i.e. the bot's fork) as two local bare repos, seeded with a
+    minimal set of CSV files. This lets tests exercise dulwich's real
+    clone/worktree/commit/push mechanics without touching the network or a
+    real GitHub repo.
+    """
+    base = tmp_path_factory.mktemp("local_remotes")
+    origin_bare = base / "origin.git"
+    push_bare = base / "push.git"
+    seed = base / "seed"
+
+    seed.mkdir()
+    dulwich_git.init(str(seed))
+    (seed / "lists").mkdir()
+    header = "url,category_code,category_description,date_added,source,notes\n"
+    country_codes = ("us", "it", "ie", "global")
+    csv_paths = []
+    for cc in country_codes:
+        p = seed / "lists" / f"{cc}.csv"
+        p.write_text(header)
+        csv_paths.append(str(p))
+    dulwich_git.add(str(seed), paths=csv_paths)
+    dulwich_git.commit(
+        str(seed),
+        message="seed",
+        author=b"seed <seed@example.com>",
+        committer=b"seed <seed@example.com>",
+    )
+
+    dulwich_git.init(str(origin_bare), bare=True)
+    dulwich_git.init(str(push_bare), bare=True)
+    dulwich_git.push(str(seed), str(origin_bare), refspecs=["master:master"])
+
+    return {"origin": str(origin_bare), "push": str(push_bare)}
+
+
+@pytest.fixture
+def use_local_git_remotes(monkeypatch, local_test_lists_remotes):
+    """Redirect URLListManager._init_repo at the two local bare repos from
+    local_test_lists_remotes instead of contacting github.com. The
+    push_repo/origin_repo strings in test_settings (conftest.py) are left
+    as-is; they're only used to build the GitHub API URLs, which are
+    themselves mocked out by mock_github_pr_api.
+    """
+
+    def fake_init_repo(self):
+        if not os.path.exists(self.repo_dir):
+            dulwich_git.clone(
+                local_test_lists_remotes["origin"], self.repo_dir, branch="master"
+            )
+            dulwich_git.remote_add(
+                self.repo_dir, "rworigin", local_test_lists_remotes["push"]
+            )
+        repo = dulwich_git.Repo(self.repo_dir)
+        dulwich_git.pull(repo, "origin", "master")
+
+    monkeypatch.setattr(testlists.manager.URLListManager, "_init_repo", fake_init_repo)
+
+
+def _read_pushed_csv(local_test_lists_remotes, branch, cc):
+    """Read a file's content directly off a branch in the local bare
+    "push" repo - i.e. bypass the API/manager entirely and inspect exactly
+    what was actually pushed, the same way a GitHub PR review would see
+    it."""
+    with dulwich_git.Repo(local_test_lists_remotes["push"]) as repo:
+        commit = repo[f"refs/heads/{branch}".encode()]
+        tree = repo[commit.tree]
+        _mode, blob_sha = tree.lookup_path(
+            repo.object_store.__getitem__, f"lists/{cc}.csv".encode()
+        )
+        return repo[blob_sha].data.decode()
+
+
+def test_submit_then_add_more_urls_then_resubmit_pushes_all_changes(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+):
+    """The scenario from the original bug report: a user creates a
+    submission, submits it (opening a PR), adds more URLs to the same
+    in-progress submission, and submits again. The re-pushed branch must
+    contain every change made so far, not just the latest one (or worse,
+    none of them, if a git.add()/git.commit() failure silently left the
+    branch stuck on an older commit while the API still reported success).
+    """
+    account_id = "0" * 16  # matches create_session_token() in conftest.py
+    branch = f"user-contribution/{account_id}"
+
+    assert get_state(client_with_user_role) == "CLEAN"
+
+    url_a = "https://example-a.org/"
+    add_url(client_with_user_role, url_a, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_a in pushed, "first submission never made it to the pushed branch"
+
+    # Add a second URL to the same in-progress submission. Since the state
+    # is PR_OPEN, update() will close the existing PR (mocked) before
+    # committing this change, then submit() re-pushes the branch.
+    url_b = "https://example-b.org/"
+    add_url(client_with_user_role, url_b, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    # This is the exact symptom from the bug report: the re-pushed branch
+    # must contain BOTH urls, not just the latest edit (or, in the worst
+    # case observed in production, neither).
+    pushed_again = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_a in pushed_again, "first URL missing from the re-pushed branch"
+    assert url_b in pushed_again, "second URL missing from the re-pushed branch"
+
+
+def test_update_url_succeeds_without_ambient_git_identity(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """Regression test for the "container has no git identity" bug.
+
+    In production this service runs as a bare numeric UID with no
+    matching /etc/passwd entry (bash shows this as "I have no name!") and
+    no git identity configured anywhere. dulwich's get_user_identity()
+    falls through the LOGNAME/USER/LNAME/USERNAME env vars, then
+    pwd.getpwuid(), and raises dulwich.errors.DefaultIdentityNotFound if
+    none of those resolve - which aborted git.commit() *after* the CSV
+    file had already been rewritten on disk by tmp_f.rename(csv_f),
+    silently leaving the branch stuck on the old commit. manager.update()
+    now passes an explicit author=/committer= to git.commit(), so it no
+    longer depends on any of this.
+    """
+    import pwd
+
+    for name in (
+        "LOGNAME",
+        "USER",
+        "LNAME",
+        "USERNAME",
+        "EMAIL",
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def no_passwd_entry(uid):
+        raise KeyError(f"no passwd entry for uid {uid}")
+
+    monkeypatch.setattr(pwd, "getpwuid", no_passwd_entry)
+
+    assert get_state(client_with_user_role) == "CLEAN"
+    add_url(client_with_user_role, "https://example-no-identity.org/", tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+
+def test_push_refuses_when_worktree_has_uncommitted_changes(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    tmp_path,
+):
+    """Regression test for the actual failure mode behind the bug report:
+    a CSV edit that landed on disk in the user's worktree (via
+    tmp_f.rename(csv_f) in manager.update()) but was never committed,
+    because git.add() and/or git.commit() raised right after. Comparing
+    refs/heads/<branch> against the worktree's HEAD can't catch this
+    (HEAD is a symref into the exact same shared ref storage, so the two
+    always agree); _push_to_repo() now checks the worktree's status
+    instead and must refuse to push when it isn't clean.
+    """
+    account_id = "0" * 16
+
+    assert get_state(client_with_user_role) == "CLEAN"
+    add_url(client_with_user_role, "https://example-stale.org/", tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    # Reproduce the bug's end state directly: edit the tracked CSV file in
+    # the worktree without going through git add/commit at all.
+    user_csv = (
+        Path(tmp_path)
+        / "users"
+        / account_id
+        / "test-lists"
+        / "lists"
+        / "us.csv"
+    )
+    with user_csv.open("a") as f:
+        f.write(
+            "https://sneaky-uncommitted-url.org/,FILE,File-sharing,"
+            "2017-04-12,,Uncommitted\n"
+        )
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200  # propose_changes() fails soft, see manager.py
+    assert r.json()["pr_id"] == ""  # ...but refuses to push a dirty worktree
+
+    # State must not have advanced to PR_OPEN off the back of a push that
+    # never actually happened.
+    assert get_state(client_with_user_role) != "PR_OPEN"
+
+
+def test_failed_update_releases_account_lock(
+    client_with_user_role,
+    use_local_git_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """Regression test for the FileLock leak this investigation also
+    turned up: an exception inside ulm.update() must not leave the
+    per-account FileLock held. Previously `del ulm` (+ gc.collect() in the
+    submit/list endpoints) only ran on the success path, so any failure -
+    including the git-identity bug above - left the lock held until an
+    unrelated request elsewhere happened to force a full GC pass. Every
+    other request for the same account (even plain reads) would then fail
+    with filelock.Timeout for up to 5s at a time - this is exactly what
+    happened in production right after a failed update-url call.
+    """
+    account_id = "0" * 16
+
+    def boom(*a, **kw):
+        raise RuntimeError("simulated git.commit failure")
+
+    monkeypatch.setattr(testlists.manager.git, "commit", boom)
+
+    d = dict(
+        country_code="US",
+        new_entry={
+            "url": "https://example-lock-test.org/",
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "Integ test",
+        },
+        comment="Integ test: trigger commit failure",
+    )
+    r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d)
+    assert r.status_code == 400
+
+    # The failing request above must have released the lock before
+    # returning. If it didn't, this acquire will time out (default
+    # timeout=5s in URLListManager.get_user_lock) instead of succeeding
+    # immediately.
+    lockfile = Path(tmp_path) / "users" / account_id / "state.lock"
+    lock = FileLock(str(lockfile), timeout=2)
+    lock.acquire()
+    lock.release()
+
+    # And a completely unrelated, ordinary request for the same account
+    # must not 500 with a lock timeout either.
+    r = client_with_user_role.get("/api/_/url-submission/test-list/us")
+    assert r.status_code == 200
 
 
 # # Tests with real GitHub # #
