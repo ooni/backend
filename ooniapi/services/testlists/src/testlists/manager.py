@@ -74,6 +74,15 @@ CITIZENLAB_CSV_HEADER = (
 )
 
 
+def _read_ref(repo, ref_name: str):
+    """Read a ref's sha, returning None instead of raising if it doesn't
+    exist yet (e.g. before the first commit on a brand new branch)."""
+    try:
+        return repo.refs[ref_name.encode()]
+    except KeyError:
+        return None
+
+
 def check_url(url):
     if not VALID_URL.match(url):
         raise BadURL()
@@ -455,8 +464,75 @@ class URLListManager:
 
             log.debug(f"Writing {csv_f.as_posix()}")
             tmp_f.rename(csv_f)
-            git.add(repo=repo, paths=[csv_f.as_posix()])
-            git.commit(repo, message=comment)
+
+            # NOTE: from here on the working tree file has already been
+            # updated on disk. If anything below raises, the CSV change is
+            # visible in the user's worktree but was never committed, so the
+            # branch ref keeps pointing at the old commit. The next push will
+            # then push a branch that is missing this change even though the
+            # file on disk looks up to date. Capture full context + traceback
+            # around dulwich calls so this can no longer fail silently.
+            try:
+                branch_name = self._get_user_branchname(account_id)
+                old_head = _read_ref(repo, f"refs/heads/{branch_name}")
+                log.debug(
+                    f"[git-debug] account={account_id} cc={cc} repo_path={repo.path} "
+                    f"branch={branch_name} old_head={old_head}"
+                )
+
+                added, ignored = git.add(repo=repo, paths=[csv_f.as_posix()])
+                log.debug(
+                    f"[git-debug] account={account_id} git.add added={added} "
+                    f"ignored={ignored}"
+                )
+
+                # Explicitly set the committer/author identity instead of
+                # relying on dulwich's system-derived fallback
+                # (user.name/email from git config, then GIT_COMMITTER_*
+                # env vars, then the OS user/gecos/hostname). In a
+                # container that has no git identity configured this
+                # fallback can be missing/malformed and dulwich raises
+                # InvalidUserIdentity from check_user_identity(), which
+                # would abort the commit *after* the file has already been
+                # renamed into place above.
+                bot_identity = f"{self.github_user} <{self.github_user}@users.noreply.github.com>".encode()
+
+                new_head = git.commit(
+                    repo,
+                    message=comment,
+                    author=bot_identity,
+                    committer=bot_identity,
+                )
+                log.debug(
+                    f"[git-debug] account={account_id} git.commit new_head={new_head}"
+                )
+
+                # Defensive check: make sure the branch ref actually moved.
+                # If dulwich raised inside commit() *after* updating the ref
+                # (e.g. during hook execution or auto-gc) this would still
+                # be fine; but if for any reason the ref wasn't updated we
+                # want to know loudly rather than silently push a stale
+                # branch later.
+                current_head = _read_ref(repo, f"refs/heads/{branch_name}")
+                if current_head != new_head:
+                    log.error(
+                        f"[git-debug] account={account_id} branch {branch_name} "
+                        f"ref is {current_head!r} but expected commit {new_head!r} "
+                        "- branch was NOT updated by git.commit()"
+                    )
+                    raise CannotUpdateList(
+                        description="Failed to update branch after commit"
+                    )
+            except Exception:
+                log.exception(
+                    f"[git-debug] account={account_id} cc={cc} "
+                    f"csv_f={csv_f.as_posix()} repo_path={repo.path} "
+                    "git add/commit failed - worktree file was already "
+                    "written to disk but the commit/branch update did not "
+                    "complete"
+                )
+                raise
+
             self.write_changes_log(account_id, cc, old_entry, new_entry)
 
             self._set_state(account_id, "IN_PROGRESS")
@@ -511,9 +587,40 @@ class URLListManager:
     def _push_to_repo(self, account_id):
         with git.Repo(self.repo_dir) as repo:
             branch_name = self._get_user_branchname(account_id)
-            log.debug(f"pushing {branch_name} to GitHub")
+
+            local_head = _read_ref(repo, f"refs/heads/{branch_name}")
+            worktree_head = None
+            user_repo_path = self._get_user_repo_path(account_id)
+            if os.path.exists(user_repo_path):
+                with git.Repo(user_repo_path) as user_repo:
+                    worktree_head = _read_ref(user_repo, "HEAD")
+
+            log.debug(
+                f"[git-debug] account={account_id} pushing {branch_name} to "
+                f"GitHub, local_head={local_head} worktree_head={worktree_head}"
+            )
+            if worktree_head is not None and local_head != worktree_head:
+                # This is exactly the failure mode we're guarding against:
+                # the user's worktree has a commit that never made it onto
+                # refs/heads/<branch> in the shared repo (e.g. because a
+                # previous update() call raised partway through git.add()/
+                # git.commit()). Pushing now would silently re-open a PR
+                # that is missing the user's latest change.
+                log.error(
+                    f"[git-debug] account={account_id} branch {branch_name} "
+                    f"ref ({local_head!r}) does not match the worktree HEAD "
+                    f"({worktree_head!r}) - refusing to push a stale branch"
+                )
+                raise CannotUpdateList(
+                    description="Local branch is out of sync with the user's worktree"
+                )
+
             refspec = f"refs/heads/{branch_name}:refs/heads/{branch_name}"
             git.push(repo, "rworigin", refspecs=[refspec], force=True)
+            log.debug(
+                f"[git-debug] account={account_id} pushed {branch_name} "
+                f"(sha={local_head}) to rworigin"
+            )
 
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
