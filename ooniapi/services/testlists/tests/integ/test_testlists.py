@@ -11,6 +11,8 @@ Test using:
     hatch run test
 """
 
+import csv
+import io
 import os
 
 from pathlib import Path
@@ -20,6 +22,7 @@ import pytest
 # debdeps: python3-pytest-mock
 
 from dulwich import porcelain as dulwich_git
+from dulwich.objects import Blob, Commit, Tree
 from filelock import FileLock
 
 import testlists.manager
@@ -455,6 +458,109 @@ def _read_pushed_csv(local_test_lists_remotes, branch, cc):
     return _read_csv_from_repo(local_test_lists_remotes["push"], branch, cc)
 
 
+def _merge_csv_union(*contents):
+    """Union-merge CSV contents by the "url" column: first-seen order is
+    kept, and a later occurrence of the same url overrides the earlier
+    row's data. Stands in for a maintainer manually resolving a (typically
+    trivial, line-level) merge conflict between two independently-authored
+    CSV changes before accepting a PR - as opposed to a raw force-push of
+    one branch's tip over the other, which would silently discard
+    whichever side isn't a git ancestor of the other.
+    """
+    seen = {}
+    order = []
+    fieldnames = None
+    for content in contents:
+        reader = csv.DictReader(io.StringIO(content))
+        if fieldnames is None:
+            fieldnames = reader.fieldnames
+        for row in reader:
+            url = row["url"]
+            if url not in seen:
+                order.append(url)
+            seen[url] = row
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    for url in order:
+        writer.writerow(seen[url])
+    return out.getvalue()
+
+
+def _simulate_maintainer_merge(origin_repo_path, push_repo_path, branch, cc="us"):
+    """Simulate a GitHub maintainer merging `branch` (from the bot's fork,
+    the "push" repo) into origin's master, producing a new commit on
+    master whose tree combines master's current content for
+    `lists/<cc>.csv` with the branch's content for the same file, via
+    _merge_csv_union().
+
+    A plain `dulwich.porcelain.push(push_repo, origin_repo,
+    refspecs=[f"...{branch}:refs/heads/master"])` only works for a clean
+    fast-forward (i.e. master hasn't moved since the branch was cut) and
+    raises DivergedBranches otherwise; force=True would "succeed" but
+    silently replace master's tree with the branch's tree wholesale,
+    discarding any content on master that isn't in the branch's own
+    history - exactly the already-merged content from a previous,
+    unrelated user's PR. A real GitHub merge doesn't do that: either it's
+    a fast-forward, or a human resolves the (typically trivial) conflict
+    and the resulting merge commit's tree reflects both sides. This
+    builds that resulting tree directly at the object level so tests can
+    assert on it without needing a real GitHub merge.
+    """
+    with dulwich_git.Repo(origin_repo_path) as origin, dulwich_git.Repo(
+        push_repo_path
+    ) as push:
+        master_tip = origin.refs[b"refs/heads/master"]
+        master_tree = origin[origin[master_tip].tree]
+        _, master_blob_sha = master_tree.lookup_path(
+            origin.object_store.__getitem__, f"lists/{cc}.csv".encode()
+        )
+        master_csv = origin[master_blob_sha].data.decode()
+
+        branch_tip = push.refs[f"refs/heads/{branch}".encode()]
+        branch_tree = push[push[branch_tip].tree]
+        _, branch_blob_sha = branch_tree.lookup_path(
+            push.object_store.__getitem__, f"lists/{cc}.csv".encode()
+        )
+        branch_csv = push[branch_blob_sha].data.decode()
+
+        merged_csv = _merge_csv_union(master_csv, branch_csv)
+
+        new_blob = Blob.from_string(merged_csv.encode())
+        origin.object_store.add_object(new_blob)
+
+        _, lists_tree_sha = master_tree.lookup_path(
+            origin.object_store.__getitem__, b"lists"
+        )
+        lists_tree = origin[lists_tree_sha]
+        new_lists_tree = Tree()
+        for name, mode, sha in lists_tree.iteritems():
+            new_lists_tree.add(
+                name, mode, new_blob.id if name == f"{cc}.csv".encode() else sha
+            )
+        origin.object_store.add_object(new_lists_tree)
+
+        new_root_tree = Tree()
+        for name, mode, sha in master_tree.iteritems():
+            new_root_tree.add(
+                name, mode, new_lists_tree.id if name == b"lists" else sha
+            )
+        origin.object_store.add_object(new_root_tree)
+
+        identity = b"maintainer <maintainer@example.com>"
+        new_commit = Commit()
+        new_commit.tree = new_root_tree.id
+        new_commit.parents = [master_tip]
+        new_commit.author = new_commit.committer = identity
+        new_commit.author_time = new_commit.commit_time = 1700000000
+        new_commit.author_timezone = new_commit.commit_timezone = 0
+        new_commit.encoding = b"UTF-8"
+        new_commit.message = f"Merge {branch} into master".encode()
+        origin.object_store.add_object(new_commit)
+
+        origin.refs[b"refs/heads/master"] = new_commit.id
+
+
 def test_submit_then_add_more_urls_then_resubmit_pushes_all_changes(
     client_with_user_role,
     mock_github_pr_api,
@@ -504,9 +610,114 @@ def test_submit_then_add_more_urls_then_resubmit_pushes_all_changes(
     assert url_b in pushed_again, "second URL missing from the re-pushed branch"
 
 
+def test_duplicate_url_rejection_does_not_block_further_submissions(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+):
+    """A failed attempt to add a URL that's already been accepted must not
+    corrupt the account's state or prevent it from making further, valid
+    submissions.
+
+    This exercises a subtlety in update(): when the account's state is
+    PR_OPEN, update() closes the existing PR and flips the state to
+    IN_PROGRESS *before* it checks for a duplicate URL. So a rejected
+    duplicate-add still has the (harmless, from the user's perspective)
+    side effect of closing whatever PR was open - the account ends up
+    IN_PROGRESS rather than back at PR_OPEN. What actually matters, and
+    what this test checks, is that this side effect is benign: the
+    previously-accepted change is never lost or altered, submit() can
+    still be called again to re-open a PR containing it, and adding a
+    genuinely new URL afterwards works too - all without ever creating a
+    duplicate row.
+    """
+    account_id = "0" * 16  # matches create_session_token() in conftest.py
+    branch = f"user-contribution/{account_id}"
+
+    assert get_state(client_with_user_role) == "CLEAN"
+
+    # --- Submit and accept a first URL.
+    url_1 = "https://first-accepted.org/"
+    add_url(client_with_user_role, url_1, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_first = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_1 in pushed_first
+
+    # --- Attempt to add the SAME url again. This must fail...
+    dup_entry = {
+        "url": url_1,
+        "category_code": "FILE",
+        "date_added": "2017-04-12",
+        "source": "",
+        "notes": "duplicate attempt",
+    }
+    d = dict(
+        country_code="US",
+        new_entry=dup_entry,
+        comment="Integ test: attempt duplicate URL",
+    )
+    r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d)
+    assert r.status_code == 400, r.json()
+    assert b"err_duplicate_url" in r.content
+
+    # ...and it must not have snuck the duplicate row in anyway, nor left
+    # the account somewhere broken/unusable. (The rejected duplicate does
+    # still close the previously-open PR as a documented side effect of
+    # update() checking state before validating the entry - see the
+    # docstring above - so this is IN_PROGRESS, not PR_OPEN, at this
+    # point.)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+    tl_after_dup = client_with_user_role.get(
+        "/api/_/url-submission/test-list/us"
+    ).json()["test_list"]
+    assert sum(1 for e in tl_after_dup if e["url"] == url_1) == 1, (
+        "the rejected duplicate must not have been written to the list twice"
+    )
+
+    # --- The already-accepted change must still be submittable: re-push
+    # and re-open a PR containing it, exactly as if the failed duplicate
+    # attempt had never happened.
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_after_dup = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_1 in pushed_after_dup, (
+        "the previously-accepted URL must survive a rejected duplicate "
+        "attempt and a resubmission"
+    )
+    assert pushed_after_dup.count(url_1) == 1, (
+        "the previously-accepted URL must not have been duplicated on the "
+        "pushed branch either"
+    )
+
+    # --- And a genuinely different URL must still be addable and
+    # submittable afterwards, ending up alongside the first one with no
+    # duplication.
+    url_2 = "https://second-accepted.org/"
+    add_url(client_with_user_role, url_2, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_final = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_1 in pushed_final
+    assert url_2 in pushed_final
+    assert pushed_final.count(url_1) == 1
+    assert pushed_final.count(url_2) == 1
+
+
 def test_second_users_branch_misses_first_users_merged_change(
     client,
-    mock_github_pr_api,
     use_local_git_remotes,
     local_test_lists_remotes,
     tmp_path,
@@ -527,6 +738,12 @@ def test_second_users_branch_misses_first_users_merged_change(
     merging) each user's branch onto origin's current master before
     pushing would avoid this class of problem; this test exists to make
     the current behavior visible and catch it if it silently changes.
+
+    It then goes on to merge B's PR too, and checks the normal case still
+    works end-to-end: B's state goes back to CLEAN, their worktree/branch
+    get pruned, and a fresh submission afterwards - now cut from a master
+    that already has both A's and B's changes - works cleanly and with no
+    drift, in contrast to the stale-branch case above.
     """
     account_a = "0" * 16
     account_b = "1" * 16
@@ -535,16 +752,45 @@ def test_second_users_branch_misses_first_users_merged_change(
     headers_a = {"Authorization": f"Bearer {create_session_token(account_a, 'user')}"}
     headers_b = {"Authorization": f"Bearer {create_session_token(account_b, 'user')}"}
 
-    # mock_github_pr_api always reports PRs as open; here we need to flip
-    # that to "closed" (merged) specifically for account A once we
-    # simulate the merge below, while account B's own flow never checks
-    # PR resolution (it never gets far enough to have an open PR of its
-    # own to check until the very end).
-    pr_a_merged = {"value": False}
+    # Fake PR API: every POST gets back a globally-unique PR URL, exactly
+    # like real GitHub hands out a fresh, incrementing PR number for every
+    # new pull request. GET/PATCH are resolved by that exact URL via
+    # resolved_prs.
+    #
+    # An earlier version of this mock derived the fake PR URL solely from
+    # the account_id (so it could tell A's PR apart from B's), which is
+    # exactly what breaks below: once B's first PR is merged and later B
+    # opens a *second* PR, an account-keyed URL can't tell that new PR
+    # apart from the already-merged one, so sync_state() immediately (and
+    # incorrectly) reported the brand new PR as resolved too. Keying by a
+    # counter instead of the account fixes this the same way GitHub itself
+    # avoids the ambiguity - by never reusing a PR's identity.
+    pr_counter = {"n": 0}
+    resolved_prs = set()
 
-    def fake_get(*a, **kw):
-        return MKClosed() if pr_a_merged["value"] else MKOpen()
+    def fake_post(apiurl, auth=None, json=None, **kw):
+        pr_counter["n"] += 1
+        url = f"https://api.github.com/repos/citizenlab/test-lists/pulls/{pr_counter['n']}"
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "open", "url": url}),
+        })()
 
+    def fake_patch(url, json=None, auth=None, **kw):
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "closed", "url": url}),
+        })()
+
+    def fake_get(url, auth=None, **kw):
+        pr_state = "closed" if url in resolved_prs else "open"
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": pr_state, "url": url}),
+        })()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", fake_post)
+    monkeypatch.setattr(testlists.manager.requests, "patch", fake_patch)
     monkeypatch.setattr(testlists.manager.requests, "get", fake_get)
 
     def add(headers, url, notes):
@@ -572,6 +818,29 @@ def test_second_users_branch_misses_first_users_merged_change(
         assert r.status_code == 200, r.json()
         return r.json()["pr_id"]
 
+    def merge_and_resolve(account_id, branch):
+        # Simulate a human accepting and merging the PR on GitHub. A's PR
+        # merges as a clean fast-forward (master hasn't moved since A's
+        # branch was cut), but B's can't: master has since moved (A's
+        # change landed) and B's branch never picked that up, so a plain
+        # force-push would silently discard A's already-merged change
+        # instead of merging. _simulate_maintainer_merge() handles both
+        # cases correctly via a real (if manually-applied) content merge,
+        # matching what an actual GitHub merge would produce either way.
+        _simulate_maintainer_merge(
+            local_test_lists_remotes["origin"],
+            local_test_lists_remotes["push"],
+            branch,
+            cc="us",
+        )
+        # Mark this account's *current* PR - and only that specific PR,
+        # by its exact URL - as merged/resolved, by reading the URL the
+        # service itself just persisted to disk. This is what lets a
+        # later, brand new PR for the same account still be correctly
+        # seen as open (see the fake_get/pr_counter comment above).
+        pr_id_path = Path(tmp_path) / "users" / account_id / "pr_id"
+        resolved_prs.add(pr_id_path.read_text())
+
     # --- User A creates and submits their change first.
     assert state(headers_a) == "CLEAN"
     url_a = "https://user-a-first.org/"
@@ -587,22 +856,16 @@ def test_second_users_branch_misses_first_users_merged_change(
     add(headers_b, url_b1, "B1")
     assert state(headers_b) == "IN_PROGRESS"
 
-    # --- A's PR is accepted and merged into origin's master. Simulate
-    # this the same way GitHub would: land A's pushed branch tip directly
-    # onto origin's master ref.
-    dulwich_git.push(
-        local_test_lists_remotes["push"],
-        local_test_lists_remotes["origin"],
-        refspecs=[f"refs/heads/{branch_a}:refs/heads/master"],
-    )
-    pr_a_merged["value"] = True
+    # --- A's PR is accepted and merged into origin's master.
+    merge_and_resolve(account_a, branch_a)
 
     # A GET for account A makes sync_state() notice the PR is resolved and
     # clean up A's worktree/branch - the normal post-merge cleanup path.
     assert state(headers_a) == "CLEAN"
 
     # --- User B adds MORE changes to their still-open submission *after*
-    # A's change has already landed on master, then finally submits.
+    # A's change has already landed on master, then finally submits. B's
+    # own PR isn't resolved yet, so this must stay PR_OPEN, not CLEAN.
     url_b2 = "https://user-b-second.org/"
     add(headers_b, url_b2, "B2")
     assert state(headers_b) == "IN_PROGRESS"
@@ -632,6 +895,43 @@ def test_second_users_branch_misses_first_users_merged_change(
         "rebase-onto-master behavior and this test should be updated "
         "to assert the fixed behavior instead"
     )
+
+    # --- Now B's PR *also* gets accepted and merged (a maintainer might
+    # do this even with the drift above - CSVs with additions in
+    # different places often merge cleanly by hand, or the maintainer
+    # just resolves the trivial conflict). Check the normal cleanup path
+    # still works correctly for B, same as it did for A.
+    merge_and_resolve(account_b, branch_b)
+
+    assert state(headers_b) == "CLEAN"
+
+    user_b_worktree = Path(tmp_path) / "users" / account_b / "test-lists"
+    assert not user_b_worktree.exists(), (
+        "B's worktree should have been removed by sync_state()'s cleanup"
+    )
+    with dulwich_git.Repo(str(Path(tmp_path) / "test-lists")) as shared_repo:
+        remaining_branches = dulwich_git.branch_list(shared_repo)
+        assert branch_b.encode() not in remaining_branches, (
+            "B's branch should have been deleted by sync_state()'s cleanup"
+        )
+
+    # --- And B's *next* submission - starting completely fresh - must
+    # still work: a new worktree/branch gets created from current master,
+    # which by now already has both A's and B's earlier changes on it.
+    assert state(headers_b) == "CLEAN"
+    url_b3 = "https://user-b-third.org/"
+    add(headers_b, url_b3, "B3")
+    assert state(headers_b) == "IN_PROGRESS"
+    submit(headers_b)
+    assert state(headers_b) == "PR_OPEN"
+
+    # No drift this time: a fresh worktree cut from current master
+    # naturally carries everything already merged, plus the new addition.
+    pushed_b_fresh = _read_pushed_csv(local_test_lists_remotes, branch_b, "us")
+    assert url_a in pushed_b_fresh
+    assert url_b1 in pushed_b_fresh
+    assert url_b2 in pushed_b_fresh
+    assert url_b3 in pushed_b_fresh
 
 
 def test_update_url_succeeds_without_ambient_git_identity(
