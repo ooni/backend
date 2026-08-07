@@ -145,15 +145,45 @@ class URLListManager:
         self._lock = FileLock(lockfile_f, timeout=5, thread_local=False)
         self._lock.acquire()  # released on URLListManager destruction
 
+    def close(self):
+        """Explicitly release the per-account FileLock.
+
+        This is idempotent and safe to call multiple times (including when
+        the lock was never successfully acquired, e.g. because __init__
+        raised a filelock.Timeout before get_user_lock() finished).
+
+        Callers MUST call this from a try/finally around any use of a
+        URLListManager rather than relying on __del__/gc to release the
+        lock. In production, an exception raised out of ulm.update() (or
+        similar) with only a bare `del ulm` on the success path left the
+        object - and its held FileLock - alive for as long as the
+        exception's traceback was referenced (which can be far longer than
+        the request that created it, since tracebacks keep local frames,
+        including `ulm`, alive). Every subsequent request for that same
+        account_id then hit a filelock.Timeout of its own (observed in
+        production as cascading 500s on unrelated read-only endpoints)
+        until some unrelated request elsewhere happened to force a full GC
+        pass.
+        """
+        lock = getattr(self, "_lock", None)
+        if lock is not None and lock.is_locked:
+            elapsed_ms = (time.monotonic_ns() - self._lock_time) / 1000_000
+            log.debug(f"[git-debug] releasing lock {lock.lock_file} held for {elapsed_ms}ms")
+            lock.release()
+
     @timer(name="citizenlab_lock_time")
     def __del__(self):
-        # try to close repo at teardown to fix hanging git processes
-        # https://github.com/gitpython-developers/GitPython/issues/1333
-        if self._lock.is_locked:
-            self._lock.release()
-        else:
-            raise Exception
-        elapsed_ms = (time.monotonic_ns() - self._lock_time) / 1000_000
+        # Fallback safety net only - close() should already have been
+        # called explicitly via try/finally by every caller. Do NOT raise
+        # here: exceptions raised inside __del__ are silently discarded by
+        # Python anyway (just printed as noisy "Exception ignored in..."
+        # lines), and "the lock isn't held anymore/never was" is an
+        # entirely expected state to find here (e.g. close() already ran,
+        # or __init__ never got past get_user_lock()).
+        try:
+            self.close()
+        except Exception:
+            log.exception("[git-debug] error releasing lock in URLListManager.__del__")
 
     @timer(name="citizenlab_repo_init")
     def _init_repo(self):
