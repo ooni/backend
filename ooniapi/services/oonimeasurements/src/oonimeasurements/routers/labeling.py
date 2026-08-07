@@ -37,8 +37,10 @@ Two invariants this module exists to enforce, in both grains:
    reconstructable from the export alone.
 """
 
+import time
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -49,6 +51,8 @@ from pydantic import BaseModel
 # existing data routers.
 from ..dependencies import get_clickhouse_session  # type: ignore
 from ..scoring import BLOCKING_THRESHOLD, SCORING_VERSION, any_blocked, attributed_to
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/labeling", tags=["labeling"])
 
@@ -977,6 +981,13 @@ def draw_interval_sample(
     }
     derived_id = _design_fingerprint(spec)
 
+    quotas = _quotas(wanted, shares, limit)
+
+    # `blocked_max` costs three float columns over the whole frame and only the
+    # near-miss stratum is defined in terms of it, so it is not read when that
+    # stratum was not asked for.
+    wants_blocked_max = "near_miss" in wanted
+
     # MUST not be run while a reprocess is in progress due to lack of FINAL
     # No test_name filter: the detector does not have one either, and the
     # frame has to be the population the detector actually runs over.
@@ -985,8 +996,9 @@ def draw_interval_sample(
                probe_asn,
                domain,
                toStartOfWeek(measurement_start_time, 1) AS week,
-               count() AS n,
-               max(greatest(dns_blocked, tcp_blocked, tls_blocked)) AS blocked_max
+               count() AS n
+               {", max(greatest(dns_blocked, tcp_blocked, tls_blocked)) AS blocked_max"
+                if wants_blocked_max else ""}
         FROM analysis_web_measurement
         WHERE measurement_start_time >= %(since)s
           AND measurement_start_time < %(until)s
@@ -995,66 +1007,109 @@ def draw_interval_sample(
         HAVING n >= %(floor)s
     """
 
-    quotas = _quotas(wanted, shares, limit)
+    # The strata are disjoint by construction (see
+    # `_resolve_interval_predicates`), which is what lets one expression label
+    # every cell-week in a single pass. Drawing each stratum under its own
+    # WHERE meant re-running this GROUP BY once to size the population and
+    # again to draw it — 2N aggregations of the same frame for N strata, and
+    # that aggregation is the whole cost of the endpoint.
+    #
+    # `random_covered` is the fallback rather than a branch of its own: its
+    # predicate is the negation of the others, so spelling it out would
+    # evaluate the alerted-set lookup a second time. The lookup is hoisted to
+    # an alias for the same reason — substituting the module constant into
+    # itself, so it cannot match anything else by accident. The predicate text
+    # recorded in the spec stays verbatim, since that text is what the design
+    # id hashes.
+    branches = ", ".join(
+        f"({predicates[s].replace(_IS_ALERTED, 'is_alerted')}), '{s}'"
+        for s in wanted
+        if s != "random_covered"
+    )
+    fallback = "'random_covered'" if "random_covered" in wanted else "''"
+    stratum_sql = f"multiIf({branches}, {fallback})" if branches else fallback
+    # Drawing only the complement never asks about alerts, so in that case the
+    # changepoint set is not built at all.
+    alerted_sql = f"{_IS_ALERTED} AS is_alerted," if "is_alerted" in stratum_sql else ""
+
+    # Per-stratum quotas, so an uneven `shares` split still takes exactly what
+    # it was promised out of one shared ordering.
+    quota_sql = "multiIf(" + ", ".join(
+        f"stratum = '{s}', {int(quotas[s])}" for s in wanted
+    ) + ", 0)"
+
+    # Same salt the per-stratum draws used — `_design_fingerprint` plus the
+    # stratum name — so a replicate drawn before this rewrite and one drawn
+    # after select the same cell-weeks.
+    order_sql = (
+        "cityHash64(concat("
+        + _CELL_KEY.format(cc="probe_cc", asn="probe_asn", dom="domain", wk="week")
+        + ", %(design)s, ':', stratum))"
+    )
+
+    params: Dict[str, Any] = {
+        "since": since_dt,
+        "until": until_dt,
+        "floor": min_measurements,
+        "design": derived_id,
+        **scope_params,
+    }
+
+    # NOTE: no blocked_max, no alert state, no changepoints leave this query.
+    # The cell key, the window and how much data is in it — that is all an
+    # analyst gets before committing.
+    t0 = time.monotonic()
+    rows = db.execute(
+        f"""
+        SELECT probe_cc, probe_asn, domain, week, n, stratum, population
+        FROM (
+            SELECT probe_cc, probe_asn, domain, week, n, stratum,
+                   count() OVER (PARTITION BY stratum) AS population,
+                   row_number() OVER (
+                       PARTITION BY stratum ORDER BY {order_sql}
+                   ) AS rn
+            FROM (
+                SELECT probe_cc, probe_asn, domain, week, n,
+                       {alerted_sql}
+                       {stratum_sql} AS stratum
+                FROM ({cells_sql}) AS cells
+            ) AS labelled
+            WHERE stratum != ''
+        ) AS ranked
+        WHERE rn <= {quota_sql}
+        ORDER BY stratum, rn
+        """,
+        params,
+    )
+    log.info("interval frame query: %.2fs", time.monotonic() - t0)
+
+    # A stratum with a population draws at least one row (quotas floor at 1),
+    # so an absent stratum here is an empty one and keeps its zero below.
+    drawn: Dict[str, List[Any]] = {s: [] for s in wanted}
+    populations: Dict[str, int] = {s: 0 for s in wanted}
+    for r in rows:
+        drawn[r[5]].append(r)
+        populations[r[5]] = int(r[6])
+
     used: Dict[str, Dict[str, Any]] = {}
     buckets: List[List[IntervalRow]] = []
 
     for stratum in wanted:
-        params: Dict[str, Any] = {
-            "since": since_dt,
-            "until": until_dt,
-            "floor": min_measurements,
-            "salt": f"{derived_id}:{stratum}",
-            "limit": quotas[stratum],
-            **scope_params,
-        }
-        where = predicates[stratum]
-
-        pop = db.execute(
-            f"SELECT count() FROM ({cells_sql}) AS cells WHERE {where}", params
-        )
-        population = int(pop[0][0]) if pop else 0
-        if not population:
-            used[stratum] = {
-                "predicate": where,
-                "table": "analysis_web_measurement",
-                "screen_kind": INTERVAL_STRATA[stratum]["screen_kind"],
-                "population_estimate": 0,
-                "drawn": 0,
-                "frame_start": since_dt.isoformat(),
-                "frame_end": until_dt.isoformat(),
-                "volume_floor": min_measurements,
-                "scope": spec["scope"],
-            }
-            continue
-
-        # NOTE: no blocked_max, no alert state, no changepoints. The cell key,
-        # the window and how much data is in it — that is all an analyst gets
-        # before committing.
-        rows = db.execute(
-            f"""
-            SELECT probe_cc, probe_asn, domain, week, n
-            FROM ({cells_sql}) AS cells
-            WHERE {where}
-            ORDER BY cityHash64(concat(
-                {_CELL_KEY.format(cc='probe_cc', asn='probe_asn',
-                                  dom='domain', wk='week')}, %(salt)s))
-            LIMIT %(limit)s
-            """,
-            params,
-        )
-
+        stratum_rows = drawn[stratum]
+        population = populations[stratum]
         used[stratum] = {
-            "predicate": where,
+            "predicate": predicates[stratum],
             "table": "analysis_web_measurement",
             "screen_kind": INTERVAL_STRATA[stratum]["screen_kind"],
             "population_estimate": population,
-            "drawn": len(rows),
+            "drawn": len(stratum_rows),
             "frame_start": since_dt.isoformat(),
             "frame_end": until_dt.isoformat(),
             "volume_floor": min_measurements,
             "scope": spec["scope"],
         }
+        if not stratum_rows:
+            continue
         buckets.append([
             IntervalRow(
                 probe_cc=r[0] or "",
@@ -1065,13 +1120,13 @@ def draw_interval_sample(
                 measurements_in_window=int(r[4]),
                 volume_band=volume_band(int(r[4])),
                 sampling_stratum=stratum,
-                sampling_weight=population / len(rows),
+                sampling_weight=population / len(stratum_rows),
                 sample_population=population,
-                sample_rows=len(rows),
+                sample_rows=len(stratum_rows),
                 sampling_design_id=derived_id,
                 screen_kind=INTERVAL_STRATA[stratum]["screen_kind"],
             )
-            for r in rows
+            for r in stratum_rows
         ])
 
     interleaved: List[IntervalRow] = []
