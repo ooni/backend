@@ -10,11 +10,11 @@ import valkey
 from clickhouse_driver import Client as ClickhouseClient
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
+from freezegun import freeze_time
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
 from oonimeasurements.main import create_app, setup_router
-from oonimeasurements.routers.private import real_now_utc
 
 THIS_DIR = Path(__file__).parent.resolve()
 
@@ -213,8 +213,7 @@ def set_since_and_until_params(since, until):
 
 
 @pytest.fixture()
-def fixed_time(app):
+def fixed_time():
     fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
-    app.dependency_overrides[real_now_utc] = lambda: fixed_now
-    yield fixed_now
-    del app.dependency_overrides[real_now_utc]
+    with freeze_time(fixed_now):
+        yield fixed_now

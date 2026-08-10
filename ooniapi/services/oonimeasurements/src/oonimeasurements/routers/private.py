@@ -64,10 +64,6 @@ TEST_GROUPS = {
 }
 
 
-def real_now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
         yield start_date + timedelta(n)
@@ -119,12 +115,11 @@ class CountryCount(BaseModel):
 @router.get("/countries_by_month", tags=["private"], response_model=List[CountryCount])
 def api_private_countries_by_month(
     clickhouse: ClickhouseDep,
-    now_utc: datetime = Depends(real_now_utc),
 ) -> List[CountryCount]:
     """Countries count by month
     """
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
     q = """SELECT
         COUNT(DISTINCT(probe_cc)) AS value,
         toStartOfMonth(measurement_start_time) AS date
@@ -385,11 +380,10 @@ class WebsiteNetworksResponse(BaseModel):
 def api_private_website_network_tests(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    now_utc: datetime = Depends(real_now_utc),
 ) -> WebsiteNetworksResponse:
     """Counts of website measurements per ASN for the 31-day window ending at now()."""
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
 
     s = """
@@ -427,7 +421,6 @@ def api_private_website_stats(
     input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: int = Query(..., description="ASN (integer)"),
-    now_utc: datetime = Depends(real_now_utc),
 ) -> WebsiteStatsResponse:
     """Daily aggregated website measurement statistics (anomalies, confirmations, failures, and totals) for the past 31 days."""
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
@@ -435,7 +428,7 @@ def api_private_website_stats(
     # made queries go from full scan to 50ms
     url = str(input)
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
 
     s = """
@@ -492,14 +485,13 @@ def api_private_website_test_urls(
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     limit: int = Query(10, description="Limit results"),
     offset: int = Query(0, description="Offset results"),
-    now_utc: datetime = Depends(real_now_utc),
 ) -> WebsiteURLsResponse:
     """Paginated list of tested URLs with per-URL counts (anomalies, confirmations, failures, totals) for the past 31 days."""
     # TODO optimize or remove
     if limit <= 0:
         limit = 10
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
 
     try:
@@ -595,12 +587,11 @@ class TorStatsResponse(BaseModel):
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
 def api_private_vanilla_tor_stats(
     clickhouse: ClickhouseDep,
-    now_utc: datetime = Depends(real_now_utc),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> TorStatsResponse:
     """Per-ASN Tor measurement statistics for the given country over the last 6 months, including counts, last-tested date, and a tally of networks with low success rates."""
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
 
     blocked = 0
     nets = []
@@ -660,10 +651,10 @@ class IMNetworkStats(BaseModel):
 @router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
 def api_private_im_networks(
     clickhouse: ClickhouseDep,
-    now_utc: datetime = Depends(real_now_utc),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> Dict[str, IMNetworkStats]:
     """Per-test instant messaging network statistics (per-ASN totals and last-tested date) for the past 31 days, keyed by test name."""
+    end = datetime.now(timezone.utc)
     s = """SELECT
     COUNT() AS total_count,
     '' AS name,
@@ -679,7 +670,7 @@ def api_private_im_networks(
     ORDER BY test_name ASC, total_count DESC
     """
     test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
-    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names, "end": now_utc})
+    q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names, "end": end})
     results: Dict[str, IMNetworkStats] = {}
     for r in q:
         # get stats for test_name or create a new IMNetworksStats
@@ -733,7 +724,6 @@ def api_private_im_stats(
     clickhouse: ClickhouseDep,
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    now_utc: datetime = Depends(real_now_utc),
     test_name: str = Query(..., description="Test name")
 ) -> IMStatsResponse:
     """Daily instant messaging measurement totals (and optional anomaly counts) for the past 31 days, for the given ASN, country, and test."""
@@ -746,7 +736,7 @@ def api_private_im_stats(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid probe_asn")
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
 
     # XXX: this method never queries anomaly_count and always returns anomaly_count=None. Why?
@@ -897,11 +887,10 @@ class GlobalOverviewMonthResponse(BaseModel):
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
 def api_private_global_by_month(
     clickhouse: ClickhouseDep,
-    now_utc: datetime = Depends(real_now_utc),
 ) -> GlobalOverviewMonthResponse:
     """Monthly global time series for the last two years: distinct networks (ASNs), distinct countries, and total measurements per month (month timestamps are start-of-month)."""
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
 
     q = """SELECT
         COUNT(DISTINCT probe_asn) AS networks_by_month,
@@ -939,11 +928,10 @@ class CircumventionStatsResponse(BaseModel):
 @router.get("/circumvention_stats_by_country", response_model=CircumventionStatsResponse, tags=["private"])
 def api_private_circumvention_stats_by_country(
     clickhouse: ClickhouseDep,
-    now_utc: datetime = Depends(real_now_utc),
 ) -> CircumventionStatsResponse:
     """Aggregated statistics on protocols used for circumvention, grouped by country. """
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
 
     q = """SELECT probe_cc, COUNT(*) as cnt
         FROM fastpath
@@ -1000,11 +988,10 @@ class CircumventionRuntimeStatsResponse(BaseModel):
 @router.get("/circumvention_runtime_stats", response_model=CircumventionRuntimeStatsResponse, tags=["private"])
 def api_private_circumvention_runtime_stats(
     clickhouse: ClickhouseDep,
-    now_utc: datetime = Depends(real_now_utc),
 ) -> CircumventionRuntimeStatsResponse:
     """Runtime statistics on protocols used for circumvention, grouped by date, country, test_name. """
 
-    end = now_utc
+    end = datetime.now(timezone.utc)
 
     q = """SELECT
         toDate(measurement_start_time) AS date,
