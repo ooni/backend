@@ -718,22 +718,37 @@ class URLListManager:
 
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
+        """Push the account's branch and open a PR for it. Returns the PR's
+        API URL.
+
+        NOTE: this used to swallow any failure from _push_to_repo()/
+        _open_pr() and return "" with an implicit HTTP 200 - the frontend
+        would then render a fake "Submitted!" success with a dead PR link
+        while the backend state silently stayed IN_PROGRESS. Both failure
+        modes now raise CannotProposeChanges() so the caller actually sees
+        the failure; retrying is expected to work once the underlying
+        issue clears, and no change is lost even if the push succeeded but
+        opening the PR failed, since submit() can simply be called again.
+        """
         log.debug("proposing changes")
         try:
             self._push_to_repo(account_id)
-        except Exception as e:
-            log.error(f"Failed to push to repo {e}")
-            return ""
-        try:
-            branch_name = self._get_user_branchname(account_id)
-        except Exception as e:
-            log.error(f"Failed to get branch name {e}")
-            return ""
+        except Exception:
+            log.exception(f"[git-debug] account={account_id} failed to push to repo")
+            raise CannotProposeChanges()
+
+        branch_name = self._get_user_branchname(account_id)
         try:
             pr_id = self._open_pr(branch_name)
-        except Exception as e:
-            log.error(f"Failed to open pr for {branch_name} {e}")
-            return ""
+        except Exception:
+            log.exception(
+                f"[git-debug] account={account_id} branch {branch_name} "
+                "was pushed successfully but opening the PR failed - "
+                "the change is not lost, retrying submit() will pick up "
+                "the already-pushed branch and try to open the PR again"
+            )
+            raise CannotProposeChanges()
+
         self._set_pr_id(account_id, pr_id)
         self._set_state(account_id, "PR_OPEN")
         return pr_id
