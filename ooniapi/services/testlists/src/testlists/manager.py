@@ -332,13 +332,34 @@ class URLListManager:
             bname = self._get_user_branchname(account_id)
             log.debug(f"Deleting {path}")
             try:
-                shutil.rmtree(path)
+                try:
+                    shutil.rmtree(path)
+                except FileNotFoundError:
+                    pass
                 with git.Repo(self.repo_dir) as repo:
                     git.worktree_prune(repo)
                     git.branch_delete(repo, bname)
                 self._maybe_delete_changes_log(account_id)
-            except Exception as e:
-                log.info(f"Error deleting {path} {e}")
+            except Exception:
+                # NOTE: this used to unconditionally set state=CLEAN below
+                # even when cleanup failed partway through (e.g. rmtree
+                # succeeded but branch_delete didn't). Since sync_state()
+                # never revisits an account once it's CLEAN, that
+                # permanently registered the branch as "checked out" in
+                # dulwich's administrative records - the next
+                # worktree_add() for this account would raise ValueError
+                # forever, with no way to recover short of an operator
+                # manually running `git worktree prune`/`branch -D`.
+                # Leaving state as-is instead makes this self-healing: the
+                # frontend polls sync_state() every 10s while PR_OPEN, so a
+                # transient failure just gets retried on the next call.
+                log.exception(
+                    f"[git-debug] account={account_id} failed to clean "
+                    f"up worktree/branch {bname} after PR merge - "
+                    "leaving state as-is so this is retried on the next "
+                    "sync rather than getting stuck"
+                )
+                return state
 
             self._set_state(account_id, "CLEAN")
             state = "CLEAN"
