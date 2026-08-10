@@ -135,7 +135,23 @@ class URLListManager:
         self.push_username = push_repo.split("/")[0]
         # lock before init repo
         self.get_user_lock(account_id)
-        self._init_repo()
+        try:
+            self._init_repo()
+        except Exception:
+            # _init_repo() does real network I/O (git.clone/git.pull
+            # against github.com). If it raises, this constructor raises
+            # too, so get_url_list_manager() never returns an object -
+            # callers' `ulm = None; try: ulm = get_url_list_manager(...)
+            # ... finally: if ulm is not None: ulm.close()` pattern can
+            # never call close() on something that was never assigned,
+            # even though the lock above was already acquired. Without
+            # this, the lock would only be released whenever __del__
+            # happens to run via GC - exactly the delayed-release problem
+            # close() exists to eliminate, just reachable through a
+            # network hiccup during clone/pull instead of a git.commit()
+            # failure.
+            self.close()
+            raise
 
     def get_user_lock(self, account_id: str):
         lockfile_dir = self.working_dir / "users" / account_id
