@@ -418,21 +418,22 @@ class URLListManager:
         """
         # TODO: set date_added to now() on new_entry
         # fields follow the order in the CSV files
+        # NOTE: these were bare asserts, which `python -O`/PYTHONOPTIMIZE
+        # strips entirely - silently skipping validation of data (an HTTP
+        # request body) that isn't guaranteed to have the expected shape.
         if old_entry:
             old_entry["category_description"] = CATEGORY_CODES[
                 old_entry["category_code"]
             ]
-            assert sorted(old_entry.keys()) == sorted(
-                CITIZENLAB_CSV_HEADER
-            ), "Unexpected keys"
+            if sorted(old_entry.keys()) != sorted(CITIZENLAB_CSV_HEADER):
+                raise InvalidRequest(description="old_entry has unexpected keys")
 
         if new_entry:
             new_entry["category_description"] = CATEGORY_CODES[
                 new_entry["category_code"]
             ]
-            assert sorted(new_entry.keys()) == sorted(
-                CITIZENLAB_CSV_HEADER
-            ), "Unexpected keys"
+            if sorted(new_entry.keys()) != sorted(CITIZENLAB_CSV_HEADER):
+                raise InvalidRequest(description="new_entry has unexpected keys")
 
         if old_entry and new_entry:
             log.debug("updating existing entry")
