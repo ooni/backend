@@ -496,7 +496,7 @@ def api_private_website_test_urls(
     start = end - timedelta(days=31)
 
     try:
-        probe_asn = int(probe_asn.upper().replace("AS", ""))
+        probe_asn_int = int(probe_asn.upper().replace("AS", ""))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid probe_asn")
 
@@ -510,7 +510,7 @@ def api_private_website_test_urls(
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
     """
-    q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn, start=start, end=end))
+    q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn_int, start=start, end=end))
     total_count = q["input_count"] if q else 0
 
     # Group msmts by CC / ASN / period with LIMIT and OFFSET
@@ -535,7 +535,7 @@ def api_private_website_test_urls(
         "start": start,
         "end": end,
         "probe_cc": probe_cc,
-        "probe_asn": probe_asn,
+        "probe_asn": probe_asn_int,
         "limit": limit,
         "offset": offset,
     }
@@ -554,7 +554,7 @@ def api_private_website_test_urls(
         args = dict(
             limit=limit,
             offset=offset + limit,
-            probe_asn=probe_asn,
+            probe_asn=probe_asn_int,
             probe_cc=probe_cc,
         )
         next_url_base = request.base_url.replace(scheme="https")
@@ -733,7 +733,7 @@ def api_private_im_stats(
         raise HTTPException(status_code=400, detail="Invalid test_name")
 
     try:
-        probe_asn = int(probe_asn.upper().replace("AS", ""))
+        probe_asn_int = int(probe_asn.upper().replace("AS", ""))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid probe_asn")
 
@@ -756,7 +756,7 @@ def api_private_im_stats(
     """
     query_params = {
         "probe_cc": probe_cc,
-        "probe_asn": probe_asn,
+        "probe_asn": probe_asn_int,
         "test_name": test_name,
         "start": start,
         "end": end,
