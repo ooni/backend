@@ -9,25 +9,22 @@ from datetime import date, datetime, timedelta, timezone
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
-from typing import Annotated, Dict, Any, Tuple, List, Optional, Union
+from typing import Annotated, Dict, Tuple, List, Optional, Union
 
 import logging
 import math
 
 from sqlalchemy import sql
 
-from fastapi import APIRouter, Depends, Header, Request, Response, Query, HTTPException
+from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.domain import DomainStr
-from pydantic import AnyUrl, Field, StringConstraints, IPvAnyAddress, BeforeValidator
+from pydantic import AnyUrl, Field, IPvAnyAddress, BeforeValidator
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required, ClickhouseDep
-from ..common.prio import generate_test_list
 from ..common.routers import BaseModel
 from ..common.countries import lookup_country
-from ..common.utils import generate_report_id
-from ..data import dnscheck_inputs, stunreachability_inputs
 
 
 # The private API is exposed under the prefix /api/_
