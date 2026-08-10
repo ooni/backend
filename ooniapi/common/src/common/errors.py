@@ -128,6 +128,27 @@ class CannotUpdateList(BaseOONIException):
     description = "Unable to update. The URL list has changed in the meantime."
 
 
+class InvalidPullRequestState(BaseOONIException):
+    """Exception raised when a stored pr_id looks malformed, or GitHub's
+    response about a PR's status doesn't have the expected shape. Either
+    indicates something is wrong with the PR-tracking state for this
+    account, not just a normal request-validation failure."""
+
+    err_str = "err_invalid_pr_state"
+    description = "The tracked pull request state is invalid or malformed"
+
+
+class CannotProposeChanges(BaseOONIException):
+    """Exception raised when pushing the branch or opening the PR on
+    GitHub fails (e.g. a transient network/GitHub outage). Retrying is
+    expected to work once the underlying issue clears - the change
+    itself is not lost even if the push succeeded but opening the PR
+    failed, since submit() can simply be called again."""
+
+    err_str = "err_cannot_propose_changes"
+    description = "Unable to submit changes. Please try again."
+
+
 class NoProposedChanges(BaseOONIException):
     """Exception raised when there are no proposed changes."""
 
