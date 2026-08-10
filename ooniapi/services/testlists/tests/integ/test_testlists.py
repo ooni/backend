@@ -1065,18 +1065,28 @@ def test_sync_state_retries_worktree_cleanup_after_transient_failure(
     r = client_with_user_role.post("/api/v1/url-submission/submit")
     assert r.status_code == 200, r.json()
 
-    # Make the branch-delete step of the cleanup fail exactly once. This
-    # must be installed BEFORE the first state check below: fake_get
-    # already reports the PR as resolved, so the very next get_state()
-    # call is what triggers sync_state()'s cleanup attempt. Installing
-    # this patch any later would let that first cleanup succeed for real
-    # (nothing left to fail), instead of exercising the retry path.
+    # Make the branch-delete step of the cleanup fail on the first two
+    # attempts. This must be installed BEFORE the first state check below:
+    # fake_get already reports the PR as resolved, so the very next
+    # get_state() call is what triggers sync_state()'s cleanup attempt -
+    # installing this patch any later would let that first cleanup succeed
+    # for real, leaving nothing to retry.
+    #
+    # Two failures, not one: the /test-list/{cc} endpoint (admin.py) calls
+    # sync_state() TWICE per request - once directly (whose return value
+    # becomes the response's "state" field) and again inside
+    # get_test_list(). A single get_state() HTTP call therefore drives two
+    # branch_delete attempts. Failing only the first left the second one
+    # (still within that same request) free to succeed for real and
+    # delete the branch, while the response kept reporting the first
+    # call's stale "PR_OPEN" - the cleanup had actually already completed
+    # underneath by the time the response was built.
     real_branch_delete = testlists.manager.git.branch_delete
     calls = {"n": 0}
 
     def flaky_branch_delete(repo, bname):
         calls["n"] += 1
-        if calls["n"] == 1:
+        if calls["n"] <= 2:
             raise RuntimeError("simulated transient failure")
         return real_branch_delete(repo, bname)
 
