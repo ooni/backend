@@ -716,6 +716,566 @@ def test_duplicate_url_rejection_does_not_block_further_submissions(
     assert pushed_final.count(url_2) == 1
 
 
+def test_delete_entry_full_lifecycle_through_real_git(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+):
+    """Deleting an existing entry (old_entry set, new_entry absent) must
+    flow through the real git commit/push path exactly like adding one
+    does. Until now only the "add" branch of update()'s CSV-rewrite loop
+    was exercised against real dulwich clone/worktree/commit/push
+    mechanics; deletion takes a different branch (the matched row is
+    simply never re-written) and deserves the same end-to-end coverage.
+    """
+    account_id = "0" * 16
+    branch = f"user-contribution/{account_id}"
+
+    url_to_delete = "https://will-be-deleted.org/"
+    add_url(client_with_user_role, url_to_delete, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_before_delete = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_to_delete in pushed_before_delete
+
+    # Delete it. Since state is PR_OPEN, update() closes the existing PR
+    # first (mocked) before processing the deletion.
+    lookup_and_delete_us_url(client_with_user_role, url_to_delete)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_after_delete = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url_to_delete not in pushed_after_delete, (
+        "the deleted URL must not still be on the re-pushed branch"
+    )
+    assert pushed_after_delete.startswith(
+        "url,category_code,category_description,date_added,source,notes\n"
+    ), "the header row must still be intact after a delete-only change"
+
+
+def test_update_existing_entry_full_lifecycle_through_real_git(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+):
+    """Editing an existing entry (old_entry AND new_entry both set, same
+    URL) must also flow through the real git commit/push path. This
+    exercises the third branch of update()'s CSV-rewrite loop (the row
+    matching old_entry is replaced with new_entry, in place) against a
+    real dulwich commit, which the other real-git tests never touch since
+    they only ever add.
+    """
+    account_id = "0" * 16
+    branch = f"user-contribution/{account_id}"
+
+    url = "https://will-be-edited.org/"
+    add_url(client_with_user_role, url, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_before_edit = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert f"{url},FILE,File-sharing,2017-04-12,,Integ test\n" in pushed_before_edit
+
+    # Fetch the exact current entry and edit its notes; the URL itself
+    # stays the same, so this doesn't touch the duplicate-URL check.
+    r = client_with_user_role.get("/api/_/url-submission/test-list/us")
+    assert r.status_code == 200
+    tl = r.json()["test_list"]
+    old_entry = next(e for e in tl if e["url"] == url)
+    new_entry = dict(old_entry, notes="Edited via integ test")
+
+    d = dict(
+        country_code="US",
+        old_entry=old_entry,
+        new_entry=new_entry,
+        comment="Integ test: edit notes",
+    )
+    r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d)
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_after_edit = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert (
+        f"{url},FILE,File-sharing,2017-04-12,,Edited via integ test\n"
+        in pushed_after_edit
+    )
+    assert (
+        f"{url},FILE,File-sharing,2017-04-12,,Integ test\n" not in pushed_after_edit
+    ), "the pre-edit row must be gone, not just appended alongside the new one"
+    assert pushed_after_edit.count(url) == 1, (
+        "editing must replace the row in place, not leave two rows for this URL"
+    )
+
+
+def test_submission_spanning_two_country_codes_lands_both_in_one_push(
+    client_with_user_role,
+    mock_github_pr_api,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+):
+    """A single in-progress submission can touch more than one country's
+    CSV file before ever being submitted - e.g. a user adds a URL to "us"
+    and, in the same sitting, another to "it". Both edits become separate
+    commits on the same per-account branch; submit() pushes that branch
+    once, and it must carry both files' changes together, each landing
+    only in its own file.
+    """
+    account_id = "0" * 16
+    branch = f"user-contribution/{account_id}"
+
+    url_us = "https://two-cc-us.org/"
+    url_it = "https://two-cc-it.org/"
+
+    assert get_state(client_with_user_role) == "CLEAN"
+
+    d_us = dict(
+        country_code="US",
+        new_entry={
+            "url": url_us,
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "US entry",
+        },
+        comment="add US url",
+    )
+    r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d_us)
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    d_it = dict(
+        country_code="IT",
+        new_entry={
+            "url": url_it,
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "IT entry",
+        },
+        comment="add IT url",
+    )
+    r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d_it)
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    pushed_us = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    pushed_it = _read_pushed_csv(local_test_lists_remotes, branch, "it")
+    assert url_us in pushed_us
+    assert url_it in pushed_it
+    assert url_it not in pushed_us, "the IT addition must not leak into the US file"
+    assert url_us not in pushed_it, "the US addition must not leak into the IT file"
+
+
+def test_duplicate_check_covers_global_but_not_the_reverse(
+    client_with_user_role,
+):
+    """_prevent_duplicate_url() checks a country-specific submission
+    against BOTH that country's own list and the "global" list, since a
+    URL that's already globally relevant shouldn't be re-added
+    per-country too. But the check is one-directional: adding to
+    "global" is only checked against the existing global list, not
+    against every individual country's list. This documents that
+    asymmetry precisely rather than assuming duplicate detection is fully
+    symmetric across all lists.
+    """
+
+    def add(cc, url, notes):
+        d = dict(
+            country_code=cc,
+            new_entry={
+                "url": url,
+                "category_code": "FILE",
+                "date_added": "2017-04-12",
+                "source": "",
+                "notes": notes,
+            },
+            comment=f"add {url} to {cc}",
+        )
+        return client_with_user_role.post("/api/v1/url-submission/update-url", json=d)
+
+    # A URL already in "global" must be rejected as a duplicate when
+    # someone tries to add the exact same URL to a specific country too.
+    url_global = "https://already-global.org/"
+    r = add("global", url_global, "global entry")
+    assert r.status_code == 200, r.json()
+
+    r = add("us", url_global, "duplicate via us")
+    assert r.status_code == 400, r.json()
+    assert b"err_duplicate_url" in r.content
+
+    # The reverse is NOT checked: a URL already in a country-specific
+    # list can still be added to "global" without being flagged.
+    url_country = "https://already-in-us.org/"
+    r = add("us", url_country, "us entry")
+    assert r.status_code == 200, r.json()
+
+    r = add("global", url_country, "not flagged as duplicate")
+    assert r.status_code == 200, (
+        f"expected the global-list add to succeed even though the same URL "
+        f"already exists in the us list - _prevent_duplicate_url only "
+        f"extends its check with the global list when adding to a "
+        f"*country*, not the other direction; if this now fails, duplicate "
+        f"detection has been made symmetric and this test should be "
+        f"updated to assert the new behavior instead. Got: {r.json()}"
+    )
+
+
+def test_propose_changes_pr_open_failure_stays_retryable(
+    client_with_user_role,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """If opening the PR on GitHub fails (e.g. a transient outage) right
+    after the branch has already been pushed, propose_changes() must
+    report a real error (not a fake HTTP 200 with an empty pr_id - which
+    the frontend would otherwise treat as success and render a link to
+    nowhere while state silently stayed IN_PROGRESS) and must NOT advance
+    state to PR_OPEN, since no PR actually exists yet. A plain retry once
+    GitHub is back up must succeed normally and open a real PR containing
+    the change that was already pushed.
+    """
+    account_id = "0" * 16
+    branch = f"user-contribution/{account_id}"
+
+    calls = {"n": 0}
+
+    def flaky_post(apiurl, auth=None, json=None, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionError("simulated GitHub outage")
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {
+                "state": "open",
+                "url": "https://api.github.com/repos/citizenlab/test-lists/pulls/1",
+            }),
+        })()
+
+    def fake_get(url, auth=None, **kw):
+        # Not mocking this made get_state()'s final check below hit the
+        # real github.com and get back a genuine 404 (no "state" key),
+        # which _is_pr_resolved() now correctly turns into
+        # InvalidPullRequestState - masking the actual thing this test is
+        # checking. Report the PR as still open so the state check reads
+        # through cleanly.
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "open", "url": url}),
+        })()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", flaky_post)
+    monkeypatch.setattr(testlists.manager.requests, "get", fake_get)
+
+    url = "https://survives-pr-open-failure.org/"
+    add_url(client_with_user_role, url, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 400, r.json()
+    assert b"err_cannot_propose_changes" in r.content
+    assert get_state(client_with_user_role) == "IN_PROGRESS", (
+        "state must not advance to PR_OPEN when no PR actually exists"
+    )
+
+    # The push itself already succeeded before the PR-open call failed,
+    # so the branch carries the change even with no PR open yet.
+    pushed = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url in pushed
+
+    # Retrying (GitHub back up) must succeed normally.
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert r.json()["pr_id"], "retry must produce a real pr_id"
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+
+def test_sync_state_retries_worktree_cleanup_after_transient_failure(
+    client_with_user_role,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """If cleaning up a resolved PR's worktree/branch fails partway
+    through (e.g. transient contention on the shared repo from another
+    account's concurrent request), sync_state() must NOT advance the
+    account to CLEAN. Doing so used to leave a branch permanently
+    registered by dulwich as "checked out" - its worktree directory gone
+    from disk, but the administrative record of it still pointing there
+    - since sync_state() never revisits an account once it's already
+    CLEAN. Every future submission attempt for that account would then
+    fail with dulwich's "Branch ... is already checked out" ValueError,
+    with no way to recover short of an operator manually running
+    `git worktree prune`/`branch -D` on the server. The fix: leave state
+    as-is on a failed cleanup, so the next sync_state() call (the
+    frontend polls this every 10s while PR_OPEN) notices the PR is still
+    resolved and retries - self-healing any transient failure.
+    """
+    account_id = "0" * 16
+    branch = f"user-contribution/{account_id}"
+
+    # Custom PR mocks: GET always reports the PR as resolved (closed),
+    # so sync_state() reaches the cleanup branch on every call, without
+    # needing to actually merge anything via _simulate_maintainer_merge.
+    def fake_post(apiurl, auth=None, json=None, **kw):
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {
+                "state": "open",
+                "url": "https://api.github.com/repos/citizenlab/test-lists/pulls/1",
+            }),
+        })()
+
+    def fake_get(url, auth=None, **kw):
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "closed", "url": url}),
+        })()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", fake_post)
+    monkeypatch.setattr(testlists.manager.requests, "get", fake_get)
+
+    url = "https://cleanup-retry.org/"
+    add_url(client_with_user_role, url, tmp_path)
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+
+    # Make the branch-delete step of the cleanup fail exactly once. This
+    # must be installed BEFORE the first state check below: fake_get
+    # already reports the PR as resolved, so the very next get_state()
+    # call is what triggers sync_state()'s cleanup attempt. Installing
+    # this patch any later would let that first cleanup succeed for real
+    # (nothing left to fail), instead of exercising the retry path.
+    real_branch_delete = testlists.manager.git.branch_delete
+    calls = {"n": 0}
+
+    def flaky_branch_delete(repo, bname):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("simulated transient failure")
+        return real_branch_delete(repo, bname)
+
+    monkeypatch.setattr(testlists.manager.git, "branch_delete", flaky_branch_delete)
+
+    user_worktree = Path(tmp_path) / "users" / account_id / "test-lists"
+    assert user_worktree.exists()
+
+    # First sync: cleanup fails partway through (rmtree succeeds,
+    # branch_delete raises). State must stay PR_OPEN, not CLEAN.
+    assert get_state(client_with_user_role) == "PR_OPEN"
+    assert not user_worktree.exists(), (
+        "rmtree runs before branch_delete, so the worktree dir is "
+        "already gone even though the failed cleanup left state PR_OPEN"
+    )
+    with dulwich_git.Repo(str(Path(tmp_path) / "test-lists")) as shared_repo:
+        assert branch.encode() in dulwich_git.branch_list(shared_repo), (
+            "the branch must still be registered since branch_delete "
+            "never completed"
+        )
+
+    # Second sync (retry): branch_delete succeeds this time. State must
+    # now correctly advance to CLEAN, and the branch must actually be
+    # gone - not just the directory.
+    assert get_state(client_with_user_role) == "CLEAN"
+    with dulwich_git.Repo(str(Path(tmp_path) / "test-lists")) as shared_repo:
+        assert branch.encode() not in dulwich_git.branch_list(shared_repo)
+
+    # This is the actual regression check: before the fix, this next
+    # submission would fail with dulwich's "Branch ... is already
+    # checked out" ValueError, because the earlier failed cleanup had
+    # already been (incorrectly) marked CLEAN and never retried.
+    url_fresh = "https://after-cleanup-retry.org/"
+    add_url(client_with_user_role, url_fresh, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+
+def test_close_pr_failure_raises_and_preserves_pr_open_state(
+    client_with_user_role,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """If closing an existing PR fails (e.g. it was already merged or
+    closed upstream between the last state check and now - a real race
+    the code's own comments call out), update() must raise
+    CannotClosePR and leave state exactly as PR_OPEN, not partially
+    transition to IN_PROGRESS. This path previously had zero test
+    coverage: _close_pr()'s failure signal was a bare `assert
+    r.status_code == 200`, which update() only caught by relying on that
+    assert raising AssertionError - a check that silently vanishes under
+    `python -O`.
+    """
+
+    def fake_post(apiurl, auth=None, json=None, **kw):
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {
+                "state": "open",
+                "url": "https://api.github.com/repos/citizenlab/test-lists/pulls/1",
+            }),
+        })()
+
+    def fake_patch_fail(url, json=None, auth=None, **kw):
+        return type("Resp", (), {
+            "status_code": 404,
+            "json": staticmethod(lambda: {"message": "Not Found"}),
+        })()
+
+    def fake_get(url, auth=None, **kw):
+        # Without this, the get_state() check below hits the real
+        # github.com and gets back a genuine 404, which _is_pr_resolved()
+        # now correctly turns into InvalidPullRequestState instead of the
+        # PR-close failure this test is actually checking.
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "open", "url": url}),
+        })()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", fake_post)
+    monkeypatch.setattr(testlists.manager.requests, "patch", fake_patch_fail)
+    monkeypatch.setattr(testlists.manager.requests, "get", fake_get)
+
+    url_a = "https://close-pr-failure-a.org/"
+    add_url(client_with_user_role, url_a, tmp_path)
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    d = dict(
+        country_code="US",
+        new_entry={
+            "url": "https://close-pr-failure-b.org/",
+            "category_code": "FILE",
+            "date_added": "2017-04-12",
+            "source": "",
+            "notes": "B",
+        },
+        comment="add B while PR close is broken",
+    )
+    r = client_with_user_role.post("/api/v1/url-submission/update-url", json=d)
+    assert r.status_code == 400, r.json()
+    assert b"err_cannot_close_pr" in r.content
+    assert get_state(client_with_user_role) == "PR_OPEN", (
+        "a failed PR-close must leave state exactly as PR_OPEN, not "
+        "partially advance to IN_PROGRESS"
+    )
+
+
+def test_account_isolation_uncommitted_changes_dont_leak_to_other_accounts(
+    client,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+):
+    """One account's in-progress (uncommitted-to-master) submission must
+    be fully isolated in its own worktree/branch: it must never be
+    visible to another account reading the shared list. There is also no
+    request parameter anywhere that lets a caller name a different
+    account_id than the one baked into their own JWT - the only way to
+    touch an account's data is to hold that account's token - so this
+    also checks that smuggling an account_id into the request body is
+    simply ignored rather than acted upon.
+    """
+    account_a = "2" * 16
+    account_b = "3" * 16
+    headers_a = {"Authorization": f"Bearer {create_session_token(account_a, 'user')}"}
+    headers_b = {"Authorization": f"Bearer {create_session_token(account_b, 'user')}"}
+
+    def add(headers, url):
+        d = dict(
+            country_code="US",
+            new_entry={
+                "url": url,
+                "category_code": "FILE",
+                "date_added": "2017-04-12",
+                "source": "",
+                "notes": "isolation test",
+            },
+            comment=f"add {url}",
+        )
+        r = client.post("/api/v1/url-submission/update-url", json=d, headers=headers)
+        assert r.status_code == 200, r.json()
+
+    def get_list(headers, cc="us"):
+        r = client.get(f"/api/_/url-submission/test-list/{cc}", headers=headers)
+        assert r.status_code == 200, r.json()
+        body = r.json()
+        return body["test_list"], body["state"]
+
+    # B starts clean, unaffected by anything A is about to do.
+    tl_b_before, state_b_before = get_list(headers_b)
+    assert state_b_before == "CLEAN"
+
+    url_a = "https://isolated-to-account-a.org/"
+    add(headers_a, url_a)
+
+    tl_a, state_a = get_list(headers_a)
+    assert state_a == "IN_PROGRESS"
+    assert any(e["url"] == url_a for e in tl_a)
+
+    # B's view must be completely unaffected by A's still-uncommitted
+    # change - not in B's list, and B's own state untouched.
+    tl_b_after, state_b_after = get_list(headers_b)
+    assert state_b_after == "CLEAN"
+    assert not any(e["url"] == url_a for e in tl_b_after)
+    assert len(tl_b_after) == len(tl_b_before)
+
+    # Smuggling an account_id into the request body (not part of the
+    # schema at all) must be silently ignored, not acted upon.
+    spoof_url = "https://spoof-attempt.org/"
+    r = client.post(
+        "/api/v1/url-submission/update-url",
+        json=dict(
+            country_code="US",
+            account_id=account_b,
+            new_entry={
+                "url": spoof_url,
+                "category_code": "FILE",
+                "date_added": "2017-04-12",
+                "source": "",
+                "notes": "spoof",
+            },
+            comment="attempt to act as another account",
+        ),
+        headers=headers_a,
+    )
+    assert r.status_code == 200, r.json()
+
+    tl_b_final, _ = get_list(headers_b)
+    assert not any(e["url"] == spoof_url for e in tl_b_final), (
+        "a smuggled account_id in the request body must be ignored; the "
+        "edit must land on the caller's own (A's) worktree, never B's"
+    )
+    tl_a_final, _ = get_list(headers_a)
+    assert any(e["url"] == spoof_url for e in tl_a_final)
+
+
 def test_second_users_branch_misses_first_users_merged_change(
     client,
     use_local_git_remotes,
@@ -1036,8 +1596,11 @@ def test_push_refuses_when_worktree_has_uncommitted_changes(
         )
 
     r = client_with_user_role.post("/api/v1/url-submission/submit")
-    assert r.status_code == 200  # propose_changes() fails soft, see manager.py
-    assert r.json()["pr_id"] == ""  # ...but refuses to push a dirty worktree
+    # _push_to_repo() raises CannotUpdateList() here, which propose_changes()
+    # now surfaces as CannotProposeChanges() (see manager.py) instead of
+    # swallowing it into a fake 200 with an empty pr_id.
+    assert r.status_code == 400, r.json()
+    assert b"err_cannot_propose_changes" in r.content
 
     # State must not have advanced to PR_OPEN off the back of a push that
     # never actually happened.
