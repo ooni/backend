@@ -463,12 +463,11 @@ class URLListManager:
         # the user, once the PR is open the lock is acquired, when the PR is
         # closed, it's released.
         if state in ("PR_OPEN"):
-            try:
-                self._close_pr(account_id)
-            except AssertionError:
-                # This might happen due to a race between the PR being closed
-                # and it being merged upstream
-                raise CannotClosePR()
+            # _close_pr() now raises CannotClosePR() directly on failure
+            # (including the race where the PR was already merged/closed
+            # upstream between our last check and now) instead of relying
+            # on us catching an AssertionError from a bare assert.
+            self._close_pr(account_id)
             self._set_state(account_id, "IN_PROGRESS")
 
         with self._get_user_repo(account_id) as repo:
@@ -617,23 +616,42 @@ class URLListManager:
             log.error(f"Failed to retrieve URL for the PR {j}")
             raise
 
+    def _check_pr_id(self, pr_id: str):
+        if not pr_id.startswith("https"):
+            raise InvalidPullRequestState(
+                description=f"pr_id {pr_id!r} doesn't look like a URL"
+            )
+
     def _close_pr(self, account_id):
         pr_id = self._get_pr_id(account_id)
-        assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
+        self._check_pr_id(pr_id)
         log.info(f"closing PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         r = requests.patch(pr_id, json={"state": "closed"}, auth=auth)
-        assert r.status_code == 200
+        if r.status_code != 200:
+            # NOTE: this used to be a bare `assert r.status_code == 200`,
+            # which is both invisible under `python -O` and previously had
+            # zero test coverage. This can genuinely happen - e.g. a race
+            # between the PR being closed here and it being merged
+            # upstream - so raise a real, catchable error instead.
+            log.error(
+                f"[git-debug] account={account_id} failed to close PR "
+                f"{pr_id}: GitHub returned status {r.status_code}"
+            )
+            raise CannotClosePR()
 
     def _is_pr_resolved(self, account_id) -> bool:
         """Raises if the PR was never opened"""
         pr_id = self._get_pr_id(account_id)
-        assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
+        self._check_pr_id(pr_id)
         log.debug(f"Fetching PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         r = requests.get(pr_id, auth=auth)
         j = r.json()
-        assert "state" in j
+        if "state" not in j:
+            raise InvalidPullRequestState(
+                description=f"GitHub's PR status response is missing 'state': {j!r}"
+            )
         return j["state"] != "open"
 
     def _push_to_repo(self, account_id):
