@@ -604,10 +604,56 @@ class URLListManager:
 
             self._set_state(account_id, "IN_PROGRESS")
 
+    @staticmethod
+    def _pr_already_exists_error(j) -> bool:
+        """True if GitHub's response to a create-PR request is its
+        structured 422 telling us a PR already exists for this exact head
+        branch, as opposed to some other failure (bad credentials, no
+        commits between head/base, etc).
+
+        This is a real, observed scenario, not a hypothetical: this
+        service's local state (statefile/pr_id under working_dir) can
+        legitimately drift out of sync with GitHub's actual PR state - for
+        example, a dev and prod deployment sharing the same github_user/
+        push_repo (so the same account_id can end up with the same branch
+        name and hit the same open PR) but each with their own, separately
+        reset local working_dir. When that happens, propose_changes()
+        thinks no PR is open and tries to create one, and GitHub rejects
+        it because one already exists for that branch.
+        """
+        if not isinstance(j, dict):
+            return False
+        for err in j.get("errors") or []:
+            if isinstance(err, dict) and "already exists" in (err.get("message") or ""):
+                return True
+        return False
+
+    def _find_open_pr_url(self, branchname):
+        """Look up the API URL of the existing open PR for `branchname`,
+        via GitHub's list-PRs endpoint filtered by head branch. Returns
+        None if there isn't one (which would be unexpected if this is
+        only ever called after GitHub's create-PR call itself reported
+        one already exists, but isn't assumed here)."""
+        head = f"{self.push_username}:{branchname}"
+        auth = HTTPBasicAuth(self.github_user, self.github_token)
+        apiurl = f"https://api.github.com/repos/{self.origin_repo}/pulls"
+        r = requests.get(apiurl, auth=auth, params={"head": head, "state": "open"})
+        results = r.json()
+        if isinstance(results, list) and results:
+            return results[0]["url"]
+        return None
+
     @timer(name="citizenlab_open_pr")
-    def _open_pr(self, branchname):
+    def _open_pr(self, branchname, _retried=False):
         """Opens PR. Returns API URL e.g.
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
+
+        If GitHub reports a PR already exists for this branch (see
+        _pr_already_exists_error's docstring for why this can legitimately
+        happen even though this service believes no PR is open), the
+        stale PR is closed and a fresh one is opened in its place - this
+        recovers automatically instead of leaving the account permanently
+        unable to submit. Only one such retry is attempted.
         """
         head = f"{self.push_username}:{branchname}"
         log.info(
@@ -629,6 +675,17 @@ class URLListManager:
             url = j["url"]
             return url
         except KeyError:
+            if not _retried and self._pr_already_exists_error(j):
+                log.warning(
+                    f"[git-debug] a PR already exists for {head} that "
+                    "this service's own state didn't know about (likely "
+                    "state drift between deployments sharing the same "
+                    "GitHub backend) - closing it and opening a fresh one"
+                )
+                existing_url = self._find_open_pr_url(branchname)
+                if existing_url is not None:
+                    requests.patch(existing_url, json={"state": "closed"}, auth=auth)
+                    return self._open_pr(branchname, _retried=True)
             log.error(f"Failed to retrieve URL for the PR {j}")
             raise
 

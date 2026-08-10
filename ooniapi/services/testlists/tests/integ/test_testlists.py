@@ -1014,6 +1014,118 @@ def test_propose_changes_pr_open_failure_stays_retryable(
     assert get_state(client_with_user_role) == "PR_OPEN"
 
 
+
+
+def test_propose_changes_recovers_from_stale_open_pr_on_github(
+    client_with_user_role,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """Regression test for a real production incident: this service's own
+    local state (statefile/pr_id under working_dir) can drift out of sync
+    with GitHub's actual PR state - e.g. two deployments sharing the same
+    GitHub backend (github_user/push_repo), each with their own
+    separately-reset working_dir, deriving the same account_id and thus
+    the same branch name. When that happens, propose_changes() believes
+    no PR is open and tries to create one, but GitHub rejects the POST
+    with a structured 422 saying a PR already exists for that exact head
+    branch - previously an unrecognized failure that just surfaced as a
+    plain CannotProposeChanges with no way to recover short of an
+    operator manually closing the stale PR on GitHub. _open_pr() now
+    recognizes this specific error, looks up the existing PR, closes it,
+    and opens a fresh one in its place, so submit() succeeds instead of
+    being stuck.
+    """
+    account_id = "0" * 16
+    branch = f"user-contribution/{account_id}"
+    head = f"ooni-bot:{branch}"  # push_username derives from push_repo="ooni-bot/test-lists" in conftest.py
+
+    calls = {"post": 0}
+
+    def flaky_post(apiurl, auth=None, json=None, **kw):
+        calls["post"] += 1
+        if calls["post"] == 1:
+            # The exact structured error GitHub returns for this case
+            # (verbatim shape from the production incident this regresses).
+            return type("Resp", (), {
+                "status_code": 422,
+                "json": staticmethod(lambda: {
+                    "message": "Validation Failed",
+                    "errors": [{
+                        "resource": "PullRequest",
+                        "code": "custom",
+                        "message": f"A pull request already exists for {head}.",
+                    }],
+                    "documentation_url": "https://docs.github.com/rest/pulls/pulls#create-a-pull-request",
+                    "status": "422",
+                }),
+            })()
+        return type("Resp", (), {
+            "status_code": 201,
+            "json": staticmethod(lambda: {
+                "state": "open",
+                "url": "https://api.github.com/repos/citizenlab/test-lists/pulls/999",
+            }),
+        })()
+
+    def fake_get(url, auth=None, params=None, **kw):
+        # requests.get is used for two different things here, distinguished
+        # by whether `params` is passed:
+        #  - _find_open_pr_url()'s list-PRs lookup during recovery, called
+        #    with params={"head": ..., "state": "open"}
+        #  - _is_pr_resolved()'s per-PR status check (used by every later
+        #    get_state() call in this test), called with no params at all
+        # A single mock that only handled the first shape left the second
+        # one falling through with params=None, which doesn't match this
+        # test's own assertion below.
+        if params is not None:
+            assert params == {"head": head, "state": "open"}, params
+            return type("Resp", (), {
+                "status_code": 200,
+                "json": staticmethod(lambda: [{
+                    "url": "https://api.github.com/repos/citizenlab/test-lists/pulls/123",
+                    "number": 123,
+                }]),
+            })()
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "open", "url": url}),
+        })()
+
+    closed = {"url": None}
+
+    def fake_patch_close(url, json=None, auth=None, **kw):
+        closed["url"] = url
+        assert json == {"state": "closed"}
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {"state": "closed", "url": url}),
+        })()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", flaky_post)
+    monkeypatch.setattr(testlists.manager.requests, "get", fake_get)
+    monkeypatch.setattr(testlists.manager.requests, "patch", fake_patch_close)
+
+    url = "https://recovers-from-stale-pr.org/"
+    add_url(client_with_user_role, url, tmp_path)
+    assert get_state(client_with_user_role) == "IN_PROGRESS"
+
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert r.json()["pr_id"] == "https://api.github.com/repos/citizenlab/test-lists/pulls/999"
+    assert get_state(client_with_user_role) == "PR_OPEN"
+
+    # The stale PR that this service's own state didn't know about must
+    # have been closed as part of recovering.
+    assert closed["url"] == "https://api.github.com/repos/citizenlab/test-lists/pulls/123"
+
+    # The branch itself was still pushed with the real change before any
+    # of this PR juggling happened.
+    pushed = _read_pushed_csv(local_test_lists_remotes, branch, "us")
+    assert url in pushed
+
 def test_sync_state_retries_worktree_cleanup_after_transient_failure(
     client_with_user_role,
     use_local_git_remotes,
@@ -1678,6 +1790,63 @@ def test_ghpr_checkout_update_submit(client_with_user_role, tmp_path):
     # This is a *real* PR
     r = list_global(client_with_user_role)
     assert r["state"] == "PR_OPEN"
+
+
+def test_sync_state_raises_invalid_pr_state_on_malformed_github_response(
+    client_with_user_role,
+    use_local_git_remotes,
+    local_test_lists_remotes,
+    tmp_path,
+    monkeypatch,
+):
+    """InvalidPullRequestState replaced a bare `assert "state" in j` in
+    _is_pr_resolved() (and a similar assert in _check_pr_id() for a
+    malformed pr_id), but until now nothing actually exercised that raise
+    - other tests only had to route around it by mocking requests.get to
+    avoid triggering it by accident. This directly forces GitHub's PR
+    status response to be missing the "state" key (which happens for
+    real: a 404 body like {"message": "Not Found", ...} has no "state"
+    key at all) and checks it surfaces as a proper 400/err_invalid_pr_state
+    instead of an unhandled AssertionError/500.
+    """
+
+    def fake_post(apiurl, auth=None, json=None, **kw):
+        return type("Resp", (), {
+            "status_code": 200,
+            "json": staticmethod(lambda: {
+                "state": "open",
+                "url": "https://api.github.com/repos/citizenlab/test-lists/pulls/1",
+            }),
+        })()
+
+    def fake_get_malformed(url, auth=None, **kw):
+        # A real shape GitHub returns for a 404 - no "state" key at all.
+        return type("Resp", (), {
+            "status_code": 404,
+            "json": staticmethod(lambda: {
+                "message": "Not Found",
+                "documentation_url": "https://docs.github.com/rest/pulls/pulls#get-a-pull-request",
+                "status": "404",
+            }),
+        })()
+
+    monkeypatch.setattr(testlists.manager.requests, "post", fake_post)
+    monkeypatch.setattr(testlists.manager.requests, "get", fake_get_malformed)
+
+    url = "https://triggers-invalid-pr-state.org/"
+    add_url(client_with_user_role, url, tmp_path)
+    r = client_with_user_role.post("/api/v1/url-submission/submit")
+    assert r.status_code == 200, r.json()
+    assert r.json()["pr_id"], "submit should have opened a PR successfully"
+
+    # Any state check while PR_OPEN calls sync_state() -> _is_pr_resolved(),
+    # which hits the malformed GET response above - so this can't go
+    # through the get_state() helper (which hard-asserts a 200) the way
+    # every other test does; hitting err_invalid_pr_state IS the point.
+    r = client_with_user_role.get("/api/_/url-submission/test-list/ie")
+    assert r.status_code == 400, r.json()
+    assert b"err_invalid_pr_state" in r.content
+
 
 
 # # Prioritization management # #
