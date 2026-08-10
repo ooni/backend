@@ -352,17 +352,18 @@ class TestCoverageResponse(BaseModel):
 def api_private_test_coverage(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    test_groups: str = Query(None, description="Comma-separated list of test group keys to filter results")
+    test_groups: Optional[str] = Query(None, description="Comma-separated list of test group keys to filter results")
 ) -> TestCoverageResponse:
     """Return number of measurements per day across test categories
     """
     # TODO: merge the two queries into one?
     # TODO: remove test categories or move aggregation to the front-end?
+    test_group_list: Optional[List[str]] = None
     if test_groups is not None:
-        test_groups = test_groups.split(",")
+        test_group_list = test_groups.split(",")
 
     tc = get_recent_test_coverage_ch(clickhouse, probe_cc)
-    nc = get_recent_network_coverage_ch(clickhouse, probe_cc, test_groups)
+    nc = get_recent_network_coverage_ch(clickhouse, probe_cc, test_group_list)
     validated = TestCoverageResponse(network_coverage=nc, test_coverage=tc)
     return validated
 
