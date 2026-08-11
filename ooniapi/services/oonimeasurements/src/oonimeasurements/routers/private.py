@@ -670,7 +670,7 @@ def api_private_im_networks(
     GROUP BY test_name, probe_asn
     ORDER BY test_name ASC, total_count DESC
     """
-    test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
+    test_names = TEST_GROUPS["im"]
     q = query_click(clickhouse, sql.text(s), {"probe_cc": probe_cc, "test_names": test_names, "end": end})
     results: Dict[str, IMNetworkStats] = {}
     for r in q:
@@ -728,7 +728,7 @@ def api_private_im_stats(
     test_name: str = Query(..., description="Test name")
 ) -> IMStatsResponse:
     """Daily instant messaging measurement totals (and optional anomaly counts) for the past 31 days, for the given ASN, country, and test."""
-    test_names = ["facebook_messenger", "signal", "telegram", "whatsapp"]
+    test_names = TEST_GROUPS["im"]
     if test_name not in test_names:
         raise HTTPException(status_code=400, detail="Invalid test_name")
 
