@@ -3,7 +3,7 @@ CC to country name lookup table
 
 Regenerate the dict with:
 
-    python3 ooniapi/countries/__init__.py
+    python3 ooniapi/common/src/common/countries/__init__.py
 
 """
 
@@ -267,7 +267,9 @@ def lookup_country(probe_cc: str) -> str:
 
 if __name__ == "__main__":
     import json
+    from pathlib import Path
 
-    with open("ooniapi/countries/country-list.json") as f:
+    country_list_path = Path(__file__).parent / "country-list.json"
+    with open(country_list_path) as f:
         d = {e["iso3166_alpha2"].upper(): e["name"] for e in json.load(f)}
     print(dict(sorted(d.items())))
