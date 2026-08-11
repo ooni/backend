@@ -537,7 +537,8 @@ def api_private_website_test_urls(
         total_count = q["input_count"] if q else 0
         results = query_click(clickhouse, sql.text(s2), d)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        log.exception(f"api_private_website_test_urls query failed: {e}")
+        raise HTTPException(status_code=400, detail="Database query error")
 
     current_page = math.ceil(offset / limit) + 1
     metadata = {
@@ -946,7 +947,8 @@ def api_private_circumvention_stats_by_country(
         return CircumventionStatsResponse(v=0, results=result)
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
+        log.exception(f"api_private_circumvention_stats_by_country query failed: {e}")
+        raise HTTPException(status_code=400, detail={"error": "Database query error", "v": 0})
 
 
 class CircumventionRuntimeStat(BaseModel):
@@ -1012,7 +1014,8 @@ def api_private_circumvention_runtime_stats(
         return CircumventionRuntimeStatsResponse(results=pivot_circumvention_runtime_stats(r), v=0)
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
+        log.exception(f"api_private_circumvention_runtime_stats query failed: {e}")
+        raise HTTPException(status_code=400, detail={"error": "Database query error", "v": 0})
 
 
 class DomainMetadataResponse(BaseModel):
@@ -1142,7 +1145,8 @@ def api_private_networks(
         results = query_click(clickhouse, sql.text(q), {})
         return MeasuredNetworksResponse(results=results, v=0)
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
+        log.exception(f"api_private_networks query failed: {e}")
+        raise HTTPException(status_code=400, detail={"error": "Database query error", "v": 0})
 
 
 def strip_trailing_dot(v: str) -> DomainStr:
@@ -1192,4 +1196,5 @@ def api_private_domains(
         results = query_click(clickhouse, sql.text(q), {})
         return DomainsMeasuredResponse(v=0, results=results)
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": str(e), "v": 0})
+        log.exception(f"api_private_domains query failed: {e}")
+        raise HTTPException(status_code=400, detail={"error": "Database query error", "v": 0})
