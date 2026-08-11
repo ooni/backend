@@ -808,6 +808,7 @@ def api_private_network_stats(
     limit: int = Query(10, description="Limit results", ge=1),
     offset: int = Query(0, description="Offset results", ge=0),
 ) -> NetworkStatsResponse:
+    """Network speed statistics (NDT) — not yet implemented; always returns an empty result set."""
 
     # TODO: implement the stats from NDT in fastpath and then here
 
