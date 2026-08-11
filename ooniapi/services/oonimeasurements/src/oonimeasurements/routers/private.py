@@ -421,7 +421,7 @@ def api_private_website_stats(
     clickhouse: ClickhouseDep,
     input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    probe_asn: int = Query(..., description="ASN (integer)"),
+    probe_asn: int = Query(..., description="ASN (integer)", ge=0),
 ) -> WebsiteStatsResponse:
     """Daily aggregated website measurement statistics (anomalies, confirmations, failures, and totals) for the past 31 days."""
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
@@ -484,14 +484,10 @@ def api_private_website_test_urls(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
-    limit: int = Query(10, description="Limit results"),
-    offset: int = Query(0, description="Offset results"),
+    limit: int = Query(10, description="Limit results", ge=1),
+    offset: int = Query(0, description="Offset results", ge=0),
 ) -> WebsiteURLsResponse:
     """Paginated list of tested URLs with per-URL counts (anomalies, confirmations, failures, totals) for the past 31 days."""
-    # TODO optimize or remove
-    if limit <= 0:
-        limit = 10
-
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
 
@@ -805,8 +801,8 @@ class NetworkStatsResponse(BaseModel):
 def api_private_network_stats(
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
-    limit: int = Query(10, description="Limit results"),
-    offset: int = Query(0, description="Offset results"),
+    limit: int = Query(10, description="Limit results", ge=1),
+    offset: int = Query(0, description="Offset results", ge=0),
 ) -> NetworkStatsResponse:
 
     # TODO: implement the stats from NDT in fastpath and then here
