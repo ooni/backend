@@ -506,11 +506,8 @@ def api_private_website_test_urls(
         AND probe_cc = :probe_cc
         AND probe_asn = :probe_asn
     """
-    q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn_int, start=start, end=end))
-    total_count = q["input_count"] if q else 0
-
     # Group msmts by CC / ASN / period with LIMIT and OFFSET
-    s = """SELECT input,
+    s2 = """SELECT input,
         countIf(anomaly = 't') as anomaly_count,
         countIf(confirmed = 't') as confirmed_count,
         countIf(msm_failure = 't') as failure_count,
@@ -535,7 +532,13 @@ def api_private_website_test_urls(
         "limit": limit,
         "offset": offset,
     }
-    results = query_click(clickhouse, sql.text(s), d)
+    try:
+        q = query_click_one_row(clickhouse, sql.text(s), dict(probe_cc=probe_cc, probe_asn=probe_asn_int, start=start, end=end))
+        total_count = q["input_count"] if q else 0
+        results = query_click(clickhouse, sql.text(s2), d)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     current_page = math.ceil(offset / limit) + 1
     metadata = {
         "offset": offset,
