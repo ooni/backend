@@ -66,6 +66,9 @@ router = APIRouter(prefix="/v1")
 
 log = logging.getLogger(__name__)
 
+# Minimum probe version supporting the webconnectivity_0.5 (LTE) experiment.
+WEBCONNECTIVITY_LTE_MIN_VERSION = (3, 28, 0)
+
 
 class ProbeLogin(BaseModel):
     # Allow None username and password
@@ -332,6 +335,20 @@ def list_test_helpers(response: Response):
     return ListTestHelpersResponse.model_validate(conf_typed)
 
 
+def supports_webconnectivity_lte(software_version: str) -> bool:
+    """Whether the probe is new enough to run webconnectivity_0.5 (LTE).
+
+    Versions are compared component-wise as ints, ignoring any pre-release
+    suffix. Versions we can't parse this way are treated as unsupported.
+    """
+    try:
+        parsed = tuple(int(n) for n in software_version.split("-")[0].split("."))
+    except ValueError:
+        return False
+
+    return parsed >= WEBCONNECTIVITY_LTE_MIN_VERSION
+
+
 @router.post("/check-in", tags=["ooniprobe"])
 def check_in(
     request: Request,
@@ -408,9 +425,10 @@ def check_in(
         }
     )
 
-    # octect = extract_probe_ipaddr_octect(1, 0)
-    # if octect in (34, 239):
-    conf["features"]["webconnectivity_0.5"] = True
+    # set webconnectivity_0.5 feature flag only for probes new enough to
+    # support it
+    if supports_webconnectivity_lte(software_version):
+        conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
 

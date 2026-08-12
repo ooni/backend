@@ -43,6 +43,37 @@ async def test_check_in_basic(client, load_url_priorities):
     assert sorted(c["conf"]) == ["features", "test_helpers"]
 
 
+@pytest.mark.parametrize(
+    "software_version,enabled",
+    [
+        ("3.28.0", True),
+        ("3.28.1", True),
+        ("3.29.0-alpha", True),
+        ("3.100.0", True),
+        ("3.27.9", False),
+        ("3.9.2", False),
+        # unparseable or missing versions don't get the feature
+        ("unknown", False),
+        ("", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_check_in_webconnectivity_lte(
+    client, load_url_priorities, software_version, enabled
+):
+    j = dict(
+        probe_cc="US",
+        probe_asn="AS1234",
+        software_name="ooniprobe-cli",
+        software_version=software_version,
+        on_wifi=True,
+        charging=False,
+    )
+    c = postj(client, "/api/v1/check-in", j)
+
+    assert c["conf"]["features"].get("webconnectivity_0.5", False) is enabled
+
+
 @pytest.mark.asyncio
 async def test_check_in_url_category_news(client):
     j = dict(
