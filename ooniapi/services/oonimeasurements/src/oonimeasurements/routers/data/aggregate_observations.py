@@ -31,6 +31,7 @@ class AggregationEntry(BaseModel):
     probe_cc: Optional[str] = None
     probe_asn: Optional[int] = None
     test_name: Optional[str] = None
+    measurement_uid: Optional[str] = None
     timestamp: Optional[datetime] = None
 
 
@@ -46,6 +47,7 @@ AggregationKeys = Literal[
     "probe_cc",
     "probe_asn",
     "test_name",
+    "measurement_uid",
 ]
 
 
@@ -63,6 +65,7 @@ async def get_aggregation_observations(
     probe_asn: Annotated[List[int] | None, Query()] = None,
     probe_cc: Annotated[List[str] | None, Query()] = None,
     ip: Annotated[List[str] | None, Query()] = None,
+    measurement_uid: Annotated[List[str] | None, Query()] = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
     since: SinceUntil = utc_30_days_ago(),
     until: SinceUntil = utc_today(),
@@ -113,6 +116,12 @@ async def get_aggregation_observations(
         group_by.append("ip")
         columns.append("ip")
         column_keys.append("ip")
+    if measurement_uid:
+        and_list.append(f"measurement_uid IN %(measurement_uid)s")
+        params_filter["measurement_uid"] = measurement_uid
+        group_by.append("measurement_uid")
+        columns.append("measurement_uid")
+        column_keys.append("measurement_uid")
 
     if "timestamp" in group_by:
         columns.append(f"{timestamp_str} as timestamp")

@@ -34,6 +34,10 @@ def test_oonidata_aggregation_analysis_with_since_and_until(
         ("probe_asn", 45758),
         ("test_name", "whatsapp"),
         ("input", "stun://stun.voys.nl:3478"),
+        (
+            "measurement_uid",
+            "20241101233756.866609_TH_webconnectivity_1bf55fb5699c39ec",
+        ),
     ],
 )
 def test_oonidata_aggregation_analysis_with_filters(
