@@ -67,21 +67,35 @@ async def get_aggregation_observations(
     ip: Annotated[List[str] | None, Query()] = None,
     measurement_uid: Annotated[List[str] | None, Query()] = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: Optional[SinceUntil] = None,
+    until: Optional[SinceUntil] = None,
     time_grain: Annotated[TimeGrains, Query()] = "day",
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
+    if since is None and not measurement_uid:
+        since = utc_30_days_ago()
+    if until is None and not measurement_uid:
+        until = utc_today()
+
     timestamp_str = get_measurement_start_day_agg(time_grain)
     column_keys = ["observation_count"]
     columns = []
     and_list = []
     order_by = ["observation_count"]
-    params_filter: Dict[str, Any] = {"since": since, "until": until}
+    params_filter: Dict[str, Any] = {}
     selected_columns = ""
     group_by_str = ""
     order_by_str = ""
     and_str = ""
+    since_clause = ""
+    until_clause = ""
+
+    if since is not None:
+        since_clause = "AND measurement_start_time > %(since)s"
+        params_filter["since"] = since
+    if until is not None:
+        until_clause = "AND measurement_start_time < %(until)s"
+        params_filter["until"] = until
 
     if len(order_by) > 0:
         order_by_str = "ORDER BY " + ",".join(order_by) + " DESC"
@@ -183,8 +197,9 @@ async def get_aggregation_observations(
 COUNT() as observation_count,
 {selected_columns}
 FROM obs_web
-WHERE measurement_start_time > %(since)s
-AND measurement_start_time < %(until)s
+WHERE 1=1
+{since_clause}
+{until_clause}
 {and_str}
 {group_by_str}
 {order_by_str}
