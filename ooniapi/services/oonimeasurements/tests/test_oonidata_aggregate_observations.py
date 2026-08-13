@@ -34,6 +34,10 @@ def test_oonidata_aggregation_observations_with_since_and_until(
         ("test_name", "whatsapp"),
         ("hostname", "www.on-instant.com"),
         ("ip", "64.233.190.139"),
+        (
+            "measurement_uid",
+            "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630",
+        ),
     ],
 )
 def test_oonidata_aggregation_observations_with_filters(

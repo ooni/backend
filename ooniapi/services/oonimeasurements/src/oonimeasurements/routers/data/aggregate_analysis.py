@@ -71,6 +71,7 @@ class AggregationEntry(BaseModel):
     probe_asn: Optional[int] = None
     test_name: Optional[str] = None
     input: Optional[str] = None
+    measurement_uid: Optional[str] = None
 
 
 class AggregationResponse(BaseModel):
@@ -300,6 +301,7 @@ async def get_aggregation_analysis(
     test_name: Annotated[Optional[str], Query()] = None,
     domain: Annotated[Optional[str], Query()] = None,
     input: Annotated[Optional[str], Query()] = None,
+    measurement_uid: Annotated[Optional[str], Query()] = None,
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
@@ -349,6 +351,10 @@ async def get_aggregation_analysis(
         q_args["input"] = input
         and_clauses.append("input = %(input)s")
         extra_cols["input"] = "input"
+    if measurement_uid is not None:
+        q_args["measurement_uid"] = measurement_uid
+        and_clauses.append("measurement_uid = %(measurement_uid)s")
+        extra_cols["measurement_uid"] = "measurement_uid"
 
     if axis_y:
         dimension_count += 1
@@ -415,6 +421,7 @@ async def get_aggregation_analysis(
             probe_asn=d.get("probe_asn"),
             test_name=d.get("test_name"),
             input=d.get("input"),
+            measurement_uid=d.get("measurement_uid"),
         )
         results.append(entry)
     return AggregationResponse(
