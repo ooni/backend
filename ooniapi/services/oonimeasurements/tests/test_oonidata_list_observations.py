@@ -33,6 +33,48 @@ def test_list_obs_report_id_only_skips_default_date_window(client):
         assert row["report_id"] == report_id, row
 
 
+def test_list_obs_measurement_uid_only_skips_default_date_window(client):
+    """
+    Without measurement_uid, since/until default to the last 7 days (fixture data is older).
+
+    With only measurement_uid, those defaults must not apply, so rows still match by
+    measurement_uid even when their measurement_start_time falls outside the usual
+    default window.
+    """
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+
+    default_response = client.get(route)
+    assert default_response.status_code == 200
+    assert len(default_response.json()["results"]) == 0
+
+    by_uid = client.get(route, params={"measurement_uid": measurement_uid})
+    assert by_uid.status_code == 200
+    j = by_uid.json()
+    assert isinstance(j["results"], list), j
+    assert len(j["results"]) > 0
+    for row in j["results"]:
+        assert row["measurement_uid"] == measurement_uid, row
+
+
+def test_list_obs_measurement_uid_with_explicit_since_and_until(client):
+    """
+    An explicit since/until must still be honored even when measurement_uid is set.
+    """
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+    params = {
+        "measurement_uid": measurement_uid,
+        # This range does not cover the measurement's date (2024-11-01).
+        "since": "2025-01-01",
+        "until": "2025-01-02",
+    }
+
+    response = client.get(route, params=params)
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    assert len(json["results"]) == 0
+
+
 def test_oonidata_list_observations_with_since_and_until(
     client, params_since_and_until_with_two_days
 ):
@@ -50,6 +92,10 @@ def test_oonidata_list_observations_with_since_and_until(
     "filter_name, filter_value",
     [
         ("report_id", "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"),
+        (
+            "measurement_uid",
+            "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630",
+        ),
         ("probe_asn", 45758),
         ("probe_cc", "IT"),
         ("software_name", "ooniprobe-cli"),
