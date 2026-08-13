@@ -152,6 +152,20 @@ def test_oonidata_list_analysis_limit_by_default(
     assert len(json["results"]) == 100
 
 
+def test_oonidata_list_analysis_includes_top_rule_id_columns(
+    client, params_since_and_until_with_two_days
+):
+    response = client.get(route, params=params_since_and_until_with_two_days)
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    assert len(json["results"]) > 0
+    for result in json["results"]:
+        assert "top_dns_rule_id" in result, result
+        assert "top_tcp_rule_id" in result, result
+        assert "top_tls_rule_id" in result, result
+
+
 def test_oonidata_list_analysis_measurement_uid_skips_default_date_filter(client):
     measurement_uid = "20241101233756.866609_TH_webconnectivity_1bf55fb5699c39ec"
 

@@ -50,6 +50,9 @@ class AnalysisEntry(BaseModel):
     top_dns_failure: Optional[str]
     top_tcp_failure: Optional[str]
     top_tls_failure: Optional[str]
+    top_dns_rule_id: str
+    top_tcp_rule_id: str
+    top_tls_rule_id: str
     dns_blocked: float
     dns_down: float
     dns_ok: float
