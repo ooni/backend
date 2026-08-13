@@ -86,15 +86,13 @@ async def get_aggregation_observations(
     selected_columns = ""
     group_by_str = ""
     order_by_str = ""
-    and_str = ""
-    since_clause = ""
-    until_clause = ""
+    where_str = ""
 
     if since is not None:
-        since_clause = "AND measurement_start_time > %(since)s"
+        and_list.append("measurement_start_time > %(since)s")
         params_filter["since"] = since
     if until is not None:
-        until_clause = "AND measurement_start_time < %(until)s"
+        and_list.append("measurement_start_time < %(until)s")
         params_filter["until"] = until
 
     if len(order_by) > 0:
@@ -188,7 +186,7 @@ async def get_aggregation_observations(
 
     selected_columns = ",".join(columns)
     if len(and_list) > 0:
-        and_str = "AND " + "AND ".join(and_list)
+        where_str = "WHERE " + " AND ".join(and_list)
 
     group_by_str = "GROUP BY " + ",".join(group_by)
 
@@ -197,10 +195,7 @@ async def get_aggregation_observations(
 COUNT() as observation_count,
 {selected_columns}
 FROM obs_web
-WHERE 1=1
-{since_clause}
-{until_clause}
-{and_str}
+{where_str}
 {group_by_str}
 {order_by_str}
 """
