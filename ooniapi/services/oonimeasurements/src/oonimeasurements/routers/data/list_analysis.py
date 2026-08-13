@@ -73,8 +73,8 @@ async def list_measurements(
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: Optional[SinceUntil] = None,
+    until: Optional[SinceUntil] = None,
     order_by: Annotated[
         Literal[
             "measurement_start_time",
@@ -92,6 +92,12 @@ async def list_measurements(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListAnalysisResponse:
+
+    if since is None and measurement_uid is None:
+        since = utc_30_days_ago()
+    if until is None and measurement_uid is None:
+        until = utc_today()
+
     q_args = {}
     and_clauses = []
     if measurement_uid is not None:
