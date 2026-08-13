@@ -152,6 +152,35 @@ def test_oonidata_list_analysis_limit_by_default(
     assert len(json["results"]) == 100
 
 
+def test_oonidata_list_analysis_measurement_uid_skips_default_date_filter(client):
+    measurement_uid = "20241101233756.866609_TH_webconnectivity_1bf55fb5699c39ec"
+
+    response = client.get(route, params={"measurement_uid": measurement_uid})
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    assert len(json["results"]) > 0
+    for result in json["results"]:
+        assert result["measurement_uid"] == measurement_uid, result
+
+
+def test_oonidata_list_analysis_measurement_uid_with_explicit_since_and_until(client):
+    measurement_uid = "20241101233756.866609_TH_webconnectivity_1bf55fb5699c39ec"
+    params = {
+        "measurement_uid": measurement_uid,
+        # This range does not cover the measurement's date, so an explicit
+        # since/until must still be honored even when measurement_uid is set.
+        "since": "2025-01-01",
+        "until": "2025-01-02",
+    }
+
+    response = client.get(route, params=params)
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    assert len(json["results"]) == 0
+
+
 def test_oonidata_list_analysis_with_limit_and_offset(
     client, params_since_and_until_with_two_days
 ):
