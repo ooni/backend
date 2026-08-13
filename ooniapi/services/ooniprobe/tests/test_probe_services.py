@@ -22,4 +22,4 @@ def test_supports_webconnectivity_lte():
     # versions we can't parse are treated as unsupported
     assert supports_webconnectivity_lte("") is False
     assert supports_webconnectivity_lte("unknown") is False
-    assert supports_webconnectivity_lte("3.28.x") is False
+    assert supports_webconnectivity_lte("3.28.y") is False
