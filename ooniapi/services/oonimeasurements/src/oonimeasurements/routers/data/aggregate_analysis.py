@@ -305,14 +305,19 @@ async def get_aggregation_analysis(
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: Optional[SinceUntil] = None,
+    until: Optional[SinceUntil] = None,
     time_grain: Annotated[TimeGrains, Query()] = "day",
     anomaly_sensitivity: Annotated[float, Query()] = 0.9,
     format: Annotated[Literal["JSON", "CSV"], Query()] = "JSON",
     download: Annotated[bool, Query()] = False,
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
+    if since is None and measurement_uid is None:
+        since = utc_30_days_ago()
+    if until is None and measurement_uid is None:
+        until = utc_today()
+
     q_args = {}
     and_clauses = []
     extra_cols = {}
