@@ -168,6 +168,7 @@ class ListObservationsResponse(BaseModel):
 @parse_probe_asn_to_int
 async def list_observations(
     report_id: Annotated[Optional[str], Query()] = None,
+    measurement_uid: Annotated[Optional[str], Query()] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
@@ -194,9 +195,9 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
-    if since is None and report_id is None:
+    if since is None and measurement_uid is None and report_id is None:
         since = date.today() - timedelta(days=7)
-    if until is None and report_id is None:
+    if until is None and measurement_uid is None and report_id is None:
         until = date.today()
 
     q_args = {}
@@ -204,6 +205,9 @@ async def list_observations(
     if report_id is not None:
         q_args["report_id"] = report_id
         and_clauses.append("report_id = %(report_id)s")
+    if measurement_uid is not None:
+        q_args["measurement_uid"] = measurement_uid
+        and_clauses.append("measurement_uid = %(measurement_uid)s")
     if probe_asn is not None:
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
@@ -252,7 +256,10 @@ async def list_observations(
     results: List[ObservationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            results.append(WebObservationEntry(**row))
+            entry = WebObservationEntry(**row)
+            if entry.target_id is None:
+                entry.target_id = entry.hostname or entry.tls_server_name
+            results.append(entry)
 
     response = ListObservationsResponse(
         metadata=ResponseMetadata(

@@ -59,7 +59,7 @@ clean:
 	rm -rf .venv
 
 run:
-	hatch run uvicorn $(SERVICE_NAME).main:app
+	VALKEY_URL=memory hatch run uvicorn $(SERVICE_NAME).main:app
 
 db-migration: docker-build
 	docker run \
