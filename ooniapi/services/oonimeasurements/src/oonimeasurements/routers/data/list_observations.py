@@ -255,7 +255,7 @@ async def list_observations(
     t = time.perf_counter()
     rows = await async_query_click(db, q, q_args)
 
-    if True: #not rows and measurement_uid is not None:
+    if not rows and measurement_uid is not None:
         # The observations for this measurement may not have been generated
         # yet by the pipeline. Generate them on the fly from the raw
         # measurement.
