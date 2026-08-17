@@ -187,3 +187,61 @@ def test_oonidata_list_observations_with_limit_and_offset(
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 10
+
+
+def _fake_obs_row(measurement_uid):
+    return {
+        "measurement_uid": measurement_uid,
+        "input": "https://example.com/",
+        "report_id": "20260414T123456Z_webconnectivity_ZW_37204_n1_aaaaaaaaaaaaaaaa",
+        "ooni_run_link_id": "",
+        "measurement_start_time": "2026-04-14T12:34:56Z",
+        "software_name": "ooniprobe-cli",
+        "software_version": "3.20.0",
+        "test_name": "web_connectivity",
+        "test_version": "0.4.3",
+        "bucket_date": "1984-01-01",
+        "probe_asn": 37204,
+        "probe_cc": "ZW",
+        "probe_as_org_name": "TelOne",
+        "probe_as_cc": "ZW",
+        "probe_as_name": "TELONE",
+        "network_type": "wifi",
+        "platform": "linux",
+        "origin": "",
+        "engine_name": "ooniprobe-engine",
+        "engine_version": "3.20.0",
+        "architecture": "amd64",
+        "resolver_ip": "8.8.8.8",
+        "resolver_asn": 15169,
+        "resolver_cc": "US",
+        "resolver_as_org_name": "Google LLC",
+        "resolver_as_cc": "US",
+        "hostname": "example.com",
+    }
+
+
+def test_oonidata_list_observations_generates_missing_observations(
+    client, monkeypatch
+):
+    measurement_uid = "20260414123456.123456_ZW_webconnectivity_aaaaaaaaaaaaaaaa"
+    calls = []
+
+    def fake_generate_observations(db, settings, uid):
+        calls.append(uid)
+        return [_fake_obs_row(uid)]
+
+    monkeypatch.setattr(
+        "oonimeasurements.routers.data.list_observations.generate_observations",
+        fake_generate_observations,
+    )
+
+    response = client.get(route, params={"measurement_uid": measurement_uid})
+    assert response.status_code == 200
+
+    json = response.json()
+    assert calls == [measurement_uid]
+    assert len(json["results"]) == 1
+    result = json["results"][0]
+    assert result["measurement_uid"] == measurement_uid
+    assert result["target_id"] == "example.com"

@@ -6,10 +6,12 @@ from typing import List, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from typing_extensions import Annotated
 
 from ...common.clickhouse_utils import async_query_click
 from ...common.dependencies import get_clickhouse_session, get_settings
+from .generate_observations import generate_observations
 from .utils import parse_probe_asn_to_int
 
 router = APIRouter()
@@ -252,6 +254,14 @@ async def list_observations(
 
     t = time.perf_counter()
     rows = await async_query_click(db, q, q_args)
+
+    if True: #not rows and measurement_uid is not None:
+        # The observations for this measurement may not have been generated
+        # yet by the pipeline. Generate them on the fly from the raw
+        # measurement.
+        rows = await run_in_threadpool(
+            generate_observations, db, settings, measurement_uid
+        )
 
     results: List[ObservationEntry] = []
     if rows and isinstance(rows, list):

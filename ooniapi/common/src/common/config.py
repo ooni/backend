@@ -44,6 +44,10 @@ class Settings(BaseSettings):
 
     # Where the geoip DBs are downloaded to
     geoip_db_dir: str = "/var/lib/ooni/geoip"
+
+    # Where the oonipipeline NetinfoDB data is downloaded to, used when
+    # generating observations on the fly from raw measurements
+    netinfodb_dir: str = "/var/lib/ooni/netinfodb"
     # -- < Ooniprobe only > -------------------------------------------------------------
     msmt_spool_dir: str = ""
     fastpath_urls: List[str] = Field(
