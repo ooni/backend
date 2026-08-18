@@ -74,6 +74,15 @@ CITIZENLAB_CSV_HEADER = (
 )
 
 
+def _read_ref(repo, ref_name: str):
+    """Read a ref's sha, returning None instead of raising if it doesn't
+    exist yet (e.g. before the first commit on a brand new branch)."""
+    try:
+        return repo.refs[ref_name.encode()]
+    except KeyError:
+        return None
+
+
 def check_url(url):
     if not VALID_URL.match(url):
         raise BadURL()
@@ -126,7 +135,23 @@ class URLListManager:
         self.push_username = push_repo.split("/")[0]
         # lock before init repo
         self.get_user_lock(account_id)
-        self._init_repo()
+        try:
+            self._init_repo()
+        except Exception:
+            # _init_repo() does real network I/O (git.clone/git.pull
+            # against github.com). If it raises, this constructor raises
+            # too, so get_url_list_manager() never returns an object -
+            # callers' `ulm = None; try: ulm = get_url_list_manager(...)
+            # ... finally: if ulm is not None: ulm.close()` pattern can
+            # never call close() on something that was never assigned,
+            # even though the lock above was already acquired. Without
+            # this, the lock would only be released whenever __del__
+            # happens to run via GC - exactly the delayed-release problem
+            # close() exists to eliminate, just reachable through a
+            # network hiccup during clone/pull instead of a git.commit()
+            # failure.
+            self.close()
+            raise
 
     def get_user_lock(self, account_id: str):
         lockfile_dir = self.working_dir / "users" / account_id
@@ -136,15 +161,45 @@ class URLListManager:
         self._lock = FileLock(lockfile_f, timeout=5, thread_local=False)
         self._lock.acquire()  # released on URLListManager destruction
 
+    def close(self):
+        """Explicitly release the per-account FileLock.
+
+        This is idempotent and safe to call multiple times (including when
+        the lock was never successfully acquired, e.g. because __init__
+        raised a filelock.Timeout before get_user_lock() finished).
+
+        Callers MUST call this from a try/finally around any use of a
+        URLListManager rather than relying on __del__/gc to release the
+        lock. In production, an exception raised out of ulm.update() (or
+        similar) with only a bare `del ulm` on the success path left the
+        object - and its held FileLock - alive for as long as the
+        exception's traceback was referenced (which can be far longer than
+        the request that created it, since tracebacks keep local frames,
+        including `ulm`, alive). Every subsequent request for that same
+        account_id then hit a filelock.Timeout of its own (observed in
+        production as cascading 500s on unrelated read-only endpoints)
+        until some unrelated request elsewhere happened to force a full GC
+        pass.
+        """
+        lock = getattr(self, "_lock", None)
+        if lock is not None and lock.is_locked:
+            elapsed_ms = (time.monotonic_ns() - self._lock_time) / 1000_000
+            log.debug(f"[git-debug] releasing lock {lock.lock_file} held for {elapsed_ms}ms")
+            lock.release()
+
     @timer(name="citizenlab_lock_time")
     def __del__(self):
-        # try to close repo at teardown to fix hanging git processes
-        # https://github.com/gitpython-developers/GitPython/issues/1333
-        if self._lock.is_locked:
-            self._lock.release()
-        else:
-            raise Exception
-        elapsed_ms = (time.monotonic_ns() - self._lock_time) / 1000_000
+        # Fallback safety net only - close() should already have been
+        # called explicitly via try/finally by every caller. Do NOT raise
+        # here: exceptions raised inside __del__ are silently discarded by
+        # Python anyway (just printed as noisy "Exception ignored in..."
+        # lines), and "the lock isn't held anymore/never was" is an
+        # entirely expected state to find here (e.g. close() already ran,
+        # or __init__ never got past get_user_lock()).
+        try:
+            self.close()
+        except Exception:
+            log.exception("[git-debug] error releasing lock in URLListManager.__del__")
 
     @timer(name="citizenlab_repo_init")
     def _init_repo(self):
@@ -293,13 +348,34 @@ class URLListManager:
             bname = self._get_user_branchname(account_id)
             log.debug(f"Deleting {path}")
             try:
-                shutil.rmtree(path)
+                try:
+                    shutil.rmtree(path)
+                except FileNotFoundError:
+                    pass
                 with git.Repo(self.repo_dir) as repo:
                     git.worktree_prune(repo)
                     git.branch_delete(repo, bname)
                 self._maybe_delete_changes_log(account_id)
-            except Exception as e:
-                log.info(f"Error deleting {path} {e}")
+            except Exception:
+                # NOTE: this used to unconditionally set state=CLEAN below
+                # even when cleanup failed partway through (e.g. rmtree
+                # succeeded but branch_delete didn't). Since sync_state()
+                # never revisits an account once it's CLEAN, that
+                # permanently registered the branch as "checked out" in
+                # dulwich's administrative records - the next
+                # worktree_add() for this account would raise ValueError
+                # forever, with no way to recover short of an operator
+                # manually running `git worktree prune`/`branch -D`.
+                # Leaving state as-is instead makes this self-healing: the
+                # frontend polls sync_state() every 10s while PR_OPEN, so a
+                # transient failure just gets retried on the next call.
+                log.exception(
+                    f"[git-debug] account={account_id} failed to clean "
+                    f"up worktree/branch {bname} after PR merge - "
+                    "leaving state as-is so this is retried on the next "
+                    "sync rather than getting stuck"
+                )
+                return state
 
             self._set_state(account_id, "CLEAN")
             state = "CLEAN"
@@ -358,21 +434,22 @@ class URLListManager:
         """
         # TODO: set date_added to now() on new_entry
         # fields follow the order in the CSV files
+        # NOTE: these were bare asserts, which `python -O`/PYTHONOPTIMIZE
+        # strips entirely - silently skipping validation of data (an HTTP
+        # request body) that isn't guaranteed to have the expected shape.
         if old_entry:
             old_entry["category_description"] = CATEGORY_CODES[
                 old_entry["category_code"]
             ]
-            assert sorted(old_entry.keys()) == sorted(
-                CITIZENLAB_CSV_HEADER
-            ), "Unexpected keys"
+            if sorted(old_entry.keys()) != sorted(CITIZENLAB_CSV_HEADER):
+                raise InvalidRequest(description="old_entry has unexpected keys")
 
         if new_entry:
             new_entry["category_description"] = CATEGORY_CODES[
                 new_entry["category_code"]
             ]
-            assert sorted(new_entry.keys()) == sorted(
-                CITIZENLAB_CSV_HEADER
-            ), "Unexpected keys"
+            if sorted(new_entry.keys()) != sorted(CITIZENLAB_CSV_HEADER):
+                raise InvalidRequest(description="new_entry has unexpected keys")
 
         if old_entry and new_entry:
             log.debug("updating existing entry")
@@ -402,12 +479,11 @@ class URLListManager:
         # the user, once the PR is open the lock is acquired, when the PR is
         # closed, it's released.
         if state in ("PR_OPEN"):
-            try:
-                self._close_pr(account_id)
-            except AssertionError:
-                # This might happen due to a race between the PR being closed
-                # and it being merged upstream
-                raise CannotClosePR()
+            # _close_pr() now raises CannotClosePR() directly on failure
+            # (including the race where the PR was already merged/closed
+            # upstream between our last check and now) instead of relying
+            # on us catching an AssertionError from a bare assert.
+            self._close_pr(account_id)
             self._set_state(account_id, "IN_PROGRESS")
 
         with self._get_user_repo(account_id) as repo:
@@ -455,16 +531,129 @@ class URLListManager:
 
             log.debug(f"Writing {csv_f.as_posix()}")
             tmp_f.rename(csv_f)
-            git.add(repo=repo, paths=[csv_f.as_posix()])
-            git.commit(repo, message=comment)
+
+            # NOTE: from here on the working tree file has already been
+            # updated on disk. If anything below raises, the CSV change is
+            # visible in the user's worktree but was never committed, so the
+            # branch ref keeps pointing at the old commit. The next push will
+            # then push a branch that is missing this change even though the
+            # file on disk looks up to date. Capture full context + traceback
+            # around dulwich calls so this can no longer fail silently.
+            try:
+                branch_name = self._get_user_branchname(account_id)
+                old_head = _read_ref(repo, f"refs/heads/{branch_name}")
+                log.debug(
+                    f"[git-debug] account={account_id} cc={cc} repo_path={repo.path} "
+                    f"branch={branch_name} old_head={old_head}"
+                )
+
+                added, ignored = git.add(repo=repo, paths=[csv_f.as_posix()])
+                log.debug(
+                    f"[git-debug] account={account_id} git.add added={added} "
+                    f"ignored={ignored}"
+                )
+
+                # Explicitly set the committer/author identity instead of
+                # relying on dulwich's system-derived fallback
+                # (user.name/email from git config, then GIT_COMMITTER_*
+                # env vars, then the OS user/gecos/hostname). In a
+                # container that has no git identity configured this
+                # fallback can be missing/malformed and dulwich raises
+                # InvalidUserIdentity from check_user_identity(), which
+                # would abort the commit *after* the file has already been
+                # renamed into place above.
+                bot_identity = f"{self.github_user} <{self.github_user}@users.noreply.github.com>".encode()
+
+                new_head = git.commit(
+                    repo,
+                    message=comment,
+                    author=bot_identity,
+                    committer=bot_identity,
+                )
+                log.debug(
+                    f"[git-debug] account={account_id} git.commit new_head={new_head}"
+                )
+
+                # Defensive check: make sure the branch ref actually moved.
+                # If dulwich raised inside commit() *after* updating the ref
+                # (e.g. during hook execution or auto-gc) this would still
+                # be fine; but if for any reason the ref wasn't updated we
+                # want to know loudly rather than silently push a stale
+                # branch later.
+                current_head = _read_ref(repo, f"refs/heads/{branch_name}")
+                if current_head != new_head:
+                    log.error(
+                        f"[git-debug] account={account_id} branch {branch_name} "
+                        f"ref is {current_head!r} but expected commit {new_head!r} "
+                        "- branch was NOT updated by git.commit()"
+                    )
+                    raise CannotUpdateList(
+                        description="Failed to update branch after commit"
+                    )
+            except Exception:
+                log.exception(
+                    f"[git-debug] account={account_id} cc={cc} "
+                    f"csv_f={csv_f.as_posix()} repo_path={repo.path} "
+                    "git add/commit failed - worktree file was already "
+                    "written to disk but the commit/branch update did not "
+                    "complete"
+                )
+                raise
+
             self.write_changes_log(account_id, cc, old_entry, new_entry)
 
             self._set_state(account_id, "IN_PROGRESS")
 
+    @staticmethod
+    def _pr_already_exists_error(j) -> bool:
+        """True if GitHub's response to a create-PR request is its
+        structured 422 telling us a PR already exists for this exact head
+        branch, as opposed to some other failure (bad credentials, no
+        commits between head/base, etc).
+
+        This is a real, observed scenario, not a hypothetical: this
+        service's local state (statefile/pr_id under working_dir) can
+        legitimately drift out of sync with GitHub's actual PR state - for
+        example, a dev and prod deployment sharing the same github_user/
+        push_repo (so the same account_id can end up with the same branch
+        name and hit the same open PR) but each with their own, separately
+        reset local working_dir. When that happens, propose_changes()
+        thinks no PR is open and tries to create one, and GitHub rejects
+        it because one already exists for that branch.
+        """
+        if not isinstance(j, dict):
+            return False
+        for err in j.get("errors") or []:
+            if isinstance(err, dict) and "already exists" in (err.get("message") or ""):
+                return True
+        return False
+
+    def _find_open_pr_url(self, branchname):
+        """Look up the API URL of the existing open PR for `branchname`,
+        via GitHub's list-PRs endpoint filtered by head branch. Returns
+        None if there isn't one (which would be unexpected if this is
+        only ever called after GitHub's create-PR call itself reported
+        one already exists, but isn't assumed here)."""
+        head = f"{self.push_username}:{branchname}"
+        auth = HTTPBasicAuth(self.github_user, self.github_token)
+        apiurl = f"https://api.github.com/repos/{self.origin_repo}/pulls"
+        r = requests.get(apiurl, auth=auth, params={"head": head, "state": "open"})
+        results = r.json()
+        if isinstance(results, list) and results:
+            return results[0]["url"]
+        return None
+
     @timer(name="citizenlab_open_pr")
-    def _open_pr(self, branchname):
+    def _open_pr(self, branchname, _retried=False):
         """Opens PR. Returns API URL e.g.
         https://api.github.com/repos/citizenlab/test-lists/pulls/800
+
+        If GitHub reports a PR already exists for this branch (see
+        _pr_already_exists_error's docstring for why this can legitimately
+        happen even though this service believes no PR is open), the
+        stale PR is closed and a fresh one is opened in its place - this
+        recovers automatically instead of leaving the account permanently
+        unable to submit. Only one such retry is attempted.
         """
         head = f"{self.push_username}:{branchname}"
         log.info(
@@ -486,53 +675,153 @@ class URLListManager:
             url = j["url"]
             return url
         except KeyError:
+            if not _retried and self._pr_already_exists_error(j):
+                log.warning(
+                    f"[git-debug] a PR already exists for {head} that "
+                    "this service's own state didn't know about (likely "
+                    "state drift between deployments sharing the same "
+                    "GitHub backend) - closing it and opening a fresh one"
+                )
+                existing_url = self._find_open_pr_url(branchname)
+                if existing_url is not None:
+                    requests.patch(existing_url, json={"state": "closed"}, auth=auth)
+                    return self._open_pr(branchname, _retried=True)
             log.error(f"Failed to retrieve URL for the PR {j}")
             raise
 
+    def _check_pr_id(self, pr_id: str):
+        if not pr_id.startswith("https"):
+            raise InvalidPullRequestState(
+                description=f"pr_id {pr_id!r} doesn't look like a URL"
+            )
+
     def _close_pr(self, account_id):
         pr_id = self._get_pr_id(account_id)
-        assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
+        self._check_pr_id(pr_id)
         log.info(f"closing PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         r = requests.patch(pr_id, json={"state": "closed"}, auth=auth)
-        assert r.status_code == 200
+        if r.status_code != 200:
+            # NOTE: this used to be a bare `assert r.status_code == 200`,
+            # which is both invisible under `python -O` and previously had
+            # zero test coverage. This can genuinely happen - e.g. a race
+            # between the PR being closed here and it being merged
+            # upstream - so raise a real, catchable error instead.
+            log.error(
+                f"[git-debug] account={account_id} failed to close PR "
+                f"{pr_id}: GitHub returned status {r.status_code}"
+            )
+            raise CannotClosePR()
 
     def _is_pr_resolved(self, account_id) -> bool:
         """Raises if the PR was never opened"""
         pr_id = self._get_pr_id(account_id)
-        assert pr_id.startswith("https"), f"{pr_id} doesn't start with https"
+        self._check_pr_id(pr_id)
         log.debug(f"Fetching PR {pr_id}")
         auth = HTTPBasicAuth(self.github_user, self.github_token)
         r = requests.get(pr_id, auth=auth)
         j = r.json()
-        assert "state" in j
+        if "state" not in j:
+            raise InvalidPullRequestState(
+                description=f"GitHub's PR status response is missing 'state': {j!r}"
+            )
         return j["state"] != "open"
 
     def _push_to_repo(self, account_id):
         with git.Repo(self.repo_dir) as repo:
             branch_name = self._get_user_branchname(account_id)
-            log.debug(f"pushing {branch_name} to GitHub")
+            local_head = _read_ref(repo, f"refs/heads/{branch_name}")
+
+            # NOTE: comparing refs/heads/<branch> in the shared repo against
+            # HEAD in the user's worktree is *not* a useful check on its
+            # own: HEAD in a worktree is a symref pointing at the exact
+            # same ref storage in the shared commondir, so the two always
+            # agree by construction - they're two views of one ref file,
+            # not two independent copies. The actual failure mode we're
+            # guarding against (git.add()/git.commit() raising after the
+            # CSV rename, per the original bug report) leaves the change
+            # sitting uncommitted in the worktree's index/working tree,
+            # which a ref comparison can never see. Check the worktree's
+            # status instead.
+            user_repo_path = self._get_user_repo_path(account_id)
+            if os.path.exists(user_repo_path):
+                with git.Repo(user_repo_path) as user_repo:
+                    worktree_head = _read_ref(user_repo, "HEAD")
+                    dirty = git.status(user_repo)
+                    log.debug(
+                        f"[git-debug] account={account_id} pushing {branch_name} "
+                        f"to GitHub, local_head={local_head} "
+                        f"worktree_head={worktree_head} status={dirty}"
+                    )
+                    has_uncommitted = bool(
+                        any(dirty.staged.values()) or dirty.unstaged
+                    )
+                    if has_uncommitted:
+                        # This is exactly the failure mode from the original
+                        # bug report: a CSV edit landed on disk in the
+                        # user's worktree (git.add() and/or git.commit()
+                        # raised right after the rename) but was never
+                        # committed, so it never reached refs/heads/<branch>
+                        # in the shared repo. Pushing now would silently
+                        # open/update a PR that's missing this change.
+                        log.error(
+                            f"[git-debug] account={account_id} branch "
+                            f"{branch_name} worktree has uncommitted changes "
+                            f"(staged={dirty.staged} unstaged={dirty.unstaged}) "
+                            "- refusing to push, this change was never "
+                            "actually committed"
+                        )
+                        raise CannotUpdateList(
+                            description="The user's worktree has uncommitted "
+                            "changes that never made it into a commit"
+                        )
+            else:
+                log.debug(
+                    f"[git-debug] account={account_id} pushing {branch_name} "
+                    f"to GitHub, local_head={local_head} (no worktree checked "
+                    "out - nothing to verify)"
+                )
+
             refspec = f"refs/heads/{branch_name}:refs/heads/{branch_name}"
             git.push(repo, "rworigin", refspecs=[refspec], force=True)
+            log.debug(
+                f"[git-debug] account={account_id} pushed {branch_name} "
+                f"(sha={local_head}) to rworigin"
+            )
 
     @timer(name="citizenlab_propose_changes")
     def propose_changes(self, account_id: str) -> str:
+        """Push the account's branch and open a PR for it. Returns the PR's
+        API URL.
+
+        NOTE: this used to swallow any failure from _push_to_repo()/
+        _open_pr() and return "" with an implicit HTTP 200 - the frontend
+        would then render a fake "Submitted!" success with a dead PR link
+        while the backend state silently stayed IN_PROGRESS. Both failure
+        modes now raise CannotProposeChanges() so the caller actually sees
+        the failure; retrying is expected to work once the underlying
+        issue clears, and no change is lost even if the push succeeded but
+        opening the PR failed, since submit() can simply be called again.
+        """
         log.debug("proposing changes")
         try:
             self._push_to_repo(account_id)
-        except Exception as e:
-            log.error(f"Failed to push to repo {e}")
-            return ""
-        try:
-            branch_name = self._get_user_branchname(account_id)
-        except Exception as e:
-            log.error(f"Failed to get branch name {e}")
-            return ""
+        except Exception:
+            log.exception(f"[git-debug] account={account_id} failed to push to repo")
+            raise CannotProposeChanges()
+
+        branch_name = self._get_user_branchname(account_id)
         try:
             pr_id = self._open_pr(branch_name)
-        except Exception as e:
-            log.error(f"Failed to open pr for {branch_name} {e}")
-            return ""
+        except Exception:
+            log.exception(
+                f"[git-debug] account={account_id} branch {branch_name} "
+                "was pushed successfully but opening the PR failed - "
+                "the change is not lost, retrying submit() will pick up "
+                "the already-pushed branch and try to open the PR again"
+            )
+            raise CannotProposeChanges()
+
         self._set_pr_id(account_id, pr_id)
         self._set_state(account_id, "PR_OPEN")
         return pr_id

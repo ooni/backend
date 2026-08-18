@@ -32,6 +32,7 @@ class AggregationEntry(BaseModel):
     probe_cc: Optional[str] = None
     probe_asn: Optional[int] = None
     test_name: Optional[str] = None
+    measurement_uid: Optional[str] = None
     timestamp: Optional[datetime] = None
 
 
@@ -47,6 +48,7 @@ AggregationKeys = Literal[
     "probe_cc",
     "probe_asn",
     "test_name",
+    "measurement_uid",
 ]
 
 
@@ -65,22 +67,35 @@ async def get_aggregation_observations(
     probe_cc: Annotated[List[str] | None, Query()] = None,
     resolver_asn: Annotated[List[str] | None, Query()] = None,
     ip: Annotated[List[str] | None, Query()] = None,
+    measurement_uid: Annotated[List[str] | None, Query()] = None,
     ooni_run_link_id: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: Optional[SinceUntil] = None,
+    until: Optional[SinceUntil] = None,
     time_grain: Annotated[TimeGrains, Query()] = "day",
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
+    if since is None and not measurement_uid:
+        since = utc_30_days_ago()
+    if until is None and not measurement_uid:
+        until = utc_today()
+
     timestamp_str = get_measurement_start_day_agg(time_grain)
     column_keys = ["observation_count"]
     columns = []
     and_list = []
     order_by = ["observation_count"]
-    params_filter: Dict[str, Any] = {"since": since, "until": until}
+    params_filter: Dict[str, Any] = {}
     selected_columns = ""
     group_by_str = ""
     order_by_str = ""
-    and_str = ""
+    where_str = ""
+
+    if since is not None:
+        and_list.append("measurement_start_time > %(since)s")
+        params_filter["since"] = since
+    if until is not None:
+        and_list.append("measurement_start_time < %(until)s")
+        params_filter["until"] = until
 
     if len(order_by) > 0:
         order_by_str = "ORDER BY " + ",".join(order_by) + " DESC"
@@ -121,6 +136,12 @@ async def get_aggregation_observations(
         group_by.append("ip")
         columns.append("ip")
         column_keys.append("ip")
+    if measurement_uid:
+        and_list.append(f"measurement_uid IN %(measurement_uid)s")
+        params_filter["measurement_uid"] = measurement_uid
+        group_by.append("measurement_uid")
+        columns.append("measurement_uid")
+        column_keys.append("measurement_uid")
 
     if "timestamp" in group_by:
         columns.append(f"{timestamp_str} as timestamp")
@@ -173,7 +194,7 @@ async def get_aggregation_observations(
 
     selected_columns = ",".join(columns)
     if len(and_list) > 0:
-        and_str = "AND " + "AND ".join(and_list)
+        where_str = "WHERE " + " AND ".join(and_list)
 
     group_by_str = "GROUP BY " + ",".join(group_by)
 
@@ -182,9 +203,7 @@ async def get_aggregation_observations(
 COUNT() as observation_count,
 {selected_columns}
 FROM obs_web
-WHERE measurement_start_time > %(since)s
-AND measurement_start_time < %(until)s
-{and_str}
+{where_str}
 {group_by_str}
 {order_by_str}
 """
