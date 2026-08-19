@@ -14,7 +14,7 @@ async def test_profiling_enabled(client, db, tmp_path, profiling_enabled):
     assert report_path.exists()
 
 @pytest.mark.asyncio
-async def test_profiling_disabled(client, db, tmp_path, profiling_disabled):
+async def test_profiling_disabled(client, db, tmp_path):
     report_path: Path = tmp_path / "report.html"
 
     assert not report_path.exists()

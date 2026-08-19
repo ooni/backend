@@ -89,12 +89,12 @@ app.add_middleware(
 )
 
 settings = get_settings()
-app.add_middleware(
-    ProfileMiddleware,
-    profiling_active = settings.profiling_active,
-    report_path = settings.profiling_report_path,
-    whitelist = ("/api/v1/submit_measurement",)
-)
+if settings.profiling_active:
+    app.add_middleware(
+        ProfileMiddleware,
+        report_path = settings.profiling_report_path,
+        whitelist = ("/api/v1/submit_measurement",)
+    )
 
 app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")

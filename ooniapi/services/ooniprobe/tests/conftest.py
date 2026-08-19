@@ -36,7 +36,7 @@ from ooniprobe.download_geoip import try_update
 from ooniprobe.main import app, lifespan
 from ooniprobe.routers.v1.probe_services import TorTarget
 
-from .utils import setup_user, set_middleware_params
+from .utils import setup_user, add_test_middleware, remove_test_middleware
 
 
 def make_override_get_settings(**kw):
@@ -466,24 +466,13 @@ async def client_with_two_working_fastpaths(
 
 @pytest_asyncio.fixture(scope='function')
 def profiling_enabled(tmp_path):
-    old = set_middleware_params(app, ProfileMiddleware,
-        profiling_active = True,
+    # The app only registers ProfileMiddleware when profiling is active, so
+    # tests that want profiling behavior must add it themselves.
+    add_test_middleware(app, ProfileMiddleware,
         report_path = str(tmp_path / "report.html"),
         whitelist = ("/api/v1/manifest",)
-    ) or {}
+    )
 
     yield
 
-    set_middleware_params(app, ProfileMiddleware, **old)
-
-@pytest_asyncio.fixture(scope='function')
-def profiling_disabled(tmp_path):
-    old = set_middleware_params(app, ProfileMiddleware,
-        profiling_active = False,
-        report_path = str(tmp_path / "report.html"),
-        whitelist = ("/api/v1/manifest",)
-    ) or {}
-
-    yield
-
-    set_middleware_params(app, ProfileMiddleware, **old)
+    remove_test_middleware(app, ProfileMiddleware)
