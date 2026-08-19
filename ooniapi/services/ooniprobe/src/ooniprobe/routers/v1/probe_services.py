@@ -530,16 +530,16 @@ def generate_test_helpers_conf() -> Dict:
             {"address": "37.218.241.93:57004", "type": "legacy"},
         ],
         "http-return-json-headers": [
-            {"address": "http://18.197.158.1:80", "type": "legacy"},
-            {"address": "http://18.197.158.1:80", "type": "legacy"},
+            {"address": "http://206.81.31.205:80", "type": "legacy"},
+            {"address": "http://206.81.31.205:80", "type": "legacy"},
         ],
         "ssl": [
             {"address": "https://37.218.241.93", "type": "legacy"},
             {"address": "https://37.218.241.93", "type": "legacy"},
         ],
         "tcp-echo": [
-            {"address": "3.71.189.84", "type": "legacy"},
-            {"address": "3.71.189.84", "type": "legacy"},
+            {"address": "134.209.237.204", "type": "legacy"},
+            {"address": "134.209.237.204", "type": "legacy"},
         ],
         "traceroute": [
             {"address": "37.218.241.93", "type": "legacy"},
