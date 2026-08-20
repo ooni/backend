@@ -539,28 +539,20 @@ def generate_test_helpers_conf() -> Dict:
         "traceroute": [
             {"address": "37.218.241.93", "type": "legacy"},
             {"address": "37.218.241.93", "type": "legacy"},
-        ],
-        "web-connectivity": [
-            {"address": "httpo://o7mcp5y4ibyjkcgs.onion", "type": "legacy"},
-            {"address": "https://wcth.ooni.io", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-            {"address": "httpo://y3zq5fwelrzkkv3s.onion", "type": "legacy"},
-            {"address": "https://wcth.ooni.io", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-        ],
+        ]
     }
+
     conf["web-connectivity"] = random_web_test_helpers(
         [
-            "https://6.th.ooni.org",
-            "https://5.th.ooni.org",
+            "https://wcth0.fra1.ooni.org",
+            "https://wcth1.fra1.ooni.org",
+            "https://wcth2.fra1.ooni.org",
+            # These are the internal addresses of the test helpers.
+            # Keeping for the moment to assess potential blocking of
+            # *.io vs *.org
+            "https://wcth0.fra1.prod.ooni.io",
+            "https://wcth1.fra1.prod.ooni.io",
+            "https://wcth2.fra1.prod.ooni.io"
         ]
     )
     conf["web-connectivity"].append(
@@ -570,6 +562,8 @@ def generate_test_helpers_conf() -> Dict:
             "type": "cloudfront",
         }
     )
+
+    assert "web-connectivity" in conf, f"missing web-connectivity test helper key in {conf}"
     return conf
 
 
