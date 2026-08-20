@@ -1,5 +1,4 @@
 import logging
-import gc
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
@@ -47,12 +46,10 @@ async def post_propose_changes(
 
     log.info("submitting testlists changes")
 
+    ulm = None
     try:
         ulm = get_url_list_manager(settings, account_id)
         pr_id = ulm.propose_changes(account_id)
-        del ulm
-        log.info("Forcing GC to unlock URLListManager immediately")
-        gc.collect() # force gc to clean up and clear FileLock
         resp = PullRequestResponse(pr_id=pr_id)  # Return the model directly
         setnocacheresponse(response)
         return resp
@@ -60,8 +57,16 @@ async def post_propose_changes(
         log.error(f"Exception occurred: {e}")
         raise e  # Already inherits from HTTPException, so can be returned directly
     except Exception as e:
-        log.error(f"Unexpected exception occurred: {e}")
+        log.exception(f"Unexpected exception occurred: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+    finally:
+        # Deterministically release the per-account FileLock regardless of
+        # success/failure - see URLListManager.close() docstring for why
+        # relying on `del ulm` + gc.collect() only on the success path
+        # caused cascading FileLock timeouts on unrelated requests in
+        # production.
+        if ulm is not None:
+            ulm.close()
 
 
 class Entry(BaseModel):
@@ -104,12 +109,13 @@ async def url_submission_update_url(
     except Exception:
         raise HTTPException(detail="Authentication required", status_code=401)
 
-    ulm = get_url_list_manager(settings, account_id)
-
     new = update.new_entry.model_dump() if update.new_entry is not None else None
     old = update.old_entry.model_dump() if update.old_entry is not None else None
 
+    ulm = None
     try:
+        ulm = get_url_list_manager(settings, account_id)
+
         if new:
             validate_entry(new)
         if old:
@@ -122,7 +128,6 @@ async def url_submission_update_url(
             new_entry=new,
             comment=update.comment,
         )
-        del ulm
         resp = UrlSubmissionResponse(updated_entry=new)
         setnocacheresponse(response)
         return resp
@@ -130,4 +135,22 @@ async def url_submission_update_url(
         log.error(f"OONIException occurred: {e}")
         raise e
     except Exception as e:
+        # NOTE: this used to swallow the exception without logging it at
+        # all, so any failure inside ulm.update() - including dulwich
+        # errors from git.add()/git.commit() - was only ever visible to
+        # the caller as a terse HTTP 400 with str(e) as the body, with
+        # zero trace of it in the server logs. Log the full traceback so
+        # these are actually debuggable.
+        log.exception(
+            f"Unexpected exception occurred while updating url-submission "
+            f"for account_id={account_id}: {e}"
+        )
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        # See URLListManager.close() docstring: without this, an
+        # exception here left the account's FileLock held until an
+        # unrelated request elsewhere happened to force a full GC pass,
+        # causing every other request for this account_id (even plain
+        # reads) to fail with a FileLock timeout in the meantime.
+        if ulm is not None:
+            ulm.close()

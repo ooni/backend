@@ -408,13 +408,8 @@ def check_in(
         }
     )
 
-    # set webconnectivity_0.5 feature flag for some probes
-    # Temporarily disabled while we work towards deploying this in prod:
-    # https://github.com/ooni/probe/issues/2674
-    #
-    # octect = extract_probe_ipaddr_octect(1, 0)
-    # if octect in (34, 239):
-    #    conf["features"]["webconnectivity_0.5"] = True
+    # set webconnectivity_0.5 feature flag
+    conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
 
@@ -530,42 +525,34 @@ def generate_test_helpers_conf() -> Dict:
             {"address": "37.218.241.93:57004", "type": "legacy"},
         ],
         "http-return-json-headers": [
-            {"address": "http://37.218.241.94:80", "type": "legacy"},
-            {"address": "http://37.218.241.94:80", "type": "legacy"},
+            {"address": "http://206.81.31.205:80", "type": "legacy"},
+            {"address": "http://206.81.31.205:80", "type": "legacy"},
         ],
         "ssl": [
             {"address": "https://37.218.241.93", "type": "legacy"},
             {"address": "https://37.218.241.93", "type": "legacy"},
         ],
         "tcp-echo": [
-            {"address": "37.218.241.93", "type": "legacy"},
-            {"address": "37.218.241.93", "type": "legacy"},
+            {"address": "134.209.237.204", "type": "legacy"},
+            {"address": "134.209.237.204", "type": "legacy"},
         ],
         "traceroute": [
             {"address": "37.218.241.93", "type": "legacy"},
             {"address": "37.218.241.93", "type": "legacy"},
-        ],
-        "web-connectivity": [
-            {"address": "httpo://o7mcp5y4ibyjkcgs.onion", "type": "legacy"},
-            {"address": "https://wcth.ooni.io", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-            {"address": "httpo://y3zq5fwelrzkkv3s.onion", "type": "legacy"},
-            {"address": "https://wcth.ooni.io", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-        ],
+        ]
     }
+
     conf["web-connectivity"] = random_web_test_helpers(
         [
-            "https://6.th.ooni.org",
-            "https://5.th.ooni.org",
+            "https://wcth0.fra1.ooni.org",
+            "https://wcth1.fra1.ooni.org",
+            "https://wcth2.fra1.ooni.org",
+            # These are the internal addresses of the test helpers.
+            # Keeping for the moment to assess potential blocking of
+            # *.io vs *.org
+            "https://wcth0.fra1.prod.ooni.io",
+            "https://wcth1.fra1.prod.ooni.io",
+            "https://wcth2.fra1.prod.ooni.io"
         ]
     )
     conf["web-connectivity"].append(
@@ -575,6 +562,8 @@ def generate_test_helpers_conf() -> Dict:
             "type": "cloudfront",
         }
     )
+
+    assert "web-connectivity" in conf, f"missing web-connectivity test helper key in {conf}"
     return conf
 
 
@@ -944,7 +933,8 @@ async def submit_measurement(
     rid = generate_report_id(test_name, settings, cc, normalize_asn(asn))
 
     # Anonymous credentials verification
-    verification_status, submit_error, submit_response = _verify_submit(
+    verification_status, submit_error, submit_response = await run_in_threadpool(
+        _verify_submit,
         submit_request, manifest, settings,
         content.get('probe_cc'), content.get('probe_asn')
     )
@@ -1133,15 +1123,17 @@ def _verify_submit(
         protocol_state = ServerState.from_creds(
             manifest.manifest.public_parameters, settings.anonc_secret_key
         )
-        submit_response = protocol_state.handle_submit_request_with_hash(
-            submit_request.nym,
-            submit_request.zkp_request,
-            probe_cc,
-            probe_asn,
-            submit_request.content,
-            age_range,
-            min_msm_count,
-        )
+
+        with Metrics.ANONC_VERIFICATION_TIMING.time():
+            submit_response = protocol_state.handle_submit_request_with_hash(
+                submit_request.nym,
+                submit_request.zkp_request,
+                probe_cc,
+                probe_asn,
+                submit_request.content,
+                age_range,
+                min_msm_count,
+            )
         return (VerificationStatus.VERIFIED, None, submit_response)
     except (DeserializationFailed, ProtocolError, CredentialError) as e:
         log.error(f"ZKP Failed: {e}")
