@@ -262,7 +262,7 @@ class CtrlGroundTruthResponse(BaseModel):
     results: List[CtrlGroundTruthEntry]
 
 @router.get(
-    "/v1/aggregation/observations/ctrl_ground_truth",
+    "/v1/aggregation/observations/ctrl",
     response_model_exclude_none=True,
     tags=["aggregation", "observations", "ctrl"],
 )
