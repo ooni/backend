@@ -55,3 +55,22 @@ def get_msmt_hash(msmt: Dict[str, Any], is_verified: str = "u") -> str:
     payload = copy.deepcopy(msmt)
     payload["is_verified"] = is_verified
     return sha512(ujson.dumps(payload).encode()).hexdigest()[:16]
+
+def add_test_middleware(app, middleware_class, **kwargs):
+    """
+    Add a middleware for the duration of a test, even if the app does not
+    normally register it (e.g. it's conditionally added based on settings).
+
+    The app's middleware stack is reset so Starlette rebuilds it on the next
+    request. Call `remove_test_middleware` during teardown to undo this.
+    """
+    app.middleware_stack = None
+    app.add_middleware(middleware_class, **kwargs)
+
+
+def remove_test_middleware(app, middleware_class):
+    """Undo `add_test_middleware`."""
+    app.user_middleware = [
+        m for m in app.user_middleware if m.cls is not middleware_class
+    ]
+    app.middleware_stack = None
