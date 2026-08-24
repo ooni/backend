@@ -1398,34 +1398,34 @@ def test_account_isolation_uncommitted_changes_dont_leak_to_other_accounts(
     assert any(e["url"] == spoof_url for e in tl_a_final)
 
 
-def test_second_users_branch_misses_first_users_merged_change(
+def test_second_users_branch_picks_up_first_users_merged_change(
     client,
     use_local_git_remotes,
     local_test_lists_remotes,
     tmp_path,
     monkeypatch,
 ):
-    """Documents a known limitation, not a regression: URLListManager
-    never rebases a user's long-lived worktree branch onto the latest
-    origin master before pushing.
+    """Regression test for a real merge-conflict bug (e.g.
+    citizenlab/test-lists#2257): URLListManager used to never update a
+    user's long-lived worktree branch against the latest origin master
+    before pushing, so a branch cut well before master moved on would be
+    pushed (and PR'd) as-is, conflicting with everything master had
+    picked up in the meantime.
 
     Scenario: user A submits and their PR gets merged. User B has their
     own in-progress submission whose worktree/branch was cut *before* A's
-    merge, adds more changes to it, and only then submits. Because the
-    service never updates B's branch against the new master in between,
-    B's pushed branch is missing A's already-merged change even though
-    it's sitting right there on master - exactly the kind of drift that
-    turns into a real merge conflict (or a silent, wrong resolution) once
-    a human tries to merge B's PR too. Rebasing (or at least fast-forward
-    merging) each user's branch onto origin's current master before
-    pushing would avoid this class of problem; this test exists to make
-    the current behavior visible and catch it if it silently changes.
+    merge, adds more changes to it, and only then submits.
+    _rebase_user_branch_onto_master() now replays B's own tracked changes
+    onto a fresh copy of master right before pushing, so B's pushed
+    branch picks up A's already-merged change automatically instead of
+    missing it - avoiding the merge conflict entirely rather than leaving
+    it for a human to discover and untangle later on GitHub.
 
     It then goes on to merge B's PR too, and checks the normal case still
     works end-to-end: B's state goes back to CLEAN, their worktree/branch
     get pruned, and a fresh submission afterwards - now cut from a master
     that already has both A's and B's changes - works cleanly and with no
-    drift, in contrast to the stale-branch case above.
+    drift, same as the rebuilt-branch case above.
     """
     account_a = "0" * 16
     account_b = "1" * 16
@@ -1501,14 +1501,14 @@ def test_second_users_branch_misses_first_users_merged_change(
         return r.json()["pr_id"]
 
     def merge_and_resolve(account_id, branch):
-        # Simulate a human accepting and merging the PR on GitHub. A's PR
-        # merges as a clean fast-forward (master hasn't moved since A's
-        # branch was cut), but B's can't: master has since moved (A's
-        # change landed) and B's branch never picked that up, so a plain
-        # force-push would silently discard A's already-merged change
-        # instead of merging. _simulate_maintainer_merge() handles both
-        # cases correctly via a real (if manually-applied) content merge,
-        # matching what an actual GitHub merge would produce either way.
+        # Simulate a human accepting and merging the PR on GitHub. Both
+        # A's and B's branches now merge cleanly - A's as a plain
+        # fast-forward, and B's because _rebase_user_branch_onto_master()
+        # already rebuilt it onto master before it was pushed, so its
+        # diff against master's current tip is exactly B's own pending
+        # changes and nothing else. _simulate_maintainer_merge() applies
+        # a real (if manually-applied) content merge either way, matching
+        # what an actual GitHub merge produces.
         _simulate_maintainer_merge(
             local_test_lists_remotes["origin"],
             local_test_lists_remotes["push"],
@@ -1560,23 +1560,20 @@ def test_second_users_branch_misses_first_users_merged_change(
     )
     assert url_a in master_content
 
-    # This is the known issue: B's branch never picked up A's change, even
-    # though B added more to their submission and submitted well after
-    # A's PR merged. If a human merged B's PR as-is, the result depends on
-    # exactly where in the file each line landed - best case, git resolves
-    # it automatically; worst case, it's a conflict a maintainer has to
-    # untangle by hand. Rebasing B's branch onto master before this push
-    # would have avoided the question entirely.
+    # This is the fix: B's branch picks up A's already-merged change even
+    # though B never explicitly did anything to fetch it - submit() now
+    # rebuilds the branch from a fresh copy of master plus B's own
+    # tracked changes right before pushing. B's PR now merges as a clean
+    # fast-forward instead of conflicting.
     pushed_b = _read_pushed_csv(local_test_lists_remotes, branch_b, "us")
+    assert url_a in pushed_b, (
+        "expected B's branch to pick up A's already-merged change via "
+        "_rebase_user_branch_onto_master(); if this fails, the "
+        "rebase-onto-master fix for citizenlab/test-lists#2257-style "
+        "merge conflicts has regressed"
+    )
     assert url_b1 in pushed_b
     assert url_b2 in pushed_b
-    assert url_a not in pushed_b, (
-        "expected B's branch to still be missing A's merged change "
-        "(documents the known stale-base/needs-rebase limitation); if "
-        "this now fails because url_a IS present, someone has added "
-        "rebase-onto-master behavior and this test should be updated "
-        "to assert the fixed behavior instead"
-    )
 
     # --- Now B's PR *also* gets accepted and merged (a maintainer might
     # do this even with the drift above - CSVs with additions in
@@ -1718,11 +1715,15 @@ def test_push_refuses_when_worktree_has_uncommitted_changes(
         )
 
     r = client_with_user_role.post("/api/v1/url-submission/submit")
-    # _push_to_repo() raises CannotUpdateList() here, which propose_changes()
-    # now surfaces as CannotProposeChanges() (see manager.py) instead of
-    # swallowing it into a fake 200 with an empty pr_id.
+    # _push_to_repo() raises CannotUpdateList() here. propose_changes()
+    # surfaces any BaseOONIException raised by _push_to_repo() as-is
+    # (see manager.py) rather than swallowing it into a fake 200 with an
+    # empty pr_id, or masking it behind the generic CannotProposeChanges:
+    # retrying submit() alone can't fix a worktree with leftover
+    # uncommitted changes, so the specific, actionable error is what
+    # should reach the caller.
     assert r.status_code == 400, r.json()
-    assert b"err_cannot_propose_changes" in r.content
+    assert b"err_cannot_update_list" in r.content
 
     # State must not have advanced to PR_OPEN off the back of a push that
     # never actually happened.
