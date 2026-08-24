@@ -38,7 +38,7 @@ from ...common.prio import (
     generate_test_list,
 )
 from ...common.routers import BaseModel
-from ...common.utils import setcacheresponse, setnocacheresponse
+from ...common.utils import setcacheresponse, setnocacheresponse, generate_report_id
 from ...dependencies import (
     ASNCCReaderDep,
     ManifestDep,
@@ -52,7 +52,6 @@ from ...dependencies import (
 from ...utils import (
     check_measurement_meta,
     extract_probe_ipaddr,
-    generate_report_id,
     geolookup_probe,
     get_cc_asn,
     metadata_from_measurement_content,
