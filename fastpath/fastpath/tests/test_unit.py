@@ -9,7 +9,7 @@ import pytest
 import json
 
 from fastpath.utils import trivial_id
-from fastpath.db import extract_input_domain
+from fastpath.db import extract_input_domain, _pack_wc_x_flags
 import fastpath.core as fp
 import fastpath.core as core
 import fastpath.s3feeder as s3feeder
@@ -40,6 +40,30 @@ def loadj(fn):
 def test_trivial_id():
     tid = trivial_id(b"", {"measurement_start_time": "2021-02-03 10:11:12"})
     assert tid == "01202102037f9c2ba4e88f827d61604550760585"
+
+
+def test_pack_wc_x_flags():
+    msm = {"test_keys": {"x_blocking_flags": 33, "x_dns_flags": 4, "x_null_null_flags": 0}}
+    packed = _pack_wc_x_flags(msm)
+    assert packed == 33 | (4 << 6)  # 289
+    # round-trips back to the three fields
+    assert packed & 0x3F == 33
+    assert (packed >> 6) & 0x07 == 4
+    assert (packed >> 9) & 0x1F == 0
+
+    # all 14 bits set fits in a UInt16
+    allbits = {"test_keys": {"x_blocking_flags": 63, "x_dns_flags": 7, "x_null_null_flags": 31}}
+    assert _pack_wc_x_flags(allbits) == 0x3FFF
+    assert _pack_wc_x_flags(allbits) <= 0xFFFF
+
+    # missing/None fields default to 0
+    assert _pack_wc_x_flags({"test_keys": {"x_blocking_flags": 1}}) == 1
+    assert _pack_wc_x_flags({"test_keys": {"x_blocking_flags": None}}) == 0
+
+    # non-0.5 web_connectivity and other nettests have no x_blocking_flags -> None
+    assert _pack_wc_x_flags({"test_keys": {"blocking": "dns", "accessible": False}}) is None
+    assert _pack_wc_x_flags({"test_keys": {}}) is None
+    assert _pack_wc_x_flags({}) is None
 
 
 def test_extract_input_domain():
