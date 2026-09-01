@@ -80,8 +80,7 @@ def _click_create_table_fastpath() -> None:
         `engine_name` String,
         `engine_version` String,
         `test_helper_address` String,
-        `test_helper_type` String,
-        `wc_x_flags` Nullable(UInt16)
+        `test_helper_type` String
     )
     ENGINE = ReplacingMergeTree
     ORDER BY (measurement_start_time, report_id, input)
@@ -143,17 +142,6 @@ def setup_clickhouse(conf) -> None:
     # FIXME _click_create_table_fastpath()
 
 
-def _pack_wc_x_flags(msm) -> Optional[int]:
-    """Pack the Web Connectivity 0.5 (LTE) analysis bitmasks into a single UInt16."""
-    tk = dget_or(msm, "test_keys", {})
-    if "x_blocking_flags" not in tk:
-        return None
-    b = (tk.get("x_blocking_flags") or 0) & 0x3F
-    d = (tk.get("x_dns_flags") or 0) & 0x07
-    n = (tk.get("x_null_null_flags") or 0) & 0x1F
-    return b | (d << 6) | (n << 9)
-
-
 def _write_rows_to_fastpath(rows: List[Dict]):
     global click_client
     sql_insert = dedent(
@@ -184,8 +172,7 @@ def _write_rows_to_fastpath(rows: List[Dict]):
     test_helper_address,
     test_helper_type,
     ooni_run_link_id,
-    is_verified,
-    wc_x_flags
+    is_verified
     ) VALUES
         """
     )
@@ -273,7 +260,6 @@ def clickhouse_upsert_summary(
         test_helper_type=test_helper_type,
         ooni_run_link_id=ooni_run_link_id,
         is_verified=is_verified,
-        wc_x_flags=_pack_wc_x_flags(msm),
     )
 
     if buffer_writes:

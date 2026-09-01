@@ -9,7 +9,7 @@ import pytest
 import json
 
 from fastpath.utils import trivial_id
-from fastpath.db import extract_input_domain, _pack_wc_x_flags
+from fastpath.db import extract_input_domain
 import fastpath.core as fp
 import fastpath.core as core
 import fastpath.s3feeder as s3feeder
@@ -40,30 +40,6 @@ def loadj(fn):
 def test_trivial_id():
     tid = trivial_id(b"", {"measurement_start_time": "2021-02-03 10:11:12"})
     assert tid == "01202102037f9c2ba4e88f827d61604550760585"
-
-
-def test_pack_wc_x_flags():
-    msm = {"test_keys": {"x_blocking_flags": 33, "x_dns_flags": 4, "x_null_null_flags": 0}}
-    packed = _pack_wc_x_flags(msm)
-    assert packed == 33 | (4 << 6)  # 289
-    # round-trips back to the three fields
-    assert packed & 0x3F == 33
-    assert (packed >> 6) & 0x07 == 4
-    assert (packed >> 9) & 0x1F == 0
-
-    # all 14 bits set fits in a UInt16
-    allbits = {"test_keys": {"x_blocking_flags": 63, "x_dns_flags": 7, "x_null_null_flags": 31}}
-    assert _pack_wc_x_flags(allbits) == 0x3FFF
-    assert _pack_wc_x_flags(allbits) <= 0xFFFF
-
-    # missing/None fields default to 0
-    assert _pack_wc_x_flags({"test_keys": {"x_blocking_flags": 1}}) == 1
-    assert _pack_wc_x_flags({"test_keys": {"x_blocking_flags": None}}) == 0
-
-    # non-0.5 web_connectivity and other nettests have no x_blocking_flags -> None
-    assert _pack_wc_x_flags({"test_keys": {"blocking": "dns", "accessible": False}}) is None
-    assert _pack_wc_x_flags({"test_keys": {}}) is None
-    assert _pack_wc_x_flags({}) is None
 
 
 def test_extract_input_domain():
@@ -461,6 +437,79 @@ def test_score_web_connectivity_no_body(fprints):
         "blocking_isp": 0.0,
         "blocking_local": 0.0,
     }
+
+
+def _wc_lte_msm(**test_keys):
+    """Minimal Web Connectivity 0.5 (LTE) measurement"""
+    return {
+        "probe_cc": "IT",
+        "test_name": "web_connectivity",
+        "test_version": "0.5.28",
+        "test_keys": test_keys,
+    }
+
+
+def test_score_web_connectivity_lte_flags(fprints):
+    msm = _wc_lte_msm(
+        blocking="dns",
+        accessible=False,
+        x_blocking_flags=32,
+        x_dns_flags=2,
+        x_null_null_flags=1,
+    )
+    scores = fp.score_measurement(msm)
+    assert scores == {
+        "blocking_general": 1.0,
+        "blocking_global": 0.0,
+        "blocking_country": 0.0,
+        "blocking_isp": 0.0,
+        "blocking_local": 0.0,
+        "analysis": {
+            "x_blocking_flags": 32,
+            "x_dns_flags": 2,
+            "x_null_null_flags": 1,
+            "blocking_type": "dns",
+        },
+    }
+
+
+def test_score_web_connectivity_lte_flags_not_blocked(fprints):
+    msm = _wc_lte_msm(
+        blocking=False,
+        accessible=True,
+        x_blocking_flags=0,
+        x_dns_flags=0,
+        x_null_null_flags=0,
+    )
+    scores = fp.score_measurement(msm)
+    assert scores["analysis"] == {
+        "x_blocking_flags": 0,
+        "x_dns_flags": 0,
+        "x_null_null_flags": 0,
+    }
+
+
+def test_score_web_connectivity_lte_flags_defaults(fprints):
+    msm = _wc_lte_msm(blocking=False, accessible=True, x_blocking_flags=5)
+    scores = fp.score_measurement(msm)
+    assert scores["analysis"] == {
+        "x_blocking_flags": 5,
+        "x_dns_flags": 0,
+        "x_null_null_flags": 0,
+    }
+
+    msm = _wc_lte_msm(
+        blocking=False, accessible=True, x_blocking_flags=5, x_dns_flags=None
+    )
+    scores = fp.score_measurement(msm)
+    assert scores["analysis"]["x_dns_flags"] == 0
+
+
+def test_score_web_connectivity_04_has_no_flags(fprints):
+    # 0.4 measurements carry no x_ flags
+    msm = loadj("web_connectivity_odd_hdr")
+    scores = fp.score_measurement(msm)
+    assert "x_blocking_flags" not in scores.get("analysis", {})
 
 
 def test_score_web_connectivity_b64_incorrect(fprints):

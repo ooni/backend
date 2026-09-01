@@ -125,7 +125,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version, test_helper_address, test_helper_type, ooni_run_link_id, "
-        "is_verified, wc_x_flags ) VALUES "
+        "is_verified ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -156,7 +156,6 @@ def test_score_web_connectivity_bug_610_2(fprints):
             "test_helper_type": "https",
             "ooni_run_link_id": None,
             "is_verified" : "u",
-            "wc_x_flags": None,
         }
     ]
 
@@ -175,7 +174,7 @@ def test_score_browser_web(fprints):
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version, test_helper_address, test_helper_type, ooni_run_link_id, "
-        "is_verified, wc_x_flags ) VALUES "
+        "is_verified ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -206,7 +205,6 @@ def test_score_browser_web(fprints):
             "test_start_time": datetime.datetime(2023, 3, 20, 18, 26, 35),
             "test_version": "0.1.0",
             "is_verified" : "u",
-            "wc_x_flags": None,
         },
     ]
 
@@ -229,7 +227,7 @@ def test_score_openvpn():
         "scores, platform, anomaly, confirmed, msm_failure, blocking_type, domain, software_name, "
         "software_version, test_version, test_runtime, architecture, engine_name, "
         "engine_version, test_helper_address, test_helper_type, ooni_run_link_id, "
-        "is_verified, wc_x_flags ) VALUES "
+        "is_verified ) VALUES "
     )
     assert query == query_exp
     assert qparams == [
@@ -260,7 +258,6 @@ def test_score_openvpn():
             "test_helper_type": "",
             "ooni_run_link_id": None,
             "is_verified" : "u",
-            "wc_x_flags": None,
         }
     ]
 

@@ -982,6 +982,15 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
+    # Web Connectivity 0.5 (LTE) bitmasks. x_blocking_flags marks a 0.5 msmt;
+    # the other two default to 0 so the three keys always appear together.
+    if "x_blocking_flags" in tk:
+        scores["analysis"] = dict(
+            x_blocking_flags=tk.get("x_blocking_flags") or 0,
+            x_dns_flags=tk.get("x_dns_flags") or 0,
+            x_null_null_flags=tk.get("x_null_null_flags") or 0,
+        )
+
     if matches:
         scores["fingerprints"] = [minifp(fp) for fp in matches]
 
@@ -1021,7 +1030,7 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
     probe_blocking = tk.get("blocking")
     if probe_blocking in blocking_types:
         scores["blocking_general"] = 1.0
-        scores["analysis"] = {"blocking_type": tk["blocking"]}
+        scores.setdefault("analysis", {})["blocking_type"] = tk["blocking"]
 
     elif probe_blocking == False:
         pass
@@ -1034,7 +1043,7 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
 
     else:
         logbug(7, "unexpected value for blocking", msm)
-        scores["analysis"] = {"msg": "Unsupported blocking type"}
+        scores.setdefault("analysis", {})["msg"] = "Unsupported blocking type"
         scores["accuracy"] = 0.0
 
     # TODO: refactor
