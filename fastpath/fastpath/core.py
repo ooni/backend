@@ -1030,7 +1030,7 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
     probe_blocking = tk.get("blocking")
     if probe_blocking in blocking_types:
         scores["blocking_general"] = 1.0
-        scores.setdefault("analysis", {})["blocking_type"] = tk["blocking"]
+        scores["analysis"] = {"blocking_type": tk["blocking"]}
 
     elif probe_blocking == False:
         pass
@@ -1043,7 +1043,7 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
 
     else:
         logbug(7, "unexpected value for blocking", msm)
-        scores.setdefault("analysis", {})["msg"] = "Unsupported blocking type"
+        scores["analysis"] = {"msg": "Unsupported blocking type"}
         scores["accuracy"] = 0.0
 
     # TODO: refactor
