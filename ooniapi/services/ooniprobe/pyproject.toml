@@ -13,8 +13,10 @@ dependencies = [
   "sqlalchemy ~= 2.0.27",
   "ujson ~= 5.9.0",
   "urllib3 ~= 2.1.0",
-  "python-dateutil ~= 2.8.2",
+  "python-dateutil ~= 2.9.0",
+  "pycountry ~= 26.2.16",
   "pydantic-settings ~= 2.1.0",
+  "pydantic_extra_types ~= 2.11.1",
   "statsd ~= 4.0.1",
   "uvicorn ~= 0.25.0",
   "psycopg2 ~= 2.9.9",
@@ -30,7 +32,7 @@ dependencies = [
   "boto3 ~= 1.39.3",
   "boto3-stubs[s3] ~= 1.39.3",
   "mypy-boto3-s3 ~= 1.39.5",
-  "ooniauth-py==0.2.0"
+  "ooniauth-py==0.3.3"
 ]
 
 readme = "README.md"
@@ -75,6 +77,7 @@ dependencies = [
   "pytest-asyncio",
   "freezegun",
   "pytest-docker",
+  "pyinstrument"
 ]
 path = ".venv/"
 

@@ -80,6 +80,11 @@ class Metrics:
         "How long it took to post the measurement to the fastpath",
     )
 
+    ANONC_VERIFICATION_TIMING = Histogram(
+        "measurement_verification_seconds",
+        "How long it took to run the anonymous credentials verification",
+    )
+
     SEND_S3_TIMING = Histogram(
         "measurement_s3_upload_seconds",
         "How long it took to send the measurement to s3",

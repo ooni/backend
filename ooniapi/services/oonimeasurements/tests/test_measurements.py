@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from freezegun import freeze_time
 from clickhouse_driver import Client as Clickhouse
+from oonimeasurements.common.anonymous_credentials import VerificationStatus
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
@@ -44,6 +45,36 @@ def test_list_measurements(client):
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 100
 
+
+
+@freeze_time("2024-01-30T00:00:00Z")
+def test_list_measurements_verification_status(client, db):
+    """List API verification_status must match fastpath.is_verified codes."""
+    ch = Clickhouse.from_url(db)
+    response = client.get(route, params={"limit": 50})
+    assert response.status_code == 200
+
+    results = response.json()["results"]
+    assert results
+
+    for result in results:
+        uid = result["measurement_uid"]
+        assert "verification_status" in result
+        row = query_click_one_row(
+            ch,
+            sql.text(
+                "SELECT is_verified FROM fastpath "
+                "WHERE measurement_uid = :uid LIMIT 1"
+            ),
+            {"uid": uid},
+        )
+        assert row, f"no fastpath row for {uid}"
+        is_verified = row["is_verified"]
+        expected = VerificationStatus.from_code(is_verified).value
+        assert result["verification_status"] == expected, (
+            f"{uid}: is_verified={is_verified} expected {expected}, "
+            f"got {result['verification_status']}"
+        )
 
 @freeze_time("2024-03-01T00:00:00Z")
 def test_list_measurements_with_since_and_until(client):
@@ -358,6 +389,7 @@ def test_get_measurement_meta_basic(client):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
+        "verification_status" : "unverified"
     }
 
     # You can also query by measurment uid
@@ -398,6 +430,7 @@ def test_get_measurement_meta_input_none_from_fp(client):
         "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
         "test_name": "http_invalid_request_line",
         "test_start_time": "2021-07-09T00:00:16Z",
+        "verification_status" : "unverified"
     }
 
 
@@ -426,6 +459,7 @@ def test_get_measurement_meta_full(client, monkeypatch):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
+        "verification_status" : "unverified"
     }
     assert raw_msm
 

@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from . import models
 from .__about__ import VERSION
+from .common.profile_middleware import ProfileMiddleware
 from .common.clickhouse_utils import query_click
 from .common.config import Settings
 from .common.dependencies import ClickhouseDep, SettingsDep, get_settings
@@ -86,6 +87,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+settings = get_settings()
+if settings.profiling_active:
+    app.add_middleware(
+        ProfileMiddleware,
+        report_path = settings.profiling_report_path,
+        whitelist = ("/api/v1/submit_measurement",)
+    )
 
 app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
@@ -186,6 +195,14 @@ async def health(
         "build_label": build_label,
     }
 
+    if settings.profiling_active:
+        try:
+            import pyinstrument  # noqa: F401
+        except ImportError:
+            # In case we set profiling active in a profile that doesn't includes
+            # development tools
+            errors.append("profiling_active_without_pyinstrument")
+
     if len(errors):
         log.error(f"Health check errors detected: {errors}")
 
@@ -209,7 +226,7 @@ def check_ooniauth_health():
     # These keys are innocuous, just created to test this
     secret_key = "AUGQSPO28+QLlf8fKhQjqAD2Ehjn0Q471Yavs7n0qsYJ0nnZ1G/Y2LqvjC3Stq0o9Ka6lB2Xq9EDIEOFhQsjbQQDAAAAAAAAAGk422WHZ5MEPCTMbaj4sDvW27Yvl+pRzDuuTasyEpIDRCEzgL3tIOErnbYtca/68gHUxIfXRCDtcSMEvxVhSAynRFLeT0pXf5fRFwX4gbzNVgvzh0MthADyh7UUPmj6BQ=="
     public_parameters = "AaJpxHsB+x4axWCrFxohF+ML5inYWbPbVQro9YGxb9NVAcgzlHrnd7PLfwWQe69W3ZLcGe4R/CnbFBwhCfdfvvpCAwAAAAAAAAAkAklNBr7fMUrdkeNT360ZsLTGN8A7kKMX6b60tJ5YCBLJ9QJdwnkp12VHPgND2/chraDFw8snqfq0JDZI2tJ04sqKzWi+y57qzh0HG+pkZ3xe7RceyE4isTs7ZRzriwA="
-    sign_request = "6iOCB9U1J7UowHfVGq0zoWiP2zSi7589rqS7bdNBC2NlAAAAAAAAAAPW0h/qB7voDedoLiDttZwawVv7xdlZY7GkbijU+o+RAAIAAAAKx1aegNytJO5oarCsIx0t5FQpqP5Wm54k+ECb9nVh7wqQpREN1uu20ZqgU4iW8XDwzOnw8IfWJBSv7FTaF0ne"
+    sign_request = "cmMXB7zv9Dw2/BG7Jg6UF4/F1c8/I6L1I/Ho7wgf1l9lAAAAAAAAAAHvLcAyEvy8L82lVWoL1kQq8Okc8vo40oq8DctqvAYcAAIAAAAGaegxFhhwDPfWPET8p2g8nSY2QEVBn21+uLED8ZNFzgbszewhiFlvRAA0unHZ2Ntje0I3rvjJHNmv5eJC2H56"
 
     server = ServerState.from_creds(public_parameters, secret_key)
     server.handle_registration_request(sign_request)
