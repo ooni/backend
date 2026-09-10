@@ -22,6 +22,7 @@ from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
 
 from ...common.routers import BaseModel
 from ...utils.api import normalize_datetime
+from ...utils.sql import group_by_date, where_by_date
 
 router = APIRouter()
 
@@ -31,49 +32,6 @@ log = logging.getLogger()
 def set_dload(resp, fname: str):
     """Add header to make response downloadable"""
     resp.headers["Content-Disposition"] = f"attachment; filename={fname}"
-
-
-def group_by_date(since, until, time_grain, cols, colnames, group_by):
-    if since and until:
-        delta = until - since
-    else:
-        delta = None
-
-    # on time_grain = "auto" or empty the smallest allowed gran. is used
-    ranges = (
-        (7, ("hour", "day", "auto")),
-        (30, ("day", "week", "auto")),
-        (365, ("day", "week", "month", "auto")),
-        (9999999, ("day", "week", "month", "year", "auto")),
-    )
-    if delta is None or delta <= timedelta():
-        raise Exception("Invalid since and until values")
-
-    for thresh, allowed in ranges:
-        if delta > timedelta(days=thresh):
-            continue
-        if time_grain not in allowed:
-            a = ", ".join(allowed)
-            msg = f"Choose time_grain between {a} for the given time range"
-            raise Exception(msg)
-        if time_grain == "auto":
-            time_grain = allowed[0]
-        break
-
-    # TODO: check around query weight / response size.
-    # Also add support in CSV format.
-    gmap = dict(
-        hour="toStartOfHour",
-        day="toDate",
-        week="toStartOfWeek",
-        month="toStartOfMonth",
-    )
-    fun = gmap[time_grain]
-    tcol = "measurement_start_day"  # TODO: support dynamic axis names
-    cols.append(sql_text(f"{fun}(measurement_start_time) AS {tcol}"))
-    colnames.append(tcol)
-    group_by.append(column(tcol))
-    return time_grain
 
 
 def validate_axis_name(axis):
@@ -349,12 +307,15 @@ async def get_measurements(
         where.append(sql_text("ooni_run_link_id IN :ooni_run_link_id_s"))
         query_params["ooni_run_link_id_s"] = ooni_run_link_id_s
 
-    if since:
-        where.append(sql_text("measurement_start_time >= :since"))
-        query_params["since"] = since
+    try:
+        time_grain = where_by_date(since, until, time_grain, where)
+    except Exception as e:
+        return jerror(str(e), v=0)
 
+    # still need to set the query params (where_by_date uses :since / :until)
+    if since:
+        query_params["since"] = since
     if until:
-        where.append(sql_text("measurement_start_time < :until"))
         query_params["until"] = until
 
     if test_name_s:
