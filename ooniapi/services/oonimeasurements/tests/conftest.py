@@ -1,3 +1,4 @@
+import logging
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -7,13 +8,20 @@ import pytest
 import requests
 import valkey
 from clickhouse_driver import Client as ClickhouseClient
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
+from freezegun import freeze_time
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
 from oonimeasurements.main import create_app, setup_router
 
 THIS_DIR = Path(__file__).parent.resolve()
+
+
+@pytest.fixture
+def log():
+    return logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -202,3 +210,10 @@ def set_since_and_until_params(since, until):
     params = {"since": since, "until": until}
 
     return params
+
+
+@pytest.fixture()
+def fixed_time():
+    fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
+    with freeze_time(fixed_now):
+        yield fixed_now
