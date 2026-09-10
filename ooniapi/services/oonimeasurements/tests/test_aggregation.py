@@ -306,6 +306,34 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
     assert r.json()["msg"] == exp
 
 
+def test_aggregation_no_axis_time_grain_year(client):
+    # 0-dimensional data, but time_grain=year still has to go through
+    # where_by_date() to build the WHERE clause. Regression test for a
+    # missing "year" entry in utils.sql.gmap/_param_cast, which made this
+    # raise an unhandled KeyError instead of returning results.
+    url = "aggregation?since=2020-07-09&until=2022-07-11&time_grain=year"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r["dimension_count"] == 0
+    assert r["result"]["measurement_count"] > 0
+
+
+def test_aggregation_x_axis_only_time_grain_year(client):
+    # 1 dimension: X, grouped by year. Regression test for a missing
+    # "year" entry in utils.sql.gmap/_param_cast, which made group_by_date()
+    # raise an unhandled KeyError for a request that _resolve_time_grain()
+    # otherwise considers perfectly valid (a >365 day range explicitly
+    # asking for time_grain=year).
+    url = "aggregation?since=2020-07-09&until=2022-07-11&time_grain=year&axis_x=measurement_start_day"
+    r = api(client, url)
+    r.pop("db_stats", None)
+    assert r["dimension_count"] == 1
+    assert len(r["result"]) > 0
+    for row in r["result"]:
+        # measurement_start_day should be rounded down to Jan 1st of its year
+        assert row["measurement_start_day"].endswith("-01-01"), row
+
+
 def test_aggregation_x_axis_only_hour(client):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"
