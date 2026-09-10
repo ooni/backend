@@ -7,7 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: debian:11
+    container: debian:13
     steps:
       - uses: actions/checkout@v2
       - name: Install deps
