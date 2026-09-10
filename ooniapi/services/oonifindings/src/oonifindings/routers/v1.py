@@ -232,7 +232,10 @@ def get_oonifinding_by_id(
     authorization: str = Header("authorization"),
 ):
     """
-    Returns an incident
+    Returns an incident by id.
+
+    It supports **fetching by slug**, if the provided id is an integer, we
+    assume it's an id. Otherwise we assume it's the slug.
     """
     log.debug("showing incident")
 

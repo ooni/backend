@@ -982,6 +982,15 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
+    # Web Connectivity 0.5 (LTE) bitmasks. x_blocking_flags marks a 0.5 msmt;
+    # the other two default to 0 so the three keys always appear together.
+    if "x_blocking_flags" in tk:
+        scores["analysis"] = dict(
+            x_blocking_flags=tk.get("x_blocking_flags") or 0,
+            x_dns_flags=tk.get("x_dns_flags") or 0,
+            x_null_null_flags=tk.get("x_null_null_flags") or 0,
+        )
+
     if matches:
         scores["fingerprints"] = [minifp(fp) for fp in matches]
 

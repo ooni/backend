@@ -39,7 +39,7 @@ from ...common.prio import (
     generate_test_list,
 )
 from ...common.routers import BaseModel
-from ...common.utils import setcacheresponse, setnocacheresponse
+from ...common.utils import setcacheresponse, setnocacheresponse, generate_report_id
 from ...dependencies import (
     ASNCCReaderDep,
     ManifestDep,
@@ -53,7 +53,6 @@ from ...dependencies import (
 from ...utils import (
     check_measurement_meta,
     extract_probe_ipaddr,
-    generate_report_id,
     geolookup_probe,
     get_cc_asn,
     metadata_from_measurement_content,
@@ -409,13 +408,8 @@ def check_in(
         }
     )
 
-    # set webconnectivity_0.5 feature flag for some probes
-    # Temporarily disabled while we work towards deploying this in prod:
-    # https://github.com/ooni/probe/issues/2674
-    #
-    # octect = extract_probe_ipaddr_octect(1, 0)
-    # if octect in (34, 239):
-    #    conf["features"]["webconnectivity_0.5"] = True
+    # set webconnectivity_0.5 feature flag
+    conf["features"]["webconnectivity_0.5"] = True
 
     conf["test_helpers"] = generate_test_helpers_conf()
 
@@ -531,42 +525,34 @@ def generate_test_helpers_conf() -> Dict:
             {"address": "37.218.241.93:57004", "type": "legacy"},
         ],
         "http-return-json-headers": [
-            {"address": "http://37.218.241.94:80", "type": "legacy"},
-            {"address": "http://37.218.241.94:80", "type": "legacy"},
+            {"address": "http://206.81.31.205:80", "type": "legacy"},
+            {"address": "http://206.81.31.205:80", "type": "legacy"},
         ],
         "ssl": [
             {"address": "https://37.218.241.93", "type": "legacy"},
             {"address": "https://37.218.241.93", "type": "legacy"},
         ],
         "tcp-echo": [
-            {"address": "37.218.241.93", "type": "legacy"},
-            {"address": "37.218.241.93", "type": "legacy"},
+            {"address": "134.209.237.204", "type": "legacy"},
+            {"address": "134.209.237.204", "type": "legacy"},
         ],
         "traceroute": [
             {"address": "37.218.241.93", "type": "legacy"},
             {"address": "37.218.241.93", "type": "legacy"},
-        ],
-        "web-connectivity": [
-            {"address": "httpo://o7mcp5y4ibyjkcgs.onion", "type": "legacy"},
-            {"address": "https://wcth.ooni.io", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-            {"address": "httpo://y3zq5fwelrzkkv3s.onion", "type": "legacy"},
-            {"address": "https://wcth.ooni.io", "type": "https"},
-            {
-                "address": "https://d33d1gs9kpq1c5.cloudfront.net",
-                "front": "d33d1gs9kpq1c5.cloudfront.net",
-                "type": "cloudfront",
-            },
-        ],
+        ]
     }
+
     conf["web-connectivity"] = random_web_test_helpers(
         [
-            "https://6.th.ooni.org",
-            "https://5.th.ooni.org",
+            "https://wcth0.fra1.ooni.org",
+            "https://wcth1.fra1.ooni.org",
+            "https://wcth2.fra1.ooni.org",
+            # These are the internal addresses of the test helpers.
+            # Keeping for the moment to assess potential blocking of
+            # *.io vs *.org
+            "https://wcth0.fra1.prod.ooni.io",
+            "https://wcth1.fra1.prod.ooni.io",
+            "https://wcth2.fra1.prod.ooni.io"
         ]
     )
     conf["web-connectivity"].append(
@@ -576,6 +562,8 @@ def generate_test_helpers_conf() -> Dict:
             "type": "cloudfront",
         }
     )
+
+    assert "web-connectivity" in conf, f"missing web-connectivity test helper key in {conf}"
     return conf
 
 
@@ -1059,7 +1047,7 @@ async def submit_measurement(
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")
-    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{tn}/{msmt_uid}.post"
+    s3_key = f"postcans/{ts_prefix}/{ts_prefix}_{cc}_{test_name}/{msmt_uid}.post"
     try:
         await run_in_threadpool(
             request.app.state.s3_client.upload_fileobj,
