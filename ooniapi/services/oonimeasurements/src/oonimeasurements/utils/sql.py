@@ -8,6 +8,7 @@ gmap = dict(
     day="toDate",
     week="toStartOfWeek",
     month="toStartOfMonth",
+    year="toStartOfYear",
 )
 
 
@@ -54,6 +55,7 @@ _param_cast = {
     "day": "toDate",
     "week": "toDateTime",
     "month": "toDateTime",
+    "year": "toDateTime",
 }
 
 
