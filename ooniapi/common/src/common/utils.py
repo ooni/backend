@@ -3,9 +3,12 @@ from io import StringIO
 from sys import byteorder
 from os import urandom
 import logging
+from base64 import b64encode
+from datetime import datetime, timezone
 from typing import List
 from fastapi import Response
 from fastapi.responses import JSONResponse
+from .config import Settings
 
 
 log = logging.getLogger(__name__)
@@ -79,3 +82,12 @@ def generate_random_intuid(collector_id: str) -> int:
         collector_id = 0
     randint = int.from_bytes(urandom(4), byteorder)
     return randint * 100 + collector_id
+
+
+def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    cid = settings.collector_id
+    rand = b64encode(urandom(12), b"oo").decode()
+    stn = test_name.replace("_", "")
+    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
+    return rid

@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from . import models
 from .__about__ import VERSION
+from .common.profile_middleware import ProfileMiddleware
 from .common.clickhouse_utils import query_click
 from .common.config import Settings
 from .common.dependencies import ClickhouseDep, SettingsDep, get_settings
@@ -86,6 +87,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+settings = get_settings()
+if settings.profiling_active:
+    app.add_middleware(
+        ProfileMiddleware,
+        report_path = settings.profiling_report_path,
+        whitelist = ("/api/v1/submit_measurement",)
+    )
 
 app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
@@ -185,6 +194,14 @@ async def health(
         "version": VERSION,
         "build_label": build_label,
     }
+
+    if settings.profiling_active:
+        try:
+            import pyinstrument  # noqa: F401
+        except ImportError:
+            # In case we set profiling active in a profile that doesn't includes
+            # development tools
+            errors.append("profiling_active_without_pyinstrument")
 
     if len(errors):
         log.error(f"Health check errors detected: {errors}")
