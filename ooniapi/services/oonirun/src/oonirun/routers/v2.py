@@ -23,6 +23,7 @@ from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_none,
+    get_client_role,
 )
 from ..common.prio import generate_test_list
 from ..common.dependencies import ClickhouseDep, PostgresDep
@@ -514,6 +515,7 @@ def make_oonirun_link(
     oonirun_link_id: str,
     account_id: Optional[str],
     revision: Optional[int] = None,
+    is_admin: bool = False,
 ):
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
@@ -548,7 +550,7 @@ def make_oonirun_link(
         date_created=date_created,
         date_updated=res.date_updated,
         is_mine=is_mine,
-        author=res.author if is_mine or res.share_email else None,
+        author=res.author if is_mine or is_admin or res.share_email else None,
         revision=str(revision),
         share_email=res.share_email
     )
@@ -699,6 +701,9 @@ def get_oonirun_link_revision(
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
+    is_admin = (
+        get_client_role(authorization, settings.jwt_encryption_key) == "admin"
+    )
 
     try:
         revision = int(revision_number)
@@ -708,7 +713,11 @@ def get_oonirun_link_revision(
         revision = None
 
     oonirun_link = make_oonirun_link(
-        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id, revision=revision
+        db=db,
+        oonirun_link_id=oonirun_link_id,
+        account_id=account_id,
+        revision=revision,
+        is_admin=is_admin,
     )
     return oonirun_link
 
@@ -733,9 +742,15 @@ def get_latest_oonirun_link(
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
+    is_admin = (
+        get_client_role(authorization, settings.jwt_encryption_key) == "admin"
+    )
 
     oonirun_link = make_oonirun_link(
-        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id
+        db=db,
+        oonirun_link_id=oonirun_link_id,
+        account_id=account_id,
+        is_admin=is_admin,
     )
     return oonirun_link
 
@@ -766,6 +781,9 @@ def list_oonirun_links(
     """
     log.debug("list oonirun")
     account_id = get_account_id_or_none(authorization, settings.jwt_encryption_key)
+    is_admin = (
+        get_client_role(authorization, settings.jwt_encryption_key) == "admin"
+    )
 
     q = db.query(models.OONIRunLink)
     if not is_expired:
@@ -791,7 +809,11 @@ def list_oonirun_links(
             short_description_intl=row.short_description_intl,
             description=row.description,
             description_intl=row.description_intl,
-            author=row.author if account_id == row.creator_account_id or row.share_email else None,
+            author=(
+                row.author
+                if account_id == row.creator_account_id or is_admin or row.share_email
+                else None
+            ),
             nettests=nettests,
             icon=row.icon,
             expiration_date=row.expiration_date,

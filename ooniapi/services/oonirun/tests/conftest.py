@@ -111,7 +111,9 @@ def client_with_other_user_role(client):
 @pytest.fixture
 def client_with_admin_role(client):
     client = TestClient(app)
-    jwt_token = create_session_token("0" * 16, "admin")
+    jwt_token = create_session_token(
+        "9" * 16, "admin", email_address="admin@example.com"
+    )
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
 

@@ -246,6 +246,46 @@ def test_oonirun_share_email_can_be_toggled_on_edit(
     assert r.json()["author"] == z["author"]
 
 
+def test_oonirun_share_email_admin_always_sees_author(
+    client, client_with_user_role, client_with_admin_role
+):
+    """
+    An admin (who is not the owner) should always see the author, even
+    when share_email is False.
+    """
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "share_email admin visibility"
+    z["share_email"] = False
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 200, r.json()
+    oonirun_link_id = r.json()["oonirun_link_id"]
+
+    # Sanity check: admin is not the owner of this link
+    r = client_with_admin_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
+    assert r.status_code == 200, r.json()
+    j = r.json()
+    assert j["is_mine"] == False
+    assert j["author"] == z["author"]
+    assert j["share_email"] == False
+
+    # Same for fetching by revision number
+    r = client_with_admin_role.get(
+        f"/api/v2/oonirun/links/{oonirun_link_id}/full-descriptor/1"
+    )
+    assert r.status_code == 200, r.json()
+    assert r.json()["author"] == z["author"]
+
+    # and for the list endpoint
+    r = client_with_admin_role.get("/api/v2/oonirun/links")
+    assert r.status_code == 200, r.json()
+    found = False
+    for d in r.json()["oonirun_links"]:
+        if d["oonirun_link_id"] == oonirun_link_id:
+            found = True
+            assert d["author"] == z["author"]
+    assert found == True
+
+
 def test_oonirun_validation(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     r = client.post("/api/v2/oonirun/links", json=z)
