@@ -180,6 +180,9 @@ class OONIRunLinkBase(BaseModel):
         default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
+    share_email: Optional[bool] = Field(
+        description="Whether to share this email with other users"
+    )
 
 
 class OONIRunLink(OONIRunLinkBase):
@@ -197,9 +200,6 @@ class OONIRunLink(OONIRunLinkBase):
     is_mine: Optional[bool] = Field(
         description="flag indiciating indicating if the ooni run link was created by the current user",
         default=False,
-    )
-    share_email: Optional[bool] = Field(
-        description="Whether to share this email with other users"
     )
 
     @computed_field(
@@ -395,6 +395,7 @@ def edit_oonirun_link(
     oonirun_link.color = edit_request.color
     oonirun_link.expiration_date = edit_request.expiration_date
     oonirun_link.date_updated = now
+    oonirun_link.share_email = edit_request.share_email
     db.commit()
 
     return OONIRunLink(
