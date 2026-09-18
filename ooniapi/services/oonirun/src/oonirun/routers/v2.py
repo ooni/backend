@@ -135,7 +135,7 @@ class OONIRunLinkBase(BaseModel):
     description: str = Field(
         title="full description of the ooni run link", min_length=2
     )
-    author: str = Field(
+    author: str | None = Field(
         title="public email address of the author name of the ooni run link",
         min_length=2,
         max_length=100,
@@ -197,6 +197,9 @@ class OONIRunLink(OONIRunLinkBase):
     is_mine: Optional[bool] = Field(
         description="flag indiciating indicating if the ooni run link was created by the current user",
         default=False,
+    )
+    share_email: Optional[bool] = Field(
+        description="Whether to share this email with other users"
     )
 
     @computed_field(
@@ -766,7 +769,7 @@ def list_oonirun_links(
             short_description_intl=row.short_description_intl,
             description=row.description,
             description_intl=row.description_intl,
-            author=row.author,
+            author=row.author if is_mine or row.share_email else None,
             nettests=nettests,
             icon=row.icon,
             expiration_date=row.expiration_date,
@@ -774,6 +777,7 @@ def list_oonirun_links(
             date_created=row.date_created,
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,
+            share_email=row.share_email
         )
         links.append(oonirun_link)
     log.debug(f"Returning {len(links)} ooni run links")
