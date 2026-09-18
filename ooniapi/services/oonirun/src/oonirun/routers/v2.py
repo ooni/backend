@@ -527,6 +527,7 @@ def make_oonirun_link(
     assert isinstance(revision, int)
 
     nettests, date_created = get_nettests(res, revision)
+    is_mine = account_id == res.creator_account_id
     return OONIRunLink(
         oonirun_link_id=res.oonirun_link_id,
         name=res.name,
@@ -541,9 +542,10 @@ def make_oonirun_link(
         nettests=nettests,
         date_created=date_created,
         date_updated=res.date_updated,
-        is_mine=account_id == res.creator_account_id,
-        author=res.author,
+        is_mine=is_mine,
+        author=res.author if is_mine or res.share_email else None,
         revision=str(revision),
+        share_email=res.share_email
     )
 
 
@@ -709,7 +711,7 @@ def get_latest_oonirun_link(
     db: PostgresDep,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
-):
+) -> OONIRunLink:
     """Fetch OONIRun descriptor by creation time or the newest one"""
     # Return the latest version of the translations
     log.debug("fetching oonirun")
