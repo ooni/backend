@@ -34,6 +34,13 @@ class OONIRunLink(Base):
     author: Mapped[str] = mapped_column(nullable=True)
     icon: Mapped[str] = mapped_column(nullable=True)
     color: Mapped[str] = mapped_column(nullable=True)
+    share_email: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=True,
+        description=
+        "Whether or not the email should be shown in the UI and "
+        "shared with other users other than the owner"
+    )
 
     nettests: Mapped[List["OONIRunLinkNettest"]] = relationship(
         back_populates="oonirun_link",
