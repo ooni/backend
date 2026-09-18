@@ -37,9 +37,11 @@ class OONIRunLink(Base):
     share_email: Mapped[bool] = mapped_column(
         nullable=False,
         default=True,
-        description=
-        "Whether or not the email should be shown in the UI and "
-        "shared with other users other than the owner"
+        server_default=sa.true(),
+        comment=(
+            "Whether or not the email should be shown in the UI and "
+            "shared with other users other than the owner"
+        ),
     )
 
     nettests: Mapped[List["OONIRunLinkNettest"]] = relationship(

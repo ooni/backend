@@ -180,8 +180,9 @@ class OONIRunLinkBase(BaseModel):
         default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
-    share_email: Optional[bool] = Field(
-        description="Whether to share this email with other users"
+    share_email: bool = Field(
+        default=True,
+        description="Whether to share this email with other users",
     )
 
 
@@ -256,6 +257,7 @@ def create_oonirun_link(
         icon=create_request.icon,
         color=create_request.color,
         expiration_date=create_request.expiration_date,
+        share_email=create_request.share_email,
         date_created=now,
         date_updated=now,
     )
@@ -294,6 +296,7 @@ def create_oonirun_link(
         icon=db_oonirun_link.icon,
         color=db_oonirun_link.color,
         expiration_date=db_oonirun_link.expiration_date,
+        share_email=db_oonirun_link.share_email,
         date_created=db_oonirun_link.date_created,
         date_updated=db_oonirun_link.date_updated,
         nettests=nettest_list,
@@ -410,6 +413,7 @@ def edit_oonirun_link(
         icon=oonirun_link.icon,
         color=oonirun_link.color,
         expiration_date=oonirun_link.expiration_date,
+        share_email=oonirun_link.share_email,
         oonirun_link_id=oonirun_link.oonirun_link_id,
         date_created=oonirun_link.date_created,
         date_updated=oonirun_link.date_updated,
