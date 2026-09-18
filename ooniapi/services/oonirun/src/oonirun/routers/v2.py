@@ -688,7 +688,12 @@ def get_oonirun_link_revision(
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ):
-    """Fetch an OONI Run link by specifying the revision number"""
+    """
+    Fetch an OONI Run link by specifying the revision number
+
+    Note that the author field might be null for other users
+    if the author chooses not to share their email.
+    """
     # Return the latest version of the translations
     log.debug("fetching oonirun")
     account_id = get_account_id_or_none(
@@ -717,7 +722,12 @@ def get_latest_oonirun_link(
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ) -> OONIRunLink:
-    """Fetch OONIRun descriptor by creation time or the newest one"""
+    """
+    Fetch OONIRun descriptor by creation time or the newest one
+
+    Note that the author field might be null for other users
+    if the author chooses not to share their email.
+    """
     # Return the latest version of the translations
     log.debug("fetching oonirun")
     account_id = get_account_id_or_none(
@@ -748,7 +758,12 @@ def list_oonirun_links(
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ) -> OONIRunLinkList:
-    """List OONIRun descriptors"""
+    """
+    List OONIRun descriptors
+
+    Note that the author field might be null for other users
+    if the author chooses not to share their email.
+    """
     log.debug("list oonirun")
     account_id = get_account_id_or_none(authorization, settings.jwt_encryption_key)
 
