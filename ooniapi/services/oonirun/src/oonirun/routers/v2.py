@@ -771,7 +771,7 @@ def list_oonirun_links(
             short_description_intl=row.short_description_intl,
             description=row.description,
             description_intl=row.description_intl,
-            author=row.author if is_mine or row.share_email else None,
+            author=row.author if account_id == row.creator_account_id or row.share_email else None,
             nettests=nettests,
             icon=row.icon,
             expiration_date=row.expiration_date,
