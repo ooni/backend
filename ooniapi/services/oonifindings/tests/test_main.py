@@ -16,7 +16,7 @@ def test_health_good(client):
 def test_health_bad(client_with_bad_settings):
     r = client_with_bad_settings.get("health")
     j = r.json()
-    assert r.status_code == 200
+    assert r.status_code == 503
     assert j["status"] == "fail", j
 
 

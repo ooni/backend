@@ -4,32 +4,28 @@ VPN Services
 Insert VPN credentials into database.
 """
 
+import io
 import itertools
 import logging
-from typing import List, TypedDict, Tuple
-import io
-import json
-
-from fastapi import Request
-from typing import Dict, Any
-
-from fastapi import HTTPException
-
-from mypy_boto3_s3 import S3Client
-from sqlalchemy.orm import Session
-import pem
-from base64 import b64encode
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from os import urandom
+from typing import Any, Dict, List, Tuple, TypedDict
 
-import httpx
+import pem
+import requests
+import ujson
+from fastapi import HTTPException, Request
+from mypy_boto3_s3 import S3Client
+from sqlalchemy.orm import Session
 
-from .metrics import Metrics
-from .common.config import Settings
+from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
+
 from .common.clickhouse_utils import insert_click
 from .common.dependencies import ClickhouseDep
-from .dependencies import CCReaderDep, ASNReaderDep
-from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
+from .common.errors import AddressNotFoundError
+from .dependencies import ASNCCReaderDep
+from .metrics import Metrics
 
 RISEUP_CA_URL = "https://api.black.riseup.net/ca.crt"
 RISEUP_CERT_URL = "https://api.black.riseup.net/3/cert"
@@ -51,15 +47,17 @@ class OpenVPNEndpoint(TypedDict):
 
 
 def fetch_riseup_ca() -> str:
-    r = httpx.get(RISEUP_CA_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    r = requests.get(RISEUP_CA_URL)
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_riseup_cert() -> str:
-    r = httpx.get(RISEUP_CERT_URL)
-    r.raise_for_status()
-    return r.text.strip()
+    r = requests.get(RISEUP_CERT_URL)
+    with r:
+        r.raise_for_status()
+        return r.text.strip()
 
 
 def fetch_openvpn_config() -> OpenVPNConfig:
@@ -72,7 +70,7 @@ def fetch_openvpn_config() -> OpenVPNConfig:
 def fetch_openvpn_endpoints() -> List[OpenVPNEndpoint]:
     endpoints = []
 
-    r = httpx.get(RISEUP_ENDPOINT_URL)
+    r = requests.get(RISEUP_ENDPOINT_URL)
     r.raise_for_status()
     j = r.json()
     for ep in j["gateways"]:
@@ -100,7 +98,7 @@ def upsert_endpoints(
     db: Session, new_endpoints: List[OpenVPNEndpoint], provider: OONIProbeVPNProvider
 ):
     new_endpoints_map = {
-        f'{ep["address"]}-{ep["protocol"]}-{ep["transport"]}': ep
+        f"{ep['address']}-{ep['protocol']}-{ep['transport']}": ep
         for ep in new_endpoints
     }
     for endpoint in provider.endpoints:
@@ -124,14 +122,129 @@ def upsert_endpoints(
         )
 
 
-def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    cid = settings.collector_id
-    rand = b64encode(urandom(12), b"oo").decode()
-    stn = test_name.replace("_", "")
-    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
-    return rid
+@dataclass
+class MeasurementMetadata:
+    """Metadata extracted from a measurement body's `content` object."""
 
+    test_name: str
+    probe_cc: str
+    probe_asn: str
+    platform: str
+    software_name: str
+    software_version: str
+
+
+def metadata_from_measurement_content(content: dict[str, Any]) -> MeasurementMetadata:
+    """
+    Parses metadata from the `content` key in a measurement body, then
+    formats fields the same way as `generate_report_id` / `open_report` do.
+    """
+
+    annotations = content.get("annotations", {})
+    if not isinstance(annotations, dict):
+        annotations = {}
+
+    return MeasurementMetadata(
+        test_name=content.get("test_name", ""),
+        probe_cc=content.get("probe_cc", ""),
+        probe_asn=content.get("probe_asn", ""),
+        platform=annotations.get("platform", ""),
+        software_name=content.get("software_name", ""),
+        software_version=content.get("software_version", ""),
+    )
+
+def check_measurement_meta(
+    test_name: str,
+    probe_cc: str,
+    probe_asn: str,
+):
+    """
+    Checks metadata consistency, raising an HTTPException and stopping
+    ingestion when an inconsistency is detected.
+
+    This metadata is expected to come from the measurement body
+    """
+
+    cc_ok = (
+        len(probe_cc) == 2 and
+        probe_cc.isupper() and
+        probe_cc.isalnum()
+    )
+    test_name_len_ok = 1 < len(test_name) <= 30
+    test_name_lower_ok = test_name.islower()
+    asn_starts_as_ok = probe_asn.startswith("AS")
+    asn_len_ok = len(probe_asn) >= 3 and len(probe_asn) <= 12
+    asn_no_leading_zero_ok = not (len(probe_asn) > 3 and probe_asn.startswith("AS0"))
+
+    if not (
+        cc_ok and test_name_len_ok and
+        test_name_lower_ok and asn_starts_as_ok and asn_len_ok and
+        asn_no_leading_zero_ok
+    ):
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_metadata").inc()
+        log.error(
+            "Bad metadata in measurement body: test_name="
+            f"{test_name[:30]}, cc={probe_cc}"
+        )
+        reasons = []
+        if not cc_ok:
+            reasons.append("bad_cc")
+        if not test_name_len_ok:
+            reasons.append("tn_len")
+        if not test_name_lower_ok:
+            reasons.append("tn_no_lower")
+        if not asn_len_ok:
+            reasons.append("asn_len")
+        if not asn_starts_as_ok:
+            reasons.append("asn_no_as_prefix")
+        if not asn_no_leading_zero_ok:
+            reasons.append("asn_leading_zero")
+
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "bad_metadata",
+                "message": f"Errors: {reasons}"
+            },
+        )
+
+    error = None
+    asn = str(probe_asn).strip().upper().lstrip("AS")
+    try:
+        asn_i = int(asn)
+        if asn_i == 0:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_0").inc()
+            Metrics.MSMNT_DISCARD_ASN0.inc()
+            log.info("Discarding ASN == 0")
+            error = "asn_0"
+            message = "Measurement discarded, ASN == 0"
+    except Exception as e:
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="asn_invalid").inc()
+        log.info(f"Discarding ASN == {probe_asn}, error: {e}")
+        error = "asn_invalid"
+        message = f"Measurement discarded, ASN == {probe_asn}"
+
+    if error:
+        raise HTTPException(
+            400,
+            detail={
+                "error": error,
+                "message" : message
+            }
+        )
+
+    # Check probe_cc for ZZ cases
+    if probe_cc == "ZZ":
+        log.info("Discarding CC == ZZ")
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
+        Metrics.MSMNT_DISCARD_CC_ZZ.inc()
+        raise HTTPException(
+            400,
+            detail={
+                "error": "cc_zz",
+                "message": "Measurement discarded, CC == ZZ",
+            },
+        )
 
 def extract_probe_ipaddr(request: Request) -> str:
 
@@ -144,75 +257,94 @@ def extract_probe_ipaddr(request: Request) -> str:
     return request.client.host if request.client else ""
 
 
-def lookup_probe_cc(ipaddr: str, cc_reader: CCReaderDep) -> str:
-    resp = cc_reader.country(ipaddr)
-    return resp.country.iso_code or "ZZ"
-
-
-def lookup_probe_network(ipaddr: str, asn_reader: ASNReaderDep) -> Tuple[str, str]:
-    resp = asn_reader.asn(ipaddr)
-
-    return (
-        "AS{}".format(resp.autonomous_system_number),
-        resp.autonomous_system_organization or "0",
-    )
+def geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple[str, str, str]:
+    entry = asn_cc_reader.get(ipaddr)
+    try:
+        cc = entry['country']['iso_code']
+        asn = entry['autonomous_system_number']
+        as_org = entry.get('autonomous_system_organization', "0")
+        return (cc, f"AS{asn}", as_org)
+    except KeyError:
+        raise AddressNotFoundError
+    except Exception as e:
+        log.error(f"Error looking up {ipaddr}: {e}")
+        raise AddressNotFoundError
 
 
 def error(msg: str | Dict[str, Any], status_code: int = 400):
     raise HTTPException(status_code=status_code, detail=msg)
 
 
-def compare_probe_msmt_cc_asn(
-    measurement_uid: str,
-    cc: str,
-    asn: str,
-    request: Request,
-    cc_reader: CCReaderDep,
-    asn_reader: ASNReaderDep,
-    clickhouse: ClickhouseDep,
-):
-    """Compares CC/ASN from measurement with CC/ASN from HTTPS connection ipaddr
-    Generates a metric.
+def normalize_asn(asn: str) -> int:
     """
+    Return ASN as int (strip 'AS' prefix if present). Invalid values return 0.
+    """
+    s = str(asn).strip().upper().lstrip("AS")
     try:
-        cc = cc.upper()
-        ipaddr = extract_probe_ipaddr(request)
-        db_cc = lookup_probe_cc(ipaddr, cc_reader)
-        db_asn, _ = lookup_probe_network(ipaddr, asn_reader)
+        return int(s)
+    except (ValueError, TypeError) as e:
+        log.error(f"Invalid asn: {e}")
+        return 0
 
-        if db_asn.startswith("AS"):
-            db_asn = db_asn[2:]
-        if db_cc == cc and db_asn == asn:
-            Metrics.PROBE_CC_ASN_MATCH.inc()
-        if db_cc != cc:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
-        if db_asn != asn:
-            Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+def get_cc_asn(
+    request: Request, asn_cc_reader: ASNCCReaderDep
+) -> Tuple[str, str]:
+    """
+    Geo-lookup the request's source IP and return (cc, asn).
 
-        if db_asn != asn or db_cc != cc:
-            details = json.dumps(
-                {
-                    "submission_cc": cc,
-                    "submission_asn": int(asn),
-                    "measurement_uid": measurement_uid,
-                }
-            )
+    Falls back to ("ZZ", "AS0") when the lookup fails.
+    """
+    ipaddr = extract_probe_ipaddr(request)
+    try:
+        cc, asn, _ = geolookup_probe(ipaddr, asn_cc_reader)
+    except AddressNotFoundError:
+        return ("ZZ", "AS0")
+    return cc, asn
 
-            insert_click(
-                clickhouse,
-                """
-                INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
-                SETTINGS
-                    async_insert=1,
-                    wait_for_async_insert=0
-                VALUES
-                """,
-                [("geoip", db_cc, int(db_asn), details)],
-                max_execution_time=5,
-            )
 
-    except Exception as e:
-        log.error(f"Error comparing msm cc and asn: {e}")
+def register_geoip_anomaly(
+    cc: str,
+    actual_cc: str,
+    asn: str,
+    actual_asn: str,
+    clickhouse: ClickhouseDep,
+    measurement_uid: str,
+    platform: str,
+    software_name: str,
+    software_version: str,
+) -> None:
+    """
+    Record a geoip mismatch in faulty_measurements.
+    """
+    sub_asn = normalize_asn(asn)
+    actual_asn_int = normalize_asn(actual_asn)
+    if actual_cc != cc:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="cc").inc()
+    if actual_asn_int != sub_asn:
+        Metrics.PROBE_CC_ASN_NO_MATCH.labels(mismatch="asn").inc()
+
+    details = ujson.dumps(
+        {
+            "submission_cc": cc.upper(),
+            "submission_asn": sub_asn,
+            "measurement_uid": measurement_uid,
+            "software_name": software_name,
+            "software_version": software_version,
+            "platform": platform,
+        }
+    )
+    insert_click(
+        clickhouse,
+        """
+        INSERT INTO faulty_measurements (type, probe_cc, probe_asn, details)
+        SETTINGS
+            async_insert=1,
+            wait_for_async_insert=0
+        VALUES
+        """,
+        [("geoip", actual_cc, actual_asn_int, details)],
+        max_execution_time=5,
+    )
 
 
 def get_first_ip(headers: str) -> str:

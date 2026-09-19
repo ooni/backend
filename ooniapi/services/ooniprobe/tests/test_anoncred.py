@@ -1,8 +1,17 @@
+import re
 from typing import Any, Dict
+import ooniauth_py
 import pytest
+import ujson
 from fastapi import status
 from ooniauth_py import UserState, ServerState
-from .utils import getj, postj, setup_user
+from pydantic import ValidationError
+from ooniprobe.dependencies import Manifest, Match, Policy, PolicyEntry
+from ooniprobe.routers.v1.probe_services import (
+    _clear_sensitive_data,
+    get_ranges_from_policy,
+)
+from .utils import get_msmt_hash, getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
 async def test_manifest_basic(client, db):
@@ -74,34 +83,426 @@ async def test_registration_errors(client):
 
 @pytest.mark.asyncio
 async def test_submission_basic(client):
-    # open report
-    j = make_report_request()
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
-
     # Create user
     user, manifest_version, emission_day = setup_user(client)
 
-    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    msm = make_verified_measurement(user, manifest_version)
 
-    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
-
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-    assert c['is_verified'] is True
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "verified", c
 
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
+    assert c["error"] is None
+
+
+@pytest.mark.asyncio
+async def test_fastpath_fallback(client_with_one_good_mocked_fastpath):
+    """
+    When the first fastpath URL fails, the second one in the list should
+    still receive a verified anonymous-credentials measurement.
+    """
+    client, mock_fastpath, success_url = client_with_one_good_mocked_fastpath
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    assert c["submit_response"], (
+        "submit_response should not be null when verification succeeded"
+    )
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    expected_url = f"{success_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url]
+
+    # Verified anonymous-credential submissions inject "t" as the
+    # `is_verified` flag in the stored payload before hashing. The bytes the
+    # server hashes also include a freshly generated random `report_id`, so we
+    # compute the expected hash from the stored body.
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    expected_hash = get_msmt_hash(stored, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+    assert stored["is_verified"] == "t"
+
+
+@pytest.mark.asyncio
+async def test_fastpath_payload_has_report_id(client_with_mocked_fastpath):
+    """
+    The body forwarded to the fastpath must always include a freshly
+    generated `report_id`, even if not provided by the client
+    """
+    client, mock_fastpath, fastpath_url = client_with_mocked_fastpath
+
+    # 1) Verified anonymous-credentials submission
+    user, manifest_version, _ = setup_user(client)
+    msm_verified = make_verified_measurement(user, manifest_version)
+    c = postj(client, "/api/v1/submit_measurement", msm_verified)
+    assert c["verification_status"] == "verified", c
+    verified_uid = c["measurement_uid"]
+
+    # 2) Unverified submission (missing anoncred fields)
+    msm_unverified = {
+        "format": "json",
+        "content": ujson.dumps(
+            {
+                "test_name": "web_connectivity",
+                "probe_asn": "AS34245",
+                "probe_cc": "IE",
+                "test_start_time": "2020-09-09 14:11:11",
+            }
+        ),
+    }
+    c = postj(client, "/api/v1/submit_measurement", msm_unverified)
+    assert c["verification_status"] == "unverified", c
+    unverified_uid = c["measurement_uid"]
+
+    # <ts>_<test_name_stripped>_<cc>_<asn_i>_ni_<rand>
+    rid_re = re.compile(
+        r"\d{8}T\d{6}Z_webconnectivity_IE_34245_n1_[A-Za-z0-9oo]{16}"
+    )
+    for uid in (verified_uid, unverified_uid):
+        url = f"{fastpath_url}/{uid}"
+        assert url in mock_fastpath.uploads, mock_fastpath.uploads
+        stored = ujson.loads(mock_fastpath.uploads[url])
+        rid = stored.get("content", {}).get("report_id")
+        assert isinstance(rid, str) and rid, stored
+        assert rid_re.fullmatch(rid), rid
+
+
+@pytest.mark.asyncio
+async def test_fastpath_only_submits_once_on_success(client_with_two_working_fastpaths):
+    """
+    When the first fastpath URL succeeds, the receiver should stop iterating
+    """
+    client, mock_fastpath, first_url, second_url = client_with_two_working_fastpaths
+
+    # build a verifiable submission
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "verified", c
+    assert c["error"] is None, c
+    msmt_uid = c["measurement_uid"]
+    assert msmt_uid, c
+
+    # Only the first fastpath URL should have received the measurement
+    expected_url = f"{first_url}/{msmt_uid}"
+    assert list(mock_fastpath.uploads.keys()) == [expected_url], (
+        "measurement should be forwarded to the first fastpath URL only, "
+        f"got {list(mock_fastpath.uploads.keys())}"
+    )
+
+    # Sanity-check the bytes that were forwarded to the fastpath
+    stored = ujson.loads(mock_fastpath.uploads[expected_url])
+    expected_hash = get_msmt_hash(stored, is_verified="t")
+    assert msmt_uid.endswith(f"_IE_webconnectivity_{expected_hash}"), msmt_uid
+
+
+@pytest.mark.asyncio
+async def test_submission_non_verified(client):
+    """
+
+    """
+    body = make_measurement_body(probe_asn="AS34245", probe_cc="IE")
+    msm = {
+        "format": "json",
+        "content": ujson.dumps(body),
+    }
+
+    # no anoncred fields -> processed but not verified, no error
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "unverified"
+    assert c["submit_response"] is None
+    assert c["error"] is None
+
+    # unknown manifest -> processed but not verified, manifest error
+    msm["manifest_version"] = "does-not-exist"
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "unverified"
+    assert c["submit_response"] is None
+    assert c["error"] == "manifest_not_found"
+
+    # incomplete anoncred fields -> processed but not verified, incomplete-fields error
+    user, manifest_version, _ = setup_user(client)
+    msm["nym"] = "dummy-nym"
+    msm["manifest_version"] = manifest_version
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "unverified"
+    assert c["submit_response"] is None
+    assert c["error"] == "incomplete_anonc_fields"
+
+    # old protocol version -> protocol-version error
+    submit_request = make_submit_request(user, "IE", "AS34245", ujson.dumps(body))
+    msm["nym"] = submit_request.nym
+    msm["zkp_request"] = submit_request.request
+    msm["manifest_version"] = manifest_version
+    msm["protocol_version"] = "0.0.1"
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "unverified"
+    assert c["submit_response"] is None
+    assert c["error"] == "protocol_version_too_old"
+
+    # unparsable protocol version -> invalid protocol version error
+    msm["protocol_version"] = "abc"
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "unverified"
+    assert c["submit_response"] is None
+    assert c["error"] == "invalid_protocol_version"
+
+
+def test_get_ranges_from_policy_match_precedence():
+    policy = [
+        PolicyEntry(
+            match=Match(probe_asn="AS15704", probe_cc="ES"),
+            policy=Policy(age=(9, 10), min_measurement_count=90),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="ES"),
+            policy=Policy(age=(7, 8), min_measurement_count=70),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="AS15704", probe_cc="*"),
+            policy=Policy(age=(5, 6), min_measurement_count=50),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="*"),
+            policy=Policy(age=(3, 4), min_measurement_count=30),
+        ),
+    ]
+
+    age_range, msm_min = get_ranges_from_policy(policy, "ES", "AS15704")
+    assert age_range == (9, 10)
+    assert msm_min == 90
+
+    age_range, msm_min = get_ranges_from_policy(policy, "ES", "AS99999")
+    assert age_range == (7, 8)
+    assert msm_min == 70
+
+    age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS15704")
+    assert age_range == (5, 6)
+    assert msm_min == 50
+
+    age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS99999")
+    assert age_range == (3, 4)
+    assert msm_min == 30
+
+    no_catchall_policy = [
+        PolicyEntry(
+            match=Match(probe_asn="AS15704", probe_cc="ES"),
+            policy=Policy(age=(9, 10), min_measurement_count=90),
+        )
+    ]
+    with pytest.raises(ValueError, match="No matching submission_policy entry"):
+        get_ranges_from_policy(no_catchall_policy, "VE", "AS8048")
+
+
+def test_get_ranges_from_policy_uses_wildcard_match():
+    policy = [
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="*"),
+            policy=Policy(age=(11, 12), min_measurement_count=110),
+        )
+    ]
+    age_range, msm_min = get_ranges_from_policy(policy, "BR", "AS28573")
+    assert age_range == (11, 12)
+    assert msm_min == 110
+
+
+def test_get_ranges_from_policy_requires_matching_entry():
+    with pytest.raises(ValueError, match="No matching submission_policy entry"):
+        get_ranges_from_policy([], "FR", "AS3215")
+
+def test_policy_requires_age_and_min_measurement_count():
+    with pytest.raises(ValidationError):
+        Policy.model_validate({"age": [21, 22]})
+    with pytest.raises(ValidationError):
+        Policy.model_validate({"min_measurement_count": 1})
+
+
+def test_get_ranges_from_policy_first_match_wins():
+    policy = [
+        PolicyEntry(
+            match=Match(probe_asn="*", probe_cc="*"),
+            policy=Policy(age=(1, 1), min_measurement_count=1),
+        ),
+        PolicyEntry(
+            match=Match(probe_asn="AS1234", probe_cc="IT"),
+            policy=Policy(age=(9, 9), min_measurement_count=9),
+        ),
+    ]
+    age_range, msm_min = get_ranges_from_policy(policy, "IT", "AS1234")
+    assert age_range == (1, 1)
+    assert msm_min == 1
+
+
+def _manifest_from_payload(payload):
+    manifest_payload = {
+        "nym_scope": "ooni.org/{probe_cc}/{probe_asn}",
+        "public_parameters": "public parameters",
+        **payload,
+    }
+    manifest_raw = ujson.dumps(manifest_payload)
+    manifest_json = ujson.loads(manifest_raw)
+    return Manifest(**manifest_json)
+
+
+def test_manifest_parsing_preserves_important_fields():
+    manifest = _manifest_from_payload(
+        {
+            "submission_policy": [
+                {
+                    "match": {"probe_cc": "*", "probe_asn": "*"},
+                    "policy": {
+                        "age": [2461110, 2826140],
+                        "min_measurement_count": 0,
+                    },
+                }
+            ]
+        }
+    )
+    assert manifest.nym_scope == "ooni.org/{probe_cc}/{probe_asn}"
+    assert manifest.public_parameters == "public parameters"
+    assert len(manifest.submission_policy) == 1
+    entry = manifest.submission_policy[0]
+    assert entry.match.probe_cc == "*"
+    assert entry.match.probe_asn == "*"
+    assert entry.policy.age == (2461110, 2826140)
+    assert entry.policy.min_measurement_count == 0
+
+
+def test_manifest_rejects_ranges_with_invalid_length():
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110],
+                            "min_measurement_count": 0,
+                        },
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": [0, 10000000],
+                        },
+                    }
+                ]
+            }
+        )
+
+
+def test_manifest_requires_probe_cc_and_probe_asn():
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": 0,
+                        },
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": 0,
+                        },
+                    }
+                ]
+            }
+        )
+
+
+def test_manifest_rejects_missing_or_bad_types_for_policy_and_match():
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {"submission_policy": [{"match": {"probe_cc": "*", "probe_asn": "*"}}]}
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": 0,
+                        }
+                    }
+                ]
+            }
+        )
+    with pytest.raises(ValidationError):
+        _manifest_from_payload({"submission_policy": "not-a-list"})
+    with pytest.raises(ValidationError):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": "not-a-dict",
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": 0,
+                        },
+                    }
+                ]
+            }
+        )
+
+
+def test_manifest_requires_catch_all_rule():
+    with pytest.raises(
+        ValidationError, match="Last rule in submission policy should be a catch-all."
+    ):
+        _manifest_from_payload(
+            {
+                "submission_policy": [
+                    {
+                        "match": {"probe_cc": "IT", "probe_asn": "AS1234"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": 0,
+                        },
+                    }
+                ]
+            }
+        )
+
 
 # TODO implement credential update
 @pytest.mark.skip
 @pytest.mark.asyncio
 async def test_credential_update(client, client_with_original_manifest, second_manifest):
 
-    (user, manifest, _) = client_with_original_manifest
+    (user, manifest_version, _) = client_with_original_manifest
     new_manifest = getj(client, "/api/v1/manifest")
     user.set_public_params(new_manifest["manifest"]["public_parameters"])
     result = postj(client, "/api/v1/update_credential", json=dict(
-        old_manifest_version = manifest,
+        old_manifest_version = manifest_version,
         manifest_version = new_manifest['meta']['version'],
         update_request = user.make_credential_update_request()
     ))
@@ -115,17 +516,11 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     (user, manifest_version, emission_day) = client_with_original_manifest
 
     # first submit: should just work out of the box
-    j = make_report_request()
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
+    msm = make_verified_measurement(user, manifest_version)
 
-    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    c = postj(client, "/api/v1/submit_measurement", msm)
 
-    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
-
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
-
-    assert c['is_verified'] is True
+    assert c["verification_status"] == "verified"
 
     # second submit: should work after updating creds
     new_manifest = getj(client, "/api/v1/manifest")
@@ -139,31 +534,55 @@ async def test_credential_update_with_submission(client, client_with_original_ma
     assert 'update_response' in result
     user.handle_credential_update_response(result['update_response']) # should not crash
 
-    j = make_report_request()
-    resp = postj(client, "/report", json=j)
-    rid = resp.pop("report_id")
+    body = make_measurement_body(probe_asn="AS34245", probe_cc="IE")
+    msm = make_verified_measurement(user, manifest_version, body=body)
 
-    submit_request = user.make_submit_request("IE", "AS34245", emission_day)
+    c = postj(client, "/api/v1/submit_measurement", msm)
 
-    msm = make_measurement(submit_request.nym, submit_request.request, emission_day, manifest_version)
+def make_measurement_body(probe_asn: str, probe_cc: str) -> dict:
+    return {
+        "test_name": "web_connectivity",
+        "probe_asn": probe_asn,
+        "probe_cc": probe_cc,
+        "test_start_time": "2020-09-09 14:11:11",
+    }
 
-    c = postj(client, f"/api/v1/submit_measurement/{rid}", msm)
+
+def make_verified_measurement(
+    user: UserState,
+    manifest_version: str,
+    probe_cc: str = "IE",
+    probe_asn: str = "AS34245",
+    body: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    body = body or make_measurement_body(probe_asn, probe_cc)
+    submit_request = make_submit_request(user, probe_cc, probe_asn, ujson.dumps(body))
+    return make_measurement(
+        submit_request.nym,
+        submit_request.request,
+        manifest_version,
+        probe_cc=probe_cc,
+        probe_asn=probe_asn,
+        content=body,
+    )
 
 
-def make_measurement(nym : str, zkp_request: str, emission_day: int, manifest_version: str, probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
+def make_measurement(
+    nym: str,
+    zkp_request: str,
+    manifest_version: str,
+    probe_cc: str = "IE",
+    probe_asn: str = "AS34245",
+    protocol_version: str = ooniauth_py.get_protocol_version(),
+    content : dict | None = None
+) -> Dict[str, Any]:
     return {
         "format": "json",
-        "content": {
-            "test_name": "web_connectivity",
-            "probe_asn": probe_asn,
-            "probe_cc": probe_cc,
-            "test_start_time": "2020-09-09 14:11:11",
-        },
+        "content": ujson.dumps(content or make_measurement_body(probe_asn, probe_cc)),
         "nym": nym,
         "zkp_request": zkp_request,
-        "probe_age_range": [emission_day - 30, emission_day + 1],
-        "probe_msm_range": [0, 100],
-        "manifest_version": manifest_version
+        "manifest_version": manifest_version,
+        "protocol_version": protocol_version,
     }
 
 def make_report_request(probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dict[str, Any]:
@@ -177,4 +596,46 @@ def make_report_request(probe_cc: str = "IE", probe_asn: str = "AS34245") -> Dic
         "test_name": "web_connectivity",
         "test_start_time": "2020-09-09 14:11:11",
         "test_version": "0.1.0",
+    }
+
+
+def test_clear_sensitive_data_strips_nym_and_zkp_request():
+    data = {
+        "format": "json",
+        "content": {"test_name": "web_connectivity"},
+        "nym": "secret-nym",
+        "zkp_request": "secret-zkp",
+        "protocol_version": "0.1.0",
+        "manifest_version": "abc123",
+    }
+
+    result = _clear_sensitive_data(data)
+
+    assert "nym" not in result
+    assert "zkp_request" not in result
+    assert result == {
+        "content": data["content"],
+        "format": "json",
+        "protocol_version": "0.1.0",
+        "manifest_version": "abc123",
+    }
+
+
+def test_clear_sensitive_data_omits_versions():
+    data = {
+        "format": "json",
+        "content": {"test_name": "dummy"},
+        "nym": "secret-nym",
+        "zkp_request": "secret-zkp",
+    }
+
+    result = _clear_sensitive_data(data)
+
+    assert "nym" not in result
+    assert "zkp_request" not in result
+    assert "protocol_version" not in result
+    assert "manifest_version" not in result
+    assert result == {
+        "content": data["content"],
+        "format": "json",
     }

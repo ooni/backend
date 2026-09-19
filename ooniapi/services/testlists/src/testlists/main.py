@@ -3,11 +3,9 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.request import urlopen
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from fastapi_utils.tasks import repeat_every
 
 from pydantic import BaseModel
 
@@ -99,29 +97,28 @@ class HealthStatus(BaseModel):
 @app.get("/health")
 async def health(
     settings: SettingsDep,
-    db: PostgresDep,
     clickhouse: ClickhouseDep,
 ):
     errors = []
     try:
         query = """
         SELECT COUNT()
-        FROM fastpath
-        WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
+        FROM citizenlab
         """
         query_click(db=clickhouse, query=query, query_params={})
     except Exception as e:
         errors.append("clickhouse_error")
         log.error(e)
 
-    try:
-        response = urlopen(settings.fastpath_url)
-        assert (
-            response.status == 200
-        ), "Unexpected status trying to connect to fastpath: " + str(response.status)
-    except Exception as exc:
-        log.error(str(exc))
-        errors.append("fastpath_connection_error")
+    for fastpath_url in settings.fastpath_urls:
+        try:
+            response = urlopen(fastpath_url)
+            assert (
+                response.status == 200
+            ), "Unexpected status trying to connect to fastpath: " + str(response.status)
+        except Exception as exc:
+            log.error(str(exc))
+            errors.append("fastpath_connection_error")
 
     if settings.jwt_encryption_key == "CHANGEME":
         errors.append("bad_jwt_secret")
@@ -129,16 +126,17 @@ async def health(
     if settings.prometheus_metrics_password == "CHANGEME":
         errors.append("bad_prometheus_password")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")

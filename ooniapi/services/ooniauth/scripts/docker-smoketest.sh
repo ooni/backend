@@ -33,10 +33,10 @@ docker run \
 trap cleanup INT TERM EXIT
 
 sleep 2
-response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT/health)
+response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT/version)
 if [ "${response}" -eq 200 ]; then
-  echo "Smoke test passed: Received 200 OK from /health endpoint."
+  echo "Smoke test passed: Received 200 OK from /version endpoint."
 else
-  echo "Smoke test failed: Did not receive 200 OK from /health endpoint. Received: $response"
+  echo "Smoke test failed: Did not receive 200 OK from /version endpoint. Received: $response"
   exit 1
 fi

@@ -34,6 +34,10 @@ def test_oonidata_aggregation_observations_with_since_and_until(
         ("test_name", "whatsapp"),
         ("hostname", "www.on-instant.com"),
         ("ip", "64.233.190.139"),
+        (
+            "measurement_uid",
+            "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630",
+        ),
     ],
 )
 def test_oonidata_aggregation_observations_with_filters(
@@ -52,6 +56,52 @@ def test_oonidata_aggregation_observations_with_filters(
             assert result[filter_name] in filter_value, result
         else:
             assert result[filter_name] == filter_value, result
+
+
+def test_oonidata_aggregation_observations_measurement_uid_only_skips_default_date_window(
+    client,
+):
+    """
+    Without measurement_uid, since/until default to the last 30 days (fixture data is older).
+
+    With only measurement_uid, those defaults must not apply, so rows still match by
+    measurement_uid even when their measurement_start_time falls outside the usual
+    default window.
+    """
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+
+    default_response = client.get(route)
+    assert default_response.status_code == 200
+    assert len(default_response.json()["results"]) == 0
+
+    by_uid = client.get(route, params={"measurement_uid": measurement_uid})
+    assert by_uid.status_code == 200
+    j = by_uid.json()
+    assert isinstance(j["results"], list), j
+    assert len(j["results"]) > 0
+    for result in j["results"]:
+        assert result["measurement_uid"] == measurement_uid, result
+
+
+def test_oonidata_aggregation_observations_measurement_uid_with_explicit_since_and_until(
+    client,
+):
+    """
+    An explicit since/until must still be honored even when measurement_uid is set.
+    """
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+    params = {
+        "measurement_uid": measurement_uid,
+        # This range does not cover the measurement's date (2024-11-01).
+        "since": "2025-01-01",
+        "until": "2025-01-02",
+    }
+
+    response = client.get(route, params=params)
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    assert len(json["results"]) == 0
 
 
 @pytest.mark.parametrize(

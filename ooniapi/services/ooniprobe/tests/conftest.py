@@ -1,14 +1,18 @@
+from freezegun import freeze_time
 import json
-import os
+import jwt
+import logging
 import pathlib
-import shutil
 import time
-from datetime import datetime
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 from urllib.request import urlopen
 
+import ooniauth_py
 import pytest
+import requests
 import ujson
 from clickhouse_driver import Client as ClickhouseClient
 from fastapi.testclient import TestClient
@@ -17,6 +21,7 @@ import pytest_asyncio
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from ooniprobe.common.profile_middleware import ProfileMiddleware
 from ooniprobe.common.clickhouse_utils import insert_click
 from ooniprobe.common.config import Settings
 from ooniprobe.common.dependencies import get_settings
@@ -33,8 +38,12 @@ from ooniprobe.download_geoip import try_update
 from ooniprobe.main import app, lifespan
 from ooniprobe.routers.v1.probe_services import TorTarget
 
-from .utils import setup_user
+from .utils import setup_user, add_test_middleware, remove_test_middleware
 
+
+@pytest.fixture
+def log():
+    return logging.getLogger(__name__)
 
 def make_override_get_settings(**kw):
     def override_get_settings():
@@ -109,16 +118,77 @@ def geoip_db_dir(fixture_path):
     return str(ooni_tempdir)
 
 
+@pytest.fixture
+def download_geoip_db_dir(tmp_path):
+    return tmp_path / "geoip"
+
+# A date used on several geoip tests:
+GEOIP_FROZEN_TIME = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+@pytest.fixture
+def frozen_time():
+    """
+    Used for geoip download tests.
+
+    This function will freeze the time for fixtures that have it as dependency
+    """
+    with freeze_time(GEOIP_FROZEN_TIME) as ft:
+        yield ft
+
+@pytest.fixture
+def last_month_geoip_db(frozen_time, download_geoip_db_dir):
+    from datetime import datetime, timezone
+
+    from dateutil.relativedelta import relativedelta
+    from ooniprobe.download_geoip import geoip_release_url
+
+    download_geoip_db_dir.mkdir(parents=True, exist_ok=True)
+    path = download_geoip_db_dir / "asn_cc.mmdb"
+    path.touch()
+    last_month = datetime.now(timezone.utc) - relativedelta(months=1)
+    ts, _, _ = geoip_release_url(last_month)
+    (download_geoip_db_dir / "geoipdbts").write_text(ts)
+    yield path
+    path.unlink(missing_ok=True)
+    (download_geoip_db_dir / "geoipdbts").unlink(missing_ok=True)
+
+
+@pytest.fixture
+def current_month_geoip_db(frozen_time, download_geoip_db_dir):
+    from datetime import datetime, timezone
+
+    from ooniprobe.download_geoip import geoip_release_url
+
+    download_geoip_db_dir.mkdir(parents=True, exist_ok=True)
+    path = download_geoip_db_dir / "asn_cc.mmdb"
+    path.touch()
+    ts, _, _ = geoip_release_url(datetime.now(timezone.utc))
+    (download_geoip_db_dir / "geoipdbts").write_text(ts)
+    yield path
+    path.unlink(missing_ok=True)
+    (download_geoip_db_dir / "geoipdbts").unlink(missing_ok=True)
+
+
 def make_manifest_mock_fn(public_params: str):
     def get_manifest_mock():
         return ManifestResponse(
             manifest=Manifest(
-                submission_policy={"*/*": "*"}, public_parameters=public_params
+                submission_policy=[
+                    {
+                        "match": {"probe_cc": "*", "probe_asn": "*"},
+                        "policy": {
+                            "age": [2461110, 2826140],
+                            "min_measurement_count": 0,
+                        },
+                    }
+                ],
+                public_parameters=public_params,
             ),
             meta=ManifestMeta(
                 version="1",
                 last_modification_date=datetime.now(),
                 manifest_url="https://ooni.mock/manifest",
+                library_version=ooniauth_py.__version__,
+                protocol_version=ooniauth_py.get_protocol_version(),
             ),
         )
 
@@ -141,6 +211,31 @@ async def client(clickhouse_server, test_settings, geoip_db_dir, test_creds):
             yield client
 
 
+def create_jwt(payload: dict) -> str:
+    return jwt.encode(payload, JWT_ENCRYPTION_KEY, algorithm="HS256")
+
+
+def create_session_token(account_id: str, role: str) -> str:
+    now = int(time.time())
+    payload = {
+        "nbf": now,
+        "iat": now,
+        "exp": now + 10 * 86400,
+        "aud": "user_auth",
+        "account_id": account_id,
+        "login_time": None,
+        "role": role,
+    }
+    return create_jwt(payload)
+
+
+@pytest.fixture
+def client_with_admin_role(client):
+    jwt_token = create_session_token("0" * 16, "admin")
+    client.headers = {"Authorization": f"Bearer {jwt_token}"}
+    yield client
+
+
 @pytest.fixture
 def test_creds():
     """
@@ -149,8 +244,8 @@ def test_creds():
 
     # (Secret key, public key)
     return (
-        "ASAAAAAAAAAAXgJT5699LDE/QjmzDjsHcVP+EOxPO/aS4grULhSZqAsgAAAAAAAAAEf1WUPkxSb1cCAUAPvwqqtsOSiLd0m/BpY5HAZLvGQFAwAAAAAAAAAgAAAAAAAAABjrB0p6whCfu/5mDCtrZ/DSaPy+dC3LFL08taNMZ10KIAAAAAAAAAAC8BjxPSqTTnYT1IrWSFkHWvE3e/dstCrLo6GvN6+FAyAAAAAAAAAAyxD+iRjtKEHwRj1AwpDt0Sj4WI8pSDfoxB29G/8eYQ0=",
-        "ASAAAAAAAAAA0Dfe5U+8tRO3siBVVp+zEoC309fhfhtsVJIv2zpeD1cBIAAAAAAAAAAw/LnzUbQepSaQzI29yCH31/Q2Awq9NuTfgW4BQzorGwMAAAAAAAAAIAAAAAAAAABgspiZ6jNoM11fBO/JJ82Ry+QJ6S2mpOpCOmu2KsxGfiAAAAAAAAAACltCp9TukC2mNw0YYAAjqhXH2fsOYoz5FwcjE1bZoD0gAAAAAAAAAN4hyN9hpFgmOU37ynNgoIBLnSg+dObJ/yWRwt5/uYhh",
+        "AUGQSPO28+QLlf8fKhQjqAD2Ehjn0Q471Yavs7n0qsYJ0nnZ1G/Y2LqvjC3Stq0o9Ka6lB2Xq9EDIEOFhQsjbQQDAAAAAAAAAGk422WHZ5MEPCTMbaj4sDvW27Yvl+pRzDuuTasyEpIDRCEzgL3tIOErnbYtca/68gHUxIfXRCDtcSMEvxVhSAynRFLeT0pXf5fRFwX4gbzNVgvzh0MthADyh7UUPmj6BQ==",
+        "AaJpxHsB+x4axWCrFxohF+ML5inYWbPbVQro9YGxb9NVAcgzlHrnd7PLfwWQe69W3ZLcGe4R/CnbFBwhCfdfvvpCAwAAAAAAAAAkAklNBr7fMUrdkeNT360ZsLTGN8A7kKMX6b60tJ5YCBLJ9QJdwnkp12VHPgND2/chraDFw8snqfq0JDZI2tJ04sqKzWi+y57qzh0HG+pkZ3xe7RceyE4isTs7ZRzriwA=",
     )
 
 
@@ -170,7 +265,7 @@ def test_settings(
         clickhouse_url=clickhouse_server,
         geoip_db_dir=geoip_db_dir,
         collector_id="1",
-        fastpath_url=fastpath_server,
+        fastpath_urls=[fastpath_server],
         anonc_manifest_bucket="test-bucket",
         anonc_manifest_file="manifest.json",
         anonc_secret_key=secret_key,
@@ -279,3 +374,136 @@ def load_url_priorities(clickhouse_db: ClickhouseClient):
 @pytest.fixture(scope="function")
 def client_with_original_manifest(client):
     return setup_user(client)
+
+
+class MockFastpathResponse:
+    """
+    Mocked fastpath response to emulate fastpath client responses
+    """
+
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}")
+
+
+class MockFastpathClient:
+    """
+    This mocked fastpath client that responds with error for some paths, and success with other
+    paths.
+
+    Used for testing fastpath responses
+    """
+
+    def __init__(self, success_url_prefix: str = "/good/"):
+        self.success_url_prefix = success_url_prefix
+        self.uploads: dict[str, bytes] = {}
+
+    def post(self, url: str, data: bytes = b"", **kwargs):
+        if self.success_url_prefix in url:
+            self.uploads[url] = data
+            return MockFastpathResponse(200)
+        return MockFastpathResponse(502)
+
+    def close(self):
+        # called by the app lifespan on shutdown
+        pass
+
+
+@asynccontextmanager
+async def _client_with_mocked_fastpath_urls(
+    test_settings, geoip_db_dir, test_creds, fastpath_urls
+):
+    """
+    Shared setup for the client_with_*_mocked_fastpath* fixtures: applies
+    dependency overrides, installs a `MockFastpathClient` on app state, and
+    yields `(client, mock_fastpath)` for the test to use.
+    """
+    _, public_key = test_creds
+
+    settings = test_settings().model_copy(update={"fastpath_urls": fastpath_urls})
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_s3_client] = get_s3_client_mock
+    app.dependency_overrides[get_tor_targets_from_s3] = get_tor_targets_from_s3_mock
+    app.dependency_overrides[get_psiphon_config_from_s3] = get_psiphon_config_from_s3_mock
+    app.dependency_overrides[_get_manifest] = make_manifest_mock_fn(public_key)
+    try_update(geoip_db_dir)
+
+    mock_fastpath = MockFastpathClient()
+    async with lifespan(app, settings, repeating_tasks_active=False):
+        with TestClient(app) as client:
+            app.state.fastpath_client = mock_fastpath
+            yield client, mock_fastpath
+
+
+@pytest_asyncio.fixture
+async def client_with_mocked_fastpath(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client with one healthy mocked fastpath URL.
+
+    Yields `(client, mock_fastpath, url)`.
+    """
+    url = "http://fastpath.ooni/good"
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, [url]
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, url
+
+
+@pytest_asyncio.fixture
+async def client_with_one_good_mocked_fastpath(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client with one failing and one healthy mocked fastpath URL, used to
+    test the fallback path.
+
+    Yields `(client, mock_fastpath, success_url)`.
+    """
+    fail_url = "http://fastpath.ooni/bad"
+    success_url = "http://fastpath.ooni/good"
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, [fail_url, success_url]
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, success_url
+
+
+@pytest_asyncio.fixture
+async def client_with_two_working_fastpaths(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client with two healthy mocked fastpath URLs.
+
+    Yields `(client, mock_fastpath, first_url, second_url)`.
+    """
+    first_url = "http://fastpath-a.ooni/good"
+    second_url = "http://fastpath-b.ooni/good"
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, [first_url, second_url]
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, first_url, second_url
+
+
+@pytest_asyncio.fixture(scope='function')
+def profiling_enabled(tmp_path):
+    # The app only registers ProfileMiddleware when profiling is active, so
+    # tests that want profiling behavior must add it themselves.
+    add_test_middleware(app, ProfileMiddleware,
+        report_path = str(tmp_path / "report.html"),
+        whitelist = ("/api/v1/manifest",)
+    )
+
+    yield
+
+    remove_test_middleware(app, ProfileMiddleware)

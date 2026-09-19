@@ -1,5 +1,4 @@
 import logging
-import gc
 
 from typing import Any, Dict, List, Optional
 
@@ -59,6 +58,7 @@ async def get_test_list_meta(
     except Exception:
         raise HTTPException(detail="Authentication required", status_code=401)
 
+    ulm = None
     try:
         ulm = get_url_list_manager(settings, account_id)
         state = ulm.sync_state(account_id)
@@ -74,20 +74,25 @@ async def get_test_list_meta(
         except CountryNotSupported:
             tl = None
 
-        del ulm
-        log.info("Forcing GC to unlock URLListManager immediately")
-        gc.collect() # force gc to clean up and clear FileLock
         # Create the response object
         resp = TestListResponse(test_list=tl, changes=changes, state=state, pr_url=pr_url)
         setnocacheresponse(response)
         return resp
     except BaseOONIException as e:
         log.error(f"OONIException occurred: {e}")
-        raise 
+        raise
     except Exception as e:
-        log.error(f"Unexpected error occurred: {e}")
+        log.exception(f"Unexpected error occurred: {e}")
         # Raise a generic HTTPException for unexpected errors
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+    finally:
+        # See URLListManager.close() docstring: this is the exact endpoint
+        # that started throwing "filelock.Timeout ... could not be
+        # acquired" 500s in production, once a *different* request for the
+        # same account_id had failed elsewhere and left the lock held
+        # without releasing it deterministically.
+        if ulm is not None:
+            ulm.close()
 
 
 class UrlPriority(BaseModel):

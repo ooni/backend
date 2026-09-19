@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from pydantic import BaseModel
 
@@ -85,16 +86,17 @@ async def health(
         log.error(err)
         errors.append(err)
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": pkg_version,
         "build_label": build_label,
     }
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")

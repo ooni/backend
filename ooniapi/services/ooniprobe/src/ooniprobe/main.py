@@ -3,16 +3,19 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import boto3
-import httpx
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import requests
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 from ooniauth_py import ServerState
 from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from . import models
 from .__about__ import VERSION
+from .common.profile_middleware import ProfileMiddleware
 from .common.clickhouse_utils import query_click
 from .common.config import Settings
 from .common.dependencies import ClickhouseDep, SettingsDep, get_settings
@@ -46,14 +49,12 @@ async def lifespan(
 
     if repeating_tasks_active:
         await setup_repeating_tasks(settings)
-    app.state.fastpath_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
-    )
     app.state.s3_client = boto3.client("s3")
+    app.state.fastpath_client = requests.Session()
 
     yield
 
-    await app.state.fastpath_client.aclose()
+    app.state.fastpath_client.close()
 
 
 def init_ooniauth():
@@ -86,6 +87,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+settings = get_settings()
+if settings.profiling_active:
+    app.add_middleware(
+        ProfileMiddleware,
+        report_path = settings.profiling_report_path,
+        whitelist = ("/api/v1/submit_measurement",)
+    )
 
 app.include_router(vpn.router, prefix="/api")
 app.include_router(probe_services.router, prefix="/api")
@@ -126,14 +135,20 @@ async def health(
         errors.append("clickhouse_error")
         log.error(e)
 
-    try:
-        resp = await app.state.fastpath_client.get(settings.fastpath_url)
-        assert resp.status_code == 200, (
-            "Unexpected status trying to connect to fastpath: " + str(resp.status_code)
-        )
-    except Exception as exc:
-        log.error(str(exc))
+    fp_ok = False
+    timeout = settings.fastpath_timeout
+    for fastpath_url in settings.fastpath_urls:
+        try:
+            resp = await run_in_threadpool(app.state.fastpath_client.get, fastpath_url, timeout=timeout)
+            with resp:
+                resp.raise_for_status()
+            fp_ok = True
+        except Exception as exc:
+            log.error(f"Unable to connect with fastpath '{fastpath_url}'. Error: {exc}")
+
+    if not fp_ok:
         errors.append("fastpath_connection_error")
+
 
     try:
         db.query(models.OONIProbeVPNProvider).limit(1).all()
@@ -165,20 +180,34 @@ async def health(
     # Check that you can retrieve the manifest
     try:
         get_manifest(s3, settings.anonc_manifest_bucket, settings.anonc_manifest_file)
+    except ValidationError as e: # Bad manifest
+        errors.append("bad_anonc_manifest")
+        log.error(f"Error parsing manifest file: {e}")
     except Exception as e:
         errors.append("anonc_manifest_unreachable")
         log.error(f"Error retrieving manifest: {e}")
 
-    status = "ok"
-    if len(errors) > 0:
-        status = "fail"
-
-    return {
+    status, code = ("ok", 200) if len(errors) == 0 else ("fail", 503)
+    result = {
         "status": status,
         "errors": errors,
         "version": VERSION,
         "build_label": build_label,
     }
+
+    if settings.profiling_active:
+        try:
+            import pyinstrument  # noqa: F401
+        except ImportError:
+            # In case we set profiling active in a profile that doesn't includes
+            # development tools
+            errors.append("profiling_active_without_pyinstrument")
+
+    if len(errors):
+        log.error(f"Health check errors detected: {errors}")
+
+
+    return JSONResponse(content=result, status_code=code)
 
 
 @app.get("/")
@@ -195,9 +224,9 @@ def check_ooniauth_health():
     # should be able to handle a credential sign request when restoring from hard-coded credentials
 
     # These keys are innocuous, just created to test this
-    secret_key = "ASAAAAAAAAAAnRLPQN8ob4XuuyS26QmvtE5yDOVbDz7wgfeoxGk99AcgAAAAAAAAAOhrJeXjwKfUY0HLwR4pMg0g3QSdyHvM1IvutqnnMksMAwAAAAAAAAAgAAAAAAAAAOR570uB89vTt0o77JCgQ5YXQpu5WpDOWBwVxhW17rAOIAAAAAAAAADrzYyr7wxWft6wiSSlYsH6HJLFhWMsM4N/Stn6ReqAASAAAAAAAAAA0wTZILAyR9U4zl1O8hZAILKaxfNDKQ3RbmPHnjjFiAs="
-    public_parameters = "ASAAAAAAAAAAAvJtNWTwFzdhbrl8v6JB18ReQyndy8/K1w2U8i2Yg30BIAAAAAAAAAAguFDwcr38wUVt2rlLXB2/8yFhniOjNYqIl4ojiAuyMwMAAAAAAAAAIAAAAAAAAAAAe1Xz7jZ5Sunow6X1wBcQgydjCp9NpYkHdBaJyUuCUSAAAAAAAAAAtKLWocJ4JqqNf6iX1HzPzQUVJaXlj7iL52bVxgeLhWwgAAAAAAAAAEZjgujZgU+k0ro0pZHd1JhoxRvRSVaPH1nHyjD8U7lG"
-    sign_request = "IAAAAAAAAABIGoRkdnwwlTAeKECF7DBNXmqdTMlhr+HsANap/DkQaWAAAAAAAAAADHgP2bLRdUt8AgWPdXdTXCl2/vnGZ9gW5yGtmDfXgyMKzTXS04EBASlz5wIVZSrLaykSAIcMM7EUwaK0Yqps0QJfoj0i3Y9Mc8yVlP0z3/kSuHTKpmq4GOEIaGFXTH6k"
+    secret_key = "AUGQSPO28+QLlf8fKhQjqAD2Ehjn0Q471Yavs7n0qsYJ0nnZ1G/Y2LqvjC3Stq0o9Ka6lB2Xq9EDIEOFhQsjbQQDAAAAAAAAAGk422WHZ5MEPCTMbaj4sDvW27Yvl+pRzDuuTasyEpIDRCEzgL3tIOErnbYtca/68gHUxIfXRCDtcSMEvxVhSAynRFLeT0pXf5fRFwX4gbzNVgvzh0MthADyh7UUPmj6BQ=="
+    public_parameters = "AaJpxHsB+x4axWCrFxohF+ML5inYWbPbVQro9YGxb9NVAcgzlHrnd7PLfwWQe69W3ZLcGe4R/CnbFBwhCfdfvvpCAwAAAAAAAAAkAklNBr7fMUrdkeNT360ZsLTGN8A7kKMX6b60tJ5YCBLJ9QJdwnkp12VHPgND2/chraDFw8snqfq0JDZI2tJ04sqKzWi+y57qzh0HG+pkZ3xe7RceyE4isTs7ZRzriwA="
+    sign_request = "cmMXB7zv9Dw2/BG7Jg6UF4/F1c8/I6L1I/Ho7wgf1l9lAAAAAAAAAAHvLcAyEvy8L82lVWoL1kQq8Okc8vo40oq8DctqvAYcAAIAAAAGaegxFhhwDPfWPET8p2g8nSY2QEVBn21+uLED8ZNFzgbszewhiFlvRAA0unHZ2Ntje0I3rvjJHNmv5eJC2H56"
 
     server = ServerState.from_creds(public_parameters, secret_key)
     server.handle_registration_request(sign_request)
