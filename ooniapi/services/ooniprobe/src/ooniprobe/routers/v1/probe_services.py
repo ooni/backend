@@ -407,7 +407,10 @@ def check_in(
         }
     )
 
-    # select the default version of experiments that have more than one.
+    # set webconnectivity_0.5 feature flag
+    conf["features"]["webconnectivity_0.5"] = True
+
+    # select the default version of experiments that have more than one
     conf["versions"] = {"web_connectivity": "v0.5"}
 
     conf["test_helpers"] = generate_test_helpers_conf()
