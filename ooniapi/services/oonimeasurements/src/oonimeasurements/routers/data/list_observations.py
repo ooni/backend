@@ -195,8 +195,6 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
-
-
     if since is None and report_id is None and measurement_uid is None:
         since = date.today() - timedelta(days=7)
     if until is None and report_id is None and measurement_uid is None:
@@ -258,7 +256,10 @@ async def list_observations(
     results: List[ObservationEntry] = []
     if rows and isinstance(rows, list):
         for row in rows:
-            results.append(WebObservationEntry(**row))
+            entry = WebObservationEntry(**row)
+            if entry.target_id is None:
+                entry.target_id = entry.hostname or entry.tls_server_name
+            results.append(entry)
 
     response = ListObservationsResponse(
         metadata=ResponseMetadata(

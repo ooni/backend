@@ -7,7 +7,6 @@ Insert VPN credentials into database.
 import io
 import itertools
 import logging
-from base64 import b64encode
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from os import urandom
@@ -23,7 +22,6 @@ from sqlalchemy.orm import Session
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
 from .common.clickhouse_utils import insert_click
-from .common.config import Settings
 from .common.dependencies import ClickhouseDep
 from .common.errors import AddressNotFoundError
 from .dependencies import ASNCCReaderDep
@@ -122,15 +120,6 @@ def upsert_endpoints(
                 provider=provider,
             )
         )
-
-
-def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    cid = settings.collector_id
-    rand = b64encode(urandom(12), b"oo").decode()
-    stn = test_name.replace("_", "")
-    rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
-    return rid
 
 
 @dataclass
