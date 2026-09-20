@@ -1,0 +1,62 @@
+name: e2e / ooniapi + miniooni
+
+# Deploys the ooniapi backend services (docker-compose) and exercises them
+# with a real, containerized miniooni client. See ooniapi/tests/e2e/README.md
+# for what this actually covers and its known gaps.
+#
+# This is the automated "tested with a real client" check requested in
+# https://github.com/ooni/backend/pull/1145.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "ooniapi/**"
+      - "fastpath/**"
+      - ".github/workflows/test_e2e_miniooni.yml"
+  pull_request:
+    paths:
+      - "ooniapi/**"
+      - "fastpath/**"
+      - ".github/workflows/test_e2e_miniooni.yml"
+  workflow_dispatch:
+    inputs:
+      probe_cli_ref:
+        description: "Extra probe-cli ref to test in addition to the default matrix (tag, branch, or commit)"
+        required: false
+        default: ""
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The "matrix of client versions" from the discussion on #1145.
+        # Add release tags here as they're cut (e.g. "v3.24.0").
+        probe_cli_ref: [master]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run e2e harness (probe-cli @ ${{ matrix.probe_cli_ref }})
+        working-directory: ooniapi/tests/e2e
+        env:
+          PROBE_CLI_REF: ${{ matrix.probe_cli_ref }}
+          DUMP_LOGS_ALWAYS: "1"
+        run: ./scripts/run.sh
+
+  e2e-dispatch-extra-ref:
+    # Only runs for manual workflow_dispatch invocations that specify an
+    # extra ref to test (e.g. a probe-cli PR branch), so it doesn't add an
+    # unconditional matrix entry to every push/PR run.
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.probe_cli_ref != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run e2e harness (probe-cli @ ${{ github.event.inputs.probe_cli_ref }})
+        working-directory: ooniapi/tests/e2e
+        env:
+          PROBE_CLI_REF: ${{ github.event.inputs.probe_cli_ref }}
+          DUMP_LOGS_ALWAYS: "1"
+        run: ./scripts/run.sh

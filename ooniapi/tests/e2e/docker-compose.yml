@@ -1,0 +1,235 @@
+# docker-compose for an end-to-end test harness that deploys the ooniapi
+# backend services and exercises them with a real, containerized miniooni
+# client (github.com/ooni/probe-cli).
+#
+# IMPORTANT: the six ooniapi python services (ooniauth, oonifindings,
+# oonimeasurements, ooniprobe, oonirun, testlists) are NOT built by this
+# compose file. Their Dockerfiles COPY a symlinked ../../common directory,
+# and each service's own `make docker-build` target works around this with
+# `tar -czh . | docker build -` (dereferencing the symlink before it reaches
+# the docker daemon). Plain `docker compose build` does not do this, so
+# building them here would silently ship a broken `common` symlink.
+#
+# Run `./scripts/build-images.sh` first (it just shells out to each
+# service's own `make docker-build`), then `docker compose up`.
+#
+# See README.md for the full instructions and known limitations.
+
+x-service-env: &service-env
+  POSTGRESQL_URL: postgresql://oonipg:oonipg@postgres:5432/oonipg
+  CLICKHOUSE_URL: clickhouse://default:default@clickhouse-server:9000
+  JWT_ENCRYPTION_KEY: e2e-test-jwt-secret-do-not-use-in-prod
+  PROMETHEUS_METRICS_PASSWORD: e2e-test-metrics-password
+  ACCOUNT_ID_HASHING_KEY: e2e-test-account-hashing-key
+  COLLECTOR_ID: "e2e"
+  BASE_URL: "http://router"
+  LOG_LEVEL: info
+  # Generous rate limits: this is a shared instance hit repeatedly by CI runs.
+  RATE_LIMITS: "100000/minute;2000000/day"
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oonipg
+      POSTGRES_PASSWORD: oonipg
+      POSTGRES_DB: oonipg
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oonipg"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  clickhouse-server:
+    # Name matches the host baked into ooniapi/../fastpath/fastpath.conf so
+    # the fastpath container needs no extra config to find it.
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+    volumes:
+      - ./clickhouse/initdb:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "default", "--password", "default", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # One-off admin task (12-factor principle XII, see ooniapi/README.md):
+  # applies the single shared alembic history (ooniapi/common/src/common/alembic)
+  # that all Postgres-backed services rely on. Any one service's image can
+  # run it since they all vendor the identical common/alembic tree.
+  migrate:
+    image: ${OONIPROBE_IMAGE:-ooni-e2e/ooniprobe:e2e}
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      OONI_PG_URL: postgresql://oonipg:oonipg@postgres:5432/oonipg
+    entrypoint: ["alembic"]
+    command: ["upgrade", "head"]
+    restart: "no"
+
+  fastpath:
+    build:
+      context: ../../../fastpath
+      dockerfile: Dockerfile
+    # fastpath has no symlink-out-of-context issue, so a native compose
+    # build is fine here (unlike the six services above).
+    command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk", "--debug"]
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+
+  ooniauth:
+    image: ${OONIAUTH_IMAGE:-ooni-e2e/ooniauth:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *service-env
+      AWS_REGION: ""
+      EMAIL_SOURCE_ADDRESS: "contact+e2e@ooni.io"
+      SESSION_EXPIRY_DAYS: 2
+      LOGIN_EXPIRY_DAYS: 7
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  oonifindings:
+    image: ${OONIFINDINGS_IMAGE:-ooni-e2e/oonifindings:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *service-env
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  oonimeasurements:
+    image: ${OONIMEASUREMENTS_IMAGE:-ooni-e2e/oonimeasurements:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse-server:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+      # valkey_url defaults to "memory" (in-process rate limiting), so no
+      # Valkey/Redis container is needed for this harness.
+      OTHER_COLLECTORS: "[]"
+      RATE_LIMITS_WHITELISTED_IPADDRS: "[]"
+      RATE_LIMITS_UNMETERED_PAGES: '["/metrics", "/health"]'
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  ooniprobe:
+    image: ${OONIPROBE_IMAGE:-ooni-e2e/ooniprobe:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse-server:
+        condition: service_healthy
+      fastpath:
+        condition: service_started
+    environment:
+      <<: *service-env
+      FASTPATH_URLS: '["http://fastpath:8472"]'
+      COLLECTOR_ID: "4"
+      # Anonymous-credentials (manifest/S3) and tor-targets/psiphon-config
+      # (S3) subsystems are intentionally left unconfigured in this harness.
+      # miniooni's submitter falls back to plain (non-credentialed)
+      # submission when GET /api/v1/manifest fails, so this does not block
+      # the core measurement pipeline test. See README.md "Known gaps".
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  oonirun:
+    image: ${OONIRUN_IMAGE:-ooni-e2e/oonirun:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse-server:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  testlists:
+    image: ${TESTLISTS_IMAGE:-ooni-e2e/testlists:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *service-env
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  # Not started by `docker compose up` (see the "client" profile below) -
+  # this is the test client, invoked on demand via:
+  #   docker compose run --rm --profile client miniooni <experiment> \
+  #     --probe-services http://router --yes ...
+  miniooni:
+    build:
+      context: ./miniooni
+      args:
+        PROBE_CLI_REPO: ${PROBE_CLI_REPO:-https://github.com/ooni/probe-cli.git}
+        PROBE_CLI_REF: ${PROBE_CLI_REF:-master}
+    profiles: ["client"]
+    depends_on:
+      router:
+        condition: service_started
+
+  router:
+    image: nginx:1.27.1
+    volumes:
+      - ./nginx/router.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${ROUTER_PORT:-8080}:80"
+    depends_on:
+      ooniauth:
+        condition: service_healthy
+      oonifindings:
+        condition: service_healthy
+      oonimeasurements:
+        condition: service_healthy
+      ooniprobe:
+        condition: service_healthy
+      oonirun:
+        condition: service_healthy
+      testlists:
+        condition: service_healthy
