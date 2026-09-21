@@ -61,8 +61,20 @@ services:
   # S3-compatible store backing ooniprobe's anonymous-credentials manifest
   # (/api/v1/manifest, /api/v1/sign_credential). See README.md for what
   # this actually tests and why a fixed test keypair is safe to use here.
+  #
+  # Image: MinIO deleted both minio/minio and minio/mc from Docker Hub on
+  # 2026-09-11 (the last step in winding down the open-source community
+  # edition in favor of its commercial AIStor product - free image
+  # publishing stopped Oct 2025, the OSS repo was archived Feb 2026). We
+  # use pgsty/minio ("Silo"), a community-maintained fork published by
+  # Pigsty (https://hub.docker.com/r/pgsty/minio) that tracks upstream
+  # MinIO RELEASE.2025-12-03T12-00-00Z and explicitly preserves
+  # MinIO-compatible S3 APIs, env vars, and CLI conventions - so nothing
+  # else here needed to change. It also bundles the client (as `mcli`,
+  # with an `mc` compatibility alias), which is why minio-init below uses
+  # this same image instead of a separate minio/mc one.
   minio:
-    image: minio/minio:latest
+    image: pgsty/minio:latest
     command: ["server", "/data"]
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -76,7 +88,7 @@ services:
   # which calls list_object_versions and asserts a VersionId is present) -
   # skip this and that endpoint 500s with "Is versioning activated?".
   minio-init:
-    image: minio/mc:latest
+    image: pgsty/minio:latest
     depends_on:
       minio:
         condition: service_started

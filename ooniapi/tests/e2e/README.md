@@ -132,6 +132,12 @@ docker compose down -v
     `oonimeasurements`'s response, sourced from `fastpath`'s
     `is_verified` column) - the client log alone isn't proof the ZKP
     proof actually checked out, only that the client didn't give up.
+  - The `minio`/`minio-init` services run `pgsty/minio` ("Silo"), a
+    community-maintained fork - not `minio/minio`/`minio/mc`, which MinIO
+    deleted from Docker Hub on 2026-09-11. See `docker-compose.yml`'s
+    comment above the `minio` service for the full story; functionally
+    nothing else here changes, since Silo preserves MinIO's S3 API, env
+    vars, and CLI conventions (including bundling the client as `mc`).
   - `CONFIG_BUCKET` (used for tor-targets/psiphon-config, see below) is a
     *different* setting from `ANONC_MANIFEST_BUCKET` above, so configuring
     one doesn't incidentally configure the other.
