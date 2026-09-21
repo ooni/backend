@@ -8,12 +8,21 @@ tested with a real client?"*.
 
 ## What this actually tests
 
-1. **Real submission** - runs the `example` experiment (a synthetic,
-   network-independent experiment built into probe-cli) through an actual
-   compiled `miniooni` binary, pointed at the compose stack via
-   `--probe-services`. This exercises session bootstrap, `ooniprobe`'s
-   `/api/v1/submit_measurement`, and the handoff to `fastpath`.
-2. **Retrieval** - polls `oonimeasurements`'s `/api/v1/measurement_meta`
+1. **Real submission, with real anonymous credentials** - runs the
+   `example` experiment (a synthetic, network-independent experiment built
+   into probe-cli) through an actual compiled `miniooni` binary, pointed
+   at the compose stack via `--probe-services`. This exercises session
+   bootstrap, `ooniprobe`'s `/api/v1/submit_measurement`, the handoff to
+   `fastpath` - and, since miniooni attempts credentialed submission by
+   default, also `GET /api/v1/manifest` and `POST /api/v1/sign_credential`
+   against a real manifest served from MinIO (see "Architecture" and
+   `docker-compose.yml`'s `minio`/`minio-init` services).
+2. **Anonymous-credentials verification** - checks miniooni's own log for
+   evidence it didn't silently fall back to uncredentialed submission,
+   then confirms server-side (via `verification_status` in
+   `oonimeasurements`'s response) that the ZKP proof actually verified -
+   see `scripts/run-checks.sh` step 2/3.
+3. **Retrieval** - polls `oonimeasurements`'s `/api/v1/measurement_meta`
    until the submitted measurement is servable, proving the full
    submit → fastpath → ClickHouse → retrieval pipeline works.
 
@@ -36,8 +45,10 @@ top-of-file comment for the same note in context.
            ┌───────┬───────────┼───────────┬─────────┬───────────┐
            ▼       ▼           ▼           ▼         ▼           ▼
        ooniauth oonirun   ooniprobe  oonifindings oonimeasurements testlists
-                              │                          ▲
-                              ▼                          │
+                              │  │                       ▲
+                              │  ▼                        │
+                              │ minio (manifest.json)     │
+                              ▼                           │
                           fastpath ─────────────────────>│ (via ClickHouse)
                               │
                               ▼
@@ -95,28 +106,35 @@ docker compose down -v
   is not configurable without patching probe-cli, so this harness needs
   real internet egress (fine on GitHub Actions runners by default) even
   though the *backend* calls are fully local.
-- **Anonymous credentials are not exercised end-to-end.** The `miniooni`
-  image builds the *real* `internal/userauth` staticlib (a Rust crate),
-  built from source by default rather than trusting a prebuilt binary
-  blob - see `miniooni/Dockerfile` for the `USERAUTH_MODE` build arg. CI
-  (`.github/workflows/test_e2e_miniooni.yml`) runs *both*
-  `USERAUTH_MODE=source` and `USERAUTH_MODE=prebuilt` in its matrix, since
-  a regression in either path is otherwise easy to miss - which is exactly
-  what happened upstream: probe-cli's `userauthVersion` was bumped without
-  updating the from-source path's pinned SHA256, so `USERAUTH_MODE=source`
-  builds fail against probe-cli master until that's fixed there (a patch
-  has been sent upstream, but this harness doesn't wait on it landing -
-  the `source` matrix job going red *is* the harness doing its job). This
-  gives miniooni's client fully capable of the credentialed submission
-  flow either way. What's still missing is the *server* side: ooniprobe's
-  `/api/v1/manifest` endpoint needs a real S3 bucket
-  (`ANONC_MANIFEST_BUCKET`/`ANONC_MANIFEST_FILE`), which we leave
-  unconfigured. probe-cli's submitter (`engine.Session.NewSubmitter`)
-  gracefully falls back to plain (non-credentialed) submission when the
-  manifest fetch fails, so the core pipeline test still passes either way.
-  Standing up a local S3-compatible service (e.g. MinIO) to test the
-  credentialed path end-to-end is a reasonable follow-up but out of scope
-  here.
+- **Anonymous credentials ARE now exercised end-to-end** - client and
+  server both. `miniooni` builds the *real* `internal/userauth` staticlib
+  (a Rust crate), from source by default rather than trusting a prebuilt
+  binary blob (`USERAUTH_MODE` build arg; CI runs both `source` and
+  `prebuilt` - see `miniooni/Dockerfile`). Server-side, `docker-compose.yml`'s
+  `minio`/`minio-init` services serve a real, versioned manifest from an
+  S3-compatible store, so `GET /api/v1/manifest` and
+  `POST /api/v1/sign_credential` both work against real (if
+  test-fixture) cryptographic material rather than 404ing.
+  - The manifest's `public_parameters` and `ooniprobe`'s
+    `ANONC_SECRET_KEY` are a matched keypair lifted verbatim from
+    `ooniapi/services/ooniprobe/tests/conftest.py`'s `test_creds`
+    fixture - the exact pair that service's own `tests/test_anoncred.py`
+    already exercises - rather than generated fresh here. That test
+    fixture's `age` range (`[2461110, 2826140]`, a Julian-day-number
+    range) is deliberately enormous (~1000 years wide starting around
+    when that fixture was written), so there's no near-term expiry to
+    worry about; if `sign_credential`/`submit_measurement` start failing
+    with an age/policy-range error decades from now, that range is where
+    to look.
+  - `scripts/run-checks.sh` checks both a client-side signal (miniooni's
+    own log for the credential-submission fallback warning) and the
+    authoritative server-side one (`verification_status` in
+    `oonimeasurements`'s response, sourced from `fastpath`'s
+    `is_verified` column) - the client log alone isn't proof the ZKP
+    proof actually checked out, only that the client didn't give up.
+  - `CONFIG_BUCKET` (used for tor-targets/psiphon-config, see below) is a
+    *different* setting from `ANONC_MANIFEST_BUCKET` above, so configuring
+    one doesn't incidentally configure the other.
 - **Tor targets / Psiphon config / `ooniauth` email sending** are similarly
   unconfigured (all need real S3 or SES). `ooniauth` is deployed and health
   checked but its register/login flows aren't exercised by
