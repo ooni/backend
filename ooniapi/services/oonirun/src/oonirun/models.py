@@ -34,7 +34,7 @@ class OONIRunLink(Base):
     author: Mapped[str] = mapped_column(nullable=True)
     icon: Mapped[str] = mapped_column(nullable=True)
     color: Mapped[str] = mapped_column(nullable=True)
-    share_email: Mapped[bool] = mapped_column(
+    publish_email: Mapped[bool] = mapped_column(
         nullable=False,
         default=True,
         server_default=sa.true(),

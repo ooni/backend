@@ -1,4 +1,4 @@
-"""add share_email column to oonirun
+"""add publish_email column to oonirun
 
 Revision ID: 87f0bcd3dea6
 Revises: b860eb79750f
@@ -22,7 +22,7 @@ def upgrade() -> None:
     op.add_column(
         "oonirun",
         sa.Column(
-            "share_email",
+            "publish_email",
             sa.Boolean(),
             nullable=False,
             server_default=sa.true(),
@@ -31,4 +31,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("oonirun", "share_email")
+    op.drop_column("oonirun", "publish_email")

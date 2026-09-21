@@ -181,9 +181,8 @@ class OONIRunLinkBase(BaseModel):
         default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
     )
-    share_email: bool = Field(
-        default=True,
-        description="Whether to share this email with other users",
+    publish_email: bool = Field(
+        description="Whether to publish this email to other users",
     )
 
 
@@ -258,7 +257,7 @@ def create_oonirun_link(
         icon=create_request.icon,
         color=create_request.color,
         expiration_date=create_request.expiration_date,
-        share_email=create_request.share_email,
+        publish_email=create_request.publish_email,
         date_created=now,
         date_updated=now,
     )
@@ -297,7 +296,7 @@ def create_oonirun_link(
         icon=db_oonirun_link.icon,
         color=db_oonirun_link.color,
         expiration_date=db_oonirun_link.expiration_date,
-        share_email=db_oonirun_link.share_email,
+        publish_email=db_oonirun_link.publish_email,
         date_created=db_oonirun_link.date_created,
         date_updated=db_oonirun_link.date_updated,
         nettests=nettest_list,
@@ -316,7 +315,9 @@ def edit_oonirun_link(
     db: PostgresDep,
     token=Depends(role_required(["admin", "user"])),
 ):
-    """Edit an existing OONI Run link"""
+    """
+    Edit an existing OONI Run link
+    """
     log.debug(f"edit oonirun {oonirun_link_id}")
     account_id = token["account_id"]
 
@@ -399,7 +400,7 @@ def edit_oonirun_link(
     oonirun_link.color = edit_request.color
     oonirun_link.expiration_date = edit_request.expiration_date
     oonirun_link.date_updated = now
-    oonirun_link.share_email = edit_request.share_email
+    oonirun_link.publish_email = edit_request.publish_email
     db.commit()
 
     return OONIRunLink(
@@ -414,7 +415,7 @@ def edit_oonirun_link(
         icon=oonirun_link.icon,
         color=oonirun_link.color,
         expiration_date=oonirun_link.expiration_date,
-        share_email=oonirun_link.share_email,
+        publish_email=oonirun_link.publish_email,
         oonirun_link_id=oonirun_link.oonirun_link_id,
         date_created=oonirun_link.date_created,
         date_updated=oonirun_link.date_updated,
@@ -550,9 +551,9 @@ def make_oonirun_link(
         date_created=date_created,
         date_updated=res.date_updated,
         is_mine=is_mine,
-        author=res.author if is_mine or is_admin or res.share_email else None,
+        author=res.author if is_mine or is_admin or res.publish_email else None,
         revision=str(revision),
-        share_email=res.share_email
+        publish_email=res.publish_email
     )
 
 
@@ -811,7 +812,7 @@ def list_oonirun_links(
             description_intl=row.description_intl,
             author=(
                 row.author
-                if account_id == row.creator_account_id or is_admin or row.share_email
+                if account_id == row.creator_account_id or is_admin or row.publish_email
                 else None
             ),
             nettests=nettests,
@@ -821,7 +822,7 @@ def list_oonirun_links(
             date_created=row.date_created,
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,
-            share_email=row.share_email
+            publish_email=row.publish_email
         )
         links.append(oonirun_link)
     log.debug(f"Returning {len(links)} ooni run links")

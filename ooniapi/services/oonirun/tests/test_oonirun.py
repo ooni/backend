@@ -23,6 +23,7 @@ SAMPLE_OONIRUN = {
     },
     "icon": "myicon",
     "author": "oonitarian@example.com",
+    "publish_email": True,
     "nettests": [
         {
             "inputs": [
@@ -77,7 +78,7 @@ EXPECTED_OONIRUN_LINK_PUBLIC_KEYS = [
     "icon",
     "color",
     "expiration_date",
-    "share_email",
+    "publish_email",
 ]
 
 SAMPLE_META = {
@@ -122,17 +123,27 @@ def test_oonirun_author_validation(client, client_with_user_role):
     assert r.status_code == 200, "valid author is OK"
 
 
-def test_oonirun_share_email_defaults_to_true(client, client_with_user_role):
+def test_oonirun_publish_email_is_required(client, client_with_user_role):
     """
-    When share_email is omitted, it should default to True
+    publish_email has no default: every create/edit request must state it
+    explicitly, consistent with every other field on this model. This is
+    intentional even though it means a client must always resend its
+    current value on edit - it avoids a client that doesn't know about
+    this field silently resetting a previously hidden email back to
+    public (see test_oonirun_publish_email_can_be_toggled_on_edit for the
+    normal toggle flow, which always re-sends publish_email).
     """
     z = deepcopy(SAMPLE_OONIRUN)
-    z["name"] = "share_email default"
-    assert "share_email" not in z
+    z["name"] = "publish_email required on create"
+    del z["publish_email"]
+    r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
+    assert r.status_code == 422, "missing publish_email should be rejected on create"
+
+    z["publish_email"] = True
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
-    assert j["share_email"] == True
+    assert j["publish_email"] == True
     assert j["author"] == z["author"]
     oonirun_link_id = j["oonirun_link_id"]
 
@@ -140,19 +151,27 @@ def test_oonirun_share_email_defaults_to_true(client, client_with_user_role):
     r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     assert r.json()["author"] == z["author"]
-    assert r.json()["share_email"] == True
+    assert r.json()["publish_email"] == True
+
+    # missing publish_email should also be rejected on edit
+    edit_req = deepcopy(z)
+    del edit_req["publish_email"]
+    r = client_with_user_role.put(
+        f"/api/v2/oonirun/links/{oonirun_link_id}", json=edit_req
+    )
+    assert r.status_code == 422, "missing publish_email should be rejected on edit"
 
 
-def test_oonirun_share_email_hides_author_from_others(
+def test_oonirun_publish_email_hides_author_from_others(
     client, client_with_user_role, client_with_other_user_role
 ):
     z = deepcopy(SAMPLE_OONIRUN)
-    z["name"] = "share_email false"
-    z["share_email"] = False
+    z["name"] = "publish_email false"
+    z["publish_email"] = False
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     j = r.json()
-    assert j["share_email"] == False
+    assert j["publish_email"] == False
     # The owner should still see their own author email on creation
     assert j["author"] == z["author"]
     oonirun_link_id = j["oonirun_link_id"]
@@ -163,14 +182,14 @@ def test_oonirun_share_email_hides_author_from_others(
     j = r.json()
     assert j["is_mine"] == True
     assert j["author"] == z["author"]
-    assert j["share_email"] == False
+    assert j["publish_email"] == False
 
     # Anonymous users should not see the author
     r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     j = r.json()
     assert j["author"] is None
-    assert j["share_email"] == False
+    assert j["publish_email"] == False
 
     # Other logged-in users should not see the author either
     r = client_with_other_user_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
@@ -192,7 +211,7 @@ def test_oonirun_share_email_hides_author_from_others(
         if d["oonirun_link_id"] == oonirun_link_id:
             found = True
             assert d["author"] is None
-            assert d["share_email"] == False
+            assert d["publish_email"] == False
     assert found == True
 
     # the owner should still see it in their own listing
@@ -206,12 +225,12 @@ def test_oonirun_share_email_hides_author_from_others(
     assert found == True
 
 
-def test_oonirun_share_email_can_be_toggled_on_edit(
+def test_oonirun_publish_email_can_be_toggled_on_edit(
     client, client_with_user_role, client_with_other_user_role
 ):
     z = deepcopy(SAMPLE_OONIRUN)
-    z["name"] = "share_email toggle"
-    z["share_email"] = True
+    z["name"] = "publish_email toggle"
+    z["publish_email"] = True
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     oonirun_link_id = r.json()["oonirun_link_id"]
@@ -222,40 +241,40 @@ def test_oonirun_share_email_can_be_toggled_on_edit(
 
     # Owner disables sharing their email
     edit_req = deepcopy(z)
-    edit_req["share_email"] = False
+    edit_req["publish_email"] = False
     r = client_with_user_role.put(
         f"/api/v2/oonirun/links/{oonirun_link_id}", json=edit_req
     )
     assert r.status_code == 200, r.json()
-    assert r.json()["share_email"] == False
+    assert r.json()["publish_email"] == False
 
     r = client_with_other_user_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     assert r.json()["author"] is None
 
     # Owner re-enables sharing their email
-    edit_req["share_email"] = True
+    edit_req["publish_email"] = True
     r = client_with_user_role.put(
         f"/api/v2/oonirun/links/{oonirun_link_id}", json=edit_req
     )
     assert r.status_code == 200, r.json()
-    assert r.json()["share_email"] == True
+    assert r.json()["publish_email"] == True
 
     r = client_with_other_user_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     assert r.json()["author"] == z["author"]
 
 
-def test_oonirun_share_email_admin_always_sees_author(
+def test_oonirun_publish_email_admin_always_sees_author(
     client, client_with_user_role, client_with_admin_role
 ):
     """
     An admin (who is not the owner) should always see the author, even
-    when share_email is False.
+    when publish_email is False.
     """
     z = deepcopy(SAMPLE_OONIRUN)
-    z["name"] = "share_email admin visibility"
-    z["share_email"] = False
+    z["name"] = "publish_email admin visibility"
+    z["publish_email"] = False
     r = client_with_user_role.post("/api/v2/oonirun/links", json=z)
     assert r.status_code == 200, r.json()
     oonirun_link_id = r.json()["oonirun_link_id"]
@@ -266,7 +285,7 @@ def test_oonirun_share_email_admin_always_sees_author(
     j = r.json()
     assert j["is_mine"] == False
     assert j["author"] == z["author"]
-    assert j["share_email"] == False
+    assert j["publish_email"] == False
 
     # Same for fetching by revision number
     r = client_with_admin_role.get(
