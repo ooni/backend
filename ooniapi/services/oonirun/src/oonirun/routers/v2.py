@@ -39,6 +39,11 @@ def utcnow_seconds():
     return datetime.now(timezone.utc).replace(microsecond=0)
 
 
+# We use this string when the oonirun link is setup to not be shared.
+# We use it so that the UI in old clients won't break
+PRIVATE_EMAIL_PLACEHOLDER = "[private email]"
+
+
 NETWORK_TYPES = [
     "vpn",
     "wifi",
@@ -551,7 +556,11 @@ def make_oonirun_link(
         date_created=date_created,
         date_updated=res.date_updated,
         is_mine=is_mine,
-        author=res.author if is_mine or is_admin or res.publish_email else None,
+        author=(
+            res.author
+            if is_mine or is_admin or res.publish_email
+            else PRIVATE_EMAIL_PLACEHOLDER
+        ),
         revision=str(revision),
         publish_email=res.publish_email
     )
@@ -694,8 +703,8 @@ def get_oonirun_link_revision(
     """
     Fetch an OONI Run link by specifying the revision number
 
-    Note that the author field might be null for other users
-    if the author chooses not to share their email.
+    Note that the author field is replaced with the placeholder "[private email]" for other users
+    if the author has set publish_email to False.
     """
     # Return the latest version of the translations
     log.debug("fetching oonirun")
@@ -735,8 +744,8 @@ def get_latest_oonirun_link(
     """
     Fetch OONIRun descriptor by creation time or the newest one
 
-    Note that the author field might be null for other users
-    if the author chooses not to share their email.
+    Note that the author field is replaced with the placeholder "[private email]" for other users
+    if the author has set publish_email to False.
     """
     # Return the latest version of the translations
     log.debug("fetching oonirun")
@@ -777,8 +786,8 @@ def list_oonirun_links(
     """
     List OONIRun descriptors
 
-    Note that the author field might be null for other users
-    if the author chooses not to share their email.
+    Note that the author field is replaced with the placeholder "[private email]" for other users
+    if the author has set publish_email to False.
     """
     log.debug("list oonirun")
     account_id = get_account_id_or_none(authorization, settings.jwt_encryption_key)
@@ -813,7 +822,7 @@ def list_oonirun_links(
             author=(
                 row.author
                 if account_id == row.creator_account_id or is_admin or row.publish_email
-                else None
+                else PRIVATE_EMAIL_PLACEHOLDER
             ),
             nettests=nettests,
             icon=row.icon,

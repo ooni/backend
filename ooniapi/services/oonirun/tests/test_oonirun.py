@@ -6,7 +6,11 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import time
 
-from oonirun.routers.v2 import utcnow_seconds, NETWORK_TYPES
+from oonirun.routers.v2 import (
+    utcnow_seconds,
+    NETWORK_TYPES,
+    PRIVATE_EMAIL_PLACEHOLDER,
+)
 from .utils import put, get, post
 
 
@@ -188,7 +192,7 @@ def test_oonirun_publish_email_hides_author_from_others(
     r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
     j = r.json()
-    assert j["author"] is None
+    assert j["author"] == PRIVATE_EMAIL_PLACEHOLDER
     assert j["publish_email"] == False
 
     # Other logged-in users should not see the author either
@@ -196,12 +200,12 @@ def test_oonirun_publish_email_hides_author_from_others(
     assert r.status_code == 200, r.json()
     j = r.json()
     assert j["is_mine"] == False
-    assert j["author"] is None
+    assert j["author"] == PRIVATE_EMAIL_PLACEHOLDER
 
     # Fetching by explicit revision number should also mask the author
     r = client.get(f"/api/v2/oonirun/links/{oonirun_link_id}?revision=1")
     assert r.status_code == 200, r.json()
-    assert r.json()["author"] is None
+    assert r.json()["author"] == PRIVATE_EMAIL_PLACEHOLDER
 
     # Listing links should also mask the author for non-owners
     r = client.get("/api/v2/oonirun/links")
@@ -210,7 +214,7 @@ def test_oonirun_publish_email_hides_author_from_others(
     for d in r.json()["oonirun_links"]:
         if d["oonirun_link_id"] == oonirun_link_id:
             found = True
-            assert d["author"] is None
+            assert d["author"] == PRIVATE_EMAIL_PLACEHOLDER
             assert d["publish_email"] == False
     assert found == True
 
@@ -250,7 +254,7 @@ def test_oonirun_publish_email_can_be_toggled_on_edit(
 
     r = client_with_other_user_role.get(f"/api/v2/oonirun/links/{oonirun_link_id}")
     assert r.status_code == 200, r.json()
-    assert r.json()["author"] is None
+    assert r.json()["author"] == PRIVATE_EMAIL_PLACEHOLDER
 
     # Owner re-enables sharing their email
     edit_req["publish_email"] = True
