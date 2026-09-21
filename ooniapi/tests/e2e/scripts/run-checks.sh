@@ -20,7 +20,6 @@ E2E_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${E2E_DIR}"
 
 ROUTER_URL="http://localhost:${ROUTER_PORT:-8080}"
-ROUTER_URL_FROM_CONTAINER="http://router"
 FAILURES=0
 
 pass() { echo "  PASS: $*"; }
@@ -47,6 +46,27 @@ echo "=== [2/3] real client: submit a measurement via containerized miniooni ===
 # run with --no-creds), and docker-compose.yml's minio/minio-init services
 # now give ooniprobe a real, matching manifest to serve - so this single
 # run is also what step 3 below is really checking.
+#
+# --probe-services needs router's literal container IP, not its hostname
+# (nor localhost - see git history on this line for that earlier, wrong
+# fix). probe-cli's session resolver (internal/engineresolver) *always*
+# wraps every child resolver - including the plain system-DNS fallback -
+# in a bogon filter (netxlite.MaybeWrapWithBogonResolver(true, ...), the
+# `true` is hardcoded, no config knob to turn it off), which rejects any
+# hostname that resolves to a private-range address - exactly what every
+# container on this compose network has, regardless of which resolver
+# answered. A literal IP address sidesteps resolution (and therefore the
+# bogon filter) entirely: netxlite/dialer.go's lookupHost() special-cases
+# net.ParseIP(hostname) != nil and returns immediately, never invoking
+# the resolver at all.
+ROUTER_CONTAINER_ID="$(docker compose ps -q router || true)"
+ROUTER_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${ROUTER_CONTAINER_ID}" 2>/dev/null || true)"
+if [ -z "${ROUTER_IP}" ]; then
+    echo "could not resolve the router container's IP address (is it running? try: docker compose ps router)" >&2
+    exit 1
+fi
+ROUTER_URL_FROM_CONTAINER="http://${ROUTER_IP}"
+
 MINIOONI_LOG="$(mktemp)"
 if docker compose --profile client run --rm miniooni example \
         --probe-services "${ROUTER_URL_FROM_CONTAINER}" \

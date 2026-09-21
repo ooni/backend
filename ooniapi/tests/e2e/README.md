@@ -92,8 +92,11 @@ To leave the stack up and experiment by hand:
 
 ```sh
 KEEP_UP=1 SKIP_BUILD=1 ./scripts/run.sh
+# --probe-services needs router's literal container IP, not a hostname -
+# see scripts/run-checks.sh's comment above this same command for why.
+ROUTER_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(docker compose ps -q router)")"
 docker compose --profile client run --rm miniooni webconnectivity \
-    --probe-services http://router -i https://example.org --yes
+    --probe-services "http://${ROUTER_IP}" -i https://example.org --yes
 curl http://localhost:8080/api/v1/measurement_meta?report_id=...
 docker compose down -v
 ```
