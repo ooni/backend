@@ -67,8 +67,21 @@ if [ -z "${ROUTER_IP}" ]; then
 fi
 ROUTER_URL_FROM_CONTAINER="http://${ROUTER_IP}"
 
+# --no-deps: router (and everything behind it) is already up and healthy
+# from run.sh's earlier `docker compose up --wait`, so this separate `run`
+# invocation has no need to touch dependencies at all - and asking it not
+# to sidesteps a known, long-standing Compose v2 quirk where a `run`/`up`
+# targeting one service can recreate unrelated, already-healthy
+# dependencies for no reason tied to any actual config change (see
+# docker/compose#9600 and #12069 for multi-year, still-open reports of
+# the same class of behavior). Without this we saw `fastpath` get
+# Recreated mid-run, which is harmless here (everything restabilizes
+# before any assertion runs) but produces exactly the confusing
+# "why did this container restart and log an error" trail that prompted
+# this fix - cheaper to just not trigger it.
 MINIOONI_LOG="$(mktemp)"
-if docker compose --profile client run --rm miniooni example \
+echo "--- miniooni output begins (resolved to ${ROUTER_URL_FROM_CONTAINER}; some docker-compose container-state noise may be interleaved before it starts) ---"
+if docker compose --profile client run --rm --no-deps miniooni example \
         --probe-services "${ROUTER_URL_FROM_CONTAINER}" \
         --software-name e2e-harness \
         --no-json \
@@ -77,6 +90,7 @@ if docker compose --profile client run --rm miniooni example \
 else
     fail "miniooni exited non-zero running the 'example' experiment"
 fi
+echo "--- miniooni output ends ---"
 
 # NOTE (also fixes a pre-existing bug): appending `|| true` to command
 # substitutions below is not just style - under `set -e` + `pipefail`, a

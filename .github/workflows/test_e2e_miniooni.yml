@@ -56,7 +56,6 @@ jobs:
         env:
           PROBE_CLI_REF: ${{ matrix.probe_cli_ref }}
           USERAUTH_MODE: ${{ matrix.userauth_mode }}
-          DUMP_LOGS_ALWAYS: "1"
         run: ./scripts/run.sh
 
   e2e-dispatch-extra-ref:
@@ -73,5 +72,4 @@ jobs:
         env:
           PROBE_CLI_REF: ${{ github.event.inputs.probe_cli_ref }}
           USERAUTH_MODE: ${{ github.event.inputs.userauth_mode }}
-          DUMP_LOGS_ALWAYS: "1"
         run: ./scripts/run.sh

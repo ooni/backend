@@ -87,6 +87,13 @@ Useful env vars (see `.env.example`):
 - `USERAUTH_MODE` - `source` (default) or `prebuilt`; see `miniooni/Dockerfile`.
 - `SKIP_BUILD=1` - skip rebuilding the ooniapi service images.
 - `KEEP_UP=1` - leave the stack running after the run for manual poking.
+- `DUMP_LOGS_ALWAYS=1` - print every container's logs even when all checks
+  pass, not just on failure (`run.sh`'s default). Useful for local
+  debugging; CI leaves this off so a passing run's output actually ends
+  at "all checks passed" instead of continuing into ~200 lines/service of
+  history that's almost entirely unremarkable by definition (the run
+  passed) - see "Known gaps" below on why some of it looks alarming even
+  though nothing was wrong.
 
 To leave the stack up and experiment by hand:
 
