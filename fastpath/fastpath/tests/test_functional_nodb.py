@@ -90,7 +90,10 @@ def test_fetch_fingerprints(fprints):
 
     dns_fp, http_fp = fastpath.db.fetch_fingerprints()
 
-    assert exe.called_once
+    # fetch_fingerprints() issues one query for fingerprints_dns and one for
+    # fingerprints_http, so we can only assert it was called, and inspect the
+    # last call (the fingerprints_http query) below.
+    exe.assert_called()
     query, qparams = exe.call_args[0]
     query = " ".join(query.split())
     assert query == (
@@ -116,7 +119,7 @@ def test_score_web_connectivity_bug_610_2(fprints):
     core.process_measurement((None, msm, "bogus_uid"))
 
     exe = fastpath.db.click_client.execute
-    assert exe.called_once
+    exe.assert_called_once()
     query, qparams = exe.call_args[0]
     query = query.replace("\n", " ").replace("  ", " ")
     query_exp = (
@@ -165,7 +168,7 @@ def test_score_browser_web(fprints):
     core.process_measurement((None, msm, "bogus_uid"))
 
     exe = fastpath.db.click_client.execute
-    assert exe.called_once
+    exe.assert_called_once()
     query, qparams = exe.call_args[0]
     query = query.replace("\n", " ").replace("  ", " ")
     query_exp = (
