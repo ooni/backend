@@ -20,6 +20,7 @@ E2E_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${E2E_DIR}"
 
 ROUTER_URL="http://localhost:${ROUTER_PORT:-8080}"
+ROUTER_URL_FROM_CONTAINER="http://router"
 FAILURES=0
 
 pass() { echo "  PASS: $*"; }
@@ -48,7 +49,7 @@ echo "=== [2/3] real client: submit a measurement via containerized miniooni ===
 # run is also what step 3 below is really checking.
 MINIOONI_LOG="$(mktemp)"
 if docker compose --profile client run --rm miniooni example \
-        --probe-services "${ROUTER_URL}" \
+        --probe-services "${ROUTER_URL_FROM_CONTAINER}" \
         --software-name e2e-harness \
         --no-json \
         --yes 2>&1 | tee "${MINIOONI_LOG}"; then

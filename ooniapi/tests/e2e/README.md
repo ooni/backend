@@ -93,7 +93,7 @@ To leave the stack up and experiment by hand:
 ```sh
 KEEP_UP=1 SKIP_BUILD=1 ./scripts/run.sh
 docker compose --profile client run --rm miniooni webconnectivity \
-    --probe-services http://localhost:8080 -i https://example.org --yes
+    --probe-services http://router -i https://example.org --yes
 curl http://localhost:8080/api/v1/measurement_meta?report_id=...
 docker compose down -v
 ```
