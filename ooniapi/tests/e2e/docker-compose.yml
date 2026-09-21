@@ -209,6 +209,12 @@ services:
       args:
         PROBE_CLI_REPO: ${PROBE_CLI_REPO:-https://github.com/ooni/probe-cli.git}
         PROBE_CLI_REF: ${PROBE_CLI_REF:-master}
+        # "source" (the default) builds the userauth staticlib from source
+        # rather than trusting a prebuilt binary blob; "prebuilt" is tested
+        # in CI too (see .github/workflows/test_e2e_miniooni.yml) so a
+        # regression in either path shows up here instead of silently -
+        # see miniooni/Dockerfile for the story on why that matters.
+        USERAUTH_MODE: ${USERAUTH_MODE:-source}
     profiles: ["client"]
     depends_on:
       router:

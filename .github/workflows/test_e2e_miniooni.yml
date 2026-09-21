@@ -25,6 +25,10 @@ on:
         description: "Extra probe-cli ref to test in addition to the default matrix (tag, branch, or commit)"
         required: false
         default: ""
+      userauth_mode:
+        description: "userauth build mode for the extra-ref run above (source or prebuilt)"
+        required: false
+        default: "source"
 
 jobs:
   e2e:
@@ -35,13 +39,23 @@ jobs:
         # The "matrix of client versions" from the discussion on #1145.
         # Add release tags here as they're cut (e.g. "v3.24.0").
         probe_cli_ref: [master]
+        # Test both ways of getting the userauth (anonymous-credentials)
+        # staticlib: built from source (the trusted path, and what
+        # docker-compose.yml defaults to) and the prebuilt bundle probe-cli
+        # also offers. Running both here means a regression in either path
+        # - like the stale userauthSourceSHA256 pin that broke
+        # USERAUTH_FROM_SOURCE=1 builds against probe-cli master as of this
+        # writing - shows up in CI instead of only breaking whichever one
+        # nobody happened to be using that day. See miniooni/Dockerfile.
+        userauth_mode: [source, prebuilt]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run e2e harness (probe-cli @ ${{ matrix.probe_cli_ref }})
+      - name: Run e2e harness (probe-cli @ ${{ matrix.probe_cli_ref }}, userauth ${{ matrix.userauth_mode }})
         working-directory: ooniapi/tests/e2e
         env:
           PROBE_CLI_REF: ${{ matrix.probe_cli_ref }}
+          USERAUTH_MODE: ${{ matrix.userauth_mode }}
           DUMP_LOGS_ALWAYS: "1"
         run: ./scripts/run.sh
 
@@ -54,9 +68,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run e2e harness (probe-cli @ ${{ github.event.inputs.probe_cli_ref }})
+      - name: Run e2e harness (probe-cli @ ${{ github.event.inputs.probe_cli_ref }}, userauth ${{ github.event.inputs.userauth_mode }})
         working-directory: ooniapi/tests/e2e
         env:
           PROBE_CLI_REF: ${{ github.event.inputs.probe_cli_ref }}
+          USERAUTH_MODE: ${{ github.event.inputs.userauth_mode }}
           DUMP_LOGS_ALWAYS: "1"
         run: ./scripts/run.sh

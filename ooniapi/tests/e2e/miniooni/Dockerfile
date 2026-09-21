@@ -7,27 +7,64 @@
 # which is the "test against a matrix of client versions" idea from
 # https://github.com/ooni/backend/pull/1145.
 #
-# The multi-stage Rust+Go build below follows the pattern from
-# https://github.com/ooni/probe-cli/pull/1782 (Dockerfile.miniooni, not yet
-# merged at the time of writing, authored by the same person - aagbsn - who
-# opened backend#1145). We don't depend on that PR directly (building against
-# an unmerged, mutable branch would be fragile); the `make userauth` /
-# buildtool machinery it packages already exists on probe-cli's master, so
-# this Dockerfile reimplements the same steps against whatever
-# PROBE_CLI_REF is checked out. Once #1782 merges, this could be simplified
-# to just `COPY --from=<probe-cli checkout> Dockerfile.miniooni` instead.
+# `make userauth` (probe-cli's own target, see its Makefile and
+# ./internal/cmd/buildtool) fetches the internal/userauth staticlib - a
+# Rust crate (ooniprobe-ffi) that gives miniooni the real anonymous-
+# credentials implementation rather than the pure-Go stub CGO_ENABLED=0
+# would silently fall back to. It can get that staticlib two ways, chosen
+# here via the USERAUTH_MODE build arg:
 #
-# Building the real userauth staticlib (a Rust crate, ooniprobe-ffi, vendored
-# via ooni/probe-cli's own buildtool) gives us the actual anonymous-credentials
-# implementation rather than the pure-Go stub CGO_ENABLED=0 would silently
-# fall back to. We still don't configure ANONC_MANIFEST_BUCKET/etc in
-# docker-compose.yml (see README's "Known gaps"), so probe-cli's own
-# graceful fallback to uncredentialed submission still applies either way -
-# but building the real thing means a future MinIO-backed credentialed-path
-# test doesn't also require rewriting this Dockerfile.
+#   USERAUTH_MODE=source (the default)
+#     Builds the staticlib from source with USERAUTH_FROM_SOURCE=1. This is
+#     the trusted path - we don't want this harness's notion of "miniooni
+#     works" to depend on trusting a prebuilt binary blob pulled from
+#     GitHub Releases. Needs a Rust toolchain (see the ruststage/
+#     builder-source stages below).
+#
+#   USERAUTH_MODE=prebuilt
+#     Downloads probe-cli's prebuilt userauth staticlib bundle instead (no
+#     Rust toolchain needed). We don't build the default image this way,
+#     but .github/workflows/test_e2e_miniooni.yml runs both modes in its
+#     matrix specifically so a regression in either path - like the stale
+#     userauthSourceSHA256 pin that broke USERAUTH_FROM_SOURCE=1 builds
+#     against probe-cli master as of this writing (fix sent upstream, but
+#     this harness shouldn't have to wait on it merging to catch the next
+#     one of these) - shows up in CI instead of silently.
+#
+# We still don't configure ANONC_MANIFEST_BUCKET/etc in docker-compose.yml
+# (see README's "Known gaps"), so probe-cli's own graceful fallback to
+# uncredentialed submission still applies either way.
 
+ARG USERAUTH_MODE=source
+
+FROM golang:1.26-bookworm AS base
+
+ARG PROBE_CLI_REPO=https://github.com/ooni/probe-cli.git
+ARG PROBE_CLI_REF=master
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    make \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Shallow-clone the requested ref rather than vendoring probe-cli into this
+# repo, so bumping the version tested is a one-line change in CI.
+RUN git clone --depth 1 --branch "${PROBE_CLI_REF}" "${PROBE_CLI_REPO}" . \
+    || (git clone "${PROBE_CLI_REPO}" . && git checkout "${PROBE_CLI_REF}")
+
+# --- userauth staticlib: prebuilt bundle -------------------------------
+FROM base AS builder-prebuilt
+
+RUN make userauth
+
+# --- userauth staticlib: built from source ------------------------------
 FROM rust:1.88-bookworm AS ruststage
-FROM golang:1.26-bookworm AS builder
+
+FROM base AS builder-source
 
 COPY --from=ruststage /usr/local/cargo /usr/local/cargo
 COPY --from=ruststage /usr/local/rustup /usr/local/rustup
@@ -40,25 +77,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     clang \
     libclang-dev \
     pkg-config \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-ARG PROBE_CLI_REPO=https://github.com/ooni/probe-cli.git
-ARG PROBE_CLI_REF=master
-
-WORKDIR /app
-
-# Shallow-clone the requested ref rather than vendoring probe-cli into this
-# repo, so bumping the version tested is a one-line change in CI.
-RUN git clone --depth 1 --branch "${PROBE_CLI_REF}" "${PROBE_CLI_REPO}" . \
-    || (git clone "${PROBE_CLI_REPO}" . && git checkout "${PROBE_CLI_REF}")
-
-# Builds internal/userauth's staticlib from source (a Rust crate pulled in by
-# probe-cli's own ./internal/cmd/buildtool via `make userauth`) rather than
-# downloading a prebuilt bundle, so this doesn't depend on prebuilt-artifact
-# availability for whatever ref/architecture we're testing.
 ENV USERAUTH_FROM_SOURCE=1
 RUN make userauth
+
+# --- pick the stage matching USERAUTH_MODE, build miniooni -------------
+FROM builder-${USERAUTH_MODE} AS builder
 
 RUN go build -trimpath -ldflags '-s -w' -o /out/miniooni ./internal/cmd/miniooni
 

@@ -65,15 +65,15 @@ cp .env.example .env   # optional, defaults are fine
 
 This builds the six service images (via each service's own
 `make docker-build` - see comments in `scripts/build-images.sh` for why),
-builds miniooni from `PROBE_CLI_REF` (default: `master`) - a real multi-stage
-Rust+Go build that includes the actual anonymous-credentials staticlib, not
-just a CGO-disabled stub, following the pattern from the (as of this
-writing, unmerged) [probe-cli#1782](https://github.com/ooni/probe-cli/pull/1782)
-- brings the stack up, runs the checks, prints logs on failure, and tears
-everything down.
+builds miniooni from `PROBE_CLI_REF` (default: `master`) - including the
+real anonymous-credentials staticlib via probe-cli's own `make userauth`,
+built from source by default (`USERAUTH_MODE=source`; see
+`miniooni/Dockerfile` and the "Known gaps" note below) - brings the stack
+up, runs the checks, prints logs on failure, and tears everything down.
 
 Useful env vars (see `.env.example`):
 - `PROBE_CLI_REF` - test against a specific probe-cli tag/branch/commit.
+- `USERAUTH_MODE` - `source` (default) or `prebuilt`; see `miniooni/Dockerfile`.
 - `SKIP_BUILD=1` - skip rebuilding the ooniapi service images.
 - `KEEP_UP=1` - leave the stack running after the run for manual poking.
 
@@ -96,11 +96,20 @@ docker compose down -v
   real internet egress (fine on GitHub Actions runners by default) even
   though the *backend* calls are fully local.
 - **Anonymous credentials are not exercised end-to-end.** The `miniooni`
-  image now builds the *real* `internal/userauth` staticlib from source
-  (a Rust crate pulled in via probe-cli's own `make userauth`/buildtool -
-  see `miniooni/Dockerfile`), so the client is fully capable of the
-  credentialed submission flow. What's still missing is the *server* side:
-  `ooniprobe`'s `/api/v1/manifest` endpoint needs a real S3 bucket
+  image builds the *real* `internal/userauth` staticlib (a Rust crate),
+  built from source by default rather than trusting a prebuilt binary
+  blob - see `miniooni/Dockerfile` for the `USERAUTH_MODE` build arg. CI
+  (`.github/workflows/test_e2e_miniooni.yml`) runs *both*
+  `USERAUTH_MODE=source` and `USERAUTH_MODE=prebuilt` in its matrix, since
+  a regression in either path is otherwise easy to miss - which is exactly
+  what happened upstream: probe-cli's `userauthVersion` was bumped without
+  updating the from-source path's pinned SHA256, so `USERAUTH_MODE=source`
+  builds fail against probe-cli master until that's fixed there (a patch
+  has been sent upstream, but this harness doesn't wait on it landing -
+  the `source` matrix job going red *is* the harness doing its job). This
+  gives miniooni's client fully capable of the credentialed submission
+  flow either way. What's still missing is the *server* side: ooniprobe's
+  `/api/v1/manifest` endpoint needs a real S3 bucket
   (`ANONC_MANIFEST_BUCKET`/`ANONC_MANIFEST_FILE`), which we leave
   unconfigured. probe-cli's submitter (`engine.Session.NewSubmitter`)
   gracefully falls back to plain (non-credentialed) submission when the
