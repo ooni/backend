@@ -149,6 +149,16 @@ services:
     environment:
       <<: *service-env
       AWS_REGION: ""
+      # ooniauth's own /health handler (routers aside) fails with
+      # "bad_aws_credentials" if these two are empty - it only checks
+      # they're *set*, not that they're real (see
+      # ooniapi/services/ooniauth/src/ooniauth/main.py). AWS_REGION alone,
+      # set above, doesn't satisfy that check. We never exercise
+      # ooniauth's actual email-sending path (nothing in this harness's
+      # test scope calls its register/login), so these just need to be
+      # non-empty, not functional.
+      AWS_ACCESS_KEY_ID: "e2e-test-unused"
+      AWS_SECRET_ACCESS_KEY: "e2e-test-unused"
       EMAIL_SOURCE_ADDRESS: "contact+e2e@ooni.io"
       SESSION_EXPIRY_DAYS: 2
       LOGIN_EXPIRY_DAYS: 7
