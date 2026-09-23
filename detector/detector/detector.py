@@ -1,481 +1,87 @@
 #!/usr/bin/env python3
 # # -*- coding: utf-8 -*-
-
 """
 OONI Event detector
 
-Run sequence:
-
-Fetch already-processed mean values from internal data directory.
-This is done to speed up restarts as processing historical data from the database
-would take a very long time.
-
-Fetch historical msmt from the fastpath and measurement/report/input tables
-
-Fetch realtime msmt by subscribing to the notifications channel `fastpath`
+Fetch historical msmt from the fastpath tables
 
 Analise msmt score with moving average to detect blocking/unblocking
+See the run_detection function for details
 
-Save outputs to local directories:
-    - RSS feed                                      /var/lib/detector/rss/
-        rss/global.xml                All events, globally
-        rss/by-country/<CC>.xml       Events by country
-        rss/type-inp/<hash>.xml       Events by test_name and input
-        rss/cc-type-inp/<hash>.xml    Events by CC, test_name and input
-    - JSON files with block/unblock events          /var/lib/detector/events/
-    - JSON files with current blocking status       /var/lib/detector/status/
-    - Internal data                                 /var/lib/detector/_internal/
+Save RSS feeds to local directories:
+  - /var/lib/detector/rss/<fname>.xml    Events by CC, ASN, test_name and input
 
 The tree under /var/lib/detector/ is served by Nginx with the exception of _internal
 
 Events are defined as changes between blocking and non-blocking on single
 CC / test_name / input tuples
 
-Outputs are "upserted" where possible. New runs overwrite/update old data.
-
 Runs as a service "detector" in a systemd unit and sandbox
 
-See README.adoc
+The --reprocess mode is only for debugging and it's destructive to
+the blocking_* DB tables.
 """
 
-# Compatible with Python3.6 and 3.7 - linted with Black
+# Compatible with Python3.9 - linted with Black
 # debdeps: python3-setuptools
 
 from argparse import ArgumentParser
-from collections import namedtuple, deque
-from configparser import ConfigParser
-from datetime import date, datetime, timedelta
+
+# from configparser import ConfigParser
+from datetime import datetime, timedelta
 from pathlib import Path
 from site import getsitepackages
-import hashlib
+from typing import Generator, Tuple, Optional, Any, Dict
+from urllib.parse import urlunsplit, urlencode
 import logging
 import os
-import pickle
-import select
-import signal
 import sys
 
 from systemd.journal import JournalHandler  # debdeps: python3-systemd
-import psycopg2  # debdeps: python3-psycopg2
-import psycopg2.extensions
-import psycopg2.extras
 import ujson  # debdeps: python3-ujson
 import feedgenerator  # debdeps: python3-feedgenerator
+import statsd  # debdeps: python3-statsd
 
-from detector.metrics import setup_metrics
-import detector.scoring as scoring
+import pandas as pd  # debdeps: python3-pandas
+import numpy as np  # debdeps: python3-numpy
+
+from clickhouse_driver import Client as Clickhouse
+
+try:
+    from tqdm import tqdm
+except ImportError:
+
+    def tqdm(x, *a, **kw):  # type: ignore
+        return x
+
 
 log = logging.getLogger("detector")
-metrics = setup_metrics(name="detector")
+metrics = statsd.StatsClient("localhost", 8125, prefix="detector")
 
-DB_USER = "shovel"
-DB_NAME = "metadb"
-DB_PASSWORD = "yEqgNr2eXvgG255iEBxVeP"  # This is already made public
+DBURI = "clickhouse://detector:detector@localhost/default?use_numpy=True"
+TCAI = ["test_name", "probe_cc", "probe_asn", "input"]
+tTCAI = ["t", "test_name", "probe_cc", "probe_asn", "input"]
 
-RO_DB_USER = "amsapi"
-RO_DB_PASSWORD = "b2HUU6gKM19SvXzXJCzpUV"  # This is already made public
+conf: Any = None
+click: Clickhouse = None
+cc_to_country_name: Dict[str, str] = {}  # CC-> name, see load_country_name_map
 
-DEFAULT_STARTTIME = datetime(2016, 1, 1)
 
-BASEURL = "http://fastpath.ooni.nu:8080"
-WEBAPP_URL = BASEURL + "/webapp"
+def query(*a, **kw):
+    settings = {}
+    if conf.reprocess:
+        settings["log_query"] = 0
+    else:
+        log.info(a)
+    return click.execute(*a, settings=settings, **kw)
 
-PKGDIR = getsitepackages()[-1]
 
-conf = None
-cc_to_country_name = None  # set by load_country_name_map
+def parse_date(d: str) -> datetime:
+    return datetime.strptime(d, "%Y-%m-%d %H:%M")
 
-# Speed up psycopg2's JSON load
-psycopg2.extras.register_default_jsonb(loads=ujson.loads, globally=True)
-psycopg2.extras.register_default_json(loads=ujson.loads, globally=True)
 
-
-def fetch_past_data(conn, start_date):
-    """Fetch past data in large chunks ordered by measurement_start_time
-    """
-    q = """
-    SELECT
-        coalesce(false) as anomaly,
-        coalesce(false) as confirmed,
-        input,
-        measurement_start_time,
-        probe_cc,
-        scores::text,
-        coalesce('') as report_id,
-        test_name,
-        tid
-    FROM fastpath
-    WHERE measurement_start_time >= %(start_date)s
-    AND measurement_start_time < %(end_date)s
-
-    UNION
-
-    SELECT
-        anomaly,
-        confirmed,
-        input,
-        measurement_start_time,
-        probe_cc,
-        coalesce('') as scores,
-        report_id,
-        test_name,
-        coalesce('') as tid
-
-    FROM measurement
-    JOIN report ON report.report_no = measurement.report_no
-    JOIN input ON input.input_no = measurement.input_no
-    WHERE measurement_start_time >= %(start_date)s
-    AND measurement_start_time < %(end_date)s
-    ORDER BY measurement_start_time
-    """
-    assert start_date
-
-    end_date = start_date + timedelta(weeks=1)
-
-    chunk_size = 20000
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        while True:
-            # Iterate across time blocks
-            now = datetime.utcnow()
-            # Ignore measurements with future timestamp
-            if end_date > now:
-                end_date = now
-                log.info("Last run")
-            log.info("Query from %s to %s", start_date, end_date)
-            p = dict(start_date=str(start_date), end_date=str(end_date))
-            cur.execute(q, p)
-            while True:
-                # Iterate across chunks of rows
-                rows = cur.fetchmany(chunk_size)
-                if not rows:
-                    break
-                log.info("Fetched msmt chunk of size %d", len(rows))
-                for r in rows:
-                    d = dict(r)
-                    if d["scores"]:
-                        d["scores"] = ujson.loads(d["scores"])
-
-                    yield d
-
-            if end_date == now:
-                break
-
-            start_date += timedelta(weeks=1)
-            end_date += timedelta(weeks=1)
-
-
-def fetch_past_data_selective(conn, start_date, cc, test_name, inp):
-    """Fetch past data in large chunks
-    """
-    chunk_size = 200_000
-    q = """
-    SELECT
-        coalesce(false) as anomaly,
-        coalesce(false) as confirmed,
-        input,
-        measurement_start_time,
-        probe_cc,
-        probe_asn,
-        scores::text,
-        test_name,
-        tid
-    FROM fastpath
-    WHERE measurement_start_time >= %(start_date)s
-    AND probe_cc = %(cc)s
-    AND test_name = %(test_name)s
-    AND input = %(inp)s
-
-    UNION
-
-    SELECT
-        anomaly,
-        confirmed,
-        input,
-        measurement_start_time,
-        probe_cc,
-        probe_asn,
-        coalesce('') as scores,
-        test_name,
-        coalesce('') as tid
-
-    FROM measurement
-    JOIN report ON report.report_no = measurement.report_no
-    JOIN input ON input.input_no = measurement.input_no
-    WHERE measurement_start_time >= %(start_date)s
-    AND probe_cc = %(cc)s
-    AND test_name = %(test_name)s
-    AND input = %(inp)s
-
-    ORDER BY measurement_start_time
-    """
-    p = dict(cc=cc, inp=inp, start_date=start_date, test_name=test_name)
-
-    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(q, p)
-        while True:
-            rows = cur.fetchmany(chunk_size)
-            if not rows:
-                break
-            log.info("Fetched msmt chunk of size %d", len(rows))
-            for r in rows:
-                d = dict(r)
-                if d["scores"]:
-                    d["scores"] = ujson.loads(d["scores"])
-
-                yield d
-
-
-def backfill_scores(d):
-    """Generate scores dict for measurements from the traditional pipeline
-    """
-    if d.get("scores", None):
-        return
-    b = (
-        scoring.anomaly
-        if d["anomaly"]
-        else 0 + scoring.confirmed
-        if d["confirmed"]
-        else 0
-    )
-    d["scores"] = dict(blocking_general=b)
-
-
-def detect_blocking_changes_1s_g(g, cc, test_name, inp, start_date):
-    """Used by webapp
-    :returns: (msmts, changes)
-    """
-    means = {}
-    msmts = []
-    changes = []
-
-    for msm in g:
-        backfill_scores(msm)
-        k = (msm["probe_cc"], msm["test_name"], msm["input"])
-        assert isinstance(msm["scores"], dict), repr(msm["scores"])
-        change = detect_blocking_changes(means, msm, warmup=True)
-        date, mean, bblocked = means[k]
-        val = msm["scores"]["blocking_general"]
-        if change:
-            changes.append(change)
-
-        msmts.append((date, val, mean))
-
-    log.debug("%d msmts processed", len(msmts))
-    assert isinstance(msmts[0][0], datetime)
-    return (msmts, changes)
-
-
-def detect_blocking_changes_one_stream(conn, cc, test_name, inp, start_date):
-    """Used by webapp
-    :returns: (msmts, changes)
-    """
-    # TODO: move into webapp?
-    g = fetch_past_data_selective(conn, start_date, cc, test_name, inp)
-    return detect_blocking_changes_1s_g(g, cc, test_name, inp, start_date)
-
-
-def load_asn_db():
-    db_f = conf.vardir / "ASN.csv"
-    log.info("Loading %s", db_f)
-    if not db_f.is_file():
-        log.info("No ASN file")
-        return {}
-
-    d = {}
-    with db_f.open() as f:
-        for line in f:
-            try:
-                asn, name = line.split(",", 1)
-                asn = int(asn)
-                name = name.strip()[1:-2].strip()
-                d[asn] = name
-            except:
-                continue
-
-    log.info("%d ASNs loaded", len(d))
-    return d
-
-
-def prevent_future_date(msm):
-    """If the msmt time is in the future replace it with utcnow
-    """
-    # Timestamp are untrusted as they are generated by the probes
-    # This makes the process non-deterministic and non-reproducible
-    # but we can run unit tests against good inputs or mock utctime
-    #
-    # Warning: measurement_start_time is used for ranged queries against the DB
-    # and to pinpoint measurements and changes
-    now = datetime.utcnow()
-    if msm["measurement_start_time"] > now:
-        delta = msm["measurement_start_time"] - now
-        some_id = msm.get("tid", None) or msm.get("report_id", "")
-        log.info("Masking measurement %s %s in the future", some_id, delta)
-        msm["measurement_start_time"] = now
-
-
-def detect_blocking_changes_asn_one_stream(conn, cc, test_name, inp, start_date):
-    """Used by webapp
-    :returns: (msmts, changes)
-    """
-    g = fetch_past_data_selective(conn, start_date, cc, test_name, inp)
-    means = {}
-    msmts = []
-    changes = []
-    asn_breakdown = {}
-
-    for msm in g:
-        backfill_scores(msm)
-        prevent_future_date(msm)
-        k = (msm["probe_cc"], msm["test_name"], msm["input"])
-        assert isinstance(msm["scores"], dict), repr(msm["scores"])
-        change = detect_blocking_changes(means, msm, warmup=True)
-        date, mean, _ = means[k]
-        val = msm["scores"]["blocking_general"]
-        if change:
-            changes.append(change)
-
-        msmts.append((date, val, mean))
-        del date
-        del val
-        del mean
-        del change
-
-        # Generate charts for popular AS
-        asn = msm["probe_asn"]
-        a = asn_breakdown.get(asn, dict(means={}, msmts=[], changes=[]))
-        change = detect_blocking_changes(a["means"], msm, warmup=True)
-        date, mean, _ = a["means"][k]
-        val = msm["scores"]["blocking_general"]
-        a["msmts"].append((date, val, mean))
-        if change:
-            a["changes"].append(change)
-        asn_breakdown[asn] = a
-
-    log.debug("%d msmts processed", len(msmts))
-    return (msmts, changes, asn_breakdown)
-
-
-Change = namedtuple(
-    "Change",
-    [
-        "probe_cc",
-        "test_name",
-        "input",
-        "blocked",
-        "mean",
-        "measurement_start_time",
-        "tid",
-        "report_id",
-    ],
-)
-
-MeanStatus = namedtuple("MeanStatus", ["measurement_start_time", "val", "blocked"])
-
-
-def detect_blocking_changes(means: dict, msm: dict, warmup=False):
-    """Detect changes in blocking patterns
-    :returns: Change or None
-    """
-    # TODO: move out params
-    upper_limit = 0.10
-    lower_limit = 0.05
-    # P: averaging value
-    # p=1: no averaging
-    # p=0.000001: very strong averaging
-    p = 0.02
-
-    inp = msm["input"]
-    if inp is None:
-        return
-
-    if not isinstance(inp, str):
-        # Some inputs are lists. TODO: handle them?
-        log.debug("odd input")
-        return
-
-    k = (msm["probe_cc"], msm["test_name"], inp)
-    tid = msm.get("tid", None)
-    report_id = msm.get("report_id", None) or None
-
-    assert isinstance(msm["scores"], dict), repr(msm["scores"])
-    blocking_general = msm["scores"]["blocking_general"]
-    measurement_start_time = msm["measurement_start_time"]
-    assert isinstance(measurement_start_time, datetime), repr(measurement_start_time)
-
-    if k not in means:
-        # cc/test_name/input tuple never seen before
-        blocked = blocking_general > upper_limit
-        means[k] = MeanStatus(measurement_start_time, blocking_general, blocked)
-        if blocked:
-            if not warmup:
-                log.info("%r new and blocked", k)
-                metrics.incr("detected_blocked")
-
-            return Change(
-                measurement_start_time=measurement_start_time,
-                blocked=blocked,
-                mean=blocking_general,
-                probe_cc=msm["probe_cc"],
-                input=msm["input"],
-                test_name=msm["test_name"],
-                tid=tid,
-                report_id=report_id,
-            )
-
-        else:
-            return None
-
-    old = means[k]
-    assert isinstance(old, MeanStatus)
-    # tdelta = measurement_start_time - old.time
-    # TODO: average weighting by time delta; add timestamp to status and means
-    # TODO: record msm leading to status change
-    new_val = (1 - p) * old.val + p * blocking_general
-    means[k] = MeanStatus(measurement_start_time, new_val, old.blocked)
-
-    if old.blocked and new_val < lower_limit:
-        # blocking cleared
-        means[k] = MeanStatus(measurement_start_time, new_val, False)
-        if not warmup:
-            log.info("%r cleared %.2f", k, new_val)
-            metrics.incr("detected_cleared")
-
-        return Change(
-            measurement_start_time=measurement_start_time,
-            blocked=False,
-            mean=new_val,
-            probe_cc=msm["probe_cc"],
-            input=msm["input"],
-            test_name=msm["test_name"],
-            tid=tid,
-            report_id=report_id,
-        )
-
-    if not old.blocked and new_val > upper_limit:
-        means[k] = MeanStatus(measurement_start_time, new_val, True)
-        if not warmup:
-            log.info("%r blocked %.2f", k, new_val)
-            metrics.incr("detected_blocked")
-
-        return Change(
-            measurement_start_time=measurement_start_time,
-            blocked=True,
-            mean=new_val,
-            probe_cc=msm["probe_cc"],
-            input=msm["input"],
-            test_name=msm["test_name"],
-            tid=tid,
-            report_id=report_id,
-        )
-
-
-def parse_date(d):
-    return datetime.strptime(d, "%Y-%m-%d").date()
-
-
-def setup_dirs(conf, root):
-    """Setup directories, creating them if needed
-    """
+def setup_dirs(root: Path) -> None:
+    """Setup directories, creating them if needed"""
     conf.vardir = root / "var/lib/detector"
     conf.outdir = conf.vardir / "output"
     conf.rssdir = conf.outdir / "rss"
@@ -484,7 +90,6 @@ def setup_dirs(conf, root):
     conf.rssdir_by_cc_tname_inp = conf.rssdir / "cc-type-inp"
     conf.eventdir = conf.outdir / "events"
     conf.statusdir = conf.outdir / "status"
-    conf.pickledir = conf.outdir / "_internal"
     for p in (
         conf.vardir,
         conf.outdir,
@@ -494,7 +99,6 @@ def setup_dirs(conf, root):
         conf.rssdir_by_cc_tname_inp,
         conf.eventdir,
         conf.statusdir,
-        conf.pickledir,
     ):
         p.mkdir(parents=True, exist_ok=True)
 
@@ -503,351 +107,144 @@ def setup():
     os.environ["TZ"] = "UTC"
     global conf
     ap = ArgumentParser(__doc__)
+    # TODO cleanup args used for debugging
     ap.add_argument("--devel", action="store_true", help="Devel mode")
-    ap.add_argument("--webapp", action="store_true", help="Run webapp")
+    ap.add_argument("-v", action="store_true", help="High verbosity")
+    ap.add_argument("--reprocess", action="store_true", help="Reprocess events")
     ap.add_argument("--start-date", type=lambda d: parse_date(d))
-    ap.add_argument("--db-host", default=None, help="Database hostname")
-    ap.add_argument(
-        "--ro-db-host", default=None, help="Read-only database hostname"
-    )
+    ap.add_argument("--end-date", type=lambda d: parse_date(d))
+    ap.add_argument("--interval-mins", type=int, default=60)
+    ap.add_argument("--db-uri", default=DBURI, help="Database hostname")
     conf = ap.parse_args()
     if conf.devel:
         format = "%(relativeCreated)d %(process)d %(levelname)s %(name)s %(message)s"
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=format)
+        lvl = logging.DEBUG if conf.v else logging.DEBUG
+        logging.basicConfig(stream=sys.stdout, level=lvl, format=format)
     else:
         log.addHandler(JournalHandler(SYSLOG_IDENTIFIER="detector"))
         log.setLevel(logging.DEBUG)
 
-
+    conf.interval = timedelta(minutes=conf.interval_mins)
     # Run inside current directory in devel mode
     root = Path(os.getcwd()) if conf.devel else Path("/")
-    conf.conffile = root / "etc/detector.conf"
-    log.info("Using conf file %r", conf.conffile.as_posix())
-    cp = ConfigParser()
-    with open(conf.conffile) as f:
-        cp.read_file(f)
-        conf.db_host = conf.db_host or cp["DEFAULT"]["db-host"]
-        conf.ro_db_host = conf.ro_db_host or cp["DEFAULT"]["ro-db-host"]
-
-    setup_dirs(conf, root)
+    setup_dirs(root)
+    # conf.conffile = root / "etc/ooni/detector.conf"
+    # log.info("Using conf file %r", conf.conffile.as_posix())
+    # cp = ConfigParser()
+    # with open(conf.conffile) as f:
+    #     cp.read_file(f)
+    #     conf.db_uri = conf.db_uri or cp["DEFAULT"]["clickhouse_url"]
 
 
-@metrics.timer("handle_new_measurement")
-def handle_new_msg(msg, means, rw_conn):
-    """Handle one measurement received in realtime from PostgreSQL
-    notifications
-    """
-    msm = ujson.loads(msg.payload)
-    assert isinstance(msm["scores"], dict), type(msm["scores"])
-    msm["measurement_start_time"] = datetime.strptime(
-        msm["measurement_start_time"], "%Y-%m-%d %H:%M:%S"
+# # RSS feed generation
+
+
+def explorer_mat_url(
+    test_name: str, inp: str, probe_cc: str, probe_asn: int, t: datetime
+) -> str:
+    """Generates a link to the MAT to display an event"""
+    since = str(t - timedelta(days=7))
+    until = str(t + timedelta(days=7))
+    p = dict(
+        test_name=test_name,
+        axis_x="measurement_start_day",
+        since=since,
+        until=until,
+        probe_asn=f"AS{probe_asn}",
+        probe_cc=probe_cc,
+        input=inp,
     )
-    log.debug("Notify for msmt from %s", msm.get("probe_cc", "<no cc>"))
-    prevent_future_date(msm)
-    change = detect_blocking_changes(means, msm, warmup=False)
-    if change is not None:
-        upsert_change(change)
-
-
-def connect_to_db(db_host, db_user, db_name, db_password):
-    dsn = f"host={db_host} user={db_user} dbname={db_name} password={db_password}"
-    log.info("Connecting to database: %r", dsn)
-    conn = psycopg2.connect(dsn)
-    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-    return conn
-
-
-def snapshot_means(msm, last_snapshot_date, means):
-    """Save means to disk every month
-    """
-    # TODO: add config parameter to recompute past data
-    t = msm["measurement_start_time"]
-    month = date(t.year, t.month, 1)
-    if month == last_snapshot_date:
-        return last_snapshot_date
-
-    log.info("Saving %s monthly snapshot", month)
-    save_means(means, month)
-    return month
-
-
-def process_historical_data(ro_conn, rw_conn, start_date, means):
-    """Process past data
-    """
-    assert start_date
-    log.info("Running process_historical_data from %s", start_date)
-    t = metrics.timer("process_historical_data").start()
-    cnt = 0
-    # fetch_past_data returns measurements ordered by measurement_start_time
-    last_snap = None
-    for past_msm in fetch_past_data(ro_conn, start_date):
-        backfill_scores(past_msm)
-        prevent_future_date(past_msm)
-        last_snap = snapshot_means(past_msm, last_snap, means)
-        change = detect_blocking_changes(means, past_msm, warmup=True)
-        cnt += 1
-        if change is not None:
-            upsert_change(change)
-
-        metrics.incr("processed_msmt")
-
-    t.stop()
-    for m in means.values():
-        assert isinstance(m[2], bool), m
-
-    blk_cnt = sum(m[2] for m in means.values())  # count blocked
-    p = 100 * blk_cnt / len(means)
-    log.info("%d tracked items, %d blocked (%.3f%%)", len(means), blk_cnt, p)
-    log.info("Processed %d measurements. Speed: %d K-items per second", cnt, cnt / t.ms)
-
-
-def create_url(change):
-    return f"{WEBAPP_URL}/chart?cc={change.probe_cc}&test_name={change.test_name}&input={change.input}&start_date="
-
-
-def basefn(cc, test_name, inp):
-    """Generate opaque filesystem-safe filename
-    inp can be "" or None (returning different hashes)
-    """
-    d = f"{cc}:{test_name}:{inp}"
-    h = hashlib.shake_128(d.encode()).hexdigest(16)
-    return h
-
-
-# TODO rename changes to events?
-
-
-def explorer_url(c: Change) -> str:
-    return f"https://explorer.ooni.org/measurement/{c.report_id}?input={c.input}"
-
-
-# TODO: regenerate RSS feeds (only) once after the warmup terminates
+    return urlunsplit(("https", "explorer.ooni.org", "/chart/mat", urlencode(p), ""))
 
 
 @metrics.timer("write_feed")
 def write_feed(feed, p: Path) -> None:
     """Write out RSS feed atomically"""
     tmp_p = p.with_suffix(".tmp")
-    with tmp_p.open("w") as f:
-        feed.write(f, "utf-8")
-
+    tmp_p.write_text(feed)
     tmp_p.rename(p)
 
 
-global_feed_cache = deque(maxlen=1000)
-
-
-@metrics.timer("update_rss_feed_global")
-def update_rss_feed_global(change: Change) -> None:
-    """Generate RSS feed for global events and write it in
-    /var/lib/detector/rss/global.xml
+@metrics.timer("generate_rss_feed")
+def generate_rss_feed(events: pd.DataFrame, update_time: datetime) -> Tuple[str, Path]:
     """
-    # The files are served by Nginx
-    global global_feed_cache
-    if not change.input:
-        return
-    global_feed_cache.append(change)
+    Generate RSS feed for a single TCAI into /var/lib/detector/rss/<fname>.xml
+    The files are then served by Nginx
+    """
+    x = events.iloc[0]
+    minp = x.input.replace("://", "_").replace("/", "_")
+    fname = f"{x.test_name}-{x.probe_cc}-AS{x.probe_asn}-{minp}"
+    log.info(f"Generating feed for {fname}. {len(events)} events.")
+
     feed = feedgenerator.Rss201rev2Feed(
         title="OONI events",
         link="https://explorer.ooni.org",
         description="Blocked services and websites detected by OONI",
         language="en",
     )
-    for c in global_feed_cache:
-        un = "" if c.blocked else "un"
-        country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
+    for e in events.itertuples():
+        cc = e.probe_cc.upper()
+        # TODO use country
+        country = cc_to_country_name.get(cc, cc)
+        status2 = "unblocked" if e.status == "OK" else "blocked"
+        link = explorer_mat_url(e.test_name, e.input, e.probe_cc, e.probe_asn, e.time)
         feed.add_item(
-            title=f"{c.input} {un}blocked in {country}",
-            link=explorer_url(c),
-            description=f"Change detected on {c.measurement_start_time}",
-            pubdate=c.measurement_start_time,
-            updateddate=datetime.utcnow(),
-        )
-    write_feed(feed, conf.rssdir / "global.xml")
-
-
-by_cc_feed_cache = {}
-
-
-@metrics.timer("update_rss_feed_by_country")
-def update_rss_feed_by_country(change: Change) -> None:
-    """Generate RSS feed for events grouped by country and write it in
-    /var/lib/detector/rss/by-country/<CC>.xml
-    """
-    # The files are served by Nginx
-    global by_cc_feed_cache
-    if not change.input:
-        return
-    cc = change.probe_cc
-    if cc not in by_cc_feed_cache:
-        by_cc_feed_cache[cc] = deque(maxlen=1000)
-    by_cc_feed_cache[cc].append(change)
-    feed = feedgenerator.Rss201rev2Feed(
-        title=f"OONI events in {cc}",
-        link="https://explorer.ooni.org",
-        description="Blocked services and websites detected by OONI",
-        language="en",
-    )
-    for c in by_cc_feed_cache[cc]:
-        un = "" if c.blocked else "un"
-        country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
-        feed.add_item(
-            title=f"{c.input} {un}blocked in {country}",
-            link=explorer_url(c),
-            description=f"Change detected on {c.measurement_start_time}",
-            pubdate=c.measurement_start_time,
-            updateddate=datetime.utcnow(),
-        )
-    write_feed(feed, conf.rssdir_by_cc / f"{cc}.xml")
-
-
-@metrics.timer("update_rss_feeds_by_cc_tname_inp")
-def update_rss_feeds_by_cc_tname_inp(events, hashfname):
-    """Generate RSS feed by cc / test_name / input and write
-    /var/lib/detector/rss/cc-type-inp/<hash>.xml
-    """
-    # The files are served by Nginx
-    feed = feedgenerator.Rss201rev2Feed(
-        title="OONI events",
-        link="https://explorer.ooni.org",
-        description="Blocked services and websites detected by OONI",
-        language="en",
-    )
-    # TODO: render date properly and add blocked/unblocked
-    # TODO: put only recent events in the feed (based on the latest event time)
-    for e in events:
-        if not e["input"]:
-            continue
-
-        country = cc_to_country_name.get(c.probe_cc.upper(), c.probe_cc)
-        feed.add_item(
-            title=f"{c.input} {un}blocked in {country}",
-            link=explorer_url(c),
-            description=f"Change detected on {c.measurement_start_time}",
-            pubdate=c.measurement_start_time,
-            updateddate=datetime.utcnow(),
+            title=f"{e.input} {status2} in {e.probe_cc} AS{e.probe_asn}",
+            link=link,
+            description=f"Change detected on {e.time}",
+            pubdate=e.time,
+            updateddate=update_time,
         )
 
-    write_feed(feed, conf.rssdir / f"{hashfname}.xml")
+    path = conf.rssdir / f"{fname}.xml"
+    return feed.writeString("utf-8"), path
 
 
-def update_status_files(blocking_events):
-    # The files are served by Nginx
-    return  # FIXME
-
-    # This contains the last status change for every cc/test_name/input
-    # that ever had a block/unblock event
-    status = {k: v[-1] for k, v in blocking_events.items()}
-
-    statusfile = conf.statusdir / f"status.json"
-    d = dict(format=1, status=status)
-    with statusfile.open("w") as f:
-        ujson.dump(d, f)
-
-    log.debug("Wrote %s", statusfile)
-
-
-@metrics.timer("upsert_change")
-def upsert_change(change):
-    """Create / update RSS and JSON files with a new change
+@metrics.timer("rebuild_feeds")
+def rebuild_feeds(events: pd.DataFrame) -> int:
+    """Rebuild whole feeds for each TCAI"""
+    # When generated in real time "events" only contains the recent events for
+    # each TCAI. We need the full history.
+    # Changes are rare enough that running a query on blocking_events for each
+    # change is not too heavy
+    cnt = 0
+    sql = """SELECT test_name, probe_cc, probe_asn, input, time, status
+    FROM blocking_events
+    WHERE test_name = %(test_name)s AND input = %(inp)s
+    AND probe_cc = %(cc)s AND probe_asn = %(asn)s
+    ORDER BY time
     """
-    # Create DB tables in future if needed
-    debug_url = create_url(change)
-    log.info("Change! %r %r", change, debug_url)
-    if not change.report_id:
-        log.error("Empty report_id")
-        return
+    events = events.reset_index()
+    unique_tcais = events[TCAI].drop_duplicates()
+    update_time = datetime.utcnow()
+    for x in unique_tcais.itertuples():
+        d = dict(test_name=x.test_name, inp=x.input, cc=x.probe_cc, asn=x.probe_asn)
+        history = click.query_dataframe(sql, d)
+        if len(history):
+            feed_data, path = generate_rss_feed(history, update_time)
+            write_feed(feed_data, path)
+            cnt += len(history)
 
+    log.info(f"[re]created {cnt} feeds")
+    return cnt
+
+
+# # Initialization
+
+
+def load_country_name_map(devel: bool) -> dict:
+    """Loads country-list.json and creates a lookup dictionary"""
     try:
-        update_rss_feed_global(change)
-        update_rss_feed_by_country(change)
-    except Exception as e:
-        log.error(e, exc_info=1)
-
-    # TODO: currently unused
-    return
-
-    # Append change to a list in a JSON file
-    # It contains all the block/unblock events for a given cc/test_name/input
-    hashfname = basefn(change.probe_cc, change.test_name, change.input)
-    events_f = conf.eventdir / f"{hashfname}.json"
-    if events_f.is_file():
-        with events_f.open() as f:
-            ecache = ujson.load(f)
-    else:
-        ecache = dict(format=1, blocking_events=[])
-
-    ecache["blocking_events"].append(change._asdict())
-    log.info("Saving %s", events_f)
-    with events_f.open("w") as f:
-        ujson.dump(ecache, f)
-
-    update_rss_feeds_by_cc_tname_inp(ecache["blocking_events"], hashfname)
-
-    update_status_files(ecache["blocking_events"])
-
-
-def load_means():
-    """Load means from a pkl file
-    The file is safely owned by the detector.
-    """
-    pf = conf.pickledir / "means.pkl"
-    log.info("Loading means from %s", pf)
-    if pf.is_file():
-        perms = pf.stat().st_mode
-        assert (perms & 2) == 0, "Insecure pickle permissions %s" % oct(perms)
-        with pf.open("rb") as f:
-            means = pickle.load(f)
-
-        assert means
-        earliest = min(m.measurement_start_time for m in means.values())
-        latest = max(m.measurement_start_time for m in means.values())
-        # Cleanup
-        # t = datetime.utcnow()
-        # for k, m in means.items():
-        #     if m.measurement_start_time > t:
-        #         log.info("Fixing time")
-        #         means[k] = MeanStatus(t, m.val, m.blocked)
-
-        latest = max(m[0] for m in means.values())
-        log.info("Earliest mean: %s", earliest)
-        return means, latest
-
-    log.info("Creating new means file")
-    return {}, None
-
-
-def save_means(means, date):
-    """Save means atomically. Protocol 4
-    """
-    tstamp = date.strftime(".%Y-%m-%d") if date else ""
-    pf = conf.pickledir / f"means{tstamp}.pkl"
-    pft = pf.with_suffix(".tmp")
-    if not means:
-        log.error("No means to save")
-        return
-    log.info("Saving %d means to %s", len(means), pf)
-    latest = max(m[0] for m in means.values())
-    log.info("Latest mean: %s", latest)
-    with pft.open("wb") as f:
-        pickle.dump(means, f, protocol=4)
-    pft.rename(pf)
-    log.info("Saving completed")
-
-
-# FIXME: for performance reasons we want to minimize heavy DB queries.
-# Means are cached in a pickle file to allow restarts and we pick up where
-# we stopped based on measurement_start_time. Yet the timestamp are untrusted
-# as they are generated by the probes.
-
-
-def load_country_name_map():
-    """Load country-list.json and create a lookup dictionary
-    """
-    fi = f"{PKGDIR}/detector/data/country-list.json"
-    log.info("Loading %s", fi)
-    with open(fi) as f:
-        clist = ujson.load(f)
+        fi = "detector/data/country-list.json"
+        log.info("Loading %s", fi)
+        with open(fi) as f:
+            clist = ujson.load(f)
+    except FileNotFoundError:
+        pkgdir = getsitepackages()[-1]
+        fi = f"{pkgdir}/detector/data/country-list.json"
+        log.info("Loading %s", fi)
+        with open(fi) as f:
+            clist = ujson.load(f)
 
     # The file is deployed with the detector: crash out if it's broken
     d = {}
@@ -861,65 +258,496 @@ def load_country_name_map():
     return d
 
 
-# TODO: handle input = None both in terms of filename collision and RSS feed
-# and add functional tests
+def create_tables() -> None:
+    # Requires admin privileges
+    sql = """
+    CREATE TABLE IF NOT EXISTS blocking_status
+    (
+    `test_name` String,
+    `input` String,
+    `probe_cc` String,
+    `probe_asn` Int32,
+    `confirmed_perc` Float32,
+    `pure_anomaly_perc` Float32,
+    `accessible_perc` Float32,
+    `cnt` Float32,
+    `status` String,
+    `old_status` String,
+    `change` Float32,
+    `stability` Float32,
+    `update_time` DateTime64(0) MATERIALIZED now64()
+    )
+    ENGINE = ReplacingMergeTree
+    ORDER BY (test_name, input, probe_cc, probe_asn)
+    SETTINGS index_granularity = 4
+    """
+    query(sql)
+    sql = """
+    CREATE TABLE IF NOT EXISTS blocking_events
+    (
+    `test_name` String,
+    `input` String,
+    `probe_cc` String,
+    `probe_asn` Int32,
+    `status` String,
+    `time` DateTime64(3),
+    `detection_time` DateTime64(0) MATERIALIZED now64()
+    )
+    ENGINE = ReplacingMergeTree
+    ORDER BY (test_name, input, probe_cc, probe_asn, time)
+    SETTINGS index_granularity = 4
+    """
+    query(sql)
+    sql = "CREATE USER IF NOT EXISTS detector IDENTIFIED WITH plaintext_password BY 'detector'"
+    query(sql)
+    query("GRANT SELECT,INSERT,OPTIMIZE,SHOW ON blocking_status TO detector")
+    query("GRANT SELECT,INSERT,OPTIMIZE,SHOW ON blocking_events TO detector")
+    query("GRANT SELECT ON * TO detector")
+
+
+def create_empty_status_df() -> pd.DataFrame:
+    status = pd.DataFrame(
+        columns=[
+            "status",
+            "old_status",
+            "change",
+            "stability",
+            "test_name",
+            "probe_cc",
+            "probe_asn",
+            "input",
+            "accessible_perc",
+            "cnt",
+            "confirmed_perc",
+            "pure_anomaly_perc",
+        ]
+    )
+    status.set_index(TCAI, inplace=True)
+    return status
+
+
+def reprocess_inner(
+    gen, time_slots_cnt: int, collect_hist=False
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    #    df = pd.DataFrame({'Courses': pd.Series(dtype='str'),
+    #                   'Fee': pd.Series(dtype='int'),
+    #                   'Duration': pd.Series(dtype='str'),
+    #                   'Discount': pd.Series(dtype='float')})
+    status = create_empty_status_df()
+    events_tmp = []
+    status_history_tmp = []
+
+    log.info(f"Processing {time_slots_cnt} time slots")
+    for new in tqdm(gen, total=time_slots_cnt):
+        assert "Unnamed: 0" not in sorted(new.columns), sorted(new.columns)
+        # assert new.index.names == TCAI, new.index.names
+        status, events = process_data(status, new)
+        if events is not None and len(events):
+            events_tmp.append(events)
+            if collect_hist:
+                status_history_tmp.append(status)
+
+    if events_tmp:
+        events = pd.concat(events_tmp)
+    else:
+        events = None
+        status_history = pd.concat(status_history_tmp) if collect_hist else None
+        return events, status, status_history
+
+
+@metrics.timer("process_historical_data")
+def process_historical_data(
+    start_date: datetime,
+    end_date: datetime,
+    interval: timedelta,
+    services: dict,
+    probe_cc=None,
+    collect_hist=False,
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    """Processes past data. Rebuilds blocking_status table and events
+    Keeps blocking_status and blocking_events in memory during the run.
+    """
+    log.info(f"Running process_historical_data from {start_date} to {end_date}")
+    urls = sorted(set(u for urls in services.values() for u in urls))
+    time_slots_cnt = int((end_date - interval - start_date) / interval)
+
+    gen = gen_input(click, start_date, end_date, interval, urls)
+    events, status, status_history = reprocess_inner(gen, time_slots_cnt)
+
+    log.debug("Replacing blocking_status table")
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
+
+    tmp_s = status.reset_index()  # .convert_dtypes()
+    click.insert_dataframe("INSERT INTO blocking_status VALUES", tmp_s)
+
+    log.debug("Replacing blocking_events table")
+    click.execute("TRUNCATE TABLE blocking_events SYNC")
+    if events is not None and len(events):
+        sql = "INSERT INTO blocking_events VALUES"
+        click.insert_dataframe(sql, events.reset_index(drop=True))
+
+    log.info("Done")
+    return events, status, status_history
+
+
+@metrics.timer("process_fresh_data")
+def process_fresh_data(
+    start_date: datetime,
+    end_date: datetime,
+    interval: timedelta,
+    services: dict,
+    probe_cc=None,
+    collect_hist=False,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Processes current data."""
+    log.info(f"Running process_fresh_data from {start_date} to {end_date}")
+    urls = sorted(set(u for urls in services.values() for u in urls))
+
+    status = load_blocking_status()
+    metrics.gauge("blocking_status_tblsize", len(status))
+
+    gen = gen_input(click, start_date, end_date, interval, urls)
+    new = None
+    for x in gen:
+        new = x
+        pass
+
+    if new is None or len(new) == 0:
+        log.error("Empty measurament batch received")
+        sys.exit(1)
+
+    log.info(f"New rows: {len(new)} Status rows: {len(status)}")
+    status, events = process_data(status, new)
+
+    assert len(status)
+
+    log.debug("Updating blocking_status table")
+
+    wanted_cols = [
+        "test_name",
+        "input",
+        "probe_cc",
+        "probe_asn",
+        "confirmed_perc",
+        "pure_anomaly_perc",
+        "accessible_perc",
+        "cnt",
+        "status",
+        "old_status",
+        "change",
+        "stability",
+    ]
+    status.status.fillna("UNKNOWN", inplace=True)
+    status.old_status.fillna("UNKNOWN", inplace=True)
+    status.change.fillna(0, inplace=True)
+    tmp_s = status.reset_index()[wanted_cols].convert_dtypes()
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
+    click.insert_dataframe("INSERT INTO blocking_status VALUES", tmp_s)
+
+    if events is not None and len(events):
+        log.debug(f"Appending {len(events)} events to blocking_events table")
+        ev = events.reset_index()
+        ev = ev.drop(columns=["old_status"])
+        ev["time"] = end_date  # event detection time
+        log.info(ev)
+        assert ev.columns.values.tolist() == [
+            "test_name",
+            "probe_cc",
+            "probe_asn",
+            "input",
+            "status",
+            "time",
+        ]
+        sql = "INSERT INTO blocking_events (test_name, probe_cc, probe_asn, input, status, time) VALUES"
+        click.insert_dataframe(sql, ev)
+
+    log.info("Done")
+    return events, status
+
+
+def gen_stats():
+    """Generates gauge metrics showing the table sizes"""
+    sql = "SELECT count() FROM blocking_status FINAL"
+    bss = query(sql)[0][0]
+    metrics.gauge("blocking_status_tblsize", bss)
+    sql = "SELECT count() FROM blocking_events"
+    bes = query(sql)[0][0]
+    metrics.gauge("blocking_events_tblsize", bes)
+
+
+def process_data(
+    blocking_status: pd.DataFrame, new: pd.DataFrame
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Detects blocking. The inputs are the current blocking status and a df
+    with new data from a single timeslice.
+    Returns an updated blocking status and a df with new blocking events.
+    """
+    if len(blocking_status) == 0 and len(new) == 0:
+        return blocking_status, []
+
+    m = blocking_status.merge(new, how="outer", on=TCAI, suffixes=("_BS", ""))
+    assert "index" not in m.columns
+    m = m.reset_index().set_index(TCAI)  # performance improvement?
+    assert m.index.names == TCAI
+
+    m["input_cnt"] = m.cnt
+    m = m.fillna(value=dict(cnt=0, cnt_BS=0, accessible_perc_BS=m.accessible_perc))
+    tau = 0.9
+
+    mavg_cnt = m.cnt * (1 - tau) + m.cnt_BS * tau
+    # totcnt = m.cnt + m.cnt_BS
+    # cp = (new.confirmed_perc * new.cnt * mu + blocking_status.confirmed_perc * blocking_status.cnt * tau / totcnt #AS confirmed_perc,
+    # ap = (new.pure_anomaly_perc * new.cnt * mu + blocking_status.pure_anomaly_perc * blocking_status.cnt * tau) / totcnt #AS pure_anomaly_perc,
+    # NOTE: using fillna(0) on percentages looks like a bug but the value is going to be ignored due to the cnt set to 0
+
+    m["input_ap"] = m.accessible_perc
+    tmp_ap = m.accessible_perc.fillna(m.accessible_perc_BS)
+    delta = (tmp_ap - m.accessible_perc_BS) / 100
+
+    # Weight the amount of datapoints in the current timeslot with
+    nu = m.cnt / (m.cnt + m.cnt_BS)
+    nu = nu * tau
+
+    m.accessible_perc = (
+        m.accessible_perc.fillna(m.accessible_perc_BS) * (1 - nu)
+        + m.accessible_perc_BS * nu
+    )
+
+    # Stability moves slowly towards 1 when accessible_perc is constant over
+    # time but drop quickly towards 0 when accessible_perc changes a lot.
+    # It is later on used to decide when we are confident enough to make
+    # statements on BLOCKED/OK status. It is also immediately set to 0 when we
+    # detect a blocking change event to mitigate flapping.
+    s_def = 0.7  # default stability
+    stability_thr = 0.8  # threshold to consider a TCAI stable
+    gtau = 0.99  # moving average tau for
+    btau = 0.7
+
+    stability = np.cos(3.14 / 2 * delta)
+    m["stab_insta"] = stability  # used for charting
+    good = stability * (1 - gtau) + m.stability.fillna(s_def) * gtau
+    gstable = stability >= stability_thr
+    m.loc[gstable, "stability"] = good[gstable]
+
+    bad = stability * (1 - btau) + m.stability.fillna(s_def) * btau
+    bstable = stability < stability_thr
+    m.loc[bstable, "stability"] = bad[bstable]
+
+    m.status = m.status.fillna("UNKNOWN")
+    m.old_status = m.status.fillna("UNKNOWN")
+
+    # Use different stability thresholds for OK vs BLOCKED?
+    stable = (m.stability > 0.98) & (stability > 0.98)
+    m.loc[(m.accessible_perc < 80) & stable, "status"] = "BLOCKED"
+    m.loc[(m.accessible_perc > 95) & stable, "status"] = "OK"
+
+    # Detect status changes AKA events
+    # Always use braces on both expressions
+    sel = (m.status != m.old_status) & (m.old_status != "UNKNOWN")
+    ww = m[sel]
+    if len(ww):
+        ww = ww[["status", "old_status"]]
+        # Drop stability to 0 after an event to prevent noisy detection
+        m.loc[sel, "stability"] = 0
+
+    events = m[sel][["status", "old_status"]]
+    if conf.devel:
+        exp_cols = [
+            "old_status",
+            "status",
+        ]
+        assert sorted(events.columns) == exp_cols, sorted(events.columns)
+
+    m.confirmed_perc.fillna(m.confirmed_perc_BS, inplace=True)
+    m.pure_anomaly_perc.fillna(m.pure_anomaly_perc_BS, inplace=True)
+    # m.accessible_perc.fillna(m.accessible_perc_BS, inplace=True)
+    m = m.drop(
+        [
+            "confirmed_perc_BS",
+            "pure_anomaly_perc_BS",
+            "accessible_perc_BS",
+            "cnt",
+            "cnt_BS",
+        ],
+        axis=1,
+    )
+
+    # moving average on cnt
+    m["cnt"] = mavg_cnt
+    assert m.index.names == TCAI
+
+    # m.reset_index(inplace=True)
+    # if "index" in m.columns:
+    #    m.drop(["index"], axis=1, inplace=True)
+
+    # if conf.devel:
+    #    exp_cols = [
+    #        "accessible_perc",
+    #        "change",
+    #        "cnt",
+    #        "confirmed_perc",
+    #        "input",
+    #        "input_ap",
+    #        "input_cnt",
+    #        "old_status",
+    #        "probe_asn",
+    #        "probe_cc",
+    #        "pure_anomaly_perc",
+    #        "stab_insta",
+    #        "stability",
+    #        "status",
+    #        "test_name",
+    #    ]
+    #    assert exp_cols == sorted(m.columns), sorted(m.columns)
+
+    return m, events
+
+
+def gen_input(
+    click,
+    start_date: datetime,
+    end_date: datetime,
+    interval: timedelta,
+    urls: list[str],
+) -> Generator[pd.DataFrame, None, None]:
+    """Queries the fastpath table for measurament counts grouped by TCAI.
+    Yields a dataframe for each time interval. Use read-ahead where needed
+    to speed up reprocessing.
+    """
+    assert start_date < end_date
+    assert interval == timedelta(minutes=60)
+    read_ahead = interval * 6 * 24
+    sql = """
+    SELECT test_name, probe_cc, probe_asn, input,
+      countIf(confirmed = 't') * 100 / cnt AS confirmed_perc,
+      countIf(anomaly = 't') * 100 / cnt - confirmed_perc AS pure_anomaly_perc,
+      countIf(anomaly = 'f') * 100 / cnt AS accessible_perc,
+      count() AS cnt,
+      toStartOfHour(measurement_start_time) AS t
+    FROM fastpath
+    WHERE test_name IN ['web_connectivity']
+    AND msm_failure = 'f'
+    AND measurement_start_time >= %(start_date)s
+    AND measurement_start_time < %(end_date)s
+    AND input IN %(urls)s
+    GROUP BY test_name, probe_cc, probe_asn, input, t
+    ORDER BY t
+    """
+    cache = None
+    t = start_date
+    while t < end_date:
+        # Load chunk from DB doing read-ahead (if needed)
+        partial_end_date = min(end_date, t + read_ahead)
+        d = dict(start_date=t, end_date=partial_end_date, urls=urls)
+        log.info(f"Querying fastpath from {t} to {partial_end_date}")
+        cache = click.query_dataframe(sql, d)
+        if len(cache) == 0:
+            t = partial_end_date
+            log.info("No data")
+            continue
+        while t < partial_end_date:
+            out = cache[cache.t == t]
+            if len(out):
+                out = out.drop(["t"], axis=1)
+                log.info(f"Returning {len(out)} rows {t}")
+                yield out
+            t += interval
+
+
+def load_blocking_status() -> pd.DataFrame:
+    """Loads the current blocking status into a dataframe."""
+    log.debug("Loading blocking status")
+    sql = """SELECT status, old_status, change, stability,
+        test_name, probe_cc, probe_asn, input,
+        accessible_perc, cnt, confirmed_perc, pure_anomaly_perc
+        FROM blocking_status FINAL
+    """
+    blocking_status = click.query_dataframe(sql)
+    if len(blocking_status) == 0:
+        log.info("Starting with empty blocking_status")
+        blocking_status = create_empty_status_df()
+
+    return blocking_status
+
+
+def reprocess_data_from_df(idf, debug=False):
+    """Reprocess data using Pandas. Used for testing."""
+    assert len(idf.index.names) == 5
+    assert "Unnamed: 0" not in sorted(idf.columns), sorted(idf.columns)
+    timeslots = idf.reset_index().t.unique()
+
+    def gen():
+        for tslot in timeslots:
+            new = idf[idf.index.get_level_values(0) == tslot]
+            assert len(new.index.names) == 5, new.index.names
+            assert "Unnamed: 0" not in sorted(new.columns), sorted(new.columns)
+            yield new
+
+    events, status, status_history = reprocess_inner(gen(), len(timeslots), True)
+    assert status.index.names == TCAI
+    return events, status, status_history
+
+
+def process(start, end, interval, services) -> None:
+    events, status = process_fresh_data(start, end, interval, services)
+    log.info(f"Events: {len(events)}")
+    if events is not None and len(events):
+        log.info("Rebuilding feeds")
+        rebuild_feeds(events)
+        # TODO: create an index of available RSS feeds
+
+
+def reprocess(conf, services) -> None:
+    click.execute("TRUNCATE TABLE blocking_status SYNC")
+    click.execute("TRUNCATE TABLE blocking_events SYNC")
+
+    t = conf.start_date
+    while t < conf.end_date:
+        te = t + conf.interval
+        process(t, te, conf.interval, services)
+        t += conf.interval
 
 
 def main():
+    global click
     setup()
     log.info("Starting")
-
-    global cc_to_country_name
-    cc_to_country_name = load_country_name_map()
-
-    ro_conn = connect_to_db(conf.ro_db_host, RO_DB_USER, DB_NAME, RO_DB_PASSWORD)
-
-    if conf.webapp:
-        import detector.detector_webapp as wa
-
-        wa.db_conn = ro_conn
-        wa.asn_db = load_asn_db()
-        log.info("Starting webapp")
-        wa.bottle.TEMPLATE_PATH.insert(0, f"{PKGDIR}/detector/views")
-        wa.bottle.run(port=8880, debug=conf.devel)
-        log.info("Exiting webapp")
+    cc_to_country_name = load_country_name_map(conf.devel)
+    click = Clickhouse.from_url(conf.db_uri)
+    if "use_numpy" not in conf.db_uri:
+        log.error("Add use_numpy to db_uri")
         return
 
-    means, latest_mean = load_means()
-    log.info("Latest mean: %s", latest_mean)
+    # create_tables()
+    # TODO: configure services
+    services = {
+        "Facebook": ["https://www.facebook.com/"],
+        "Twitter": ["https://twitter.com/"],
+        "YouTube": ["https://www.youtube.com/"],
+        "Instagram": ["https://www.instagram.com/"],
+    }
+    if conf.reprocess:
+        # Destructing reprocess
+        assert conf.start_date and conf.end_date, "Dates not set"
+        reprocess(conf, services)
+        return
+        # assert conf.start_date and conf.end_date, "Dates not set"
+        # events, status, _ = process_historical_data(
+        #    conf.start_date, conf.end_date, conf.interval, services
+        # )
+        # s = status.reset_index()
+        # log.info((s.accessible_perc, s.cnt, s.status))
 
-    # Register exit handlers
-    def save_means_on_exit(*a):
-        log.info("Received SIGINT / SIGTERM")
-        save_means(means, None)
-        log.info("Exiting")
-        sys.exit()
+    else:
+        # Process fresh data
+        if conf.end_date is None:
+            # Beginning of current UTC hour
+            conf.end_date = datetime(*datetime.utcnow().timetuple()[:4])
+            conf.start_date = conf.end_date - conf.interval
+        process(conf.start_date, conf.end_date, conf.interval, services)
 
-    signal.signal(signal.SIGINT, save_means_on_exit)
-    signal.signal(signal.SIGTERM, save_means_on_exit)
-
-    rw_conn = connect_to_db(conf.db_host, DB_USER, DB_NAME, DB_PASSWORD)
-
-    td = timedelta(weeks=6)
-    start_date = latest_mean - td if latest_mean else DEFAULT_STARTTIME
-    process_historical_data(ro_conn, rw_conn, start_date, means)
-    save_means(means, None)
-
-    log.info("Starting real-time processing")
-    with rw_conn.cursor() as cur:
-        cur.execute("LISTEN fastpath;")
-
-    while True:
-        if select.select([rw_conn], [], [], 60) == ([], [], []):
-            continue  # timeout
-
-        rw_conn.poll()
-        while rw_conn.notifies:
-            msg = rw_conn.notifies.pop(0)
-            try:
-                handle_new_msg(msg, means, rw_conn)
-            except Exception as e:
-                log.exception(e)
+    gen_stats()
+    log.info("Done")
 
 
 if __name__ == "__main__":
