@@ -23,6 +23,7 @@ from ..common.routers import BaseModel
 from ..common.dependencies import get_settings, role_required
 from ..common.auth import (
     get_account_id_or_none,
+    get_client_role,
 )
 from ..common.prio import generate_test_list
 from ..common.dependencies import ClickhouseDep, PostgresDep
@@ -36,6 +37,11 @@ router = APIRouter()
 
 def utcnow_seconds():
     return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+# We use this string when the oonirun link is setup to not be shared.
+# We use it so that the UI in old clients won't break
+PRIVATE_EMAIL_PLACEHOLDER = "[private email]"
 
 
 NETWORK_TYPES = [
@@ -135,7 +141,7 @@ class OONIRunLinkBase(BaseModel):
     description: str = Field(
         title="full description of the ooni run link", min_length=2
     )
-    author: str = Field(
+    author: str | None = Field(
         title="public email address of the author name of the ooni run link",
         min_length=2,
         max_length=100,
@@ -179,6 +185,9 @@ class OONIRunLinkBase(BaseModel):
     expiration_date: datetime = Field(
         default_factory=lambda: utcnow_seconds() + timedelta(days=30 * 6),
         description="future time after which the ooni run link will be considered expired and no longer editable or usable (defaults to 6 months from now)",
+    )
+    publish_email: bool = Field(
+        description="Whether to publish this email to other users",
     )
 
 
@@ -253,6 +262,7 @@ def create_oonirun_link(
         icon=create_request.icon,
         color=create_request.color,
         expiration_date=create_request.expiration_date,
+        publish_email=create_request.publish_email,
         date_created=now,
         date_updated=now,
     )
@@ -291,6 +301,7 @@ def create_oonirun_link(
         icon=db_oonirun_link.icon,
         color=db_oonirun_link.color,
         expiration_date=db_oonirun_link.expiration_date,
+        publish_email=db_oonirun_link.publish_email,
         date_created=db_oonirun_link.date_created,
         date_updated=db_oonirun_link.date_updated,
         nettests=nettest_list,
@@ -309,7 +320,9 @@ def edit_oonirun_link(
     db: PostgresDep,
     token=Depends(role_required(["admin", "user"])),
 ):
-    """Edit an existing OONI Run link"""
+    """
+    Edit an existing OONI Run link
+    """
     log.debug(f"edit oonirun {oonirun_link_id}")
     account_id = token["account_id"]
 
@@ -392,6 +405,7 @@ def edit_oonirun_link(
     oonirun_link.color = edit_request.color
     oonirun_link.expiration_date = edit_request.expiration_date
     oonirun_link.date_updated = now
+    oonirun_link.publish_email = edit_request.publish_email
     db.commit()
 
     return OONIRunLink(
@@ -406,6 +420,7 @@ def edit_oonirun_link(
         icon=oonirun_link.icon,
         color=oonirun_link.color,
         expiration_date=oonirun_link.expiration_date,
+        publish_email=oonirun_link.publish_email,
         oonirun_link_id=oonirun_link.oonirun_link_id,
         date_created=oonirun_link.date_created,
         date_updated=oonirun_link.date_updated,
@@ -506,6 +521,7 @@ def make_oonirun_link(
     oonirun_link_id: str,
     account_id: Optional[str],
     revision: Optional[int] = None,
+    is_admin: bool = False,
 ):
     q = db.query(models.OONIRunLink).filter(
         models.OONIRunLink.oonirun_link_id == oonirun_link_id
@@ -524,6 +540,7 @@ def make_oonirun_link(
     assert isinstance(revision, int)
 
     nettests, date_created = get_nettests(res, revision)
+    is_mine = account_id == res.creator_account_id
     return OONIRunLink(
         oonirun_link_id=res.oonirun_link_id,
         name=res.name,
@@ -538,9 +555,14 @@ def make_oonirun_link(
         nettests=nettests,
         date_created=date_created,
         date_updated=res.date_updated,
-        is_mine=account_id == res.creator_account_id,
-        author=res.author,
+        is_mine=is_mine,
+        author=(
+            res.author
+            if is_mine or is_admin or res.publish_email
+            else PRIVATE_EMAIL_PLACEHOLDER
+        ),
         revision=str(revision),
+        publish_email=res.publish_email
     )
 
 
@@ -678,11 +700,19 @@ def get_oonirun_link_revision(
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ):
-    """Fetch an OONI Run link by specifying the revision number"""
+    """
+    Fetch an OONI Run link by specifying the revision number
+
+    Note that the author field is replaced with the placeholder "[private email]" for other users
+    if the author has set publish_email to False.
+    """
     # Return the latest version of the translations
     log.debug("fetching oonirun")
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
+    )
+    is_admin = (
+        get_client_role(authorization, settings.jwt_encryption_key) == "admin"
     )
 
     try:
@@ -693,7 +723,11 @@ def get_oonirun_link_revision(
         revision = None
 
     oonirun_link = make_oonirun_link(
-        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id, revision=revision
+        db=db,
+        oonirun_link_id=oonirun_link_id,
+        account_id=account_id,
+        revision=revision,
+        is_admin=is_admin,
     )
     return oonirun_link
 
@@ -706,16 +740,27 @@ def get_latest_oonirun_link(
     db: PostgresDep,
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
-):
-    """Fetch OONIRun descriptor by creation time or the newest one"""
+) -> OONIRunLink:
+    """
+    Fetch OONIRun descriptor by creation time or the newest one
+
+    Note that the author field is replaced with the placeholder "[private email]" for other users
+    if the author has set publish_email to False.
+    """
     # Return the latest version of the translations
     log.debug("fetching oonirun")
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
+    is_admin = (
+        get_client_role(authorization, settings.jwt_encryption_key) == "admin"
+    )
 
     oonirun_link = make_oonirun_link(
-        db=db, oonirun_link_id=oonirun_link_id, account_id=account_id
+        db=db,
+        oonirun_link_id=oonirun_link_id,
+        account_id=account_id,
+        is_admin=is_admin,
     )
     return oonirun_link
 
@@ -738,9 +783,17 @@ def list_oonirun_links(
     authorization: str = Header("authorization"),
     settings=Depends(get_settings),
 ) -> OONIRunLinkList:
-    """List OONIRun descriptors"""
+    """
+    List OONIRun descriptors
+
+    Note that the author field is replaced with the placeholder "[private email]" for other users
+    if the author has set publish_email to False.
+    """
     log.debug("list oonirun")
     account_id = get_account_id_or_none(authorization, settings.jwt_encryption_key)
+    is_admin = (
+        get_client_role(authorization, settings.jwt_encryption_key) == "admin"
+    )
 
     q = db.query(models.OONIRunLink)
     if not is_expired:
@@ -766,7 +819,11 @@ def list_oonirun_links(
             short_description_intl=row.short_description_intl,
             description=row.description,
             description_intl=row.description_intl,
-            author=row.author,
+            author=(
+                row.author
+                if account_id == row.creator_account_id or is_admin or row.publish_email
+                else PRIVATE_EMAIL_PLACEHOLDER
+            ),
             nettests=nettests,
             icon=row.icon,
             expiration_date=row.expiration_date,
@@ -774,6 +831,7 @@ def list_oonirun_links(
             date_created=row.date_created,
             date_updated=row.date_updated,
             is_mine=account_id == row.creator_account_id,
+            publish_email=row.publish_email
         )
         links.append(oonirun_link)
     log.debug(f"Returning {len(links)} ooni run links")
