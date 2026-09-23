@@ -16,6 +16,8 @@ from .utils import (
     utc_today,
 )
 
+from ...utils.api import normalize_datetime
+
 router = APIRouter()
 
 import logging
@@ -99,6 +101,23 @@ async def get_aggregation_observations(
 
     if len(order_by) > 0:
         order_by_str = "ORDER BY " + ",".join(order_by) + " DESC"
+
+    # check since and until
+    now = datetime.now(timezone.utc)
+    six_months_ago = now - timedelta(days=30 * 6)
+
+    if since:
+        since = datetime.combine(since, datetime.min.time())
+    else:
+        since = six_months_ago
+
+    if until:
+        until = datetime.combine(until, datetime.min.time())
+    else:
+        until = now
+
+    since = normalize_datetime(since)
+    until = normalize_datetime(until)
 
     if probe_cc:
         and_list.append(f"probe_cc IN %(probe_cc)s")
