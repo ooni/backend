@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pydantic import BaseModel as PydandicBaseModel
-from pydantic import ConfigDict
+from pydantic import field_serializer
 
 
 ISO_FORMAT_DATETIME = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -8,13 +8,20 @@ ISO_FORMAT_DATE = "%Y-%m-%d"
 
 
 class BaseModel(PydandicBaseModel):
-    model_config = ConfigDict(
-        # TODO(art): this should be ported over to the functional serializer
-        # pattern (https://docs.pydantic.dev/latest/api/functional_serializers/)
-        # since json_encoders is deprecated, see:
-        # https://docs.pydantic.dev/2.6/api/config/#pydantic.config.ConfigDict.json_encoders
-        json_encoders={
-            datetime: lambda v: v.strftime(ISO_FORMAT_DATETIME),
-            date: lambda v: v.strftime(ISO_FORMAT_DATE),
-        }
-    )
+    @field_serializer("*", when_used="json")
+    def serialize_json(self, v):
+        # Note: datetime is a subclass of date, so check datetime first.
+        if isinstance(v, datetime):
+            # If you always want "...Z", normalize to UTC.
+            if v.tzinfo is None:
+                v = v.replace(tzinfo=timezone.utc)
+            else:
+                v = v.astimezone(timezone.utc)
+
+            # Your format includes microseconds + trailing Z
+            return v.strftime(ISO_FORMAT_DATETIME)
+
+        if isinstance(v, date):
+            return v.strftime(ISO_FORMAT_DATE)
+
+        return v
