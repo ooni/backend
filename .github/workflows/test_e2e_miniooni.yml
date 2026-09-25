@@ -1,0 +1,75 @@
+name: e2e / ooniapi + miniooni
+
+# Deploys the ooniapi backend services (docker-compose) and exercises them
+# with a real, containerized miniooni client. See ooniapi/tests/e2e/README.md
+# for what this actually covers and its known gaps.
+#
+# This is the automated "tested with a real client" check requested in
+# https://github.com/ooni/backend/pull/1145.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "ooniapi/**"
+      - "fastpath/**"
+      - ".github/workflows/test_e2e_miniooni.yml"
+  pull_request:
+    paths:
+      - "ooniapi/**"
+      - "fastpath/**"
+      - ".github/workflows/test_e2e_miniooni.yml"
+  workflow_dispatch:
+    inputs:
+      probe_cli_ref:
+        description: "Extra probe-cli ref to test in addition to the default matrix (tag, branch, or commit)"
+        required: false
+        default: ""
+      userauth_mode:
+        description: "userauth build mode for the extra-ref run above (source or prebuilt)"
+        required: false
+        default: "source"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The "matrix of client versions" from the discussion on #1145.
+        # Add release tags here as they're cut (e.g. "v3.24.0").
+        probe_cli_ref: [master]
+        # Test both ways of getting the userauth (anonymous-credentials)
+        # staticlib: built from source (the trusted path, and what
+        # docker-compose.yml defaults to) and the prebuilt bundle probe-cli
+        # also offers. Running both here means a regression in either path
+        # - like the stale userauthSourceSHA256 pin that broke
+        # USERAUTH_FROM_SOURCE=1 builds against probe-cli master as of this
+        # writing - shows up in CI instead of only breaking whichever one
+        # nobody happened to be using that day. See miniooni/Dockerfile.
+        userauth_mode: [source, prebuilt]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run e2e harness (probe-cli @ ${{ matrix.probe_cli_ref }}, userauth ${{ matrix.userauth_mode }})
+        working-directory: ooniapi/tests/e2e
+        env:
+          PROBE_CLI_REF: ${{ matrix.probe_cli_ref }}
+          USERAUTH_MODE: ${{ matrix.userauth_mode }}
+        run: ./scripts/run.sh
+
+  e2e-dispatch-extra-ref:
+    # Only runs for manual workflow_dispatch invocations that specify an
+    # extra ref to test (e.g. a probe-cli PR branch), so it doesn't add an
+    # unconditional matrix entry to every push/PR run.
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.probe_cli_ref != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run e2e harness (probe-cli @ ${{ github.event.inputs.probe_cli_ref }}, userauth ${{ github.event.inputs.userauth_mode }})
+        working-directory: ooniapi/tests/e2e
+        env:
+          PROBE_CLI_REF: ${{ github.event.inputs.probe_cli_ref }}
+          USERAUTH_MODE: ${{ github.event.inputs.userauth_mode }}
+        run: ./scripts/run.sh
