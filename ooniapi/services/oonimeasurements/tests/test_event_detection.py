@@ -134,3 +134,21 @@ def test_changepoint_field_present(client):
 
     resp = getj(client, "/api/v1/detector/changepoints")
     assert all('block_type' in r for r in resp['results'])
+
+def test_changepoint_list_default_window_is_relative_to_request_time(
+    client, db, fixed_time
+):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(
+            "INSERT INTO event_detector_changepoints (probe_asn, probe_cc, domain, ts, count_isp_resolver, count_other_resolver, count, block_type) VALUES",
+            [(64500, "ZZ", "default-window.example.org", datetime(2026, 1, 25, tzinfo=UTC), 1, 0, 1, "tcp_block")],
+        )
+
+    resp = getj(
+        client,
+        "/api/v1/detector/changepoints",
+        params={"domain": "default-window.example.org"},
+    )
+    assert len(resp["results"]) == 1, resp
