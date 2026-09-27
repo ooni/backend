@@ -263,11 +263,6 @@ def test_private_api_global_overview_by_month(client, fixed_time):
     assert resp["networks_by_month"][0]["date"].endswith("T00:00:00+00:00")
 
 
-@pytest.mark.skip(reason="NotImplemented")
-def test_private_api_quotas_summary(client_with_admin_role):
-    resp = privapi(client_with_admin_role, "quotas_summary")
-
-
 def test_private_api_check_report_id(client, log):
     rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
     url = f"check_report_id?report_id={rid}"
