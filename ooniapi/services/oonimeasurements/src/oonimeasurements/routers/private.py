@@ -242,10 +242,10 @@ def check_report_id() -> CheckReportIDResponse:
 
 
 def last_30days(begin=31, end=1):
-    first_day = datetime.now() - timedelta(begin)
+    first_day = datetime.now(timezone.utc) - timedelta(begin)
     first_day = datetime(first_day.year, first_day.month, first_day.day)
 
-    last_day = datetime.now() - timedelta(end)
+    last_day = datetime.now(timezone.utc) - timedelta(end)
     last_day = datetime(last_day.year, last_day.month, last_day.day)
 
     for d in daterange(first_day, last_day):
