@@ -40,9 +40,8 @@ def _ddl_statements():
         lines = [l for l in path.read_text().split("\n") if not l.startswith("--")]
         for stmt in "\n".join(lines).split(";"):
             stmt = stmt.strip()
-            # data fixtures are not part of the schema, and the counters_* MVs
-            # do not exist in production so they must not skew ingest numbers
-            if not stmt or stmt.upper().startswith(("INSERT", "CREATE MATERIALIZED VIEW")):
+            # data fixtures are not part of the schema
+            if not stmt or stmt.upper().startswith("INSERT"):
                 continue
             yield re.sub(r"\bdefault\.", "", stmt)
 
