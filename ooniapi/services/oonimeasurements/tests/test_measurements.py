@@ -508,3 +508,61 @@ def test_measurements_date_range_6_months_limit(client):
     # Range within 6 months should return 200
     resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-04-01"})
     assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
+
+
+@pytest.fixture(scope="session")
+def torsf_fastpath_rows(db):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    def row(i, cc, day, anomaly="f", failure="f"):
+        return {
+            "measurement_uid": f"201903{day:02d}120000.00000{i}_{cc}_torsf_torsfstats",
+            "report_id": f"201903{day:02d}T120000Z_torsf_{cc}_64500_n1_torsfstats{i}",
+            "probe_cc": cc,
+            "probe_asn": 64500,
+            "test_name": "torsf",
+            "measurement_start_time": datetime(2019, 3, day, 12, i),
+            "anomaly": anomaly,
+            "confirmed": "f",
+            "msm_failure": failure,
+        }
+
+    rows = [
+        row(0, "IT", 1),
+        row(1, "IT", 1, anomaly="t"),
+        row(2, "IT", 1, failure="t"),
+        row(3, "DE", 2),
+    ]
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(f"INSERT INTO fastpath ({','.join(rows[0])}) VALUES", rows)
+
+
+def test_torsf_stats_filter_by_probe_cc(client, torsf_fastpath_rows):
+    params = {"probe_cc": "IT", "since": "2019-02-28", "until": "2019-03-03"}
+    response = client.get("/api/v1/torsf_stats", params=params)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "v": 0,
+        "result": [
+            {
+                "anomaly_count": 1,
+                "anomaly_rate": 1 / 3,
+                "confirmed_count": 0,
+                "failure_count": 1,
+                "measurement_count": 3,
+                "measurement_start_day": "2019-03-01",
+                "probe_cc": "IT",
+            }
+        ],
+    }
+
+
+def test_torsf_stats_group_by_probe_cc(client, torsf_fastpath_rows):
+    params = {"since": "2019-02-28", "until": "2019-03-03"}
+    response = client.get("/api/v1/torsf_stats", params=params)
+    assert response.status_code == 200, response.text
+    result = response.json()["result"]
+    assert [(r["measurement_start_day"], r["probe_cc"], r["measurement_count"]) for r in result] == [
+        ("2019-03-01", "IT", 3),
+        ("2019-03-02", "DE", 1),
+    ]
