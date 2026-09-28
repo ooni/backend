@@ -5,10 +5,13 @@ The fastpath inserts one row per measurement (about 38 inserts/s in
 production), so per-insert latency of small batches is what matters: an index
 or projection that slows these down can make the fastpath drop measurements.
 Each run inserts into an empty clone of the table, which keeps every index and
-projection of the original.
+projection of the original. Materialized views fed by the table (on fastpath,
+the counters_* views on data1) are recreated on the clone, since in production
+they run as part of every insert.
 """
 
 import os
+import re
 import statistics
 import time
 
@@ -32,7 +35,9 @@ def test_bench_ingest(bench, bench_writable, name):
     click = bench.click
     click.execute(f"DROP TABLE IF EXISTS {clone} SYNC")
     click.execute(f"CREATE TABLE {clone} AS {table}")
+    views = []
     try:
+        views = _clone_views(click, table, clone)
         columns = _insertable_columns(click, table)
         rows = click.execute(
             f"SELECT {','.join(columns)} FROM {table} ORDER BY measurement_start_time DESC LIMIT {INSERTS * batch}"
@@ -48,7 +53,12 @@ def test_bench_ingest(bench, bench_writable, name):
         cost = _server_cost(click, tag["log_comment"])
         [(count,)] = click.execute(f"SELECT count() FROM {clone}")
         assert count == len(rows)
+        for view in views:
+            [(view_rows,)] = click.execute(f"SELECT count() FROM {view}")
+            assert view_rows > 0, f"{view} received no rows, so its cost was not measured"
     finally:
+        for view in views:
+            click.execute(f"DROP VIEW IF EXISTS {view} SYNC")
         click.execute(f"DROP TABLE IF EXISTS {clone} SYNC")
 
     timings.sort()
@@ -58,8 +68,32 @@ def test_bench_ingest(bench, bench_writable, name):
         "p50_ms": round(statistics.median(timings) * 1000, 3),
         "p95_ms": round(timings[int(len(timings) * 0.95) - 1] * 1000, 3),
         "mean_ms": round(statistics.fmean(timings) * 1000, 3),
+        "views": views,
         **cost,
     }
+
+
+def _clone_views(click, table, clone):
+    """Recreate the materialized views reading from `table` so they read from `clone`."""
+    [(dependents,)] = click.execute(
+        "SELECT dependencies_table FROM system.tables WHERE database = currentDatabase() AND name = %(t)s",
+        {"t": table},
+    )
+    views = []
+    for view in dependents:
+        [(ddl,)] = click.execute(
+            "SELECT create_table_query FROM system.tables WHERE database = currentDatabase() AND name = %(v)s",
+            {"v": view},
+        )
+        view_clone = f"bench_ingest_{view}"
+        ddl, renamed = re.subn(rf"^CREATE MATERIALIZED VIEW \S+\.{view}\b", f"CREATE MATERIALIZED VIEW {view_clone}", ddl)
+        # keep the original name as alias so qualified columns (fastpath.input) resolve
+        ddl, rewired = re.subn(rf"\bFROM \S+\.{table}\b", f"FROM {clone} AS {table}", ddl)
+        assert (renamed, rewired) == (1, 1), f"unexpected definition of {view}: {ddl}"
+        click.execute(f"DROP VIEW IF EXISTS {view_clone} SYNC")
+        click.execute(ddl)
+        views.append(view_clone)
+    return views
 
 
 def _server_cost(click, log_comment):
