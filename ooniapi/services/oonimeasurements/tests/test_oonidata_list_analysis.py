@@ -206,3 +206,10 @@ def test_oonidata_list_analysis_with_limit_and_offset(
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 10
+
+
+def test_oonidata_list_analysis_next_url_follows_offset_and_limit(client):
+    response = client.get(route, params={"offset": 10, "limit": 5})
+    assert response.status_code == 200, response.text
+    metadata = response.json()["metadata"]
+    assert metadata["next_url"].endswith("/api/v1/analysis?offset=15&limit=5"), metadata
