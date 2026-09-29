@@ -177,8 +177,8 @@ async def list_observations(
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_7_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: SinceUntil = None,
+    until: SinceUntil = None,
     order_by: Annotated[
         Literal[
             "measurement_start_time",
