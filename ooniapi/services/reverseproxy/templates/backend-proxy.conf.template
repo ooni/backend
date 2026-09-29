@@ -42,9 +42,9 @@ server {
 }
 
 upstream wcths {
-  server 138.68.86.164; # wcth0.fra1.prod.ooni.io
-  server 167.71.36.149; # wcth1.fra1.prod.ooni.io
-  server 164.92.167.175; # wcth2.fra1.prod.ooni.io
+  server 138.68.86.164:443; # wcth0.fra1.prod.ooni.io
+  server 167.71.36.149:443; # wcth1.fra1.prod.ooni.io
+  server 164.92.167.175:443; # wcth2.fra1.prod.ooni.io
 }
 
 server {
