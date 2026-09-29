@@ -21,7 +21,7 @@ def fake_get_manifest(s3, bucket, key):
             submission_policy=[
                 PolicyEntry(
                     match=Match(probe_cc="*", probe_asn="*"),
-                    policy=Policy(age=(2461110, 2826140), measurement_count=(0, 10000000)),
+                    policy=Policy(age=(2461110, 2826140), min_measurement_count=0),
                 )
             ],
             public_parameters="public parameters"

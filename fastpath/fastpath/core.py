@@ -982,6 +982,15 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
         scores["accuracy"] = 0.0
         return scores
 
+    # Web Connectivity 0.5 (LTE) bitmasks. x_blocking_flags marks a 0.5 msmt;
+    # the other two default to 0 so the three keys always appear together.
+    if "x_blocking_flags" in tk:
+        scores["analysis"] = dict(
+            x_blocking_flags=tk.get("x_blocking_flags") or 0,
+            x_dns_flags=tk.get("x_dns_flags") or 0,
+            x_null_null_flags=tk.get("x_null_null_flags") or 0,
+        )
+
     if matches:
         scores["fingerprints"] = [minifp(fp) for fp in matches]
 
@@ -1021,7 +1030,10 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
     probe_blocking = tk.get("blocking")
     if probe_blocking in blocking_types:
         scores["blocking_general"] = 1.0
-        scores["analysis"] = {"blocking_type": tk["blocking"]}
+        # Add blocking_type to "analysis" without discarding the WC 0.5 x_
+        # flags that may have been set into it above.
+        scores.setdefault("analysis", {})
+        scores["analysis"]["blocking_type"] = tk["blocking"]
 
     elif probe_blocking == False:
         pass
@@ -1809,6 +1821,7 @@ def core():
 
     # Spawn worker processes
     # 'queue' is a singleton from the portable_queue module
+    parent_pid = os.getpid()
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]
@@ -1823,6 +1836,10 @@ def core():
         log.exception(e)
 
     finally:
+        # Not a parent PID. Note that gunicorn forks on start_http_api
+        # to create children processes
+        if os.getpid() != parent_pid:
+            return
         log.info("Shutting down workers")
         time.sleep(1)
         shut_down(queue)

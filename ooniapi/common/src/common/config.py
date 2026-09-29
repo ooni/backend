@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "OONI Data API"
     base_url: str = "https://api.ooni.io"
     clickhouse_url: str = "clickhouse://localhost"
-    valkey_url: str = "valkey://localhost:6379"
+    valkey_url: str = "memory"
     postgresql_url: str = "postgresql://oonidb:oonidb@localhost/oonidb"
     log_level: str = "info"
     # Prod bucket: "ooni-data-eu-fra"
@@ -46,7 +46,12 @@ class Settings(BaseSettings):
     geoip_db_dir: str = "/var/lib/ooni/geoip"
     # -- < Ooniprobe only > -------------------------------------------------------------
     msmt_spool_dir: str = ""
-    fastpath_url: str = ""  # example: http://123.123.123.123:8472
+    fastpath_urls: List[str] = Field(
+        description="List of fastpath instances to send measurements to",
+        default_factory=list,
+    ) # example: [http://123.123.123.123:8472]
+    fastpath_timeout: int = 10
+
     failed_reports_bucket: str = (
         ""  # for uploading reports that couldn't be sent to fastpath
     )
@@ -101,3 +106,7 @@ class Settings(BaseSettings):
     github_token: str = ""
     origin_repo: str = ""
     push_repo: str = ""
+
+    # Profiling settings
+    profiling_active: bool = False
+    profiling_report_path: str = ""

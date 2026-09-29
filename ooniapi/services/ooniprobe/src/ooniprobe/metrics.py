@@ -80,6 +80,11 @@ class Metrics:
         "How long it took to post the measurement to the fastpath",
     )
 
+    ANONC_VERIFICATION_TIMING = Histogram(
+        "measurement_verification_seconds",
+        "How long it took to run the anonymous credentials verification",
+    )
+
     SEND_S3_TIMING = Histogram(
         "measurement_s3_upload_seconds",
         "How long it took to send the measurement to s3",
@@ -88,7 +93,13 @@ class Metrics:
     SEND_FASTPATH_CNT = Counter(
         "measurement_fastpath_send_count",
         "How many times ooniprobe failed to send a measurement to fastpath",
-        labelnames=["status"],
+        labelnames=["status", "instance"],
+    )
+
+    FASTPATH_INSTANCE_FAILURE = Counter(
+        "fastpath_instance_failure",
+        "How many times a measurement submission per fastpath instance failed",
+        labelnames = ["instance"]
     )
 
     SEND_S3_CNT = Counter(
