@@ -40,7 +40,23 @@ async def test_check_in_basic(client, load_url_priorities):
     assert stn == "webconnectivity"
     assert cc == "US"
 
-    assert sorted(c["conf"]) == ["features", "test_helpers"]
+    assert sorted(c["conf"]) == ["features", "test_helpers", "versions"]
+
+
+@pytest.mark.asyncio
+async def test_check_in_webconnectivity_lte(client, load_url_priorities):
+    j = dict(
+        probe_cc="US",
+        probe_asn="AS1234",
+        software_name="ooniprobe-cli",
+        software_version="3.28.0",
+        on_wifi=True,
+        charging=False,
+    )
+    c = postj(client, "/api/v1/check-in", j)
+
+    assert c["conf"]["versions"]["web_connectivity"] == "v0.5"
+    assert c["conf"]["features"]["webconnectivity_0.5"] is True
 
 
 @pytest.mark.asyncio

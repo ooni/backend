@@ -14,14 +14,13 @@ from ..common.config import Settings
 from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
-from ..common.utils import setnocacheresponse
+from ..common.utils import setnocacheresponse, generate_report_id
 from ..dependencies import ASNCCReaderDep, SettingsDep
 from ..metrics import Metrics
 from ..utils import (
     MeasurementMetadata,
     check_measurement_meta,
     error,
-    generate_report_id,
     get_cc_asn,
     metadata_from_measurement_content,
     normalize_asn,
