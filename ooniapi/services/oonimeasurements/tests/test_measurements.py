@@ -7,6 +7,7 @@ from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
+from urllib.parse import urlparse
 from .conftest import THIS_DIR
 
 route = "api/v1/measurements"
@@ -508,3 +509,60 @@ def test_measurements_date_range_6_months_limit(client):
     # Range within 6 months should return 200
     resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-04-01"})
     assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
+
+
+def test_list_measurements_pagination_no_duplicates(client, db):
+    """
+    Inserting a new measurement between page requests should not cause
+    measurements to be repeated in the next page.
+    """
+    test_name = "pagination_test"
+    ch = Clickhouse.from_url(db)
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
+
+    def make_row(i: int, ts: datetime) -> dict:
+        return {
+            "measurement_uid": f"20260101000000.000000_XY_{test_name}_{i:04d}",
+            "report_id": f"report_{i:04d}",
+            "input": f"https://example{i}.com",
+            "probe_cc": "XY",
+            "probe_asn": 1234,
+            "test_name": test_name,
+            "measurement_start_time": ts,
+            "test_start_time": ts,
+            "scores": "{}",
+        }
+
+    # 1. Add 20 measurements
+    rows = [make_row(i, now - timedelta(minutes=i + 1)) for i in range(20)]
+    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+
+    try:
+        # 2. Request first page
+        resp = client.get(route, params={"test_name": test_name, "limit": 10})
+        assert resp.status_code == 200, resp.json()
+        j = resp.json()
+        first_page = [r["measurement_uid"] for r in j["results"]]
+        assert len(first_page) == 10
+        next_url = j["metadata"]["next_url"]
+        assert next_url is not None
+
+        # 3. Add a new measurement
+        ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", [make_row(20, now)])
+
+        # 4. Request next page using next_url
+        parsed = urlparse(next_url)
+        resp = client.get(f"{parsed.path}?{parsed.query}")
+        assert resp.status_code == 200, resp.json()
+        second_page = [r["measurement_uid"] for r in resp.json()["results"]]
+
+        all_uids = first_page + second_page
+        assert len(all_uids) == len(set(all_uids)), "Duplicated measurements across pages"
+    finally:
+        # Note that we can't truncate fastpath as it has fixtures that other
+        # tests might need, so we delete only the entires for this test
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": test_name},
+        )
