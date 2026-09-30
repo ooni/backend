@@ -534,9 +534,14 @@ async def list_changepoints(
     probe_asn: ProbeASNOrNone = None,
     probe_cc: ProbeCCOrNone = None,
     domain: str | None = Query(default=None),
-    since: SinceUntil = utc_30_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: Optional[SinceUntil] = None,
+    until: Optional[SinceUntil] = None,
 ) -> ListChangePointsResponse:
+    if since is None:
+        since = utc_30_days_ago()
+    if until is None:
+        until = utc_today()
+
     conditions = []
     query_params = {}
 

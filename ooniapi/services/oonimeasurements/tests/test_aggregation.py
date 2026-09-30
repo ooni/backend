@@ -306,6 +306,15 @@ def test_aggregation_x_axis_only_invalid_time_grain_too_large(client):
     assert r.json()["msg"] == exp
 
 
+def test_aggregation_x_axis_only_time_grain_year(client):
+    url = "aggregation?since=2020-07-09&until=2022-07-11&time_grain=year&axis_x=measurement_start_day"
+    r = api(client, url)
+    assert r["dimension_count"] == 1
+    assert len(r["result"]) > 0
+    for row in r["result"]:
+        assert row["measurement_start_day"].endswith("-01-01"), row
+
+
 def test_aggregation_x_axis_only_hour(client):
     # 1 dimension: X
     url = "aggregation?since=2021-07-09&until=2021-07-11&axis_x=measurement_start_day"

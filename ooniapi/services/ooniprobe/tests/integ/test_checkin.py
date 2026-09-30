@@ -53,7 +53,7 @@ async def test_check_in_basic(client, load_url_priorities):
     assert stn == "webconnectivity"
     assert cc == "US"
 
-    assert sorted(c["conf"]) == ["features", "test_helpers"]
+    assert sorted(c["conf"]) == ["features", "test_helpers", "versions"]
 
 
 @pytest.mark.asyncio
@@ -68,6 +68,7 @@ async def test_check_in_webconnectivity_lte(client, load_url_priorities):
     )
     c = postj(client, "/api/v1/check-in", j)
 
+    assert c["conf"]["versions"]["web_connectivity"] == "v0.5"
     assert c["conf"]["features"]["webconnectivity_0.5"] is True
 
 
