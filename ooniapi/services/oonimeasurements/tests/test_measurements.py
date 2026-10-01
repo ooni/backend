@@ -619,3 +619,71 @@ def test_list_measurements_offset_wins_over_cont(client, db):
             "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
             {"tn": test_name},
         )
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+def test_list_measurements_pagination_ordering(client, db, order):
+    """
+    Paginating with cont should return all measurements exactly once, sorted
+    by (measurement_start_time, measurement_uid), including ties on
+    measurement_start_time across page boundaries.
+    """
+    test_name = "pagination_test"
+    ch = Clickhouse.from_url(db)
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
+
+    # 4 timestamps with 3 measurements each, so pages of 2 split tie groups.
+    # uid suffixes are not in insertion order so the uid tiebreaker matters
+    suffixes = ["c3", "a1", "b2"]
+    rows = []
+    for t in range(4):
+        ts = now - timedelta(minutes=t + 1)
+        for i, suffix in enumerate(suffixes):
+            rows.append({
+                "measurement_uid": f"{ts.strftime('%Y%m%d%H%M%S')}.000000_XY_{test_name}_{suffix}",
+                "report_id": f"report_{t}_{i}",
+                "input": f"https://example{t}{i}.com",
+                "probe_cc": "XY",
+                "probe_asn": 1234,
+                "test_name": test_name,
+                "measurement_start_time": ts,
+                "test_start_time": ts,
+                "scores": "{}",
+            })
+    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+
+    expected = [
+        r["measurement_uid"]
+        for r in sorted(
+            rows,
+            key=lambda r: (r["measurement_start_time"], r["measurement_uid"]),
+            reverse=order == "desc",
+        )
+    ]
+
+    try:
+        got = []
+        j = getj(client, route, params={"test_name": test_name, "limit": 2, "order": order})
+        got += [r["measurement_uid"] for r in j["results"]]
+        while j["metadata"]["next_url"] is not None:
+            assert len(got) <= len(rows), "Pagination is not terminating"
+            parsed = urlparse(j["metadata"]["next_url"])
+            j = getj(client, f"{parsed.path}?{parsed.query}")
+            got += [r["measurement_uid"] for r in j["results"]]
+
+        assert got == expected
+    finally:
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": test_name},
+        )
+
+
+def test_list_measurements_limit_zero(client):
+    """
+    limit=0 is a valid value, it should return no results and no next_url
+    """
+    j = getj(client, route, params={"limit": 0})
+    assert j["results"] == []
+    assert j["metadata"]["next_url"] is None
