@@ -993,7 +993,7 @@ async def list_measurements(
 
     # We got less results than what we expected, we know the count and that
     # we are done
-    if len(results) < limit:
+    if len(results) < limit or len(results) == 0: # limit can be 0
         next_url = None
     else:
         next_args = dict(request.query_params)
