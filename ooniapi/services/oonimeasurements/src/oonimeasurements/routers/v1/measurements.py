@@ -572,7 +572,14 @@ class ResultsMetadata(BaseModel):
     current_page: int = Field(title="")
     limit: int = Field(title="")
     next_url: Optional[str] = Field(title="")
-    offset: int = Field(title="")
+    offset: int = Field(
+        title="Offset",
+        deprecated=True,
+        description="Offset based pagination is deprecated. Prefer cursor-based"
+        " pagination implemented by the continuation `cont` token. This token"
+        " will be provided in the `next_url` field when no offset-based"
+        " pagination is used."
+    )
     pages: int = Field(title="")
     query_time: float = Field(title="")
 
@@ -697,14 +704,25 @@ async def list_measurements(
         ),
     ] = "desc",
     offset: Annotated[
-        int, Query(description="Offset into the result set (default: 0)")
+        int, Query(description="Offset into the result set (default: 0). "
+            "Offset-based pagination is now deprecated, use the continuation token `cont` instead",
+            deprecated=True,
+        )
     ] = 0,
     limit: Annotated[
         int,
         Query(
-            description="Number of records to return (default: 100)", ge=0, le=1_000_000
+            description="Number of records to return (default: 100)", ge=0, le=1_000_000,
         ),
     ] = 100,
+    cont: Annotated [
+        str | None,
+        Query(
+            description="Continuation token: used to to determine the next page"
+            " of measurements to retrieve. Usually comes from the `next_url` "
+            "field in `metadata`."
+        )
+    ] = None,
     user_agent: Annotated[str | None, Header()] = None,
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
