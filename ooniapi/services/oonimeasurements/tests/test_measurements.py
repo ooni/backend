@@ -687,3 +687,79 @@ def test_list_measurements_limit_zero(client):
     j = getj(client, route, params={"limit": 0})
     assert j["results"] == []
     assert j["metadata"]["next_url"] is None
+
+
+@pytest.mark.parametrize(
+    "cont",
+    [
+        "",
+        "nodash",
+        "notadate-20260101000000.000000_XY_webconnectivity_0000",
+        "2026-01-01-20260101000000.000000_XY_webconnectivity_0000",
+        "20260101000000-20260101000000.000000_XY_webconnectivity_0000-extra",
+    ],
+)
+def test_list_measurements_invalid_cont(client, cont):
+    resp = client.get(route, params={"cont": cont})
+    assert resp.status_code == 400, resp.json()
+
+
+def test_cont_token_roundtrip():
+    msm = measurements.Measurement(
+        measurement_url="",
+        measurement_start_time=datetime(2026, 9, 24, 10, 37, 49),
+        measurement_uid="20260924103750.562725_VE_webconnectivity_239aa1cf9dda27a7",
+    )
+    start_time, uid = measurements._parse_cont(measurements._make_cont(msm))
+    assert start_time == msm.measurement_start_time
+    assert uid == msm.measurement_uid
+
+
+@pytest.mark.parametrize(
+    "n_rows, limit, expected_pages",
+    [
+        # Exact multiple of limit: the last full page still has a next_url,
+        # following it returns an empty page
+        (10, 5, [5, 5, 0]),
+        # Less rows than limit: no next_url
+        (3, 5, [3]),
+    ],
+)
+def test_list_measurements_pagination_end(client, db, n_rows, limit, expected_pages):
+    test_name = "pagination_test"
+    ch = Clickhouse.from_url(db)
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
+
+    rows = []
+    for i in range(n_rows):
+        ts = now - timedelta(minutes=i + 1)
+        rows.append({
+            "measurement_uid": f"{ts.strftime('%Y%m%d%H%M%S')}.000000_XY_{test_name}_{i:04d}",
+            "report_id": f"report_{i:04d}",
+            "input": f"https://example{i}.com",
+            "probe_cc": "XY",
+            "probe_asn": 1234,
+            "test_name": test_name,
+            "measurement_start_time": ts,
+            "test_start_time": ts,
+            "scores": "{}",
+        })
+    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+
+    try:
+        pages = []
+        j = getj(client, route, params={"test_name": test_name, "limit": limit})
+        pages.append(len(j["results"]))
+        while j["metadata"]["next_url"] is not None:
+            assert len(pages) <= len(expected_pages), "Pagination is not terminating"
+            parsed = urlparse(j["metadata"]["next_url"])
+            j = getj(client, f"{parsed.path}?{parsed.query}")
+            pages.append(len(j["results"]))
+
+        assert pages == expected_pages
+    finally:
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": test_name},
+        )
