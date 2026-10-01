@@ -9,7 +9,7 @@ import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
 from urllib.parse import urlparse, parse_qs
 from .conftest import THIS_DIR
-from .utils import getj
+from .utils import getj, make_fastpath_row
 
 route = "api/v1/measurements"
 
@@ -512,146 +512,93 @@ def test_measurements_date_range_6_months_limit(client):
     assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
 
 
-def test_list_measurements_pagination_no_duplicates(client, db):
+def test_list_measurements_pagination_no_duplicates(client, insert_fastpath):
     """
     Inserting a new measurement between page requests should not cause
     measurements to be repeated in the next page.
     """
     test_name = "pagination_test"
-    ch = Clickhouse.from_url(db)
     now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
-
-    def make_row(i: int, ts: datetime) -> dict:
-        return {
-            "measurement_uid": f"20260101000000.000000_XY_{test_name}_{i:04d}",
-            "report_id": f"report_{i:04d}",
-            "input": f"https://example{i}.com",
-            "probe_cc": "XY",
-            "probe_asn": 1234,
-            "test_name": test_name,
-            "measurement_start_time": ts,
-            "test_start_time": ts,
-            "scores": "{}",
-        }
 
     # 1. Add 20 measurements
-    rows = [make_row(i, now - timedelta(minutes=i + 1)) for i in range(20)]
-    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+    rows = [
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(20)
+    ]
+    insert_fastpath(rows)
 
-    try:
-        # 2. Request first page
-        j = getj(client, route, params={"test_name": test_name, "limit": 10})
-        first_page = [r["measurement_uid"] for r in j["results"]]
-        assert len(first_page) == 10
-        next_url = j["metadata"]["next_url"]
-        assert next_url is not None
-        assert 'cont' in next_url, 'Continuation token should be default option'
+    # 2. Request first page
+    j = getj(client, route, params={"test_name": test_name, "limit": 10})
+    first_page = [r["measurement_uid"] for r in j["results"]]
+    assert len(first_page) == 10
+    next_url = j["metadata"]["next_url"]
+    assert next_url is not None
+    assert 'cont' in next_url, 'Continuation token should be default option'
 
-        # 3. Add a new measurement
-        ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", [make_row(20, now)])
+    # 3. Add a new measurement
+    insert_fastpath([make_fastpath_row(test_name, "0020", now)])
 
-        # 4. Request next page using next_url
-        parsed = urlparse(next_url)
-        j = getj(client, f"{parsed.path}?{parsed.query}")
-        second_page = [r["measurement_uid"] for r in j["results"]]
+    # 4. Request next page using next_url
+    parsed = urlparse(next_url)
+    j = getj(client, f"{parsed.path}?{parsed.query}")
+    second_page = [r["measurement_uid"] for r in j["results"]]
 
-        all_uids = first_page + second_page
-        assert len(all_uids) == len(set(all_uids)), "Duplicated measurements across pages"
-    finally:
-        # Note that we can't truncate fastpath as it has fixtures that other
-        # tests might need, so we delete only the entires for this test
-        ch.execute(
-            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
-            {"tn": test_name},
-        )
+    all_uids = first_page + second_page
+    assert len(all_uids) == len(set(all_uids)), "Duplicated measurements across pages"
 
 
-def test_list_measurements_offset_wins_over_cont(client, db):
+def test_list_measurements_offset_wins_over_cont(client, insert_fastpath):
     """
     When both offset and cont are provided, offset-based pagination is used
     and cont is ignored, to avoid breaking legacy clients.
     """
     test_name = "pagination_test"
-    ch = Clickhouse.from_url(db)
     now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
+    insert_fastpath([
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(20)
+    ])
 
-    rows = []
-    for i in range(20):
-        ts = now - timedelta(minutes=i + 1)
-        rows.append({
-            "measurement_uid": f"{ts.strftime('%Y%m%d%H%M%S')}.000000_XY_{test_name}_{i:04d}",
-            "report_id": f"report_{i:04d}",
-            "input": f"https://example{i}.com",
-            "probe_cc": "XY",
-            "probe_asn": 1234,
-            "test_name": test_name,
-            "measurement_start_time": ts,
-            "test_start_time": ts,
-            "scores": "{}",
-        })
-    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+    params = {"test_name": test_name, "limit": 10}
 
-    try:
-        params = {"test_name": test_name, "limit": 10}
+    # Get a valid cont token from the first page
+    next_url = getj(client, route, params=params)["metadata"]["next_url"]
+    cont = parse_qs(urlparse(next_url).query)["cont"][0]
 
-        # Get a valid cont token from the first page
-        next_url = getj(client, route, params=params)["metadata"]["next_url"]
-        cont = parse_qs(urlparse(next_url).query)["cont"][0]
+    # Expected result using only offset
+    j = getj(client, route, params={**params, "offset": 5})
+    expected = [r["measurement_uid"] for r in j["results"]]
+    assert len(expected) == 10
 
-        # Expected result using only offset
-        j = getj(client, route, params={**params, "offset": 5})
-        expected = [r["measurement_uid"] for r in j["results"]]
-        assert len(expected) == 10
+    # Using both offset and cont should give the same result as offset only
+    j = getj(client, route, params={**params, "offset": 5, "cont": cont})
+    got = [r["measurement_uid"] for r in j["results"]]
+    assert got == expected
 
-        # Using both offset and cont should give the same result as offset only
-        j = getj(client, route, params={**params, "offset": 5, "cont": cont})
-        got = [r["measurement_uid"] for r in j["results"]]
-        assert got == expected
-
-        # next_url should keep using offset
-        next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
-        assert next_qs["offset"] == ["15"]
-        assert "cont" not in next_qs
-    finally:
-        ch.execute(
-            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
-            {"tn": test_name},
-        )
+    # next_url should keep using offset
+    next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
+    assert next_qs["offset"] == ["15"]
+    assert "cont" not in next_qs
 
 
 @pytest.mark.parametrize("order", ["asc", "desc"])
-def test_list_measurements_pagination_ordering(client, db, order):
+def test_list_measurements_pagination_ordering(client, insert_fastpath, order):
     """
     Paginating with cont should return all measurements exactly once, sorted
     by (measurement_start_time, measurement_uid), including ties on
     measurement_start_time across page boundaries.
     """
     test_name = "pagination_test"
-    ch = Clickhouse.from_url(db)
     now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
 
     # 4 timestamps with 3 measurements each, so pages of 2 split tie groups.
     # uid suffixes are not in insertion order so the uid tiebreaker matters
-    suffixes = ["c3", "a1", "b2"]
-    rows = []
-    for t in range(4):
-        ts = now - timedelta(minutes=t + 1)
-        for i, suffix in enumerate(suffixes):
-            rows.append({
-                "measurement_uid": f"{ts.strftime('%Y%m%d%H%M%S')}.000000_XY_{test_name}_{suffix}",
-                "report_id": f"report_{t}_{i}",
-                "input": f"https://example{t}{i}.com",
-                "probe_cc": "XY",
-                "probe_asn": 1234,
-                "test_name": test_name,
-                "measurement_start_time": ts,
-                "test_start_time": ts,
-                "scores": "{}",
-            })
-    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+    rows = [
+        make_fastpath_row(test_name, f"{t}_{suffix}", now - timedelta(minutes=t + 1))
+        for t in range(4)
+        for suffix in ["c3", "a1", "b2"]
+    ]
+    insert_fastpath(rows)
 
     expected = [
         r["measurement_uid"]
@@ -662,22 +609,16 @@ def test_list_measurements_pagination_ordering(client, db, order):
         )
     ]
 
-    try:
-        got = []
-        j = getj(client, route, params={"test_name": test_name, "limit": 2, "order": order})
+    got = []
+    j = getj(client, route, params={"test_name": test_name, "limit": 2, "order": order})
+    got += [r["measurement_uid"] for r in j["results"]]
+    while j["metadata"]["next_url"] is not None:
+        assert len(got) <= len(rows), "Pagination is not terminating"
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
         got += [r["measurement_uid"] for r in j["results"]]
-        while j["metadata"]["next_url"] is not None:
-            assert len(got) <= len(rows), "Pagination is not terminating"
-            parsed = urlparse(j["metadata"]["next_url"])
-            j = getj(client, f"{parsed.path}?{parsed.query}")
-            got += [r["measurement_uid"] for r in j["results"]]
 
-        assert got == expected
-    finally:
-        ch.execute(
-            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
-            {"tn": test_name},
-        )
+    assert got == expected
 
 
 def test_list_measurements_limit_zero(client):
@@ -715,6 +656,7 @@ def test_cont_token_roundtrip():
     assert uid == msm.measurement_uid
 
 
+
 @pytest.mark.parametrize(
     "n_rows, limit, expected_pages",
     [
@@ -725,41 +667,64 @@ def test_cont_token_roundtrip():
         (3, 5, [3]),
     ],
 )
-def test_list_measurements_pagination_end(client, db, n_rows, limit, expected_pages):
+def test_list_measurements_pagination_end(client, insert_fastpath, n_rows, limit, expected_pages):
     test_name = "pagination_test"
-    ch = Clickhouse.from_url(db)
     now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
+    insert_fastpath([
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(n_rows)
+    ])
 
-    rows = []
-    for i in range(n_rows):
-        ts = now - timedelta(minutes=i + 1)
-        rows.append({
-            "measurement_uid": f"{ts.strftime('%Y%m%d%H%M%S')}.000000_XY_{test_name}_{i:04d}",
-            "report_id": f"report_{i:04d}",
-            "input": f"https://example{i}.com",
-            "probe_cc": "XY",
-            "probe_asn": 1234,
-            "test_name": test_name,
-            "measurement_start_time": ts,
-            "test_start_time": ts,
-            "scores": "{}",
-        })
-    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
-
-    try:
-        pages = []
-        j = getj(client, route, params={"test_name": test_name, "limit": limit})
+    pages = []
+    j = getj(client, route, params={"test_name": test_name, "limit": limit})
+    pages.append(len(j["results"]))
+    while j["metadata"]["next_url"] is not None:
+        assert len(pages) <= len(expected_pages), "Pagination is not terminating"
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
         pages.append(len(j["results"]))
-        while j["metadata"]["next_url"] is not None:
-            assert len(pages) <= len(expected_pages), "Pagination is not terminating"
-            parsed = urlparse(j["metadata"]["next_url"])
-            j = getj(client, f"{parsed.path}?{parsed.query}")
-            pages.append(len(j["results"]))
 
-        assert pages == expected_pages
-    finally:
-        ch.execute(
-            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
-            {"tn": test_name},
-        )
+    assert pages == expected_pages
+
+
+def test_list_measurements_pagination_late_arrivals(client, insert_fastpath):
+    """
+    This test documents a limitation of cursor based pagination:
+
+    Measurements inserted after a page was read are only returned if they sort
+    after the cursor
+
+    Measurements that sort before the cursor are never returned.
+    """
+    test_name = "pagination_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+
+    rows = [
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(20)
+    ]
+    insert_fastpath(rows)
+
+    # First page (desc): the 10 newest measurements, the cursor points to
+    # the measurement started 10 minutes ago
+    j = getj(client, route, params={"test_name": test_name, "limit": 10})
+    got = [r["measurement_uid"] for r in j["results"]]
+    assert got == [r["measurement_uid"] for r in rows[:10]]
+
+    # Late arrivals: received now, but started in the past.
+    # - behind: sorts before the cursor, within the already-read page
+    # - ahead: sorts after the cursor, within the pages not read yet
+    behind = make_fastpath_row(test_name, "behind", now - timedelta(minutes=5, seconds=30), now)
+    ahead = make_fastpath_row(test_name, "ahead", now - timedelta(minutes=15, seconds=30), now)
+    insert_fastpath([behind, ahead])
+
+    while j["metadata"]["next_url"] is not None:
+        assert len(got) <= len(rows) + 2, "Pagination is not terminating"
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+        got += [r["measurement_uid"] for r in j["results"]]
+
+    assert len(got) == len(set(got)), "Duplicated measurements across pages"
+    assert ahead["measurement_uid"] in got
+    assert behind["measurement_uid"] not in got
+    assert set(r["measurement_uid"] for r in rows) <= set(got)
