@@ -796,3 +796,18 @@ def test_measurement_meta_by_uid_without_timestamp_prefix(client):
     response = client.get("/api/v1/measurement_meta", params={"measurement_uid": "not-a-timestamp-uid"})
     assert response.status_code == 200, response.text
     assert response.json() == {}
+
+
+@pytest.mark.parametrize("which", [0, 1, 2])
+def test_s3path_lookup_by_uid_inside_and_outside_uid_window(db, uid_lookup_rows, which):
+    from clickhouse_driver import Client as ClickhouseClient
+    from oonimeasurements.routers.v1.measurements import measurement_uid_to_s3path_linenum
+
+    expected = uid_lookup_rows[which]
+    s3path = f"raw/20190501/12/IT/webconnectivity/uid-lookup-{which}.jsonl.gz"
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(
+            "INSERT INTO jsonl (report_id, input, s3path, linenum, measurement_uid) VALUES",
+            [(expected["report_id"], expected["input"], s3path, 7, expected["measurement_uid"])],
+        )
+        assert measurement_uid_to_s3path_linenum(click, expected["measurement_uid"]) == (s3path, 7)
