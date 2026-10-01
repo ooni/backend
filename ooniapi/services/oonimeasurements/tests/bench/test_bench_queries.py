@@ -47,6 +47,7 @@ CASES = {
     "measurements.domain": ("/api/v1/measurements", {"domain": DOMAIN}),
     "measurements.report_id": ("/api/v1/measurements", {"report_id": "{report_id}"}),
     "measurement_meta.uid": ("/api/v1/measurement_meta", {"measurement_uid": "{measurement_uid}"}),
+    "measurement_meta.report_id": ("/api/v1/measurement_meta", {"report_id": "{report_id}", "input": "{input}"}),
     # /api/v1/observations, /api/v1/aggregation/observations
     "observations.default": ("/api/v1/observations", {}),
     "observations.cc": ("/api/v1/observations", {"probe_cc": CC}),
@@ -91,8 +92,8 @@ CASES = {
 
 @pytest.fixture(scope="session")
 def samples(bench):
-    [(report_id, measurement_uid)] = bench.click.execute(
-        f"SELECT report_id, measurement_uid FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
+    [(report_id, measurement_uid, input)] = bench.click.execute(
+        f"SELECT report_id, measurement_uid, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
         f" AND measurement_start_time >= today() - 7 ORDER BY measurement_uid LIMIT 1"
     )
     [(obs_report_id,)] = bench.click.execute(
@@ -105,6 +106,7 @@ def samples(bench):
     return {
         "report_id": report_id,
         "measurement_uid": measurement_uid,
+        "input": input,
         "obs_report_id": obs_report_id,
         "busiest_asn": str(busiest_asn),
         "busiest_input": busiest_input,
