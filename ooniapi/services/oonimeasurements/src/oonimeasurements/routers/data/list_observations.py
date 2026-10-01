@@ -164,6 +164,29 @@ class ListObservationsResponse(BaseModel):
     results: List[ObservationEntry]
 
 
+def _page_query(cols, and_clauses, order, limit, offset, selective) -> str:
+    """
+    obs_web is sorted by (measurement_uid, observation_idx), so ORDER BY on any
+    other column cannot stop early and a plain SELECT would read every column of
+    every matching row. Pick the page's keys reading only the columns needed to
+    filter and sort, then read full rows for those keys through the primary key.
+    Both steps apply the same filters and order, so the page is the same.
+    A selective filter already reads few rows, and a second read would cost more.
+    """
+    where = " AND ".join(and_clauses) or "1"
+    if selective:
+        return f"SELECT {','.join(cols)} FROM obs_web WHERE {where} ORDER BY {order} LIMIT {limit} OFFSET {offset}"
+    keys = (
+        "SELECT measurement_uid, observation_idx FROM obs_web"
+        f" WHERE {where} ORDER BY {order} LIMIT {limit} OFFSET {offset}"
+    )
+    return (
+        f"SELECT {','.join(cols)} FROM obs_web"
+        f" WHERE {where} AND (measurement_uid, observation_idx) IN ({keys})"
+        f" ORDER BY {order} LIMIT {limit}"
+    )
+
+
 @router.get("/v1/observations", tags=["observations", "list_data"])
 @parse_probe_asn_to_int
 async def list_observations(
@@ -244,11 +267,8 @@ async def list_observations(
         q_args["until"] = until
 
     cols = list(WebObservationEntry.model_json_schema()["properties"].keys())
-    q = f"SELECT {','.join(cols)} FROM obs_web"
-    if len(and_clauses) > 0:
-        q += " WHERE "
-        q += " AND ".join(and_clauses)
-    q += f" ORDER BY {order_by} {order} LIMIT {limit} OFFSET {offset}"
+    selective = measurement_uid is not None or report_id is not None
+    q = _page_query(cols, and_clauses, f"{order_by} {order}", limit, offset, selective)
 
     t = time.perf_counter()
     rows = await async_query_click(db, q, q_args)

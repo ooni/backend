@@ -233,3 +233,45 @@ def test_oonidata_list_observations_with_limit_and_offset(
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 10
+
+
+@pytest.fixture(scope="module")
+def paged_observations(db):
+    from datetime import datetime, timedelta
+    from clickhouse_driver import Client as ClickhouseClient
+
+    start = datetime(2019, 4, 1)
+    rows = [
+        (f"20190401{i:06d}.000000_ZY_webconnectivity_paging", idx, start + timedelta(minutes=i * 4 + idx), "ZY", f"paging{i}.example.org")
+        for i in range(3)
+        for idx in range(4)
+    ]
+    insert = "INSERT INTO obs_web (measurement_uid, observation_idx, measurement_start_time, probe_cc, hostname) VALUES"
+    with ClickhouseClient.from_url(db) as click:
+        # a duplicate in a separate part stays until merged, as ReplacingMergeTree allows
+        click.execute("SYSTEM STOP MERGES obs_web")
+        try:
+            click.execute(insert, rows)
+            click.execute(insert, [rows[5]])
+            yield click
+        finally:
+            click.execute("SYSTEM START MERGES obs_web")
+
+
+@pytest.mark.parametrize(
+    "order, offset, limit",
+    [("DESC", 0, 5), ("ASC", 3, 4), ("DESC", 10, 5), ("ASC", 0, 100)],
+)
+def test_oonidata_list_observations_page_matches_plain_query(client, paged_observations, order, offset, limit):
+    params = {"probe_cc": "ZY", "since": "2019-04-01", "until": "2019-04-02", "order": order, "offset": offset, "limit": limit}
+    response = client.get(route, params=params)
+    assert response.status_code == 200, response.text
+    got = [(r["measurement_uid"], r["observation_idx"]) for r in response.json()["results"]]
+
+    expected = paged_observations.execute(
+        "SELECT measurement_uid, observation_idx FROM obs_web"
+        " WHERE probe_cc = 'ZY' AND measurement_start_time >= '2019-04-01' AND measurement_start_time <= '2019-04-02'"
+        f" ORDER BY measurement_start_time {order} LIMIT {limit} OFFSET {offset}"
+    )
+    assert got == [tuple(r) for r in expected]
+    assert len(got) == min(limit, max(13 - offset, 0))
