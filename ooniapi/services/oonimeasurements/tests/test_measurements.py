@@ -750,3 +750,49 @@ def test_list_measurements_pagination_pins_default_window(client, insert_fastpat
     got += [r["measurement_uid"] for r in j["results"]]
 
     assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
+
+
+@pytest.fixture(scope="session")
+def uid_lookup_rows(db):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    def row(uid, mst):
+        return {
+            "measurement_uid": uid,
+            "report_id": f"20190501T120000Z_webconnectivity_IT_3269_n1_{uid[-8:]}",
+            "input": "https://uid-lookup.example.org/",
+            "probe_cc": "IT",
+            "probe_asn": 3269,
+            "test_name": "web_connectivity",
+            "measurement_start_time": mst,
+            "scores": "{}",
+        }
+
+    rows = [
+        # starts moments before it was collected: found within the uid window
+        row("20190501120000.000000_IT_webconnectivity_uidwin01", datetime(2019, 5, 1, 11, 59)),
+        # uploaded a month late: only the unbounded fallback finds it
+        row("20190501120000.000000_IT_webconnectivity_uidlate1", datetime(2019, 4, 1, 12, 0)),
+        # uploaded 6 hours late: found by the day wide window
+        row("20190501120000.000000_IT_webconnectivity_uid6hlte", datetime(2019, 5, 1, 6, 0)),
+    ]
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(f"INSERT INTO fastpath ({','.join(rows[0])}) VALUES", rows)
+    return rows
+
+
+@pytest.mark.parametrize("which", [0, 1, 2])
+def test_measurement_meta_by_uid_inside_and_outside_uid_window(client, uid_lookup_rows, which):
+    expected = uid_lookup_rows[which]
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": expected["measurement_uid"]})
+    assert response.status_code == 200, response.text
+    meta = response.json()
+    assert meta["measurement_uid"] == expected["measurement_uid"]
+    assert meta["report_id"] == expected["report_id"]
+    assert meta["measurement_start_time"].startswith(expected["measurement_start_time"].strftime("%Y-%m-%dT%H:%M"))
+
+
+def test_measurement_meta_by_uid_without_timestamp_prefix(client):
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": "not-a-timestamp-uid"})
+    assert response.status_code == 200, response.text
+    assert response.json() == {}
