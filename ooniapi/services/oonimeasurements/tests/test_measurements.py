@@ -7,8 +7,9 @@ from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from .conftest import THIS_DIR
+from .utils import getj
 
 route = "api/v1/measurements"
 
@@ -540,22 +541,20 @@ def test_list_measurements_pagination_no_duplicates(client, db):
 
     try:
         # 2. Request first page
-        resp = client.get(route, params={"test_name": test_name, "limit": 10})
-        assert resp.status_code == 200, resp.json()
-        j = resp.json()
+        j = getj(client, route, params={"test_name": test_name, "limit": 10})
         first_page = [r["measurement_uid"] for r in j["results"]]
         assert len(first_page) == 10
         next_url = j["metadata"]["next_url"]
         assert next_url is not None
+        assert 'cont' in next_url, 'Continuation token should be default option'
 
         # 3. Add a new measurement
         ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", [make_row(20, now)])
 
         # 4. Request next page using next_url
         parsed = urlparse(next_url)
-        resp = client.get(f"{parsed.path}?{parsed.query}")
-        assert resp.status_code == 200, resp.json()
-        second_page = [r["measurement_uid"] for r in resp.json()["results"]]
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+        second_page = [r["measurement_uid"] for r in j["results"]]
 
         all_uids = first_page + second_page
         assert len(all_uids) == len(set(all_uids)), "Duplicated measurements across pages"
@@ -573,7 +572,7 @@ def test_list_measurements_offset_wins_over_cont(client, db):
     When both offset and cont are provided, offset-based pagination is used
     and cont is ignored, to avoid breaking legacy clients.
     """
-    test_name = "pagination_offset_test"
+    test_name = "pagination_test"
     ch = Clickhouse.from_url(db)
     now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
     cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
@@ -598,21 +597,16 @@ def test_list_measurements_offset_wins_over_cont(client, db):
         params = {"test_name": test_name, "limit": 10}
 
         # Get a valid cont token from the first page
-        resp = client.get(route, params=params)
-        assert resp.status_code == 200, resp.json()
-        next_url = resp.json()["metadata"]["next_url"]
+        next_url = getj(client, route, params=params)["metadata"]["next_url"]
         cont = parse_qs(urlparse(next_url).query)["cont"][0]
 
         # Expected result using only offset
-        resp = client.get(route, params={**params, "offset": 5})
-        assert resp.status_code == 200, resp.json()
-        expected = [r["measurement_uid"] for r in resp.json()["results"]]
+        j = getj(client, route, params={**params, "offset": 5})
+        expected = [r["measurement_uid"] for r in j["results"]]
         assert len(expected) == 10
 
         # Using both offset and cont should give the same result as offset only
-        resp = client.get(route, params={**params, "offset": 5, "cont": cont})
-        assert resp.status_code == 200, resp.json()
-        j = resp.json()
+        j = getj(client, route, params={**params, "offset": 5, "cont": cont})
         got = [r["measurement_uid"] for r in j["results"]]
         assert got == expected
 

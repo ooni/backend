@@ -999,6 +999,7 @@ async def list_measurements(
         next_args = dict(request.query_params)
         if offset != 0: # Legacy path
             next_args["offset"] = str(offset + limit)
+            next_args.pop('cont', None)
         else:
             last_uid = results[-1].measurement_uid
             if last_uid is None:
