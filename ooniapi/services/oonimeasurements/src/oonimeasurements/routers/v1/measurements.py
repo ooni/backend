@@ -350,6 +350,49 @@ def _get_measurement_meta_clickhouse(
     return format_msmt_meta(msmt_meta)
 
 
+# measurement_uid starts with its collection time. In production measurements
+# are collected a median 3 s after they start (p99 216 s, p99.9 ~4 h), and 3%
+# start slightly after it (fast probe clocks). Lookups by uid search widening
+# windows of the primary key and finally the whole table, so results do not
+# depend on the windows.
+UID_LOOKUP_WINDOWS = (
+    (timedelta(minutes=15), timedelta(minutes=15)),
+    (timedelta(days=1), timedelta(hours=1)),
+)
+UID_WINDOW_CLAUSE = "AND fastpath.measurement_start_time BETWEEN :mst_lo AND :mst_hi"
+
+
+def _uid_lookup_windows(measurement_uid: str) -> List[Dict[str, datetime]]:
+    try:
+        collected = datetime.strptime(measurement_uid[:14], "%Y%m%d%H%M%S")
+    except ValueError:
+        return []
+    return [
+        dict(mst_lo=collected - before, mst_hi=collected + after)
+        for before, after in UID_LOOKUP_WINDOWS
+    ]
+
+
+def _query_one_by_uid(
+    db: ClickhouseClient, query: str, measurement_uid: str
+) -> Optional[dict]:
+    """Run `query`, which filters fastpath by :uid and has a {window}
+    placeholder, over widening uid windows and then unbounded."""
+    params = dict(uid=measurement_uid)
+    for window in _uid_lookup_windows(measurement_uid):
+        row = query_click_one_row(
+            db,
+            sql.text(query.format(window=UID_WINDOW_CLAUSE)),
+            dict(params, **window),
+            query_prio=3,
+        )
+        if row:
+            return row
+    return query_click_one_row(
+        db, sql.text(query.format(window="")), params, query_prio=3
+    )
+
+
 def _get_measurement_meta_by_uid(
     db: ClickhouseClient, measurement_uid: str
 ) -> MeasurementMeta:
@@ -358,11 +401,10 @@ def _get_measurement_meta_by_uid(
     """
     query = """SELECT * FROM fastpath
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE measurement_uid = :uid
+        WHERE measurement_uid = :uid {window}
         LIMIT 1
     """
-    query_params = dict(uid=measurement_uid)
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    msmt_meta = _query_one_by_uid(db, query, measurement_uid)
     if not msmt_meta:
         return MeasurementMeta()  # measurement not found
     if msmt_meta["probe_asn"] == 0:
