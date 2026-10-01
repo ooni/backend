@@ -196,11 +196,10 @@ def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str
     # TODO: cleanup this
     query = """SELECT s3path, linenum FROM jsonl
         PREWHERE (report_id, input) IN (
-            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid
+            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid {window}
         )
         LIMIT 1"""
-    query_params = dict(uid=measurement_uid)
-    lookup = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    lookup = _query_one_by_uid(db, query, measurement_uid)
     if lookup is None:
         raise MeasurementNotFound
 
