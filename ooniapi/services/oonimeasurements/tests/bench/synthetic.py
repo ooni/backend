@@ -47,7 +47,9 @@ def _ddl_statements():
 
 
 def schema_fingerprint() -> str:
-    return hashlib.sha256("\n".join(_ddl_statements()).encode()).hexdigest()[:16]
+    """Changes whenever the schema or this generator does."""
+    source = "\n".join(_ddl_statements()) + Path(__file__).read_text()
+    return hashlib.sha256(source.encode()).hexdigest()[:16]
 
 
 def create_schema(click):
@@ -194,7 +196,9 @@ def insert_fastpath(click, n: int):
 
 
 def insert_obs_web(click, n: int):
-    # four observations per measurement (dns, tcp, tls, http); `m` keys the measurement
+    # four observations per measurement (dns, tcp, tls, http); `m` keys the
+    # measurement. Measurements close in time differ in m % 250, so every
+    # observation gets a distinct start time and ordering by it is total.
     m = "intDiv(number, 4)"
     idx = "number % 4"
     blocked = f"({_h(20, m)} % 100 < 10)"
@@ -215,7 +219,7 @@ def insert_obs_web(click, n: int):
             {idx},
             concat('https://', hostname, '/'),
             {_report_id("'web_connectivity'", m)},
-            {_mst(n // 4, m)} AS measurement_start_time,
+            addMilliseconds(toDateTime64({_mst(n // 4, m)}, 3), {m} % 250 * 4 + {idx}) AS measurement_start_time,
             'ooniprobe-cli', '3.20.0', 'web_connectivity', '0.4.3', toString(toDate(measurement_start_time)),
             {_asn(m)} AS probe_asn,
             {_cc(m)} AS probe_cc,
