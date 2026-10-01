@@ -5,7 +5,6 @@ Measurements API
 import gzip
 import json
 import logging
-import math
 import string
 import time
 from datetime import datetime, timedelta, timezone
@@ -878,6 +877,31 @@ async def list_measurements(
     elif failure is False:
         fpwhere.append(sql.text("fastpath.msm_failure = 'f'"))
 
+    if cont is not None:
+
+        # Direction of the comparator operators depends on the sorting order:
+        # order desc -> <, <=
+        # order asc -> >, >=
+        cont_x, cont_xe = ('<', '<=') if order.lower() == 'desc' else ('>', '>=')
+        fpwhere.append(
+            sql.text(
+                # Tuple comparison breaks indexing, so we have to specify the
+                # lexicographical comparision manually to leverage the table
+                # index
+                f"""
+                measurement_start_time {cont_xe} :cont_start_time AND
+                (measurement_start_time {cont_x} :cont_start_time OR measurement_uid {cont_x} :cont_msmt_uid)
+                """
+            )
+        )
+        try:
+            cont_start_time, cont_msmt_uid = _parse_cont(cont)
+        except ValueError as e:
+            raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST, detail={"msg": str(e)})
+
+        query_params['cont_start_time'] = cont_start_time
+        query_params['cont_msmt_uid'] = cont_msmt_uid
+
     fpq_table = sql.table("fastpath")
 
     if input:
@@ -905,7 +929,11 @@ async def list_measurements(
     if order_by is None:
         order_by = OrderBy("measurement_start_time")
 
-    fp_query = fp_query.order_by(text("{} {}".format(order_by.value, order)))
+    # Sorting by measurement_uid helps to make the sorting deterministic
+    fp_query = fp_query.order_by(
+        text(f"{order_by.value} {order}, measurement_uid {order}"
+        )
+    )
 
     # Assemble the "external" query. Run a final order by followed by limit and
     # offset
@@ -958,25 +986,29 @@ async def list_measurements(
         if r.input_ == INULL:
             results[i].input_ = None
 
+    # Pages and count are unrealistic for how expensive they can get
     pages = -1
     count = -1
-    current_page = math.ceil(offset / limit) + 1
+    current_page = -1
 
     # We got less results than what we expected, we know the count and that
     # we are done
     if len(results) < limit:
-        count = offset + len(results)
-        pages = math.ceil(count / limit)
         next_url = None
     else:
-        # XXX this is too intensive. find a workaround
-        # count_start_time = time.time()
-        # count = q.count()
-        # pages = math.ceil(count / limit)
-        # current_page = math.ceil(offset / limit) + 1
-        # query_time += time.time() - count_start_time
         next_args = dict(request.query_params)
-        next_args["offset"] = str(offset + limit)
+        if offset != 0: # Legacy path
+            next_args["offset"] = str(offset + limit)
+        else:
+            last_uid = results[-1].measurement_uid
+            if last_uid is None:
+                log.error("measurement_uid is null when it shouldn't")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail = {"error":"invalid measurements found"}
+                )
+            next_args["cont"] = _make_cont(results[-1])
+            next_args["order"] = order
         next_args["limit"] = str(limit)
         next_url = genurl(settings.base_url, "/api/v1/measurements", **next_args)
 
@@ -993,6 +1025,26 @@ async def list_measurements(
     setcacheresponse("1m", response)
     return MeasurementList(metadata=metadata, results=results[:limit])
 
+_CONT_TOKEN_DATETIME_FMT = "%Y%m%d%H%M%S"
+def _make_cont(msm: Measurement) -> str:
+    """
+    Constructs a continuation token from a measurement
+    """
+    assert msm.measurement_start_time, "Invalid measurement: measurement_start_time is None"
+    start_time = datetime.strftime(msm.measurement_start_time, _CONT_TOKEN_DATETIME_FMT)
+    # measurement_uid doesn't have a -, we need a separator that won't be present
+    # in measurement_uid
+    return f"{start_time}-{msm.measurement_uid}"
+
+def _parse_cont(cont: str) -> tuple[datetime, str]:
+
+    try:
+        start_time_str, msm_uid = cont.split("-")
+        start_time = datetime.strptime(start_time_str, _CONT_TOKEN_DATETIME_FMT)
+        return start_time, msm_uid
+
+    except Exception as e:
+        raise ValueError(f"Invalid continuation token: {e}")
 
 class ErrorResponse(BaseModel):
     v: int
