@@ -566,3 +566,62 @@ def test_list_measurements_pagination_no_duplicates(client, db):
             "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
             {"tn": test_name},
         )
+
+
+def test_list_measurements_offset_wins_over_cont(client, db):
+    """
+    When both offset and cont are provided, offset-based pagination is used
+    and cont is ignored, to avoid breaking legacy clients.
+    """
+    test_name = "pagination_offset_test"
+    ch = Clickhouse.from_url(db)
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    cols = "measurement_uid, report_id, input, probe_cc, probe_asn, test_name, measurement_start_time, test_start_time, scores"
+
+    rows = []
+    for i in range(20):
+        ts = now - timedelta(minutes=i + 1)
+        rows.append({
+            "measurement_uid": f"{ts.strftime('%Y%m%d%H%M%S')}.000000_XY_{test_name}_{i:04d}",
+            "report_id": f"report_{i:04d}",
+            "input": f"https://example{i}.com",
+            "probe_cc": "XY",
+            "probe_asn": 1234,
+            "test_name": test_name,
+            "measurement_start_time": ts,
+            "test_start_time": ts,
+            "scores": "{}",
+        })
+    ch.execute(f"INSERT INTO fastpath ({cols}) VALUES", rows)
+
+    try:
+        params = {"test_name": test_name, "limit": 10}
+
+        # Get a valid cont token from the first page
+        resp = client.get(route, params=params)
+        assert resp.status_code == 200, resp.json()
+        next_url = resp.json()["metadata"]["next_url"]
+        cont = parse_qs(urlparse(next_url).query)["cont"][0]
+
+        # Expected result using only offset
+        resp = client.get(route, params={**params, "offset": 5})
+        assert resp.status_code == 200, resp.json()
+        expected = [r["measurement_uid"] for r in resp.json()["results"]]
+        assert len(expected) == 10
+
+        # Using both offset and cont should give the same result as offset only
+        resp = client.get(route, params={**params, "offset": 5, "cont": cont})
+        assert resp.status_code == 200, resp.json()
+        j = resp.json()
+        got = [r["measurement_uid"] for r in j["results"]]
+        assert got == expected
+
+        # next_url should keep using offset
+        next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
+        assert next_qs["offset"] == ["15"]
+        assert "cont" not in next_qs
+    finally:
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": test_name},
+        )

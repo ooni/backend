@@ -877,8 +877,8 @@ async def list_measurements(
     elif failure is False:
         fpwhere.append(sql.text("fastpath.msm_failure = 'f'"))
 
-    if cont is not None:
-
+    # Cursor-based pagination
+    if cont is not None and offset == 0:
         # Direction of the comparator operators depends on the sorting order:
         # order desc -> <, <=
         # order asc -> >, >=
