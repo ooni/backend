@@ -21,6 +21,16 @@ import sys
 
 # bytes read ratios outside this band count as a change
 THRESHOLD = 0.10
+# time is noisy even after correcting for drift: note only large changes
+TIME_THRESHOLD = 0.25
+TIME_FLOOR_MS = 2.0
+DOWN, UP, DOT = "\u2193", "\u2191", "\u00b7"
+# arrow colors by size of change, from GitHub's palette, for factors from 1.1
+# (THRESHOLD) up to 1.5, 2, 4, 8 and beyond: the larger the saving, the
+# brighter the green; the larger the regression, the deeper the red
+SHADE_FACTORS = (1.5, 2, 4, 8)
+LESS_SHADES = ("#116329", "#1a7f37", "#2da44e", "#4ac26b", "#6fdd8b")
+MORE_SHADES = ("#d4a72c", "#bc4c00", "#cf222e", "#a40e26", "#82071e")
 
 
 def load(paths):
@@ -104,7 +114,40 @@ def render_text(rows, baseline, candidate):
     return "\n".join(lines)
 
 
-def render_markdown(rows, baseline, candidate):
+def _arrow(less, factor, plain):
+    """A down or up arrow, colored by the size of the change unless plain.
+    Markdown cannot color text, so the color comes from GitHub's math."""
+    if plain:
+        return DOWN if less else UP
+    shades = LESS_SHADES if less else MORE_SHADES
+    shade = shades[sum(factor >= f for f in SHADE_FACTORS)]
+    glyph = "\\blacktriangledown" if less else "\\blacktriangle"
+    return f"$`\\color{{{shade}}}{glyph}`$"
+
+
+def _factor(base, new):
+    return base / new if new < base else new / base
+
+
+def _change_note(r, d, plain):
+    """Arrow, factor and bar for a significant change in bytes read, and a
+    note for a significant change in time, after correcting for drift."""
+    b, c = r["base"], r["new"]
+    if not (b and c):
+        return ""
+    notes = []
+    if b["read_bytes"] and c["read_bytes"] and abs(c["read_bytes"] / b["read_bytes"] - 1) >= THRESHOLD:
+        f = _factor(b["read_bytes"], c["read_bytes"])
+        less = c["read_bytes"] < b["read_bytes"]
+        word = "less" if less else "more"
+        notes.append(f"{_arrow(less, f, plain)} {f:.1f}x {word} read")
+    base_ms, new_ms = b["median_ms"] * (d or 1), c["median_ms"]
+    if base_ms and abs(new_ms - base_ms) >= TIME_FLOOR_MS and abs(new_ms / base_ms - 1) >= TIME_THRESHOLD:
+        notes.append(f"{_factor(base_ms, new_ms):.1f}x {'faster' if new_ms < base_ms else 'slower'}")
+    return f" {DOT} ".join(notes)
+
+
+def render_markdown(rows, baseline, candidate, plain=False):
     lines = [
         f"**{summary(rows, baseline is not None)}**",
         "",
@@ -125,9 +168,16 @@ def render_markdown(rows, baseline, candidate):
     ]
     lines += [
         f"| {r['name']} | {_ms(r['base'])} | {_ms(r['new'])} | {_mb(r['base'])} | {_mb(r['new'])}"
-        f" | {_rows(r['base'])} | {_rows(r['new'])} | {r['verdict']} |"
+        f" | {_rows(r['base'])} | {_rows(r['new'])} | {' '.join(x for x in (r['verdict'] if r['verdict'] == 'RESPONSE CHANGED' else '', _change_note(r, d, plain) or r['verdict']) if x)} |"
         for r in rows
     ]
+    if baseline:
+        lines += [
+            "",
+            f"{_arrow(True, 4, plain)} / {_arrow(False, 4, plain)}: bytes read went down / up by at least"
+            f" {THRESHOLD:.0%}" + ("" if plain else "; the larger the change, the brighter the green or the deeper the red")
+            + f". Time is noted when it changed by at least {TIME_THRESHOLD:.0%} after correcting for drift.",
+        ]
     if candidate["ingest"]:
         lines += ["", "| ingest | per insert |", "|---|---|"]
         lines += [f"| {name} | {_ingest(baseline, candidate, name)} |" for name in sorted(candidate["ingest"])]
@@ -146,6 +196,7 @@ def main(argv=None):
     parser.add_argument("baseline")
     parser.add_argument("candidate")
     parser.add_argument("--markdown", action="store_true")
+    parser.add_argument("--plain", action="store_true", help="markdown without colored arrows")
     parser.add_argument("--summary-file", help="write the one line summary here")
     args = parser.parse_args(argv)
 
@@ -153,8 +204,10 @@ def main(argv=None):
     if baseline and baseline["meta"]["dataset"] != candidate["meta"]["dataset"]:
         print(f"warning: datasets differ: {baseline['meta']['dataset']} vs {candidate['meta']['dataset']}", file=sys.stderr)
     rows = compare(baseline, candidate)
-    render = render_markdown if args.markdown else render_text
-    print(render(rows, baseline, candidate))
+    if args.markdown:
+        print(render_markdown(rows, baseline, candidate, args.plain))
+    else:
+        print(render_text(rows, baseline, candidate))
     if args.summary_file:
         with open(args.summary_file, "w") as f:
             f.write(summary(rows, baseline is not None))
