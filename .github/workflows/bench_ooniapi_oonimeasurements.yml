@@ -1,5 +1,10 @@
 name: benchmark ooniapi/oonimeasurements
 on:
+  push:
+    paths:
+      - "ooniapi/services/oonimeasurements/**"
+      - "ooniapi/common/**"
+      - ".github/workflows/bench_ooniapi_oonimeasurements.yml"
   pull_request:
     paths:
       - "ooniapi/services/oonimeasurements/**"
@@ -16,12 +21,13 @@ permissions:
   statuses: write
 
 concurrency:
-  group: bench-oonimeasurements-${{ github.ref }}
+  group: bench-oonimeasurements-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   SERVICE: ooniapi/services/oonimeasurements
-  STATUS_CONTEXT: benchmark / oonimeasurements
+  # push and pull request runs of one commit compare different bases
+  STATUS_CONTEXT: benchmark / oonimeasurements (${{ github.event_name }})
   OONI_BENCH_ROWS: ${{ inputs.rows || '200000' }}
   OONI_BENCH_REPS: "5"
 
@@ -47,10 +53,15 @@ jobs:
         id: commits
         run: |
           # a pull request checks out its merge into the base branch, so the
-          # benchmarked change is that merge against its first parent
+          # benchmarked change is that merge against its first parent; a push
+          # is compared with what the branch pointed to before it, unless the
+          # branch is new or that commit is gone after a force push
           head="${{ github.event.pull_request.head.sha || github.sha }}"
+          before="${{ github.event.before }}"
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             base="$(git rev-parse HEAD^1)"
+          elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$before" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
+            base="$before"
           else
             base="$(git merge-base "origin/${{ github.event.repository.default_branch }}" HEAD)"
           fi
@@ -111,9 +122,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${{ steps.compare.outputs.exit }}" in
-            0) state=success; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
-            1) state=failure; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
+          case "${{ job.status }}:${{ steps.compare.outputs.exit }}" in
+            cancelled:*) state=error; description="cancelled, superseded by a newer run" ;;
+            *:0) state=success; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
+            *:1) state=failure; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
             *) state=error; description="benchmark did not complete" ;;
           esac
           gh api "repos/${{ github.repository }}/statuses/${{ steps.commits.outputs.head }}" \
