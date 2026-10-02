@@ -7,7 +7,9 @@ from oonimeasurements.common.clickhouse_utils import query_click_one_row
 from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
+from urllib.parse import urlparse, parse_qs
 from .conftest import THIS_DIR
+from .utils import getj, make_fastpath_row
 
 route = "api/v1/measurements"
 
@@ -260,33 +262,23 @@ def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtur
     assert j == {}, j
 
 
-def test_measurements_order_by_test_start_time_forbidden(client):
-    """
-    Tests that the `test_start_time` is NOT a valid order by field in oonimeasurements
-    """
-
-    resp = client.get("/api/v1/measurements", params={"order_by": "test_start_time"})
-
-    assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
-
-
 @freeze_time(FROZEN_TIME)
-def test_measurements_order_by_invalid_value_422(client):
+@pytest.mark.parametrize(
+    "order_by", ["measurement_start_time", "test_start_time", "probe_cc", "nonexistent"]
+)
+def test_measurements_order_by_ignored(client, order_by):
     """
-    Tests that invalid `order_by` values return 422 status code,
-    and valid `order_by` values return 200 status code
+    order_by is accepted for compatibility but ignored, results are always
+    sorted by measurement_start_time
     """
-    invalid_values = ["probe_cc", "probe_asn", "test_start_time", "nonexistent"]
+    j = getj(client, route, params={"order_by": order_by})
+    assert len(j["results"]) > 1, "Not enough results"
 
-    for invalid_value in invalid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value})
-        assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
-
-    valid_values = ["measurement_start_time"]
-
-    for valid_value in valid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": valid_value})
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}. Response: {resp.json()}"
+    d = get_time(j["results"][0])
+    for row in j["results"][1:]:
+        next_d = get_time(row)
+        assert next_d <= d, "Results should be sorted by measurement_start_time"
+        d = next_d
 
 
 def test_measurements_limit_hard_capped(client):
@@ -508,3 +500,253 @@ def test_measurements_date_range_6_months_limit(client):
     # Range within 6 months should return 200
     resp = client.get("/api/v1/measurements", params={"since": "2024-01-01", "until": "2024-04-01"})
     assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
+
+
+def test_list_measurements_pagination_no_duplicates(client, insert_fastpath):
+    """
+    Inserting a new measurement between page requests should not cause
+    measurements to be repeated in the next page.
+    """
+    test_name = "pagination_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+
+    # 1. Add 20 measurements
+    rows = [
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(20)
+    ]
+    insert_fastpath(rows)
+
+    # 2. Request first page
+    j = getj(client, route, params={"test_name": test_name, "limit": 10})
+    first_page = [r["measurement_uid"] for r in j["results"]]
+    assert len(first_page) == 10
+    next_url = j["metadata"]["next_url"]
+    assert next_url is not None
+    assert 'cont' in next_url, 'Continuation token should be default option'
+
+    # 3. Add a new measurement
+    insert_fastpath([make_fastpath_row(test_name, "0020", now)])
+
+    # 4. Request next page using next_url
+    parsed = urlparse(next_url)
+    j = getj(client, f"{parsed.path}?{parsed.query}")
+    second_page = [r["measurement_uid"] for r in j["results"]]
+
+    all_uids = first_page + second_page
+    assert len(all_uids) == len(set(all_uids)), "Duplicated measurements across pages"
+
+
+def test_list_measurements_cont_wins_over_offset(client, insert_fastpath):
+    """
+    When both offset and cont are provided, cursor-based pagination is used
+    and offset is ignored.
+    """
+    test_name = "pagination_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    insert_fastpath([
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(20)
+    ])
+
+    params = {"test_name": test_name, "limit": 10}
+
+    # Get a valid cont token from the first page
+    next_url = getj(client, route, params=params)["metadata"]["next_url"]
+    cont = parse_qs(urlparse(next_url).query)["cont"][0]
+
+    # Expected result using only cont
+    j = getj(client, route, params={**params, "cont": cont})
+    expected = [r["measurement_uid"] for r in j["results"]]
+    assert len(expected) == 10
+
+    # Using both offset and cont should give the same result as cont only
+    j = getj(client, route, params={**params, "offset": 5, "cont": cont})
+    got = [r["measurement_uid"] for r in j["results"]]
+    assert got == expected
+
+    # next_url should keep using cont
+    next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
+    assert "cont" in next_qs
+    assert "offset" not in next_qs
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+def test_list_measurements_pagination_ordering(client, insert_fastpath, order):
+    """
+    Paginating with cont should return all measurements exactly once, sorted
+    by (measurement_start_time, measurement_uid), including ties on
+    measurement_start_time across page boundaries.
+    """
+    test_name = "pagination_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+
+    # 4 timestamps with 3 measurements each, so pages of 2 split tie groups.
+    # uid suffixes are not in insertion order so the uid tiebreaker matters
+    rows = [
+        make_fastpath_row(test_name, f"{t}_{suffix}", now - timedelta(minutes=t + 1))
+        for t in range(4)
+        for suffix in ["c3", "a1", "b2"]
+    ]
+    insert_fastpath(rows)
+
+    expected = [
+        r["measurement_uid"]
+        for r in sorted(
+            rows,
+            key=lambda r: (r["measurement_start_time"], r["measurement_uid"]),
+            reverse=order == "desc",
+        )
+    ]
+
+    got = []
+    j = getj(client, route, params={"test_name": test_name, "limit": 2, "order": order})
+    got += [r["measurement_uid"] for r in j["results"]]
+    while j["metadata"]["next_url"] is not None:
+        assert len(got) <= len(rows), "Pagination is not terminating"
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+        got += [r["measurement_uid"] for r in j["results"]]
+
+    assert got == expected
+
+
+def test_list_measurements_limit_zero(client):
+    """
+    limit=0 is NOT a valid value, it should return 422
+    """
+    getj(client, route, params={"limit": 0}, expected_status=422)
+
+
+@pytest.mark.parametrize(
+    "cont",
+    [
+        "",
+        "nodash",
+        "notadate-20260101000000.000000_XY_webconnectivity_0000",
+        "2026-01-01-20260101000000.000000_XY_webconnectivity_0000",
+        "20260101000000-20260101000000.000000_XY_webconnectivity_0000-extra",
+    ],
+)
+def test_list_measurements_invalid_cont(client, cont):
+    resp = client.get(route, params={"cont": cont})
+    assert resp.status_code == 400, resp.json()
+
+
+def test_cont_token_roundtrip():
+    msm = measurements.Measurement(
+        measurement_url="",
+        measurement_start_time=datetime(2026, 9, 24, 10, 37, 49),
+        measurement_uid="20260924103750.562725_VE_webconnectivity_239aa1cf9dda27a7",
+    )
+    start_time, uid = measurements._parse_cont(measurements._make_cont(msm))
+    assert start_time == msm.measurement_start_time
+    assert uid == msm.measurement_uid
+
+
+
+@pytest.mark.parametrize(
+    "n_rows, limit, expected_pages",
+    [
+        # Exact multiple of limit: the last full page still has a next_url,
+        # following it returns an empty page
+        (10, 5, [5, 5, 0]),
+        # Less rows than limit: no next_url
+        (3, 5, [3]),
+    ],
+)
+def test_list_measurements_pagination_end(client, insert_fastpath, n_rows, limit, expected_pages):
+    test_name = "pagination_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    insert_fastpath([
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(n_rows)
+    ])
+
+    pages = []
+    j = getj(client, route, params={"test_name": test_name, "limit": limit})
+    pages.append(len(j["results"]))
+    while j["metadata"]["next_url"] is not None:
+        assert len(pages) <= len(expected_pages), "Pagination is not terminating"
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+        pages.append(len(j["results"]))
+
+    assert pages == expected_pages
+
+
+def test_list_measurements_pagination_late_arrivals(client, insert_fastpath):
+    """
+    This test documents a limitation of cursor based pagination:
+
+    Measurements inserted after a page was read are only returned if they sort
+    after the cursor
+
+    Measurements that sort before the cursor are never returned.
+    """
+    test_name = "pagination_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+
+    rows = [
+        make_fastpath_row(test_name, f"{i:04d}", now - timedelta(minutes=i + 1))
+        for i in range(20)
+    ]
+    insert_fastpath(rows)
+
+    # First page (desc): the 10 newest measurements, the cursor points to
+    # the measurement started 10 minutes ago
+    j = getj(client, route, params={"test_name": test_name, "limit": 10})
+    got = [r["measurement_uid"] for r in j["results"]]
+    assert got == [r["measurement_uid"] for r in rows[:10]]
+
+    # Late arrivals: received now, but started in the past.
+    # - behind: sorts before the cursor, within the already-read page
+    # - ahead: sorts after the cursor, within the pages not read yet
+    behind = make_fastpath_row(test_name, "behind", now - timedelta(minutes=5, seconds=30), now)
+    ahead = make_fastpath_row(test_name, "ahead", now - timedelta(minutes=15, seconds=30), now)
+    insert_fastpath([behind, ahead])
+
+    while j["metadata"]["next_url"] is not None:
+        assert len(got) <= len(rows) + 2, "Pagination is not terminating"
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+        got += [r["measurement_uid"] for r in j["results"]]
+
+    assert len(got) == len(set(got)), "Duplicated measurements across pages"
+    assert ahead["measurement_uid"] in got
+    assert behind["measurement_uid"] not in got
+    assert set(r["measurement_uid"] for r in rows) <= set(got)
+
+
+def test_list_measurements_pagination_pins_default_window(client, insert_fastpath):
+    """
+    When since/until are not provided, the default window is computed at
+    request time. next_url should pin it so that it doesn't shift between
+    pages, eg. when paginating across midnight UTC.
+    """
+    test_name = "pagination_test"
+    # Default window at 2026-01-10T23:59 is (2025-12-12, 2026-01-11]
+    newest = [
+        make_fastpath_row(test_name, f"new_{i}", datetime(2026, 1, 10, 12, i))
+        for i in range(5)
+    ]
+    # In the oldest day of the window, would be dropped if the window shifts
+    oldest = [
+        make_fastpath_row(test_name, f"old_{i}", datetime(2025, 12, 12, 12, i))
+        for i in range(5)
+    ]
+    insert_fastpath(newest + oldest)
+
+    with freeze_time("2026-01-10T23:59:00Z"):
+        j = getj(client, route, params={"test_name": test_name, "limit": 5})
+    got = [r["measurement_uid"] for r in j["results"]]
+    next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
+    assert "since" in next_qs and "until" in next_qs
+
+    # Next page after midnight: the default window would now start on 2025-12-13
+    with freeze_time("2026-01-11T00:01:00Z"):
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+    got += [r["measurement_uid"] for r in j["results"]]
+
+    assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
