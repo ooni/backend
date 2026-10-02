@@ -201,8 +201,10 @@ def api_private_countries(
     """
     setcacheresponse("1d", response)
     q = """
-    SELECT probe_cc, COUNT() AS measurement_count
+    SELECT probe_cc,
+    COUNT() AS measurement_count
     FROM fastpath
+    WHERE toDate(measurement_start_time) < today()
     GROUP BY probe_cc ORDER BY probe_cc
     """
     c = []
