@@ -262,33 +262,23 @@ def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtur
     assert j == {}, j
 
 
-def test_measurements_order_by_test_start_time_forbidden(client):
-    """
-    Tests that the `test_start_time` is NOT a valid order by field in oonimeasurements
-    """
-
-    resp = client.get("/api/v1/measurements", params={"order_by": "test_start_time"})
-
-    assert resp.status_code != 200, f"Unexpected code: {resp.status_code}"
-
-
 @freeze_time(FROZEN_TIME)
-def test_measurements_order_by_invalid_value_422(client):
+@pytest.mark.parametrize(
+    "order_by", ["measurement_start_time", "test_start_time", "probe_cc", "nonexistent"]
+)
+def test_measurements_order_by_ignored(client, order_by):
     """
-    Tests that invalid `order_by` values return 422 status code,
-    and valid `order_by` values return 200 status code
+    order_by is accepted for compatibility but ignored, results are always
+    sorted by measurement_start_time
     """
-    invalid_values = ["probe_cc", "probe_asn", "test_start_time", "nonexistent"]
+    j = getj(client, route, params={"order_by": order_by})
+    assert len(j["results"]) > 1, "Not enough results"
 
-    for invalid_value in invalid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": invalid_value})
-        assert resp.status_code == 422, f"Expected 422, got {resp.status_code}. Response: {resp.json()}"
-
-    valid_values = ["measurement_start_time"]
-
-    for valid_value in valid_values:
-        resp = client.get("/api/v1/measurements", params={"order_by": valid_value})
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}. Response: {resp.json()}"
+    d = get_time(j["results"][0])
+    for row in j["results"][1:]:
+        next_d = get_time(row)
+        assert next_d <= d, "Results should be sorted by measurement_start_time"
+        d = next_d
 
 
 def test_measurements_limit_hard_capped(client):
