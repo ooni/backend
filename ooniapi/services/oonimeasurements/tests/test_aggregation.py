@@ -1,4 +1,7 @@
 import pytest
+from datetime import datetime, timedelta
+
+from freezegun import freeze_time
 
 from textwrap import dedent
 from urllib.parse import urlencode
@@ -742,3 +745,91 @@ def test_aggregation_probe_asn_result_wont_crash(client):
     r = api(client, url)
     assert r["dimension_count"] == 2
     assert isinstance(r["result"][0]["probe_asn"], int)
+
+
+def exact_count(db, since, until, **where):
+    """measurement_count over the exact [since, until) instant range"""
+    from clickhouse_driver import Client as ClickhouseClient
+
+    clauses = "".join(f" AND {k} = %({k})s" for k in where)
+    with ClickhouseClient.from_url(db) as click:
+        [(count,)] = click.execute(
+            "SELECT count() FROM fastpath WHERE measurement_start_time >= %(since)s"
+            f" AND measurement_start_time < %(until)s{clauses}",
+            dict(since=since, until=until, **where),
+        )
+    return count
+
+
+def assert_buckets_sum_to(r, expected):
+    assert r["dimension_count"] == 1
+    assert sum(b["measurement_count"] for b in r["result"]) == expected, fjd(r)
+
+
+@pytest.mark.parametrize(
+    "time_grain, since, until",
+    [
+        # bounds deliberately fall mid-bucket
+        ("week", "2025-11-05", "2026-01-14"),
+        ("month", "2025-10-10", "2026-01-20"),
+        ("day", "2025-10-10", "2026-01-20"),
+    ],
+)
+def test_aggregation_time_grain_does_not_round_since_until(client, db, time_grain, since, until):
+    url = f"aggregation?since={since}&until={until}&time_grain={time_grain}&axis_x=measurement_start_day"
+    r = api(client, url)
+    expected = exact_count(db, datetime.fromisoformat(since), datetime.fromisoformat(until))
+    assert expected > 0
+    assert_buckets_sum_to(r, expected)
+
+
+def test_aggregation_week_grain_partial_first_and_last_bucket(client, db):
+    url = "aggregation?since=2026-01-07&until=2026-01-21&time_grain=week&axis_x=measurement_start_day"
+    r = api(client, url)
+    buckets = {b["measurement_start_day"]: b["measurement_count"] for b in r["result"]}
+    # toStartOfWeek is Sunday based: 2026-01-04, 2026-01-11, 2026-01-18
+    assert buckets == {
+        "2026-01-04": exact_count(db, datetime(2026, 1, 7), datetime(2026, 1, 11)),
+        "2026-01-11": exact_count(db, datetime(2026, 1, 11), datetime(2026, 1, 18)),
+        "2026-01-18": exact_count(db, datetime(2026, 1, 18), datetime(2026, 1, 21)),
+    }, fjd(r)
+
+
+@freeze_time("2026-01-31 23:59:00")
+def test_aggregation_default_window_is_exactly_last_180_days(client, db):
+    now = datetime(2026, 1, 31, 23, 59)
+    todays = exact_count(db, datetime(2026, 1, 31), now)
+    assert todays > 0, "the fixture must have measurements on the frozen day"
+
+    r = api(client, "aggregation")
+    assert r["dimension_count"] == 0
+    assert r["result"]["measurement_count"] == exact_count(db, now - timedelta(days=180), now)
+
+
+@freeze_time("2026-01-31 23:59:00")
+def test_aggregation_default_window_includes_today_bucket(client, db):
+    r = api(client, "aggregation?axis_x=measurement_start_day&time_grain=day")
+    last = r["result"][-1]
+    assert last["measurement_start_day"] == "2026-01-31", fjd(r)
+    assert last["measurement_count"] == exact_count(db, datetime(2026, 1, 31), datetime(2026, 1, 31, 23, 59))
+
+
+def test_aggregation_time_grain_is_ignored_without_time_axis(client, db):
+    # hour is only valid for ranges up to 7 days when grouping by time
+    r = api(client, "aggregation?since=2025-10-01&until=2026-01-01&time_grain=hour&probe_cc=IT")
+    assert r["dimension_count"] == 0
+    assert r["result"]["measurement_count"] == exact_count(
+        db, datetime(2025, 10, 1), datetime(2026, 1, 1), probe_cc="IT"
+    )
+
+
+def test_aggregation_empty_range_without_time_axis(client):
+    r = api(client, "aggregation?since=2026-01-10&until=2026-01-10")
+    assert r["dimension_count"] == 0
+    assert r["result"] == {
+        "anomaly_count": 0,
+        "confirmed_count": 0,
+        "failure_count": 0,
+        "measurement_count": 0,
+        "ok_count": 0,
+    }
