@@ -29,7 +29,7 @@ from pydantic import Field, IPvAnyAddress
 from starlette.concurrency import run_in_threadpool
 
 from ...common.anonymous_credentials import VerificationStatus
-from ...common.auth import create_jwt, decode_jwt, jwt
+from ...common.auth import create_jwt, decode_jwt, jwt, BEARER_PREFIX
 from ...common.dependencies import ClickhouseDep
 from ...common.errors import AddressNotFoundError
 from ...common.prio import (
@@ -1286,17 +1286,30 @@ class TorTarget(BaseModel):
     params: Optional[Dict[str, List[str]]] = None
 
 
+def check_probe_token(request: Request, key: str, desc: str) -> None:
+    """Require a probe_token JWT as issued by /api/v1/login"""
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith(BEARER_PREFIX):
+        log.info(f"{desc}: missing or malformed token")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    try:
+        decode_jwt(authorization[len(BEARER_PREFIX):], audience="probe_token", key=key)
+    except jwt.exceptions.PyJWTError:
+        log.info(f"{desc}: invalid token")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
 @router.get(
     "/test-list/tor-targets", tags=["ooniprobe"], response_model=Dict[str, TorTarget]
 )
 def list_tor_targets(
     request: Request,
+    response: Response,
     targets: TorTargetsDep,
+    settings: SettingsDep,
 ) -> Dict[str, TorTarget]:
-    token = request.headers.get("Authorization")
-    if token is None:
-        # XXX not actually validated
-        pass
+    setnocacheresponse(response)
+    check_probe_token(request, settings.jwt_encryption_key, "tor-targets")
 
     if targets is not None:
         return targets
@@ -1328,13 +1341,13 @@ class PsiphonConfig(BaseModel):
 @router.get("/test-list/psiphon-config", tags=["ooniprobe"], response_model=PsiphonConfig)
 def psiphon_config(
     request: Request,
-    config: PsiphonConfigDep
+    response: Response,
+    config: PsiphonConfigDep,
+    settings: SettingsDep,
     ) -> PsiphonConfig:
+    setnocacheresponse(response)
+    check_probe_token(request, settings.jwt_encryption_key, "psiphon-config")
 
-    token = request.headers.get("Authorization")
-    if token is None:
-        # XXX not actually validated
-        pass
     if config is not None:
         return config
 
