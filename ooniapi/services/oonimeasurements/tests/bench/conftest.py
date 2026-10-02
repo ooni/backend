@@ -31,10 +31,12 @@ from oonimeasurements.main import create_app, setup_router
 from ..conftest import make_override_get_settings
 from . import synthetic
 
-BENCH_DB = "ooni_bench"
 ROWS = int(os.environ.get("OONI_BENCH_ROWS", 50_000))
 REPS = int(os.environ.get("OONI_BENCH_REPS", 3))
+# an existing database to benchmark as is, e.g. a copy of production data
 EXTERNAL_URL = os.environ.get("OONI_BENCH_CLICKHOUSE_URL")
+# a running server to build synthetic datasets on, instead of starting one
+SERVER_URL = os.environ.get("OONI_BENCH_SERVER_URL")
 HARNESS = {"log_comment": "ooni-bench-harness"}
 VOLATILE_KEYS = {"db_stats", "query_time", "elapsed_seconds"}
 # endpoints derive default windows from the wall clock; pin it so that runs
@@ -44,6 +46,11 @@ ANCHOR = datetime.combine(date.today(), dt_time(12), tzinfo=timezone.utc)
 
 def _dataset_id() -> str:
     return f"rows={ROWS} days={synthetic.DAYS} anchor={date.today()} schema={synthetic.schema_fingerprint()}"
+
+
+# one database per dataset, so datasets for different schemas or sizes can
+# share a server, and runs that need the same one reuse it
+BENCH_DB = "ooni_bench_" + hashlib.sha256(_dataset_id().encode()).hexdigest()[:12]
 
 
 def _is_current(click) -> bool:
@@ -71,7 +78,7 @@ def _build(server_url: str):
 def bench_db(request):
     if EXTERNAL_URL:
         return EXTERNAL_URL
-    server_url = request.getfixturevalue("clickhouse_server")
+    server_url = SERVER_URL or request.getfixturevalue("clickhouse_server")
     _build(server_url)
     return f"{server_url}/{BENCH_DB}"
 

@@ -7,7 +7,7 @@ Only EXPLAIN is run for the lookups, so this is cheap and read-only and can be
 pointed at production:
 
     python tests/bench/lookup_pruning.py clickhouse://user:pass@host:9000/ooni
-    python tests/bench/lookup_pruning.py clickhouse://test:test@localhost:9000/ooni_bench
+    python tests/bench/lookup_pruning.py clickhouse://test:test@localhost:9000/ooni_bench_<dataset hash>
 """
 
 import argparse
