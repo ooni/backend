@@ -247,7 +247,6 @@ def insert_fastpath(click, n: int):
             'u'
         FROM numbers({n})
         """,
-        settings={"max_threads": 1},
     )
 
 
@@ -301,7 +300,6 @@ def insert_obs_web(click, n: int):
             toDateTime(measurement_start_time) + 3600
         FROM numbers({n})
         """,
-        settings={"max_threads": 1},
     )
 
 
@@ -336,7 +334,6 @@ def insert_analysis_web_measurement(click, n: int):
             if({blocked} AND {_h(23)} % 3 = 2, 0.8, 0.0) AS tls_blocked, 0.05, 1 - tls_blocked
         FROM numbers({n})
         """,
-        settings={"max_threads": 1},
     )
 
 
@@ -365,3 +362,7 @@ def populate(click, rows: int):
     insert_obs_web(click, rows * 3)
     insert_analysis_web_measurement(click, rows * 7 // 10)
     insert_changepoints(click, max(rows // 1000, 10))
+    # merged like production, and the same part layout, so the same bytes
+    # read, whenever background merges would otherwise have run
+    for table in ("fastpath", "obs_web", "analysis_web_measurement"):
+        click.execute(f"OPTIMIZE TABLE {table} FINAL")
