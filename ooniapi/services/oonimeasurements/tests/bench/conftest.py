@@ -105,12 +105,16 @@ def bench_client(bench_db):
         yield TestClient(app)
 
 
-def _stable_hash(body) -> str:
+def _stable_hash(body, unordered=False) -> str:
+    """Hash of a response without its volatile fields; with unordered, lists
+    are compared as sets, for endpoints whose results have no defined order."""
+
     def strip(o):
         if isinstance(o, dict):
             return {k: strip(v) for k, v in o.items() if k not in VOLATILE_KEYS}
         if isinstance(o, list):
-            return [strip(v) for v in o]
+            items = [strip(v) for v in o]
+            return sorted(items, key=lambda v: json.dumps(v, sort_keys=True)) if unordered else items
         return o
 
     return hashlib.sha256(json.dumps(strip(body), sort_keys=True).encode()).hexdigest()[:16]
@@ -121,16 +125,16 @@ class Recorder:
         self.queries = {}
         self.ingest = {}
 
-    def query(self, client, name, path, params=None):
+    def query(self, client, name, path, params=None, unordered=False):
         """Time `path` and return its (last) response body.
 
         Server side cost is read from system.query_log, so it covers every
         query the endpoint issues for one request.
         """
         with freeze_time(ANCHOR, tick=True):
-            return self._query(client, name, path, params)
+            return self._query(client, name, path, params, unordered)
 
-    def _query(self, client, name, path, params):
+    def _query(self, client, name, path, params, unordered):
         response = client.get(path, params=params)  # warm up caches
         assert response.status_code == 200, f"{name}: {response.text[:500]}"
         [(start,)] = self.click.execute("SELECT toUnixTimestamp64Micro(now64(6))", settings=HARNESS)
@@ -148,7 +152,7 @@ class Recorder:
             "median_ms": round(statistics.median(timings) * 1000, 2),
             "read_rows": read_rows // REPS,
             "read_bytes": read_bytes // REPS,
-            "response_hash": _stable_hash(body),
+            "response_hash": _stable_hash(body, unordered),
         }
         return body
 

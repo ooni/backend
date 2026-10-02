@@ -125,9 +125,14 @@ def _has_data(body) -> bool:
     return bool(body)
 
 
+# endpoints whose SQL has no ORDER BY: the order of their results depends on
+# the query plan, so a change of plan must not count as a changed response
+UNORDERED = {"private.networks"}
+
+
 @pytest.mark.parametrize("name", CASES)
 def test_bench_query(bench, bench_client, samples, name):
     path, params = CASES[name]
     params = {k: v.format(**samples) if isinstance(v, str) else v for k, v in params.items()}
-    body = bench.query(bench_client, name, path, params)
+    body = bench.query(bench_client, name, path, params, unordered=name in UNORDERED)
     assert _has_data(body), f"{name} returned no data, the benchmark would be meaningless: {body}"
