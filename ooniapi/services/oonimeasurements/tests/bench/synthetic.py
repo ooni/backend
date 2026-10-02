@@ -36,7 +36,8 @@ CATEGORY_CODES = ["NEWS", "HUMR", "POLR", "GRP", "LGBT", "REL", "COMT", "MMED", 
 def _schema_files():
     yield INITDB_DIR / "01-scheme.sql"
     yield INITDB_DIR / "03-faulty-msm-detection.sql"
-    yield from sorted(MIGRATIONS_DIR.iterdir())
+    # numeric order, so 10_ follows 9_
+    yield from sorted(MIGRATIONS_DIR.iterdir(), key=lambda p: int(p.name.split("_", 1)[0]))
 
 
 def _ddl_statements():
