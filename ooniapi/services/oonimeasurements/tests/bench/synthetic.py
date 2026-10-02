@@ -10,6 +10,7 @@ a tuned run can be compared byte for byte.
 import hashlib
 import os
 import re
+from datetime import date
 from pathlib import Path
 
 from oonimeasurements.routers.private import TEST_GROUPS
@@ -22,6 +23,10 @@ DAYS = int(os.environ.get("OONI_BENCH_DAYS", 180))
 if DAYS < 2:
     # some benchmarked endpoints default to windows ending before yesterday
     raise ValueError(f"OONI_BENCH_DAYS must be at least 2, got {DAYS}")
+# the day the dataset ends; pin it so that a dataset built on one day can be
+# reused on the next instead of being rebuilt
+ANCHOR_DATE = date.fromisoformat(os.environ.get("OONI_BENCH_ANCHOR") or date.today().isoformat())
+TODAY = f"toDate('{ANCHOR_DATE.isoformat()}')"
 URL_COUNT = 3000
 COUNTRIES = [
     "US", "IT", "DE", "RU", "IR", "CN", "IN", "BR", "GB", "FR",
@@ -87,7 +92,7 @@ def _url_idx(key="number"):
 
 
 def _mst(n, key="number"):
-    return f"toDateTime(today() - {DAYS}) + intDiv({key} * {DAYS * 86400}, {n}) + {_h(3, key)} % 60"
+    return f"toDateTime({TODAY} - {DAYS}) + intDiv({key} * {DAYS * 86400}, {n}) + {_h(3, key)} % 60"
 
 
 def _uid(test_name_expr, key="number", delay=None):
@@ -120,7 +125,7 @@ REPORT = f"intDiv(number, {MEASUREMENTS_PER_REPORT})"
 def _report_start(n):
     reports = -(-n // MEASUREMENTS_PER_REPORT)
     # every report starts at least a minute before the end of the window
-    return f"(toDateTime(today() - {DAYS}) + intDiv({REPORT} * {DAYS * 86400 - 120}, {reports}) + {_h(3, REPORT)} % 60)"
+    return f"(toDateTime({TODAY} - {DAYS}) + intDiv({REPORT} * {DAYS * 86400 - 120}, {reports}) + {_h(3, REPORT)} % 60)"
 
 
 def _report_duration(n):
@@ -129,7 +134,7 @@ def _report_duration(n):
     r = f"{_h(21, REPORT)}"
     d = f"multiIf({h} < 600, 2 + {r} % 18, {h} < 850, 20 + {r} % 580, {h} < 950, 600 + {r} % 6600, {h} < 999, 7200 + {r} % 43200, 86400 + {r} % 172800)"
     # reports still running at the end of the window are cut short
-    return f"least({d}, dateDiff('second', {_report_start(n)}, toDateTime(today())) - {2 * MEASUREMENTS_PER_REPORT})"
+    return f"least({d}, dateDiff('second', {_report_start(n)}, toDateTime({TODAY})) - {2 * MEASUREMENTS_PER_REPORT})"
 
 
 def _report_mst(n):
@@ -196,7 +201,7 @@ def insert_lookup_tables(click):
             toUInt32(1000 + intDiv(number, {ASNS_PER_COUNTRY}) * 100 + number % {ASNS_PER_COUNTRY}) AS asn,
             concat('Synthetic Network ', toString(asn)),
             arrayElement({_array(COUNTRIES)}, least(intDiv(number, {ASNS_PER_COUNTRY}), {len(COUNTRIES)})),
-            today() - 30, concat('AS', toString(asn)), 'synthetic'
+            {TODAY} - 30, concat('AS', toString(asn)), 'synthetic'
         FROM numbers({(len(COUNTRIES) + 1) * ASNS_PER_COUNTRY})
         """
     )
@@ -347,7 +352,7 @@ def insert_changepoints(click, n: int):
         SELECT
             {_asn()} AS probe_asn, {_cc()} AS probe_cc,
             concat('site', toString({_url_idx()}), '.example.org'),
-            toDateTime(today() - {DAYS}) + intDiv(number * {DAYS * 86400}, {n}),
+            toDateTime({TODAY} - {DAYS}) + intDiv(number * {DAYS * 86400}, {n}),
             1, 1, 2, 0.8, if({_h(24)} % 2 = 0, 1, -1), 0.1, 0.1, 3.5,
             arrayElement(['dns_isp_block', 'tcp_block', 'tls_block'], 1 + {_h(24)} % 3)
         FROM numbers({n})
