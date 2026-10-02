@@ -43,7 +43,7 @@ ANCHOR = datetime.combine(date.today(), dt_time(12), tzinfo=timezone.utc)
 
 
 def _dataset_id() -> str:
-    return f"rows={ROWS} anchor={date.today()} schema={synthetic.schema_fingerprint()}"
+    return f"rows={ROWS} days={synthetic.DAYS} anchor={date.today()} schema={synthetic.schema_fingerprint()}"
 
 
 def _is_current(click) -> bool:
