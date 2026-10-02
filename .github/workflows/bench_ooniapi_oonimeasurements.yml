@@ -13,8 +13,17 @@ on:
   workflow_dispatch:
     inputs:
       rows:
-        description: "fastpath rows to generate"
-        default: "200000"
+        description: "fastpath rows to generate (production has ~2M a day)"
+        default: "2000000"
+      days:
+        description: "days the rows are spread over"
+        default: "7"
+      reps:
+        description: "timed requests per query"
+        default: "5"
+      base:
+        description: "commit or branch to compare with (default: merge base with the default branch)"
+        default: ""
 
 permissions:
   contents: read
@@ -28,12 +37,26 @@ env:
   SERVICE: ooniapi/services/oonimeasurements
   # push and pull request runs of one commit compare different bases
   STATUS_CONTEXT: benchmark / oonimeasurements (${{ github.event_name }})
-  OONI_BENCH_ROWS: ${{ inputs.rows || '200000' }}
-  OONI_BENCH_REPS: "5"
+  OONI_BENCH_ROWS: ${{ inputs.rows || '2000000' }}
+  OONI_BENCH_DAYS: ${{ inputs.days || '7' }}
+  OONI_BENCH_REPS: ${{ inputs.reps || '5' }}
+  # one server for every round, so each dataset is built once per job
+  OONI_BENCH_SERVER_URL: clickhouse://test:test@localhost:9000
 
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.2
+        env:
+          CLICKHOUSE_USER: test
+          CLICKHOUSE_PASSWORD: test
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "clickhouse-client --user test --password test --query 'SELECT 1'"
+          --health-interval 5s --health-timeout 5s --health-retries 30
     steps:
       # full history: the base commit and tags are needed, and nothing is
       # pushed, so the token is not left in .git/config for the PR's code
@@ -51,6 +74,8 @@ jobs:
 
       - name: Resolve commits
         id: commits
+        env:
+          BASE_INPUT: ${{ inputs.base }}
         run: |
           # a pull request checks out its merge into the base branch, so the
           # benchmarked change is that merge against its first parent; a push
@@ -58,7 +83,9 @@ jobs:
           # branch is new or that commit is gone after a force push
           head="${{ github.event.pull_request.head.sha || github.sha }}"
           before="${{ github.event.before }}"
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+          if [ -n "$BASE_INPUT" ]; then
+            base="$(git rev-parse --verify --quiet "$BASE_INPUT^{commit}" || git rev-parse --verify "origin/$BASE_INPUT^{commit}")"
+          elif [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             base="$(git rev-parse HEAD^1)"
           elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$before" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
             base="$before"
