@@ -147,7 +147,7 @@ async def list_measurements(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
             limit=limit,
-            next_url=f"{settings.base_url}/api/v1/analysis?offset=100&limit=100",
+            next_url=f"{settings.base_url}/api/v1/analysis?offset={offset + limit}&limit={limit}",
             offset=offset,
             pages=-1,
             query_time=time.perf_counter() - t,
