@@ -8,6 +8,7 @@ a tuned run can be compared byte for byte.
 """
 
 import hashlib
+import os
 import re
 from pathlib import Path
 
@@ -17,7 +18,10 @@ TESTS_DIR = Path(__file__).parent.parent
 INITDB_DIR = TESTS_DIR / "fixtures" / "initdb"
 MIGRATIONS_DIR = TESTS_DIR / "migrations"
 
-DAYS = 180
+DAYS = int(os.environ.get("OONI_BENCH_DAYS", 180))
+if DAYS < 2:
+    # some benchmarked endpoints default to windows ending before yesterday
+    raise ValueError(f"OONI_BENCH_DAYS must be at least 2, got {DAYS}")
 URL_COUNT = 3000
 COUNTRIES = [
     "US", "IT", "DE", "RU", "IR", "CN", "IN", "BR", "GB", "FR",
@@ -86,9 +90,9 @@ def _mst(n, key="number"):
     return f"toDateTime(today() - {DAYS}) + intDiv({key} * {DAYS * 86400}, {n}) + {_h(3, key)} % 60"
 
 
-def _uid(test_name_expr, key="number"):
+def _uid(test_name_expr, key="number", delay=None):
     # collection delay: usually seconds, sometimes days (late uploads)
-    delay = f"if({_h(10, key)} % 100 < 2, {_h(10, key)} % 259200, {_h(10, key)} % 120)"
+    delay = delay or f"if({_h(10, key)} % 100 < 2, {_h(10, key)} % 259200, {_h(10, key)} % 120)"
     return (
         f"concat(formatDateTime(measurement_start_time + {delay}, '%Y%m%d%H%i%S'), '.',"
         f" leftPad(toString({_h(8, key)} % 1000000), 6, '0'), '_', probe_cc, '_',"
@@ -104,14 +108,66 @@ def _report_id(test_name_expr, key="number"):
     )
 
 
-def _test_name_expr() -> str:
+# fastpath measurements belong to reports, like in production: a report's
+# measurements share its probe, test and report_id and are spread over its run,
+# so thousands of reports overlap in time; measurements are collected (uid)
+# after a lag and the report_id timestamp is when the collector opened the
+# report. Distributions follow production data2 (2026-10).
+MEASUREMENTS_PER_REPORT = 4
+REPORT = f"intDiv(number, {MEASUREMENTS_PER_REPORT})"
+
+
+def _report_start(n):
+    reports = -(-n // MEASUREMENTS_PER_REPORT)
+    # every report starts at least a minute before the end of the window
+    return f"(toDateTime(today() - {DAYS}) + intDiv({REPORT} * {DAYS * 86400 - 120}, {reports}) + {_h(3, REPORT)} % 60)"
+
+
+def _report_duration(n):
+    # 60% 2-20 s, 25% up to 10 min, 10% up to 2 h, 4.9% up to 14 h, 0.1% 1-3 days
+    h = f"{_h(20, REPORT)} % 1000"
+    r = f"{_h(21, REPORT)}"
+    d = f"multiIf({h} < 600, 2 + {r} % 18, {h} < 850, 20 + {r} % 580, {h} < 950, 600 + {r} % 6600, {h} < 999, 7200 + {r} % 43200, 86400 + {r} % 172800)"
+    # reports still running at the end of the window are cut short
+    return f"least({d}, dateDiff('second', {_report_start(n)}, toDateTime(today())) - {2 * MEASUREMENTS_PER_REPORT})"
+
+
+def _report_mst(n):
+    # spread over the run, at least a second apart so the sort key stays unique
+    i = f"(number % {MEASUREMENTS_PER_REPORT})"
+    return f"{_report_start(n)} + {i} + intDiv({i} * {_report_duration(n)}, {MEASUREMENTS_PER_REPORT})"
+
+
+def _report_opened(n):
+    # report_id time after the report's first measurement: 85% 3-20 s, 10% up to 2 min, 4.9% up to 1 h, 0.1% 11-25 h
+    h = f"{_h(22, REPORT)} % 1000"
+    r = f"{_h(23, REPORT)}"
+    return f"({_report_start(n)} + multiIf({h} < 850, 3 + {r} % 17, {h} < 950, 20 + {r} % 100, {h} < 999, 120 + {r} % 3480, 39600 + {r} % 50400))"
+
+
+def _collection_lag():
+    # 3% -1..-30 s (fast clocks), 50% 1-5 s, 40% 5-30 s, 6% 30-200 s, 0.9% 200 s-4 h, 0.1% 4 h-3 days
+    h = f"{_h(10)} % 10000"
+    r = f"toInt64({_h(24)} % 244800)"
+    return f"multiIf({h} < 300, -1 - {r} % 30, {h} < 5300, 1 + {r} % 5, {h} < 9300, 5 + {r} % 25, {h} < 9900, 30 + {r} % 170, {h} < 9990, 200 + {r} % 14200, 14400 + {r})"
+
+
+def _report_id_opened(n, test_name_expr):
+    return (
+        f"concat(formatDateTime({_report_opened(n)}, '%Y%m%dT%H%i%SZ'), '_',"
+        f" replaceAll({test_name_expr}, '_', ''), '_', probe_cc, '_', toString(probe_asn),"
+        f" '_n1_', substring(hex({_h(7, REPORT)}), 1, 16))"
+    )
+
+
+def _test_name_expr(key="number") -> str:
     buckets = [
         (70, "web_connectivity"), (76, "signal"), (80, "whatsapp"), (83, "telegram"),
         (85, "facebook_messenger"), (88, "tor"), (90, "torsf"), (92, "psiphon"),
         (94, "riseupvpn"), (96, "dnscheck"), (98, "ndt"),
     ]
     args = ", ".join(f"r < {b}, '{t}'" for b, t in buckets)
-    return f"multiIf({args}, 'http_invalid_request_line')".replace("r <", f"{_h(18)} % 100 <")
+    return f"multiIf({args}, 'http_invalid_request_line')".replace("r <", f"{_h(18, key)} % 100 <")
 
 
 def insert_citizenlab(click):
@@ -159,15 +215,15 @@ def insert_fastpath(click, n: int):
             test_helper_address, test_helper_type, ooni_run_link_id, is_verified
         )
         SELECT
-            {_uid('test_name')},
-            {_report_id('test_name')},
+            {_uid('test_name', delay=_collection_lag())},
+            {_report_id_opened(n, 'test_name')},
             multiIf(test_name = 'web_connectivity', concat('https://site', toString({_url_idx()}), '.example.org/'),
                     test_name = 'dnscheck', 'https://dns.google/dns-query', '') AS input,
-            {_cc()} AS probe_cc,
-            {_asn()} AS probe_asn,
-            {_test_name_expr()} AS test_name,
-            measurement_start_time - {_h(11)} % 300,
-            {_mst(n)} AS measurement_start_time,
+            {_cc(REPORT)} AS probe_cc,
+            {_asn(REPORT)} AS probe_asn,
+            {_test_name_expr(REPORT)} AS test_name,
+            {_report_start(n)},
+            {_report_mst(n)} AS measurement_start_time,
             '',
             multiIf(
                 test_name IN ('tor', 'torsf', 'psiphon', 'riseupvpn'),
