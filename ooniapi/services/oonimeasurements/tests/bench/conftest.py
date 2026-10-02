@@ -70,7 +70,9 @@ def _build(server_url: str):
             return
         click.execute(f"DROP DATABASE IF EXISTS {BENCH_DB} SYNC")
         click.execute(f"CREATE DATABASE {BENCH_DB}")
-    with ClickhouseClient.from_url(f"{server_url}/{BENCH_DB}") as click:
+    # OPTIMIZE ... FINAL of a large table takes longer than the driver's
+    # default 300 s socket timeout, which makes the server abort the merge
+    with ClickhouseClient.from_url(f"{server_url}/{BENCH_DB}?send_receive_timeout=7200") as click:
         synthetic.create_schema(click)
         synthetic.populate(click, ROWS)
         click.execute("CREATE TABLE bench_meta (dataset_id String) ENGINE = TinyLog")
