@@ -1,0 +1,323 @@
+# docker-compose for an end-to-end test harness that deploys the ooniapi
+# backend services and exercises them with a real, containerized miniooni
+# client (github.com/ooni/probe-cli).
+#
+# IMPORTANT: the six ooniapi python services (ooniauth, oonifindings,
+# oonimeasurements, ooniprobe, oonirun, testlists) are NOT built by this
+# compose file. Their Dockerfiles COPY a symlinked ../../common directory,
+# and each service's own `make docker-build` target works around this with
+# `tar -czh . | docker build -` (dereferencing the symlink before it reaches
+# the docker daemon). Plain `docker compose build` does not do this, so
+# building them here would silently ship a broken `common` symlink.
+#
+# Run `./scripts/build-images.sh` first (it just shells out to each
+# service's own `make docker-build`), then `docker compose up`.
+#
+# See README.md for the full instructions and known limitations.
+
+x-service-env: &service-env
+  POSTGRESQL_URL: postgresql://oonipg:oonipg@postgres:5432/oonipg
+  CLICKHOUSE_URL: clickhouse://default:default@clickhouse-server:9000
+  JWT_ENCRYPTION_KEY: e2e-test-jwt-secret-do-not-use-in-prod
+  PROMETHEUS_METRICS_PASSWORD: e2e-test-metrics-password
+  ACCOUNT_ID_HASHING_KEY: e2e-test-account-hashing-key
+  COLLECTOR_ID: "e2e"
+  BASE_URL: "http://router"
+  LOG_LEVEL: info
+  # Generous rate limits: this is a shared instance hit repeatedly by CI runs.
+  RATE_LIMITS: "100000/minute;2000000/day"
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oonipg
+      POSTGRES_PASSWORD: oonipg
+      POSTGRES_DB: oonipg
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oonipg"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  clickhouse-server:
+    # Name matches the host baked into ooniapi/../fastpath/fastpath.conf so
+    # the fastpath container needs no extra config to find it.
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+    volumes:
+      - ./clickhouse/initdb:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "default", "--password", "default", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # S3-compatible store backing ooniprobe's anonymous-credentials manifest
+  # (/api/v1/manifest, /api/v1/sign_credential). See README.md for what
+  # this actually tests and why a fixed test keypair is safe to use here.
+  #
+  # Image: MinIO deleted both minio/minio and minio/mc from Docker Hub on
+  # 2026-09-11 (the last step in winding down the open-source community
+  # edition in favor of its commercial AIStor product - free image
+  # publishing stopped Oct 2025, the OSS repo was archived Feb 2026). We
+  # use pgsty/minio ("Silo"), a community-maintained fork published by
+  # Pigsty (https://hub.docker.com/r/pgsty/minio) that tracks upstream
+  # MinIO RELEASE.2025-12-03T12-00-00Z and explicitly preserves
+  # MinIO-compatible S3 APIs, env vars, and CLI conventions - so nothing
+  # else here needed to change. It also bundles the client (as `mcli`,
+  # with an `mc` compatibility alias), which is why minio-init below uses
+  # this same image instead of a separate minio/mc one.
+  minio:
+    image: pgsty/minio:latest
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
+  # One-off job: waits for minio, creates the manifest bucket, turns on
+  # versioning, and uploads manifest.json. Versioning matters here, not
+  # just as good S3 hygiene: ooniprobe's GET /api/v1/manifest uses the S3
+  # object's VersionId as the manifest's own "version" field (see
+  # ooniapi/services/ooniprobe/src/ooniprobe/dependencies.py:get_manifest,
+  # which calls list_object_versions and asserts a VersionId is present) -
+  # skip this and that endpoint 500s with "Is versioning activated?".
+  minio-init:
+    image: pgsty/minio:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done
+        mc mb local/ooni-anonc-test || true
+        mc version enable local/ooni-anonc-test
+        cat <<'JSON' | mc pipe local/ooni-anonc-test/manifest.json
+        {
+          "nym_scope": "ooni.org/{probe_cc}/{probe_asn}",
+          "submission_policy": [
+            {
+              "match": {"probe_cc": "*", "probe_asn": "*"},
+              "policy": {"age": [2461110, 2826140], "min_measurement_count": 0}
+            }
+          ],
+          "public_parameters": "AaJpxHsB+x4axWCrFxohF+ML5inYWbPbVQro9YGxb9NVAcgzlHrnd7PLfwWQe69W3ZLcGe4R/CnbFBwhCfdfvvpCAwAAAAAAAAAkAklNBr7fMUrdkeNT360ZsLTGN8A7kKMX6b60tJ5YCBLJ9QJdwnkp12VHPgND2/chraDFw8snqfq0JDZI2tJ04sqKzWi+y57qzh0HG+pkZ3xe7RceyE4isTs7ZRzriwA="
+        }
+        JSON
+    restart: "no"
+
+  # One-off admin task (12-factor principle XII, see ooniapi/README.md):
+  # applies the single shared alembic history (ooniapi/common/src/common/alembic)
+  # that all Postgres-backed services rely on. Any one service's image can
+  # run it since they all vendor the identical common/alembic tree.
+  migrate:
+    image: ${OONIPROBE_IMAGE:-ooni-e2e/ooniprobe:e2e}
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      OONI_PG_URL: postgresql://oonipg:oonipg@postgres:5432/oonipg
+    entrypoint: ["alembic"]
+    command: ["upgrade", "head"]
+    restart: "no"
+
+  fastpath:
+    build:
+      context: ../../../fastpath
+      dockerfile: Dockerfile
+    # fastpath has no symlink-out-of-context issue, so a native compose
+    # build is fine here (unlike the six services above).
+    command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk", "--debug"]
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+
+  ooniauth:
+    image: ${OONIAUTH_IMAGE:-ooni-e2e/ooniauth:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *service-env
+      AWS_REGION: ""
+      # ooniauth's own /health handler (routers aside) fails with
+      # "bad_aws_credentials" if these two are empty - it only checks
+      # they're *set*, not that they're real (see
+      # ooniapi/services/ooniauth/src/ooniauth/main.py). AWS_REGION alone,
+      # set above, doesn't satisfy that check. We never exercise
+      # ooniauth's actual email-sending path (nothing in this harness's
+      # test scope calls its register/login), so these just need to be
+      # non-empty, not functional.
+      AWS_ACCESS_KEY_ID: "e2e-test-unused"
+      AWS_SECRET_ACCESS_KEY: "e2e-test-unused"
+      EMAIL_SOURCE_ADDRESS: "contact+e2e@ooni.io"
+      SESSION_EXPIRY_DAYS: 2
+      LOGIN_EXPIRY_DAYS: 7
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  oonifindings:
+    image: ${OONIFINDINGS_IMAGE:-ooni-e2e/oonifindings:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *service-env
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  oonimeasurements:
+    image: ${OONIMEASUREMENTS_IMAGE:-ooni-e2e/oonimeasurements:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse-server:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+      # valkey_url defaults to "memory" (in-process rate limiting), so no
+      # Valkey/Redis container is needed for this harness.
+      OTHER_COLLECTORS: "[]"
+      RATE_LIMITS_WHITELISTED_IPADDRS: "[]"
+      RATE_LIMITS_UNMETERED_PAGES: '["/metrics", "/health"]'
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  ooniprobe:
+    image: ${OONIPROBE_IMAGE:-ooni-e2e/ooniprobe:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse-server:
+        condition: service_healthy
+      fastpath:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./aws/config:/etc/aws-config:ro
+    environment:
+      <<: *service-env
+      FASTPATH_URLS: '["http://fastpath:8472"]'
+      COLLECTOR_ID: "4"
+      AWS_CONFIG_FILE: /etc/aws-config
+      AWS_ENDPOINT_URL: http://minio:9000
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+      ANONC_MANIFEST_BUCKET: ooni-anonc-test
+      ANONC_MANIFEST_FILE: manifest.json
+      # This secret key and the manifest's public_parameters (see
+      # minio-init above) are a matched pair lifted directly from
+      # ooniapi/services/ooniprobe/tests/conftest.py's `test_creds`
+      # fixture - the same keypair that service's own anoncred test suite
+      # (tests/test_anoncred.py) already exercises, so it's a
+      # known-working pair rather than something generated ad hoc here.
+      ANONC_SECRET_KEY: "AUGQSPO28+QLlf8fKhQjqAD2Ehjn0Q471Yavs7n0qsYJ0nnZ1G/Y2LqvjC3Stq0o9Ka6lB2Xq9EDIEOFhQsjbQQDAAAAAAAAAGk422WHZ5MEPCTMbaj4sDvW27Yvl+pRzDuuTasyEpIDRCEzgL3tIOErnbYtca/68gHUxIfXRCDtcSMEvxVhSAynRFLeT0pXf5fRFwX4gbzNVgvzh0MthADyh7UUPmj6BQ=="
+      # tor-targets/psiphon-config remain unconfigured (they're a separate
+      # S3 setting, CONFIG_BUCKET, from ANONC_MANIFEST_BUCKET above) - see
+      # README.md "Known gaps".
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  oonirun:
+    image: ${OONIRUN_IMAGE:-ooni-e2e/oonirun:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse-server:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  testlists:
+    image: ${TESTLISTS_IMAGE:-ooni-e2e/testlists:e2e}
+    pull_policy: never
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *service-env
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  # Not started by `docker compose up` (see the "client" profile below) -
+  # this is the test client, invoked on demand via:
+  #   docker compose run --rm --profile client miniooni <experiment> \
+  #     --probe-services http://router --yes ...
+  miniooni:
+    build:
+      context: ./miniooni
+      args:
+        PROBE_CLI_REPO: ${PROBE_CLI_REPO:-https://github.com/ooni/probe-cli.git}
+        PROBE_CLI_REF: ${PROBE_CLI_REF:-master}
+        # "source" (the default) builds the userauth staticlib from source
+        # rather than trusting a prebuilt binary blob; "prebuilt" is tested
+        # in CI too (see .github/workflows/test_e2e_miniooni.yml) so a
+        # regression in either path shows up here instead of silently -
+        # see miniooni/Dockerfile for the story on why that matters.
+        USERAUTH_MODE: ${USERAUTH_MODE:-source}
+    profiles: ["client"]
+    depends_on:
+      router:
+        condition: service_started
+
+  router:
+    image: nginx:1.27.1
+    volumes:
+      - ./nginx/router.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${ROUTER_PORT:-8080}:80"
+    depends_on:
+      ooniauth:
+        condition: service_healthy
+      oonifindings:
+        condition: service_healthy
+      oonimeasurements:
+        condition: service_healthy
+      ooniprobe:
+        condition: service_healthy
+      oonirun:
+        condition: service_healthy
+      testlists:
+        condition: service_healthy
