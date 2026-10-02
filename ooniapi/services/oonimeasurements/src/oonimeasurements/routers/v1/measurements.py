@@ -877,8 +877,10 @@ async def list_measurements(
     elif failure is False:
         fpwhere.append(sql.text("fastpath.msm_failure = 'f'"))
 
-    # Cursor-based pagination
-    if cont is not None and offset == 0:
+    # Cursor-based pagination. If cont is provided, it takes precedence over
+    # offset
+    if cont is not None:
+        offset = 0
         # Direction of the comparator operators depends on the sorting order:
         # order desc -> <, <=
         # order asc -> >, >=
@@ -1010,6 +1012,7 @@ async def list_measurements(
                 )
             next_args["cont"] = _make_cont(results[-1])
             next_args["order"] = order
+            next_args.pop("offset", None)
         next_args["limit"] = str(limit)
         # Pin the time window so that default since/until computed at request
         # time don't shift between pages

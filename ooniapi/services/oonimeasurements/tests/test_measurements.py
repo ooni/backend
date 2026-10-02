@@ -547,10 +547,10 @@ def test_list_measurements_pagination_no_duplicates(client, insert_fastpath):
     assert len(all_uids) == len(set(all_uids)), "Duplicated measurements across pages"
 
 
-def test_list_measurements_offset_wins_over_cont(client, insert_fastpath):
+def test_list_measurements_cont_wins_over_offset(client, insert_fastpath):
     """
-    When both offset and cont are provided, offset-based pagination is used
-    and cont is ignored, to avoid breaking legacy clients.
+    When both offset and cont are provided, cursor-based pagination is used
+    and offset is ignored.
     """
     test_name = "pagination_test"
     now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
@@ -565,20 +565,20 @@ def test_list_measurements_offset_wins_over_cont(client, insert_fastpath):
     next_url = getj(client, route, params=params)["metadata"]["next_url"]
     cont = parse_qs(urlparse(next_url).query)["cont"][0]
 
-    # Expected result using only offset
-    j = getj(client, route, params={**params, "offset": 5})
+    # Expected result using only cont
+    j = getj(client, route, params={**params, "cont": cont})
     expected = [r["measurement_uid"] for r in j["results"]]
     assert len(expected) == 10
 
-    # Using both offset and cont should give the same result as offset only
+    # Using both offset and cont should give the same result as cont only
     j = getj(client, route, params={**params, "offset": 5, "cont": cont})
     got = [r["measurement_uid"] for r in j["results"]]
     assert got == expected
 
-    # next_url should keep using offset
+    # next_url should keep using cont
     next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
-    assert next_qs["offset"] == ["15"]
-    assert "cont" not in next_qs
+    assert "cont" in next_qs
+    assert "offset" not in next_qs
 
 
 @pytest.mark.parametrize("order", ["asc", "desc"])
