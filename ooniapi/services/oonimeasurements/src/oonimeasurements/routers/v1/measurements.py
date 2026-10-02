@@ -8,7 +8,6 @@ import logging
 import string
 import time
 from datetime import datetime, timedelta, timezone
-from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode, urljoin
 from urllib.request import urlopen
@@ -593,10 +592,6 @@ def genurl(base_url: str, path: str, **kw) -> str:
     return urljoin(base_url, path) + "?" + urlencode(kw)
 
 
-class OrderBy(str, Enum):
-    measurement_start_time = "measurement_start_time"
-
-
 @router.get("/v1/measurements")
 async def list_measurements(
     request: Request,
@@ -688,11 +683,12 @@ async def list_measurements(
         Optional[str], Query(description="Filter measurements by OONIRun ID.")
     ] = None,
     order_by: Annotated[
-        Optional[
-            OrderBy
-        ],  # Use an actual enum to enforce validation of ordering fields
+        # TODO Remove this in the near future
+        Optional[str],
         Query(
-            description="By which key the results should be ordered by (default: `null`)",
+            description="Deprecated, kept for compatibility. Results are always"
+            " ordered by `measurement_start_time` regardless of this field",
+            deprecated=True,
         ),
     ] = None,
     order: Annotated[
@@ -928,13 +924,9 @@ async def list_measurements(
 
     fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
 
-    if order_by is None:
-        order_by = OrderBy("measurement_start_time")
-
     # Sorting by measurement_uid helps to make the sorting deterministic
     fp_query = fp_query.order_by(
-        text(f"{order_by.value} {order}, measurement_uid {order}"
-        )
+        text(f"measurement_start_time {order}, measurement_uid {order}")
     )
 
     # Assemble the "external" query. Run a final order by followed by limit and
