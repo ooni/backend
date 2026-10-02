@@ -4,11 +4,11 @@ import httpx
 
 
 def getj(
-    client: httpx.Client, url: str, params: Dict[str, Any] | None = None
+    client: httpx.Client, url: str, params: Dict[str, Any] | None = None, expected_status: int = 200
 ) -> Dict[str, Any]:
     resp = client.get(url, params=params)
     assert (
-        resp.status_code == 200
+        resp.status_code == expected_status
     ), f"Unexpected status code:  {resp.status_code}. {resp.content}"
     return resp.json()
 

@@ -613,11 +613,9 @@ def test_list_measurements_pagination_ordering(client, insert_fastpath, order):
 
 def test_list_measurements_limit_zero(client):
     """
-    limit=0 is a valid value, it should return no results and no next_url
+    limit=0 is NOT a valid value, it should return 422
     """
-    j = getj(client, route, params={"limit": 0})
-    assert j["results"] == []
-    assert j["metadata"]["next_url"] is None
+    getj(client, route, params={"limit": 0}, expected_status=422)
 
 
 @pytest.mark.parametrize(

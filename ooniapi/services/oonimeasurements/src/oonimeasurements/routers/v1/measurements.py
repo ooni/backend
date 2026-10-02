@@ -707,7 +707,7 @@ async def list_measurements(
     limit: Annotated[
         int,
         Query(
-            description="Number of records to return (default: 100)", ge=0, le=1_000_000,
+            description="Number of records to return (default: 100)", gt=0, le=1_000_000,
         ),
     ] = 100,
     cont: Annotated [
@@ -987,7 +987,7 @@ async def list_measurements(
 
     # We got less results than what we expected, we know the count and that
     # we are done
-    if len(results) < limit or len(results) == 0: # limit can be 0
+    if len(results) < limit:
         next_url = None
     else:
         next_args = dict(request.query_params)
