@@ -1011,6 +1011,12 @@ async def list_measurements(
             next_args["cont"] = _make_cont(results[-1])
             next_args["order"] = order
         next_args["limit"] = str(limit)
+        # Pin the time window so that default since/until computed at request
+        # time don't shift between pages
+        if since is not None:
+            next_args["since"] = since.isoformat()
+        if until is not None:
+            next_args["until"] = until.isoformat()
         next_url = genurl(settings.base_url, "/api/v1/measurements", **next_args)
 
     query_time = time.time() - iter_start_time

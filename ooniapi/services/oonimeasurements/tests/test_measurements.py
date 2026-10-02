@@ -728,3 +728,37 @@ def test_list_measurements_pagination_late_arrivals(client, insert_fastpath):
     assert ahead["measurement_uid"] in got
     assert behind["measurement_uid"] not in got
     assert set(r["measurement_uid"] for r in rows) <= set(got)
+
+
+def test_list_measurements_pagination_pins_default_window(client, insert_fastpath):
+    """
+    When since/until are not provided, the default window is computed at
+    request time. next_url should pin it so that it doesn't shift between
+    pages, eg. when paginating across midnight UTC.
+    """
+    test_name = "pagination_test"
+    # Default window at 2026-01-10T23:59 is (2025-12-12, 2026-01-11]
+    newest = [
+        make_fastpath_row(test_name, f"new_{i}", datetime(2026, 1, 10, 12, i))
+        for i in range(5)
+    ]
+    # In the oldest day of the window, would be dropped if the window shifts
+    oldest = [
+        make_fastpath_row(test_name, f"old_{i}", datetime(2025, 12, 12, 12, i))
+        for i in range(5)
+    ]
+    insert_fastpath(newest + oldest)
+
+    with freeze_time("2026-01-10T23:59:00Z"):
+        j = getj(client, route, params={"test_name": test_name, "limit": 5})
+    got = [r["measurement_uid"] for r in j["results"]]
+    next_qs = parse_qs(urlparse(j["metadata"]["next_url"]).query)
+    assert "since" in next_qs and "until" in next_qs
+
+    # Next page after midnight: the default window would now start on 2025-12-13
+    with freeze_time("2026-01-11T00:01:00Z"):
+        parsed = urlparse(j["metadata"]["next_url"])
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+    got += [r["measurement_uid"] for r in j["results"]]
+
+    assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
