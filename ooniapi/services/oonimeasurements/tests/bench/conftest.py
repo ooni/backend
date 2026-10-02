@@ -9,6 +9,9 @@ Environment variables:
     OONI_BENCH_CLICKHOUSE_URL   run against an existing database (e.g. a replica
                                 with real data) instead of generating one; it is
                                 only read from, and ingest benchmarks are skipped
+    OONI_BENCH_ANCHOR           day the synthetic dataset ends, YYYY-MM-DD
+                                (default today); pin it to reuse a dataset
+                                across days
 """
 
 import hashlib
@@ -17,7 +20,7 @@ import os
 import statistics
 import subprocess
 import time
-from datetime import date, datetime, time as dt_time, timezone
+from datetime import datetime, time as dt_time, timezone
 from unittest.mock import patch
 
 import pytest
@@ -41,11 +44,11 @@ HARNESS = {"log_comment": "ooni-bench-harness"}
 VOLATILE_KEYS = {"db_stats", "query_time", "elapsed_seconds"}
 # endpoints derive default windows from the wall clock; pin it so that runs
 # made at different times of the same day return identical responses
-ANCHOR = datetime.combine(date.today(), dt_time(12), tzinfo=timezone.utc)
+ANCHOR = datetime.combine(synthetic.ANCHOR_DATE, dt_time(12), tzinfo=timezone.utc)
 
 
 def _dataset_id() -> str:
-    return f"rows={ROWS} days={synthetic.DAYS} anchor={date.today()} schema={synthetic.schema_fingerprint()}"
+    return f"rows={ROWS} days={synthetic.DAYS} anchor={synthetic.ANCHOR_DATE} schema={synthetic.schema_fingerprint()}"
 
 
 # one database per dataset, so datasets for different schemas or sizes can

@@ -7,9 +7,11 @@ Not covered:
     /api/v1/aggregation/observations/ctrl       obs_web_ctrl is not in the test schema
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
+
+from .synthetic import ANCHOR_DATE, TODAY
 
 CC = "US"
 ASN = 1100
@@ -17,7 +19,7 @@ DOMAIN = "site0.example.org"
 
 
 def ago(days: int) -> str:
-    return (date.today() - timedelta(days=days)).isoformat()
+    return (ANCHOR_DATE - timedelta(days=days)).isoformat()
 
 
 LAST_30 = {"since": ago(30), "until": ago(0)}
@@ -94,14 +96,14 @@ CASES = {
 def samples(bench):
     [(report_id, measurement_uid, input)] = bench.click.execute(
         f"SELECT report_id, measurement_uid, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
-        f" AND measurement_start_time >= today() - 7 ORDER BY measurement_uid LIMIT 1"
+        f" AND measurement_start_time >= {TODAY} - 7 ORDER BY measurement_uid LIMIT 1"
     )
     [(obs_report_id,)] = bench.click.execute(
-        "SELECT report_id FROM obs_web WHERE measurement_start_time >= today() - 7 ORDER BY measurement_uid LIMIT 1"
+        f"SELECT report_id FROM obs_web WHERE measurement_start_time >= {TODAY} - 7 ORDER BY measurement_uid LIMIT 1"
     )
     [(busiest_asn, busiest_input)] = bench.click.execute(
         f"SELECT probe_asn, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
-        f" AND measurement_start_time >= today() - 30 GROUP BY probe_asn, input ORDER BY count() DESC, probe_asn, input LIMIT 1"
+        f" AND measurement_start_time >= {TODAY} - 30 GROUP BY probe_asn, input ORDER BY count() DESC, probe_asn, input LIMIT 1"
     )
     return {
         "report_id": report_id,

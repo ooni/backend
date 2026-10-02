@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 
@@ -26,8 +26,8 @@ def test_dataset_covers_default_windows(bench, table):
     [(first, last)] = bench.click.execute(
         f"SELECT toDate(min(measurement_start_time)), toDate(max(measurement_start_time)) FROM {table}"
     )
-    assert first == date.today() - timedelta(days=synthetic.DAYS)
-    assert last in (date.today() - timedelta(days=1), date.today())
+    assert first == synthetic.ANCHOR_DATE - timedelta(days=synthetic.DAYS)
+    assert last in (synthetic.ANCHOR_DATE - timedelta(days=1), synthetic.ANCHOR_DATE)
 
 
 def test_dataset_measurement_uid_tracks_start_time(bench):
