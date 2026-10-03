@@ -118,14 +118,14 @@ CREATE MATERIALIZED VIEW default.counters_asn_test_list
 (
     `week` DateTime,
     `probe_cc` String,
-    `probe_asn` UInt32,
+    `probe_asn` UInt64,
     `input` String,
     `msmt_cnt` UInt64
 )
 ENGINE = SummingMergeTree
 ORDER BY (probe_cc, probe_asn, input)
-SETTINGS index_granularity = 8192 AS
-SELECT
+SETTINGS index_granularity = 8192
+AS SELECT
     toStartOfWeek(measurement_start_time) AS week,
     probe_cc,
     probe_asn,
