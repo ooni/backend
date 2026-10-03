@@ -149,14 +149,30 @@ EMPTY = {"measurements.cc.input_absent.7d", "measurements.cc.input_absent.30d", 
 # endpoints whose SQL has no ORDER BY, or orders with ties (im_networks:
 # networks with the same count): the order of their results depends on the
 # query plan, so a change of plan must not count as a changed response
-UNORDERED = {"private.networks", "changepoints.default", "changepoints.cc", "private.im_networks"}
+UNORDERED = {
+    "private.networks", "changepoints.default", "changepoints.cc", "private.im_networks",
+    # ordered by timestamp and count, with ties
+    "aggregation_observations.default", "aggregation_observations.cc.timestamp",
+    "aggregation_observations.hostname",
+}
+
+
+def _counts_only(body):
+    # quantile() samples groups of more than 8192 values, nondeterministically
+    # across threads: at 120M rows the p50 and p90 of a group differ from one
+    # run to the next (5 runs, 5 results) while the counts do not
+    return [{**r, "v": r["v"][2:]} for r in body["results"]]
+
+
+# endpoints whose responses are partly approximate: compare the exact part
+HASHED = {"private.circumvention_runtime_stats": _counts_only}
 
 
 @pytest.mark.parametrize("name", CASES)
 def test_bench_query(bench, bench_client, samples, name):
     path, params = CASES[name]
     params = {k: v.format(**samples) if isinstance(v, str) else v for k, v in params.items()}
-    body = bench.query(bench_client, name, path, params, unordered=name in UNORDERED)
+    body = bench.query(bench_client, name, path, params, unordered=name in UNORDERED, hashed=HASHED.get(name))
     if name in EMPTY:
         assert not _has_data(body), f"{name} should find nothing: {body}"
     else:
