@@ -130,16 +130,17 @@ class Recorder:
         self.queries = {}
         self.ingest = {}
 
-    def query(self, client, name, path, params=None, unordered=False):
+    def query(self, client, name, path, params=None, unordered=False, hashed=None):
         """Time `path` and return its (last) response body.
 
         Server side cost is read from system.query_log, so it covers every
-        query the endpoint issues for one request.
+        query the endpoint issues for one request. `hashed`, if given, maps
+        the body to the part of it that must not change.
         """
         with freeze_time(ANCHOR, tick=True):
-            return self._query(client, name, path, params, unordered)
+            return self._query(client, name, path, params, unordered, hashed)
 
-    def _query(self, client, name, path, params, unordered):
+    def _query(self, client, name, path, params, unordered, hashed):
         response = client.get(path, params=params)  # warm up caches
         assert response.status_code == 200, f"{name}: {response.text[:500]}"
         [(start,)] = self.click.execute("SELECT toUnixTimestamp64Micro(now64(6))", settings=HARNESS)
@@ -157,7 +158,7 @@ class Recorder:
             "median_ms": round(statistics.median(timings) * 1000, 2),
             "read_rows": read_rows // REPS,
             "read_bytes": read_bytes // REPS,
-            "response_hash": _stable_hash(body, unordered),
+            "response_hash": _stable_hash(hashed(body) if hashed else body, unordered),
         }
         return body
 
