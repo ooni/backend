@@ -196,11 +196,13 @@ def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str
     # TODO: cleanup this
     query = """SELECT s3path, linenum FROM jsonl
         PREWHERE (report_id, input) IN (
-            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid
+            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid {window}
         )
         LIMIT 1"""
-    query_params = dict(uid=measurement_uid)
-    lookup = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    # {window} is filled by _query_one_in_windows
+    lookup = _query_one_in_windows(
+        db, query, dict(uid=measurement_uid), _uid_lookup_windows(measurement_uid)
+    )
     if lookup is None:
         raise MeasurementNotFound
 
@@ -331,17 +333,20 @@ def _get_measurement_meta_clickhouse(
     query = "SELECT * FROM fastpath "
     if input_ is None:
         # fastpath uses input = '' for empty values
-        query += "WHERE report_id = :report_id AND input = '' "
+        query += "WHERE report_id = :report_id AND input = '' {window} "
     else:
         # Join citizenlab to return category_code (useful only for web conn)
         query += """
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
         WHERE fastpath.input = :input
-        AND fastpath.report_id = :report_id
+        AND fastpath.report_id = :report_id {window}
         """
     query_params = dict(input=input_, report_id=report_id)
     query += "LIMIT 1"
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    # {window} is filled by _query_one_in_windows
+    msmt_meta = _query_one_in_windows(
+        db, query, query_params, _report_lookup_windows(report_id)
+    )
     if not msmt_meta:
         return MeasurementMeta()  # measurement not found
     if msmt_meta["probe_asn"] == 0:
@@ -352,6 +357,66 @@ def _get_measurement_meta_clickhouse(
     return format_msmt_meta(msmt_meta)
 
 
+# Lookups of a single measurement search widening windows of
+# measurement_start_time, which the primary key prunes, and finally the whole
+# table, so results do not depend on the windows. Queries mark where the
+# window goes with {window}.
+START_TIME_WINDOW_CLAUSE = (
+    "AND fastpath.measurement_start_time BETWEEN :mst_lo AND :mst_hi"
+)
+
+# measurement_uid starts with its collection time. In production measurements
+# are collected a median 3 s after they start (p99 216 s, p99.9 ~4 h), and 3%
+# start slightly after it (fast probe clocks).
+UID_LOOKUP_WINDOWS = (
+    (timedelta(minutes=15), timedelta(minutes=15)),
+    (timedelta(days=1), timedelta(hours=1)),
+)
+
+# report_id starts with the time its report was opened. In production 59% of
+# measurements start before it, mostly by seconds (p1 -107 s, p0.01 -25 h),
+# and the rest after it (p90 +7 min, p99 +1.7 h, p99.9 +14 h).
+REPORT_LOOKUP_WINDOWS = (
+    (timedelta(minutes=15), timedelta(hours=2)),
+    (timedelta(days=2), timedelta(days=1)),
+)
+
+
+def _windows_around(timestamp: str, fmt: str, windows) -> List[Dict[str, datetime]]:
+    try:
+        t = datetime.strptime(timestamp, fmt)
+    except ValueError:
+        return []
+    return [dict(mst_lo=t - before, mst_hi=t + after) for before, after in windows]
+
+
+def _uid_lookup_windows(measurement_uid: str) -> List[Dict[str, datetime]]:
+    return _windows_around(measurement_uid[:14], "%Y%m%d%H%M%S", UID_LOOKUP_WINDOWS)
+
+
+def _report_lookup_windows(report_id: str) -> List[Dict[str, datetime]]:
+    return _windows_around(report_id[:16], "%Y%m%dT%H%M%SZ", REPORT_LOOKUP_WINDOWS)
+
+
+def _query_one_in_windows(
+    db: ClickhouseClient, query: str, params: dict, windows: List[Dict[str, datetime]]
+) -> Optional[dict]:
+    """Run `query` with its {window} placeholder set to each window in turn,
+    then removed, and return the first row found."""
+    for window in windows:
+        row = query_click_one_row(
+            db,
+            sql.text(query.format(window=START_TIME_WINDOW_CLAUSE)),
+            dict(params, **window),
+            query_prio=3,
+        )
+        if row:
+            return row
+    return query_click_one_row(
+        db, sql.text(query.format(window="")), params, query_prio=3
+    )
+
+
 def _get_measurement_meta_by_uid(
     db: ClickhouseClient, measurement_uid: str
 ) -> MeasurementMeta:
@@ -360,11 +425,13 @@ def _get_measurement_meta_by_uid(
     """
     query = """SELECT * FROM fastpath
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE measurement_uid = :uid
+        WHERE measurement_uid = :uid {window}
         LIMIT 1
     """
-    query_params = dict(uid=measurement_uid)
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    # {window} is filled by _query_one_in_windows
+    msmt_meta = _query_one_in_windows(
+        db, query, dict(uid=measurement_uid), _uid_lookup_windows(measurement_uid)
+    )
     if not msmt_meta:
         return MeasurementMeta()  # measurement not found
     if msmt_meta["probe_asn"] == 0:
