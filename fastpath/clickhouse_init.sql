@@ -85,24 +85,12 @@ ENGINE = ReplacingMergeTree
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
-CREATE TABLE IF NOT EXISTS default.citizenlab_flip AS default.citizenlab;
-
 CREATE TABLE IF NOT EXISTS test_groups (
   `test_name` String,
   `test_group` String
 )
 ENGINE = Join(ANY, LEFT, test_name);
 
-
--- Auth
-
-CREATE TABLE IF NOT EXISTS accounts
-(
-    `account_id` FixedString(32),
-    `role` String
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id;
 
 -- Materialized views
 

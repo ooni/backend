@@ -85,24 +85,12 @@ ENGINE = ReplacingMergeTree
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
-CREATE TABLE default.citizenlab_flip AS default.citizenlab;
-
 CREATE TABLE test_groups (
   `test_name` String,
   `test_group` String
 )
 ENGINE = Join(ANY, LEFT, test_name);
 
-
--- Auth
-
-CREATE TABLE accounts
-(
-    `account_id` FixedString(32),
-    `role` String
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id;
 
 -- Materialized views
 
@@ -189,50 +177,6 @@ CREATE TABLE asnmeta
 )
 ENGINE = MergeTree
 ORDER BY (asn, changed);
-
-CREATE TABLE IF NOT EXISTS default.incidents
-(
-    `update_time` DateTime DEFAULT now(),
-    `create_time` DateTime DEFAULT now(),
-    `start_time` DateTime DEFAULT now(),
-    `end_time` Nullable(DateTime),
-    `creator_account_id` FixedString(32),
-    `reported_by` String,
-    `email_address` String,
-    `id` String,
-    `title` String,
-    `text` String,
-    `event_type` LowCardinality(String),
-    `published` UInt8,
-    `deleted` UInt8 DEFAULT 0,
-    `CCs` Array(FixedString(2)),
-    `ASNs` Array(UInt32),
-    `domains` Array(String),
-    `tags` Array(String),
-    `links` Array(String),
-    `test_names` Array(String),
-    `short_description` String,
-)
-ENGINE = ReplacingMergeTree(update_time)
-ORDER BY (id)
-SETTINGS index_granularity = 1;
-
-CREATE TABLE IF NOT EXISTS default.oonirun
-(
-    `ooni_run_link_id` UInt64,
-    `descriptor_creation_time` DateTime64(3),
-    `translation_creation_time` DateTime64(3),
-    `creator_account_id` FixedString(32),
-    `archived` UInt8 DEFAULT 0,
-    `descriptor` String,
-    `author` String,
-    `name` String,
-    `short_description` String,
-    `icon` String
-)
-ENGINE = ReplacingMergeTree(translation_creation_time)
-ORDER BY (ooni_run_link_id, descriptor_creation_time)
-SETTINGS index_granularity = 1;
 
 CREATE TABLE analysis_web_measurement
 (
