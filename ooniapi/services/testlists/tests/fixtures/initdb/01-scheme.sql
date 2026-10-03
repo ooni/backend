@@ -137,10 +137,11 @@ CREATE TABLE msmt_feedback
     `measurement_uid` String,
     `account_id` String,
     `status` String,
-    `update_time` DateTime64(3) MATERIALIZED now64()
+    `update_time` DateTime64(3) DEFAULT now64(),
+    `comment` String
 )
 ENGINE = ReplacingMergeTree
-ORDER BY (measurement_uid, account_id)
+ORDER BY (measurement_uid, account_id, update_time)
 SETTINGS index_granularity = 4;
 
 CREATE TABLE default.fingerprints_dns
