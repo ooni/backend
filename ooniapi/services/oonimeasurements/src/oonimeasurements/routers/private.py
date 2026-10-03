@@ -19,7 +19,7 @@ from sqlalchemy import sql
 from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.domain import DomainStr
-from pydantic import AnyUrl, Field, IPvAnyAddress, BeforeValidator
+from pydantic import AnyUrl, Field, IPvAnyAddress, BeforeValidator, field_serializer
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required, ClickhouseDep
@@ -78,9 +78,13 @@ def expand_dates(li):
 class ASNCount(BaseModel):
     date: datetime = Field(..., description="Timestamp for the measurement (ISO 8601).")
     value: int = Field(..., description="Count of unique ASN seen.")
-    model_config = {
-        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
-    }
+
+    # NOTE: overrides the common.routers.BaseModel wildcard json serializer
+    # to preserve this endpoint's pre-existing timestamp format (no
+    # microseconds, "+00:00" UTC offset) for backwards API compatibility.
+    @field_serializer("date", when_used="json")
+    def serialize_date(self, dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
 @router.get("/asn_by_month", tags=["private"], response_model=List[ASNCount])
@@ -107,9 +111,12 @@ class CountryCount(BaseModel):
     date: datetime = Field(..., description="Timestamp for the measurement (ISO 8601).")
     value: int = Field(..., description="Count of unique countries seen.")
 
-    model_config = {
-        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
-    }
+    # NOTE: overrides the common.routers.BaseModel wildcard json serializer
+    # to preserve this endpoint's pre-existing timestamp format (no
+    # microseconds, "+00:00" UTC offset) for backwards API compatibility.
+    @field_serializer("date", when_used="json")
+    def serialize_date(self, dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
 @router.get("/countries_by_month", tags=["private"], response_model=List[CountryCount])
@@ -711,9 +718,13 @@ class IMStatsItem(BaseModel):
     anomaly_count: Optional[int] = Field(None, description="Number of measurements flagged as anomalies for that day")
     test_day: datetime = Field(..., description="Timestamp for the day (ISO 8601, midnight UTC)")
     total_count: int = Field(..., description="Total number of measurements for that day")
-    model_config = {
-        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
-    }
+
+    # NOTE: overrides the common.routers.BaseModel wildcard json serializer
+    # to preserve this endpoint's pre-existing timestamp format (no
+    # microseconds, "+00:00" UTC offset) for backwards API compatibility.
+    @field_serializer("test_day", when_used="json")
+    def serialize_test_day(self, dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
 class IMStatsResponse(BaseModel):
@@ -875,9 +886,13 @@ def api_private_global_overview(
 class GlobalOverviewStat(BaseModel):
     date: datetime = Field(..., description="Month start timestamp (ISO 8601, midnight UTC)")
     value: int = Field(..., description="Count value for the month")
-    model_config = {
-        "json_encoders": { datetime: lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat() }
-    }
+
+    # NOTE: overrides the common.routers.BaseModel wildcard json serializer
+    # to preserve this endpoint's pre-existing timestamp format (no
+    # microseconds, "+00:00" UTC offset) for backwards API compatibility.
+    @field_serializer("date", when_used="json")
+    def serialize_date(self, dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
 class GlobalOverviewMonthResponse(BaseModel):
