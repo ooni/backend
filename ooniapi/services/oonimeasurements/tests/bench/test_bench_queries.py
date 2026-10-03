@@ -146,9 +146,10 @@ def _has_data(body) -> bool:
 EMPTY = {"measurements.cc.input_absent.7d", "measurements.cc.input_absent.30d", "aggregation.cc.input_absent"}
 
 
-# endpoints whose SQL has no ORDER BY: the order of their results depends on
-# the query plan, so a change of plan must not count as a changed response
-UNORDERED = {"private.networks"}
+# endpoints whose SQL has no ORDER BY, or orders with ties (im_networks:
+# networks with the same count): the order of their results depends on the
+# query plan, so a change of plan must not count as a changed response
+UNORDERED = {"private.networks", "changepoints.default", "changepoints.cc", "private.im_networks"}
 
 
 @pytest.mark.parametrize("name", CASES)
