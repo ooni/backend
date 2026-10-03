@@ -42,6 +42,7 @@ def test_dataset_has_realistic_mix(bench):
     [(web, anomalies, countries)] = bench.click.execute(
         "SELECT countIf(test_name = 'web_connectivity') / count(), countIf(anomaly = 't') / count(), uniqExact(probe_cc) FROM fastpath"
     )
-    assert 0.6 < web < 0.8
-    assert 0.05 < anomalies < 0.11
-    assert countries == len(synthetic.COUNTRIES)
+    # production: 84% web_connectivity, 8.6% anomalies, 145 countries a day
+    assert 0.8 < web < 0.88
+    assert 0.07 < anomalies < 0.10
+    assert 100 < countries <= len(synthetic.COUNTRIES)
