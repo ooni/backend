@@ -62,12 +62,14 @@ CREATE TABLE IF NOT EXISTS default.jsonl
     `input` String,
     `s3path` String,
     `linenum` Int32,
-    `measurement_uid` String
+    `measurement_uid` String,
+    `date` Date,
+    `source` String,
+    `update_time` DateTime64(3) MATERIALIZED now64()
 )
-ENGINE = MergeTree
-ORDER BY (report_id, input)
+ENGINE = ReplacingMergeTree(update_time)
+ORDER BY (report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
-
 
 CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
 (
