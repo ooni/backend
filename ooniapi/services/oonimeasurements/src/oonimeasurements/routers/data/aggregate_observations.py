@@ -12,7 +12,7 @@ from .utils import (
     SinceUntil,
     TimeGrains,
     get_measurement_start_day_agg,
-    utc_30_days_ago,
+    utc_7_days_ago,
     utc_today,
 )
 
@@ -75,7 +75,7 @@ async def get_aggregation_observations(
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
     if since is None and not measurement_uid:
-        since = utc_30_days_ago()
+        since = utc_7_days_ago()
     if until is None and not measurement_uid:
         until = utc_today()
 
