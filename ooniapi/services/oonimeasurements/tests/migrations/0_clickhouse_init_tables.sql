@@ -84,27 +84,14 @@ CREATE TABLE IF NOT EXISTS default.event_detector_changepoints
     `dns_other_blocked` Nullable(Float32),
     `tcp_blocked` Nullable(Float32),
     `tls_blocked` Nullable(Float32),
-    `dns_isp_blocked_current_state` String DEFAULT 'ok',
-    `dns_isp_blocked_s_pos` Nullable(Float32),
-    `dns_isp_blocked_s_neg` Nullable(Float32),
-    `dns_other_blocked_current_state` String DEFAULT 'ok',
-    `dns_other_blocked_s_pos` Nullable(Float32),
-    `dns_other_blocked_s_neg` Nullable(Float32),
-    `tcp_blocked_current_state` String DEFAULT 'ok',
-    `tcp_blocked_s_pos` Nullable(Float32),
-    `tcp_blocked_s_neg` Nullable(Float32),
-    `tls_blocked_current_state` String DEFAULT 'ok',
-    `tls_blocked_s_pos` Nullable(Float32),
-    `tls_blocked_s_neg` Nullable(Float32),
     `change_dir` Nullable(Int8),
-    `current_state` String DEFAULT 'ok',
     `s_pos` Nullable(Float32),
     `s_neg` Nullable(Float32),
+    `current_state` String,
     `h` Nullable(Float32),
+    `block_type` String
 )
-ENGINE = MergeTree
-PARTITION BY toYYYYMM(ts)
+ENGINE = ReplacingMergeTree
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
 
-ALTER TABLE default.event_detector_changepoints ADD COLUMN `block_type` String;
