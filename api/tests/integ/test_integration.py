@@ -304,7 +304,7 @@ def test_get_measurement_meta_not_found(client):
     resp = client.get(url)
     # TODO: is this a bug?
     assert resp.status_code == 200
-    assert resp.json == {}
+    assert resp.get_json() == {}
 
 
 def FIXME_MISSING_MSMT____test_get_measurement_meta_input_none_from_fp(client):
