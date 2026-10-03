@@ -11,10 +11,11 @@ from datetime import timedelta
 
 import pytest
 
-from .synthetic import ANCHOR_DATE, TODAY
+from .synthetic import ANCHOR_DATE, TODAY, country_asn
 
 CC = "US"
-ASN = 1100
+# the busiest US network
+ASN = country_asn(CC)
 DOMAIN = "site0.example.org"
 
 
