@@ -7,6 +7,7 @@ Not covered:
     /api/v1/aggregation/observations/ctrl       obs_web_ctrl is not in the test schema
 """
 
+import json
 from datetime import timedelta
 
 import pytest
@@ -164,8 +165,28 @@ def _counts_only(body):
     return [{**r, "v": r["v"][2:]} for r in body["results"]]
 
 
-# endpoints whose responses are partly approximate: compare the exact part
-HASHED = {"private.circumvention_runtime_stats": _counts_only}
+def _defined_order(body):
+    # ORDER BY measurement_start_time DESC LIMIT leaves rows with the same
+    # time in no defined order, and at the page's end which of them make the
+    # page: production has ~23 measurements a second, analysis here ~16 rows
+    # a second. Compare only what the ORDER BY defines: the rows in order of
+    # time, tied rows as a set, without the last time's (cut) group.
+    rows = body["results"]
+    assert all("measurement_start_time" in r for r in rows), "expected rows ordered by measurement_start_time"
+    groups = {}
+    for r in rows:
+        groups.setdefault(r["measurement_start_time"], []).append(r)
+    times = list(groups)[:-1]
+    return {**body, "results": [sorted(groups[t], key=lambda r: json.dumps(r, sort_keys=True)) for t in times]}
+
+
+# endpoints whose responses are partly approximate or undefined: compare
+# the part that is defined
+HASHED = {
+    "private.circumvention_runtime_stats": _counts_only,
+    **{name: _defined_order for name, (path, _) in CASES.items()
+       if path in ("/api/v1/measurements", "/api/v1/observations", "/api/v1/analysis") and name not in EMPTY},
+}
 
 
 @pytest.mark.parametrize("name", CASES)
