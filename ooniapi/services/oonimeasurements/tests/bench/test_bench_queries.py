@@ -11,12 +11,17 @@ from datetime import timedelta
 
 import pytest
 
+from .conftest import VOLATILE_KEYS
 from .synthetic import ANCHOR_DATE, TODAY, country_asn
 
 CC = "US"
 # the busiest US network
 ASN = country_asn(CC)
 DOMAIN = "site0.example.org"
+# production's costliest search (data2, 2026-10: 40% of query time): pollers
+# checking whether IPs, which are never an input, are measured from IR
+ABSENT_CC = "IR"
+ABSENT_INPUT = "95.179.192.8"
 
 
 def ago(days: int) -> str:
@@ -42,6 +47,8 @@ CASES = {
         "/api/v1/aggregation",
         {"axis_x": "measurement_start_day", "category_code": "NEWS", "probe_cc": CC, **LAST_30},
     ),
+    "aggregation.cc.input": ("/api/v1/aggregation", {"probe_cc": CC, "input": "{busiest_input}", **LAST_30}),
+    "aggregation.cc.input_absent": ("/api/v1/aggregation", {"probe_cc": ABSENT_CC, "input": ABSENT_INPUT, **LAST_30}),
     "aggregation.x_cc.domain.180d": ("/api/v1/aggregation", {"axis_x": "probe_cc", "domain": DOMAIN, "since": ago(180), "until": ago(0)}),
     # /api/v1/measurements, /api/v1/measurement_meta
     "measurements.default": ("/api/v1/measurements", {}),
@@ -49,6 +56,13 @@ CASES = {
     "measurements.cc.anomaly": ("/api/v1/measurements", {"probe_cc": CC, "anomaly": "true"}),
     "measurements.domain": ("/api/v1/measurements", {"domain": DOMAIN}),
     "measurements.report_id": ("/api/v1/measurements", {"report_id": "{report_id}"}),
+    "measurements.cc.input_absent.7d": (
+        "/api/v1/measurements", {"probe_cc": ABSENT_CC, "input": ABSENT_INPUT, "since": ago(7), "until": ago(0)},
+    ),
+    "measurements.cc.input_absent.30d": ("/api/v1/measurements", {"probe_cc": ABSENT_CC, "input": ABSENT_INPUT}),
+    "measurements.cc.test.anomaly": (
+        "/api/v1/measurements", {"probe_cc": CC, "test_name": "web_connectivity", "anomaly": "true"},
+    ),
     "measurement_meta.uid": ("/api/v1/measurement_meta", {"measurement_uid": "{measurement_uid}"}),
     "measurement_meta.report_id": ("/api/v1/measurement_meta", {"report_id": "{report_id}", "input": "{input}"}),
     # /api/v1/observations, /api/v1/aggregation/observations
@@ -120,12 +134,16 @@ def _has_data(body) -> bool:
     if isinstance(body, list):
         return len(body) > 0
     if isinstance(body, dict):
-        return any(_has_data(v) for k, v in body.items() if k != "metadata")
+        return any(_has_data(v) for k, v in body.items() if k != "metadata" and k not in VOLATILE_KEYS)
     if isinstance(body, bool):
         return body
     if isinstance(body, (int, float)):
         return body > 0
     return bool(body)
+
+
+# cases that must find nothing, like their production counterparts
+EMPTY = {"measurements.cc.input_absent.7d", "measurements.cc.input_absent.30d", "aggregation.cc.input_absent"}
 
 
 # endpoints whose SQL has no ORDER BY: the order of their results depends on
@@ -138,4 +156,7 @@ def test_bench_query(bench, bench_client, samples, name):
     path, params = CASES[name]
     params = {k: v.format(**samples) if isinstance(v, str) else v for k, v in params.items()}
     body = bench.query(bench_client, name, path, params, unordered=name in UNORDERED)
-    assert _has_data(body), f"{name} returned no data, the benchmark would be meaningless: {body}"
+    if name in EMPTY:
+        assert not _has_data(body), f"{name} should find nothing: {body}"
+    else:
+        assert _has_data(body), f"{name} returned no data, the benchmark would be meaningless: {body}"
