@@ -101,30 +101,6 @@ PRIMARY KEY account_id;
 
 -- Materialized views
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS default.counters_test_list
-(
-    `day` DateTime,
-    `probe_cc` String,
-    `input` String,
-    `msmt_cnt` UInt64
-)
-ENGINE = SummingMergeTree
-PARTITION BY day
-ORDER BY (probe_cc, input)
-SETTINGS index_granularity = 8192 AS
-SELECT
-    toDate(measurement_start_time) AS day,
-    probe_cc,
-    input,
-    count() AS msmt_cnt
-FROM default.fastpath
-INNER JOIN default.citizenlab ON fastpath.input = citizenlab.url
-WHERE (measurement_start_time < now()) AND (measurement_start_time > (now() - toIntervalDay(8))) AND (test_name = 'web_connectivity')
-GROUP BY
-    day,
-    probe_cc,
-    input;
-
 CREATE MATERIALIZED VIEW IF NOT EXISTS default.counters_asn_test_list
 (
     `week` DateTime,
