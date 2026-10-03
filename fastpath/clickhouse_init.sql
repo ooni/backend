@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS default.fastpath
     `measurement_uid` String,
     `report_id` String,
     `input` String,
-    `probe_cc` String,
-    `probe_asn` UInt32,
-    `test_name` String,
+    `probe_cc` LowCardinality(String),
+    `probe_asn` Int32,
+    `test_name` LowCardinality(String),
     `test_start_time` DateTime,
     `measurement_start_time` DateTime,
     `filename` String,
@@ -31,18 +31,20 @@ CREATE TABLE IF NOT EXISTS default.fastpath
     `server_as_name` String,
     `update_time` DateTime64(3) MATERIALIZED now64(),
     `test_version` String,
-    `test_runtime` Float32,
     `architecture` String,
-    `engine_name` String,
+    `engine_name` LowCardinality(String),
     `engine_version` String,
+    `test_runtime` Float32,
     `blocking_type` String,
     `test_helper_address` LowCardinality(String),
     `test_helper_type` LowCardinality(String),
     `ooni_run_link_id` Nullable(UInt64),
-    `is_verified` LowCardinality(String),
+    `is_verified` LowCardinality(String) DEFAULT 'u',
+    INDEX fastpath_rid_idx report_id TYPE minmax GRANULARITY 1,
+    INDEX measurement_uid_idx measurement_uid TYPE minmax GRANULARITY 8
 )
-ENGINE = ReplacingMergeTree
-ORDER BY (measurement_start_time, report_id, input)
+ENGINE = ReplacingMergeTree(update_time)
+ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS default.jsonl
