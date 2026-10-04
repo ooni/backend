@@ -161,6 +161,10 @@ def client_with_bad_settings(app):
 @pytest.fixture
 def client(app):
     client = TestClient(app)
+    # FastAPI builds each route's parameter model on first use; build them
+    # all now, before any test freezes time: under freezegun, datetime is
+    # replaced by a class pydantic rejects
+    client.get("/openapi.json")
     yield client
 
 
