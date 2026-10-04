@@ -36,3 +36,21 @@ def test_get_first_ip():
     assert get_first_ip("1.1.1.1") == "1.1.1.1"
     assert get_first_ip("1.1.1.1, 2.2.2.2") == "1.1.1.1"
     assert get_first_ip("") == ""
+
+
+def test_check_measurement_meta_test_name_chars():
+    # the collector spec allows letters, digits and _ . + -
+    # (ooni/spec backends/bk-003-collector.md); test names must also be
+    # lowercase
+    for test_name in ("web_connectivity", "dnscheck", "ndt7", "http_header_field_manipulation",
+                      "web.connectivity", "web-connectivity", "web+connectivity"):
+        check_measurement_meta(test_name, "IT", "AS123")
+
+    # anything else is rejected: the test name becomes part of the
+    # measurement uid, which fastpath uses in file names
+    for test_name in ("web/connectivity", "web\\connectivity", "web%connectivity",
+                      "web connectivity", "webconnectivity\n"):
+        with pytest.raises(HTTPException) as e:
+            check_measurement_meta(test_name, "IT", "AS123")
+        assert e.value.status_code == 400
+        assert "tn_chars" in str(e.value.detail)

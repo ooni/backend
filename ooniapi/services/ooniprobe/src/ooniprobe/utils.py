@@ -7,6 +7,7 @@ Insert VPN credentials into database.
 import io
 import itertools
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from os import urandom
@@ -172,13 +173,17 @@ def check_measurement_meta(
     )
     test_name_len_ok = 1 < len(test_name) <= 30
     test_name_lower_ok = test_name.islower()
+    # the characters the collector spec allows (ooni/spec
+    # backends/bk-003-collector.md): the test name is part of the
+    # measurement uid, which fastpath uses in file names
+    test_name_chars_ok = re.fullmatch(r"[0-9A-Za-z_.+-]+", test_name) is not None
     asn_starts_as_ok = probe_asn.startswith("AS")
     asn_len_ok = len(probe_asn) >= 3 and len(probe_asn) <= 12
     asn_no_leading_zero_ok = not (len(probe_asn) > 3 and probe_asn.startswith("AS0"))
 
     if not (
         cc_ok and test_name_len_ok and
-        test_name_lower_ok and asn_starts_as_ok and asn_len_ok and
+        test_name_lower_ok and test_name_chars_ok and asn_starts_as_ok and asn_len_ok and
         asn_no_leading_zero_ok
     ):
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="bad_metadata").inc()
@@ -193,6 +198,8 @@ def check_measurement_meta(
             reasons.append("tn_len")
         if not test_name_lower_ok:
             reasons.append("tn_no_lower")
+        if not test_name_chars_ok:
+            reasons.append("tn_chars")
         if not asn_len_ok:
             reasons.append("asn_len")
         if not asn_starts_as_ok:
