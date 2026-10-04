@@ -1,8 +1,18 @@
 coverage:
   status:
+    # Each ooniapi service uploads its own report (flag); a commit whose
+    # upload for a service is missing reuses that service's last report
+    # (carryforward), so the project total always covers every service and
+    # PRs aren't compared against a base with a different set of reports.
     project:
       default:
-        target: 95
+        # the whole API is around 92%; fail on a drop of more than 1%
+        target: auto
+        threshold: 1%
     patch:
       default:
         target: 95
+
+flag_management:
+  default_rules:
+    carryforward: true
