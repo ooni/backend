@@ -1013,3 +1013,27 @@ def test_prepare_fingerprints():
         ],
         "http": [],
     }
+
+
+@pytest.mark.parametrize("test_name", ["webconnectivity", "web.connectivity", "web-connectivity", "web+connectivity"])
+def test_write_measurement_to_disk(tmp_path, monkeypatch, test_name):
+    monkeypatch.setattr(fp.conf, "msmt_spool_dir", str(tmp_path / "spool"), raising=False)
+    uid = f"20261004120000.123456_IT_{test_name}_0123456789abcdef"
+    fp.write_measurement_to_disk((b"{}", None, uid))
+    written = tmp_path / "spool" / "incoming" / f"2026100412_IT_{test_name}" / f"{uid}.post"
+    assert written.read_bytes() == b"{}"
+
+
+@pytest.mark.parametrize("uid", [
+    # not in the format the API generates: {ts}_{cc}_{test_name}_{hash}
+    "20261004120000.123456_IT_web/connectivity_0123456789abcdef",
+    "20261004120000.123456_IT_web%connectivity_0123456789abcdef",
+    "20261004120000.123456_it_webconnectivity_0123456789abcdef",
+    "20261004120000.123456_IT_webconnectivity_0123456789abcdeg",
+    "20261004120000_IT_webconnectivity_0123456789abcdef",
+])
+def test_write_measurement_to_disk_rejects_bad_uid(tmp_path, monkeypatch, uid):
+    monkeypatch.setattr(fp.conf, "msmt_spool_dir", str(tmp_path / "spool"), raising=False)
+    fp.write_measurement_to_disk((b"{}", None, uid))
+    # nothing is created anywhere under the test directory, not even the spool
+    assert list(tmp_path.rglob("*")) == []
