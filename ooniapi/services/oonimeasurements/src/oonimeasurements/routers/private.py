@@ -5,7 +5,7 @@ In here live private API endpoints for use only by OONI services. You should
 not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
@@ -13,7 +13,6 @@ from typing import Annotated, Dict, Tuple, List, Optional, Union
 
 import logging
 import math
-import time
 
 from sqlalchemy import sql
 
