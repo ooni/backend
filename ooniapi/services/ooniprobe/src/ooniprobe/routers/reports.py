@@ -60,8 +60,8 @@ def zstd_decompress(data: bytes, limit: int) -> bytes:
     """Decompress zstd data, one frame after the other, stopping as soon as
     the output exceeds limit bytes, whatever size the frames declare"""
     out = bytearray()
+    dec = zstd.ZstdDecompressor()
     while True:
-        dec = zstd.ZstdDecompressor()
         out += dec.decompress(data, max_length=limit + 1 - len(out))
         if len(out) > limit:
             raise MeasurementTooLarge()
