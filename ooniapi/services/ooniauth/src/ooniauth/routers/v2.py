@@ -5,7 +5,7 @@ import logging
 
 import jwt
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Response
 from pydantic import Field
 from pydantic.functional_validators import field_validator
 from pydantic import EmailStr
@@ -24,6 +24,7 @@ from ..utils import (
 from ..common.dependencies import get_settings
 from ..common.config import Settings
 from ..common.routers import BaseModel
+from ..common.utils import setnocacheresponse
 from ..common.auth import (
     create_jwt,
     decode_jwt,
@@ -227,9 +228,11 @@ async def create_user_session(
 
 @router.get("/v2/ooniauth/user-session", response_model=UserSession)
 async def get_user_session(
+    response: Response,
     authorization: str = Header("authorization"),
     settings: Settings = Depends(get_settings),
 ):
+    setnocacheresponse(response)
     user_session = maybe_get_user_session_from_header(
         authorization_header=authorization,
         admin_emails=settings.admin_emails,
