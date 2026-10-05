@@ -260,12 +260,6 @@ def _chunks(size: int):
         yield CHUNK
 
 
-@pytest.fixture
-def small_limits(monkeypatch):
-    monkeypatch.setattr(reports, "MAX_BODY_SIZE", 2 * MB)
-    monkeypatch.setattr(reports, "MAX_DECOMPRESSED_SIZE", 4 * MB)
-
-
 def _bad_count(reason: str) -> float:
     return REGISTRY.get_sample_value("measurement_bad_count_total", {"reason": reason}) or 0.0
 

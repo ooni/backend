@@ -37,6 +37,7 @@ from ooniprobe.dependencies import (
 from ooniprobe.download_geoip import try_update
 from ooniprobe.main import app, lifespan
 from ooniprobe.routers.v1.probe_services import TorTarget
+from ooniprobe.routers import reports
 
 from .utils import setup_user, add_test_middleware, remove_test_middleware
 
@@ -507,3 +508,9 @@ def profiling_enabled(tmp_path):
     yield
 
     remove_test_middleware(app, ProfileMiddleware)
+
+@pytest.fixture
+def small_limits(monkeypatch):
+    MB = 1024 * 1024
+    monkeypatch.setattr(reports, "MAX_BODY_SIZE", 2 * MB)
+    monkeypatch.setattr(reports, "MAX_DECOMPRESSED_SIZE", 4 * MB)
