@@ -199,7 +199,20 @@ def api_private_countries(
 ) -> CountryStatResponse:
     """Summary of countries
     """
-    setcacheresponse("1d", response)
+
+    # only cache the response until next midnight rollover
+    now = datetime.now(timezone.utc)
+    next_midnight = datetime.combine(
+        now.date() + timedelta(days=1),
+        time.min,
+        tzinfo=timezone.utc,
+    )
+
+    ttl_seconds = int((next_midnight - now).total_seconds())
+
+    if ttl_seconds > 0:
+        setcacheresponse(f"{ttl_seconds}s", response)
+
     q = """
     SELECT probe_cc,
     COUNT() AS measurement_count
