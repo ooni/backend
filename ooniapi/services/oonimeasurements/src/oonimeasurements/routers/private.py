@@ -5,7 +5,7 @@ In here live private API endpoints for use only by OONI services. You should
 not rely on these as they are likely to change, break in unexpected ways. Also
 there is no versioning on them.
 """
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from itertools import product
 
 from urllib.parse import urljoin, urlencode
@@ -25,7 +25,7 @@ from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required, ClickhouseDep
 from ..common.routers import BaseModel
 from ..common.countries import lookup_country
-from ..common.utils import setcacheresponse
+from ..common.utils import setcacheresponse, seconds_until_midnight
 
 
 # The private API is exposed under the prefix /api/_
@@ -91,7 +91,8 @@ def api_private_asn_by_month(
 ) -> List[ASNCount]:
     """Network count by month
     """
-    setcacheresponse("1d", response)
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     q = """SELECT
         COUNT(DISTINCT(probe_asn)) AS value,
@@ -200,18 +201,7 @@ def api_private_countries(
     """Summary of countries
     """
 
-    # only cache the response until next midnight rollover
-    now = datetime.now(timezone.utc)
-    next_midnight = datetime.combine(
-        now.date() + timedelta(days=1),
-        time.min,
-        tzinfo=timezone.utc,
-    )
-
-    ttl_seconds = int((next_midnight - now).total_seconds())
-
-    if ttl_seconds > 0:
-        setcacheresponse(f"{ttl_seconds}s", response)
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     q = """
     SELECT probe_cc,
@@ -971,14 +961,14 @@ class CircumventionStatsResponse(BaseModel):
     results: Optional[List[CountryCircumventionStat]] = Field(None, description="List of per-country circumvention tool measurement counts over 6 months")
     v: int = Field(..., description="API Response version")
 
-
 @router.get("/circumvention_stats_by_country", response_model=CircumventionStatsResponse, tags=["private"])
 def api_private_circumvention_stats_by_country(
     response: Response,
     clickhouse: ClickhouseDep,
 ) -> CircumventionStatsResponse:
     """Aggregated statistics on protocols used for circumvention, grouped by country. """
-    setcacheresponse("1d", response)
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     end = datetime.now(timezone.utc)
 
@@ -1041,7 +1031,8 @@ def api_private_circumvention_runtime_stats(
     clickhouse: ClickhouseDep,
 ) -> CircumventionRuntimeStatsResponse:
     """Runtime statistics on protocols used for circumvention, grouped by date, country, test_name. """
-    setcacheresponse("1d", response)
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     end = datetime.now(timezone.utc)
 
