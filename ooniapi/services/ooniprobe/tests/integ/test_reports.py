@@ -292,3 +292,25 @@ async def test_collector_upload_zstd_decompressed_too_large(client, small_limits
     resp = client.post(f"/report/{RID}", content=zbody, headers=[("Content-Encoding", "zstd")])
     assert resp.status_code == 413, resp.content
     assert _bad_count("decompressed_too_large") == before + 1
+
+
+@pytest.mark.asyncio
+async def test_collector_upload_zstd_multiple_frames(client):
+    """Concatenated zstd frames are one valid stream: the upload is the
+    concatenation of what every frame decompresses to"""
+    body = _msmt_body(1000)
+    half = len(body) // 2
+    zbody = zstd.compress(body[:half]) + zstd.compress(body[half:])
+    c = post(client, f"/report/{RID}", zbody, headers=[("Content-Encoding", "zstd")])
+    assert "measurement_uid" in c, c
+
+
+@pytest.mark.asyncio
+async def test_collector_upload_zstd_frames_too_large_together(client, small_limits):
+    """The cap holds for all frames together, not for each one"""
+    frame = zstd.compress(b"\0" * (reports.MAX_DECOMPRESSED_SIZE // 2))
+    zbody = frame * 3
+    before = _bad_count("decompressed_too_large")
+    resp = client.post(f"/report/{RID}", content=zbody, headers=[("Content-Encoding", "zstd")])
+    assert resp.status_code == 413, resp.content
+    assert _bad_count("decompressed_too_large") == before + 1
