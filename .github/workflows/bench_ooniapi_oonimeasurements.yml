@@ -118,9 +118,9 @@ jobs:
           [ -d "$base_dir/tests/bench" ] || { echo "base has no benchmark suite, reporting head only"; base_dir=; }
           for round in 1 2; do
             if [ -n "$base_dir" ]; then
-              (cd "$base_dir" && OONI_BENCH_JSON="$RUNNER_TEMP/base-$round.json" hatch run test tests/bench)
+              (cd "$base_dir" && OONI_BENCH_JSON="$RUNNER_TEMP/base-$round.json" hatch run bench)
             fi
-            (cd "$SERVICE" && OONI_BENCH_JSON="$RUNNER_TEMP/head-$round.json" hatch run test tests/bench)
+            (cd "$SERVICE" && OONI_BENCH_JSON="$RUNNER_TEMP/head-$round.json" hatch run bench)
           done
 
       - name: Compare
