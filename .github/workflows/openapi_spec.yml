@@ -40,9 +40,16 @@ jobs:
             "$RUNNER_TEMP/openapi/oonifindings.json" > dist/openapi.json
 
       - uses: actions/upload-artifact@v4
+        id: upload
         with:
           name: openapi
           path: dist/openapi.json
+
+      - name: Link the artifact in the summary
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          echo "Merged spec: [openapi.json (zip)]($ARTIFACT_URL)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compare with the spec served on api.ooni.io
         run: |
