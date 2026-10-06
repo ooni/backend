@@ -1,0 +1,59 @@
+name: public OpenAPI spec
+on:
+  push:
+    paths:
+      - "ooniapi/common/**"
+      - "ooniapi/services/oonifindings/**"
+      - "ooniapi/services/oonimeasurements/**"
+      - "ooniapi/scripts/merge_openapi.py"
+      - ".github/workflows/openapi_spec.yml"
+  workflow_dispatch:
+
+jobs:
+  merge_openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install hatch
+        run: pip install "hatch>=1.13" "virtualenv<21"
+
+      - name: Dump each service's OpenAPI document
+        run: |
+          mkdir -p "$RUNNER_TEMP/openapi"
+          for svc in oonimeasurements oonifindings; do
+            (cd "ooniapi/services/$svc" &&
+              hatch run python -c "import json; from $svc.main import app; print(json.dumps(app.openapi()))" \
+                > "$RUNNER_TEMP/openapi/$svc.json")
+          done
+
+      - name: Merge the public endpoints
+        run: |
+          mkdir -p dist
+          python ooniapi/scripts/merge_openapi.py \
+            "$RUNNER_TEMP/openapi/oonimeasurements.json" \
+            "$RUNNER_TEMP/openapi/oonifindings.json" > dist/openapi.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: dist/openapi.json
+
+      - name: Compare with the spec served on api.ooni.io
+        run: |
+          canon() { python -c "import json,sys; print(json.dumps(json.load(sys.stdin), sort_keys=True))"; }
+          if ! curl -sSf https://api.ooni.io/openapi.json -o served.json; then
+            msg="https://api.ooni.io/openapi.json is not served"
+          elif [ "$(canon < served.json)" != "$(canon < dist/openapi.json)" ]; then
+            msg="https://api.ooni.io/openapi.json differs from this build: serve the openapi artifact of this run"
+          else
+            echo "https://api.ooni.io/openapi.json is up to date" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::warning::$msg"
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
