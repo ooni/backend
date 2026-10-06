@@ -327,3 +327,26 @@ PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, probe_cc, probe_asn)
 SETTINGS index_granularity = 8192;
 
+CREATE TABLE default.event_detector_changepoints
+(
+    `probe_asn` UInt32,
+    `probe_cc` String,
+    `domain` String,
+    `ts` DateTime64(3, 'UTC'),
+    `count_isp_resolver` Nullable(UInt32),
+    `count_other_resolver` Nullable(UInt32),
+    `count` Nullable(UInt32),
+    `dns_isp_blocked` Nullable(Float32),
+    `dns_other_blocked` Nullable(Float32),
+    `tcp_blocked` Nullable(Float32),
+    `tls_blocked` Nullable(Float32),
+    `change_dir` Nullable(Int8),
+    `s_pos` Nullable(Float32),
+    `s_neg` Nullable(Float32),
+    `current_state` String,
+    `h` Nullable(Float32),
+    `block_type` String
+)
+ENGINE = ReplacingMergeTree
+ORDER BY (probe_asn, probe_cc, ts, domain)
+SETTINGS index_granularity = 8192;
