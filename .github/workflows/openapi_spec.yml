@@ -45,11 +45,13 @@ jobs:
           path: dist/openapi.json
           archive: false
 
-      - name: Link the artifact in the summary
+      - name: Link the artifact
         env:
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
           echo "Merged spec: [openapi.json]($ARTIFACT_URL)" >> "$GITHUB_STEP_SUMMARY"
+          # annotations also show where the PR lists checks, unlike the summary
+          echo "::notice title=Merged spec::openapi.json: $ARTIFACT_URL"
 
       - name: Compare with the spec served on api.ooni.io
         run: |
