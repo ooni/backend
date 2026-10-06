@@ -13,7 +13,7 @@ from datetime import timedelta
 import pytest
 
 from .conftest import VOLATILE_KEYS
-from .synthetic import ANCHOR_DATE, TODAY, country_asn
+from .synthetic import ANCHOR_DATE, COUNTRIES, COUNTRY_LIST_OFFSETS, TODAY, country_asn
 
 CC = "US"
 # the busiest US network
@@ -23,6 +23,14 @@ DOMAIN = "site0.example.org"
 # checking whether IPs, which are never an input, are measured from IR
 ABSENT_CC = "IR"
 ABSENT_INPUT = "95.179.192.8"
+# production's costliest aggregations (data2, week to 2026-10-06) filter a small
+# country by a popular domain: domain IN ['tinder.com'] AND probe_cc IN ['SA'],
+# by day over a month, 99 s of CPU a call. DOMAIN is in the global list's head,
+# tested everywhere like tinder.com, and SA has 0.2% of measurements
+SMALL_CC = "SA"
+# the top site of IR's own list, like domain IN ['astraguardvpn.com'] AND
+# probe_cc IN ['IR'] over a day
+IR_DOMAIN = f"site{COUNTRY_LIST_OFFSETS[COUNTRIES.index('IR')]}.example.org"
 
 
 def ago(days: int) -> str:
@@ -51,6 +59,25 @@ CASES = {
     "aggregation.cc.input": ("/api/v1/aggregation", {"probe_cc": CC, "input": "{busiest_input}", **LAST_30}),
     "aggregation.cc.input_absent": ("/api/v1/aggregation", {"probe_cc": ABSENT_CC, "input": ABSENT_INPUT, **LAST_30}),
     "aggregation.x_cc.domain.180d": ("/api/v1/aggregation", {"axis_x": "probe_cc", "domain": DOMAIN, "since": ago(180), "until": ago(0)}),
+    "aggregation.x_day.small_cc.test.domain": (
+        "/api/v1/aggregation",
+        {"axis_x": "measurement_start_day", "probe_cc": SMALL_CC, "test_name": "web_connectivity", "domain": DOMAIN, **LAST_30},
+    ),
+    "aggregation.cc.test.country_domain.1d": (
+        "/api/v1/aggregation",
+        {"probe_cc": "IR", "test_name": "web_connectivity", "domain": IR_DOMAIN, "since": ago(1), "until": ago(0)},
+    ),
+    "aggregation.big_cc.test.input.15d": (
+        "/api/v1/aggregation",
+        {"probe_cc": "RU", "test_name": "web_connectivity", "input": f"https://{DOMAIN}/", "since": ago(15), "until": ago(0)},
+    ),
+    "aggregation.x_day.small_cc.test": (
+        "/api/v1/aggregation", {"axis_x": "measurement_start_day", "probe_cc": SMALL_CC, "test_name": "web_connectivity", **LAST_30},
+    ),
+    "aggregation.x_cc.test.domain.2d": (
+        "/api/v1/aggregation",
+        {"axis_x": "probe_cc", "test_name": "web_connectivity", "domain": DOMAIN, "since": ago(2), "until": ago(0)},
+    ),
     # /api/v1/measurements, /api/v1/measurement_meta
     "measurements.default": ("/api/v1/measurements", {}),
     "measurements.cc": ("/api/v1/measurements", {"probe_cc": CC}),
