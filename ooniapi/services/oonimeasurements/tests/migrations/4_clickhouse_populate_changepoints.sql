@@ -1,5 +1,5 @@
 INSERT INTO default.event_detector_changepoints (probe_asn, probe_cc, domain, ts, count_isp_resolver, count_other_resolver, count, dns_isp_blocked, dns_other_blocked, tcp_blocked, tls_blocked, change_dir, s_pos, s_neg, current_state, h, block_type) VALUES
-(945,'US','www.facebook.com','2024-01-15 18:00:00.000',0,2,2,nan,0,0.75,0,-1,NULL,0,'3.6899884',0.04597198,'tcp_block'),
+(945,'US','www.facebook.com','2024-01-15 18:00:00.000',0,2,2,nan,0,0.75,0,-1,3.6899884,0,'ok',0.04597198,'tcp_block'),
 (8048,'VE','google.com','2024-01-23 04:00:00.000',0,1,1,nan,0,0,0.7,-1,3.6120336,0,'ok',0.19636363,'tcp_block'),
 (8048,'VE','amazon.com','2024-01-29 22:00:00.000',0,1,1,nan,0,0.75,0,1,3.647134,0,'ok',0.1875,'tcp_block'),
 (8346,'SN','www.tiktok.com','2024-01-31 15:00:00.000',2,0,2,0,nan,0,0.75,1,3.7752855,0,'ok',0.098714285,'tcp_block'),
