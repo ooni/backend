@@ -14,10 +14,16 @@ import os
 import re
 import statistics
 import time
+import uuid
 
 import pytest
 
 INSERTS = int(os.environ.get("OONI_BENCH_INSERTS", 100))
+
+# tags this session's inserts in system.query_log: CI benchmarks base and head
+# on the same server within one workflow run, so the run id alone would mix
+# their costs; the random part separates the sessions, the run id traces them
+SESSION = f"{os.environ.get('GITHUB_RUN_ID', 'local')}-{uuid.uuid4().hex[:8]}"
 
 CASES = {
     "ingest.fastpath.batch_1": ("fastpath", 1),
@@ -43,7 +49,7 @@ def test_bench_ingest(bench, bench_writable, name):
             f"SELECT {','.join(columns)} FROM {table} ORDER BY measurement_start_time DESC LIMIT {INSERTS * batch}"
         )
         insert = f"INSERT INTO {clone} ({','.join(columns)}) VALUES"
-        tag = {"log_comment": f"ooni-bench-{name}"}
+        tag = {"log_comment": f"ooni-bench-{SESSION}-{name}"}
         timings = []
         for i in range(INSERTS):
             chunk = rows[i * batch:(i + 1) * batch]
