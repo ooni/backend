@@ -70,7 +70,11 @@ def compare(baseline, candidate):
         b, c = base_q.get(name), candidate["queries"].get(name)
         row = {"name": name, "base": b, "new": c, "verdict": "new" if not b else "removed" if not c else ""}
         if b and c:
-            ratio = c["read_bytes"] / b["read_bytes"] if b["read_bytes"] else 1.0
+            if b["read_bytes"]:
+                ratio = c["read_bytes"] / b["read_bytes"]
+            else:
+                # nothing read on the base: any read now is more, not unchanged
+                ratio = float("inf") if c["read_bytes"] else 1.0
             row["bytes_ratio"] = ratio
             if b["response_hash"] != c["response_hash"]:
                 row["verdict"] = "RESPONSE CHANGED"
@@ -141,6 +145,9 @@ def _change_note(r, d, plain):
         less = c["read_bytes"] < b["read_bytes"]
         word = "less" if less else "more"
         notes.append(f"{_arrow(less, f, plain)} {f:.1f}x {word} read")
+    elif bool(b["read_bytes"]) != bool(c["read_bytes"]):
+        less = not c["read_bytes"]
+        notes.append(f"{_arrow(less, SHADE_FACTORS[-1], plain)} {'reads nothing' if less else 'reads where base read nothing'}")
     base_ms, new_ms = b["median_ms"] * (d or 1), c["median_ms"]
     if base_ms and abs(new_ms - base_ms) >= TIME_FLOOR_MS and abs(new_ms / base_ms - 1) >= TIME_THRESHOLD:
         notes.append(f"{_factor(base_ms, new_ms):.1f}x {'faster' if new_ms < base_ms else 'slower'}")
