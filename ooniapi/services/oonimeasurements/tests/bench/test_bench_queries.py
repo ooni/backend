@@ -152,6 +152,9 @@ EMPTY = {"measurements.cc.input_absent.7d", "measurements.cc.input_absent.30d", 
 # query plan, so a change of plan must not count as a changed response
 UNORDERED = {
     "private.networks", "changepoints.default", "changepoints.cc", "private.im_networks",
+    # GROUP BY probe_asn without ORDER BY: one row per network, in the order
+    # the aggregation threads finish
+    "private.vanilla_tor_stats",
     # ordered by timestamp and count, with ties
     "aggregation_observations.default", "aggregation_observations.cc.timestamp",
     "aggregation_observations.hostname",
