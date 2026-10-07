@@ -611,6 +611,40 @@ def test_list_measurements_pagination_ordering(client, insert_fastpath, order):
     assert got == expected
 
 
+@pytest.mark.parametrize("order", ["asc", "desc"])
+@pytest.mark.parametrize("filters", [{}, {"probe_cc": "XY"}])
+def test_list_measurements_offset_ordering(client, insert_fastpath, order, filters):
+    """
+    Paginating with offset splits tie groups like cont does, with and without
+    a country (which finds the page's times in the by_cc_test_domain
+    projection)
+    """
+    test_name = "pagination_offset_test"
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    rows = [
+        make_fastpath_row(test_name, f"{t}_{suffix}", now - timedelta(minutes=t + 1))
+        for t in range(4)
+        for suffix in ["c3", "a1", "b2"]
+    ]
+    insert_fastpath(rows)
+
+    expected = [
+        r["measurement_uid"]
+        for r in sorted(
+            rows,
+            key=lambda r: (r["measurement_start_time"], r["measurement_uid"]),
+            reverse=order == "desc",
+        )
+    ]
+
+    got = []
+    for offset in range(0, len(rows), 2):
+        params = {"test_name": test_name, "limit": 2, "offset": offset, "order": order, **filters}
+        got += [r["measurement_uid"] for r in getj(client, route, params=params)["results"]]
+
+    assert got == expected
+
+
 def test_list_measurements_limit_zero(client):
     """
     limit=0 is NOT a valid value, it should return 422
