@@ -106,6 +106,12 @@ CASES = {
     ),
     # and with one: an input IR measures, like input = 'https://parsflix.tv/',
     # 5 at a time (17 s at the median in production)
+    # deep pages of a country's search, by offset and by the cursor (cont)
+    # that #1273 added: the same page, rows 901-1000 and 4901-5000
+    "measurements.cc.page_10.offset": ("/api/v1/measurements", {"probe_cc": CC, "offset": "900", **LAST_30}),
+    "measurements.cc.page_10.cont": ("/api/v1/measurements", {"probe_cc": CC, "cont": "{cont_900}", **LAST_30}),
+    "measurements.cc.page_50.offset": ("/api/v1/measurements", {"probe_cc": CC, "offset": "4900", **LAST_30}),
+    "measurements.cc.page_50.cont": ("/api/v1/measurements", {"probe_cc": CC, "cont": "{cont_4900}", **LAST_30}),
     "measurements.cc.input": ("/api/v1/measurements", {"probe_cc": "IR", "input": f"https://{IR_DOMAIN}/", "limit": "5", **LAST_30}),
     "measurement_meta.uid": ("/api/v1/measurement_meta", {"measurement_uid": "{measurement_uid}"}),
     "measurement_meta.report_id": ("/api/v1/measurement_meta", {"report_id": "{report_id}", "input": "{input}"}),
@@ -164,6 +170,16 @@ def samples(bench):
         f"SELECT probe_asn, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
         f" AND measurement_start_time >= {TODAY} - 30 GROUP BY probe_asn, input ORDER BY count() DESC, probe_asn, input LIMIT 1"
     )
+    # cont tokens for the deep pages: the row before each page, in the
+    # search's order (time, then uid, descending), as _make_cont writes it
+    conts = {}
+    for n in (900, 4900):
+        [(start_time, uid)] = bench.click.execute(
+            f"SELECT measurement_start_time, measurement_uid FROM fastpath WHERE probe_cc = '{CC}' AND probe_asn != 0"
+            f" AND measurement_start_time > toDateTime('{ago(30)}') AND measurement_start_time <= toDateTime('{ago(0)}')"
+            f" ORDER BY measurement_start_time DESC, measurement_uid DESC LIMIT 1 OFFSET {n - 1}"
+        )
+        conts[f"cont_{n}"] = f"{start_time:%Y%m%d%H%M%S}-{uid}"
     return {
         "report_id": report_id,
         "measurement_uid": measurement_uid,
@@ -171,6 +187,7 @@ def samples(bench):
         "obs_report_id": obs_report_id,
         "busiest_asn": str(busiest_asn),
         "busiest_input": busiest_input,
+        **conts,
     }
 
 
