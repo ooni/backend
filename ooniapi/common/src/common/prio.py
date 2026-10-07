@@ -68,6 +68,11 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
         o["weight"] = priority / max(e["msmt_cnt"], 0.1)
         test_list.append(o)
 
+    # URLs with the same weight, common when measurement counts are low, come
+    # out in a random order: probes that test only the top of the list then
+    # don't all test the same URLs. sorted() is stable, so shuffling first
+    # breaks the ties without changing the ranking.
+    random.shuffle(test_list)
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
 

@@ -185,3 +185,26 @@ async def test_debug_prioritization(client):
     resp = client.get("/api/_/debug_prioritization")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/json"
+
+
+def test_compute_priorities_random_tie_break():
+    # 20 URLs with the same weight and one with a higher weight
+    entries = [
+        {"category_code": "NEWS", "domain": f"d{i}.org", "url": f"https://d{i}.org/", "cc": "ZZ", "msmt_cnt": 0}
+        for i in range(20)
+    ]
+    entries.append({"category_code": "NEWS", "domain": "top.org", "url": "https://top.org/", "cc": "ZZ", "msmt_cnt": 0})
+    prio_rules = [
+        {"category_code": "NEWS", "cc": "*", "domain": "*", "priority": 100, "url": "*"},
+        {"category_code": "*", "cc": "*", "domain": "top.org", "priority": 100, "url": "*"},
+    ]
+    orders = set()
+    for _ in range(20):
+        out = prio.compute_priorities(entries, prio_rules)
+        # the ranking holds: highest weight first, weights never increase
+        assert out[0]["url"] == "https://top.org/"
+        assert [o["weight"] for o in out] == sorted((o["weight"] for o in out), reverse=True)
+        orders.add(tuple(o["url"] for o in out[1:]))
+    # the 20 tied URLs come out in different orders; all 20 runs giving the
+    # same order has probability 20!^-19
+    assert len(orders) > 1
