@@ -1,3 +1,5 @@
+import random
+
 import pytest
 
 from ooniprobe.common import prio
@@ -187,7 +189,7 @@ async def test_debug_prioritization(client):
     assert resp.headers["content-type"] == "application/json"
 
 
-def test_compute_priorities_random_tie_break():
+def tied_entries():
     # 20 URLs with the same weight and one with a higher weight
     entries = [
         {"category_code": "NEWS", "domain": f"d{i}.org", "url": f"https://d{i}.org/", "cc": "ZZ", "msmt_cnt": 0}
@@ -198,13 +200,42 @@ def test_compute_priorities_random_tie_break():
         {"category_code": "NEWS", "cc": "*", "domain": "*", "priority": 100, "url": "*"},
         {"category_code": "*", "cc": "*", "domain": "top.org", "priority": 100, "url": "*"},
     ]
-    orders = set()
-    for _ in range(20):
-        out = prio.compute_priorities(entries, prio_rules)
-        # the ranking holds: highest weight first, weights never increase
-        assert out[0]["url"] == "https://top.org/"
-        assert [o["weight"] for o in out] == sorted((o["weight"] for o in out), reverse=True)
-        orders.add(tuple(o["url"] for o in out[1:]))
-    # the 20 tied URLs come out in different orders; all 20 runs giving the
-    # same order has probability 20!^-19
-    assert len(orders) > 1
+    return entries, prio_rules
+
+
+def urls(out):
+    return [o["url"] for o in out]
+
+
+def test_compute_priorities_seeded_tie_break():
+    entries, prio_rules = tied_entries()
+    out = prio.compute_priorities(entries, prio_rules, seed="IT:30722:20368")
+    # the ranking holds: highest weight first, weights never increase
+    assert out[0]["url"] == "https://top.org/"
+    assert [o["weight"] for o in out] == sorted((o["weight"] for o in out), reverse=True)
+
+    # the same seed gives the same order, whatever order the entries come in
+    # (the query that fetches them has no ORDER BY)
+    shuffled = list(entries)
+    random.Random(1).shuffle(shuffled)
+    assert urls(prio.compute_priorities(shuffled, prio_rules, seed="IT:30722:20368")) == urls(out)
+
+    # other networks and other slots get the tied URLs in other orders; any
+    # two of these being equal has probability 1/20!
+    seeds = ["IT:30722:20368", "IT:30722:20369", "IT:3269:20368", "DE:30722:20368"]
+    assert len({tuple(urls(prio.compute_priorities(entries, prio_rules, seed=s))) for s in seeds}) == len(seeds)
+
+
+def test_compute_priorities_without_seed_keeps_entry_order():
+    entries, prio_rules = tied_entries()
+    out = prio.compute_priorities(entries, prio_rules)
+    assert urls(out) == ["https://top.org/"] + [f"https://d{i}.org/" for i in range(20)]
+
+
+def test_tie_break_seed_changes_per_network_and_day():
+    day = 86400
+    t = 20368 * day + 3600
+    assert prio.tie_break_seed("it", 30722, t) == prio.tie_break_seed("IT", 30722, t + 3600)
+    assert prio.tie_break_seed("IT", 30722, t) != prio.tie_break_seed("IT", 30722, t + day)
+    assert prio.tie_break_seed("IT", 30722, t) != prio.tie_break_seed("IT", 3269, t)
+    assert prio.tie_break_seed("IT", 30722, t) != prio.tie_break_seed("DE", 30722, t)

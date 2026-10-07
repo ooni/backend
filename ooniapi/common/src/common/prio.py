@@ -23,7 +23,8 @@ blockdiag {
 
 from functools import lru_cache
 import random
-from typing import Annotated, Dict, List, Tuple
+import time
+from typing import Annotated, Dict, List, Optional, Tuple
 import logging
 
 import sqlalchemy as sa
@@ -53,8 +54,24 @@ def match_prio_rule(cz, pr: dict) -> bool:
     return True
 
 
-def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
-    # Order based on (msmt_cnt / priority) to provide balancing
+# Probes on the same network get URLs that tie on weight in the same order
+# within a slot, so that they measure the same URLs and confirm each other's
+# results, and in a new order in the next slot, so that over several slots
+# they work through more of the list. A shorter slot spreads measurements
+# over the list sooner, with fewer probes per URL in each slot.
+TIE_BREAK_SLOT_SECONDS = 86400
+
+
+def tie_break_seed(probe_cc: str, probe_asn: int, now: Optional[float] = None) -> str:
+    """Seed for ordering a network's tied URLs during the current slot"""
+    slot = int((time.time() if now is None else now) // TIE_BREAK_SLOT_SECONDS)
+    return f"{probe_cc.upper()}:{probe_asn}:{slot}"
+
+
+def compute_priorities(entries: tuple, prio_rules: tuple, seed: Optional[str] = None) -> list:
+    """Order based on (msmt_cnt / priority) to provide balancing.
+    With seed, URLs with the same weight come out in an order picked by the
+    seed (see tie_break_seed), otherwise in the order of entries."""
     test_list = []
     for e in entries:
         # Calculate priority for an URL
@@ -68,11 +85,13 @@ def compute_priorities(entries: tuple, prio_rules: tuple) -> list:
         o["weight"] = priority / max(e["msmt_cnt"], 0.1)
         test_list.append(o)
 
-    # URLs with the same weight, common when measurement counts are low, come
-    # out in a random order: probes that test only the top of the list then
-    # don't all test the same URLs. sorted() is stable, so shuffling first
-    # breaks the ties without changing the ranking.
-    random.shuffle(test_list)
+    if seed is not None:
+        # entries come from a query without ORDER BY: sort them so that the
+        # same seed gives the same order. sorted() is stable, so shuffling
+        # first breaks ties between equal weights without changing the
+        # ranking.
+        test_list.sort(key=lambda k: (k["url"], k["cc"]))
+        random.Random(seed).shuffle(test_list)
     return sorted(test_list, key=lambda k: k["weight"], reverse=True)
 
 
@@ -140,7 +159,7 @@ def generate_test_list(
     log.info("fetched %d url entries", len(entries))
     prio_rules = fetch_prioritization_rules(clickhouse, country_code)
     log.info("fetched %d priority rules", len(prio_rules))
-    li = compute_priorities(entries, prio_rules)
+    li = compute_priorities(entries, prio_rules, tie_break_seed(country_code, probe_asn))
     # Filter unwanted category codes, replace ZZ, trim priority <= 0
     out = []
     for entry in li:
