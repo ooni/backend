@@ -229,7 +229,7 @@ def _counts_only(body):
 
 
 def _defined_order(body):
-    # ORDER BY measurement_start_time DESC LIMIT leaves rows with the same
+    # observations and analysis: ORDER BY measurement_start_time DESC LIMIT leaves rows with the same
     # time in no defined order, and at the page's end which of them make the
     # page: production has ~23 measurements a second, analysis here ~16 rows
     # a second. Compare only what the ORDER BY defines: the rows in order of
@@ -244,11 +244,14 @@ def _defined_order(body):
 
 
 # endpoints whose responses are partly approximate or undefined: compare
-# the part that is defined
+# the part that is defined. /api/v1/measurements orders by time and then
+# measurement_uid (#1273), so its pages are defined in full and compared
+# whole: a change that returns other rows at a page's end, or in another
+# order within a second, counts as a changed response.
 HASHED = {
     "private.circumvention_runtime_stats": _counts_only,
     **{name: _defined_order for name, (path, _) in CASES.items()
-       if path in ("/api/v1/measurements", "/api/v1/observations", "/api/v1/analysis") and name not in EMPTY},
+       if path in ("/api/v1/observations", "/api/v1/analysis") and name not in EMPTY},
 }
 
 
