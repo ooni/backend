@@ -81,11 +81,9 @@ def setup_router(app: FastAPI):
         errors = []
 
         try:
-            query = """
-            SELECT COUNT()
-            FROM fastpath
-            WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
-            """
+            # Only checks that ClickHouse answers: the load balancer calls this
+            # hundreds of thousands of times a week
+            query = "SELECT 1"
             await async_query_click(db=db, query=query, query_params={})
         except Exception as exc:
             log.error(exc)
