@@ -54,11 +54,12 @@ def match_prio_rule(cz, pr: dict) -> bool:
     return True
 
 
-# Probes on the same network get URLs that tie on weight in the same order
-# within a slot, so that they measure the same URLs and confirm each other's
-# results, and in a new order in the next slot, so that over several slots
-# they work through more of the list. A shorter slot spreads measurements
-# over the list sooner, with fewer probes per URL in each slot.
+# Weights are recomputed from the measurement counts on every request, so a
+# URL leaves a tie once its measurements are counted. The seed only orders
+# the URLs that still tie: probes on the same network that check in before
+# each other's results are counted get the same URLs, and later ones carry
+# on down the tied URLs in the same order. While counts don't change, the
+# order stays the same for the whole slot.
 TIE_BREAK_SLOT_SECONDS = 86400
 
 
