@@ -91,6 +91,22 @@ CASES = {
     "measurements.cc.test.anomaly": (
         "/api/v1/measurements", {"probe_cc": CC, "test_name": "web_connectivity", "anomaly": "true"},
     ),
+    # production's costliest searches without an input (data2, week to
+    # 2026-10-07): a small country's anomalies in one test, newest first
+    "measurements.small_cc.test.anomaly": (
+        "/api/v1/measurements", {"probe_cc": "JO", "test_name": "signal", "anomaly": "true", **LAST_30},
+    ),
+    "measurements.cc.test.anomaly.messenger": (
+        "/api/v1/measurements", {"probe_cc": "IL", "test_name": "facebook_messenger", "anomaly": "true", **LAST_30},
+    ),
+    "measurements.cc.limit_10": ("/api/v1/measurements", {"probe_cc": "EG", "limit": "10", **LAST_30}),
+    "measurements.big_cc.test.30min": (
+        "/api/v1/measurements",
+        {"probe_cc": "CN", "test_name": "web_connectivity", "since": f"{ago(1)}T14:30:00", "until": f"{ago(1)}T15:00:00"},
+    ),
+    # and with one: an input IR measures, like input = 'https://parsflix.tv/',
+    # 5 at a time (17 s at the median in production)
+    "measurements.cc.input": ("/api/v1/measurements", {"probe_cc": "IR", "input": f"https://{IR_DOMAIN}/", "limit": "5", **LAST_30}),
     "measurement_meta.uid": ("/api/v1/measurement_meta", {"measurement_uid": "{measurement_uid}"}),
     "measurement_meta.report_id": ("/api/v1/measurement_meta", {"report_id": "{report_id}", "input": "{input}"}),
     # /api/v1/observations, /api/v1/aggregation/observations
