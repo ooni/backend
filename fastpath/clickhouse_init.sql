@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS default.fastpath
     `measurement_uid` String,
     `report_id` String,
     `input` String,
-    `probe_cc` String,
-    `probe_asn` UInt32,
-    `test_name` String,
+    `probe_cc` LowCardinality(String),
+    `probe_asn` Int32,
+    `test_name` LowCardinality(String),
     `test_start_time` DateTime,
     `measurement_start_time` DateTime,
     `filename` String,
@@ -31,18 +31,20 @@ CREATE TABLE IF NOT EXISTS default.fastpath
     `server_as_name` String,
     `update_time` DateTime64(3) MATERIALIZED now64(),
     `test_version` String,
-    `test_runtime` Float32,
     `architecture` String,
-    `engine_name` String,
+    `engine_name` LowCardinality(String),
     `engine_version` String,
+    `test_runtime` Float32,
     `blocking_type` String,
     `test_helper_address` LowCardinality(String),
     `test_helper_type` LowCardinality(String),
     `ooni_run_link_id` Nullable(UInt64),
-    `is_verified` LowCardinality(String),
+    `is_verified` LowCardinality(String) DEFAULT 'u',
+    INDEX fastpath_rid_idx report_id TYPE minmax GRANULARITY 1,
+    INDEX measurement_uid_idx measurement_uid TYPE minmax GRANULARITY 8
 )
-ENGINE = ReplacingMergeTree
-ORDER BY (measurement_start_time, report_id, input)
+ENGINE = ReplacingMergeTree(update_time)
+ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS default.jsonl
@@ -51,10 +53,13 @@ CREATE TABLE IF NOT EXISTS default.jsonl
     `input` String,
     `s3path` String,
     `linenum` Int32,
-    `measurement_uid` String
+    `measurement_uid` String,
+    `date` Date,
+    `source` String,
+    `update_time` DateTime64(3) MATERIALIZED now64()
 )
-ENGINE = MergeTree
-ORDER BY (report_id, input)
+ENGINE = ReplacingMergeTree(update_time)
+ORDER BY (report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS default.url_priorities (
@@ -80,8 +85,6 @@ ENGINE = ReplacingMergeTree
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
-CREATE TABLE IF NOT EXISTS default.citizenlab_flip AS default.citizenlab;
-
 CREATE TABLE IF NOT EXISTS test_groups (
   `test_name` String,
   `test_group` String
@@ -89,54 +92,20 @@ CREATE TABLE IF NOT EXISTS test_groups (
 ENGINE = Join(ANY, LEFT, test_name);
 
 
--- Auth
-
-CREATE TABLE IF NOT EXISTS accounts
-(
-    `account_id` FixedString(32),
-    `role` String
-)
-ENGINE = EmbeddedRocksDB
-PRIMARY KEY account_id;
-
 -- Materialized views
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS default.counters_test_list
-(
-    `day` DateTime,
-    `probe_cc` String,
-    `input` String,
-    `msmt_cnt` UInt64
-)
-ENGINE = SummingMergeTree
-PARTITION BY day
-ORDER BY (probe_cc, input)
-SETTINGS index_granularity = 8192 AS
-SELECT
-    toDate(measurement_start_time) AS day,
-    probe_cc,
-    input,
-    count() AS msmt_cnt
-FROM default.fastpath
-INNER JOIN default.citizenlab ON fastpath.input = citizenlab.url
-WHERE (measurement_start_time < now()) AND (measurement_start_time > (now() - toIntervalDay(8))) AND (test_name = 'web_connectivity')
-GROUP BY
-    day,
-    probe_cc,
-    input;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS default.counters_asn_test_list
 (
     `week` DateTime,
     `probe_cc` String,
-    `probe_asn` UInt32,
+    `probe_asn` UInt64,
     `input` String,
     `msmt_cnt` UInt64
 )
 ENGINE = SummingMergeTree
 ORDER BY (probe_cc, probe_asn, input)
-SETTINGS index_granularity = 8192 AS
-SELECT
+SETTINGS index_granularity = 8192
+AS SELECT
     toStartOfWeek(measurement_start_time) AS week,
     probe_cc,
     probe_asn,
@@ -156,10 +125,11 @@ CREATE TABLE IF NOT EXISTS msmt_feedback
     `measurement_uid` String,
     `account_id` String,
     `status` String,
-    `update_time` DateTime64(3) MATERIALIZED now64()
+    `update_time` DateTime64(3) DEFAULT now64(),
+    `comment` String
 )
 ENGINE = ReplacingMergeTree
-ORDER BY (measurement_uid, account_id)
+ORDER BY (measurement_uid, account_id, update_time)
 SETTINGS index_granularity = 4;
 
 CREATE TABLE IF NOT EXISTS default.fingerprints_dns

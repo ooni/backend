@@ -1,5 +1,8 @@
 #!/bin/sh
 set -e
 
-gzip -dc /fixtures/samples/obs_web-sample.sql.gz | clickhouse-client
-gzip -dc /fixtures/samples/analysis_web_measurement-sample.sql.gz | clickhouse-client
+# samples a service's tests downloaded into its fixtures/samples, if any
+for f in /fixtures/samples/*.sql.gz; do
+    [ -e "$f" ] || continue
+    gzip -dc "$f" | clickhouse-client
+done

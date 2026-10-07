@@ -1,0 +1,167 @@
+name: benchmark ooniapi/oonimeasurements
+on:
+  push:
+    paths:
+      - "ooniapi/services/oonimeasurements/**"
+      - "ooniapi/common/**"
+      - ".github/workflows/bench_ooniapi_oonimeasurements.yml"
+  pull_request:
+    paths:
+      - "ooniapi/services/oonimeasurements/**"
+      - "ooniapi/common/**"
+      - ".github/workflows/bench_ooniapi_oonimeasurements.yml"
+  workflow_dispatch:
+    inputs:
+      rows:
+        description: "fastpath rows to generate (production has ~2M a day)"
+        default: "2000000"
+      days:
+        description: "days the rows are spread over"
+        default: "7"
+      reps:
+        description: "timed requests per query"
+        default: "5"
+      base:
+        description: "commit or branch to compare with (default: merge base with the default branch)"
+        default: ""
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: bench-oonimeasurements-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SERVICE: ooniapi/services/oonimeasurements
+  # push and pull request runs of one commit compare different bases
+  STATUS_CONTEXT: benchmark / oonimeasurements (${{ github.event_name }})
+  OONI_BENCH_ROWS: ${{ inputs.rows || '2000000' }}
+  OONI_BENCH_DAYS: ${{ inputs.days || '7' }}
+  OONI_BENCH_REPS: ${{ inputs.reps || '5' }}
+  # one server for every round, so each dataset is built once per job
+  OONI_BENCH_SERVER_URL: clickhouse://test:test@localhost:9000
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.2
+        env:
+          CLICKHOUSE_USER: test
+          CLICKHOUSE_PASSWORD: test
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "clickhouse-client --user test --password test --query 'SELECT 1'"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    steps:
+      # full history: the base commit and tags are needed, and nothing is
+      # pushed, so the token is not left in .git/config for the PR's code
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install hatch
+        run: pip install "hatch>=1.13" "virtualenv<21"
+
+      - name: Resolve commits
+        id: commits
+        env:
+          BASE_INPUT: ${{ inputs.base }}
+        run: |
+          # a pull request checks out its merge into the base branch, so the
+          # benchmarked change is that merge against its first parent; a push
+          # is compared with what the branch pointed to before it, unless the
+          # branch is new or that commit is gone after a force push
+          head="${{ github.event.pull_request.head.sha || github.sha }}"
+          before="${{ github.event.before }}"
+          if [ -n "$BASE_INPUT" ]; then
+            base="$(git rev-parse --verify --quiet "$BASE_INPUT^{commit}" || git rev-parse --verify "origin/$BASE_INPUT^{commit}")"
+          elif [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            base="$(git rev-parse HEAD^1)"
+          elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$before" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$before^{commit}" 2>/dev/null; then
+            base="$before"
+          else
+            base="$(git merge-base "origin/${{ github.event.repository.default_branch }}" HEAD)"
+          fi
+          {
+            echo "head=$head"
+            echo "base=$base"
+            echo "run_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_OUTPUT"
+
+      # a pull request from a fork gets a read-only token, so status updates are best effort
+      - name: Mark status pending
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh api "repos/${{ github.repository }}/statuses/${{ steps.commits.outputs.head }}"
+          -f state=pending -f context="$STATUS_CONTEXT"
+          -f description="benchmarking against ${{ steps.commits.outputs.base }}"
+          -f target_url="${{ steps.commits.outputs.run_url }}"
+
+      # base and head run on the same runner and dataset, so bytes read compare
+      # exactly; interleaved rounds keep load on the runner from favouring a side
+      - name: Benchmark base and head
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "${{ steps.commits.outputs.base }}"
+          base_dir="$RUNNER_TEMP/base/$SERVICE"
+          [ -d "$base_dir/tests/bench" ] || { echo "base has no benchmark suite, reporting head only"; base_dir=; }
+          for round in 1 2; do
+            if [ -n "$base_dir" ]; then
+              (cd "$base_dir" && OONI_BENCH_JSON="$RUNNER_TEMP/base-$round.json" hatch run bench)
+            fi
+            (cd "$SERVICE" && OONI_BENCH_JSON="$RUNNER_TEMP/head-$round.json" hatch run bench)
+          done
+
+      - name: Compare
+        id: compare
+        working-directory: ${{ env.SERVICE }}
+        run: |
+          baseline="$RUNNER_TEMP/base-1.json,$RUNNER_TEMP/base-2.json"
+          [ -f "$RUNNER_TEMP/base-1.json" ] || baseline=-
+          set +e
+          python tests/bench/compare.py "$baseline" "$RUNNER_TEMP/head-1.json,$RUNNER_TEMP/head-2.json" \
+            --markdown --summary-file "$RUNNER_TEMP/summary.txt" >> "$GITHUB_STEP_SUMMARY"
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oonimeasurements-benchmark
+          path: |
+            ${{ runner.temp }}/base-*.json
+            ${{ runner.temp }}/head-*.json
+          if-no-files-found: ignore
+
+      - name: Publish status
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "${{ job.status }}:${{ steps.compare.outputs.exit }}" in
+            cancelled:*) state=error; description="cancelled, superseded by a newer run" ;;
+            *:0) state=success; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
+            *:1) state=failure; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
+            *) state=error; description="benchmark did not complete" ;;
+          esac
+          gh api "repos/${{ github.repository }}/statuses/${{ steps.commits.outputs.head }}" \
+            -f state="$state" -f context="$STATUS_CONTEXT" \
+            -f description="${description:0:140}" \
+            -f target_url="${{ steps.commits.outputs.run_url }}"
+
+      - name: Fail on changed responses
+        if: steps.compare.outputs.exit == '1'
+        run: |
+          echo "a benchmarked endpoint returned a different response than on the base commit"
+          exit 1
