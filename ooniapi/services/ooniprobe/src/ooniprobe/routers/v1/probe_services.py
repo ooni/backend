@@ -477,6 +477,11 @@ def probe_geoip(
     """Looks up probe CC, ASN, network name using GeoIP, prepare
     response dict
     """
+    # Probes that leave geolocation to us send ZZ, or XX (probe-multiplatform
+    # since 6.1.0), with AS0
+    if probe_cc == "XX":
+        probe_cc = "ZZ"
+
     db_probe_cc = "ZZ"
     db_asn = "AS0"
     db_probe_network_name = None
