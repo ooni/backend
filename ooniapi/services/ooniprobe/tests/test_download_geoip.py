@@ -1,12 +1,14 @@
 from tests.conftest import GEOIP_FROZEN_TIME
 from pathlib import Path
 
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from freezegun import freeze_time
 
 from ooniprobe.download_geoip import (
     geoip_release_url,
     try_update,
+    is_latest_available
 )
 
 
@@ -135,3 +137,8 @@ def test_download_nothing_no_db(
     assert db_path is None
     assert not (download_geoip_db_dir / "asn_cc.mmdb").exists()
     assert not (download_geoip_db_dir / "geoipdbts").exists()
+
+
+def test_is_download_available_404():
+    bad_url = geoip_release_url(datetime(2222, 1, 1))[2]
+    assert is_latest_available(bad_url) is False

@@ -73,7 +73,9 @@ def create_jwt(payload: dict) -> str:
     return jwt.encode(payload, "super_secure", algorithm="HS256")
 
 
-def create_session_token(account_id: str, role: str) -> str:
+def create_session_token(
+    account_id: str, role: str, email_address: str = "oonitarian@example.com"
+) -> str:
     now = int(time.time())
     payload = {
         "nbf": now,
@@ -81,7 +83,7 @@ def create_session_token(account_id: str, role: str) -> str:
         "exp": now + 10 * 86400,
         "aud": "user_auth",
         "account_id": account_id,
-        "email_address": "oonitarian@example.com",
+        "email_address": email_address,
         "login_time": None,
         "role": role,
     }
@@ -97,9 +99,21 @@ def client_with_user_role(client):
 
 
 @pytest.fixture
+def client_with_other_user_role(client):
+    client = TestClient(app)
+    jwt_token = create_session_token(
+        "1" * 16, "user", email_address="someoneelse@example.com"
+    )
+    client.headers = {"Authorization": f"Bearer {jwt_token}"}
+    yield client
+
+
+@pytest.fixture
 def client_with_admin_role(client):
     client = TestClient(app)
-    jwt_token = create_session_token("0" * 16, "admin")
+    jwt_token = create_session_token(
+        "9" * 16, "admin", email_address="admin@example.com"
+    )
     client.headers = {"Authorization": f"Bearer {jwt_token}"}
     yield client
 

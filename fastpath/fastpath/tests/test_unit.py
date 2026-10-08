@@ -512,6 +512,35 @@ def test_score_web_connectivity_04_has_no_flags(fprints):
     assert "x_blocking_flags" not in scores.get("analysis", {})
 
 
+def test_score_web_connectivity_lte_flags_survive_confirmed_blocking(fprints):
+    """Regression test.
+
+    score_web_connectivity() sets scores["analysis"] twice for a WC 0.5
+    (LTE) measurement that is also classified as a confirmed block: once
+    near the top of the function (the x_blocking_flags/x_dns_flags/
+    x_null_null_flags bitmasks) and again further down, when `blocking`
+    matches one of `blocking_types` (adding "blocking_type"). The second
+    write must merge into the existing "analysis" dict rather than
+    replace it, or the x_ flags silently disappear for exactly the
+    measurements this feature was meant to describe: confirmed-blocked
+    WC 0.5 results.
+    """
+    msm = _wc_lte_msm(
+        blocking="tcp_ip",
+        accessible=False,
+        x_blocking_flags=8,
+        x_dns_flags=0,
+        x_null_null_flags=0,
+    )
+    scores = fp.score_measurement(msm)
+    assert scores["analysis"] == {
+        "x_blocking_flags": 8,
+        "x_dns_flags": 0,
+        "x_null_null_flags": 0,
+        "blocking_type": "tcp_ip",
+    }
+
+
 def test_score_web_connectivity_b64_incorrect(fprints):
     # response->body->data is replaced with a short string with
     # incorrect padding

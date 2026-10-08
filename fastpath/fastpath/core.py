@@ -1030,7 +1030,10 @@ def score_web_connectivity(msm: dict, matches: list) -> dict:
     probe_blocking = tk.get("blocking")
     if probe_blocking in blocking_types:
         scores["blocking_general"] = 1.0
-        scores["analysis"] = {"blocking_type": tk["blocking"]}
+        # Add blocking_type to "analysis" without discarding the WC 0.5 x_
+        # flags that may have been set into it above.
+        scores.setdefault("analysis", {})
+        scores["analysis"]["blocking_type"] = tk["blocking"]
 
     elif probe_blocking == False:
         pass

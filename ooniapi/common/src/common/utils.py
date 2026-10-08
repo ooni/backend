@@ -4,7 +4,7 @@ from sys import byteorder
 from os import urandom
 import logging
 from base64 import b64encode
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import List
 from fastapi import Response
 from fastapi.responses import JSONResponse
@@ -91,3 +91,15 @@ def generate_report_id(test_name, settings: Settings, cc: str, asn_i: int) -> st
     stn = test_name.replace("_", "")
     rid = f"{ts}_{stn}_{cc}_{asn_i}_n{cid}_{rand}"
     return rid
+
+def seconds_until_midnight() -> int:
+    now = datetime.now(timezone.utc)
+    next_midnight = datetime.combine(
+        now.date() + timedelta(days=1),
+        time.min,
+        tzinfo=timezone.utc,
+    )
+
+    ttl_seconds = int((next_midnight - now).total_seconds())
+
+    return max(1, ttl_seconds)
