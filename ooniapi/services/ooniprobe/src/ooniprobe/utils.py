@@ -22,7 +22,8 @@ from sqlalchemy.orm import Session
 from ooniprobe.models import OONIProbeVPNProvider, OONIProbeVPNProviderEndpoint
 
 from .common.clickhouse_utils import insert_click
-from .common.dependencies import ClickhouseDep
+from .common.dependencies import ClickhouseDep, get_settings
+from .common.utils import client_ipaddr, trusted_proxies
 from .common.errors import AddressNotFoundError
 from .dependencies import ASNCCReaderDep
 from .metrics import Metrics
@@ -247,14 +248,9 @@ def check_measurement_meta(
         )
 
 def extract_probe_ipaddr(request: Request) -> str:
-
-    real_ip_headers = ["X-Forwarded-For", "X-Real-IP"]
-
-    for h in real_ip_headers:
-        if h in request.headers:
-            return get_first_ip(request.headers.getlist(h)[0])
-
-    return request.client.host if request.client else ""
+    """The probe's address: the one our proxies saw, see client_ipaddr"""
+    peer = request.client.host if request.client else None
+    return client_ipaddr(request.headers.getlist("X-Forwarded-For"), peer, trusted_proxies(tuple(get_settings().trusted_proxies)))
 
 
 def geolookup_probe(ipaddr: str, asn_cc_reader: ASNCCReaderDep) -> Tuple[str, str, str]:
@@ -345,17 +341,6 @@ def register_geoip_anomaly(
         [("geoip", actual_cc, actual_asn_int, details)],
         max_execution_time=5,
     )
-
-
-def get_first_ip(headers: str) -> str:
-    """
-    parse the first ip from a comma-separated list of ips encoded as a string
-
-    example:
-    in: '123.123.123, 1.1.1.1'
-    out: '123.123.123'
-    """
-    return headers.partition(",")[0]
 
 
 def read_file(s3_client: S3Client, bucket: str, file: str) -> str:

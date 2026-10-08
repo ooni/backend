@@ -2,13 +2,18 @@ from csv import DictWriter
 from io import StringIO
 from sys import byteorder
 from os import urandom
+import ipaddress
 import logging
 from base64 import b64encode
 from datetime import datetime, time, timedelta, timezone
-from typing import List
+from functools import lru_cache
+from typing import Iterable, List, Optional, Set, Tuple, Union
 from fastapi import Response
 from fastapi.responses import JSONResponse
 from .config import Settings
+
+IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
 
 log = logging.getLogger(__name__)
@@ -103,3 +108,67 @@ def seconds_until_midnight() -> int:
     ttl_seconds = int((next_midnight - now).total_seconds())
 
     return max(1, ttl_seconds)
+
+
+class InvalidForwardedFor(ValueError):
+    """An X-Forwarded-For entry our side of the chain wrote isn't an address"""
+
+
+class TrustedProxies:
+    """Proxies whose X-Forwarded-For entries client_ipaddr skips, parsed
+    once: single addresses in a set, wider networks in a list"""
+
+    def __init__(self, entries: Iterable[str] = ()):
+        self.addresses: Set[IPAddress] = set()
+        self.networks: List[IPNetwork] = []
+        for entry in entries:
+            net = ipaddress.ip_network(entry, strict=False)
+            if net.num_addresses == 1:
+                self.addresses.add(net.network_address)
+            else:
+                self.networks.append(net)
+        # a proxy writes its own address the same way every time: matching
+        # its text skips parsing it
+        self.texts: Set[str] = {str(a) for a in self.addresses}
+
+    def __bool__(self) -> bool:
+        return bool(self.addresses or self.networks)
+
+    def __contains__(self, ip: IPAddress) -> bool:
+        return ip in self.addresses or any(ip in net for net in self.networks)
+
+
+@lru_cache(maxsize=16)
+def trusted_proxies(entries: Tuple[str, ...]) -> TrustedProxies:
+    """TrustedProxies for a setting's value, parsed once per value"""
+    return TrustedProxies(entries)
+
+
+def client_ipaddr(forwarded_for: List[str], peer: Optional[str], trusted: TrustedProxies) -> str:
+    """The client's address from the X-Forwarded-For headers of a request:
+    the last entry, which the ALB or the gateway appended, skipping trusted
+    proxies. Without the header, the peer address.
+
+    Raises InvalidForwardedFor if an entry it reaches isn't an IP address
+    (our proxies only write addresses) or every entry is a trusted proxy.
+    """
+    # Take entries off the right one at a time; the ones further left,
+    # written by the client, are never looked at
+    rest = ",".join(forwarded_for)
+    found_trusted = False
+    while rest:
+        rest, _, entry = rest.rpartition(",")
+        entry = entry.strip()
+        if not entry:
+            continue
+        if entry not in trusted.texts:
+            try:
+                ip = ipaddress.ip_address(entry)
+            except ValueError:
+                raise InvalidForwardedFor(f"X-Forwarded-For entry {entry!r} is not an IP address: {forwarded_for!r}")
+            if ip not in trusted:
+                return entry
+        found_trusted = True
+    if found_trusted:
+        raise InvalidForwardedFor(f"X-Forwarded-For has only trusted proxies, no client: {forwarded_for!r}")
+    return peer or ""
