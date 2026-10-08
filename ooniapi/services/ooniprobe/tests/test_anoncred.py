@@ -11,6 +11,7 @@ from ooniprobe.routers.v1.probe_services import (
     _clear_sensitive_data,
     get_ranges_from_policy,
 )
+from ooniprobe.routers.v1 import probe_services
 from .utils import get_msmt_hash, getj, make_submit_request, postj, setup_user
 
 @pytest.mark.asyncio
@@ -94,6 +95,26 @@ async def test_submission_basic(client):
     assert c['submit_response'], "Submit response should not be null if the proof was verified"
     user.handle_submit_response(c['submit_response'])
     assert c["error"] is None
+
+
+# What a panic in ooniauth_py's Rust code raises; it inherits from BaseException
+PanicException = type("PanicException", (BaseException,), {"__module__": "pyo3_runtime"})
+
+
+@pytest.mark.asyncio
+async def test_submission_ooniauth_panic(client, monkeypatch):
+    user, manifest_version, _ = setup_user(client)
+    msm = make_verified_measurement(user, manifest_version)
+
+    class PanickingServerState:
+        @staticmethod
+        def from_creds(*args):
+            raise PanicException("called `Option::unwrap()` on a `None` value")
+
+    monkeypatch.setattr(probe_services, "ServerState", PanickingServerState)
+    c = postj(client, "/api/v1/submit_measurement", msm)
+    assert c["verification_status"] == "failed", c
+    assert c["error"] == "unknown_error", c
 
 
 @pytest.mark.asyncio

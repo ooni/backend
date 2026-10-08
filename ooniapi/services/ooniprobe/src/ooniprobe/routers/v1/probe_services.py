@@ -799,6 +799,14 @@ def _anonc_exc_to_str(error: ProtocolError | CredentialError | DeserializationFa
     return type_to_str[type(error)]
 
 
+def is_rust_panic(exc: BaseException) -> bool:
+    """
+    A panic in ooniauth_py's Rust code is raised as pyo3_runtime.PanicException,
+    which inherits from BaseException rather than Exception
+    """
+    return type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
+
+
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
     type_str = _anonc_exc_to_str(error)
 
@@ -1142,6 +1150,11 @@ def _verify_submit(
         return (VerificationStatus.FAILED, _anonc_exc_to_str(e), None)
     except Exception as e:
         log.error(f"Unexpected anonc error: {e}")
+        return (VerificationStatus.FAILED, "unknown_error", None)
+    except BaseException as e:
+        if not is_rust_panic(e):
+            raise
+        log.error(f"ooniauth panic: {e}")
         return (VerificationStatus.FAILED, "unknown_error", None)
 
 def _clear_sensitive_data(data : dict[str, Any]):

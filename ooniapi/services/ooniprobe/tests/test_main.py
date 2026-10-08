@@ -52,6 +52,20 @@ def test_health_bad(client_with_bad_settings):
 
 
 @pytest.mark.asyncio
+async def test_health_ooniauth_panic(client, monkeypatch):
+    # What a panic in ooniauth_py's Rust code raises; it inherits from BaseException
+    PanicException = type("PanicException", (BaseException,), {"__module__": "pyo3_runtime"})
+
+    def panic():
+        raise PanicException("explicit panic")
+
+    monkeypatch.setattr(m, "get_manifest", fake_get_manifest)
+    monkeypatch.setattr(m, "check_ooniauth_health", panic)
+    j = client.get("health").json()
+    assert j["errors"] == ["bad_ooniauth_health"], j
+
+
+@pytest.mark.asyncio
 async def test_metrics(client):
     r = client.get("/metrics")
 
