@@ -158,12 +158,10 @@ async def health(
 
     try:
         check_ooniauth_health()
-    except Exception as exc:
-        # see if this library raises Exception or something inheriting from BaseException instead
-        log.error(f"Usertauth health error: {exc}")
-        errors.append("bad_ooniauth_health")
     except BaseException as exc:
-        log.error(f"Usertauth health error: {exc}")
+        if not isinstance(exc, Exception) and not probe_services.is_rust_panic(exc):
+            raise
+        log.error(f"Userauth health error: {exc}")
         errors.append("bad_ooniauth_health")
 
     if settings.jwt_encryption_key == "CHANGEME":

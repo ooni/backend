@@ -1,5 +1,4 @@
 from sqlalchemy import desc
-import asyncio
 import io
 import logging
 import random
@@ -800,6 +799,14 @@ def _anonc_exc_to_str(error: ProtocolError | CredentialError | DeserializationFa
     return type_to_str[type(error)]
 
 
+def is_rust_panic(exc: BaseException) -> bool:
+    """
+    A panic in ooniauth_py's Rust code is raised as pyo3_runtime.PanicException,
+    which inherits from BaseException rather than Exception
+    """
+    return type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
+
+
 def to_http_exception(error: ProtocolError | CredentialError | DeserializationFailed):
     type_str = _anonc_exc_to_str(error)
 
@@ -915,9 +922,6 @@ async def submit_measurement(
             submit_request.content
         )
         assert isinstance(content, dict), "'content' should be a json encoded as a string"
-    except asyncio.CancelledError:
-        log.exception("Handler cancelled (client disconnect/timeout)")
-        raise
     except Exception as e:
         log.error(f"invalid content: {e}")
         raise HTTPException(
@@ -926,9 +930,6 @@ async def submit_measurement(
                 "error" : str(e)
             }
         )
-    except BaseException as e:
-        log.exception("Unexpected BaseException: %r", e)
-        raise
 
     metadata = metadata_from_measurement_content(content)
 
@@ -996,17 +997,11 @@ async def submit_measurement(
                 success = True
                 break
 
-            except asyncio.CancelledError:
-                log.exception("Handler cancelled (client disconnect/timeout)")
-                raise
             except Exception as e:
                 log.exception(
                     f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
                     f"({fastpath_url}): {e}"
                 )
-            except BaseException as e:
-                log.exception("Unexpected BaseException: %r", e)
-                raise
 
         Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
@@ -1027,16 +1022,9 @@ async def submit_measurement(
                     metadata.software_name,
                     metadata.software_version,
                 )
-            except asyncio.CancelledError:
-                log.exception("Handler cancelled (client disconnect/timeout)")
-                raise
             except Exception as e:
                 log.error(f"Error checking for geoip anomalies: {e}")
                 Metrics.COMPARE_CC_FAILURE.inc()
-            except BaseException as e:
-                log.exception("Unexpected BaseException: %r", e)
-                raise
-
 
         return SubmitMeasurementResponse(
             measurement_uid=msmt_uid,
@@ -1058,15 +1046,9 @@ async def submit_measurement(
             Bucket=settings.failed_reports_bucket,
             Key=s3_key,
         )
-    except asyncio.CancelledError:
-        log.exception("Handler cancelled (client disconnect/timeout)")
-        raise
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
         Metrics.SEND_S3_FAILURE.inc()
-    except BaseException as e:
-        log.exception("Unexpected BaseException: %r", e)
-        raise
 
     log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
     Metrics.MISSED_MSMNTS.inc()
@@ -1167,11 +1149,13 @@ def _verify_submit(
         log.error(f"ZKP Failed: {e}")
         return (VerificationStatus.FAILED, _anonc_exc_to_str(e), None)
     except Exception as e:
-        log.error(f"Unexpected (Exception) anonc error: {e}")
+        log.error(f"Unexpected anonc error: {e}")
         return (VerificationStatus.FAILED, "unknown_error", None)
     except BaseException as e:
-        log.error(f"Unexpected (BaseException) anonc error: {e}")
-        raise
+        if not is_rust_panic(e):
+            raise
+        log.error(f"ooniauth panic: {e}")
+        return (VerificationStatus.FAILED, "unknown_error", None)
 
 def _clear_sensitive_data(data : dict[str, Any]):
     """
