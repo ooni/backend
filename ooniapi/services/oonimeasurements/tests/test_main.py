@@ -15,7 +15,7 @@ def test_health_bad(client_with_bad_settings):
     j = r.json()
     print(j)
     assert j["status"] == "fail", j
-    assert r.status_code == 200
+    assert r.status_code == 503
 
 
 def test_metrics(app):

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import pytest
 
 route = "api/v1/aggregation/observations"
@@ -34,6 +35,10 @@ def test_oonidata_aggregation_observations_with_since_and_until(
         ("test_name", "whatsapp"),
         ("hostname", "www.on-instant.com"),
         ("ip", "64.233.190.139"),
+        (
+            "measurement_uid",
+            "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630",
+        ),
     ],
 )
 def test_oonidata_aggregation_observations_with_filters(
@@ -52,6 +57,52 @@ def test_oonidata_aggregation_observations_with_filters(
             assert result[filter_name] in filter_value, result
         else:
             assert result[filter_name] == filter_value, result
+
+
+def test_oonidata_aggregation_observations_measurement_uid_only_skips_default_date_window(
+    client,
+):
+    """
+    Without measurement_uid, since/until default to the last 30 days (fixture data is older).
+
+    With only measurement_uid, those defaults must not apply, so rows still match by
+    measurement_uid even when their measurement_start_time falls outside the usual
+    default window.
+    """
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+
+    default_response = client.get(route)
+    assert default_response.status_code == 200
+    assert len(default_response.json()["results"]) == 0
+
+    by_uid = client.get(route, params={"measurement_uid": measurement_uid})
+    assert by_uid.status_code == 200
+    j = by_uid.json()
+    assert isinstance(j["results"], list), j
+    assert len(j["results"]) > 0
+    for result in j["results"]:
+        assert result["measurement_uid"] == measurement_uid, result
+
+
+def test_oonidata_aggregation_observations_measurement_uid_with_explicit_since_and_until(
+    client,
+):
+    """
+    An explicit since/until must still be honored even when measurement_uid is set.
+    """
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+    params = {
+        "measurement_uid": measurement_uid,
+        # This range does not cover the measurement's date (2024-11-01).
+        "since": "2025-01-01",
+        "until": "2025-01-02",
+    }
+
+    response = client.get(route, params=params)
+
+    json = response.json()
+    assert isinstance(json["results"], list), json
+    assert len(json["results"]) == 0
 
 
 @pytest.mark.parametrize(
@@ -92,3 +143,24 @@ def test_oonidata_aggregation_observations_groupby_failure(
     assert "failure" in first_result.keys()
     assert "timestamp" in first_result.keys()
     assert "observation_count" in first_result.keys()
+
+
+def test_oonidata_aggregation_observations_filter_by_resolver_asn(client, db):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    mst = datetime(2019, 3, 1, 12, tzinfo=timezone.utc)
+    rows = [
+        (f"20190301120000.00000{i}_ZZ_webconnectivity_resolverasn", 0, mst, asn, "dns_nxdomain_error")
+        for i, asn in enumerate([64500, 64500, 64500, 64501, 64501])
+    ]
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(
+            "INSERT INTO obs_web (measurement_uid, observation_idx, measurement_start_time, resolver_asn, dns_failure) VALUES",
+            rows,
+        )
+
+    params = {"resolver_asn": 64500, "since": "2019-03-01", "until": "2019-03-02"}
+    response = client.get(route, params=params)
+    assert response.status_code == 200, response.text
+    results = response.json()["results"]
+    assert sum(r["observation_count"] for r in results) == 3, results

@@ -50,6 +50,9 @@ class AnalysisEntry(BaseModel):
     top_dns_failure: Optional[str]
     top_tcp_failure: Optional[str]
     top_tls_failure: Optional[str]
+    top_dns_rule_id: str
+    top_tcp_rule_id: str
+    top_tls_rule_id: str
     dns_blocked: float
     dns_down: float
     dns_ok: float
@@ -73,8 +76,8 @@ async def list_measurements(
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
-    since: SinceUntil = utc_30_days_ago(),
-    until: SinceUntil = utc_today(),
+    since: Optional[SinceUntil] = None,
+    until: Optional[SinceUntil] = None,
     order_by: Annotated[
         Literal[
             "measurement_start_time",
@@ -92,6 +95,12 @@ async def list_measurements(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListAnalysisResponse:
+
+    if since is None and measurement_uid is None:
+        since = utc_30_days_ago()
+    if until is None and measurement_uid is None:
+        until = utc_today()
+
     q_args = {}
     and_clauses = []
     if measurement_uid is not None:
@@ -138,7 +147,7 @@ async def list_measurements(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
             limit=limit,
-            next_url=f"{settings.base_url}/api/v1/analysis?offset=100&limit=100",
+            next_url=f"{settings.base_url}/api/v1/analysis?offset={offset + limit}&limit={limit}",
             offset=offset,
             pages=-1,
             query_time=time.perf_counter() - t,

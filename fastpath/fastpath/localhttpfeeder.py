@@ -9,7 +9,10 @@ from gunicorn.app.base import BaseApplication
 
 
 API_PORT = int(os.environ.get("FASTPATH_API_PORT", 8472))
-QUEUE_PUT_TIMEOUT = int(os.environ.get("FASTPATH_QUEUE_PUT_TIMEOUT", 5))
+# QUEUE_PUT_TIMEOUT set to -1 means that we block
+QUEUE_PUT_TIMEOUT = int(os.environ.get("FASTPATH_QUEUE_PUT_TIMEOUT", -1))
+if QUEUE_PUT_TIMEOUT == -1:
+    QUEUE_PUT_TIMEOUT = None
 WORKER_TIMEOUT = int(os.environ.get("FASTPATH_WORKER_TIMEOUT", 30))
 
 class MsmtFeeder(BaseApplication):
@@ -44,6 +47,10 @@ def start_http_api(queue):
 
     options = {
         "bind": f"0.0.0.0:{API_PORT}",
-        "worker_timeout": WORKER_TIMEOUT,
+        "timeout": WORKER_TIMEOUT,
+        "control_socket_disable": True,
     }
+    print(f"starting localhttpfeeder with worker_timeout: {WORKER_TIMEOUT} and"
+          f" queue_put_timeout: {QUEUE_PUT_TIMEOUT}", flush=True)
+
     MsmtFeeder(handler_app, options).run()

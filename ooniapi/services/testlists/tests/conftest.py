@@ -225,7 +225,7 @@ def test_settings(alembic_migration, clickhouse_server, fastpath_server, tmp_pat
         prometheus_metrics_password="super_secure",
         clickhouse_url=clickhouse_server,
         collector_id="1",
-        fastpath_url=fastpath_server,
+        fastpath_urls=[fastpath_server],
         working_dir=str(tmp_path),
         github_user="fakeuser",
         github_token="faketoken",
