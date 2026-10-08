@@ -9,6 +9,7 @@ import zstd
 from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
 
 from ..common.config import Settings
 from ..common.dependencies import ClickhouseDep
