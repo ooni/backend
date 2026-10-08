@@ -21,6 +21,19 @@ async def test_check_in_geoip(client):
 
 
 @pytest.mark.asyncio
+async def test_check_in_invalid_probe_cc(client):
+    j = dict(
+        probe_cc="Z0", # invalid country-code
+        probe_asn="AS1234",
+        on_wifi=True,
+        charging=False,
+    )
+    r = client.post("/api/v1/check-in", json=j)
+
+    assert r.status_code == 422 # model validation error
+
+
+@pytest.mark.asyncio
 async def test_check_in_basic(client, load_url_priorities):
     j = dict(
         probe_cc="US",
