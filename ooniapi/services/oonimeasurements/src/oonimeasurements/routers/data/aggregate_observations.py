@@ -49,6 +49,7 @@ AggregationKeys = Literal[
     "probe_asn",
     "test_name",
     "measurement_uid",
+    "resolver_asn"
 ]
 
 
