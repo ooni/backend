@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
 from ..common.config import Settings
+from ..common.countries import lookup_country
 from ..common.dependencies import ClickhouseDep
 from ..common.metrics import timer
 from ..common.routers import BaseModel
@@ -165,7 +166,7 @@ async def receive_measurement(
             data = await request.body()
     except ClientDisconnect:
         log.info(f"Client disconnected mid-upload")
-        Metrics.CLIENT_DISCONNECT.inc()
+        Metrics.CLIENT_DISCONNECT.labels(probe_cc=_label_cc(cc)).inc()
         error("Client disconnect")
     except Exception as e:
         log.error(f"Uncaught exception {e}")
@@ -302,6 +303,19 @@ def _process_measurement_body(
 
     with Metrics.SERIALIZE_BODY_TIMING.time():
         return ujson.dumps(json).encode("utf-8"), metadata
+
+def _label_cc(cc: str) -> str:
+    """
+    The report_id's cc as a metric label. The client sets it and nothing has
+    checked it yet when the body is read, so anything that isn't a known
+    country code is counted as XX.
+    """
+    try:
+        lookup_country(cc)
+    except KeyError:
+        return "XX"
+    return cc.upper()
+
 
 def _compare_report_id_to_body_meta(cc: str, asn: str, test_name: str, metadata: MeasurementMetadata):
     """
