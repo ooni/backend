@@ -539,8 +539,6 @@ async def list_changepoints(
 ) -> ListChangePointsResponse:
     if since is None:
         since = utc_30_days_ago()
-    if until is None:
-        until = utc_today()
 
     conditions = []
     query_params = {}
@@ -562,10 +560,22 @@ async def list_changepoints(
     conditions.append(sql.text("ts >= :since"))
     query_params["since"] = since
 
-    conditions.append(sql.text("ts <= :until"))
-    query_params["until"] = until
+    # Without until, return everything up to now: the detector writes
+    # changepoints every hour, so today's are the most recent ones
+    if until is not None:
+        conditions.append(sql.text("ts <= :until"))
+        query_params["until"] = until
 
-    q = sql.select(ChangePointEntry.table).where(sql.and_(*conditions))
+    q = (
+        sql.select(ChangePointEntry.table)
+        .where(sql.and_(*conditions))
+        .order_by(
+            sql.desc(sql.column("ts")),
+            sql.column("probe_cc"),
+            sql.column("probe_asn"),
+            sql.column("domain"),
+        )
+    )
     res = await async_query_click(clickhouse, q, query_params)
     results = [ChangePointEntry.from_row(row) for row in res]
     return ListChangePointsResponse(results=results)
