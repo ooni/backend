@@ -2,6 +2,8 @@ import hashlib
 from typing import Optional, Dict, Any
 import jwt
 
+BEARER_PREFIX = "Bearer "
+
 
 def hash_email_address(email_address: str, key: str) -> str:
     em = email_address.encode()
@@ -34,11 +36,12 @@ def create_jwt(payload: dict, key: str) -> str:
 
 
 def get_client_token(authorization: str, jwt_encryption_key: str):
+    if not authorization or not authorization.startswith(BEARER_PREFIX):
+        return None
+    token = authorization[len(BEARER_PREFIX):]
     try:
-        assert authorization.startswith("Bearer ")
-        token = authorization[7:]
         return decode_jwt(token, audience="user_auth", key=jwt_encryption_key)
-    except:
+    except jwt.exceptions.PyJWTError:
         return None
 
 
