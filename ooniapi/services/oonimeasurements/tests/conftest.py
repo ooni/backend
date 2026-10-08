@@ -213,8 +213,11 @@ def set_since_and_until_params(since, until):
 
 
 @pytest.fixture()
-def fixed_time():
-    fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
+def fixed_time(request):
+    # a test can pick another time with indirect parametrization
+    fixed_now = getattr(
+        request, "param", datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
+    )
     with freeze_time(fixed_now):
         yield fixed_now
 

@@ -148,3 +148,33 @@ def test_changepoint_list_default_window_is_relative_to_request_time(
         params={"domain": "default-window.example.org"},
     )
     assert len(resp["results"]) == 1, resp
+
+
+@pytest.mark.parametrize(
+    "fixed_time", [datetime(2026, 2, 1, 15, tzinfo=UTC)], indirect=True
+)
+def test_changepoint_list_default_window_includes_today(client, db, fixed_time):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    # until used to default to midnight, which left out the changepoints
+    # the detector wrote today
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(
+            "INSERT INTO event_detector_changepoints (probe_asn, probe_cc, domain, ts, count_isp_resolver, count_other_resolver, count, block_type) VALUES",
+            [(64501, "ZZ", "today.example.org", datetime(2026, 2, 1, 12, tzinfo=UTC), 1, 0, 1, "tcp_block")],
+        )
+
+    resp = getj(
+        client,
+        "/api/v1/detector/changepoints",
+        params={"domain": "today.example.org"},
+    )
+    assert len(resp["results"]) == 1, resp
+
+
+def test_changepoint_list_newest_first(client):
+    resp = getjsu(client, "/api/v1/detector/changepoints")
+
+    times = [parse_dt(r["start_time"]) for r in resp["results"]]
+    assert len(times) > 1, "Not enough data to validate"
+    assert times == sorted(times, reverse=True), times
