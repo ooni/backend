@@ -11,6 +11,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .utils import TrustedProxies, client_ipaddr
+
 ## We convert the previous limits by multiplying by 100, since they were previously expressed as seconds of runtime per period. Now we are expressing cost as the number of 10ms.
 # ipaddr_per_month=60000,
 # ipaddr_per_week=20000,
@@ -45,6 +47,7 @@ class RateLimiterMiddleware:
         rate_limits: str = DEFAULT_LIMITS,
         whitelisted_ipaddrs: List[str] = [],
         unmetered_pages: List[str] = [],
+        trusted_proxies: List[str] = [],
     ):
         self.app = app
         self._unmetered_pages_globs = set()
@@ -56,6 +59,7 @@ class RateLimiterMiddleware:
                 self._unmetered_pages.add(p)
 
         self.whitelisted_ipaddrs = whitelisted_ipaddrs
+        self.trusted_proxies = TrustedProxies(trusted_proxies)
         if valkey_url.startswith("memory"):
             self.limits_storage = MemoryStorage()
         else:
@@ -66,13 +70,9 @@ class RateLimiterMiddleware:
 
     def get_client_ipaddr(self, scope: Scope, receive: Receive) -> str:
         request = Request(scope, receive)
-
         headers = Headers(scope=scope)
-        x_forwarded_for = headers.get("X-Forwarded-For")
-        if x_forwarded_for:
-            return x_forwarded_for.split(",")[0].strip()
-
-        return request.client.host
+        peer = request.client.host if request.client else None
+        return client_ipaddr(headers.getlist("X-Forwarded-For"), peer, self.trusted_proxies)
 
     def is_unmetered_page(self, path: str) -> bool:
         if path in self._unmetered_pages:

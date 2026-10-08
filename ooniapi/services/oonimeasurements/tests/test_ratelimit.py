@@ -95,3 +95,48 @@ async def test_10_per_minute(valkey_server, app):
             # no rate limit, no header
             assert "x-ratelimit-remaining" not in resp.headers.keys()
             assert resp.status_code == 200
+
+
+def _client_ipaddr(xff=None, client=("10.0.0.1", 1234), **kwargs):
+    middleware = RateLimiterMiddleware(app=None, valkey_url="memory", **kwargs)
+    headers = [(b"x-forwarded-for", v.encode()) for v in (xff or [])]
+    scope = {"type": "http", "method": "GET", "path": "/", "headers": headers, "client": client}
+    return middleware.get_client_ipaddr(scope, None)
+
+
+def test_client_ipaddr_is_the_address_appended_by_the_proxy():
+    # the ALB (xff_header_processing.mode = append) and the gateway append
+    # the address they saw to whatever X-Forwarded-For the client sent
+    assert _client_ipaddr(["198.51.100.7"]) == "198.51.100.7"
+    assert _client_ipaddr(["203.0.113.9, 198.51.100.7"]) == "198.51.100.7"
+    # several X-Forwarded-For headers count as one list, in order
+    assert _client_ipaddr(["203.0.113.9", "198.51.100.7"]) == "198.51.100.7"
+    # without the header, the peer address
+    assert _client_ipaddr() == "10.0.0.1"
+
+
+def test_client_ipaddr_skips_trusted_proxies():
+    # a request forwarded by another proxy (e.g. the legacy API host) before
+    # the ALB: skip the proxies we trust, from the right
+    xff = ["203.0.113.9, 192.0.2.10"]
+    assert _client_ipaddr(xff) == "192.0.2.10"
+    assert _client_ipaddr(xff, trusted_proxies=["192.0.2.10"]) == "203.0.113.9"
+    assert _client_ipaddr(xff, trusted_proxies=["192.0.2.0/24"]) == "203.0.113.9"
+
+
+def test_whitelist_applies_to_the_appended_address_only():
+    middleware = RateLimiterMiddleware(app=None, valkey_url="memory", whitelisted_ipaddrs=["5.9.112.244"])
+    scope = {"type": "http", "method": "GET", "path": "/", "client": ("10.0.0.1", 1234),
+             "headers": [(b"x-forwarded-for", b"5.9.112.244, 198.51.100.7")]}
+    assert middleware.get_client_ipaddr(scope, None) == "198.51.100.7"
+    assert not middleware.is_ip_whitelisted("198.51.100.7")
+
+
+def test_client_ipaddr_fails_on_an_entry_our_proxy_should_not_write():
+    from oonimeasurements.common.utils import InvalidForwardedFor
+    # e.g. the ALB's xff_client_port setting turned on
+    with pytest.raises(InvalidForwardedFor):
+        _client_ipaddr(["203.0.113.9, 198.51.100.7:51234"])
+    # a chain of only trusted proxies doesn't say who the client is
+    with pytest.raises(InvalidForwardedFor):
+        _client_ipaddr(["192.0.2.10"], trusted_proxies=["192.0.2.0/24"])

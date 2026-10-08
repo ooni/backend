@@ -84,3 +84,19 @@ async def test_check_in_url_category_news(client):
 async def test_test_helpers(client):
     c = getj(client, "/api/v1/test-helpers")
     assert len(c) == 6
+
+
+@pytest.mark.asyncio
+async def test_check_in_geoip_uses_address_appended_by_proxy(client):
+    """Behind the ALB (xff_header_processing.mode = append) or the gateway,
+    the last X-Forwarded-For entry is the address the proxy saw; earlier
+    entries come from the client"""
+    j = dict(on_wifi=True, charging=False)
+    headers = {
+        # k.root-servers.net (NL) sent by the client, then the address the
+        # proxy appended: c.root-servers.net (US)
+        "X-Forwarded-For": "193.0.14.129, 192.33.4.12"
+    }
+    c = postj(client, "/api/v1/check-in", json=j, headers=headers)
+    assert c["probe_cc"] == "US"
+    assert c["probe_asn"] == "AS2149"
