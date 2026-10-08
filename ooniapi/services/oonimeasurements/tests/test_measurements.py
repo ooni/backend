@@ -750,3 +750,82 @@ def test_list_measurements_pagination_pins_default_window(client, insert_fastpat
     got += [r["measurement_uid"] for r in j["results"]]
 
     assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
+
+
+@pytest.fixture(scope="session")
+def uid_lookup_rows(db):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    def row(uid, mst, input="https://uid-lookup.example.org/"):
+        return {
+            "measurement_uid": uid,
+            "report_id": f"20190501T120000Z_webconnectivity_IT_3269_n1_{uid[-8:]}",
+            "input": input,
+            "probe_cc": "IT",
+            "probe_asn": 3269,
+            "test_name": "web_connectivity",
+            "measurement_start_time": mst,
+            "scores": "{}",
+        }
+
+    rows = [
+        # starts moments before it was collected: found within the uid window
+        row("20190501120000.000000_IT_webconnectivity_uidwin01", datetime(2019, 5, 1, 11, 59)),
+        # uploaded a month late: only the unbounded fallback finds it
+        row("20190501120000.000000_IT_webconnectivity_uidlate1", datetime(2019, 4, 1, 12, 0)),
+        # uploaded 6 hours late: found by the day wide window
+        row("20190501120000.000000_IT_webconnectivity_uid6hlte", datetime(2019, 5, 1, 6, 0)),
+        # a test without input, starting 30 s after its report was opened
+        row("20190501120000.000000_IT_whatsapp_ridnoinp", datetime(2019, 5, 1, 12, 0, 30), input=""),
+    ]
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(f"INSERT INTO fastpath ({','.join(rows[0])}) VALUES", rows)
+    return rows
+
+
+@pytest.mark.parametrize("which", [0, 1, 2])
+def test_measurement_meta_by_uid_inside_and_outside_uid_window(client, uid_lookup_rows, which):
+    expected = uid_lookup_rows[which]
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": expected["measurement_uid"]})
+    assert response.status_code == 200, response.text
+    meta = response.json()
+    assert meta["measurement_uid"] == expected["measurement_uid"]
+    assert meta["report_id"] == expected["report_id"]
+    assert meta["measurement_start_time"].startswith(expected["measurement_start_time"].strftime("%Y-%m-%dT%H:%M"))
+
+
+def test_measurement_meta_by_uid_without_timestamp_prefix(client):
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": "not-a-timestamp-uid"})
+    assert response.status_code == 200, response.text
+    assert response.json() == {}
+
+
+@pytest.mark.parametrize("which", [0, 1, 2])
+def test_s3path_lookup_by_uid_inside_and_outside_uid_window(db, uid_lookup_rows, which):
+    from clickhouse_driver import Client as ClickhouseClient
+    from oonimeasurements.routers.v1.measurements import measurement_uid_to_s3path_linenum
+
+    expected = uid_lookup_rows[which]
+    s3path = f"raw/20190501/12/IT/webconnectivity/uid-lookup-{which}.jsonl.gz"
+    with ClickhouseClient.from_url(db) as click:
+        click.execute(
+            "INSERT INTO jsonl (report_id, input, s3path, linenum, measurement_uid) VALUES",
+            [(expected["report_id"], expected["input"], s3path, 7, expected["measurement_uid"])],
+        )
+        assert measurement_uid_to_s3path_linenum(click, expected["measurement_uid"]) == (s3path, 7)
+
+
+@pytest.mark.parametrize("which", [0, 1, 2, 3])
+def test_measurement_meta_by_report_id_inside_and_outside_report_window(client, uid_lookup_rows, which):
+    # report ids start 2019-05-01 12:00:00; rows start 1 min before (first
+    # window), 6 h before (second), a month before (unbounded) and, without
+    # input, 30 s after (first)
+    expected = uid_lookup_rows[which]
+    params = {"report_id": expected["report_id"]}
+    if expected["input"]:
+        params["input"] = expected["input"]
+    response = client.get("/api/v1/measurement_meta", params=params)
+    assert response.status_code == 200, response.text
+    meta = response.json()
+    assert meta["measurement_uid"] == expected["measurement_uid"]
+    assert meta["report_id"] == expected["report_id"]
