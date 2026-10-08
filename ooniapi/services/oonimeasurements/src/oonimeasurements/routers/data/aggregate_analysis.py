@@ -15,10 +15,9 @@ from ...dependencies import ClickhouseDep, get_clickhouse_session
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
-    utc_30_days_ago,
     utc_today,
 )
-from .utils import TimeGrains, get_measurement_start_day_agg, parse_probe_asn_to_int
+from .utils import TimeGrains, get_measurement_start_day_agg, parse_probe_asn_to_int, utc_7_days_ago
 
 router = APIRouter()
 
@@ -314,7 +313,7 @@ async def get_aggregation_analysis(
     db=Depends(get_clickhouse_session),
 ) -> AggregationResponse:
     if since is None and measurement_uid is None:
-        since = utc_30_days_ago()
+        since = utc_7_days_ago()
     if until is None and measurement_uid is None:
         until = utc_today()
 
@@ -538,7 +537,7 @@ async def list_changepoints(
     until: Optional[SinceUntil] = None,
 ) -> ListChangePointsResponse:
     if since is None:
-        since = utc_30_days_ago()
+        since = utc_7_days_ago()
     if until is None:
         until = utc_today()
 
