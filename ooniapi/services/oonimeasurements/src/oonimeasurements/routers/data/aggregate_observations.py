@@ -114,7 +114,7 @@ async def get_aggregation_observations(
         column_keys.append("probe_asn")
     if resolver_asn:
         and_list.append(f"resolver_asn IN %(resolver_asn)s")
-        params_filter["resolver_asn"] = probe_asn
+        params_filter["resolver_asn"] = resolver_asn
         group_by.append("resolver_asn")
         columns.append("resolver_asn")
         column_keys.append("resolver_asn")

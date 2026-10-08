@@ -67,6 +67,7 @@ def group_by_date(since, until, time_grain, cols, colnames, group_by):
         day="toDate",
         week="toStartOfWeek",
         month="toStartOfMonth",
+        year="toStartOfYear",
     )
     fun = gmap[time_grain]
     tcol = "measurement_start_day"  # TODO: support dynamic axis names
