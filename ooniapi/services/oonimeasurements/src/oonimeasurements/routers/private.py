@@ -16,7 +16,7 @@ import math
 
 from sqlalchemy import sql
 
-from fastapi import APIRouter, Depends, Request, Query, HTTPException
+from fastapi import APIRouter, Depends, Request, Query, HTTPException, Response
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.domain import DomainStr
 from pydantic import AnyUrl, Field, IPvAnyAddress, BeforeValidator
@@ -25,6 +25,7 @@ from ..common.clickhouse_utils import query_click, query_click_one_row
 from ..common.dependencies import role_required, ClickhouseDep
 from ..common.routers import BaseModel
 from ..common.countries import lookup_country
+from ..common.utils import setcacheresponse, seconds_until_midnight
 
 
 # The private API is exposed under the prefix /api/_
@@ -85,10 +86,13 @@ class ASNCount(BaseModel):
 
 @router.get("/asn_by_month", tags=["private"], response_model=List[ASNCount])
 def api_private_asn_by_month(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> List[ASNCount]:
     """Network count by month
     """
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     q = """SELECT
         COUNT(DISTINCT(probe_asn)) AS value,
@@ -114,10 +118,12 @@ class CountryCount(BaseModel):
 
 @router.get("/countries_by_month", tags=["private"], response_model=List[CountryCount])
 def api_private_countries_by_month(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> List[CountryCount]:
     """Countries count by month
     """
+    setcacheresponse("1d", response)
 
     end = datetime.now(timezone.utc)
     q = """SELECT
@@ -143,9 +149,10 @@ class TestNameResponse(BaseModel):
 
 
 @router.get("/test_names", tags=["private"], response_model=TestNameResponse)
-def api_private_test_names() -> TestNameResponse:
+def api_private_test_names(response: Response) -> TestNameResponse:
     """Provides test names and descriptions to Explorer
     """
+    setcacheresponse("1h", response)
     # TODO: eventually drop this, once we see nobody is using it
     TEST_NAMES = {
         "bridge_reachability": "Bridge Reachability",
@@ -188,13 +195,19 @@ class CountryStatResponse(BaseModel):
 
 @router.get("/countries", tags=["private"], response_model=CountryStatResponse)
 def api_private_countries(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> CountryStatResponse:
     """Summary of countries
     """
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
+
     q = """
-    SELECT probe_cc, COUNT() AS measurement_count
+    SELECT probe_cc,
+    COUNT() AS measurement_count
     FROM fastpath
+    WHERE toDate(measurement_start_time) < today()
     GROUP BY probe_cc ORDER BY probe_cc
     """
     c = []
@@ -242,10 +255,10 @@ def check_report_id() -> CheckReportIDResponse:
 
 
 def last_30days(begin=31, end=1):
-    first_day = datetime.now() - timedelta(begin)
+    first_day = datetime.now(timezone.utc) - timedelta(begin)
     first_day = datetime(first_day.year, first_day.month, first_day.day)
 
-    last_day = datetime.now() - timedelta(end)
+    last_day = datetime.now(timezone.utc) - timedelta(end)
     last_day = datetime(last_day.year, last_day.month, last_day.day)
 
     for d in daterange(first_day, last_day):
@@ -350,12 +363,14 @@ class TestCoverageResponse(BaseModel):
 
 @router.get("/test_coverage", response_model=TestCoverageResponse, tags=["private"])
 def api_private_test_coverage(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     test_groups: Optional[str] = Query(None, description="Comma-separated list of test group keys to filter results")
 ) -> TestCoverageResponse:
     """Return number of measurements per day across test categories
     """
+    setcacheresponse("1h", response)
     # TODO: merge the two queries into one?
     # TODO: remove test categories or move aggregation to the front-end?
     test_group_list: Optional[List[str]] = None
@@ -379,10 +394,12 @@ class WebsiteNetworksResponse(BaseModel):
 
 @router.get("/website_networks", response_model=WebsiteNetworksResponse, tags=["private"])
 def api_private_website_network_tests(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
 ) -> WebsiteNetworksResponse:
     """Counts of website measurements per ASN for the 31-day window ending at now()."""
+    setcacheresponse("1h", response)
 
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
@@ -418,12 +435,14 @@ class WebsiteStatsResponse(BaseModel):
 
 @router.get("/website_stats", response_model=WebsiteStatsResponse, tags=["private"])
 def api_private_website_stats(
+    response: Response,
     clickhouse: ClickhouseDep,
     input: AnyUrl = Query(..., description="Website to query stats"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     probe_asn: int = Query(..., description="ASN (integer)", ge=0),
 ) -> WebsiteStatsResponse:
     """Daily aggregated website measurement statistics (anomalies, confirmations, failures, and totals) for the past 31 days."""
+    setcacheresponse("1h", response)
     # uses_pg_index counters_day_cc_asn_input_idx a BRIN index was not used at
     # all, but BTREE on (measurement_start_day, probe_cc, probe_asn, input)
     # made queries go from full scan to 50ms
@@ -480,6 +499,7 @@ class WebsiteURLsResponse(BaseModel):
 
 @router.get("/website_urls", response_model=WebsiteURLsResponse, tags=["private"])
 def api_private_website_test_urls(
+    response: Response,
     request: Request,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
@@ -488,6 +508,7 @@ def api_private_website_test_urls(
     offset: int = Query(0, description="Offset results", ge=0),
 ) -> WebsiteURLsResponse:
     """Paginated list of tested URLs with per-URL counts (anomalies, confirmations, failures, totals) for the past 31 days."""
+    setcacheresponse("1h", response)
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=31)
 
@@ -587,10 +608,12 @@ class TorStatsResponse(BaseModel):
 
 @router.get("/vanilla_tor_stats", response_model=TorStatsResponse, tags=["private"])
 def api_private_vanilla_tor_stats(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> TorStatsResponse:
     """Per-ASN Tor measurement statistics for the given country over the last 6 months, including counts, last-tested date, and a tally of networks with low success rates."""
+    setcacheresponse("1h", response)
 
     end = datetime.now(timezone.utc)
 
@@ -651,10 +674,12 @@ class IMNetworkStats(BaseModel):
 
 @router.get("/im_networks", response_model=Dict[str, IMNetworkStats], tags=["private"])
 def api_private_im_networks(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code")
 ) -> Dict[str, IMNetworkStats]:
     """Per-test instant messaging network statistics (per-ASN totals and last-tested date) for the past 31 days, keyed by test name."""
+    setcacheresponse("1h", response)
     end = datetime.now(timezone.utc)
     s = """SELECT
     COUNT() AS total_count,
@@ -722,12 +747,14 @@ class IMStatsResponse(BaseModel):
 
 @router.get("/im_stats", response_model=IMStatsResponse, tags=["private"])
 def api_private_im_stats(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_asn: str = Query(..., description="ASN, e.g. AS1234"),
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     test_name: str = Query(..., description="Test name")
 ) -> IMStatsResponse:
     """Daily instant messaging measurement totals (and optional anomaly counts) for the past 31 days, for the given ASN, country, and test."""
+    setcacheresponse("1h", response)
     test_names = TEST_GROUPS["im"]
     if test_name not in test_names:
         raise HTTPException(status_code=400, detail="Invalid test_name")
@@ -803,12 +830,14 @@ class NetworkStatsResponse(BaseModel):
 
 @router.get("/network_stats", response_model=NetworkStatsResponse, tags=["private"])
 def api_private_network_stats(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
     limit: int = Query(10, description="Limit results", ge=1),
     offset: int = Query(0, description="Offset results", ge=0),
 ) -> NetworkStatsResponse:
     """Network speed statistics (NDT) — not yet implemented; always returns an empty result set."""
+    setcacheresponse("1d", response)
 
     # TODO: implement the stats from NDT in fastpath and then here
 
@@ -823,10 +852,12 @@ class CountryOverviewResponse(BaseModel):
 
 @router.get("/country_overview", response_model=CountryOverviewResponse, tags=["private"])
 def api_private_country_overview(
+    response: Response,
     clickhouse: ClickhouseDep,
     probe_cc: CountryAlpha2 = Query(..., description="Country Code"),
 ) -> CountryOverviewResponse:
     """Country-level summary for the requested two-letter code: first available measurement date, total number of measurements since 2012-12-01, and number of distinct ASNs observed (networks)."""
+    setcacheresponse("1d", response)
     # TODO: add circumvention_tools_blocked im_apps_blocked
     # middlebox_detected_networks websites_confirmed_blocked
     s = """SELECT
@@ -854,9 +885,11 @@ class GlobalOverviewResponse(BaseModel):
 
 @router.get("/global_overview", response_model=GlobalOverviewResponse, tags=["private"])
 def api_private_global_overview(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> GlobalOverviewResponse:
     """Global summary of measurements across all countries: total distinct networks (ASNs), total countries with measurements, and total measurement count (computed from the fastpath table)."""
+    setcacheresponse("1d", response)
     q = """SELECT
         COUNT(DISTINCT(probe_asn)) AS network_count,
         COUNT(DISTINCT probe_cc) AS country_count,
@@ -888,9 +921,11 @@ class GlobalOverviewMonthResponse(BaseModel):
 
 @router.get("/global_overview_by_month", response_model=GlobalOverviewMonthResponse, tags=["private"])
 def api_private_global_by_month(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> GlobalOverviewMonthResponse:
     """Monthly global time series for the last two years: distinct networks (ASNs), distinct countries, and total measurements per month (month timestamps are start-of-month)."""
+    setcacheresponse("1d", response)
 
     end = datetime.now(timezone.utc)
 
@@ -926,12 +961,14 @@ class CircumventionStatsResponse(BaseModel):
     results: Optional[List[CountryCircumventionStat]] = Field(None, description="List of per-country circumvention tool measurement counts over 6 months")
     v: int = Field(..., description="API Response version")
 
-
 @router.get("/circumvention_stats_by_country", response_model=CircumventionStatsResponse, tags=["private"])
 def api_private_circumvention_stats_by_country(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> CircumventionStatsResponse:
     """Aggregated statistics on protocols used for circumvention, grouped by country. """
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     end = datetime.now(timezone.utc)
 
@@ -990,9 +1027,12 @@ class CircumventionRuntimeStatsResponse(BaseModel):
 
 @router.get("/circumvention_runtime_stats", response_model=CircumventionRuntimeStatsResponse, tags=["private"])
 def api_private_circumvention_runtime_stats(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> CircumventionRuntimeStatsResponse:
     """Runtime statistics on protocols used for circumvention, grouped by date, country, test_name. """
+
+    setcacheresponse(f"{seconds_until_midnight()}s", response)
 
     end = datetime.now(timezone.utc)
 
@@ -1026,6 +1066,7 @@ class DomainMetadataResponse(BaseModel):
 
 @router.get("/domain_metadata", response_model=DomainMetadataResponse, tags=["private"])
 def api_private_domain_metadata(
+    response: Response,
     clickhouse: ClickhouseDep,
     domain: DomainStr = Query(..., description="Domain Name"),
 ) -> DomainMetadataResponse:
@@ -1045,6 +1086,7 @@ def api_private_domain_metadata(
     all of this works as expected (ex. moving shortest URL representations from
     the country lists into the global list).
     """
+    setcacheresponse("2h", response)
     category_code = "MISC"
 
     if domain.startswith("www."):
@@ -1088,10 +1130,12 @@ class ASNMetadataResponse(BaseModel):
 
 @router.get("/asnmeta", response_model=ASNMetadataResponse, tags=["private"])
 def api_private_asnmeta(
+    response: Response,
     clickhouse: ClickhouseDep,
     asn: int = Query(..., description="Autonomous System Number, e.g. 1234"),
 ) -> ASNMetadataResponse:
     """Look up organization name by ASN"""
+    setcacheresponse("2h", response)
 
     q = """SELECT org_name
         FROM asnmeta
@@ -1117,9 +1161,11 @@ class MeasuredNetworksResponse(BaseModel):
 
 @router.get("/networks", response_model=MeasuredNetworksResponse, tags=["private"])
 def api_private_networks(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> MeasuredNetworksResponse:
     """List all networks that have measurements by per-ASN measurement count and associated organization name."""
+    setcacheresponse("2h", response)
     q = """
     SELECT probe_asn, cnt, org_name FROM (
         SELECT
@@ -1167,9 +1213,11 @@ class DomainsMeasuredResponse(BaseModel):
 
 @router.get("/domains", response_model=DomainsMeasuredResponse, tags=["private"])
 def api_private_domains(
+    response: Response,
     clickhouse: ClickhouseDep,
 ) -> DomainsMeasuredResponse:
     """List all the domains in the test-lists with their measurement count."""
+    setcacheresponse("2h", response)
     # The nested ORDER BY lower(cc) puts global entries (cc=ZZ) on top so that
     # any(category_code) picks it up as the most meaningful category code.
     q = """
