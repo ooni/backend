@@ -1,4 +1,7 @@
+from datetime import datetime, timedelta
+
 import pytest
+from clickhouse_driver import Client as ClickhouseClient
 
 route = "api/v1/observations"
 
@@ -235,43 +238,153 @@ def test_oonidata_list_observations_with_limit_and_offset(
     assert len(json["results"]) == 10
 
 
-@pytest.fixture(scope="module")
-def paged_observations(db):
-    from datetime import datetime, timedelta
-    from clickhouse_driver import Client as ClickhouseClient
+ORDER_BY = ["measurement_start_time", "input", "probe_cc", "probe_asn", "test_name"]
+PAGING_SINCE, PAGING_UNTIL = "2019-04-30", "2019-05-02"
+PAGING_WHERE = f"probe_cc = 'ZY' AND measurement_start_time >= '{PAGING_SINCE}' AND measurement_start_time <= '{PAGING_UNTIL}'"
+# observations per measurement, and minutes from 2019-04-30 23:55 to its start
+OBSERVATIONS = [3, 1, 5, 2, 4, 3, 1, 2]
+MINUTES = [0, 0, 5, 9, 9, 12, 12, 15]
+COPIED = [(1, 0), (2, 3), (4, 1)]  # (measurement, observation_idx) stored twice
 
-    start = datetime(2019, 4, 1)
-    rows = [
-        (f"20190401{i:06d}.000000_ZY_webconnectivity_paging", idx, start + timedelta(minutes=i * 4 + idx), "ZY", f"paging{i}.example.org")
-        for i in range(3)
-        for idx in range(4)
-    ]
-    insert = "INSERT INTO obs_web (measurement_uid, observation_idx, measurement_start_time, probe_cc, hostname) VALUES"
+
+def paging_uid(m):
+    return f"20190430{m:06d}.000000_ZY_webconnectivity_paging"
+
+
+@pytest.fixture(scope="module", params=[False, True], ids=["once", "copies"])
+def paged_observations(db, request):
+    """
+    Observations shaped like production's: those of one measurement share
+    measurement_start_time and some measurements share it too, so every
+    order_by has ties; the rows span two monthly partitions and several parts.
+    With copies, some observations are stored twice, as ooni/data reprocessing
+    leaves them until a merge.
+    """
+    start = datetime(2019, 4, 30, 23, 55, 0, 123000)
+    measurements = []
+    for m, (count, minutes) in enumerate(zip(OBSERVATIONS, MINUTES)):
+        t = start + timedelta(minutes=minutes)
+        measurements.append([
+            (
+                paging_uid(m),
+                idx,
+                t,
+                t.strftime("%Y-%m-%d"),
+                "ZY",
+                m % 3,
+                "web_connectivity" if m % 2 else "signal",
+                None if m == 2 else f"https://paging{m % 3}.example.org/",
+                f"ZY_paging_report{m // 3}",
+            )
+            for idx in range(count)
+        ])
+    insert = (
+        "INSERT INTO obs_web (measurement_uid, observation_idx, measurement_start_time, bucket_date,"
+        " probe_cc, probe_asn, test_name, input, report_id) VALUES"
+    )
     with ClickhouseClient.from_url(db) as click:
-        # a duplicate in a separate part stays until merged, as ReplacingMergeTree allows
+        # a copy in a separate part stays until merged, as ReplacingMergeTree allows
         click.execute("SYSTEM STOP MERGES obs_web")
         try:
-            click.execute(insert, rows)
-            click.execute(insert, [rows[5]])
-            yield click
+            for batch in (measurements[:3], measurements[3:6], measurements[6:]):
+                click.execute(insert, [row for rows in batch for row in rows])
+            copies = [measurements[m][idx] for m, idx in COPIED] if request.param else []
+            if copies:
+                click.execute(insert, copies)
+            yield click, sum(OBSERVATIONS) + len(copies)
         finally:
             click.execute("SYSTEM START MERGES obs_web")
+            click.execute("DELETE FROM obs_web WHERE probe_cc = 'ZY'")
+
+
+def single_query(click, where, order_by, order, offset, limit):
+    """The page as the endpoint's single query returned it, with the tie-breaker."""
+    rows = click.execute(
+        f"SELECT measurement_uid, observation_idx FROM obs_web WHERE {where}"
+        f" ORDER BY {order_by} {order}, measurement_uid, observation_idx LIMIT {limit} OFFSET {offset}"
+    )
+    return [tuple(r) for r in rows]
+
+
+def get_page(client, offset, limit, **params):
+    params = {"offset": offset, "limit": limit, **params}
+    response = client.get(route, params=params)
+    assert response.status_code == 200, response.text
+    return [(r["measurement_uid"], r["observation_idx"]) for r in response.json()["results"]]
+
+
+def paging_params(order_by, order):
+    return {"probe_cc": "ZY", "since": PAGING_SINCE, "until": PAGING_UNTIL, "order_by": order_by, "order": order}
+
+
+@pytest.mark.parametrize("order", ["ASC", "DESC"])
+@pytest.mark.parametrize("order_by", ORDER_BY)
+def test_oonidata_list_observations_pages_match_single_query(client, paged_observations, order_by, order):
+    click, count = paged_observations
+    for limit in [1, 2, 4, 5, 7]:
+        for offset in range(count + 2):
+            expected = single_query(click, PAGING_WHERE, order_by, order, offset, limit)
+            got = get_page(client, offset, limit, **paging_params(order_by, order))
+            assert got == expected, (limit, offset)
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+@pytest.mark.parametrize("order_by", ORDER_BY)
+@pytest.mark.parametrize("limit", [1, 4, 5])
+def test_oonidata_list_observations_paging_returns_every_row(client, paged_observations, order_by, order, limit):
+    click, count = paged_observations
+    seen = []
+    for offset in range(0, count + limit, limit):
+        seen += get_page(client, offset, limit, **paging_params(order_by, order))
+    stored = click.execute(f"SELECT measurement_uid, observation_idx FROM obs_web WHERE {PAGING_WHERE}")
+    assert sorted(seen) == sorted(tuple(r) for r in stored), "rows missing or repeated"
+    assert seen == single_query(click, PAGING_WHERE, order_by, order, 0, count)
 
 
 @pytest.mark.parametrize(
-    "order, offset, limit",
-    [("DESC", 0, 5), ("ASC", 3, 4), ("DESC", 10, 5), ("ASC", 0, 100)],
+    "params, where",
+    [
+        ({"report_id": "ZY_paging_report0"}, "report_id = 'ZY_paging_report0'"),
+        ({"measurement_uid": paging_uid(2)}, f"measurement_uid = '{paging_uid(2)}'"),
+        (
+            {"probe_cc": "ZY", "probe_asn": "AS1", "test_name": "web_connectivity", "since": PAGING_SINCE, "until": PAGING_UNTIL},
+            f"{PAGING_WHERE} AND probe_asn = 1 AND test_name = 'web_connectivity'",
+        ),
+    ],
+    ids=["report_id", "measurement_uid", "filters"],
 )
-def test_oonidata_list_observations_page_matches_plain_query(client, paged_observations, order, offset, limit):
-    params = {"probe_cc": "ZY", "since": "2019-04-01", "until": "2019-04-02", "order": order, "offset": offset, "limit": limit}
-    response = client.get(route, params=params)
-    assert response.status_code == 200, response.text
-    got = [(r["measurement_uid"], r["observation_idx"]) for r in response.json()["results"]]
+@pytest.mark.parametrize("order", ["ASC", "desc"])
+def test_oonidata_list_observations_filtered_pages_match_single_query(client, paged_observations, params, where, order):
+    click, _ = paged_observations
+    count = click.execute(f"SELECT count() FROM obs_web WHERE {where}")[0][0]
+    assert count > 1
+    for limit in [1, 2, 3]:
+        for offset in range(count + 1):
+            expected = single_query(click, where, "measurement_start_time", order, offset, limit)
+            got = get_page(client, offset, limit, order=order, **params)
+            assert got == expected, (limit, offset)
 
-    expected = paged_observations.execute(
-        "SELECT measurement_uid, observation_idx FROM obs_web"
-        " WHERE probe_cc = 'ZY' AND measurement_start_time >= '2019-04-01' AND measurement_start_time <= '2019-04-02'"
-        f" ORDER BY measurement_start_time {order} LIMIT {limit} OFFSET {offset}"
-    )
-    assert got == [tuple(r) for r in expected]
-    assert len(got) == min(limit, max(13 - offset, 0))
+
+def test_oonidata_list_observations_reads_keys_again_only_for_copies(client, paged_observations, monkeypatch):
+    from oonimeasurements.routers.data import list_observations
+
+    click, count = paged_observations
+    queries = []
+
+    async def counting(db, q, q_args, *args, **kwargs):
+        queries.append(q)
+        return await list_observations_query(db, q, q_args, *args, **kwargs)
+
+    list_observations_query = list_observations.async_query_click
+    monkeypatch.setattr(list_observations, "async_query_click", counting)
+    read_again = 0
+    for offset in range(count):
+        queries.clear()
+        page = get_page(client, offset, 3, **paging_params("measurement_start_time", "ASC"))
+        rows = click.execute(
+            f"SELECT count() FROM obs_web WHERE {PAGING_WHERE} AND (measurement_uid, observation_idx) IN %(keys)s",
+            {"keys": page},
+        )[0][0] if page else 0
+        assert len(queries) == (2 if rows > len(set(page)) else 1), offset
+        read_again += len(queries) == 2
+    assert (read_again > 0) == (count > sum(OBSERVATIONS))
