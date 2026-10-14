@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = ''
 
 dependencies = [
-  "fastapi ~= 0.108.0",
+  "fastapi ~= 0.142.2",
   "boto3 ~= 1.39.3",
   "mypy-boto3-s3 ~= 1.39.5",
   "clickhouse-driver ~= 0.2.6",
@@ -19,15 +19,15 @@ dependencies = [
   "uvicorn ~= 0.25.0",
   "httpx ~= 0.26.0",
   "psycopg2 ~= 2.9.9",
-  "pyjwt ~= 2.8.0",
+  "pyjwt ~= 2.15.1",
   "alembic ~= 1.13.1",
   "python-dateutil ~= 2.9.0",
-  "prometheus-fastapi-instrumentator ~= 6.1.0",
+  "prometheus-fastapi-instrumentator ~= 8.1.0",
   "prometheus-client",
 ]
 
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = "BSD-3-Clause"
 keywords = []
 authors = [
@@ -36,11 +36,7 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
