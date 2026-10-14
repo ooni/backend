@@ -125,11 +125,9 @@ async def health(
 ):
     errors = []
     try:
-        query = """
-        SELECT COUNT()
-        FROM fastpath
-        WHERE measurement_start_time < NOW() AND measurement_start_time > NOW() - INTERVAL 3 HOUR
-        """
+        # Only checks that ClickHouse answers: the load balancer calls this
+        # hundreds of thousands of times a week
+        query = "SELECT 1"
         query_click(db=clickhouse, query=query, query_params={})
     except Exception as e:
         errors.append("clickhouse_error")
