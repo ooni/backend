@@ -187,7 +187,8 @@ def measurements(clickhouse_db, fixtures_data_dir):
         ms["measurement_start_time"] = date
         ms["test_start_time"] = date
 
-    query = "INSERT INTO fastpath VALUES"
+    # name the columns, as the fastpath does: the rest take their defaults
+    query = f"INSERT INTO fastpath ({', '.join(measurements[0])}) VALUES"
     insert_click(clickhouse_db, query, measurements)
 
     yield

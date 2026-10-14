@@ -14,8 +14,7 @@ CREATE TABLE IF NOT EXISTS default.faulty_measurements
 )
 ENGINE = ReplacingMergeTree
 ORDER BY (ts, type, probe_cc, probe_asn, uid)
-SETTINGS
-    -- These settings will buffer inserts and return without verifying that they reached disk
-    -- See: https://clickhouse.com/docs/best-practices/selecting-an-insert-strategy#asynchronous-inserts
-    async_insert=1,
-    wait_for_async_insert=0;
+-- Inserts are asynchronous: ooniprobe sets async_insert=1 and
+-- wait_for_async_insert=0 on each INSERT (ooniprobe/utils.py), as production
+-- doesn't set them on the table.
+SETTINGS index_granularity = 8192;
