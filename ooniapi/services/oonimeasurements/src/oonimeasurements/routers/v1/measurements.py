@@ -109,7 +109,7 @@ def _fetch_jsonl_measurement_body_from_s3(
 )
 def get_measurement(
     measurement_uid: str,
-    download: bool,
+    download: bool = False,
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ):

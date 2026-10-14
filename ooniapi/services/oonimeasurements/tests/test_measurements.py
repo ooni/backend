@@ -240,6 +240,26 @@ def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtu
     assert resp.status_code == 400, resp.status_code
 
 
+def test_get_measurement_download_optional(client, monkeypatch, maybe_download_fixtures):
+    """
+    /api/v1/measurement/{uid} returns the measurement without download, and
+    as an attachment with download=true
+    """
+    monkeypatch.setattr(measurements, "get_bucket_url", fake_get_bucket_url)
+
+    # Taken from fixtures
+    uid = "20250709075147.833477_US_webconnectivity_8f0e0b49950f2592"
+    rid = "20250709T074913Z_webconnectivity_US_10796_n1_XDgk16bsGyJbx6Jl"
+    resp = client.get(f"/api/v1/measurement/{uid}")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["report_id"] == rid
+    assert "content-disposition" not in resp.headers
+
+    resp = client.get(f"/api/v1/measurement/{uid}", params={"download": "true"})
+    assert resp.status_code == 200, resp.text
+    assert uid in resp.headers["content-disposition"]
+
+
 def test_raw_measurement_returns_json(client, monkeypatch, maybe_download_fixtures):
     """
     Test that raw_measurements returns json instead of a string
