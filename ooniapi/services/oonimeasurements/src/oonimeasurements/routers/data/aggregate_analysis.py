@@ -346,7 +346,7 @@ async def get_aggregation_analysis(
         extra_cols["test_name"] = "test_name"
     if ooni_run_link_id is not None:
         q_args["ooni_run_link_id"] = ooni_run_link_id
-        and_clauses.append("%(ooni_run_link_id)s")
+        and_clauses.append("ooni_run_link_id = %(ooni_run_link_id)s")
         extra_cols["ooni_run_link_id"] = "ooni_run_link_id"
     if domain is not None:
         q_args["domain"] = domain
