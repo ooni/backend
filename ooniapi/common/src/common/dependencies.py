@@ -60,7 +60,7 @@ def get_clickhouse_session(settings: SettingsDep, request : Request):
     # route             = /measurement/{measurement_uid}
     # request.url.path  = /measurement/1234
     route = request.scope.get("route")
-    path = route.path if route else request.url.path
+    path = route.path if route else "unknown"
     meta = dict(
         app_name = settings.app_name,
         handler = f"{request.method} {path}"
