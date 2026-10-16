@@ -259,6 +259,7 @@ def test_settings(
 ):
     (secret_key, _) = test_creds
     yield make_override_get_settings(
+        app_name="ooniprobe",
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",

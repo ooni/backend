@@ -59,6 +59,7 @@ def client_with_bad_settings():
 @pytest.fixture
 def client(alembic_migration, clickhouse_server):
     app.dependency_overrides[get_settings] = make_override_get_settings(
+        app_name="oonirun",
         postgresql_url=alembic_migration,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
