@@ -8,14 +8,9 @@ from oonimeasurements.routers.v1.measurements import format_msmt_meta
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
 from urllib.parse import urlparse, parse_qs
-from .conftest import THIS_DIR
-from .utils import getj, make_fastpath_row
+from .utils import fake_get_bucket_url, getj, make_fastpath_row
 
 route = "api/v1/measurements"
-
-
-def fake_get_bucket_url(bucket_name):
-    return f"file://{THIS_DIR}/fixtures/"
 
 
 def normalize_probe_asn(probe_asn):

@@ -29,6 +29,7 @@ def app(db, valkey_server):
     app = create_app()
 
     settings_override = make_override_get_settings(
+        app_name="oonimeasurements",
         valkey_url=valkey_server,
         clickhouse_url=db,
         jwt_encryption_key="super_secure",

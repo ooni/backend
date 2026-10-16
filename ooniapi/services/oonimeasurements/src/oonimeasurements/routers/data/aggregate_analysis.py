@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 from ...common.clickhouse_utils import async_query_click
-from ...dependencies import ClickhouseDep, get_clickhouse_session
+from ...common.dependencies import ClickhouseDep, get_clickhouse_session
 from ...utils.api import ProbeASNOrNone, ProbeCCOrNone
 from .list_analysis import (
     SinceUntil,
