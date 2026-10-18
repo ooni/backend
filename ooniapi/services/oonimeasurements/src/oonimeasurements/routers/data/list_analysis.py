@@ -14,7 +14,7 @@ from ...dependencies import get_clickhouse_session
 from .utils import (
     SinceUntil,
     parse_probe_asn_to_int,
-    utc_30_days_ago,
+    utc_7_days_ago,
     utc_today,
 )
 
@@ -97,7 +97,7 @@ async def list_measurements(
 ) -> ListAnalysisResponse:
 
     if since is None and measurement_uid is None:
-        since = utc_30_days_ago()
+        since = utc_7_days_ago()
     if until is None and measurement_uid is None:
         until = utc_today()
 
