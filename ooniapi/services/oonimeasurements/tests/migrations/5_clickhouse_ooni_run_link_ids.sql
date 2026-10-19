@@ -1,8 +1,5 @@
--- The analysis_web_measurement and obs_web samples have no ooni_run_link_id
--- at all, while in production about half of the measurements come from an
--- OONI Run link. Give the samples the ten most common production link ids
--- (2026-10-08, one day of analysis_web_measurement), in about the same shares,
--- picked by measurement_uid so that both tables agree.
+-- Give the samples the ten most common production link ids in about the
+-- same shares picked by measurement_uid so that both the tables agree
 
 ALTER TABLE analysis_web_measurement UPDATE ooni_run_link_id = multiIf(
     cityHash64(measurement_uid) % 1000 < 487, '',
