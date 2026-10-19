@@ -81,6 +81,7 @@ def client(
     email_source_address,
 ):
     app.dependency_overrides[get_settings] = make_override_get_settings(
+        app_name="ooniauth",
         jwt_encryption_key=jwt_encryption_key,
         prometheus_metrics_password=prometheus_password,
         email_source_address=email_source_address,

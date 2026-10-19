@@ -686,17 +686,20 @@ def test_oonirun_revisions(client, client_with_user_role):
     z["name"] = "first descriptor"
     j = post(client_with_user_role, "/api/v2/oonirun/links", json = z)
     oonirun_link_id_one = j["oonirun_link_id"]
+    # revision 1 is created with the link
+    first_date_created = j["date_created"]
 
-    ## Create two new revisions
+    ## Create two new revisions; each edit's date_updated is when its
+    ## revision was created, while date_created stays the link's
     j["nettests"][0]["inputs"].append("https://foo.net/")
     j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
-    first_date_created = j["date_created"]
+    second_date_created = j["date_updated"]
 
     time.sleep(1)
 
     j["nettests"][0]["inputs"].append("https://foo2.net/")
     j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
-    second_date_created = j["date_created"]
+    third_date_created = j["date_updated"]
 
     ## Fetch first revision
     j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/1")
@@ -705,6 +708,11 @@ def test_oonirun_revisions(client, client_with_user_role):
     ## Fetch second revision
     j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
     assert j["date_created"] == second_date_created
+
+    ## Fetch third revision, created at least a second later
+    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/3")
+    assert j["date_created"] == third_date_created
+    assert third_date_created > second_date_created
 
     ### Create another descriptor as user
     z["name"] = "second descriptor"

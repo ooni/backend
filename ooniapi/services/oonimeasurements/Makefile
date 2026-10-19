@@ -49,6 +49,9 @@ test:
 test-cov:
 	hatch run test-cov
 
+bench:
+	hatch run bench $(ARGS)
+
 build:
 	hatch build
 

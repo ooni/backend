@@ -59,6 +59,7 @@ def client_with_bad_settings():
 @pytest.fixture
 def client(alembic_migration, clickhouse_server):
     app.dependency_overrides[get_settings] = make_override_get_settings(
+        app_name="oonirun",
         postgresql_url=alembic_migration,
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
@@ -187,7 +188,8 @@ def measurements(clickhouse_db, fixtures_data_dir):
         ms["measurement_start_time"] = date
         ms["test_start_time"] = date
 
-    query = "INSERT INTO fastpath VALUES"
+    # name the columns, as the fastpath does: the rest take their defaults
+    query = f"INSERT INTO fastpath ({', '.join(measurements[0])}) VALUES"
     insert_click(clickhouse_db, query, measurements)
 
     yield

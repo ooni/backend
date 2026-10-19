@@ -83,8 +83,10 @@ dependencies = [
 path = ".venv/"
 
 [tool.hatch.envs.default.scripts]
-test = "pytest {args:tests}"
-test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term {args:tests}"
+# the benchmarks take minutes and say nothing about correctness: run them with `bench`
+test = "pytest --ignore=tests/bench {args:tests}"
+bench = "pytest tests/bench {args}"
+test-cov = "pytest -s --full-trace --log-level=INFO  --log-cli-level=INFO -v --setup-show --cov=./ --cov-report=xml --cov-report=html --cov-report=term --ignore=tests/bench {args:tests}"
 cov-report = ["coverage report"]
 cov = ["test-cov", "cov-report"]
 

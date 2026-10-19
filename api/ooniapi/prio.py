@@ -5,7 +5,8 @@ OONI Probe Services API - reactive URL prioritization
 based on the citizenlab URL list and the measurements count from the last
 7 days.
 
-The ooni-update-counters service updates the counters_test_list table at intervals
+The counters_asn_test_list materialized view counts the fastpath measurements
+of citizenlab URLs per week, country and network as they are inserted
 
 The ooni-update-citizenlab service updates the citizenlab table at intervals
 
@@ -14,8 +15,8 @@ blockdiag {
   Probes [color = "#ffeeee"];
   "API: test-list/urls" [color = "#eeeeff"];
   Probes -> "API: receive msmt" -> "Fastpath" -> "DB: fastpath table";
-  "DB: fastpath table" -> "ooni-update-counters service" -> "DB: counters_test_list table";
-  "DB: counters_test_list table" -> "API: test-list/urls" -> Probes;
+  "DB: fastpath table" -> "DB: counters_asn_test_list table";
+  "DB: counters_asn_test_list table" -> "API: test-list/urls" -> Probes;
   "DB: citizenlab table" -> "API: test-list/urls";
 }
 ```

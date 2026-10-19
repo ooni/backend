@@ -29,6 +29,7 @@ def app(db, valkey_server):
     app = create_app()
 
     settings_override = make_override_get_settings(
+        app_name="oonimeasurements",
         valkey_url=valkey_server,
         clickhouse_url=db,
         jwt_encryption_key="super_secure",
@@ -128,7 +129,8 @@ def create_db_for_fixture(conn_url):
     try:
         with ClickhouseClient.from_url(conn_url) as client:
             migrations_dir = THIS_DIR / "migrations"
-            for fn in sorted(migrations_dir.iterdir()):
+            # numeric order, so 10_ follows 9_
+            for fn in sorted(migrations_dir.iterdir(), key=lambda p: int(p.name.split("_", 1)[0])):
                 migration_path = fn.resolve()
                 run_migration(migration_path, click=client)
         return conn_url
