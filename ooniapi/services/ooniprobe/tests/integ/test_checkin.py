@@ -84,3 +84,28 @@ async def test_check_in_url_category_news(client):
 async def test_test_helpers(client):
     c = getj(client, "/api/v1/test-helpers")
     assert len(c) == 6
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("probe_cc", ["ZZ", "XX", "xx"])
+async def test_check_in_unknown_country_uses_geoip(client, probe_cc):
+    # probe-multiplatform (since 6.1.0) sends XX and AS0 and leaves
+    # geolocation to the backend, as older probes do with ZZ
+    j = dict(
+        run_type="timed",
+        charging=True,
+        probe_cc=probe_cc,
+        probe_asn="AS0",
+        on_wifi=True,
+        software_name="ooniprobe-android-unattended",
+        software_version="6.2.1",
+        web_connectivity=dict(category_codes=[]),
+    )
+    headers = {"X-Forwarded-For": "192.33.4.12"}  # c.root-servers.net, US AS2149
+    c = postj(client, "/api/v1/check-in", json=j, headers=headers)
+
+    assert (c["probe_cc"], c["probe_asn"]) == ("US", "AS2149")
+    # the test list and report ID are made for the looked up country and network
+    webc_rid = c["tests"]["web_connectivity"]["report_id"]
+    _ts, _stn, cc, asn_i, _coll, _rand = webc_rid.split("_")
+    assert (cc, asn_i) == ("US", "2149")

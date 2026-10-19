@@ -220,6 +220,7 @@ def client_with_admin_role(client):
 @pytest.fixture
 def test_settings(alembic_migration, clickhouse_server, fastpath_server, tmp_path):
     yield make_override_get_settings(
+        app_name="testlists",
         postgresql_url=alembic_migration,
         jwt_encryption_key=JWT_ENCRYPTION_KEY,
         prometheus_metrics_password="super_secure",

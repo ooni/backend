@@ -4,14 +4,16 @@ from typing import Annotated, TypeAlias
 from clickhouse_driver import Client as Clickhouse
 
 import boto3
-from fastapi import Depends
-from fastapi import HTTPException, Header
+from fastapi import Depends, Request
+from fastapi import HTTPException, Header, Response
 from mypy_boto3_s3 import S3Client
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+import ujson
 
 from .auth import get_client_token
 from .config import Settings
+from .utils import setnocacheresponse
 
 
 @lru_cache
@@ -26,15 +28,16 @@ def role_required(roles: list[str]):
     """Wrapped function requiring user to be logged in and have the right role."""
 
     # Also:
-    #  explicitely set no-cache headers
     #  apply the cross_origin decorator to:
     #    - set CORS header to a trusted URL
     #    - enable credentials (cookies)
     #
     async def verify_jwt(
+        response: Response,
         settings: Annotated[Settings, Depends(get_settings)],
         authorization: str = Header("authorization"),
     ):
+        setnocacheresponse(response)
         try:
             tok = get_client_token(authorization, settings.jwt_encryption_key)
         except:
@@ -50,8 +53,24 @@ def role_required(roles: list[str]):
     return verify_jwt
 
 
-def get_clickhouse_session(settings: SettingsDep):
+def get_clickhouse_session(settings: SettingsDep, request : Request):
     db = Clickhouse.from_url(settings.clickhouse_url)
+
+    # Route has the URL pattern, not the actual path.
+    # route             = /measurement/{measurement_uid}
+    # request.url.path  = /measurement/1234
+    route = request.scope.get("route")
+    path = route.path if route else "unknown"
+    meta = dict(
+        app_name = settings.app_name,
+        handler = f"{request.method} {path}"
+    )
+
+    db.settings['log_comment'] = ujson.dumps(
+        meta,
+        escape_forward_slashes = False
+    )
+
     try:
         yield db
     finally:

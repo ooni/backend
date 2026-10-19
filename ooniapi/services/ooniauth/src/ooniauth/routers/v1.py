@@ -5,7 +5,7 @@ import logging
 
 import jwt
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path
+from fastapi import APIRouter, Depends, Query, HTTPException, Header, Path, Response
 from pydantic import Field
 from pydantic.functional_validators import field_validator
 from pydantic import EmailStr
@@ -23,6 +23,7 @@ from ..utils import (
 from ..common.dependencies import get_settings, role_required
 from ..common.config import Settings
 from ..common.routers import BaseModel
+from ..common.utils import setnocacheresponse
 from ..common.auth import (
     create_jwt,
     decode_jwt,
@@ -108,6 +109,7 @@ class SessionTokenCreate(BaseModel):
 
 @router.get("/v1/user_login", response_model=SessionTokenCreate)
 async def user_login(
+    response: Response,
     token: Annotated[
         str,
         Query(alias="k", description="JWT token with aud=register"),
@@ -115,6 +117,7 @@ async def user_login(
     settings: Settings = Depends(get_settings),
 ):
     """Auth Services: login using a registration/login link"""
+    setnocacheresponse(response)
 
     # **IMPORTANT** You have to compute this token using a different key
     # to the one used in ooniprobe service, because you could allow
@@ -172,10 +175,12 @@ class SessionTokenRefresh(BaseModel):
     response_model=SessionTokenRefresh,
 )
 async def user_refresh_token(
+    response: Response,
     settings: Settings = Depends(get_settings),
     authorization: str = Header("authorization"),
 ):
     """Auth services: refresh user token"""
+    setnocacheresponse(response)
     tok = get_client_token(
         authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
@@ -203,10 +208,12 @@ class AccountMetadata(BaseModel):
 
 @router.get("/_/account_metadata")
 async def get_account_metadata(
+    response: Response,
     settings: Settings = Depends(get_settings),
     authorization: str = Header("authorization"),
 ):
     """Get account metadata for logged-in users"""
+    setnocacheresponse(response)
     try:
         tok = get_client_token(
             authorization=authorization, jwt_encryption_key=settings.jwt_encryption_key

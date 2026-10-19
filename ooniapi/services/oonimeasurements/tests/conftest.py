@@ -29,6 +29,7 @@ def app(db, valkey_server):
     app = create_app()
 
     settings_override = make_override_get_settings(
+        app_name="oonimeasurements",
         valkey_url=valkey_server,
         clickhouse_url=db,
         jwt_encryption_key="super_secure",
@@ -128,7 +129,8 @@ def create_db_for_fixture(conn_url):
     try:
         with ClickhouseClient.from_url(conn_url) as client:
             migrations_dir = THIS_DIR / "migrations"
-            for fn in sorted(migrations_dir.iterdir()):
+            # numeric order, so 10_ follows 9_
+            for fn in sorted(migrations_dir.iterdir(), key=lambda p: int(p.name.split("_", 1)[0])):
                 migration_path = fn.resolve()
                 run_migration(migration_path, click=client)
         return conn_url
@@ -217,3 +219,26 @@ def fixed_time():
     fixed_now = datetime(2026, 2, 1, 0, 0, 0, tzinfo=timezone.utc)
     with freeze_time(fixed_now):
         yield fixed_now
+
+
+@pytest.fixture
+def insert_fastpath(db):
+    """
+    Insert rows into fastpath, they are deleted on teardown by test_name.
+
+    Note that we can't truncate fastpath as it has fixtures that other tests
+    might need, so we delete only the entries inserted by the test
+    """
+    ch = ClickhouseClient.from_url(db)
+    test_names = set()
+
+    def insert(rows):
+        test_names.update(r["test_name"] for r in rows)
+        ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
+
+    yield insert
+    for tn in test_names:
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": tn},
+        )
