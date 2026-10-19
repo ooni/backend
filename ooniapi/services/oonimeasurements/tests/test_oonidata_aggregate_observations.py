@@ -145,19 +145,17 @@ def test_oonidata_aggregation_observations_groupby_failure(
     assert "observation_count" in first_result.keys()
 
 
-def test_oonidata_aggregation_observations_filter_by_resolver_asn(client, db):
-    from clickhouse_driver import Client as ClickhouseClient
-
+def test_oonidata_aggregation_observations_filter_by_resolver_asn(client, insert_rows):
     mst = datetime(2019, 3, 1, 12, tzinfo=timezone.utc)
     rows = [
-        (f"20190301120000.00000{i}_ZZ_webconnectivity_resolverasn", 0, mst, asn, "dns_nxdomain_error")
+        dict(
+            measurement_uid=f"20190301120000.00000{i}_ZZ_webconnectivity_resolverasn",
+            observation_idx=0, measurement_start_time=mst, resolver_asn=asn,
+            dns_failure="dns_nxdomain_error",
+        )
         for i, asn in enumerate([64500, 64500, 64500, 64501, 64501])
     ]
-    with ClickhouseClient.from_url(db) as click:
-        click.execute(
-            "INSERT INTO obs_web (measurement_uid, observation_idx, measurement_start_time, resolver_asn, dns_failure) VALUES",
-            rows,
-        )
+    insert_rows("obs_web", rows, delete_by="measurement_uid")
 
     params = {"resolver_asn": 64500, "since": "2019-03-01", "until": "2019-03-02"}
     response = client.get(route, params=params)

@@ -243,3 +243,28 @@ def insert_fastpath(db):
             "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
             {"tn": tn},
         )
+
+
+@pytest.fixture
+def insert_rows(db):
+    """
+    Insert rows into a table; they are deleted on teardown by the values they
+    have in the delete_by column, so that tests that run later don't see them.
+
+    The test database is shared by the whole session, and closing the
+    connection doesn't undo an INSERT.
+    """
+    inserted = []
+    with ClickhouseClient.from_url(db) as ch:
+
+        def insert(table, rows, delete_by):
+            inserted.append((table, delete_by, tuple({r[delete_by] for r in rows})))
+            # table and column names come from tests, never from user input
+            ch.execute(f"INSERT INTO {table} ({', '.join(rows[0])}) VALUES", rows)
+
+        yield insert
+        for table, column, values in inserted:
+            ch.execute(
+                f"ALTER TABLE {table} DELETE WHERE {column} IN %(values)s SETTINGS mutations_sync = 1",
+                {"values": values},
+            )
