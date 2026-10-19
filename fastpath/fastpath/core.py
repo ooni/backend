@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict
 from hashlib import sha512
+import re
 import binascii
 import logging
 import multiprocessing as mp
@@ -1649,6 +1650,12 @@ def flag_measurements_with_wrong_date(msm: dict, msmt_uid: str, scores: dict) ->
         scores["accuracy"] = 0.0
         scores["msg"] = "Measurement start time too old"
 
+# {ts}_{cc}_{test_name}_{hash}, as built by the API's measurement submission.
+# test_name is limited to the characters the collector spec allows (ooni/spec
+# backends/bk-003-collector.md), less the underscores the API removes.
+MSMT_UID_RE = re.compile(r"[0-9]{14}\.[0-9]{6}_[A-Z0-9]{2}_[0-9A-Za-z.+-]+_[0-9a-f]{16}")
+
+
 def write_measurement_to_disk(msm_tup) -> None:
     """Write this measurement to disk so that it can be
     processed by the measurement uploader
@@ -1659,6 +1666,11 @@ def write_measurement_to_disk(msm_tup) -> None:
 
     # msmt_uid is a unique id based on upload time, cc, testname and hash
     data, measurement, msmt_uid = msm_tup
+    # it names the file and its directory: only accept the format the API
+    # generates
+    if MSMT_UID_RE.fullmatch(msmt_uid) is None:
+        log.error(f"Discarding measurement with malformed msmt_uid {msmt_uid!r}")
+        return
     ts, cc, test_name, h = msmt_uid.split("_")
 
     hour = ts[:10] #only take until the hour
