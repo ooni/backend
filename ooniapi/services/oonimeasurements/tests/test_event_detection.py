@@ -125,22 +125,28 @@ def test_changepoint_field_present(client):
     resp = getj(client, "/api/v1/detector/changepoints")
     assert all('block_type' in r for r in resp['results'])
 
-def test_changepoint_list_default_window_is_relative_to_request_time(
-    client, db, fixed_time
-):
-    from clickhouse_driver import Client as ClickhouseClient
+def changepoint(domain, ts, probe_asn):
+    return dict(
+        probe_asn=probe_asn, probe_cc="ZZ", domain=domain, ts=ts,
+        count_isp_resolver=1, count_other_resolver=0, count=1, block_type="tcp_block",
+    )
 
+
+def test_changepoint_list_default_window_is_relative_to_request_time(
+    client, insert_rows, fixed_time
+):
     # fixed_time is defined in conftest.py as 2026-2-1
     # this query tests that exactly one row inserted within 30 days of fixed_time is returned
     # previously, utc_30_days_ago was evaluated at import time, before time is fixed, so the response
     # handler would return no rows.
 
-    with ClickhouseClient.from_url(db) as click:
-        click.execute(
-            "INSERT INTO event_detector_changepoints (probe_asn, probe_cc, domain, ts, count_isp_resolver, count_other_resolver, count, block_type) VALUES",
-            [(64500, "ZZ", "default-window.example.org", datetime(2026, 1, 25, tzinfo=UTC), 1, 0, 1, "tcp_block"),
-             (64500, "ZZ", "default-window.example.org", datetime(2025, 1, 25, tzinfo=UTC), 1, 0, 1, "tcp_block")],
-        )
+    domain = "default-window.example.org"
+    insert_rows(
+        "event_detector_changepoints",
+        [changepoint(domain, datetime(2026, 1, 25, tzinfo=UTC), 64500),
+         changepoint(domain, datetime(2025, 1, 25, tzinfo=UTC), 64500)],
+        delete_by="domain",
+    )
 
     resp = getj(
         client,
@@ -148,3 +154,31 @@ def test_changepoint_list_default_window_is_relative_to_request_time(
         params={"domain": "default-window.example.org"},
     )
     assert len(resp["results"]) == 1, resp
+
+
+@pytest.mark.parametrize(
+    "fixed_time", [datetime(2026, 2, 1, 15, tzinfo=UTC)], indirect=True
+)
+def test_changepoint_list_default_window_includes_today(client, insert_rows, fixed_time):
+    # until used to default to midnight, which left out the changepoints
+    # the detector wrote today
+    insert_rows(
+        "event_detector_changepoints",
+        [changepoint("today.example.org", datetime(2026, 2, 1, 12, tzinfo=UTC), 64501)],
+        delete_by="domain",
+    )
+
+    resp = getj(
+        client,
+        "/api/v1/detector/changepoints",
+        params={"domain": "today.example.org"},
+    )
+    assert len(resp["results"]) == 1, resp
+
+
+def test_changepoint_list_newest_first(client):
+    resp = getjsu(client, "/api/v1/detector/changepoints")
+
+    times = [parse_dt(r["start_time"]) for r in resp["results"]]
+    assert len(times) > 1, "Not enough data to validate"
+    assert times == sorted(times, reverse=True), times
