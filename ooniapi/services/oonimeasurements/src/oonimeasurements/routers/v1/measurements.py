@@ -875,7 +875,7 @@ async def list_measurements(
 
     # Cursor-based pagination. If cont is provided, it takes precedence over
     # offset
-    cont_where = cont_before = None
+    cont_where = past_cont_time = None
     if cont is not None:
         offset = 0
         # Direction of the comparator operators depends on the sorting order:
@@ -891,7 +891,7 @@ async def list_measurements(
             (measurement_start_time {cont_x} :cont_start_time OR measurement_uid {cont_x} :cont_msmt_uid)
             """
         )
-        cont_before = sql.text(f"measurement_start_time {cont_x} :cont_start_time")
+        past_cont_time = sql.text(f"measurement_start_time {cont_x} :cont_start_time")
         try:
             cont_start_time, cont_msmt_uid = _parse_cont(cont)
         except ValueError as e:
@@ -924,64 +924,48 @@ async def list_measurements(
 
     # Ordering by measurement_start_time alone, which leads the table's sort
     # key, lets ClickHouse stop reading once it has a page; adding
-    # measurement_uid makes it read every row the filters match. So find
-    # the times on the page first, reading only the columns the filters
-    # need, then read the page's rows, ordered by time and uid, from the
-    # granules holding those times. Every match at a time on the page,
-    # including the times cut off at its end, is read again, so the page is
-    # the same as ordering every match by time and uid.
+    # measurement_uid makes it read every row the filters match. So a
+    # subquery finds the times on the page, reading only the columns the
+    # filters need, and the query reads the rows at those times, ordered by
+    # time and uid. Every match at a time on the page, including the times
+    # cut off at its end, is read again, so the page is the same as ordering
+    # every match by time and uid.
     times_where = list(fpwhere)
-    if cont_before is not None:
-        # the rows at the cursor's time are always read again below
-        times_where.append(cont_before)
-    times_query = (
-        select(text("measurement_start_time"))
+    if past_cont_time is not None:
+        times_where.append(past_cont_time)
+    page_times = (
+        select(column("measurement_start_time"))
         .where(and_(*times_where))
         .select_from(fpq_table)
         .order_by(text(f"measurement_start_time {order}"))
-        .limit(offset + limit)
+        .limit(sql.bindparam("times_limit"))
     )
-    log.debug(f"list measurements, times: {times_query}")
+    on_page = column("measurement_start_time").in_(page_times)
+    if cont is not None:
+        # the rows at the cursor's time are always read again
+        on_page = sql.or_(on_page, sql.text("measurement_start_time = :cont_start_time"))
 
     rows_where = list(fpwhere)
     if cont_where is not None:
         rows_where.append(cont_where)
-    rows_where.append(sql.text("measurement_start_time IN :page_times"))
+    rows_where.append(on_page)
     # Sorting by measurement_uid helps to make the sorting deterministic
     query = (
         select("*")
         .where(and_(*rows_where))
         .select_from(fpq_table)
         .order_by(text(f"measurement_start_time {order}, measurement_uid {order}"))
-        .offset(offset)
-        .limit(limit)
+        .offset(sql.bindparam("offset"))
+        .limit(sql.bindparam("limit"))
     )
     log.debug(f"list measurements: {query}")
+    query_params.update(times_limit=offset + limit, offset=offset, limit=limit)
 
     # Run the query, generate the results list
     iter_start_time = time.time()
 
     try:
-        times = await async_query_click(
-            db,
-            times_query,
-            dict(query_params, param_1=offset + limit),
-        )
-        page_times = {r["measurement_start_time"] for r in times}
-        if cont is not None:
-            page_times.add(query_params["cont_start_time"])
-        rows = []
-        if page_times:
-            rows = await async_query_click(
-                db,
-                query,
-                dict(
-                    query_params,
-                    page_times=sorted(page_times),
-                    param_1=limit,
-                    param_2=offset,
-                ),
-            )
+        rows = await async_query_click(db, query, query_params)
         results = []
         for row in rows:
             msmt_uid = row["measurement_uid"]
