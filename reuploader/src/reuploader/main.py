@@ -140,9 +140,12 @@ def main():
     with requests.Session() as client:
         remaining = BATCH_SIZE
         try:
-            for prefix, subs, objs in walk(s3, client, BUCKET_NAME, ""):
+            for prefix, subs, objs in walk(s3, client, BUCKET_NAME, PREFIX):
                 logger.info("PREFIX: %s  subdirs=%d objects=%d", prefix, len(subs), len(objs))
                 for key in objs:
+                    if not key.endswith(".post"):
+                        logger.debug("Skipping %s: not a measurement", key)
+                        continue
                     key, err = process_postcan(s3, client, BUCKET_NAME, key)
                     if err:
                         logger.warning("Failed to process %s: %s", key, err)
