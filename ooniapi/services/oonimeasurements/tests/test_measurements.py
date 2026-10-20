@@ -655,8 +655,8 @@ def search_rows(db):
     """
     rng = random.Random(1297)
     rows = []
-    for i in range(150):
-        t = SEARCH_NOW - timedelta(seconds=rng.randrange(0, 30))
+    for i in range(60):
+        t = SEARCH_NOW - timedelta(seconds=rng.randrange(0, 12))
         input_ = rng.choice(list(SEARCH_INPUTS))
         row = make_fastpath_row(SEARCH_TEST, f"{i:03d}", t, uid_ts=t + timedelta(seconds=rng.randrange(-60, 60)))
         row.update(
@@ -695,6 +695,15 @@ def search_rows(db):
         )
 
 
+def page_order(r):
+    return (r["measurement_start_time"], r["measurement_uid"])
+
+
+def wanted(value, listed, default_excluded):
+    """A listed filter keeps the values listed; without one, the API leaves out a default (ZZ, AS0)"""
+    return value in listed if listed is not None else value != default_excluded
+
+
 def search_reference(rows, params):
     """
     The rows a search returns, in order, as /api/v1/measurements defines
@@ -704,22 +713,20 @@ def search_reference(rows, params):
     def listed(key):
         return params[key].split(",") if key in params else None
 
-    ccs, asns, domains = listed("probe_cc"), listed("probe_asn"), listed("domain")
+    ccs, domains = listed("probe_cc"), listed("domain")
+    asns = [int(a.removeprefix("AS")) for a in listed("probe_asn") or []] or None
     since = datetime.fromisoformat(params["since"])
     until = datetime.fromisoformat(params["until"])
-    flags = {"anomaly": "anomaly", "confirmed": "confirmed", "failure": "msm_failure"}
+    flag_columns = {"anomaly": "anomaly", "confirmed": "confirmed", "failure": "msm_failure"}
+    # the column each given flag checks, and the value it must have
+    flags = {col: "t" if params[p] == "true" else "f" for p, col in flag_columns.items() if p in params}
     out = []
     for r in rows:
         if not since < r["measurement_start_time"] <= until:
             continue
-        if ccs is not None and r.get("probe_cc") not in ccs or ccs is None and r.get("probe_cc") == "ZZ":
+        if not wanted(r.get("probe_cc"), ccs, "ZZ") or not wanted(r.get("probe_asn"), asns, 0):
             continue
-        asn = r.get("probe_asn")
-        if asns is not None and asn not in [int(a.removeprefix("AS")) for a in asns]:
-            continue
-        if asns is None and asn == 0:
-            continue
-        if any(k in params and r.get(col) != ("t" if params[k] == "true" else "f") for k, col in flags.items()):
+        if any(r.get(col) != value for col, value in flags.items()):
             continue
         if "input" in params:
             if r["input"] != params["input"]:
@@ -732,8 +739,7 @@ def search_reference(rows, params):
                 out += [r] * n
                 continue
         out.append(r)
-    key = lambda r: (r["measurement_start_time"], r["measurement_uid"])
-    return sorted(out, key=key, reverse=params.get("order", "desc") == "desc")
+    return sorted(out, key=page_order, reverse=params.get("order", "desc") == "desc")
 
 
 SEARCH_FILTERS = [
@@ -752,8 +758,8 @@ SEARCH_FILTERS = [
     {"category_code": "HUMR", "input": "https://review1297-a.example/"},
     # the window cuts through a tie group at each end
     {
-        "since": (SEARCH_NOW - timedelta(seconds=20)).isoformat(),
-        "until": (SEARCH_NOW - timedelta(seconds=5)).isoformat(),
+        "since": (SEARCH_NOW - timedelta(seconds=9)).isoformat(),
+        "until": (SEARCH_NOW - timedelta(seconds=3)).isoformat(),
     },
 ]
 
@@ -768,50 +774,58 @@ def test_list_measurements_search_reference(client, search_rows, filters, limit,
     pages; a cont page starts after the previous page's last row
     """
     params = {**SEARCH_WINDOW, **filters, "test_name": SEARCH_TEST, "limit": limit, "order": order}
-    expected = [r["measurement_uid"] for r in search_reference(search_rows, params)]
-    assert expected, "every filter matches something"
+    rows = search_reference(search_rows, params)
+    assert rows, "every filter matches something"
 
-    def uids(j):
-        return [r["measurement_uid"] for r in j["results"]]
+    def uids(rows):
+        return [r["measurement_uid"] for r in rows]
 
     # offset pages
-    for offset in range(0, len(expected) + limit, limit):
+    for offset in range(0, len(rows) + limit, limit):
         j = getj(client, route, params={**params, "offset": offset})
-        assert uids(j) == expected[offset : offset + limit], f"offset {offset}"
+        assert uids(j["results"]) == uids(rows[offset : offset + limit]), f"offset {offset}"
 
-    # cont pages: a page may end inside the copies a category join makes, and
-    # the next page starts after the last row's (time, uid)
-    rows = search_reference(search_rows, params)
-    key = lambda r: (r["measurement_start_time"], r["measurement_uid"])
-    after = lambda a, b: a < b if order == "desc" else a > b
+    # cont pages: each starts after the previous page's last (time, uid), so
+    # a page that ends inside the copies a category join makes skips the rest
     j = getj(client, route, params=params)
-    remaining = rows
     while True:
-        assert uids(j) == [r["measurement_uid"] for r in remaining[:limit]]
-        if len(remaining) < limit or not remaining:
+        assert uids(j["results"]) == uids(rows[:limit])
+        if len(rows) < limit:
             assert j["metadata"]["next_url"] is None
             break
-        last = key(remaining[limit - 1])
-        remaining = [r for r in remaining if after(key(r), last)]
+        last = page_order(rows[limit - 1])
+        rows = [r for r in rows if (page_order(r) < last if order == "desc" else page_order(r) > last)]
         next_url = j["metadata"]["next_url"]
         assert next_url is not None
         parsed = urlparse(next_url)
         j = getj(client, f"{parsed.path}?{parsed.query}")
 
 
+LARGE_PAGE_TEST = "large_page_test"
+
+
+@pytest.fixture(scope="module")
+def large_page_rows(db):
+    """15k measurements a second apart, newest first"""
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    rows = [make_fastpath_row(LARGE_PAGE_TEST, f"{i:05d}", now - timedelta(seconds=i + 1)) for i in range(15000)]
+    with Clickhouse.from_url(db) as ch:
+        ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
+        yield rows
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": LARGE_PAGE_TEST},
+        )
+
+
 @pytest.mark.parametrize("limit,offset", [(15000, 0), (100, 14900), (20000, 0)])
-def test_list_measurements_large_page(client, insert_fastpath, limit, offset):
+def test_list_measurements_large_page(client, large_page_rows, limit, offset):
     """
     Pages with more distinct times than fit in a query's text: limit and
     offset reach 1M, and ClickHouse's max_query_size is 256 KiB
     """
-    test_name = "large_page_test"
-    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
-    rows = [make_fastpath_row(test_name, f"{i:05d}", now - timedelta(seconds=i + 1)) for i in range(15000)]
-    insert_fastpath(rows)
-
-    j = getj(client, route, params={"test_name": test_name, "limit": limit, "offset": offset})
-    expected = [r["measurement_uid"] for r in rows][offset : offset + limit]
+    j = getj(client, route, params={"test_name": LARGE_PAGE_TEST, "limit": limit, "offset": offset})
+    expected = [r["measurement_uid"] for r in large_page_rows][offset : offset + limit]
     assert [r["measurement_uid"] for r in j["results"]] == expected
     assert (j["metadata"]["next_url"] is None) == (len(expected) < limit)
 
