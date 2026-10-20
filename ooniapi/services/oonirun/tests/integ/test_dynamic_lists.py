@@ -2,12 +2,7 @@ from copy import deepcopy
 from oonirun.common.clickhouse_utils import insert_click
 import pytest
 from ..test_oonirun import SAMPLE_OONIRUN, SAMPLE_META
-
-
-def postj(client, url, **kw):
-    response = client.post(url, json=kw)
-    assert response.status_code == 200
-    return response.json()
+from ..utils import postj
 
 
 def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
@@ -19,7 +14,7 @@ def test_engine_descriptor_basic(client, client_with_user_role, url_priorities):
     z["nettests"] = z["nettests"][:1]
 
     # Create a link
-    j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
     orlid = j["oonirun_link_id"]
 
     # Get link
@@ -45,13 +40,13 @@ def test_check_in_url_category_news(client, client_with_user_role, url_prioritie
     z["nettests"] = z["nettests"][:1]
 
     # Create a link
-    j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
     orlid = j["oonirun_link_id"]
 
     # fetch the link
     meta = deepcopy(SAMPLE_META)
     meta["website_category_codes"] = ["NEWS"]
-    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", json=meta)
     inputs = j["nettests"][0]["inputs"]
     inputs_extra = j["nettests"][0]["inputs_extra"]
     assert len(inputs), inputs
@@ -74,7 +69,7 @@ def test_prioritization_with_measurements(
     z["nettests"] = z["nettests"][:1]
 
     # Create a link
-    j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
     orlid = j["oonirun_link_id"]
 
     # fetch the link
@@ -82,7 +77,7 @@ def test_prioritization_with_measurements(
     # In ES we have more measurements for twitter, (see tests/fixtures/data/measurements.json)
     # so twitter should NOT show up first
     meta["probe_cc"] = "ES"
-    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", json=meta)
     inputs = j["nettests"][0]["inputs"]
     assert len(inputs), inputs
     assert "twitter.com" not in inputs[0], "Twitter should not be the first one"
@@ -90,7 +85,7 @@ def test_prioritization_with_measurements(
     # Twitter with a different asn can be first
     meta["probe_cc"] = "ES"
     meta["probe_asn"] = "AS9999"
-    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", json=meta)
     inputs = j["nettests"][0]["inputs"]
     assert len(inputs), inputs
     assert "twitter.com" in inputs[0], "Twitter should be the first one"
@@ -98,7 +93,7 @@ def test_prioritization_with_measurements(
     # Similarly, in IT twitter should be first, and facebook last
     meta["probe_cc"] = "IT"
     meta["probe_asn"] = "AS1234"
-    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", json=meta)
     inputs = j["nettests"][0]["inputs"]
     assert len(inputs), inputs
     assert "twitter.com" in inputs[0], "Twitter should be the first one"
@@ -120,12 +115,12 @@ def test_priorities_basic(
     z["nettests"] = z["nettests"][:1]
 
     # Create a link
-    j = postj(client_with_user_role, "/api/v2/oonirun/links", **z)
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
     orlid = j["oonirun_link_id"]
 
     meta = deepcopy(SAMPLE_META)
     meta["probe_cc"] = "ES"
-    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", **meta)
+    j = postj(client, f"/api/v2/oonirun/links/{orlid}/engine-descriptor/latest", json=meta)
     inputs = j["nettests"][0]["inputs"]
     assert len(inputs), inputs
     assert "ooni.org" in inputs[0], "Ooni should be the first one"
