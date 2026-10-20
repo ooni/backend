@@ -675,24 +675,24 @@ def search_rows(db):
         row.update(domain="", anomaly="f", confirmed="f", msm_failure="f")
         rows.append(row)
 
-    ch = Clickhouse.from_url(db)
-    ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
-    ch.execute(
-        "INSERT INTO citizenlab (domain, url, cc, category_code) VALUES",
-        [
-            {"domain": SEARCH_INPUTS[url], "url": url, "cc": f"C{n}", "category_code": cat}
-            for url, cats in SEARCH_CITIZENLAB.items()
-            for n, cat in enumerate(cats)
-        ],
-    )
-    yield rows
-    ch.execute(
-        "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
-        {"tn": SEARCH_TEST},
-    )
-    ch.execute(
-        "ALTER TABLE citizenlab DELETE WHERE domain LIKE 'review1297-%%' SETTINGS mutations_sync = 1"
-    )
+    with Clickhouse.from_url(db) as ch:
+        ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
+        ch.execute(
+            "INSERT INTO citizenlab (domain, url, cc, category_code) VALUES",
+            [
+                {"domain": SEARCH_INPUTS[url], "url": url, "cc": f"C{n}", "category_code": cat}
+                for url, cats in SEARCH_CITIZENLAB.items()
+                for n, cat in enumerate(cats)
+            ],
+        )
+        yield rows
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": SEARCH_TEST},
+        )
+        ch.execute(
+            "ALTER TABLE citizenlab DELETE WHERE domain LIKE 'review1297-%%' SETTINGS mutations_sync = 1"
+        )
 
 
 def search_reference(rows, params):
