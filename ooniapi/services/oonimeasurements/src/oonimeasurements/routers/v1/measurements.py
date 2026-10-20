@@ -875,14 +875,14 @@ async def list_measurements(
 
     # Cursor-based pagination. If cont is provided, it takes precedence over
     # offset
-    cont_where = past_cont_time = None
+    after_cont = after_cont_time = None
     if cont is not None:
         offset = 0
         # Direction of the comparator operators depends on the sorting order:
         # order desc -> <, <=
         # order asc -> >, >=
         cont_x, cont_xe = ('<', '<=') if order.lower() == 'desc' else ('>', '>=')
-        cont_where = sql.text(
+        after_cont = sql.text(
             # Tuple comparison breaks indexing, so we have to specify the
             # lexicographical comparision manually to leverage the table
             # index
@@ -891,7 +891,7 @@ async def list_measurements(
             (measurement_start_time {cont_x} :cont_start_time OR measurement_uid {cont_x} :cont_msmt_uid)
             """
         )
-        past_cont_time = sql.text(f"measurement_start_time {cont_x} :cont_start_time")
+        after_cont_time = sql.text(f"measurement_start_time {cont_x} :cont_start_time")
         try:
             cont_start_time, cont_msmt_uid = _parse_cont(cont)
         except ValueError as e:
@@ -922,17 +922,15 @@ async def list_measurements(
             )
             fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
-    # Ordering by measurement_start_time alone, which leads the table's sort
-    # key, lets ClickHouse stop reading once it has a page; adding
-    # measurement_uid makes it read every row the filters match. So a
-    # subquery finds the times on the page, reading only the columns the
-    # filters need, and the query reads the rows at those times, ordered by
-    # time and uid. Every match at a time on the page, including the times
-    # cut off at its end, is read again, so the page is the same as ordering
-    # every match by time and uid.
+    # Ordering by measurement_start_time alone, the table's first sort key,
+    # lets ClickHouse stop reading once it has a page; ordering by
+    # measurement_uid too makes it read and sort every match. So a subquery
+    # finds the page's times, reading only the columns the filters need, and
+    # the query reads every match at those times and orders them by time and
+    # uid, which gives the same page.
     times_where = list(fpwhere)
-    if past_cont_time is not None:
-        times_where.append(past_cont_time)
+    if after_cont_time is not None:
+        times_where.append(after_cont_time)
     page_times = (
         select(column("measurement_start_time"))
         .where(and_(*times_where))
@@ -942,12 +940,14 @@ async def list_measurements(
     )
     on_page = column("measurement_start_time").in_(page_times)
     if cont is not None:
-        # the rows at the cursor's time are always read again
+        # The subquery skips the cursor's time, as the rows there that earlier
+        # pages returned would take places in its LIMIT; the rest of them are
+        # read here.
         on_page = sql.or_(on_page, sql.text("measurement_start_time = :cont_start_time"))
 
     rows_where = list(fpwhere)
-    if cont_where is not None:
-        rows_where.append(cont_where)
+    if after_cont is not None:
+        rows_where.append(after_cont)
     rows_where.append(on_page)
     # Sorting by measurement_uid helps to make the sorting deterministic
     query = (
