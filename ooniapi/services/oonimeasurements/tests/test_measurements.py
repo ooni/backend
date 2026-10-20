@@ -52,31 +52,31 @@ def test_list_measurements(client):
 @freeze_time("2024-01-30T00:00:00Z")
 def test_list_measurements_verification_status(client, db):
     """List API verification_status must match fastpath.is_verified codes."""
-    ch = Clickhouse.from_url(db)
     response = client.get(route, params={"limit": 50})
     assert response.status_code == 200
 
     results = response.json()["results"]
     assert results
 
-    for result in results:
-        uid = result["measurement_uid"]
-        assert "verification_status" in result
-        row = query_click_one_row(
-            ch,
-            sql.text(
-                "SELECT is_verified FROM fastpath "
-                "WHERE measurement_uid = :uid LIMIT 1"
-            ),
-            {"uid": uid},
-        )
-        assert row, f"no fastpath row for {uid}"
-        is_verified = row["is_verified"]
-        expected = VerificationStatus.from_code(is_verified).value
-        assert result["verification_status"] == expected, (
-            f"{uid}: is_verified={is_verified} expected {expected}, "
-            f"got {result['verification_status']}"
-        )
+    with Clickhouse.from_url(db) as ch:
+        for result in results:
+            uid = result["measurement_uid"]
+            assert "verification_status" in result
+            row = query_click_one_row(
+                ch,
+                sql.text(
+                    "SELECT is_verified FROM fastpath "
+                    "WHERE measurement_uid = :uid LIMIT 1"
+                ),
+                {"uid": uid},
+            )
+            assert row, f"no fastpath row for {uid}"
+            is_verified = row["is_verified"]
+            expected = VerificationStatus.from_code(is_verified).value
+            assert result["verification_status"] == expected, (
+                f"{uid}: is_verified={is_verified} expected {expected}, "
+                f"got {result['verification_status']}"
+            )
 
 @freeze_time("2024-03-01T00:00:00Z")
 def test_list_measurements_with_since_and_until(client):
@@ -192,26 +192,25 @@ def test_list_measurements_with_multiple_values_to_filters_not_in_the_result(cli
 
 
 def test_failure_format(db):
-    ch = Clickhouse.from_url(db)
-
-    msm = (
-        query_click_one_row(
-            ch,
-            "SELECT * FROM fastpath WHERE test_name = 'web_connectivity' LIMIT 1",
-            {},
+    with Clickhouse.from_url(db) as ch:
+        msm = (
+            query_click_one_row(
+                ch,
+                "SELECT * FROM fastpath WHERE test_name = 'web_connectivity' LIMIT 1",
+                {},
+            )
+            or {}
         )
-        or {}
-    )
-    uid = msm["measurement_uid"]
+        uid = msm["measurement_uid"]
 
-    q = """
-    SELECT * FROM fastpath
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE measurement_uid = :uid
-        LIMIT 1
-    """
-    query_params = dict(uid=uid)
-    row = query_click_one_row(ch, sql.text(q), query_params, query_prio=3) or {}
+        q = """
+        SELECT * FROM fastpath
+            LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+            WHERE measurement_uid = :uid
+            LIMIT 1
+        """
+        query_params = dict(uid=uid)
+        row = query_click_one_row(ch, sql.text(q), query_params, query_prio=3) or {}
 
     # Validation shouldn't crash
     format_msmt_meta(row)

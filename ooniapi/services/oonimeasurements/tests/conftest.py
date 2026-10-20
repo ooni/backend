@@ -230,19 +230,19 @@ def insert_fastpath(db):
     Note that we can't truncate fastpath as it has fixtures that other tests
     might need, so we delete only the entries inserted by the test
     """
-    ch = ClickhouseClient.from_url(db)
     test_names = set()
+    with ClickhouseClient.from_url(db) as ch:
 
-    def insert(rows):
-        test_names.update(r["test_name"] for r in rows)
-        ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
+        def insert(rows):
+            test_names.update(r["test_name"] for r in rows)
+            ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
 
-    yield insert
-    for tn in test_names:
-        ch.execute(
-            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
-            {"tn": tn},
-        )
+        yield insert
+        for tn in test_names:
+            ch.execute(
+                "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+                {"tn": tn},
+            )
 
 
 @pytest.fixture
