@@ -191,16 +191,23 @@ def measurement_uid_to_s3path_linenum(db: ClickhouseClient, measurement_uid: str
     """
     Fetch measurement S3 location using measurement_uid
     """
-    # TODO: cleanup this
-    query = """SELECT s3path, linenum FROM jsonl
-        PREWHERE (report_id, input) IN (
-            SELECT report_id, input FROM fastpath WHERE measurement_uid = :uid {window}
-        )
-        LIMIT 1"""
+    # Found in fastpath first, so that a measurement jsonl doesn't have yet
+    # isn't searched for in all of fastpath.
     # {window} is filled by _query_one_in_windows
-    lookup = _query_one_in_windows(
+    query = """SELECT report_id, input FROM fastpath
+        WHERE measurement_uid = :uid {window}
+        LIMIT 1"""
+    msmt = _query_one_in_windows(
         db, query, dict(uid=measurement_uid), _uid_lookup_windows(measurement_uid)
     )
+    if msmt is None:
+        raise MeasurementNotFound
+
+    # jsonl's primary key starts with (report_id, input)
+    query = """SELECT s3path, linenum FROM jsonl
+        WHERE report_id = :report_id AND input = :input
+        LIMIT 1"""
+    lookup = query_click_one_row(db, sql.text(query), msmt, query_prio=3)
     if lookup is None:
         raise MeasurementNotFound
 
