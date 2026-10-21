@@ -855,3 +855,22 @@ def test_s3path_lookup_by_uid(db, uid_lookup_rows, insert_jsonl, name):
     with Clickhouse.from_url(db) as ch:
         assert measurements.measurement_uid_to_s3path_linenum(ch, expected["measurement_uid"]) == (s3path, 7)
 
+
+def test_lookups_query_the_first_window_only_when_it_finds_the_row(db, uid_lookup_rows, monkeypatch):
+    queries = []
+
+    def recording_query_click_one_row(db, query, params, query_prio):
+        queries.append(str(query))
+        return query_click_one_row(db, query, params, query_prio)
+
+    monkeypatch.setattr(measurements, "query_click_one_row", recording_query_click_one_row)
+    row = uid_lookup_rows["minute"]
+    with Clickhouse.from_url(db) as ch:
+        measurements._get_measurement_meta_by_uid(ch, row["measurement_uid"])
+        measurements._get_measurement_meta_clickhouse(ch, row["report_id"], row["input"])
+        # jsonl doesn't have the measurement yet
+        with pytest.raises(type(measurements.MeasurementNotFound)):
+            measurements.measurement_uid_to_s3path_linenum(ch, row["measurement_uid"])
+
+    assert ["BETWEEN" in q and "fastpath" in q for q in queries] == [True, True, True, False]
+    assert "FROM jsonl" in queries[-1]
