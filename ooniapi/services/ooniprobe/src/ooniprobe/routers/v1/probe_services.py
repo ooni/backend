@@ -681,7 +681,8 @@ class GeoLookupResult(BaseModel):
 
 class GeoLookupRequest(BaseModel):
     addresses: List[IPvAnyAddress] = Field(
-        description="list of IPv4 or IPv6 address to geolookup"
+        description="list of IPv4 or IPv6 address to geolookup",
+        examples=[["8.8.8.8", "2001:4860:4860::8888"]],
     )
 
 
