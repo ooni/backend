@@ -875,23 +875,23 @@ async def list_measurements(
 
     # Cursor-based pagination. If cont is provided, it takes precedence over
     # offset
+    after_cont = after_cont_time = None
     if cont is not None:
         offset = 0
         # Direction of the comparator operators depends on the sorting order:
         # order desc -> <, <=
         # order asc -> >, >=
         cont_x, cont_xe = ('<', '<=') if order.lower() == 'desc' else ('>', '>=')
-        fpwhere.append(
-            sql.text(
-                # Tuple comparison breaks indexing, so we have to specify the
-                # lexicographical comparision manually to leverage the table
-                # index
-                f"""
-                measurement_start_time {cont_xe} :cont_start_time AND
-                (measurement_start_time {cont_x} :cont_start_time OR measurement_uid {cont_x} :cont_msmt_uid)
-                """
-            )
+        after_cont = sql.text(
+            # Tuple comparison breaks indexing, so we have to specify the
+            # lexicographical comparision manually to leverage the table
+            # index
+            f"""
+            measurement_start_time {cont_xe} :cont_start_time AND
+            (measurement_start_time {cont_x} :cont_start_time OR measurement_uid {cont_x} :cont_msmt_uid)
+            """
         )
+        after_cont_time = sql.text(f"measurement_start_time {cont_x} :cont_start_time")
         try:
             cont_start_time, cont_msmt_uid = _parse_cont(cont)
         except ValueError as e:
@@ -922,19 +922,44 @@ async def list_measurements(
             )
             fpwhere.append(sql.text("citizenlab.category_code = :category_code"))
 
-    fp_query = select("*").where(and_(*fpwhere)).select_from(fpq_table)
-
-    # Sorting by measurement_uid helps to make the sorting deterministic
-    fp_query = fp_query.order_by(
-        text(f"measurement_start_time {order}, measurement_uid {order}")
+    # Ordering by measurement_start_time alone, the table's first sort key,
+    # lets ClickHouse stop reading once it has a page; ordering by
+    # measurement_uid too makes it read and sort every match. So a subquery
+    # finds the page's times, reading only the columns the filters need, and
+    # the query reads every match at those times and orders them by time and
+    # uid, which gives the same page.
+    times_where = list(fpwhere)
+    if after_cont_time is not None:
+        times_where.append(after_cont_time)
+    page_times = (
+        select(column("measurement_start_time"))
+        .where(and_(*times_where))
+        .select_from(fpq_table)
+        .order_by(text(f"measurement_start_time {order}"))
+        .limit(sql.bindparam("times_limit"))
     )
+    on_page = column("measurement_start_time").in_(page_times)
+    if cont is not None:
+        # The subquery skips the cursor's time, as the rows there that earlier
+        # pages returned would take places in its LIMIT; the rest of them are
+        # read here.
+        on_page = sql.or_(on_page, sql.text("measurement_start_time = :cont_start_time"))
 
-    # Assemble the "external" query. Run a final order by followed by limit and
-    # offset
-    query = fp_query.offset(offset).limit(limit)
+    rows_where = list(fpwhere)
+    if after_cont is not None:
+        rows_where.append(after_cont)
+    rows_where.append(on_page)
+    # Sorting by measurement_uid helps to make the sorting deterministic
+    query = (
+        select("*")
+        .where(and_(*rows_where))
+        .select_from(fpq_table)
+        .order_by(text(f"measurement_start_time {order}, measurement_uid {order}"))
+        .offset(sql.bindparam("offset"))
+        .limit(sql.bindparam("limit"))
+    )
     log.debug(f"list measurements: {query}")
-    query_params["param_1"] = limit
-    query_params["param_2"] = offset
+    query_params.update(times_limit=offset + limit, offset=offset, limit=limit)
 
     # Run the query, generate the results list
     iter_start_time = time.time()
