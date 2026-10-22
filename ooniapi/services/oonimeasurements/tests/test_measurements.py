@@ -765,3 +765,112 @@ def test_list_measurements_pagination_pins_default_window(client, insert_fastpat
     got += [r["measurement_uid"] for r in j["results"]]
 
     assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
+
+
+def uid_lookup_row(name, start, input="https://uid-lookup.example.org/"):
+    return {
+        "measurement_uid": f"20190501120000.000000_IT_uidlookup_{name}",
+        "report_id": f"20190501T120000Z_uidlookup_IT_3269_n1_{name}",
+        "input": input,
+        "probe_cc": "IT",
+        "probe_asn": 3269,
+        "test_name": "uid_lookup",
+        "measurement_start_time": start,
+        "scores": "{}",
+    }
+
+
+# Their measurement_uid and report_id say 2019-05-01 12:00:00
+UID_LOOKUP_ROWS = {
+    # starts a minute before: the first window finds it
+    "minute": uid_lookup_row("minute", datetime(2019, 5, 1, 11, 59)),
+    # starts 6 h before: the second window finds it
+    "hours": uid_lookup_row("hours", datetime(2019, 5, 1, 6, 0)),
+    # starts a month before: only the unbounded query finds it
+    "month": uid_lookup_row("month", datetime(2019, 4, 1, 12, 0)),
+    # a test without input, starting 30 s after: the first window finds it
+    "noinput": uid_lookup_row("noinput", datetime(2019, 5, 1, 12, 0, 30), input=""),
+}
+
+
+@pytest.fixture
+def uid_lookup_rows(insert_fastpath):
+    insert_fastpath(list(UID_LOOKUP_ROWS.values()))
+    return UID_LOOKUP_ROWS
+
+
+@pytest.fixture
+def insert_jsonl(db):
+    """Inserts rows into jsonl, deleted on teardown"""
+    ch = Clickhouse.from_url(db)
+    uids = []
+
+    def insert(rows):
+        uids.extend(r["measurement_uid"] for r in rows)
+        ch.execute(f"INSERT INTO jsonl ({', '.join(rows[0])}) VALUES", rows)
+
+    yield insert
+    ch.execute(
+        "ALTER TABLE jsonl DELETE WHERE measurement_uid IN %(uids)s SETTINGS mutations_sync = 1",
+        {"uids": uids},
+    )
+    ch.disconnect()
+
+
+@pytest.mark.parametrize("name", ["minute", "hours", "month"])
+def test_measurement_meta_by_uid(client, uid_lookup_rows, name):
+    expected = uid_lookup_rows[name]
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": expected["measurement_uid"]})
+    assert response.status_code == 200, response.text
+    meta = response.json()
+    assert meta["measurement_uid"] == expected["measurement_uid"]
+    assert meta["report_id"] == expected["report_id"]
+    assert meta["measurement_start_time"] == expected["measurement_start_time"].strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_measurement_meta_by_uid_without_timestamp_prefix(client):
+    response = client.get("/api/v1/measurement_meta", params={"measurement_uid": "not-a-timestamp-uid"})
+    assert response.status_code == 200, response.text
+    assert response.json() == {}
+
+
+@pytest.mark.parametrize("name", ["minute", "hours", "month", "noinput"])
+def test_measurement_meta_by_report_id(client, uid_lookup_rows, name):
+    expected = uid_lookup_rows[name]
+    params = {"report_id": expected["report_id"]}
+    if expected["input"]:
+        params["input"] = expected["input"]
+    response = client.get("/api/v1/measurement_meta", params=params)
+    assert response.status_code == 200, response.text
+    meta = response.json()
+    assert meta["measurement_uid"] == expected["measurement_uid"]
+    assert meta["report_id"] == expected["report_id"]
+
+
+@pytest.mark.parametrize("name", ["minute", "hours", "month"])
+def test_s3path_lookup_by_uid(db, uid_lookup_rows, insert_jsonl, name):
+    expected = uid_lookup_rows[name]
+    s3path = f"raw/20190501/12/IT/uidlookup/{name}.jsonl.gz"
+    insert_jsonl([{k: expected[k] for k in ("report_id", "input", "measurement_uid")} | {"s3path": s3path, "linenum": 7}])
+    with Clickhouse.from_url(db) as ch:
+        assert measurements.measurement_uid_to_s3path_linenum(ch, expected["measurement_uid"]) == (s3path, 7)
+
+
+def test_lookups_query_the_first_window_only_when_it_finds_the_row(db, uid_lookup_rows, monkeypatch):
+    queries = []
+
+    def recording_query_click_one_row(db, query, params, query_prio):
+        queries.append(str(query))
+        return query_click_one_row(db, query, params, query_prio)
+
+    monkeypatch.setattr(measurements, "query_click_one_row", recording_query_click_one_row)
+    row = uid_lookup_rows["minute"]
+    with Clickhouse.from_url(db) as ch:
+        measurements._get_measurement_meta_by_uid(ch, row["measurement_uid"])
+        measurements._get_measurement_meta_clickhouse(ch, row["report_id"], row["input"])
+        # jsonl doesn't have the measurement yet
+        with pytest.raises(type(measurements.MeasurementNotFound)):
+            measurements.measurement_uid_to_s3path_linenum(ch, row["measurement_uid"])
+
+    assert ["BETWEEN" in q and "fastpath" in q for q in queries] == [True, True, True, False]
+    assert "FROM jsonl" in queries[-1]
