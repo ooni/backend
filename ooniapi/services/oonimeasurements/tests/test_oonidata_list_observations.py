@@ -10,12 +10,13 @@ measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
     [
         {},
         {"since": "2024-11-01", "until": "2024-11-02"},
+        {"report_id": "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"},
         {"probe_cc": "DE"},
     ],
 )
-def test_list_obs_without_report_id_or_measurement_uid_fails(client, params):
+def test_list_obs_without_measurement_uid_fails(client, params):
     response = client.get(route, params=params)
-    assert response.status_code == 400, response.json()
+    assert response.status_code == 422, response.json()
 
 
 def test_list_obs_measurement_uid_only(client):
@@ -30,18 +31,6 @@ def test_list_obs_measurement_uid_only(client):
     assert len(j["results"]) > 0
     for row in j["results"]:
         assert row["measurement_uid"] == measurement_uid, row
-
-
-def test_list_obs_report_id_only(client):
-    report_id = "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"
-
-    by_report = client.get(route, params={"report_id": report_id})
-    assert by_report.status_code == 200
-    j = by_report.json()
-    assert isinstance(j["results"], list), j
-    assert len(j["results"]) > 0
-    for row in j["results"]:
-        assert row["report_id"] == report_id, row
 
 
 def test_list_obs_measurement_uid_with_explicit_since_and_until(client):
@@ -65,7 +54,6 @@ def test_list_obs_measurement_uid_with_explicit_since_and_until(client):
 @pytest.mark.parametrize(
     "filter_name, filter_value",
     [
-        ("report_id", "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"),
         ("probe_asn", 3209),
         ("probe_cc", "DE"),
         ("software_name", "ooniprobe-android-unattended"),
