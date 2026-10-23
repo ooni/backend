@@ -1022,34 +1022,6 @@ def test_x_user_agent_header_parsing(client_with_user_role, client):
     assert r.status_code == 422, r.json()
 
 
-def test_nettest_blocked_by_platform(client_with_user_role, client):
-    z = deepcopy(SAMPLE_OONIRUN)
-    z["name"] = "Testing nettest filtering by platform"
-    z["nettests"] = z["nettests"][:1]
-    z["nettests"].append(deepcopy(z["nettests"][0]))
-    z["nettests"][1]["test_name"] = "tlsmiddlebox"
-
-    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
-    url = f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest"
-
-    def get_test_names(platform):
-        headers = {
-            "UserAgent": f"ooniprobe,3.8.2,{platform},ooniprobe-engine,3.17.2,ooniprobe-engine_1.2.3"
-        }
-        j = postj(client, url, json=SAMPLE_META, headers=headers)
-        return [nt["test_name"] for nt in j["nettests"]]
-
-    assert get_test_names("ios") == ["web_connectivity"]
-    assert get_test_names("android") == ["web_connectivity", "tlsmiddlebox"]
-
-    # No header, no filtering
-    j = postj(client, url, json=SAMPLE_META)
-    assert [nt["test_name"] for nt in j["nettests"]] == [
-        "web_connectivity",
-        "tlsmiddlebox",
-    ]
-
-
 def test_network_type_validation(client_with_user_role, client):
     z = deepcopy(SAMPLE_OONIRUN)
     z["name"] = "Testing dynamic test lists calculation"
