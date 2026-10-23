@@ -1,10 +1,10 @@
 import dataclasses
 import math
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import List, Literal, Optional, Union
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
@@ -195,10 +195,11 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
-    if since is None and report_id is None and measurement_uid is None:
-        since = date.today() - timedelta(days=7)
-    if until is None and report_id is None and measurement_uid is None:
-        until = date.today()
+    # Browsing obs_web without these is too expensive
+    if report_id is None and measurement_uid is None:
+        raise HTTPException(
+            status_code=400, detail="report_id or measurement_uid is required"
+        )
 
     q_args = {}
     and_clauses = []
