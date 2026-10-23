@@ -28,6 +28,10 @@ docker-push:
 imagedefinitions.json:
 	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
+test:
+	pip install -q . pytest
+	python -m pytest -q tests
+
 # Used by other ECS services but not implemented yet
 docker-smoketest:
 	echo "Smoketest not yet implemented"
