@@ -164,6 +164,57 @@ class ListObservationsResponse(BaseModel):
     results: List[ObservationEntry]
 
 
+def _page_queries(cols, and_clauses, order_by_clause, limit, offset, selective):
+    """
+    Returns the query for the page's rows and, unless the filter is selective,
+    the query for the page's keys.
+
+    obs_web's primary key is (measurement_uid, observation_idx), so ORDER BY on
+    any other column cannot stop early and a plain SELECT would read every column
+    of every matching row. The keys query picks the page reading only the
+    columns needed to filter and sort, and the rows query reads full rows for
+    those keys through the primary key. A selective filter already reads few
+    rows, and a second read would cost more.
+
+    The primary key breaks ties, so every request orders the rows the same way
+    and consecutive pages neither overlap nor skip rows.
+
+    This works around ClickHouse < 25.4. From 25.4 lazy materialization
+    (query_plan_optimize_lazy_materialization, on by default) does the same for
+    a plain SELECT; benchmark that before removing the two steps.
+    """
+    where = " AND ".join(and_clauses)
+    order = f"ORDER BY {order_by_clause}, measurement_uid, observation_idx"
+    page = f"{order} LIMIT {limit} OFFSET {offset}"
+    if selective:
+        return f"SELECT {','.join(cols)} FROM obs_web WHERE {where} {page}", None
+    keys = f"SELECT measurement_uid, observation_idx FROM obs_web WHERE {where} {page}"
+    # no LIMIT: every stored copy of a key comes back, see _match_page_keys
+    rows = f"SELECT {','.join(cols)} FROM obs_web WHERE {where} AND (measurement_uid, observation_idx) IN ({keys}) {order}"
+    return rows, keys
+
+
+async def _match_page_keys(db, rows, keys_query, q_args):
+    """
+    ooni/data reprocessing can store an observation twice until a merge, and the
+    rows query returns every copy of the page's keys, even one that the keys
+    query left to the next page. Then return as many copies of each key as the
+    keys query picked, as a single query would have.
+    """
+    keys = [(r["measurement_uid"], r["observation_idx"]) for r in rows]
+    if len(set(keys)) == len(keys):
+        return rows
+    copies = {}
+    for key, row in zip(keys, rows):
+        copies.setdefault(key, []).append(row)
+    page = []
+    for k in await async_query_click(db, keys_query, q_args):
+        found = copies.get((k["measurement_uid"], k["observation_idx"]))
+        if found:  # empty only if the key was inserted between the two queries
+            page.append(found.pop(0) if len(found) > 1 else found[0])
+    return page
+
+
 @router.get("/v1/observations", tags=["observations", "list_data"])
 @parse_probe_asn_to_int
 async def list_observations(
@@ -244,14 +295,13 @@ async def list_observations(
         q_args["until"] = until
 
     cols = list(WebObservationEntry.model_json_schema()["properties"].keys())
-    q = f"SELECT {','.join(cols)} FROM obs_web"
-    if len(and_clauses) > 0:
-        q += " WHERE "
-        q += " AND ".join(and_clauses)
-    q += f" ORDER BY {order_by} {order} LIMIT {limit} OFFSET {offset}"
+    selective = measurement_uid is not None or report_id is not None
+    q, keys_q = _page_queries(cols, and_clauses, f"{order_by} {order}", limit, offset, selective)
 
     t = time.perf_counter()
     rows = await async_query_click(db, q, q_args)
+    if keys_q is not None:
+        rows = await _match_page_keys(db, rows, keys_q, q_args)
 
     results: List[ObservationEntry] = []
     if rows and isinstance(rows, list):
