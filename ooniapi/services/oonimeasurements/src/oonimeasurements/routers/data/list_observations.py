@@ -167,7 +167,16 @@ class ListObservationsResponse(BaseModel):
 @router.get("/v1/observations", tags=["observations", "list_data"])
 @parse_probe_asn_to_int
 async def list_observations(
-    measurement_uid: Annotated[str, Query()],
+    measurement_uid: Annotated[str, Query(
+        description="""
+        Required. The measurement_uid of the measurement to list
+        observations for. Filtering without it is no longer supported.
+        """
+    )],
+    report_id: Annotated[Optional[str], Query(
+        deprecated=True,
+        description="Deprecated, use `measurement_uid` instead"
+    )] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
