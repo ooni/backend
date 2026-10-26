@@ -1,3 +1,5 @@
+import random
+
 import pytest
 from datetime import datetime, timezone, timedelta
 from freezegun import freeze_time
@@ -624,6 +626,208 @@ def test_list_measurements_pagination_ordering(client, insert_fastpath, order):
         got += [r["measurement_uid"] for r in j["results"]]
 
     assert got == expected
+
+
+SEARCH_TEST = "search_reference_test"
+SEARCH_NOW = datetime(2026, 10, 1, 12, 0, 0)
+SEARCH_WINDOW = {
+    "since": (SEARCH_NOW - timedelta(days=1)).isoformat(),
+    "until": SEARCH_NOW.isoformat(),
+}
+SEARCH_INPUTS = {
+    "https://review1297-a.example/": "review1297-a.example",
+    "https://review1297-b.example/": "review1297-b.example",
+    "https://review1297-c.example/": "review1297-c.example",
+}
+# url -> categories, one citizenlab row each: a is listed twice under NEWS
+SEARCH_CITIZENLAB = {
+    "https://review1297-a.example/": ["NEWS", "NEWS"],
+    "https://review1297-b.example/": ["NEWS"],
+    "https://review1297-c.example/": ["HUMR"],
+}
+
+
+@pytest.fixture(scope="module")
+def search_rows(db):
+    """
+    Measurements with many ties on measurement_start_time, uids in no
+    particular order of time, and rows the default filters exclude (ZZ, AS0)
+    """
+    rng = random.Random(1297)
+    rows = []
+    for i in range(60):
+        t = SEARCH_NOW - timedelta(seconds=rng.randrange(0, 12))
+        input_ = rng.choice(list(SEARCH_INPUTS))
+        row = make_fastpath_row(SEARCH_TEST, f"{i:03d}", t, uid_ts=t + timedelta(seconds=rng.randrange(-60, 60)))
+        row.update(
+            input=input_,
+            domain=SEARCH_INPUTS[input_],
+            probe_cc=rng.choice(["XY", "XY", "IR", "ZZ"]),
+            probe_asn=rng.choice([1234, 1234, 5678, 0]),
+            anomaly=rng.choice(["t", "f"]),
+            confirmed=rng.choice(["t", "f", "f"]),
+            msm_failure=rng.choice(["t", "f", "f"]),
+        )
+        rows.append(row)
+    # the window's edges: since excludes its time, until includes it
+    for i, t in enumerate([SEARCH_NOW - timedelta(days=1), SEARCH_NOW]):
+        row = make_fastpath_row(SEARCH_TEST, f"edge{i}", t)
+        row.update(domain="", anomaly="f", confirmed="f", msm_failure="f")
+        rows.append(row)
+
+    with Clickhouse.from_url(db) as ch:
+        ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
+        ch.execute(
+            "INSERT INTO citizenlab (domain, url, cc, category_code) VALUES",
+            [
+                {"domain": SEARCH_INPUTS[url], "url": url, "cc": f"C{n}", "category_code": cat}
+                for url, cats in SEARCH_CITIZENLAB.items()
+                for n, cat in enumerate(cats)
+            ],
+        )
+        yield rows
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": SEARCH_TEST},
+        )
+        ch.execute(
+            "ALTER TABLE citizenlab DELETE WHERE domain LIKE 'review1297-%%' SETTINGS mutations_sync = 1"
+        )
+
+
+def page_order(r):
+    return (r["measurement_start_time"], r["measurement_uid"])
+
+
+def wanted(value, listed, default_excluded):
+    """A listed filter keeps the values listed; without one, the API leaves out a default (ZZ, AS0)"""
+    return value in listed if listed is not None else value != default_excluded
+
+
+def search_reference(rows, params):
+    """
+    The rows a search returns, in order, as /api/v1/measurements defines
+    them: a category_code returns a measurement once per matching citizenlab
+    row, as the join does
+    """
+    def listed(key):
+        return params[key].split(",") if key in params else None
+
+    ccs, domains = listed("probe_cc"), listed("domain")
+    asns = [int(a.removeprefix("AS")) for a in listed("probe_asn") or []] or None
+    since = datetime.fromisoformat(params["since"])
+    until = datetime.fromisoformat(params["until"])
+    flag_columns = {"anomaly": "anomaly", "confirmed": "confirmed", "failure": "msm_failure"}
+    # the column each given flag checks, and the value it must have
+    flags = {col: "t" if params[p] == "true" else "f" for p, col in flag_columns.items() if p in params}
+    out = []
+    for r in rows:
+        if not since < r["measurement_start_time"] <= until:
+            continue
+        if not wanted(r.get("probe_cc"), ccs, "ZZ") or not wanted(r.get("probe_asn"), asns, 0):
+            continue
+        if any(r.get(col) != value for col, value in flags.items()):
+            continue
+        if "input" in params:
+            if r["input"] != params["input"]:
+                continue
+        else:
+            if domains is not None and r.get("domain") not in domains:
+                continue
+            if "category_code" in params:
+                n = SEARCH_CITIZENLAB.get(r["input"], []).count(params["category_code"])
+                out += [r] * n
+                continue
+        out.append(r)
+    return sorted(out, key=page_order, reverse=params.get("order", "desc") == "desc")
+
+
+SEARCH_FILTERS = [
+    {},
+    {"probe_cc": "XY"},
+    {"probe_cc": "XY,IR"},
+    {"probe_cc": "ZZ"},
+    {"probe_asn": "AS1234"},
+    {"probe_asn": "5678,0"},
+    {"anomaly": "true"},
+    {"confirmed": "false", "failure": "true"},
+    {"domain": "review1297-a.example", "probe_cc": "IR"},
+    {"input": "https://review1297-b.example/"},
+    {"category_code": "NEWS"},
+    {"category_code": "NEWS", "domain": "review1297-a.example"},
+    {"category_code": "HUMR", "input": "https://review1297-a.example/"},
+    # the window cuts through a tie group at each end
+    {
+        "since": (SEARCH_NOW - timedelta(seconds=9)).isoformat(),
+        "until": (SEARCH_NOW - timedelta(seconds=3)).isoformat(),
+    },
+]
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+@pytest.mark.parametrize("limit", [2, 7, 500])
+@pytest.mark.parametrize("filters", SEARCH_FILTERS, ids=lambda f: ",".join(f"{k}={v}" for k, v in f.items()) or "none")
+def test_list_measurements_search_reference(client, search_rows, filters, limit, order):
+    """
+    Every page of a search, by offset and by cont, is the reference's: the
+    matches ordered by (measurement_start_time, measurement_uid), cut into
+    pages; a cont page starts after the previous page's last row
+    """
+    params = {**SEARCH_WINDOW, **filters, "test_name": SEARCH_TEST, "limit": limit, "order": order}
+    rows = search_reference(search_rows, params)
+    assert rows, "every filter matches something"
+
+    def uids(rows):
+        return [r["measurement_uid"] for r in rows]
+
+    # offset pages
+    for offset in range(0, len(rows) + limit, limit):
+        j = getj(client, route, params={**params, "offset": offset})
+        assert uids(j["results"]) == uids(rows[offset : offset + limit]), f"offset {offset}"
+
+    # cont pages: each starts after the previous page's last (time, uid), so
+    # a page that ends inside the copies a category join makes skips the rest
+    j = getj(client, route, params=params)
+    while True:
+        assert uids(j["results"]) == uids(rows[:limit])
+        if len(rows) < limit:
+            assert j["metadata"]["next_url"] is None
+            break
+        last = page_order(rows[limit - 1])
+        rows = [r for r in rows if (page_order(r) < last if order == "desc" else page_order(r) > last)]
+        next_url = j["metadata"]["next_url"]
+        assert next_url is not None
+        parsed = urlparse(next_url)
+        j = getj(client, f"{parsed.path}?{parsed.query}")
+
+
+LARGE_PAGE_TEST = "large_page_test"
+
+
+@pytest.fixture(scope="module")
+def large_page_rows(db):
+    """15k measurements a second apart, newest first"""
+    now = datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
+    rows = [make_fastpath_row(LARGE_PAGE_TEST, f"{i:05d}", now - timedelta(seconds=i + 1)) for i in range(15000)]
+    with Clickhouse.from_url(db) as ch:
+        ch.execute(f"INSERT INTO fastpath ({', '.join(rows[0])}) VALUES", rows)
+        yield rows
+        ch.execute(
+            "ALTER TABLE fastpath DELETE WHERE test_name = %(tn)s SETTINGS mutations_sync = 1",
+            {"tn": LARGE_PAGE_TEST},
+        )
+
+
+@pytest.mark.parametrize("limit,offset", [(15000, 0), (100, 14900), (20000, 0)])
+def test_list_measurements_large_page(client, large_page_rows, limit, offset):
+    """
+    Pages with more distinct times than fit in a query's text: limit and
+    offset reach 1M, and ClickHouse's max_query_size is 256 KiB
+    """
+    j = getj(client, route, params={"test_name": LARGE_PAGE_TEST, "limit": limit, "offset": offset})
+    expected = [r["measurement_uid"] for r in large_page_rows][offset : offset + limit]
+    assert [r["measurement_uid"] for r in j["results"]] == expected
+    assert (j["metadata"]["next_url"] is None) == (len(expected) < limit)
 
 
 def test_list_measurements_limit_zero(client):
