@@ -66,6 +66,11 @@ def route_template(request: Request) -> str:
     route's full path, as in the OpenAPI schema. Routes don't change after
     startup, so the map is built once per app. Routes aren't hashable: they're
     keyed by id(), and live as long as the app.
+
+    Adding or replacing routes at runtime (include_router, add_api_route or
+    mount after the first request) would break this: the map wouldn't know
+    the new routes, and their queries would be tagged "unknown". Every service
+    adds its routes once, when the app is created.
     """
     templates = getattr(request.app.state, "route_templates", None)
     if templates is None:
