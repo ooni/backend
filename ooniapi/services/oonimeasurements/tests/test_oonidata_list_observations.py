@@ -2,51 +2,28 @@ import pytest
 
 route = "api/v1/observations"
 
-
-def test_oonidata_list_observations(client):
-    response = client.get(route)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) == 0
+measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
 
 
-def test_list_obs_report_id_only_skips_default_date_window(client):
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"since": "2024-11-01", "until": "2024-11-02"},
+        {"report_id": "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"},
+        {"probe_cc": "DE"},
+    ],
+)
+def test_list_obs_without_measurement_uid_fails(client, params):
+    response = client.get(route, params=params)
+    assert response.status_code == 422, response.json()
+
+
+def test_list_obs_measurement_uid_only(client):
     """
-    Without report_id, since/until default to the last 7 days (fixture data is older).
-
-    With only report_id, those defaults must not apply, so rows still match by report_id
-    even when their measurement_start_time falls outside the usual default window.
+    With only measurement_uid, no date window is applied, so rows still match
+    even when their measurement_start_time is old.
     """
-    report_id = "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"
-
-    default_response = client.get(route)
-    assert default_response.status_code == 200
-    assert len(default_response.json()["results"]) == 0
-
-    by_report = client.get(route, params={"report_id": report_id})
-    assert by_report.status_code == 200
-    j = by_report.json()
-    assert isinstance(j["results"], list), j
-    assert len(j["results"]) > 0
-    for row in j["results"]:
-        assert row["report_id"] == report_id, row
-
-
-def test_list_obs_measurement_uid_only_skips_default_date_window(client):
-    """
-    Without measurement_uid, since/until default to the last 7 days (fixture data is older).
-
-    With only measurement_uid, those defaults must not apply, so rows still match by
-    measurement_uid even when their measurement_start_time falls outside the usual
-    default window.
-    """
-    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
-
-    default_response = client.get(route)
-    assert default_response.status_code == 200
-    assert len(default_response.json()["results"]) == 0
-
     by_uid = client.get(route, params={"measurement_uid": measurement_uid})
     assert by_uid.status_code == 200
     j = by_uid.json()
@@ -60,7 +37,6 @@ def test_list_obs_measurement_uid_with_explicit_since_and_until(client):
     """
     An explicit since/until must still be honored even when measurement_uid is set.
     """
-    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
     params = {
         "measurement_uid": measurement_uid,
         # This range does not cover the measurement's date (2024-11-01).
@@ -75,41 +51,20 @@ def test_list_obs_measurement_uid_with_explicit_since_and_until(client):
     assert len(json["results"]) == 0
 
 
-def test_oonidata_list_observations_with_since_and_until(
-    client, params_since_and_until_with_two_days
-):
-    response = client.get(route, params=params_since_and_until_with_two_days)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) > 0
-    for result in json["results"]:
-        assert "test_name" in result, result
-        assert "probe_cc" in result, result
-
-
 @pytest.mark.parametrize(
     "filter_name, filter_value",
     [
-        ("report_id", "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"),
-        (
-            "measurement_uid",
-            "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630",
-        ),
-        ("probe_asn", 45758),
-        ("probe_cc", "IT"),
-        ("software_name", "ooniprobe-cli"),
-        ("software_version", "3.20.0"),
+        ("probe_asn", 3209),
+        ("probe_cc", "DE"),
+        ("software_name", "ooniprobe-android-unattended"),
+        ("software_version", "4.0.0"),
         ("test_name", "web_connectivity"),
         ("test_version", "0.4.3"),
-        ("engine_version", "3.20.0"),
+        ("engine_version", "3.23.0"),
     ],
 )
-def test_oonidata_list_observations_with_filters(
-    client, filter_name, filter_value, params_since_and_until_with_two_days
-):
-    params = params_since_and_until_with_two_days
-    params[filter_name] = filter_value
+def test_oonidata_list_observations_with_filters(client, filter_name, filter_value):
+    params = {"measurement_uid": measurement_uid, filter_name: filter_value}
 
     response = client.get(route, params=params)
 
@@ -120,12 +75,8 @@ def test_oonidata_list_observations_with_filters(
         assert result[filter_name] == filter_value, result
 
 
-def test_oonidata_list_observations_filtering_by_probe_asn_as_a_string_with_since_and_until(
-    client, params_since_and_until_with_two_days
-):
-    params = params_since_and_until_with_two_days
-    probe_asn = 45758
-    params["probe_asn"] = "AS" + str(probe_asn)
+def test_oonidata_list_observations_filtering_by_probe_asn_as_a_string(client):
+    params = {"measurement_uid": measurement_uid, "probe_asn": "AS3209"}
 
     response = client.get(route, params=params)
 
@@ -133,103 +84,14 @@ def test_oonidata_list_observations_filtering_by_probe_asn_as_a_string_with_sinc
     assert isinstance(json["results"], list), json
     assert len(json["results"]) > 0
     for result in json["results"]:
-        assert result["probe_asn"] == probe_asn, result
+        assert result["probe_asn"] == 3209, result
 
 
-def test_oonidata_list_observations_order_default(
-    client, params_since_and_until_with_two_days
-):
-    response = client.get(route, params=params_since_and_until_with_two_days)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) > 0
-    for i in range(1, len(json["results"])):
-        assert "measurement_start_time" in json["results"][i], json["results"][i]
-        previous_date = json["results"][i - 1]["measurement_start_time"]
-        current_date = json["results"][i]["measurement_start_time"]
-        assert (
-            previous_date >= current_date
-        ), f"The dates are not ordered: {previous_date} < {current_date}"
-
-
-def test_oonidata_list_observations_order_asc(
-    client, params_since_and_until_with_two_days
-):
-    params = params_since_and_until_with_two_days
-    params["order"] = "ASC"
+def test_oonidata_list_observations_with_limit_and_offset(client):
+    params = {"measurement_uid": measurement_uid, "limit": 5}
 
     response = client.get(route, params=params)
 
     json = response.json()
     assert isinstance(json["results"], list), json
-    assert len(json["results"]) > 0
-    for i in range(1, len(json["results"])):
-        assert "measurement_start_time" in json["results"][i], json["results"][i]
-        previous_date = json["results"][i - 1]["measurement_start_time"]
-        current_date = json["results"][i]["measurement_start_time"]
-        assert (
-            previous_date <= current_date
-        ), f"The dates are not ordered: {previous_date} > {current_date}"
-
-
-@pytest.mark.parametrize(
-    "field, order",
-    [
-        ("input", "asc"),
-        ("probe_cc", "asc"),
-        ("probe_asn", "asc"),
-        ("test_name", "asc"),
-        ("input", "desc"),
-        ("probe_cc", "desc"),
-        ("probe_asn", "desc"),
-        ("test_name", "desc"),
-    ],
-)
-def test_oonidata_list_observations_order_by_field(
-    client, field, order, params_since_and_until_with_two_days
-):
-    params = params_since_and_until_with_two_days
-    params["order_by"] = field
-    params["order"] = order
-
-    response = client.get(route, params=params)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) > 0
-    for i in range(1, len(json["results"])):
-        assert field in json["results"][i], json["results"][i]
-        previous = json["results"][i - 1][field]
-        current = json["results"][i][field]
-        if order == "asc":
-            assert (
-                previous <= current
-            ), f"The {field} values are not ordered in ascending order: {previous} > {current}"
-        else:
-            assert (
-                previous >= current
-            ), f"The {field} values are not ordered in descending order: {previous} < {current}"
-
-
-def test_oonidata_list_observations_limit_by_default(
-    client, params_since_and_until_with_two_days
-):
-    response = client.get(route, params=params_since_and_until_with_two_days)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) == 100
-
-
-def test_oonidata_list_observations_with_limit_and_offset(
-    client, params_since_and_until_with_two_days
-):
-    params = params_since_and_until_with_two_days
-    params["limit"] = 10
-
-    response = client.get(route, params=params)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) == 10
+    assert len(json["results"]) == 5
