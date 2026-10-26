@@ -34,6 +34,30 @@ def test_list_obs_default_window_is_last_complete_hour(client):
         assert report_id not in default_report_ids()
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"since": "2024-11-01", "until": "2024-11-02"},
+        {"report_id": "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"},
+        {"probe_cc": "DE"},
+    ],
+)
+def test_list_obs_without_measurement_uid_is_deprecated(client, params):
+    response = client.get(route, params=params)
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "@1792972800"  # 2026-10-26
+    assert "measurement_uid" in response.json()["metadata"]["deprecation"]
+
+
+def test_list_obs_measurement_uid_is_not_deprecated(client):
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+    response = client.get(route, params={"measurement_uid": measurement_uid})
+    assert response.status_code == 200
+    assert "Deprecation" not in response.headers
+    assert response.json()["metadata"]["deprecation"] is None
+
+
 def test_list_obs_report_id_only_skips_default_date_window(client):
     """
     Without report_id, since/until default to the last complete hour (fixture data is older).
