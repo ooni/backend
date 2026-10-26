@@ -203,6 +203,13 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
+    """
+    List observations of a given measurement.
+
+    This endpoint used to allow listing measurements by time intervals, however
+    we're not at capacity to support this use case at the moment, so we will
+    limit this functionality at the moment.
+    """
     q_args = {}
     and_clauses = []
     q_args["measurement_uid"] = measurement_uid
