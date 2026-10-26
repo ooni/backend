@@ -80,8 +80,8 @@ async def test_10_per_minute(valkey_server, app):
     # real clock a slow CI runner could charge 4 or 5 units per request and
     # use up the 10/minute quota in three. Its clock here advances 25 ms
     # between a request's start and its response: every request costs 2.
-    clock = itertools.count(step=0.025)
-    fake_time = SimpleNamespace(perf_counter=lambda: next(clock))
+    clock = itertools.count(step=2)
+    fake_time = SimpleNamespace(perf_counter=lambda: next(clock) / 100)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
