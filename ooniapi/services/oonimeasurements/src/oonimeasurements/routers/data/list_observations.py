@@ -3,6 +3,7 @@ import math
 import time
 from datetime import date, datetime
 from typing import List, Literal, Optional, Union
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -272,7 +273,9 @@ async def list_observations(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
             limit=limit,
-            next_url=f"{settings.base_url}/api/v1/observations?offset={offset + limit}&limit={limit}",
+            next_url=f"{settings.base_url}/api/v1/observations?" + urlencode(
+                {"measurement_uid": measurement_uid, "offset": offset + limit, "limit": limit}
+            ),
             offset=offset,
             pages=-1,
             query_time=time.perf_counter() - t,

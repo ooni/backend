@@ -1,4 +1,8 @@
+from urllib.parse import parse_qs, urlparse
+
 import pytest
+
+from .utils import getj
 
 route = "api/v1/observations"
 
@@ -95,3 +99,17 @@ def test_oonidata_list_observations_with_limit_and_offset(client):
     json = response.json()
     assert isinstance(json["results"], list), json
     assert len(json["results"]) == 5
+
+
+def test_oonidata_list_observations_next_url_keeps_measurement_uid(client):
+    params = {"measurement_uid": measurement_uid, "limit": 2}
+
+    next_url = urlparse(getj(client, route, params=params)["metadata"]["next_url"])
+    next_params = parse_qs(next_url.query)
+    assert next_params["measurement_uid"] == [measurement_uid]
+    assert next_params["offset"] == ["2"]
+    assert next_params["limit"] == ["2"]
+
+    j = getj(client, f"{next_url.path}?{next_url.query}")
+    for row in j["results"]:
+        assert row["measurement_uid"] == measurement_uid, row
