@@ -1,10 +1,10 @@
 import dataclasses
 import math
 import time
-from datetime import date, datetime, timedelta
-from typing import List, Literal, Optional, Union
+from datetime import date, datetime, timedelta, timezone
+from typing import List, Literal, Optional, Tuple, Union
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
@@ -14,10 +14,38 @@ from .utils import parse_probe_asn_to_int
 
 router = APIRouter()
 
+# obs_web is written by ooni/data's hourly DAG, which runs at HH:30 for the
+# measurements received in the previous hour. Leave up to an hour for that run
+# to finish, so that the default window is a complete hour, not one still
+# being filled.
+# Stopgap: browsing without filters goes away when its deprecation (#1313)
+# is enforced.
+DEFAULT_WINDOW_DELAY = timedelta(minutes=90)
+
+
+def default_window(now: datetime) -> Tuple[datetime, datetime]:
+    """
+    The last complete hour of observations, eg. 11:00-12:00 from 13:30 to 14:29
+    """
+    until = (now - DEFAULT_WINDOW_DELAY).replace(minute=0, second=0, microsecond=0)
+    return until - timedelta(hours=1), until
+
+
+# Listing observations without measurement_uid is deprecated (#1313). The
+# Deprecation header (RFC 9745) carries the date it was deprecated on.
+DEPRECATED_SINCE = datetime(2026, 10, 26, tzinfo=timezone.utc)
+DEPRECATION_NOTICE = (
+    "Listing observations without measurement_uid is deprecated and will stop"
+    " working. Browse measurements with /api/v1/measurements, get time series"
+    " with /api/v1/aggregation/observations, then fetch a measurement's"
+    " observations with /api/v1/observations?measurement_uid=..."
+)
+
 
 class ResponseMetadata(BaseModel):
     count: int
     current_page: int
+    deprecation: Optional[str] = None
     limit: int
     next_url: str
     offset: int
@@ -167,8 +195,12 @@ class ListObservationsResponse(BaseModel):
 @router.get("/v1/observations", tags=["observations", "list_data"])
 @parse_probe_asn_to_int
 async def list_observations(
-    report_id: Annotated[Optional[str], Query()] = None,
-    measurement_uid: Annotated[Optional[str], Query()] = None,
+    response: Response,
+    report_id: Annotated[Optional[str], Query(deprecated=True)] = None,
+    measurement_uid: Annotated[
+        Optional[str],
+        Query(description="Will be required: " + DEPRECATION_NOTICE),
+    ] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
@@ -195,10 +227,18 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
+    default_since, default_until = default_window(
+        datetime.now(timezone.utc).replace(tzinfo=None)
+    )
     if since is None and report_id is None and measurement_uid is None:
-        since = date.today() - timedelta(days=7)
+        since = default_since
     if until is None and report_id is None and measurement_uid is None:
-        until = date.today()
+        until = default_until
+
+    deprecation = None
+    if measurement_uid is None:
+        deprecation = DEPRECATION_NOTICE
+        response.headers["Deprecation"] = f"@{int(DEPRECATED_SINCE.timestamp())}"
 
     q_args = {}
     and_clauses = []
@@ -261,10 +301,11 @@ async def list_observations(
                 entry.target_id = entry.hostname or entry.tls_server_name
             results.append(entry)
 
-    response = ListObservationsResponse(
+    return ListObservationsResponse(
         metadata=ResponseMetadata(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
+            deprecation=deprecation,
             limit=limit,
             next_url=f"{settings.base_url}/api/v1/observations?offset={offset + limit}&limit={limit}",
             offset=offset,
@@ -273,5 +314,3 @@ async def list_observations(
         ),
         results=results,
     )
-
-    return response

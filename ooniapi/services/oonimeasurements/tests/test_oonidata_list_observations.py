@@ -1,4 +1,5 @@
 import pytest
+from freezegun import freeze_time
 
 route = "api/v1/observations"
 
@@ -11,9 +12,55 @@ def test_oonidata_list_observations(client):
     assert len(json["results"]) == 0
 
 
+def test_list_obs_default_window_is_last_complete_hour(client):
+    """
+    The fixture report has observations from 2024-11-01 23:33 UTC. The hour
+    23:00-00:00 becomes the default window once the pipeline has had 90
+    minutes to process it, and stays it for an hour.
+    """
+    report_id = "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"
+
+    def default_report_ids():
+        response = client.get(route, params={"limit": 1000})
+        assert response.status_code == 200
+        return {r["report_id"] for r in response.json()["results"]}
+
+    with freeze_time("2024-11-02T01:29:59Z"):
+        assert report_id not in default_report_ids()
+    for now in ("2024-11-02T01:30:00Z", "2024-11-02T02:29:59Z"):
+        with freeze_time(now):
+            assert report_id in default_report_ids()
+    with freeze_time("2024-11-02T02:30:00Z"):
+        assert report_id not in default_report_ids()
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"since": "2024-11-01", "until": "2024-11-02"},
+        {"report_id": "20241101T233351Z_webconnectivity_DE_3209_n1_I7QVY7IdnaSfYmsb"},
+        {"probe_cc": "DE"},
+    ],
+)
+def test_list_obs_without_measurement_uid_is_deprecated(client, params):
+    response = client.get(route, params=params)
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "@1792972800"  # 2026-10-26
+    assert "measurement_uid" in response.json()["metadata"]["deprecation"]
+
+
+def test_list_obs_measurement_uid_is_not_deprecated(client):
+    measurement_uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+    response = client.get(route, params={"measurement_uid": measurement_uid})
+    assert response.status_code == 200
+    assert "Deprecation" not in response.headers
+    assert response.json()["metadata"]["deprecation"] is None
+
+
 def test_list_obs_report_id_only_skips_default_date_window(client):
     """
-    Without report_id, since/until default to the last 7 days (fixture data is older).
+    Without report_id, since/until default to the last complete hour (fixture data is older).
 
     With only report_id, those defaults must not apply, so rows still match by report_id
     even when their measurement_start_time falls outside the usual default window.
@@ -35,7 +82,7 @@ def test_list_obs_report_id_only_skips_default_date_window(client):
 
 def test_list_obs_measurement_uid_only_skips_default_date_window(client):
     """
-    Without measurement_uid, since/until default to the last 7 days (fixture data is older).
+    Without measurement_uid, since/until default to the last complete hour (fixture data is older).
 
     With only measurement_uid, those defaults must not apply, so rows still match by
     measurement_uid even when their measurement_start_time falls outside the usual
