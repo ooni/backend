@@ -1,8 +1,8 @@
 import dataclasses
 import math
 import time
-from datetime import date, datetime, timedelta
-from typing import List, Literal, Optional, Union
+from datetime import date, datetime, timedelta, timezone
+from typing import List, Literal, Optional, Tuple, Union
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -13,6 +13,22 @@ from ...common.dependencies import get_clickhouse_session, get_settings
 from .utils import parse_probe_asn_to_int
 
 router = APIRouter()
+
+# obs_web is written by ooni/data's hourly DAG, which runs at HH:30 for the
+# measurements received in the previous hour. Leave up to an hour for that run
+# to finish, so that the default window is a complete hour, not one still
+# being filled.
+# Stopgap: browsing without filters goes away when its deprecation (#1313)
+# is enforced.
+DEFAULT_WINDOW_DELAY = timedelta(minutes=90)
+
+
+def default_window(now: datetime) -> Tuple[datetime, datetime]:
+    """
+    The last complete hour of observations, eg. 11:00-12:00 from 13:30 to 14:29
+    """
+    until = (now - DEFAULT_WINDOW_DELAY).replace(minute=0, second=0, microsecond=0)
+    return until - timedelta(hours=1), until
 
 
 class ResponseMetadata(BaseModel):
@@ -195,10 +211,13 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
+    default_since, default_until = default_window(
+        datetime.now(timezone.utc).replace(tzinfo=None)
+    )
     if since is None and report_id is None and measurement_uid is None:
-        since = date.today() - timedelta(days=7)
+        since = default_since
     if until is None and report_id is None and measurement_uid is None:
-        until = date.today()
+        until = default_until
 
     q_args = {}
     and_clauses = []
