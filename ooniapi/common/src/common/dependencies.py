@@ -4,7 +4,7 @@ from typing import Annotated, TypeAlias
 from clickhouse_driver import Client as Clickhouse
 
 import boto3
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.routing import iter_route_contexts
 from fastapi import HTTPException, Header, Response
 from mypy_boto3_s3 import S3Client
@@ -54,6 +54,24 @@ def role_required(roles: list[str]):
     return verify_jwt
 
 
+@lru_cache
+def route_templates(app: FastAPI) -> dict[int, str]:
+    """
+    Each route's full path template, as in the OpenAPI schema, built once per
+    app on its first request. Routes aren't hashable: they're keyed by id(),
+    and live as long as the app.
+
+    Adding or replacing routes at runtime (include_router, add_api_route or
+    mount after the first request) would break this: the map wouldn't know
+    the new routes, and their queries would be tagged "unknown". Every service
+    adds its routes once, when the app is created.
+    """
+    return {
+        id(ctx.original_route): ctx.path_format
+        for ctx in iter_route_contexts(app.routes)
+    }
+
+
 def route_template(request: Request) -> str:
     """
     The URL pattern of the matched route, not the actual path, so that the
@@ -62,24 +80,9 @@ def route_template(request: Request) -> str:
         request.url.path  = /api/v1/measurement/1234
 
     scope["route"] is the route as its router defined it, without
-    include_router's prefix (/api). FastAPI's iter_route_contexts gives each
-    route's full path, as in the OpenAPI schema. Routes don't change after
-    startup, so the map is built once per app. Routes aren't hashable: they're
-    keyed by id(), and live as long as the app.
-
-    Adding or replacing routes at runtime (include_router, add_api_route or
-    mount after the first request) would break this: the map wouldn't know
-    the new routes, and their queries would be tagged "unknown". Every service
-    adds its routes once, when the app is created.
+    include_router's prefix (/api), so look its full template up.
     """
-    templates = getattr(request.app.state, "route_templates", None)
-    if templates is None:
-        templates = {
-            id(ctx.original_route): ctx.path_format
-            for ctx in iter_route_contexts(request.app.routes)
-        }
-        request.app.state.route_templates = templates
-    return templates.get(id(request.scope.get("route")), "unknown")
+    return route_templates(request.app).get(id(request.scope.get("route")), "unknown")
 
 
 def get_clickhouse_session(settings: SettingsDep, request : Request):
