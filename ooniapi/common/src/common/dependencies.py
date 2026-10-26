@@ -5,6 +5,7 @@ from clickhouse_driver import Client as Clickhouse
 
 import boto3
 from fastapi import Depends, Request
+from fastapi.routing import iter_route_contexts
 from fastapi import HTTPException, Header, Response
 from mypy_boto3_s3 import S3Client
 from sqlalchemy import create_engine
@@ -53,17 +54,35 @@ def role_required(roles: list[str]):
     return verify_jwt
 
 
+def route_template(request: Request) -> str:
+    """
+    The URL pattern of the matched route, not the actual path, so that the
+    log_comment stays low-cardinality:
+        route template    = /api/v1/measurement/{measurement_uid}
+        request.url.path  = /api/v1/measurement/1234
+
+    scope["route"] is the route as its router defined it, without
+    include_router's prefix (/api). FastAPI's iter_route_contexts gives each
+    route's full path, as in the OpenAPI schema. Routes don't change after
+    startup, so the map is built once per app. Routes aren't hashable: they're
+    keyed by id(), and live as long as the app.
+    """
+    templates = getattr(request.app.state, "route_templates", None)
+    if templates is None:
+        templates = {
+            id(ctx.original_route): ctx.path_format
+            for ctx in iter_route_contexts(request.app.routes)
+        }
+        request.app.state.route_templates = templates
+    return templates.get(id(request.scope.get("route")), "unknown")
+
+
 def get_clickhouse_session(settings: SettingsDep, request : Request):
     db = Clickhouse.from_url(settings.clickhouse_url)
 
-    # Route has the URL pattern, not the actual path.
-    # route             = /measurement/{measurement_uid}
-    # request.url.path  = /measurement/1234
-    route = request.scope.get("route")
-    path = route.path if route else "unknown"
     meta = dict(
         app_name = settings.app_name,
-        handler = f"{request.method} {path}"
+        handler = f"{request.method} {route_template(request)}"
     )
 
     db.settings['log_comment'] = ujson.dumps(
