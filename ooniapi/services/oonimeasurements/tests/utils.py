@@ -1,6 +1,11 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any
 import httpx
+
+
+def fake_get_bucket_url(bucket_name):
+    return f"file://{Path(__file__).parent.resolve()}/fixtures/"
 
 
 def getj(

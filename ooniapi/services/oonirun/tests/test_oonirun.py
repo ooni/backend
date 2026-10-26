@@ -11,7 +11,7 @@ from oonirun.routers.v2 import (
     NETWORK_TYPES,
     PRIVATE_EMAIL_PLACEHOLDER,
 )
-from .utils import put, get, post
+from .utils import putj, getj, postj
 
 
 SAMPLE_OONIRUN = {
@@ -684,62 +684,70 @@ def test_oonirun_revisions(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
     ### Create descriptor as user
     z["name"] = "first descriptor"
-    j = post(client_with_user_role, "/api/v2/oonirun/links", json = z)
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json = z)
     oonirun_link_id_one = j["oonirun_link_id"]
-
-    ## Create two new revisions
-    j["nettests"][0]["inputs"].append("https://foo.net/")
-    j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
+    # revision 1 is created with the link
     first_date_created = j["date_created"]
+
+    ## Create two new revisions; each edit's date_updated is when its
+    ## revision was created, while date_created stays the link's
+    j["nettests"][0]["inputs"].append("https://foo.net/")
+    j = putj(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
+    second_date_created = j["date_updated"]
 
     time.sleep(1)
 
     j["nettests"][0]["inputs"].append("https://foo2.net/")
-    j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
-    second_date_created = j["date_created"]
+    j = putj(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_one}", json = j)
+    third_date_created = j["date_updated"]
 
     ## Fetch first revision
-    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/1")
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/1")
     assert j["date_created"] == first_date_created
 
     ## Fetch second revision
-    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
     assert j["date_created"] == second_date_created
+
+    ## Fetch third revision, created at least a second later
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/3")
+    assert j["date_created"] == third_date_created
+    assert third_date_created > second_date_created
 
     ### Create another descriptor as user
     z["name"] = "second descriptor"
-    j = post(client_with_user_role, "/api/v2/oonirun/links", json=z)
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
     oonirun_link_id_two = j["oonirun_link_id"]
 
     ## Create new revision
     j["nettests"][0]["inputs"].append("https://foo.net/")
-    j = put(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_two}", json=j)
+    j = putj(client_with_user_role, f"/api/v2/oonirun/links/{oonirun_link_id_two}", json=j)
 
     ## Fetch anonymously and check it's got the new revision
-    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}")
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}")
     assert j["revision"] == "3", "revision is 3"
 
-    j = get(client_with_user_role, "/api/v2/oonirun/links")
+    j = getj(client_with_user_role, "/api/v2/oonirun/links")
     descs = j["oonirun_links"]
     assert len(descs) == 2, j
 
     ## Fetch latest revision number
-    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/latest")
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/latest")
     assert j["revision"] == "3", "revision is 3"
     lastest_nettests = j["nettests"]
     latest_date_created = j["date_created"]
 
     ## Fetch specific revision number
-    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/full-descriptor/2")
     assert j["revision"] == "2", "revision is 2"
 
     ## Get revision list
-    j = get(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/revisions")
+    j = getj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/revisions")
     assert len(j["revisions"]) == 3, "there are 2 revisions"
     assert j["revisions"][0] == "3", "the latest one is 3"
 
     ## Fetch nettests for latest
-    j_latest = post(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest", json=SAMPLE_META)
+    j_latest = postj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/latest", json=SAMPLE_META)
     assert j_latest["revision"] == "3", "revision is 3"
 
     # The engine-descriptor returns a list along with targets name on reading
@@ -749,7 +757,7 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert j_latest["date_created"] == latest_date_created, "date created matches"
 
     ## Should match latest
-    j1 = post(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json=SAMPLE_META)
+    j1 = postj(client, f"/api/v2/oonirun/links/{oonirun_link_id_one}/engine-descriptor/3", json=SAMPLE_META)
     assert j_latest == j1
 
     ## Fetch invalid revision number
@@ -760,10 +768,10 @@ def test_oonirun_revisions(client, client_with_user_role):
     assert r.status_code != 200, r.json()
 
     ## Get not-existing revision
-    j = get(client, "/api/v2/oonirun/links/404/revisions", expected_code=404)
+    j = getj(client, "/api/v2/oonirun/links/404/revisions", expected_code=404)
 
     ## Get not-existing engine descriptor
-    j = post(client, "/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META, expected_code=404)
+    j = postj(client, "/api/v2/oonirun/links/404/engine-descriptor/latest", json=SAMPLE_META, expected_code=404)
 
 def test_inputs_extra_length(client, client_with_user_role):
     z = deepcopy(SAMPLE_OONIRUN)
@@ -1012,6 +1020,34 @@ def test_x_user_agent_header_parsing(client_with_user_role, client):
         json=SAMPLE_META,
     )
     assert r.status_code == 422, r.json()
+
+
+def test_nettest_blocked_by_platform(client_with_user_role, client):
+    z = deepcopy(SAMPLE_OONIRUN)
+    z["name"] = "Testing nettest filtering by platform"
+    z["nettests"] = z["nettests"][:1]
+    z["nettests"].append(deepcopy(z["nettests"][0]))
+    z["nettests"][1]["test_name"] = "tlsmiddlebox"
+
+    j = postj(client_with_user_role, "/api/v2/oonirun/links", json=z)
+    url = f"/api/v2/oonirun/links/{j['oonirun_link_id']}/engine-descriptor/latest"
+
+    def get_test_names(platform):
+        headers = {
+            "UserAgent": f"ooniprobe,3.8.2,{platform},ooniprobe-engine,3.17.2,ooniprobe-engine_1.2.3"
+        }
+        j = postj(client, url, json=SAMPLE_META, headers=headers)
+        return [nt["test_name"] for nt in j["nettests"]]
+
+    assert get_test_names("ios") == ["web_connectivity"]
+    assert get_test_names("android") == ["web_connectivity", "tlsmiddlebox"]
+
+    # No header, no filtering
+    j = postj(client, url, json=SAMPLE_META)
+    assert [nt["test_name"] for nt in j["nettests"]] == [
+        "web_connectivity",
+        "tlsmiddlebox",
+    ]
 
 
 def test_network_type_validation(client_with_user_role, client):

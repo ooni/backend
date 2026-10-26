@@ -160,6 +160,9 @@ def list_oonifindings(
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
+    # creator_account_id is nullable: None would match it with IS NULL
+    if account_id is None:
+        account_id = "never-match"
 
     q = db.query(models.OONIFinding).filter(
         models.OONIFinding.deleted != 1,
@@ -179,10 +182,14 @@ def list_oonifindings(
     if domain:
         q = q.filter(sa.or_(*[models.OONIFinding.domains.any_() == d for d in domain]))
 
-    if account_id is None:
-        # non-published incidents are not exposed to anon users
-        q = q.filter(models.OONIFinding.published == 1)
-        account_id = "never-match"
+    if client_role != "admin":
+        # unpublished findings are drafts: only admins and their creator see them
+        q = q.filter(
+            sa.or_(
+                models.OONIFinding.published == 1,
+                models.OONIFinding.creator_account_id == account_id,
+            )
+        )
 
     findings = []
     row: models.OONIFinding
@@ -210,7 +217,7 @@ def list_oonifindings(
             mine=(row.creator_account_id == account_id),
         )
 
-        if account_id is None or client_role != "admin":
+        if client_role != "admin":
             oonifinding.email_address = ""
 
         findings.append(oonifinding)
@@ -245,6 +252,9 @@ def get_oonifinding_by_id(
     account_id = get_account_id_or_none(
         authorization, jwt_encryption_key=settings.jwt_encryption_key
     )
+    # creator_account_id is nullable: None would match it with IS NULL
+    if account_id is None:
+        account_id = "never-match"
 
     q = db.query(models.OONIFinding).filter(
         models.OONIFinding.deleted != 1,
@@ -256,10 +266,14 @@ def get_oonifinding_by_id(
     except ValueError:
         q = q.filter(models.OONIFinding.finding_slug == finding_id)
 
-    # non-published incidents are not exposed to anon users
-    if account_id is None:
-        q = q.filter(models.OONIFinding.published == 1)
-        account_id = "never-match"
+    if client_role != "admin":
+        # unpublished findings are drafts: only admins and their creator see them
+        q = q.filter(
+            sa.or_(
+                models.OONIFinding.published == 1,
+                models.OONIFinding.creator_account_id == account_id,
+            )
+        )
 
     try:
         finding: models.OONIFinding = q.one()
@@ -290,7 +304,7 @@ def get_oonifinding_by_id(
         mine=(finding.creator_account_id == account_id),
     )
 
-    if account_id is None or client_role != "admin":
+    if client_role != "admin":
         oonifinding.email_address = ""  # hide email
 
     # TODO: cache if possible

@@ -24,6 +24,7 @@ dependencies = [
   "python-dateutil ~= 2.9.0",
   "prometheus-fastapi-instrumentator ~= 8.1.0",
   "prometheus-client",
+  "ujson ~= 5.9.0",
 ]
 
 readme = "README.md"

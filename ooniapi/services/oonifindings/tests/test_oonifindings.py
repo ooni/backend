@@ -346,11 +346,9 @@ def test_oonifinding_workflow(client, client_with_hashed_email, client_with_user
     ), "unpublished events cannot be seen with invalid account id"
 
     r = client_with_user_role.get(f"api/v1/incidents/show/{incident_id}")
-    incident = r.json()["incident"]
-    assert incident
-    assert incident["mine"] is False
-    assert incident["email_address"] == ""
-    assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+    assert (
+        r.status_code == 404
+    ), "unpublished events cannot be seen by users who did not create them"
 
     r = client_with_admin_role.get(f"api/v1/incidents/show/{incident_id}")
     incident = r.json()["incident"]
@@ -397,7 +395,7 @@ def test_oonifinding_workflow(client, client_with_hashed_email, client_with_user
 
     r = client_with_user_role.get("api/v1/incidents/search?only_mine=false")
     incidents = r.json()["incidents"]
-    assert len(incidents) == 2
+    assert len(incidents) == 1, "the unpublished one is not listed for users"
     for incident in incidents:
         assert incident["email_address"] == ""
         assert incident["mine"] is False
@@ -440,6 +438,39 @@ def test_oonifinding_workflow(client, client_with_hashed_email, client_with_user
         assert incident["email_address"] == SAMPLE_EMAIL
         assert incident["mine"] is True
         assert sorted(incident.keys()) == sorted(EXPECTED_OONIFINDING_PUBLIC_KEYS)
+
+
+def test_oonifinding_unpublished_visibility(
+    client, client_with_hashed_email, client_with_user_role
+):
+    admin = client_with_hashed_email(SAMPLE_EMAIL, "admin")
+    # the same account after losing the admin role still owns the draft
+    creator = client_with_hashed_email(SAMPLE_EMAIL, "user")
+
+    z = deepcopy(SAMPLE_OONIFINDING)
+    r = admin.post("api/v1/incidents/create", json=z)
+    assert r.status_code == 200
+    incident_id = r.json()["id"]
+
+    for c, visible in (
+        (client, False),
+        (client_with_user_role, False),
+        (creator, True),
+        (admin, True),
+    ):
+        r = c.get(f"api/v1/incidents/show/{incident_id}")
+        assert r.status_code == (200 if visible else 404)
+        r = c.get("api/v1/incidents/search")
+        ids = [i["id"] for i in r.json()["incidents"]]
+        assert (incident_id in ids) == visible
+
+    r = admin.post(
+        "api/v1/incidents/publish",
+        json=admin.get(f"api/v1/incidents/show/{incident_id}").json()["incident"],
+    )
+    assert r.json()["r"] == 1
+    for c in (client, client_with_user_role, creator, admin):
+        assert c.get(f"api/v1/incidents/show/{incident_id}").status_code == 200
 
 
 def test_oonifinding_create(client, client_with_hashed_email, client_with_user_role):

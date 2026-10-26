@@ -55,6 +55,33 @@ def test_oonidata_aggregation_analysis_with_filters(
         assert result[filter_param] == filter_value, result
 
 
+def test_oonidata_aggregation_analysis_ooni_run_link_id(
+    client, params_since_and_until_with_ten_days
+):
+    params = dict(params_since_and_until_with_ten_days)
+    response = client.get(route, params=params)
+    all_count = sum(r["count"] for r in response.json()["results"])
+
+    params["ooni_run_link_id"] = "00104"
+    response = client.get(route, params=params)
+
+    assert response.status_code == 200, response.text
+    run_link_count = sum(r["count"] for r in response.json()["results"])
+    assert 0 < run_link_count < all_count
+
+
+def test_oonidata_aggregation_analysis_unknown_ooni_run_link_id(
+    client, params_since_and_until_with_ten_days
+):
+    params = params_since_and_until_with_ten_days
+    params["ooni_run_link_id"] = "10001"
+
+    response = client.get(route, params=params)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["results"] == []
+
+
 def test_oonidata_aggregation_analysis_measurement_uid_only_skips_default_date_window(
     client,
 ):
