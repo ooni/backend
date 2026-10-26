@@ -8,13 +8,13 @@ description = ''
 dynamic = ["version"]
 
 dependencies = [
-  "fastapi ~= 0.108.0",
+  "fastapi ~= 0.142.2",
   "filelock ~= 3.20.0",
   "clickhouse-driver ~= 0.2.6",
   "sqlalchemy ~= 2.0.27",
-  "dulwich~=0.25.2",
-  "ujson ~= 5.9.0",
-  "urllib3 ~= 2.6.3",
+  "dulwich ~= 1.2.17",
+  "ujson ~= 5.13.0",
+  "urllib3 ~= 2.8.0",
   "python-dateutil ~= 2.8.2",
   "gitpython ~= 3.1.45",
   "pydantic-settings ~= 2.1.0",
@@ -22,9 +22,9 @@ dependencies = [
   "uvicorn ~= 0.25.0",
   "psycopg2 ~= 2.9.9",
   "httpx ~= 0.26.0",
-  "pyjwt ~= 2.8.0",
+  "pyjwt ~= 2.15.1",
   "alembic ~= 1.13.1",
-  "prometheus-fastapi-instrumentator ~= 6.1.0",
+  "prometheus-fastapi-instrumentator ~= 8.1.0",
   "prometheus-client",
   "pem ~= 23.1.0",
   "geoip2 ~= 5.0.1",
@@ -36,18 +36,14 @@ dependencies = [
 ]
 
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = "MPL-2.0"
 keywords = []
 authors = [{ name = "OONI", email = "contact@ooni.org" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
