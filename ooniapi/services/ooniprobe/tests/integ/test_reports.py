@@ -1,8 +1,11 @@
 import json
 import re
-import zstd
+from compression import zstd
 import pytest
+from prometheus_client import REGISTRY
 import ujson
+
+from ooniprobe.routers import reports
 
 from ..utils import get_msmt_hash
 
@@ -215,3 +218,99 @@ async def test_fastpath_only_submits_once_on_success(client_with_two_working_fas
 
     stored = ujson.loads(mock_fastpath.uploads[expected_url])
     assert get_msmt_hash(stored) == expected_hash
+
+
+def _msmt_body(padding: int = 0) -> bytes:
+    """A valid measurement upload for the integtest report, with a test key
+    padded to the given number of characters"""
+    return json.dumps({
+        "format": "json",
+        "content": {
+            "test_keys": {"padding": "x" * padding},
+            "probe_cc": "IT",
+            "probe_asn": "AS1",
+            "test_name": "integtest",
+        },
+    }).encode()
+
+
+RID = "20230101T000000Z_integtest_IT_1_n1_integtest0000000"
+
+
+@pytest.mark.asyncio
+async def test_collector_upload_large_msmt(client):
+    """8 MB, about the largest upload seen in a week, is still accepted,
+    plain and zstd compressed"""
+    body = _msmt_body(8 * 1024 * 1024)
+    c = post(client, f"/report/{RID}", body)
+    assert "measurement_uid" in c, c
+    zbody = zstd.compress(body)
+    c = post(client, f"/report/{RID}", zbody, headers=[("Content-Encoding", "zstd")])
+    assert "measurement_uid" in c, c
+
+
+# The limits are lowered for these tests, and oversized inputs generated
+# 1 MB at a time, so they need little memory
+MB = 1024 * 1024
+CHUNK = b"\0" * MB
+
+
+def _chunks(size: int):
+    for _ in range(size // MB):
+        yield CHUNK
+
+
+def _bad_count(reason: str) -> float:
+    return REGISTRY.get_sample_value("measurement_bad_count_total", {"reason": reason}) or 0.0
+
+
+@pytest.mark.asyncio
+async def test_collector_upload_body_too_large(client, small_limits):
+    size = reports.MAX_BODY_SIZE + MB
+    before = _bad_count("body_too_large")
+    # refused on Content-Length, before the body is read
+    resp = client.post(f"/report/{RID}", content=_chunks(size), headers={"Content-Length": str(size)})
+    assert resp.status_code == 413, resp.content
+    # without Content-Length the body is streamed, and cut off past the limit
+    resp = client.post(f"/report/{RID}", content=_chunks(size))
+    assert resp.status_code == 413, resp.content
+    assert _bad_count("body_too_large") == before + 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("write_content_size", [True, False])
+async def test_collector_upload_zstd_decompressed_too_large(client, small_limits, write_content_size):
+    """A small zstd upload that decompresses past the cap is refused,
+    whether or not its frame declares its size"""
+    size = reports.MAX_DECOMPRESSED_SIZE + MB
+    comp = zstd.ZstdCompressor(options={zstd.CompressionParameter.content_size_flag: write_content_size})
+    if write_content_size:
+        comp.set_pledged_input_size(size)
+    zbody = b"".join(comp.compress(c) for c in _chunks(size)) + comp.flush()
+    assert len(zbody) < MB
+    before = _bad_count("decompressed_too_large")
+    resp = client.post(f"/report/{RID}", content=zbody, headers=[("Content-Encoding", "zstd")])
+    assert resp.status_code == 413, resp.content
+    assert _bad_count("decompressed_too_large") == before + 1
+
+
+@pytest.mark.asyncio
+async def test_collector_upload_zstd_multiple_frames(client):
+    """Concatenated zstd frames are one valid stream: the upload is the
+    concatenation of what every frame decompresses to"""
+    body = _msmt_body(1000)
+    half = len(body) // 2
+    zbody = zstd.compress(body[:half]) + zstd.compress(body[half:])
+    c = post(client, f"/report/{RID}", zbody, headers=[("Content-Encoding", "zstd")])
+    assert "measurement_uid" in c, c
+
+
+@pytest.mark.asyncio
+async def test_collector_upload_zstd_frames_too_large_together(client, small_limits):
+    """The cap holds for all frames together, not for each one"""
+    frame = zstd.compress(b"\0" * (reports.MAX_DECOMPRESSED_SIZE // 2))
+    zbody = frame * 3
+    before = _bad_count("decompressed_too_large")
+    resp = client.post(f"/report/{RID}", content=zbody, headers=[("Content-Encoding", "zstd")])
+    assert resp.status_code == 413, resp.content
+    assert _bad_count("decompressed_too_large") == before + 1

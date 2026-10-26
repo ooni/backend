@@ -4,8 +4,9 @@ from datetime import datetime, timezone
 from hashlib import sha512
 from typing import Any, Dict, List, Tuple
 
+from compression import zstd
+
 import ujson
-import zstd
 from fastapi import APIRouter, Header, Request, Response
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
@@ -28,6 +29,49 @@ from ..utils import (
 )
 
 router = APIRouter()
+
+# Largest measurement upload accepted, as sent, and once zstd decompressed.
+# Over 7 days (2026-10) the largest POST /report body was 8.3 MB and 99.9%
+# were under 1 MB; the largest decompressed measurements in fastpath's spool
+# were around 1 MB. Each request holds the body, the parsed JSON and a
+# serialized copy at once, so the decompressed cap also bounds its memory.
+MAX_BODY_SIZE = 16 * 1024 * 1024
+MAX_DECOMPRESSED_SIZE = 32 * 1024 * 1024
+
+
+class MeasurementTooLarge(Exception):
+    pass
+
+
+async def read_body(request: Request, limit: int) -> bytes:
+    """Read the request body, stopping as soon as it exceeds limit bytes"""
+    content_length = request.headers.get("content-length", "")
+    if content_length.isdigit() and int(content_length) > limit:
+        raise MeasurementTooLarge()
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > limit:
+            raise MeasurementTooLarge()
+    return bytes(body)
+
+
+def zstd_decompress(data: bytes, limit: int) -> bytes:
+    """Decompress zstd data, one frame after the other, stopping as soon as
+    the output exceeds limit bytes, whatever size the frames declare"""
+    out = bytearray()
+    while True:
+        # a decompressor handles a single frame: past its end it raises
+        # EOFError, so each frame needs a new one
+        dec = zstd.ZstdDecompressor()
+        out += dec.decompress(data, max_length=limit + 1 - len(out))
+        if len(out) > limit:
+            raise MeasurementTooLarge()
+        if not dec.eof:
+            raise zstd.ZstdError("truncated zstd frame")
+        data = dec.unused_data
+        if not data:
+            return bytes(out)
 
 log = logging.getLogger(__name__)
 
@@ -159,14 +203,21 @@ async def receive_measurement(
         Metrics.BAD_MEASUREMENTS_CNT.labels(reason="cc_zz").inc()
         return empty_measurement
 
-    with Metrics.READ_BODY_TIMING.time():
-        data = await request.body()
+    try:
+        with Metrics.READ_BODY_TIMING.time():
+            data = await read_body(request, MAX_BODY_SIZE)
+    except MeasurementTooLarge:
+        Metrics.BAD_MEASUREMENTS_CNT.labels(reason="body_too_large").inc()
+        error("Measurement too large", status_code=413)
 
     if content_encoding == "zstd":
         try:
             compressed_len = len(data)
-            data = zstd.decompress(data)
+            data = zstd_decompress(data, MAX_DECOMPRESSED_SIZE)
             log.debug(f"Zstd compression ratio {compressed_len / len(data)}")
+        except MeasurementTooLarge:
+            Metrics.BAD_MEASUREMENTS_CNT.labels(reason="decompressed_too_large").inc()
+            error("Measurement too large", status_code=413)
         except Exception as e:
             log.info(f"Failed zstd decompression. Error: {e}")
             Metrics.BAD_MEASUREMENTS_CNT.labels(reason="zstd_fail").inc()
