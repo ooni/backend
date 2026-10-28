@@ -21,6 +21,7 @@ from oonimeasurements.common.dependencies import get_clickhouse_session
 from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
 
 from ...common.routers import BaseModel
+from ...common.utils import setcacheresponse, setnocacheresponse
 from ...utils.api import normalize_datetime
 
 router = APIRouter()
@@ -295,7 +296,10 @@ async def get_measurements(
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
     cacheable = until and until < datetime.now(timezone.utc) - timedelta(hours=72)
-    cacheable = False  # FIXME
+    if cacheable:
+        setcacheresponse("1d", response)
+    else:
+        setnocacheresponse(response)
 
     # Assemble query
     colnames = [
@@ -420,9 +424,6 @@ async def get_measurements(
         msg = f"Stats: {pq.progress.rows} {pq.progress.bytes} {pq.progress.total_rows} {pq.elapsed}"
         log.info(msg)
 
-        if cacheable:
-            response.headers["Cache-Control"] = f"max_age={3600 * 24}"
-
         headers = {}
         if resp_format == "CSV":
             csv_data = convert_to_csv(r)
@@ -431,7 +432,12 @@ async def get_measurements(
                     f"attachment; filename=ooni-aggregate-data.csv"
                 )
 
-            return Response(content=csv_data, media_type="text/csv", headers=headers)
+            response = Response(content=csv_data, media_type="text/csv", headers=headers)
+            if cacheable:
+                setcacheresponse("1d", response)
+            else:
+                setnocacheresponse(response)
+            return response
 
         else:
             if download:

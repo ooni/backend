@@ -52,9 +52,21 @@ def test_aggregation_no_axis_with_caching(client):
     assert j["result"]["measurement_count"] > 0
     assert j["result"]["ok_count"] > 0
 
-    h = dict(resp.headers)
-    # FIXME: caching is currently disabled
-    # assert h["Cache-Control"] == "max-age=86400"
+    assert resp.headers["Cache-Control"] == "max-age=86400"
+
+
+def test_aggregation_csv_with_caching(client):
+    url = "aggregation?probe_cc=IT&since=2024-01-01&until=2024-02-01&format=CSV"
+    r = client.get(f"/api/v1/{url}")
+    assert r.headers["Cache-Control"] == "max-age=86400"
+
+
+def test_aggregation_recent_not_cached(client):
+    # the last 72 hours can still change
+    until = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    r = client.get(f"/api/v1/aggregation?probe_cc=IT&since=2024-01-01&until={until}")
+    assert r.status_code == 200, r.text
+    assert "Cache-Control" not in r.headers
 
 
 def test_aggregation_no_axis_csv(client):
