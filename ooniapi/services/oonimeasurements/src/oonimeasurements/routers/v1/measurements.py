@@ -279,7 +279,7 @@ def _fetch_measurement_body(
     raise MeasurementNotFound
 
 
-class MeasurementOutcome(str, Enum):
+class MsmtOutcome(str, Enum):
     """
     Verdict for the measurement, computed by the backend.
 
@@ -287,8 +287,8 @@ class MeasurementOutcome(str, Enum):
     - `anomaly`: signs of blocking were detected
     - `confirmed`: blocking was confirmed (e.g. a known blockpage)
     - `failed`: the measurement failed
-    - `down`: `web_connectivity` only; analysis indicates the website was down rather than blocked
-    - `error`: web_connectivity only; analysis is inconclusive
+    - `down`: analysis indicates the target was down rather than blocked
+    - `error`: analysis is inconclusive
     """
 
     OK = "ok"
@@ -331,7 +331,7 @@ class MeasurementMeta(BaseModel):
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
-    outcome: Optional[MeasurementOutcome] = None
+    outcome: Optional[MsmtOutcome] = None
     analysis_ready: Optional[bool] = None
     outcome_details: Optional[OutcomeDetails] = None
 
@@ -360,6 +360,69 @@ def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
         )
     )
     return formatted_msmt_meta
+
+
+def _get_measurement_outcome(
+    db: ClickhouseClient, msmt_meta: dict
+) -> tuple[MsmtOutcome, bool, Optional[OutcomeDetails]]:
+    """
+    Compute outcome, analysis_ready and outcome_details for a fastpath row,
+    using analysis_web_measurement when available.
+    Returns (outcome, analysis_ready, outcome_details)
+    """
+    # replacing merge tree, it can be duplicated for a while, most likely
+    # during a backfill.
+    query = """SELECT * FROM analysis_web_measurement
+        WHERE measurement_uid = :uid
+        LIMIT 1
+    """
+    query_params = dict(uid=msmt_meta["measurement_uid"])
+    analysis = query_click_one_row(db, sql.text(query), query_params)
+
+    analysis_ready = analysis is not None
+    details = None
+    if analysis is not None:
+        layers = {
+            name: AnalysisLayer(
+                blocked=analysis[f"{name}_blocked"],
+                down=analysis[f"{name}_down"],
+                ok=analysis[f"{name}_ok"],
+                top_failure=analysis[f"top_{name}_failure"],
+                top_rule_id=analysis[f"top_{name}_rule_id"] or None,
+            )
+            for name in ("dns", "tcp", "tls")
+        }
+        blocking_type = max(layers, key=lambda name: layers[name].blocked)
+        if layers[blocking_type].blocked <= 0:
+            blocking_type = None
+        details = OutcomeDetails(
+            blocking_type=blocking_type,
+            top_probe_analysis=analysis["top_probe_analysis"],
+            **layers,
+        )
+
+    if msmt_meta["msm_failure"] == "t":
+        outcome = MsmtOutcome.FAILED
+    elif msmt_meta["confirmed"] == "t":
+        outcome = MsmtOutcome.CONFIRMED
+    elif msmt_meta["anomaly"] == "t":
+        outcome = MsmtOutcome.ANOMALY
+    elif details is None:
+        outcome = MsmtOutcome.OK
+    else:
+        layers = (details.dns, details.tcp, details.tls)
+        blocked = max(layer.blocked for layer in layers)
+        down = max(layer.down for layer in layers)
+        ok = max(layer.ok for layer in layers)
+        if down > max(blocked, ok):
+            outcome = MsmtOutcome.DOWN
+        elif ok > max(blocked, down):
+            outcome = MsmtOutcome.OK
+        else:
+            # we don't know what to say here
+            outcome = MsmtOutcome.ERROR
+
+    return outcome, analysis_ready, details
 
 
 def _get_measurement_meta_clickhouse(
