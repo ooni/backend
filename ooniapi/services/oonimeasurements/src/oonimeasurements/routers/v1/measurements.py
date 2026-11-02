@@ -8,6 +8,7 @@ import logging
 import string
 import time
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode, urljoin
 from urllib.request import urlopen
@@ -276,6 +277,26 @@ def _fetch_measurement_body(
         return body.decode("utf-8")
 
     raise MeasurementNotFound
+
+
+class MeasurementOutcome(str, Enum):
+    """
+    Verdict for the measurement, computed by the backend.
+
+    - `ok`: no anomaly detected
+    - `anomaly`: signs of blocking were detected
+    - `confirmed`: blocking was confirmed (e.g. a known blockpage)
+    - `failed`: the measurement failed
+    - `down`: `web_connectivity` only; analysis indicates the website was down rather than blocked
+    - `error`: web_connectivity only; analysis is inconclusive
+    """
+
+    OK = "ok"
+    ANOMALY = "anomaly"
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+    DOWN = "down"
+    ERROR = "error"
 
 
 class MeasurementMeta(BaseModel):
