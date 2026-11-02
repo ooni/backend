@@ -299,6 +299,22 @@ class MeasurementOutcome(str, Enum):
     ERROR = "error"
 
 
+class AnalysisLayer(BaseModel):
+    blocked: float
+    down: float
+    ok: float
+    top_failure: Optional[str] = None
+    top_rule_id: Optional[str] = None
+
+
+class OutcomeDetails(BaseModel):
+    blocking_type: Optional[str] = None
+    top_probe_analysis: Optional[str] = None
+    dns: AnalysisLayer
+    tcp: AnalysisLayer
+    tls: AnalysisLayer
+
+
 class MeasurementMeta(BaseModel):
     input: Optional[str] = None
     measurement_start_time: Optional[datetime] = None
@@ -315,6 +331,9 @@ class MeasurementMeta(BaseModel):
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
+    outcome: Optional[MeasurementOutcome] = None
+    analysis_ready: Optional[bool] = None
+    outcome_details: Optional[OutcomeDetails] = None
 
     @field_serializer("measurement_start_time", "test_start_time")
     def format_ts(self, v: datetime) -> str:
