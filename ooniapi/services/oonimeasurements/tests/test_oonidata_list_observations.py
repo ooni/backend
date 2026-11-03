@@ -95,3 +95,10 @@ def test_oonidata_list_observations_next_url_keeps_measurement_uid(client):
     j = getj(client, f"{next_url.path}?{next_url.query}")
     for row in j["results"]:
         assert row["measurement_uid"] == measurement_uid, row
+
+
+def test_list_obs_deprecation_headers(client):
+    response = client.get(route, params={"measurement_uid": measurement_uid})
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "@1793664000"  # 2026-11-03 UTC
+    assert "/api/v1/measurements>" in response.headers["Link"]

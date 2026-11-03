@@ -1,11 +1,11 @@
 import dataclasses
 import math
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional, Union
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
@@ -165,9 +165,10 @@ class ListObservationsResponse(BaseModel):
     results: List[ObservationEntry]
 
 
-@router.get("/v1/observations", tags=["observations", "list_data"])
+@router.get("/v1/observations", tags=["observations", "list_data"], deprecated=True)
 @parse_probe_asn_to_int
 async def list_observations(
+    response: Response,
     measurement_uid: Annotated[str, Query(
         description="""
         Required. The measurement_uid of the measurement to list
@@ -207,8 +208,17 @@ async def list_observations(
 
     This endpoint used to allow listing measurements by time intervals, however
     we're not at capacity to support this use case at the moment, so we will
-    limit this functionality at the moment.
+    limit this functionality for the time being.
+
+    Deprecated: use `/api/v1/measurements` to find measurements, then query
+    their observations here by `measurement_uid`.
     """
+    # RFC 9745 Deprecation header: "@" followed by the unix timestamp
+    deprecation_ts = int(datetime(2026, 11, 3, tzinfo=timezone.utc).timestamp())
+    response.headers["Deprecation"] = f"@{deprecation_ts}"
+    response.headers["Link"] = (
+        f'<{settings.base_url}/api/v1/measurements>; rel="alternate"'
+    )
     q_args = {}
     and_clauses = []
     q_args["measurement_uid"] = measurement_uid
@@ -259,7 +269,7 @@ async def list_observations(
                 entry.target_id = entry.hostname or entry.tls_server_name
             results.append(entry)
 
-    response = ListObservationsResponse(
+    result = ListObservationsResponse(
         metadata=ResponseMetadata(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
@@ -274,4 +284,4 @@ async def list_observations(
         results=results,
     )
 
-    return response
+    return result
