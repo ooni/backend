@@ -1,7 +1,7 @@
 import dataclasses
 import math
 import time
-from datetime import date, datetime
+from datetime import datetime
 from typing import List, Literal, Optional, Union
 from urllib.parse import urlencode
 
@@ -181,8 +181,6 @@ async def list_observations(
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
-    since: Annotated[Optional[date], Query()] = None,
-    until: Annotated[Optional[date], Query()] = None,
     order_by: Annotated[
         Literal[
             "measurement_start_time",
@@ -242,13 +240,6 @@ async def list_observations(
     if ooni_run_link_id is not None:
         q_args["ooni_run_link_id"] = ooni_run_link_id
         and_clauses.append("ooni_run_link_id = %(ooni_run_link_id)s")
-
-    if since is not None:
-        q_args["since"] = since
-        and_clauses.append("measurement_start_time >= %(since)s")
-    if until is not None:
-        and_clauses.append("measurement_start_time <= %(until)s")
-        q_args["until"] = until
 
     cols = list(WebObservationEntry.model_json_schema()["properties"].keys())
     q = f"SELECT {','.join(cols)} FROM obs_web"

@@ -37,24 +37,6 @@ def test_list_obs_measurement_uid_only(client):
         assert row["measurement_uid"] == measurement_uid, row
 
 
-def test_list_obs_measurement_uid_with_explicit_since_and_until(client):
-    """
-    An explicit since/until must still be honored even when measurement_uid is set.
-    """
-    params = {
-        "measurement_uid": measurement_uid,
-        # This range does not cover the measurement's date (2024-11-01).
-        "since": "2025-01-01",
-        "until": "2025-01-02",
-    }
-
-    response = client.get(route, params=params)
-
-    json = response.json()
-    assert isinstance(json["results"], list), json
-    assert len(json["results"]) == 0
-
-
 @pytest.mark.parametrize(
     "filter_name, filter_value",
     [
