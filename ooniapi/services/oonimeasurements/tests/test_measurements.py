@@ -789,7 +789,7 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     assert j["analysis_ready"] is True
 
     details = j["outcome_details"]
-    assert details["blocking_type"] == "dns"
+    assert details["blocking_layer"] == "dns"
     assert details["dns"] == {
         "blocked": pytest.approx(0.1),
         "down": pytest.approx(0.9),

@@ -300,6 +300,9 @@ class MsmtOutcome(str, Enum):
 
 
 class AnalysisLayer(BaseModel):
+    """
+    Analysis details for a specific layer
+    """
     blocked: float
     down: float
     ok: float
@@ -308,7 +311,8 @@ class AnalysisLayer(BaseModel):
 
 
 class OutcomeDetails(BaseModel):
-    blocking_type: Optional[str] = None
+    # layer of blocking: dns, tcp, tls
+    blocking_layer: Optional[str] = None
     dns: AnalysisLayer
     tcp: AnalysisLayer
     tls: AnalysisLayer
@@ -399,11 +403,12 @@ def _get_measurement_outcome(
             )
             for name in ("dns", "tcp", "tls")
         }
-        blocking_type = max(layers, key=lambda name: layers[name].blocked)
-        if layers[blocking_type].blocked <= 0:
-            blocking_type = None
+        # dns, tcp, tls
+        blocking_layer = max(layers, key=lambda name: layers[name].blocked)
+        if layers[blocking_layer].blocked <= 0:
+            blocking_layer = None
         details = OutcomeDetails(
-            blocking_type=blocking_type,
+            blocking_layer=blocking_layer,
             **layers,
         )
 
