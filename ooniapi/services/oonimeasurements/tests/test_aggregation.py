@@ -61,15 +61,15 @@ def test_aggregation_csv_with_caching(client):
     assert r.headers["Cache-Control"] == "max-age=86400"
 
 
-def test_aggregation_recent_not_cached(client):
-    # the last 72 hours can still change, so shared caches must not keep them
+def test_aggregation_recent_cached_briefly(client):
+    # the last 72 hours can still change, so caches keep them for a minute only
     until = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     for fmt in ("JSON", "CSV"):
         r = client.get(
             f"/api/v1/aggregation?probe_cc=IT&since=2024-01-01&until={until}&format={fmt}"
         )
         assert r.status_code == 200, r.text
-        assert r.headers["Cache-Control"] == "no-cache"
+        assert r.headers["Cache-Control"] == "max-age=60"
 
 
 def test_aggregation_no_axis_csv(client):
