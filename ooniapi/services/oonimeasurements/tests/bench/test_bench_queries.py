@@ -122,6 +122,8 @@ CASES = {
         {"probe_cc": CC, "group_by": ["failure", "timestamp"]},
     ),
     "aggregation_observations.hostname": ("/api/v1/aggregation/observations", {"hostname": DOMAIN}),
+    # /api/v1/observations/{measurement_uid}
+    "observations.uid": ("/api/v1/observations/{obs_measurement_uid}", {}),
     # /api/v1/analysis, /api/v1/aggregation/analysis, /api/v1/detector/changepoints
     "analysis.default": ("/api/v1/analysis", {}),
     "analysis.cc": ("/api/v1/analysis", {"probe_cc": CC}),
@@ -163,6 +165,11 @@ def samples(bench):
         f"SELECT probe_asn, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
         f" AND measurement_start_time >= {TODAY} - 30 GROUP BY probe_asn, input ORDER BY count() DESC, probe_asn, input LIMIT 1"
     )
+    # obs_web's synthetic uids are not fastpath's: sample one from obs_web
+    [(obs_measurement_uid,)] = bench.click.execute(
+        f"SELECT measurement_uid FROM obs_web WHERE probe_cc = '{CC}'"
+        f" AND measurement_start_time >= {TODAY} - 7 ORDER BY measurement_uid LIMIT 1"
+    )
     # cont tokens for the deep pages: the row before each page, in the
     # search's order (time, then uid, descending), as _make_cont writes it
     conts = {}
@@ -176,6 +183,7 @@ def samples(bench):
     return {
         "report_id": report_id,
         "measurement_uid": measurement_uid,
+        "obs_measurement_uid": obs_measurement_uid,
         "input": input,
         "busiest_asn": str(busiest_asn),
         "busiest_input": busiest_input,
@@ -250,6 +258,7 @@ HASHED = {
 @pytest.mark.parametrize("name", CASES)
 def test_bench_query(bench, bench_client, samples, name):
     path, params = CASES[name]
+    path = path.format(**samples)
     params = {k: v.format(**samples) if isinstance(v, str) else v for k, v in params.items()}
     body = bench.query(bench_client, name, path, params, unordered=name in UNORDERED, hashed=HASHED.get(name))
     if name in EMPTY:
