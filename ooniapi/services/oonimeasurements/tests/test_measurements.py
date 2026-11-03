@@ -777,3 +777,31 @@ def test_list_measurements_pagination_pins_default_window(client, insert_fastpat
     got += [r["measurement_uid"] for r in j["results"]]
 
     assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
+
+
+def test_get_measurement_meta_outcome_from_analysis(client):
+    # From fixtures: fastpath has no anomaly, the analysis says the website was down
+    uid = "20261102235954.625052_IT_webconnectivity_8f3c70c1d4c17f8e"
+    j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
+
+    assert j["anomaly"] is False
+    assert j["outcome"] == "down"
+    assert j["analysis_ready"] is True
+
+    details = j["outcome_details"]
+    assert details["blocking_type"] == "dns"
+    assert details["top_probe_analysis"] == "false"
+    assert details["dns"] == {
+        "blocked": pytest.approx(0.1),
+        "down": pytest.approx(0.9),
+        "ok": 0.0,
+        "top_failure": "android_dns_cache_no_data",
+        "top_rule_id": "dns_system_failure_ctrl_also_failing",
+    }
+    assert details["tls"] == {
+        "blocked": 0.0,
+        "down": 0.0,
+        "ok": 0.0,
+        "top_failure": None,
+        "top_rule_id": "no_tls_data",
+    }
