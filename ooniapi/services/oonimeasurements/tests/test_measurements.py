@@ -765,3 +765,17 @@ def test_list_measurements_pagination_pins_default_window(client, insert_fastpat
     got += [r["measurement_uid"] for r in j["results"]]
 
     assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
+
+
+def test_get_measurement_observations(client):
+    uid = "20241101233410.169530_DE_webconnectivity_2eb2a331c9ce0630"
+    results = getj(client, f"/api/v1/observations/{uid}")["results"]
+    assert len(results) > 0
+    assert all(row["measurement_uid"] == uid for row in results)
+
+def test_get_measurement_observations_not_found(client):
+    getj(
+        client,
+        "/api/v1/observations/20241101233410.169530_XX_nonexistent",
+        expected_status=404,
+    )
