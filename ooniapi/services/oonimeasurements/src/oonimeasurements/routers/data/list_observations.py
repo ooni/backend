@@ -1,11 +1,12 @@
 import dataclasses
+import functools
 import math
 import time
 from datetime import datetime, timezone
 from typing import List, Literal, Optional, Union
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
@@ -160,6 +161,14 @@ class WebObservationEntry(BaseModel):
 ObservationEntry = Union[WebObservationEntry, BaseModel]
 
 
+@functools.cache
+def web_observation_columns() -> tuple[str, ...]:
+    """
+    Columns of obs_web returned by the API, computed once
+    """
+    return tuple(WebObservationEntry.model_json_schema()["properties"].keys())
+
+
 class ListObservationsResponse(BaseModel):
     metadata: ResponseMetadata
     results: List[ObservationEntry]
@@ -251,7 +260,7 @@ async def list_observations(
         q_args["ooni_run_link_id"] = ooni_run_link_id
         and_clauses.append("ooni_run_link_id = %(ooni_run_link_id)s")
 
-    cols = list(WebObservationEntry.model_json_schema()["properties"].keys())
+    cols = web_observation_columns()
     q = f"SELECT {','.join(cols)} FROM obs_web"
     if len(and_clauses) > 0:
         q += " WHERE "
@@ -285,3 +294,35 @@ async def list_observations(
     )
 
     return result
+
+
+class MeasurementObservations(BaseModel):
+    results: List[WebObservationEntry]
+
+
+@router.get("/v1/observations/{measurement_uid}", tags=["observations"])
+async def get_measurement_observations(
+    measurement_uid: str,
+    db=Depends(get_clickhouse_session),
+) -> MeasurementObservations:
+    """
+    Returns all the observations of the given measurement
+    """
+    # Only fetch what is needed for the API, observations have a lot of columns
+    cols = web_observation_columns()
+    query = f"""SELECT {','.join(cols)} FROM obs_web
+    WHERE measurement_uid = %(measurement_uid)s
+    ORDER BY observation_idx
+    """
+    rows = await async_query_click(db, query, {"measurement_uid": measurement_uid})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Observations not found")
+
+    results = []
+    for row in rows:
+        entry = WebObservationEntry(**row)
+        # target_id might be None, if it is fallback to hostname or
+        # tls_server_name
+        entry.target_id = entry.target_id or entry.hostname or entry.tls_server_name
+        results.append(entry)
+    return MeasurementObservations(results=results)
