@@ -805,3 +805,22 @@ def test_get_measurement_meta_outcome_from_analysis(client):
         "top_failure": None,
         "top_rule_id": "no_tls_data",
     }
+
+
+@pytest.mark.parametrize(
+    "uid, outcome",
+    [
+        ("20261102235959.421505_IT_webconnectivity_ffc43f72327e9e92", "ok"),
+        ("20261102230525.945442_IT_webconnectivity_304a9635f7c75acc", "anomaly"),
+        ("20261102235959.049245_IT_webconnectivity_f56830cb94c52473", "confirmed"),
+        ("20261102230555.630901_IT_webconnectivity_6f4be9d2e144d85b", "failed"),
+        ("20261102235954.625052_IT_webconnectivity_8f3c70c1d4c17f8e", "down"),
+        # analysis is a tie between blocked and down
+        ("20261102230217.292736_VE_webconnectivity_44e6f996ae10a97d", "error"),
+    ],
+)
+def test_get_measurement_meta_outcomes(client, uid, outcome):
+    j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
+    assert j["outcome"] == outcome
+    assert j["analysis_ready"] is True
+    assert j["outcome_details"] is not None
