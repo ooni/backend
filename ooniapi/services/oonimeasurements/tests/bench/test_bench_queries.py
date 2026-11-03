@@ -115,11 +115,7 @@ CASES = {
     "measurements.cc.input": ("/api/v1/measurements", {"probe_cc": "IR", "input": f"https://{IR_DOMAIN}/", "limit": "5", **LAST_30}),
     "measurement_meta.uid": ("/api/v1/measurement_meta", {"measurement_uid": "{measurement_uid}"}),
     "measurement_meta.report_id": ("/api/v1/measurement_meta", {"report_id": "{report_id}", "input": "{input}"}),
-    # /api/v1/observations, /api/v1/aggregation/observations
-    "observations.default": ("/api/v1/observations", {}),
-    "observations.cc": ("/api/v1/observations", {"probe_cc": CC}),
-    "observations.2d": ("/api/v1/observations", {"since": ago(3), "until": ago(1)}),
-    "observations.report_id": ("/api/v1/observations", {"report_id": "{obs_report_id}"}),
+    # /api/v1/aggregation/observations
     "aggregation_observations.default": ("/api/v1/aggregation/observations", {}),
     "aggregation_observations.cc.timestamp": (
         "/api/v1/aggregation/observations",
@@ -163,9 +159,6 @@ def samples(bench):
         f"SELECT report_id, measurement_uid, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
         f" AND measurement_start_time >= {TODAY} - 7 ORDER BY measurement_uid LIMIT 1"
     )
-    [(obs_report_id,)] = bench.click.execute(
-        f"SELECT report_id FROM obs_web WHERE measurement_start_time >= {TODAY} - 7 ORDER BY measurement_uid LIMIT 1"
-    )
     [(busiest_asn, busiest_input)] = bench.click.execute(
         f"SELECT probe_asn, input FROM fastpath WHERE probe_cc = '{CC}' AND test_name = 'web_connectivity'"
         f" AND measurement_start_time >= {TODAY} - 30 GROUP BY probe_asn, input ORDER BY count() DESC, probe_asn, input LIMIT 1"
@@ -184,7 +177,6 @@ def samples(bench):
         "report_id": report_id,
         "measurement_uid": measurement_uid,
         "input": input,
-        "obs_report_id": obs_report_id,
         "busiest_asn": str(busiest_asn),
         "busiest_input": busiest_input,
         **conts,
@@ -229,7 +221,7 @@ def _counts_only(body):
 
 
 def _defined_order(body):
-    # observations and analysis: ORDER BY measurement_start_time DESC LIMIT leaves rows with the same
+    # analysis: ORDER BY measurement_start_time DESC LIMIT leaves rows with the same
     # time in no defined order, and at the page's end which of them make the
     # page: production has ~23 measurements a second, analysis here ~16 rows
     # a second. Compare only what the ORDER BY defines: the rows in order of
@@ -251,7 +243,7 @@ def _defined_order(body):
 HASHED = {
     "private.circumvention_runtime_stats": _counts_only,
     **{name: _defined_order for name, (path, _) in CASES.items()
-       if path in ("/api/v1/observations", "/api/v1/analysis") and name not in EMPTY},
+       if path == "/api/v1/analysis" and name not in EMPTY},
 }
 
 
