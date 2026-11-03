@@ -340,7 +340,12 @@ class MeasurementMeta(BaseModel):
         return v.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
+def format_msmt_meta(
+    msmt_meta: dict,
+    outcome: MsmtOutcome,
+    analysis_ready: bool,
+    outcome_details: Optional[OutcomeDetails],
+) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
         input=msmt_meta["input"],
         measurement_start_time=msmt_meta["measurement_start_time"],
@@ -357,7 +362,10 @@ def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
         category_code=msmt_meta.get("category_code", None),
         verification_status=VerificationStatus.from_code(
             msmt_meta["is_verified"]
-        )
+        ),
+        outcome=outcome,
+        analysis_ready=analysis_ready,
+        outcome_details=outcome_details,
     )
     return formatted_msmt_meta
 
@@ -450,7 +458,8 @@ def _get_measurement_meta_clickhouse(
         # https://github.com/ooni/explorer/issues/495
         return MeasurementMeta()  # unwanted
 
-    return format_msmt_meta(msmt_meta)
+    outcome, analysis_ready, outcome_details = _get_measurement_outcome(db, msmt_meta)
+    return format_msmt_meta(msmt_meta, outcome, analysis_ready, outcome_details)
 
 
 def _get_measurement_meta_by_uid(
@@ -473,7 +482,8 @@ def _get_measurement_meta_by_uid(
         # https://github.com/ooni/explorer/issues/495
         return MeasurementMeta()  # unwanted
 
-    return format_msmt_meta(msmt_meta)
+    outcome, analysis_ready, outcome_details = _get_measurement_outcome(db, msmt_meta)
+    return format_msmt_meta(msmt_meta, outcome, analysis_ready, outcome_details)
 
 
 @router.get("/v1/raw_measurement")

@@ -4,7 +4,10 @@ from freezegun import freeze_time
 from clickhouse_driver import Client as Clickhouse
 from oonimeasurements.common.anonymous_credentials import VerificationStatus
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
-from oonimeasurements.routers.v1.measurements import format_msmt_meta
+from oonimeasurements.routers.v1.measurements import (
+    _get_measurement_outcome,
+    format_msmt_meta,
+)
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
 from urllib.parse import urlparse, parse_qs
@@ -209,7 +212,7 @@ def test_failure_format(db):
     row = query_click_one_row(ch, sql.text(q), query_params, query_prio=3) or {}
 
     # Validation shouldn't crash
-    format_msmt_meta(row)
+    format_msmt_meta(row, *_get_measurement_outcome(ch, row))
 
 
 def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtures):
@@ -396,7 +399,10 @@ def test_get_measurement_meta_basic(client):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
-        "verification_status" : "unverified"
+        "verification_status" : "unverified",
+        "outcome": "anomaly",
+        "analysis_ready": False,
+        "outcome_details": None,
     }
 
     # You can also query by measurment uid
@@ -437,7 +443,10 @@ def test_get_measurement_meta_input_none_from_fp(client):
         "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
         "test_name": "http_invalid_request_line",
         "test_start_time": "2021-07-09T00:00:16Z",
-        "verification_status" : "unverified"
+        "verification_status" : "unverified",
+        "outcome": "ok",
+        "analysis_ready": False,
+        "outcome_details": None,
     }
 
 
@@ -466,7 +475,10 @@ def test_get_measurement_meta_full(client, monkeypatch):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
-        "verification_status" : "unverified"
+        "verification_status" : "unverified",
+        "outcome": "anomaly",
+        "analysis_ready": False,
+        "outcome_details": None,
     }
     assert raw_msm
 
