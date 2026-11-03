@@ -309,7 +309,6 @@ class AnalysisLayer(BaseModel):
 
 class OutcomeDetails(BaseModel):
     blocking_type: Optional[str] = None
-    top_probe_analysis: Optional[str] = None
     dns: AnalysisLayer
     tcp: AnalysisLayer
     tls: AnalysisLayer
@@ -405,7 +404,6 @@ def _get_measurement_outcome(
             blocking_type = None
         details = OutcomeDetails(
             blocking_type=blocking_type,
-            top_probe_analysis=analysis["top_probe_analysis"],
             **layers,
         )
 
