@@ -502,9 +502,10 @@ def test_measurements_date_range_6_months_limit(client):
     assert resp.status_code == 200, f"Unexpected status code: {resp.status_code}. Response: {resp.json()}"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def torsf_fastpath_rows(db):
-    from clickhouse_driver import Client as ClickhouseClient
+    """Inserts torsf rows, deleted on teardown. Not through insert_fastpath:
+    it deletes by test_name, and the fixtures have torsf measurements too."""
 
     def row(i, cc, day, anomaly="f", failure="f"):
         return {
@@ -525,15 +526,17 @@ def torsf_fastpath_rows(db):
         row(2, "IT", 1, failure="t"),
         row(3, "DE", 2),
     ]
-    with ClickhouseClient.from_url(db) as click:
+    with Clickhouse.from_url(db) as click:
         click.execute(f"INSERT INTO fastpath ({','.join(rows[0])}) VALUES", rows)
+        yield
+        click.execute(
+            "ALTER TABLE fastpath DELETE WHERE measurement_uid LIKE '%%_torsf_torsfstats' SETTINGS mutations_sync = 1"
+        )
 
 
 def test_torsf_stats_filter_by_probe_cc(client, torsf_fastpath_rows):
     params = {"probe_cc": "IT", "since": "2019-02-28", "until": "2019-03-03"}
-    response = client.get("/api/v1/torsf_stats", params=params)
-    assert response.status_code == 200, response.text
-    assert response.json() == {
+    assert getj(client, "/api/v1/torsf_stats", params=params) == {
         "v": 0,
         "result": [
             {
@@ -551,9 +554,7 @@ def test_torsf_stats_filter_by_probe_cc(client, torsf_fastpath_rows):
 
 def test_torsf_stats_group_by_probe_cc(client, torsf_fastpath_rows):
     params = {"since": "2019-02-28", "until": "2019-03-03"}
-    response = client.get("/api/v1/torsf_stats", params=params)
-    assert response.status_code == 200, response.text
-    result = response.json()["result"]
+    result = getj(client, "/api/v1/torsf_stats", params=params)["result"]
     assert [(r["measurement_start_day"], r["probe_cc"], r["measurement_count"]) for r in result] == [
         ("2019-03-01", "IT", 3),
         ("2019-03-02", "DE", 1),
