@@ -60,12 +60,12 @@ jobs:
     steps:
       # full history: the base commit and tags are needed, and nothing is
       # pushed, so the token is not left in .git/config for the PR's code
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -134,7 +134,7 @@ jobs:
             --markdown --summary-file "$RUNNER_TEMP/summary.txt" >> "$GITHUB_STEP_SUMMARY"
           echo "exit=$?" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: oonimeasurements-benchmark

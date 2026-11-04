@@ -7,10 +7,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: 3.11
 
@@ -22,7 +22,7 @@ jobs:
         working-directory: ./ooniapi/services/oonimeasurements/
 
       - name: Upload coverage to codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           # authenticate with GitHub's OIDC token: no secret needed, and not
           # subject to the rate limit that drops tokenless uploads
