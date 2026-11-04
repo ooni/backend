@@ -833,3 +833,84 @@ def test_aggregation_empty_range_without_time_axis(client):
         "measurement_count": 0,
         "ok_count": 0,
     }
+
+
+# Aggregations served by the agg_day_cc_asn_test projection must equal the
+# plain query over fastpath. Default windows (no since/until) start and end
+# mid-day, so they also cover the partial days read outside the projection.
+PROJECTION_CASES = {
+    "no axis": {},
+    "probe_cc": {"axis_x": "probe_cc"},
+    "probe_asn x test_name": {"axis_x": "probe_asn", "axis_y": "test_name"},
+    "test_name, web_connectivity only": {"axis_x": "test_name", "test_name": "web_connectivity"},
+    "day": {"axis_x": "measurement_start_day", "time_grain": "day", "since": "2025-12-01", "until": "2026-01-15"},
+    "week x probe_cc": {"axis_x": "measurement_start_day", "axis_y": "probe_cc", "time_grain": "week", "since": "2025-11-01", "until": "2026-01-31"},
+    "month, web_connectivity": {"axis_x": "measurement_start_day", "time_grain": "month", "since": "2025-07-01", "until": "2026-02-01", "test_name": "web_connectivity"},
+    "default window, week": {"axis_x": "measurement_start_day", "time_grain": "week"},
+}
+BUCKETS = {"day": "toDate(measurement_start_time)", "week": "toStartOfWeek(measurement_start_time)", "month": "toStartOfMonth(measurement_start_time)"}
+COUNTS = (
+    "countIf(anomaly = 't' AND confirmed = 'f' AND msm_failure = 'f') AS anomaly_count, "
+    "countIf(confirmed = 't' AND msm_failure = 'f') AS confirmed_count, countIf(msm_failure = 't') AS failure_count, "
+    "countIf(anomaly = 'f' AND confirmed = 'f' AND msm_failure = 'f') AS ok_count, count() AS measurement_count"
+)
+
+
+def plain_aggregation(db, params, now):
+    """The aggregation as one query over fastpath, without projections."""
+    from clickhouse_driver import Client as ClickhouseClient
+
+    since = datetime.fromisoformat(params["since"]) if "since" in params else now - timedelta(days=180)
+    until = datetime.fromisoformat(params["until"]) if "until" in params else now
+    keys = [a for a in (params.get("axis_x"), params.get("axis_y")) if a]
+    exprs = [f"{BUCKETS[params['time_grain']]} AS {k}" if k == "measurement_start_day" else k for k in keys]
+    where = " AND test_name = %(test_name)s" if "test_name" in params else ""
+    group = f" GROUP BY {', '.join(keys)} ORDER BY {', '.join(keys)}" if keys else ""
+    with ClickhouseClient.from_url(db) as click:
+        rows, columns = click.execute(
+            f"SELECT {', '.join([COUNTS] + exprs)} FROM fastpath"
+            f" WHERE measurement_start_time >= %(since)s AND measurement_start_time < %(until)s{where}{group}"
+            " SETTINGS optimize_use_projections = 0",
+            dict(since=since, until=until, test_name=params.get("test_name")),
+            with_column_types=True,
+        )
+    names = [c for c, _ in columns]
+    result = [{n: (v.isoformat() if hasattr(v, "isoformat") else v) for n, v in zip(names, row)} for row in rows]
+    return result if keys else result[0]
+
+
+def last_aggregation_projections(db):
+    from clickhouse_driver import Client as ClickhouseClient
+
+    with ClickhouseClient.from_url(db) as click:
+        click.execute("SYSTEM FLUSH LOGS")
+        [(projections,)] = click.execute(
+            "SELECT projections FROM system.query_log WHERE type = 'QueryFinish'"
+            " AND query LIKE '%anomaly_count%' AND query NOT LIKE '%system.query_log%'"
+            " AND query NOT LIKE '%optimize_use_projections%'"
+            " ORDER BY event_time_microseconds DESC LIMIT 1"
+        )
+    return projections
+
+
+@pytest.mark.parametrize("case", PROJECTION_CASES)
+@freeze_time("2026-01-31 12:00:00")
+def test_aggregation_from_projection_equals_plain_query(client, db, case):
+    params = PROJECTION_CASES[case]
+    r = api(client, f"aggregation?{urlencode(params)}")
+    expected = plain_aggregation(db, params, datetime(2026, 1, 31, 12))
+    assert r["result"] == expected, fjd(r)
+    assert any("agg_day_cc_asn_test" in p for p in last_aggregation_projections(db))
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"axis_x": "measurement_start_day", "time_grain": "hour", "since": "2026-01-28", "until": "2026-01-31"},
+        {"axis_x": "probe_cc", "domain": "www.example.com"},
+        {"axis_x": "blocking_type"},
+    ],
+)
+def test_aggregation_outside_projection_reads_fastpath(client, db, params):
+    api(client, f"aggregation?{urlencode(params)}")
+    assert not any("agg_day_cc_asn_test" in p for p in last_aggregation_projections(db))
