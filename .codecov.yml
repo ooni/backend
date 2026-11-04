@@ -9,6 +9,10 @@ coverage:
         # the whole API is around 92%; fail on a drop of more than 1%
         target: auto
         threshold: 1%
+      # and never below this, so small drops can't add up; each status is
+      # its own check (codecov/project/floor) and both must pass
+      floor:
+        target: 90%
     patch:
       default:
         target: 95
