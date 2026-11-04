@@ -4,7 +4,8 @@ from typing import Annotated, TypeAlias
 from clickhouse_driver import Client as Clickhouse
 
 import boto3
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.routing import iter_route_contexts
 from fastapi import HTTPException, Header, Response
 from mypy_boto3_s3 import S3Client
 from sqlalchemy import create_engine
@@ -53,17 +54,43 @@ def role_required(roles: list[str]):
     return verify_jwt
 
 
+@lru_cache
+def route_templates(app: FastAPI) -> dict[int, str]:
+    """
+    Each route's full path template, as in the OpenAPI schema, built once per
+    app on its first request. Routes aren't hashable: they're keyed by id(),
+    and live as long as the app.
+
+    Adding or replacing routes at runtime (include_router, add_api_route or
+    mount after the first request) would break this: the map wouldn't know
+    the new routes, and their queries would be tagged "unknown". Every service
+    adds its routes once, when the app is created.
+    """
+    return {
+        id(ctx.original_route): ctx.path_format
+        for ctx in iter_route_contexts(app.routes)
+    }
+
+
+def route_template(request: Request) -> str:
+    """
+    The URL pattern of the matched route, not the actual path, so that the
+    log_comment stays low-cardinality:
+        route template    = /api/v1/measurement/{measurement_uid}
+        request.url.path  = /api/v1/measurement/1234
+
+    scope["route"] is the route as its router defined it, without
+    include_router's prefix (/api), so look its full template up.
+    """
+    return route_templates(request.app).get(id(request.scope.get("route")), "unknown")
+
+
 def get_clickhouse_session(settings: SettingsDep, request : Request):
     db = Clickhouse.from_url(settings.clickhouse_url)
 
-    # Route has the URL pattern, not the actual path.
-    # route             = /measurement/{measurement_uid}
-    # request.url.path  = /measurement/1234
-    route = request.scope.get("route")
-    path = route.path if route else "unknown"
     meta = dict(
         app_name = settings.app_name,
-        handler = f"{request.method} {path}"
+        handler = f"{request.method} {route_template(request)}"
     )
 
     db.settings['log_comment'] = ujson.dumps(
