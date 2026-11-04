@@ -106,7 +106,9 @@ branch = true
 parallel = true
 omit = [
   "src/oonimeasurements/common/*",
-  "src/oonimeasurements/__about__.py"
+  "src/oonimeasurements/__about__.py",
+  # the benchmarks run in their own workflow, not with the tests
+  "tests/bench/*",
 ]
 
 [tool.coverage.paths]
