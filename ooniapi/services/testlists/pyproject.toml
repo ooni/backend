@@ -9,7 +9,7 @@ dynamic = ["version"]
 
 dependencies = [
   "fastapi ~= 0.142.2",
-  "filelock ~= 3.20.0",
+  "filelock ~= 4.2.1",
   "clickhouse-driver ~= 0.2.6",
   "sqlalchemy ~= 2.0.27",
   "dulwich ~= 1.2.17",
