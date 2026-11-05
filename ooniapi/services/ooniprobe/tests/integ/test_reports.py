@@ -3,6 +3,9 @@ import re
 import zstd
 import pytest
 import ujson
+from starlette.requests import ClientDisconnect, Request
+
+from ooniprobe.metrics import Metrics
 
 from ..utils import get_msmt_hash
 
@@ -215,3 +218,36 @@ async def test_fastpath_only_submits_once_on_success(client_with_two_working_fas
 
     stored = ujson.loads(mock_fastpath.uploads[expected_url])
     assert get_msmt_hash(stored) == expected_hash
+
+
+@pytest.mark.parametrize(
+    "report_cc, label_cc",
+    [("IE", "IE"), ("ie", "IE"), ("Q1", "XX")],
+)
+def test_collector_upload_msmt_client_disconnect(client, monkeypatch, report_cc, label_cc):
+    rid = f"20200909T141111Z_webconnectivity_{report_cc}_34245_n1_disconnecttest00"
+
+    async def disconnected(self):
+        raise ClientDisconnect()
+
+    monkeypatch.setattr(Request, "body", disconnected)
+    counter = Metrics.CLIENT_DISCONNECT.labels(probe_cc=label_cc)
+    before = counter._value.get()
+
+    resp = client.post(f"/report/{rid}", json={"format": "json", "content": {}})
+
+    assert resp.status_code == 400, resp.json()
+    assert counter._value.get() == before + 1
+
+
+def test_collector_upload_msmt_body_read_error(client, monkeypatch):
+    rid = "20200909T141111Z_webconnectivity_IE_34245_n1_disconnecttest00"
+
+    async def broken(self):
+        raise RuntimeError("body read failed")
+
+    monkeypatch.setattr(Request, "body", broken)
+
+    resp = client.post(f"/report/{rid}", json={"format": "json", "content": {}})
+
+    assert resp.status_code == 500, resp.json()
