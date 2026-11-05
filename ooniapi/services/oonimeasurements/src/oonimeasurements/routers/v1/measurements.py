@@ -372,8 +372,20 @@ class MeasurementMeta(BaseModel):
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
     outcome: Optional[MsmtOutcome] = None
-    fastpath_analysis: Optional[FastpathAnalysis] = None
-    final_analysis: Optional[FinalAnalysis] = None
+    fastpath_analysis: Optional[FastpathAnalysis] = Field(
+        default=None,
+        description=(
+            "Preliminary analysis performed by the fastpath as soon as the "
+            "measurement is received. Prefer `final_analysis` when available."
+        ),
+    )
+    final_analysis: Optional[FinalAnalysis] = Field(
+        default=None,
+        description=(
+            "Final analysis performed by the analysis pipeline, it takes up to "
+            "1h after the measurement arrives to be available. "
+        ),
+        )
     analysis_ready: Optional[bool] = None
 
     @field_serializer("measurement_start_time", "test_start_time")
