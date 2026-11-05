@@ -4,6 +4,8 @@
 
 from pathlib import Path
 from datetime import date
+import os
+import time
 
 import pytest
 import json
@@ -1037,3 +1039,106 @@ def test_write_measurement_to_disk_rejects_bad_uid(tmp_path, monkeypatch, uid):
     fp.write_measurement_to_disk((b"{}", None, uid))
     # nothing is created anywhere under the test directory, not even the spool
     assert list(tmp_path.rglob("*")) == []
+
+
+# # worker supervision
+
+
+def _wsgi_post(app, uid="20221121172249.123456_RO_openvpn_0123456789abcdef"):
+    import io
+
+    status = []
+    environ = {
+        "REQUEST_METHOD": "POST",
+        "PATH_INFO": "/" + uid,
+        "wsgi.input": io.BytesIO(b'{"format": "json", "content": {}}'),
+    }
+    app(environ, lambda s, headers: status.append(s))
+    return status[0]
+
+
+def test_feeder_queues_measurements():
+    import multiprocessing as mp
+    from fastpath.localhttpfeeder import make_handler_app
+
+    q, accepting = mp.Queue(2), mp.Event()
+    accepting.set()
+    assert _wsgi_post(make_handler_app(q, accepting)) == "200 OK"
+    assert q.get(timeout=1)[2] == "20221121172249.123456_RO_openvpn_0123456789abcdef"
+
+
+def test_feeder_503_when_workers_are_gone():
+    import multiprocessing as mp
+    from fastpath.localhttpfeeder import make_handler_app
+
+    q, accepting = mp.Queue(2), mp.Event()
+    assert _wsgi_post(make_handler_app(q, accepting)) == "503 Service Unavailable"
+    assert q.empty()
+
+
+def test_feeder_503_when_queue_stays_full(monkeypatch):
+    import multiprocessing as mp
+    import fastpath.localhttpfeeder as feeder
+
+    monkeypatch.setattr(feeder, "QUEUE_PUT_TIMEOUT", 0.01)
+    q, accepting = mp.Queue(1), mp.Event()
+    accepting.set()
+    q.put("busy")
+    assert _wsgi_post(feeder.make_handler_app(q, accepting)) == "503 Service Unavailable"
+
+
+def _exit_with(code):
+    import sys
+
+    sys.exit(code)
+
+
+def test_watch_workers_terminates_when_a_worker_dies():
+    import multiprocessing as mp
+    import threading
+    from unittest.mock import Mock
+
+    alive = mp.Process(target=time.sleep, args=(30,))
+    alive.start()
+    w = mp.Process(target=_exit_with, args=(3,))
+    w.start()
+    # gunicorn's master reaps every child process, which makes
+    # Process.is_alive() return True for a dead worker
+    os.waitpid(w.pid, 0)
+    assert w.is_alive()
+    accepting, stopping, terminate = mp.Event(), threading.Event(), Mock()
+    accepting.set()
+    assert core.watch_workers([alive, w], accepting, stopping, terminate, interval=0.01)
+    terminate.assert_called_once()
+    assert not accepting.is_set()
+    alive.terminate()
+
+
+def test_watch_workers_returns_on_shutdown():
+    import multiprocessing as mp
+    import threading
+    from unittest.mock import Mock
+
+    w = mp.Process(target=time.sleep, args=(30,))
+    w.start()
+    stopping, terminate = threading.Event(), Mock()
+    threading.Timer(0.1, stopping.set).start()
+    assert not core.watch_workers([w], Mock(), stopping, terminate, interval=0.01)
+    terminate.assert_not_called()
+    w.terminate()
+
+
+def test_shut_down_with_dead_workers_writes_queue_to_spool(tmp_path, monkeypatch):
+    import multiprocessing as mp
+
+    uid = "20221121172249.123456_RO_openvpn_0123456789abcdef"
+    monkeypatch.setattr(core.conf, "write_to_disk", True, raising=False)
+    monkeypatch.setattr(core.conf, "msmt_spool_dir", tmp_path, raising=False)
+    w = mp.Process(target=_exit_with, args=(1,))
+    w.start()
+    os.waitpid(w.pid, 0)  # reaped by gunicorn
+    q = mp.Queue(1)
+    q.put((b"{}", None, uid))
+    # used to block forever on the full queue
+    core.shut_down(q, [w])
+    assert (tmp_path / "incoming" / "2022112117_RO_openvpn" / f"{uid}.post").read_bytes() == b"{}"

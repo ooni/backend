@@ -23,9 +23,13 @@ import re
 import binascii
 import logging
 import multiprocessing as mp
+from multiprocessing.connection import wait as mp_wait
 import os
+import signal
 import sys
+import threading
 import time
+from queue import Empty, Full
 import yaml
 
 from packaging.version import Version
@@ -65,6 +69,10 @@ NUM_WORKERS = _read_int_from_env("FASTPATH_NUM_WORKERS", 2)
 # MB per worker
 QUEUE_SIZE = _read_int_from_env("FASTPATH_QUEUE_SIZE", NUM_WORKERS * 50)
 queue = mp.Queue(QUEUE_SIZE)
+# How often the parent process checks that the workers are alive
+WORKER_CHECK_SECONDS = _read_int_from_env("FASTPATH_WORKER_CHECK_SECONDS", 5)
+# How long to wait at shutdown for the workers to process the queue
+WORKER_JOIN_SECONDS = _read_int_from_env("FASTPATH_WORKER_JOIN_SECONDS", 60)
 
 metrics = setup_metrics(name="fastpath")
 
@@ -1810,13 +1818,78 @@ def process_measurement(msm_tup, buffer_writes=False) -> None:
         metrics.incr("unhandled_exception")
 
 
-def shut_down(queue):
+def shut_down(queue, workers):
+    """Ask the workers to exit once they have processed the queue.
+    Stop waiting for room in the queue when no worker is left to make it,
+    then write the measurements left in it to the spool, so that they are
+    uploaded even if they were not processed."""
     metrics.incr("shut_down")
     log.info("Shutting down workers")
-    [queue.put(None) for n in range(NUM_WORKERS)]
-    # FIXME
-    # queue.close()
-    # queue.join_thread()
+    stop_cnt = 0
+    while stop_cnt < len(workers) and len(dead_workers(workers)) < len(workers):
+        try:
+            queue.put(None, timeout=1)
+            stop_cnt += 1
+        except Full:
+            pass
+
+    # A worker killed while waiting in queue.get() leaves the queue's read
+    # lock held and the other workers stuck: do not wait for them forever
+    deadline = time.time() + WORKER_JOIN_SECONDS
+    for w in workers:
+        metrics.incr("joined")
+        w.join(max(0, deadline - time.time()))
+        metrics.decr("joined")
+        if not dead_workers([w]):
+            log.error(f"Worker {w.pid} did not exit, terminating it")
+            w.terminate()
+            w.join(1)
+
+    leftover = 0
+    while True:
+        try:
+            msm_tup = queue.get(timeout=0.1)
+        except Empty:
+            break
+        if msm_tup is None:
+            continue
+        leftover += 1
+        if conf.write_to_disk:
+            try:
+                write_measurement_to_disk(msm_tup)
+            except Exception:
+                log.error("failed to write measurement to disk", exc_info=True)
+    if leftover:
+        log.error(f"{leftover} measurements left unprocessed in the queue")
+        metrics.incr("unprocessed_measurements", leftover)
+
+
+def dead_workers(workers, timeout=0.0) -> list:
+    """Workers that have exited, waiting up to timeout for one to exit.
+    Process.is_alive() cannot tell: gunicorn's master reaps every child
+    process, workers included, and is_alive() is True for a child that
+    was reaped by someone else. A worker's sentinel becomes ready when it
+    exits whoever reaps it."""
+    ready = mp_wait([w.sentinel for w in workers], timeout)
+    return [w for w in workers if w.sentinel in ready]
+
+
+def watch_workers(workers, accepting, stopping, terminate, interval=WORKER_CHECK_SECONDS) -> bool:
+    """Wait until a measurement processor exits while fastpath is running.
+    Then stop accepting measurements and terminate fastpath, so that it is
+    restarted, instead of queueing measurements nobody will process.
+    Returns True if a worker died.
+    """
+    while not stopping.is_set():
+        dead = dead_workers(workers, interval)
+        if dead and not stopping.is_set():
+            for w in dead:
+                log.error(f"Worker {w.pid} exited, terminating")
+            metrics.incr("worker_died")
+            accepting.clear()
+            terminate()
+            return True
+    return False
 
 
 def core():
@@ -1837,11 +1910,24 @@ def core():
     workers = [
         mp.Process(target=msm_processor, args=(queue,)) for n in range(NUM_WORKERS)
     ]
+    # Cleared when a worker dies: the HTTP API answers 503 from then on
+    accepting = mp.Event()
+    accepting.set()
+    stopping = threading.Event()
+    worker_died = threading.Event()
+
+    def watch():
+        # SIGTERM makes gunicorn shut down gracefully and return
+        terminate = lambda: os.kill(parent_pid, signal.SIGTERM)
+        if watch_workers(workers, accepting, stopping, terminate):
+            worker_died.set()
+
     try:
         [t.start() for t in workers]
+        threading.Thread(target=watch, name="watch_workers", daemon=True).start()
         # Start HTTP API
         log.info("Starting HTTP API")
-        start_http_api(queue)
+        start_http_api(queue, accepting)
 
     except Exception as e:
         metrics.incr("worker_exception")
@@ -1852,17 +1938,15 @@ def core():
         # to create children processes
         if os.getpid() != parent_pid:
             return
+        stopping.set()
         log.info("Shutting down workers")
         time.sleep(1)
-        shut_down(queue)
-        time.sleep(1)
-        log.info("Join")
-        for w in workers:
-            metrics.incr("joined")
-            w.join()
-            metrics.decr("joined")
+        shut_down(queue, workers)
         log.info("Join done")
         clean_caches()
+        if worker_died.is_set():
+            # Exit with an error so that the restart is visible
+            sys.exit(1)
 
 
 def extract_expected_countries(ec):
