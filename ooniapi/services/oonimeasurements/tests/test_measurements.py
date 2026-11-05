@@ -401,8 +401,14 @@ def test_get_measurement_meta_basic(client):
         "category_code": "",
         "verification_status" : "unverified",
         "outcome": "anomaly",
+        "fastpath_analysis": {
+            "anomaly": True,
+            "confirmed": False,
+            "failure": False,
+            "blocking_type": "http-failure",
+        },
+        "final_analysis": None,
         "analysis_ready": False,
-        "outcome_details": None,
     }
 
     # You can also query by measurment uid
@@ -445,8 +451,15 @@ def test_get_measurement_meta_input_none_from_fp(client):
         "test_start_time": "2021-07-09T00:00:16Z",
         "verification_status" : "unverified",
         "outcome": "ok",
-        "analysis_ready": False,
-        "outcome_details": None,
+        "fastpath_analysis": {
+            "anomaly": False,
+            "confirmed": False,
+            "failure": False,
+            "blocking_type": None,
+        },
+        "final_analysis": None,
+        # http_invalid_request_line has no delayed analysis
+        "analysis_ready": True,
     }
 
 
@@ -477,8 +490,14 @@ def test_get_measurement_meta_full(client, monkeypatch):
         "category_code": "",
         "verification_status" : "unverified",
         "outcome": "anomaly",
+        "fastpath_analysis": {
+            "anomaly": True,
+            "confirmed": False,
+            "failure": False,
+            "blocking_type": "http-failure",
+        },
+        "final_analysis": None,
         "analysis_ready": False,
-        "outcome_details": None,
     }
     assert raw_msm
 
@@ -788,8 +807,8 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     assert j["outcome"] == "down"
     assert j["analysis_ready"] is True
 
-    details = j["outcome_details"]
-    assert details["blocking_layer"] == "dns"
+    details = j["final_analysis"]
+    assert details["blocking_type"] == "dns"
     assert details["dns"] == {
         "blocked": pytest.approx(0.1),
         "down": pytest.approx(0.9),
@@ -811,8 +830,10 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     [
         ("20261102235959.421505_IT_webconnectivity_ffc43f72327e9e92", "ok"),
         ("20261102230525.945442_IT_webconnectivity_304a9635f7c75acc", "anomaly"),
-        ("20261102235959.049245_IT_webconnectivity_f56830cb94c52473", "confirmed"),
-        ("20261102230555.630901_IT_webconnectivity_6f4be9d2e144d85b", "failed"),
+        # fastpath says confirmed, the final analysis is a tie
+        ("20261102235959.049245_IT_webconnectivity_f56830cb94c52473", "error"),
+        # fastpath says failed, the final analysis says ok
+        ("20261102230555.630901_IT_webconnectivity_6f4be9d2e144d85b", "ok"),
         ("20261102235954.625052_IT_webconnectivity_8f3c70c1d4c17f8e", "down"),
         # analysis is a tie between blocked and down
         ("20261102230217.292736_VE_webconnectivity_44e6f996ae10a97d", "error"),
@@ -822,4 +843,4 @@ def test_get_measurement_meta_outcomes(client, uid, outcome):
     j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
     assert j["outcome"] == outcome
     assert j["analysis_ready"] is True
-    assert j["outcome_details"] is not None
+    assert j["final_analysis"] is not None
