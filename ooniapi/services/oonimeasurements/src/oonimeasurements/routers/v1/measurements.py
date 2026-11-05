@@ -371,7 +371,14 @@ class MeasurementMeta(BaseModel):
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
-    outcome: Optional[MsmtOutcome] = None
+    outcome: Optional[MsmtOutcome] = Field(
+        default=None,
+        description=(
+            "Analysis outcome for this measurement. It can change over time "
+            "after the measurement is analysed by the pipeline and more "
+            "details are available. This is guaranteed to only change once."
+        )
+    )
     fastpath_analysis: Optional[FastpathAnalysis] = Field(
         default=None,
         description=(
