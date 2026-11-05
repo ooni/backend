@@ -844,3 +844,27 @@ def test_get_measurement_meta_outcomes(client, uid, outcome):
     assert j["outcome"] == outcome
     assert j["analysis_ready"] is True
     assert j["final_analysis"] is not None
+
+
+@pytest.mark.parametrize(
+    "anomaly, confirmed, msm_failure, outcome",
+    [
+        ("f", "f", "f", "ok"),
+        ("t", "f", "f", "anomaly"),
+        ("t", "t", "f", "confirmed"),
+        ("t", "t", "t", "failed"),
+    ],
+)
+def test_get_measurement_outcome_fastpath_only(db, anomaly, confirmed, msm_failure, outcome):
+    # An analysed test with no analysis row yet: the outcome comes from fastpath
+    row = make_fastpath_row("web_connectivity", "noanalysis", datetime(2026, 11, 2))
+    row.update(anomaly=anomaly, confirmed=confirmed, msm_failure=msm_failure, blocking_type="")
+
+    res, fastpath, final, analysis_ready = _get_measurement_outcome(Clickhouse.from_url(db), row)
+
+    assert res == outcome
+    assert fastpath.anomaly == (anomaly == "t")
+    assert fastpath.confirmed == (confirmed == "t")
+    assert fastpath.failure == (msm_failure == "t")
+    assert final is None
+    assert analysis_ready is False
