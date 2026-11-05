@@ -310,12 +310,47 @@ class AnalysisLayer(BaseModel):
     top_rule_id: Optional[str] = None
 
 
-class OutcomeDetails(BaseModel):
+class FastpathAnalysis(BaseModel):
+    """
+    Preliminary analysis performed by the fastpath
+    """
+    anomaly: bool
+    confirmed: bool
+    failure: bool
+    blocking_type: Optional[str] = None
+
+
+class FinalAnalysis(BaseModel):
+    """
+    Final analysis performed by the analysis pipeline
+    """
     # layer of blocking: dns, tcp, tls
-    blocking_layer: Optional[str] = None
+    blocking_type: Optional[str] = None
     dns: AnalysisLayer
     tcp: AnalysisLayer
     tls: AnalysisLayer
+
+
+# Tests analysed by the analysis pipeline, the ones producing web observations.
+# Other tests have no delayed analysis, so their fastpath analysis is final.
+# You can check the list of test_names processed by the pipeline with the
+# following query:
+# SELECT DISTINCT test_name FROM analysis_web_measurement
+# TODO: if oonipipeline is ever imported in the backend, derive this from
+# NETTEST_TRANSFORMERS so it can't drift from the pipeline
+ANALYSED_TEST_NAMES = {
+    "web_connectivity",
+    "dnscheck",
+    "telegram",
+    "whatsapp",
+    "signal",
+    "facebook_messenger",
+    "tor",
+    "echcheck",
+    "browser_web",
+    "stunreachability",
+    "urlgetter",
+}
 
 
 class MeasurementMeta(BaseModel):
@@ -335,8 +370,9 @@ class MeasurementMeta(BaseModel):
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
     outcome: Optional[MsmtOutcome] = None
+    fastpath_analysis: Optional[FastpathAnalysis] = None
+    final_analysis: Optional[FinalAnalysis] = None
     analysis_ready: Optional[bool] = None
-    outcome_details: Optional[OutcomeDetails] = None
 
     @field_serializer("measurement_start_time", "test_start_time")
     def format_ts(self, v: datetime) -> str:
@@ -346,8 +382,9 @@ class MeasurementMeta(BaseModel):
 def format_msmt_meta(
     msmt_meta: dict,
     outcome: MsmtOutcome,
+    fastpath_analysis: FastpathAnalysis,
+    final_analysis: Optional[FinalAnalysis],
     analysis_ready: bool,
-    outcome_details: Optional[OutcomeDetails],
 ) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
         input=msmt_meta["input"],
@@ -367,65 +404,82 @@ def format_msmt_meta(
             msmt_meta["is_verified"]
         ),
         outcome=outcome,
+        fastpath_analysis=fastpath_analysis,
+        final_analysis=final_analysis,
         analysis_ready=analysis_ready,
-        outcome_details=outcome_details,
     )
     return formatted_msmt_meta
 
 
-def _get_measurement_outcome(
-    db: ClickhouseClient, msmt_meta: dict
-) -> tuple[MsmtOutcome, bool, Optional[OutcomeDetails]]:
-    """
-    Compute outcome, analysis_ready and outcome_details for a fastpath row,
-    using analysis_web_measurement when available.
-    Returns (outcome, analysis_ready, outcome_details)
-    """
+def _get_fastpath_analysis(msmt_meta: dict) -> FastpathAnalysis:
+    return FastpathAnalysis(
+        anomaly=msmt_meta["anomaly"] == "t",
+        confirmed=msmt_meta["confirmed"] == "t",
+        failure=msmt_meta["msm_failure"] == "t",
+        blocking_type=msmt_meta.get("blocking_type") or None,
+    )
+
+
+def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[FinalAnalysis]:
     # replacing merge tree, it can be duplicated for a while, most likely
     # during a backfill.
     query = """SELECT * FROM analysis_web_measurement
         WHERE measurement_uid = :uid
         LIMIT 1
     """
-    query_params = dict(uid=msmt_meta["measurement_uid"])
-    analysis = query_click_one_row(db, sql.text(query), query_params)
+    analysis = query_click_one_row(db, sql.text(query), dict(uid=measurement_uid))
+    if analysis is None:
+        return None
 
-    analysis_ready = analysis is not None
-    details = None
-    if analysis is not None:
-        layers = {
-            name: AnalysisLayer(
-                blocked=analysis[f"{name}_blocked"],
-                down=analysis[f"{name}_down"],
-                ok=analysis[f"{name}_ok"],
-                top_failure=analysis[f"top_{name}_failure"],
-                top_rule_id=analysis[f"top_{name}_rule_id"] or None,
-            )
-            for name in ("dns", "tcp", "tls")
-        }
-        # dns, tcp, tls
-        blocking_layer = max(layers, key=lambda name: layers[name].blocked)
-        if layers[blocking_layer].blocked <= 0:
-            blocking_layer = None
-        details = OutcomeDetails(
-            blocking_layer=blocking_layer,
-            **layers,
+    layers = {
+        name: AnalysisLayer(
+            blocked=analysis[f"{name}_blocked"],
+            down=analysis[f"{name}_down"],
+            ok=analysis[f"{name}_ok"],
+            top_failure=analysis[f"top_{name}_failure"],
+            top_rule_id=analysis[f"top_{name}_rule_id"] or None,
         )
+        for name in ("dns", "tcp", "tls")
+    }
+    # dns, tcp, tls
+    blocking_type = max(layers, key=lambda name: layers[name].blocked)
+    if layers[blocking_type].blocked <= 0:
+        blocking_type = None
+    return FinalAnalysis(blocking_type=blocking_type, **layers)
 
-    if msmt_meta["msm_failure"] == "t":
-        outcome = MsmtOutcome.FAILED
-    elif msmt_meta["confirmed"] == "t":
-        outcome = MsmtOutcome.CONFIRMED
-    elif msmt_meta["anomaly"] == "t":
-        outcome = MsmtOutcome.ANOMALY
-    elif details is None:
-        outcome = MsmtOutcome.OK
+
+def _get_measurement_outcome(
+    db: ClickhouseClient, msmt_meta: dict
+) -> tuple[MsmtOutcome, FastpathAnalysis, Optional[FinalAnalysis], bool]:
+    """
+    Compute outcome, fastpath_analysis, final_analysis and analysis_ready for
+    a fastpath row. The outcome comes from the final analysis when available,
+    and from the fastpath analysis otherwise.
+    """
+    fastpath = _get_fastpath_analysis(msmt_meta)
+    final = _get_final_analysis(db, msmt_meta["measurement_uid"])
+    # tests without delayed analysis are ready with the fastpath analysis only
+    analysis_ready = final is not None or msmt_meta["test_name"] not in ANALYSED_TEST_NAMES
+
+    if fastpath.failure:
+        fastpath_outcome = MsmtOutcome.FAILED
+    elif fastpath.confirmed:
+        fastpath_outcome = MsmtOutcome.CONFIRMED
+    elif fastpath.anomaly:
+        fastpath_outcome = MsmtOutcome.ANOMALY
     else:
-        layers = (details.dns, details.tcp, details.tls)
+        fastpath_outcome = MsmtOutcome.OK
+
+    # The final analysis is assumed to be right when available
+    outcome = fastpath_outcome
+    if final is not None:
+        layers = (final.dns, final.tcp, final.tls)
         blocked = max(layer.blocked for layer in layers)
         down = max(layer.down for layer in layers)
         ok = max(layer.ok for layer in layers)
-        if down > max(blocked, ok):
+        if blocked > max(down, ok):
+            outcome = MsmtOutcome.ANOMALY
+        elif down > max(blocked, ok):
             outcome = MsmtOutcome.DOWN
         elif ok > max(blocked, down):
             outcome = MsmtOutcome.OK
@@ -433,7 +487,13 @@ def _get_measurement_outcome(
             # we don't know what to say here
             outcome = MsmtOutcome.ERROR
 
-    return outcome, analysis_ready, details
+        if outcome != fastpath_outcome:
+            log.info(
+                f"Final analysis outcome '{outcome.value}' differs from fastpath "
+                f"outcome '{fastpath_outcome.value}' for {msmt_meta['measurement_uid']}"
+            )
+
+    return outcome, fastpath, final, analysis_ready
 
 
 def _get_measurement_meta_clickhouse(
@@ -461,8 +521,7 @@ def _get_measurement_meta_clickhouse(
         # https://github.com/ooni/explorer/issues/495
         return MeasurementMeta()  # unwanted
 
-    outcome, analysis_ready, outcome_details = _get_measurement_outcome(db, msmt_meta)
-    return format_msmt_meta(msmt_meta, outcome, analysis_ready, outcome_details)
+    return format_msmt_meta(msmt_meta, *_get_measurement_outcome(db, msmt_meta))
 
 
 def _get_measurement_meta_by_uid(
@@ -485,8 +544,7 @@ def _get_measurement_meta_by_uid(
         # https://github.com/ooni/explorer/issues/495
         return MeasurementMeta()  # unwanted
 
-    outcome, analysis_ready, outcome_details = _get_measurement_outcome(db, msmt_meta)
-    return format_msmt_meta(msmt_meta, outcome, analysis_ready, outcome_details)
+    return format_msmt_meta(msmt_meta, *_get_measurement_outcome(db, msmt_meta))
 
 
 @router.get("/v1/raw_measurement")
