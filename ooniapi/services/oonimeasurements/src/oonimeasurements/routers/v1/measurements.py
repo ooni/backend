@@ -317,7 +317,8 @@ class FastpathAnalysis(BaseModel):
     anomaly: bool
     confirmed: bool
     failure: bool
-    blocking_type: Optional[str] = None
+    # several types of blocking can happen at the same time
+    blocking_type: List[str] = []
 
 
 class FinalAnalysis(BaseModel):
@@ -325,7 +326,8 @@ class FinalAnalysis(BaseModel):
     Final analysis performed by the analysis pipeline
     """
     # layer of blocking: dns, tcp, tls
-    blocking_type: Optional[str] = None
+    # several types of blocking can happen at the same time
+    blocking_type: List[str] = []
     dns: AnalysisLayer
     tcp: AnalysisLayer
     tls: AnalysisLayer
@@ -416,7 +418,8 @@ def _get_fastpath_analysis(msmt_meta: dict) -> FastpathAnalysis:
         anomaly=msmt_meta["anomaly"] == "t",
         confirmed=msmt_meta["confirmed"] == "t",
         failure=msmt_meta["msm_failure"] == "t",
-        blocking_type=msmt_meta.get("blocking_type") or None,
+        # TODO: fastpath only reports one blocking type for now
+        blocking_type=[msmt_meta["blocking_type"]] if msmt_meta.get("blocking_type") else [],
     )
 
 
@@ -442,9 +445,11 @@ def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[
         for name in ("dns", "tcp", "tls")
     }
     # dns, tcp, tls
-    blocking_type = max(layers, key=lambda name: layers[name].blocked)
-    if layers[blocking_type].blocked <= 0:
-        blocking_type = None
+    # TODO: report every blocked layer, only the most blocked one for now
+    blocking_type = []
+    most_blocked = max(layers, key=lambda name: layers[name].blocked)
+    if layers[most_blocked].blocked > 0:
+        blocking_type.append(most_blocked)
     return FinalAnalysis(blocking_type=blocking_type, **layers)
 
 

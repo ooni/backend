@@ -405,7 +405,7 @@ def test_get_measurement_meta_basic(client):
             "anomaly": True,
             "confirmed": False,
             "failure": False,
-            "blocking_type": "http-failure",
+            "blocking_type": ["http-failure"],
         },
         "final_analysis": None,
         "analysis_ready": False,
@@ -455,7 +455,7 @@ def test_get_measurement_meta_input_none_from_fp(client):
             "anomaly": False,
             "confirmed": False,
             "failure": False,
-            "blocking_type": None,
+            "blocking_type": [],
         },
         "final_analysis": None,
         # http_invalid_request_line has no delayed analysis
@@ -494,7 +494,7 @@ def test_get_measurement_meta_full(client, monkeypatch):
             "anomaly": True,
             "confirmed": False,
             "failure": False,
-            "blocking_type": "http-failure",
+            "blocking_type": ["http-failure"],
         },
         "final_analysis": None,
         "analysis_ready": False,
@@ -808,7 +808,7 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     assert j["analysis_ready"] is True
 
     details = j["final_analysis"]
-    assert details["blocking_type"] == "dns"
+    assert details["blocking_type"] == ["dns"]
     assert details["dns"] == {
         "blocked": pytest.approx(0.1),
         "down": pytest.approx(0.9),
