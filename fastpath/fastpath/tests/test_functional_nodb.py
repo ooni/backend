@@ -362,3 +362,37 @@ def test_insert_rows_gives_up(monkeypatch):
 def test_flush_empty_buffer():
     fastpath.db.fastpath_row_buffer = []
     fastpath.db.flush_fastpath_buffer()
+
+
+def test_update_fingerprints_retries_after_failure(monkeypatch):
+    dns_fp = loadj("fingerprints_dns")
+    http_fp = loadj("fingerprints_http")
+    now = 1_700_000_000
+    monkeypatch.setattr(core.time, "time", lambda: now)
+    monkeypatch.setattr(core, "fingerprints_update_time", 0)
+    monkeypatch.setattr(core, "fingerprints_loaded", False)
+    monkeypatch.setattr(core, "fingerprints", dict(dns=[], http=[]))
+    fetch = Mock(side_effect=Exception("clickhouse is down"))
+    monkeypatch.setattr(fastpath.db, "fetch_fingerprints", fetch)
+
+    core.update_fingerprints_if_needed()
+    assert core.fingerprints == dict(dns=[], http=[])
+
+    # The next attempt comes after the retry delay, not after an hour
+    fetch.side_effect = None
+    fetch.return_value = (dns_fp, http_fp)
+    now += core.FINGERPRINTS_RETRY_SECONDS - 1
+    core.update_fingerprints_if_needed()
+    assert fetch.call_count == 1
+    now += 1
+    core.update_fingerprints_if_needed()
+    assert fetch.call_count == 2
+    assert len(core.fingerprints["http"]) == len(http_fp)
+
+    # Once loaded, they are refreshed hourly
+    now += core.FINGERPRINTS_REFRESH_SECONDS - 1
+    core.update_fingerprints_if_needed()
+    assert fetch.call_count == 2
+    now += 1
+    core.update_fingerprints_if_needed()
+    assert fetch.call_count == 3
