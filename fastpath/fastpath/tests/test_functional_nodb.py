@@ -303,3 +303,62 @@ def test_score_openvpn():
     cols = ", ".join(qparams[0].keys())
     q = query.replace("\n", " ").replace("  ", " ")
     assert q == f"INSERT INTO obs_openvpn ( {cols} ) VALUES "
+
+
+# # inserts
+
+
+def _summary_rows(n, bad=()):
+    return [dict(measurement_uid=f"uid{i}", bad=i in bad) for i in range(n)]
+
+
+def test_insert_rows_drops_only_bad_rows(monkeypatch):
+    from clickhouse_driver.errors import TypeMismatchError
+
+    inserted = []
+
+    def execute(sql, rows, settings=None):
+        if any(r["bad"] for r in rows):
+            raise TypeMismatchError("Type mismatch in VALUES section")
+        inserted.extend(rows)
+
+    fastpath.db.click_client.execute = Mock(side_effect=execute)
+    sleep = Mock()
+    monkeypatch.setattr(fastpath.db.time, "sleep", sleep)
+    rows = _summary_rows(10_000, bad={17, 9_000})
+    assert fastpath.db.insert_rows("INSERT", rows, {}) == 2
+    assert len(inserted) == 9_998
+    assert {r["measurement_uid"] for r in rows} - {r["measurement_uid"] for r in inserted} == {
+        "uid17",
+        "uid9000",
+    }
+    sleep.assert_not_called()
+
+
+def test_insert_rows_retries_network_errors(monkeypatch):
+    from clickhouse_driver.errors import NetworkError
+
+    exe = fastpath.db.click_client.execute
+    exe.side_effect = [NetworkError("reset"), EOFError(), None]
+    sleep = Mock()
+    monkeypatch.setattr(fastpath.db.time, "sleep", sleep)
+    rows = _summary_rows(3)
+    assert fastpath.db.insert_rows("INSERT", rows, {}) == 0
+    assert exe.call_count == 3
+    assert all(c.args[1] == rows for c in exe.call_args_list)
+    assert [c.args[0] for c in sleep.call_args_list] == [1.0, 2.0]
+
+
+def test_insert_rows_gives_up(monkeypatch):
+    from clickhouse_driver.errors import NetworkError
+
+    exe = fastpath.db.click_client.execute
+    exe.side_effect = NetworkError("down")
+    monkeypatch.setattr(fastpath.db.time, "sleep", Mock())
+    assert fastpath.db.insert_rows("INSERT", _summary_rows(5), {}) == 5
+    assert exe.call_count == fastpath.db.INSERT_ATTEMPTS
+
+
+def test_flush_empty_buffer():
+    fastpath.db.fastpath_row_buffer = []
+    fastpath.db.flush_fastpath_buffer()
