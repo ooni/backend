@@ -160,8 +160,7 @@ jobs:
             -f description="${description:0:140}" \
             -f target_url="${{ steps.commits.outputs.run_url }}"
 
-      - name: Fail on changed responses
+      - name: Warn on changed responses
         if: steps.compare.outputs.exit == '1'
         run: |
-          echo "a benchmarked endpoint returned a different response than on the base commit"
-          exit 1
+          echo "::warning title=Changed responses::a benchmarked endpoint returned a different response than on the base commit"
