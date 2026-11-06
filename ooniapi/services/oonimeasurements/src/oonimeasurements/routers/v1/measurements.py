@@ -446,7 +446,14 @@ BLOCKED_THRESHOLD = 0.5
 def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[FinalAnalysis]:
     # replacing merge tree, it can be duplicated for a while, most likely
     # during a backfill.
-    query = """SELECT * FROM analysis_web_measurement
+    layer_names = ("dns", "tcp", "tls")
+    cols = []
+    for name in layer_names:
+        for col in ("{}_blocked", "{}_down", "{}_ok", "top_{}_failure", "top_{}_rule_id"):
+            cols.append(col.format(name))
+
+    # Only pick the columns we need
+    query = f"""SELECT {", ".join(cols)} FROM analysis_web_measurement
         WHERE measurement_uid = :uid
         LIMIT 1
     """
@@ -462,7 +469,7 @@ def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[
             top_failure=analysis[f"top_{name}_failure"],
             top_rule_id=analysis[f"top_{name}_rule_id"] or None,
         )
-        for name in ("dns", "tcp", "tls")
+        for name in layer_names
     }
     # Layers likely blocked, most blocked first
     blocking_type = [
