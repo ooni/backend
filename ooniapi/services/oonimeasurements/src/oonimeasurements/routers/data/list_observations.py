@@ -1,10 +1,12 @@
 import dataclasses
+import functools
 import math
 import time
-from datetime import date, datetime, timedelta
+from datetime import datetime, timezone
 from typing import List, Literal, Optional, Union
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
@@ -159,21 +161,36 @@ class WebObservationEntry(BaseModel):
 ObservationEntry = Union[WebObservationEntry, BaseModel]
 
 
+@functools.cache
+def web_observation_columns() -> tuple[str, ...]:
+    """
+    Columns of obs_web returned by the API, computed once
+    """
+    return tuple(WebObservationEntry.model_json_schema()["properties"].keys())
+
+
 class ListObservationsResponse(BaseModel):
     metadata: ResponseMetadata
     results: List[ObservationEntry]
 
 
-@router.get("/v1/observations", tags=["observations", "list_data"])
+@router.get("/v1/observations", tags=["observations", "list_data"], deprecated=True)
 @parse_probe_asn_to_int
 async def list_observations(
-    report_id: Annotated[Optional[str], Query()] = None,
-    measurement_uid: Annotated[Optional[str], Query()] = None,
+    response: Response,
+    measurement_uid: Annotated[str, Query(
+        description="""
+        Required. The measurement_uid of the measurement to list
+        observations for. Filtering without it is no longer supported.
+        """
+    )],
+    report_id: Annotated[Optional[str], Query(
+        deprecated=True,
+        description="Deprecated, use `measurement_uid` instead"
+    )] = None,
     probe_asn: Annotated[Union[int, str, None], Query()] = None,
     probe_cc: Annotated[Optional[str], Query(max_length=2, min_length=2)] = None,
     test_name: Annotated[Optional[str], Query()] = None,
-    since: Annotated[Optional[date], Query()] = None,
-    until: Annotated[Optional[date], Query()] = None,
     order_by: Annotated[
         Literal[
             "measurement_start_time",
@@ -195,19 +212,26 @@ async def list_observations(
     db=Depends(get_clickhouse_session),
     settings=Depends(get_settings),
 ) -> ListObservationsResponse:
-    if since is None and report_id is None and measurement_uid is None:
-        since = date.today() - timedelta(days=7)
-    if until is None and report_id is None and measurement_uid is None:
-        until = date.today()
+    """
+    List observations of a given measurement.
 
+    This endpoint used to allow listing measurements by time intervals, however
+    we're not at capacity to support this use case at the moment, so we will
+    limit this functionality for the time being.
+
+    Deprecated: use `/api/v1/measurements` to find measurements, then query
+    their observations here by `measurement_uid`.
+    """
+    # RFC 9745 Deprecation header: "@" followed by the unix timestamp
+    deprecation_ts = int(datetime(2026, 11, 3, tzinfo=timezone.utc).timestamp())
+    response.headers["Deprecation"] = f"@{deprecation_ts}"
+    response.headers["Link"] = (
+        f'<{settings.base_url}/api/v1/measurements>; rel="alternate"'
+    )
     q_args = {}
     and_clauses = []
-    if report_id is not None:
-        q_args["report_id"] = report_id
-        and_clauses.append("report_id = %(report_id)s")
-    if measurement_uid is not None:
-        q_args["measurement_uid"] = measurement_uid
-        and_clauses.append("measurement_uid = %(measurement_uid)s")
+    q_args["measurement_uid"] = measurement_uid
+    and_clauses.append("measurement_uid = %(measurement_uid)s")
     if probe_asn is not None:
         q_args["probe_asn"] = probe_asn
         and_clauses.append("probe_asn = %(probe_asn)d")
@@ -236,14 +260,7 @@ async def list_observations(
         q_args["ooni_run_link_id"] = ooni_run_link_id
         and_clauses.append("ooni_run_link_id = %(ooni_run_link_id)s")
 
-    if since is not None:
-        q_args["since"] = since
-        and_clauses.append("measurement_start_time >= %(since)s")
-    if until is not None:
-        and_clauses.append("measurement_start_time <= %(until)s")
-        q_args["until"] = until
-
-    cols = list(WebObservationEntry.model_json_schema()["properties"].keys())
+    cols = web_observation_columns()
     q = f"SELECT {','.join(cols)} FROM obs_web"
     if len(and_clauses) > 0:
         q += " WHERE "
@@ -261,12 +278,14 @@ async def list_observations(
                 entry.target_id = entry.hostname or entry.tls_server_name
             results.append(entry)
 
-    response = ListObservationsResponse(
+    result = ListObservationsResponse(
         metadata=ResponseMetadata(
             count=-1,
             current_page=math.ceil(offset / limit) + 1,
             limit=limit,
-            next_url=f"{settings.base_url}/api/v1/observations?offset={offset + limit}&limit={limit}",
+            next_url=f"{settings.base_url}/api/v1/observations?" + urlencode(
+                {"measurement_uid": measurement_uid, "offset": offset + limit, "limit": limit}
+            ),
             offset=offset,
             pages=-1,
             query_time=time.perf_counter() - t,
@@ -274,4 +293,36 @@ async def list_observations(
         results=results,
     )
 
-    return response
+    return result
+
+
+class MeasurementObservations(BaseModel):
+    results: List[WebObservationEntry]
+
+
+@router.get("/v1/observations/{measurement_uid}", tags=["observations"])
+async def get_measurement_observations(
+    measurement_uid: str,
+    db=Depends(get_clickhouse_session),
+) -> MeasurementObservations:
+    """
+    Returns all the observations of the given measurement
+    """
+    # Only fetch what is needed for the API, observations have a lot of columns
+    cols = web_observation_columns()
+    query = f"""SELECT {','.join(cols)} FROM obs_web
+    WHERE measurement_uid = %(measurement_uid)s
+    ORDER BY observation_idx
+    """
+    rows = await async_query_click(db, query, {"measurement_uid": measurement_uid})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Observations not found")
+
+    results = []
+    for row in rows:
+        entry = WebObservationEntry(**row)
+        # target_id might be None, if it is fallback to hostname or
+        # tls_server_name
+        entry.target_id = entry.target_id or entry.hostname or entry.tls_server_name
+        results.append(entry)
+    return MeasurementObservations(results=results)
