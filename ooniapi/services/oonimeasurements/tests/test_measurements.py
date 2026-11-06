@@ -212,7 +212,7 @@ def test_failure_format(db):
     row = query_click_one_row(ch, sql.text(q), query_params, query_prio=3) or {}
 
     # Validation shouldn't crash
-    format_msmt_meta(row, *_get_measurement_outcome(ch, row))
+    format_msmt_meta(row, _get_measurement_outcome(ch, row))
 
 
 def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtures):
@@ -400,15 +400,17 @@ def test_get_measurement_meta_basic(client):
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
         "verification_status" : "unverified",
-        "outcome": "anomaly",
-        "fastpath_analysis": {
-            "anomaly": True,
-            "confirmed": False,
-            "failure": False,
-            "blocking_type": ["http-failure"],
+        "analysis": {
+            "outcome": "anomaly",
+            "fastpath_analysis": {
+                "anomaly": True,
+                "confirmed": False,
+                "failure": False,
+                "blocking_type": ["http-failure"],
+            },
+            "final_analysis": None,
+            "analysis_ready": False,
         },
-        "final_analysis": None,
-        "analysis_ready": False,
     }
 
     # You can also query by measurment uid
@@ -450,16 +452,18 @@ def test_get_measurement_meta_input_none_from_fp(client):
         "test_name": "http_invalid_request_line",
         "test_start_time": "2021-07-09T00:00:16Z",
         "verification_status" : "unverified",
-        "outcome": "ok",
-        "fastpath_analysis": {
-            "anomaly": False,
-            "confirmed": False,
-            "failure": False,
-            "blocking_type": [],
+        "analysis": {
+            "outcome": "ok",
+            "fastpath_analysis": {
+                "anomaly": False,
+                "confirmed": False,
+                "failure": False,
+                "blocking_type": [],
+            },
+            "final_analysis": None,
+            # http_invalid_request_line has no delayed analysis
+            "analysis_ready": True,
         },
-        "final_analysis": None,
-        # http_invalid_request_line has no delayed analysis
-        "analysis_ready": True,
     }
 
 
@@ -489,15 +493,17 @@ def test_get_measurement_meta_full(client, monkeypatch):
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
         "verification_status" : "unverified",
-        "outcome": "anomaly",
-        "fastpath_analysis": {
-            "anomaly": True,
-            "confirmed": False,
-            "failure": False,
-            "blocking_type": ["http-failure"],
+        "analysis": {
+            "outcome": "anomaly",
+            "fastpath_analysis": {
+                "anomaly": True,
+                "confirmed": False,
+                "failure": False,
+                "blocking_type": ["http-failure"],
+            },
+            "final_analysis": None,
+            "analysis_ready": False,
         },
-        "final_analysis": None,
-        "analysis_ready": False,
     }
     assert raw_msm
 
@@ -804,10 +810,10 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
 
     assert j["anomaly"] is False
-    assert j["outcome"] == "down"
-    assert j["analysis_ready"] is True
+    assert j["analysis"]["outcome"] == "down"
+    assert j["analysis"]["analysis_ready"] is True
 
-    details = j["final_analysis"]
+    details = j["analysis"]["final_analysis"]
     # dns blocked is 0.1, below the blocked threshold
     assert details["blocking_type"] == []
     assert details["dns"] == {
@@ -842,9 +848,9 @@ def test_get_measurement_meta_outcome_from_analysis(client):
 )
 def test_get_measurement_meta_outcomes(client, uid, outcome):
     j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
-    assert j["outcome"] == outcome
-    assert j["analysis_ready"] is True
-    assert j["final_analysis"] is not None
+    assert j["analysis"]["outcome"] == outcome
+    assert j["analysis"]["analysis_ready"] is True
+    assert j["analysis"]["final_analysis"] is not None
 
 
 @pytest.mark.parametrize(
@@ -861,27 +867,25 @@ def test_get_measurement_outcome_fastpath_only(db, anomaly, confirmed, msm_failu
     row = make_fastpath_row("web_connectivity", "noanalysis", datetime(2026, 11, 2))
     row.update(anomaly=anomaly, confirmed=confirmed, msm_failure=msm_failure, blocking_type="")
 
-    res, fastpath, final, analysis_ready = _get_measurement_outcome(Clickhouse.from_url(db), row)
+    res = _get_measurement_outcome(Clickhouse.from_url(db), row)
 
-    assert res == outcome
-    assert fastpath.anomaly == (anomaly == "t")
-    assert fastpath.confirmed == (confirmed == "t")
-    assert fastpath.failure == (msm_failure == "t")
-    assert final is None
-    assert analysis_ready is False
+    assert res.outcome == outcome
+    assert res.fastpath_analysis.anomaly == (anomaly == "t")
+    assert res.fastpath_analysis.confirmed == (confirmed == "t")
+    assert res.fastpath_analysis.failure == (msm_failure == "t")
+    assert res.final_analysis is None
+    assert res.analysis_ready is False
 
 
 @pytest.mark.parametrize("include_outcome", [False, True])
-def test_get_measurement_meta_include_outcome(db, include_outcome):
-    # The outcome requires an extra query, make sure it only runs when asked
+def test_format_msmt_meta_outcome(db, include_outcome):
+    # The outcome requires an extra query, it's only included when given
     ch = Clickhouse.from_url(db)
-
     uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
-    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
-    inp = "https://www.backtrack-linux.org/"
-    by_uid = measurements._get_measurement_meta_by_uid(ch, uid, include_outcome)
-    by_rid = measurements._get_measurement_meta_clickhouse(ch, rid, inp, include_outcome)
+    row = measurements._get_fastpath_row(ch, measurement_uid=uid)
+    outcome = _get_measurement_outcome(ch, row) if include_outcome else None
 
-    for meta in (by_uid, by_rid):
-        assert meta.measurement_uid == uid
-        assert (meta.outcome is not None) == include_outcome
+    meta = format_msmt_meta(row, outcome)
+
+    assert meta.measurement_uid == uid
+    assert (meta.analysis is not None) == include_outcome

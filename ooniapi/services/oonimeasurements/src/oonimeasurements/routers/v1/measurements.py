@@ -355,6 +355,30 @@ ANALYSED_TEST_NAMES = {
 }
 
 
+class MeasurementOutcome(BaseModel):
+    outcome: MsmtOutcome = Field(
+        description=(
+            "Analysis outcome for this measurement. It can change over time "
+            "after the measurement is analysed by the pipeline and more "
+            "details are available. This is guaranteed to only change once."
+        )
+    )
+    fastpath_analysis: FastpathAnalysis = Field(
+        description=(
+            "Preliminary analysis performed by the fastpath as soon as the "
+            "measurement is received. Prefer `final_analysis` when available."
+        ),
+    )
+    final_analysis: Optional[FinalAnalysis] = Field(
+        default=None,
+        description=(
+            "Final analysis performed by the analysis pipeline, it takes up to "
+            "1h after the measurement arrives to be available. "
+        ),
+    )
+    analysis_ready: bool
+
+
 class MeasurementMeta(BaseModel):
     input: Optional[str] = None
     measurement_start_time: Optional[datetime] = None
@@ -371,29 +395,7 @@ class MeasurementMeta(BaseModel):
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
-    outcome: Optional[MsmtOutcome] = Field(
-        default=None,
-        description=(
-            "Analysis outcome for this measurement. It can change over time "
-            "after the measurement is analysed by the pipeline and more "
-            "details are available. This is guaranteed to only change once."
-        )
-    )
-    fastpath_analysis: Optional[FastpathAnalysis] = Field(
-        default=None,
-        description=(
-            "Preliminary analysis performed by the fastpath as soon as the "
-            "measurement is received. Prefer `final_analysis` when available."
-        ),
-    )
-    final_analysis: Optional[FinalAnalysis] = Field(
-        default=None,
-        description=(
-            "Final analysis performed by the analysis pipeline, it takes up to "
-            "1h after the measurement arrives to be available. "
-        ),
-        )
-    analysis_ready: Optional[bool] = None
+    analysis: Optional[MeasurementOutcome] = None
 
     @field_serializer("measurement_start_time", "test_start_time")
     def format_ts(self, v: datetime) -> str:
@@ -401,11 +403,7 @@ class MeasurementMeta(BaseModel):
 
 
 def format_msmt_meta(
-    msmt_meta: dict,
-    outcome: Optional[MsmtOutcome] = None,
-    fastpath_analysis: Optional[FastpathAnalysis] = None,
-    final_analysis: Optional[FinalAnalysis] = None,
-    analysis_ready: Optional[bool] = None,
+    msmt_meta: dict, outcome: Optional[MeasurementOutcome] = None
 ) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
         input=msmt_meta["input"],
@@ -424,11 +422,10 @@ def format_msmt_meta(
         verification_status=VerificationStatus.from_code(
             msmt_meta["is_verified"]
         ),
-        outcome=outcome,
-        fastpath_analysis=fastpath_analysis,
-        final_analysis=final_analysis,
-        analysis_ready=analysis_ready,
     )
+    if outcome is not None:
+        # only set when given, so it's excluded from the response otherwise
+        formatted_msmt_meta.analysis = outcome
     return formatted_msmt_meta
 
 
@@ -484,7 +481,7 @@ def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[
 
 def _get_measurement_outcome(
     db: ClickhouseClient, msmt_meta: dict
-) -> tuple[MsmtOutcome, FastpathAnalysis, Optional[FinalAnalysis], bool]:
+) -> MeasurementOutcome:
     """
     Compute outcome, fastpath_analysis, final_analysis and analysis_ready for
     a fastpath row. The outcome comes from the final analysis when available,
@@ -527,91 +524,49 @@ def _get_measurement_outcome(
                 f"outcome '{fastpath_outcome.value}' for {msmt_meta['measurement_uid']}"
             )
 
-    return outcome, fastpath, final, analysis_ready
+    return MeasurementOutcome(
+        outcome=outcome,
+        fastpath_analysis=fastpath,
+        final_analysis=final,
+        analysis_ready=analysis_ready,
+    )
 
 
-def _get_measurement_meta_clickhouse(
+def _get_fastpath_row(
     db: ClickhouseClient,
-    report_id: str,
-    input_: Optional[str],
-    include_outcome: bool = False,
-) -> MeasurementMeta:
-    # Given report_id + input, fetch measurement data from fastpath table
-    query = "SELECT * FROM fastpath "
-    if input_ is None:
+    measurement_uid: Optional[str] = None,
+    report_id: Optional[str] = None,
+    input_: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Get the fastpath row by measurement_uid, or by report_id + input.
+    None if missing or unwanted
+    """
+    if measurement_uid:
+        query = """SELECT * FROM fastpath
+            LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+            WHERE measurement_uid = :uid
+        """
+    elif input_ is None:
         # fastpath uses input = '' for empty values
-        query += "WHERE report_id = :report_id AND input = '' "
+        query = "SELECT * FROM fastpath WHERE report_id = :report_id AND input = '' "
     else:
         # Join citizenlab to return category_code (useful only for web conn)
-        query += """
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE fastpath.input = :input
-        AND fastpath.report_id = :report_id
+        query = """SELECT * FROM fastpath
+            LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+            WHERE fastpath.input = :input
+            AND fastpath.report_id = :report_id
         """
-    query_params = dict(input=input_, report_id=report_id)
     query += "LIMIT 1"
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
-    if not msmt_meta:
-        return MeasurementMeta()  # measurement not found
-    if msmt_meta["probe_asn"] == 0:
+    query_params = dict(uid=measurement_uid, report_id=report_id, input=input_)
+    row = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    if not row:
+        return None  # measurement not found
+    if row["probe_asn"] == 0:
         # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
         # https://github.com/ooni/explorer/issues/495
-        return MeasurementMeta()  # unwanted
-
-    outcome = fp_analysis = pipeline_analysis = analysis_ready = None
-    if include_outcome:
-        (
-            outcome,
-            fp_analysis,
-            pipeline_analysis,
-            analysis_ready
-        ) = _get_measurement_outcome(db, msmt_meta)
-    return format_msmt_meta(
-        msmt_meta,
-        outcome,
-        fp_analysis,
-        pipeline_analysis,
-        analysis_ready
-    )
-
-
-def _get_measurement_meta_by_uid(
-    db: ClickhouseClient, measurement_uid: str, include_outcome: bool = False
-) -> MeasurementMeta:
-    """
-    Get measurement meta from measurement_uid. With include_outcome, also
-    compute the outcome fields, which requires an extra query
-    """
-    query = """SELECT * FROM fastpath
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE measurement_uid = :uid
-        LIMIT 1
-    """
-    query_params = dict(uid=measurement_uid)
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
-    if not msmt_meta:
-        return MeasurementMeta()  # measurement not found
-    if msmt_meta["probe_asn"] == 0:
-        # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
-        # https://github.com/ooni/explorer/issues/495
-        return MeasurementMeta()  # unwanted
-
-    outcome = fp_analysis = pipeline_analysis = analysis_ready = None
-    if include_outcome:
-        (
-            outcome,
-            fp_analysis,
-            pipeline_analysis,
-            analysis_ready
-        ) = _get_measurement_outcome(db, msmt_meta)
-    return format_msmt_meta(
-        msmt_meta,
-        outcome,
-        fp_analysis,
-        pipeline_analysis,
-        analysis_ready
-    )
-
+        return None  # unwanted
+    return row
 
 
 @router.get("/v1/raw_measurement")
@@ -645,14 +600,14 @@ async def get_raw_measurement(
     # This is used by Explorer to let users download msmts
     if measurement_uid:
         log.info(f"get_raw_measurement {measurement_uid}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_by_uid, db, measurement_uid
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, measurement_uid=measurement_uid
         )
 
     elif report_id:
         log.info(f"get_raw_measurement {report_id} {input}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_clickhouse, db, report_id, input
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, report_id=report_id, input_=input
         )
     else:
         raise HTTPException(
@@ -660,13 +615,13 @@ async def get_raw_measurement(
             detail="Either report_id or measurement_uid must be provided",
         )
 
-    if msmt_meta.report_id:
+    if row is not None:
         body = await run_in_threadpool(
             _fetch_measurement_body,
             db,
             settings,
-            msmt_meta.report_id,
-            msmt_meta.measurement_uid,
+            row["report_id"],
+            row["measurement_uid"],
         )
     else:
         body = "{}"
@@ -755,19 +710,25 @@ async def get_measurement_meta(
 
     if request.measurement_uid:
         log.info(f"get_measurement_meta {request.measurement_uid}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_by_uid, db, request.measurement_uid, True
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, measurement_uid=request.measurement_uid
         )
     elif request.report_id:
         log.info(f"get_measurement_meta {request.report_id} {input}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_clickhouse, db, request.report_id, request.input, True
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, report_id=request.report_id, input_=request.input
         )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing measurement_uid or report_id. You should provide at the least one",
         )
+
+    if row is None:
+        msmt_meta = MeasurementMeta()  # measurement not found
+    else:
+        outcome = await run_in_threadpool(_get_measurement_outcome, db, row)
+        msmt_meta = format_msmt_meta(row, outcome)
 
     if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
         # Emulates old monolith behaviour of returning int as probe_asn
