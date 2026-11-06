@@ -21,6 +21,7 @@ from oonimeasurements.common.dependencies import get_clickhouse_session
 from oonimeasurements.common.utils import commasplit, convert_to_csv, jerror
 
 from ...common.routers import BaseModel
+from ...common.utils import setcacheresponse
 from ...utils.api import normalize_datetime
 
 router = APIRouter()
@@ -294,8 +295,12 @@ async def get_measurements(
         return jerror(str(e), v=0, code=200)
 
     dimension_cnt = int(bool(axis_x)) + int(bool(axis_y))
+    # The last 72 hours can still change: cache them briefly, as the API
+    # gateway did without a Cache-Control (10 s), so that popular charts are
+    # served from its cache and identical requests share one query.
     cacheable = until and until < datetime.now(timezone.utc) - timedelta(hours=72)
-    cacheable = False  # FIXME
+    cache_for = "1d" if cacheable else "1m"
+    setcacheresponse(cache_for, response)
 
     # Assemble query
     colnames = [
@@ -420,9 +425,6 @@ async def get_measurements(
         msg = f"Stats: {pq.progress.rows} {pq.progress.bytes} {pq.progress.total_rows} {pq.elapsed}"
         log.info(msg)
 
-        if cacheable:
-            response.headers["Cache-Control"] = f"max_age={3600 * 24}"
-
         headers = {}
         if resp_format == "CSV":
             csv_data = convert_to_csv(r)
@@ -431,7 +433,11 @@ async def get_measurements(
                     f"attachment; filename=ooni-aggregate-data.csv"
                 )
 
-            return Response(content=csv_data, media_type="text/csv", headers=headers)
+            response = Response(
+                content=csv_data, media_type="text/csv", headers=headers
+            )
+            setcacheresponse(cache_for, response)
+            return response
 
         else:
             if download:
