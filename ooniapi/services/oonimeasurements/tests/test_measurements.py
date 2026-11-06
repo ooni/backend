@@ -869,3 +869,19 @@ def test_get_measurement_outcome_fastpath_only(db, anomaly, confirmed, msm_failu
     assert fastpath.failure == (msm_failure == "t")
     assert final is None
     assert analysis_ready is False
+
+
+@pytest.mark.parametrize("include_outcome", [False, True])
+def test_get_measurement_meta_include_outcome(db, include_outcome):
+    # The outcome requires an extra query, make sure it only runs when asked
+    ch = Clickhouse.from_url(db)
+
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    rid = "20210709T004340Z_webconnectivity_MY_4818_n1_YCM7J9mGcEHds2K3"
+    inp = "https://www.backtrack-linux.org/"
+    by_uid = measurements._get_measurement_meta_by_uid(ch, uid, include_outcome)
+    by_rid = measurements._get_measurement_meta_clickhouse(ch, rid, inp, include_outcome)
+
+    for meta in (by_uid, by_rid):
+        assert meta.measurement_uid == uid
+        assert (meta.outcome is not None) == include_outcome
