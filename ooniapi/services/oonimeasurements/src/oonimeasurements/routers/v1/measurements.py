@@ -442,6 +442,10 @@ def _get_fastpath_analysis(msmt_meta: dict) -> FastpathAnalysis:
     )
 
 
+# A layer is blocked when its blocked score is above this value
+BLOCKED_THRESHOLD = 0.5
+
+
 def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[FinalAnalysis]:
     # replacing merge tree, it can be duplicated for a while, most likely
     # during a backfill.
@@ -463,12 +467,18 @@ def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[
         )
         for name in ("dns", "tcp", "tls")
     }
-    # dns, tcp, tls
-    # TODO: report every blocked layer, only the most blocked one for now
-    blocking_type = []
-    most_blocked = max(layers, key=lambda name: layers[name].blocked)
-    if layers[most_blocked].blocked > 0:
-        blocking_type.append(most_blocked)
+    # Layers likely blocked, most blocked first
+    blocking_type = [
+        name
+        for name, analysis in layers.items()
+        if analysis.blocked > BLOCKED_THRESHOLD
+    ]
+    blocking_type = sorted(
+        blocking_type,
+        key=lambda name: layers[name].blocked,
+        reverse=True
+    )
+
     return FinalAnalysis(blocking_type=blocking_type, **layers)
 
 
@@ -498,14 +508,14 @@ def _get_measurement_outcome(
     outcome = fastpath_outcome
     if final is not None:
         layers = (final.dns, final.tcp, final.tls)
-        blocked = max(layer.blocked for layer in layers)
         down = max(layer.down for layer in layers)
         ok = max(layer.ok for layer in layers)
-        if blocked > max(down, ok):
+        if final.blocking_type:
+            # any blocked layer makes it an anomaly, even if others are ok
             outcome = MsmtOutcome.ANOMALY
-        elif down > max(blocked, ok):
+        elif down > ok:
             outcome = MsmtOutcome.DOWN
-        elif ok > max(blocked, down):
+        elif ok > down:
             outcome = MsmtOutcome.OK
         else:
             # we don't know what to say here

@@ -808,7 +808,8 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     assert j["analysis_ready"] is True
 
     details = j["final_analysis"]
-    assert details["blocking_type"] == ["dns"]
+    # dns blocked is 0.1, below the blocked threshold
+    assert details["blocking_type"] == []
     assert details["dns"] == {
         "blocked": pytest.approx(0.1),
         "down": pytest.approx(0.9),
@@ -830,13 +831,13 @@ def test_get_measurement_meta_outcome_from_analysis(client):
     [
         ("20261102235959.421505_IT_webconnectivity_ffc43f72327e9e92", "ok"),
         ("20261102230525.945442_IT_webconnectivity_304a9635f7c75acc", "anomaly"),
-        # fastpath says confirmed, the final analysis is a tie
-        ("20261102235959.049245_IT_webconnectivity_f56830cb94c52473", "error"),
+        # dns blocked, tcp and tls ok
+        ("20261102235959.049245_IT_webconnectivity_f56830cb94c52473", "anomaly"),
         # fastpath says failed, the final analysis says ok
         ("20261102230555.630901_IT_webconnectivity_6f4be9d2e144d85b", "ok"),
         ("20261102235954.625052_IT_webconnectivity_8f3c70c1d4c17f8e", "down"),
-        # analysis is a tie between blocked and down
-        ("20261102230217.292736_VE_webconnectivity_44e6f996ae10a97d", "error"),
+        # dns blocked 0.5 is not above the threshold, down wins
+        ("20261102230217.292736_VE_webconnectivity_44e6f996ae10a97d", "down"),
     ],
 )
 def test_get_measurement_meta_outcomes(client, uid, outcome):
