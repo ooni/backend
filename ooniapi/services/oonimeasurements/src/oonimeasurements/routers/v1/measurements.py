@@ -402,10 +402,10 @@ class MeasurementMeta(BaseModel):
 
 def format_msmt_meta(
     msmt_meta: dict,
-    outcome: MsmtOutcome,
-    fastpath_analysis: FastpathAnalysis,
-    final_analysis: Optional[FinalAnalysis],
-    analysis_ready: bool,
+    outcome: Optional[MsmtOutcome] = None,
+    fastpath_analysis: Optional[FastpathAnalysis] = None,
+    final_analysis: Optional[FinalAnalysis] = None,
+    analysis_ready: Optional[bool] = None,
 ) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
         input=msmt_meta["input"],
@@ -531,7 +531,10 @@ def _get_measurement_outcome(
 
 
 def _get_measurement_meta_clickhouse(
-    db: ClickhouseClient, report_id: str, input_: Optional[str]
+    db: ClickhouseClient,
+    report_id: str,
+    input_: Optional[str],
+    include_outcome: bool = False,
 ) -> MeasurementMeta:
     # Given report_id + input, fetch measurement data from fastpath table
     query = "SELECT * FROM fastpath "
@@ -555,14 +558,29 @@ def _get_measurement_meta_clickhouse(
         # https://github.com/ooni/explorer/issues/495
         return MeasurementMeta()  # unwanted
 
-    return format_msmt_meta(msmt_meta, *_get_measurement_outcome(db, msmt_meta))
+    outcome = fp_analysis = pipeline_analysis = analysis_ready = None
+    if include_outcome:
+        (
+            outcome,
+            fp_analysis,
+            pipeline_analysis,
+            analysis_ready
+        ) = _get_measurement_outcome(db, msmt_meta)
+    return format_msmt_meta(
+        msmt_meta,
+        outcome,
+        fp_analysis,
+        pipeline_analysis,
+        analysis_ready
+    )
 
 
 def _get_measurement_meta_by_uid(
-    db: ClickhouseClient, measurement_uid: str
+    db: ClickhouseClient, measurement_uid: str, include_outcome: bool = False
 ) -> MeasurementMeta:
     """
-    Get measurement meta from measurement_uid
+    Get measurement meta from measurement_uid. With include_outcome, also
+    compute the outcome fields, which requires an extra query
     """
     query = """SELECT * FROM fastpath
         LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
@@ -578,7 +596,22 @@ def _get_measurement_meta_by_uid(
         # https://github.com/ooni/explorer/issues/495
         return MeasurementMeta()  # unwanted
 
-    return format_msmt_meta(msmt_meta, *_get_measurement_outcome(db, msmt_meta))
+    outcome = fp_analysis = pipeline_analysis = analysis_ready = None
+    if include_outcome:
+        (
+            outcome,
+            fp_analysis,
+            pipeline_analysis,
+            analysis_ready
+        ) = _get_measurement_outcome(db, msmt_meta)
+    return format_msmt_meta(
+        msmt_meta,
+        outcome,
+        fp_analysis,
+        pipeline_analysis,
+        analysis_ready
+    )
+
 
 
 @router.get("/v1/raw_measurement")
@@ -723,12 +756,12 @@ async def get_measurement_meta(
     if request.measurement_uid:
         log.info(f"get_measurement_meta {request.measurement_uid}")
         msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_by_uid, db, request.measurement_uid
+            _get_measurement_meta_by_uid, db, request.measurement_uid, True
         )
     elif request.report_id:
         log.info(f"get_measurement_meta {request.report_id} {input}")
         msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_clickhouse, db, request.report_id, request.input
+            _get_measurement_meta_clickhouse, db, request.report_id, request.input, True
         )
     else:
         raise HTTPException(
