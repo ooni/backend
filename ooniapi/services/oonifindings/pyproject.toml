@@ -15,7 +15,6 @@ dependencies = [
   "sqlalchemy ~= 2.0.27",
   "pydantic-settings ~= 2.1.0", 
   "uvicorn ~= 0.25.0",
-  "statsd ~= 4.0.1",
   "uvicorn ~= 0.25.0",
   "httpx ~= 0.26.0",
   "psycopg2 ~= 2.9.9",
