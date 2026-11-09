@@ -1055,20 +1055,22 @@ class ErrorResponse(BaseModel):
 
 @router.get("/v1/torsf_stats")
 async def get_torsf_stats(
-    probe_cc: Annotated[Optional[str], Query(description="Two letter country code")],
+    response: Response,
+    probe_cc: Annotated[
+        Optional[str], Query(description="Two letter country code")
+    ] = None,
     since: Annotated[
         Optional[datetime],
         Query(
             description='Start date of when measurements were run (ex. "2016-10-20T10:30:00")'
         ),
-    ],
+    ] = None,
     until: Annotated[
         Optional[datetime],
         Query(
             description='End date of when measurement were run (ex. "2016-10-20T10:30:00")'
         ),
-    ],
-    response: Response,
+    ] = None,
     db=Depends(get_clickhouse_session),
 ):
     """
@@ -1085,6 +1087,7 @@ async def get_torsf_stats(
         sql.text("countIf(anomaly = 't') AS anomaly_count"),
         sql.text("countIf(confirmed = 't') AS confirmed_count"),
         sql.text("countIf(msm_failure = 't') AS failure_count"),
+        sql.text("count() AS measurement_count"),
     ]
     table = sql.table("fastpath")
     where = [sql.text("test_name = 'torsf'")]
@@ -1105,7 +1108,7 @@ async def get_torsf_stats(
 
     # Assemble query
     where_expr = and_(*where)
-    query = select(cols).where(where_expr).select_from(table)
+    query = select(*cols).where(where_expr).select_from(table)
 
     query = query.group_by(column("measurement_start_day"), column("probe_cc"))
     query = query.order_by(column("measurement_start_day"), column("probe_cc"))
@@ -1119,7 +1122,7 @@ async def get_torsf_stats(
             result.append(row)
         if cacheable:
             setcacheresponse("1d", response)
-        return Response({"v": 0, "result": result})
+        return {"v": 0, "result": result}
 
     except Exception as e:
         setnocacheresponse(response)
