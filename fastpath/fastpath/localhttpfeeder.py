@@ -62,12 +62,17 @@ def make_handler_app(queue, accepting):
     return handler_app
 
 
-def start_http_api(queue, accepting):
+def start_http_api(queue, accepting, ready=None):
+    """Run the HTTP API. `ready`, a threading.Event, is set once gunicorn
+    has installed its signal handlers (gunicorn calls when_ready after that).
+    """
     options = {
         "bind": f"0.0.0.0:{API_PORT}",
         "timeout": WORKER_TIMEOUT,
         "control_socket_disable": True,
     }
+    if ready is not None:
+        options["when_ready"] = lambda server: ready.set()
     print(f"starting localhttpfeeder with worker_timeout: {WORKER_TIMEOUT} and"
           f" queue_put_timeout: {QUEUE_PUT_TIMEOUT}", flush=True)
 

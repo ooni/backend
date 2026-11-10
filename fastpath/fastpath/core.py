@@ -1892,6 +1892,23 @@ def watch_workers(workers, accepting, stopping, terminate, interval=WORKER_CHECK
     return False
 
 
+def signal_when_ready(ready, stopping, kill, interval=1.0) -> bool:
+    """Call kill() once the HTTP API is ready, unless fastpath stops first.
+    Returns True if kill() was called.
+
+    In a container fastpath is PID 1, and the kernel drops signals to PID 1
+    that have no handler. gunicorn installs its SIGTERM handler before it
+    calls when_ready, which sets `ready`; a SIGTERM sent before that, for
+    example when a worker dies at startup because ClickHouse is unreachable,
+    would be lost and fastpath would keep running, answering 503.
+    """
+    while not ready.wait(interval):
+        if stopping.is_set():
+            return False
+    kill()
+    return True
+
+
 def core():
     # There are 3 main data sources, in order of age:
     # - cans on S3
@@ -1915,10 +1932,16 @@ def core():
     accepting.set()
     stopping = threading.Event()
     worker_died = threading.Event()
+    # Set by gunicorn once it handles SIGTERM
+    http_ready = threading.Event()
 
     def watch():
         # SIGTERM makes gunicorn shut down gracefully and return
-        terminate = lambda: os.kill(parent_pid, signal.SIGTERM)
+        def terminate():
+            signal_when_ready(
+                http_ready, stopping, lambda: os.kill(parent_pid, signal.SIGTERM)
+            )
+
         if watch_workers(workers, accepting, stopping, terminate):
             worker_died.set()
 
@@ -1927,7 +1950,7 @@ def core():
         threading.Thread(target=watch, name="watch_workers", daemon=True).start()
         # Start HTTP API
         log.info("Starting HTTP API")
-        start_http_api(queue, accepting)
+        start_http_api(queue, accepting, http_ready)
 
     except Exception as e:
         metrics.incr("worker_exception")

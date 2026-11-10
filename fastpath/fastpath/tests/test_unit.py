@@ -1128,6 +1128,50 @@ def test_watch_workers_returns_on_shutdown():
     w.terminate()
 
 
+def test_signal_when_ready_waits_for_the_http_api():
+    import threading
+    from unittest.mock import Mock
+
+    ready, stopping, kill = threading.Event(), threading.Event(), Mock()
+    threading.Timer(0.1, ready.set).start()
+    t0 = time.monotonic()
+    assert core.signal_when_ready(ready, stopping, kill, interval=0.01)
+    assert time.monotonic() - t0 >= 0.1
+    kill.assert_called_once()
+
+
+def test_signal_when_ready_gives_up_when_stopping():
+    import threading
+    from unittest.mock import Mock
+
+    ready, stopping, kill = threading.Event(), threading.Event(), Mock()
+    threading.Timer(0.1, stopping.set).start()
+    assert not core.signal_when_ready(ready, stopping, kill, interval=0.01)
+    kill.assert_not_called()
+
+
+def test_start_http_api_sets_ready_from_gunicorns_when_ready(monkeypatch):
+    import threading
+    import fastpath.localhttpfeeder as feeder
+
+    options = {}
+
+    class FakeFeeder:
+        def __init__(self, app, conf):
+            options.update(conf)
+
+        def run(self):
+            pass
+
+    monkeypatch.setattr(feeder, "MsmtFeeder", FakeFeeder)
+    ready = threading.Event()
+    feeder.start_http_api(None, None, ready)
+    assert not ready.is_set()
+    # gunicorn's Arbiter.start() installs its signal handlers, then calls when_ready
+    options["when_ready"](None)
+    assert ready.is_set()
+
+
 def test_shut_down_with_dead_workers_writes_queue_to_spool(tmp_path, monkeypatch):
     import multiprocessing as mp
 
