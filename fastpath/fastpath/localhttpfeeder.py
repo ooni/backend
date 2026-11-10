@@ -45,10 +45,18 @@ def start_http_api(queue):
         start_response("200 OK", [])
         return [b""]
 
+    def flush_queue(server, worker):
+        # Measurements this HTTP worker has queued may still sit in the queue's
+        # buffer in this process. Write them to the pipe before the worker exits,
+        # or they are lost.
+        queue.close()
+        queue.join_thread()
+
     options = {
         "bind": f"0.0.0.0:{API_PORT}",
         "timeout": WORKER_TIMEOUT,
         "control_socket_disable": True,
+        "worker_exit": flush_queue,
     }
     print(f"starting localhttpfeeder with worker_timeout: {WORKER_TIMEOUT} and"
           f" queue_put_timeout: {QUEUE_PUT_TIMEOUT}", flush=True)
