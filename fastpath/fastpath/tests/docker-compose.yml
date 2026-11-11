@@ -24,7 +24,7 @@ services:
       timeout: 5s
 
   # As ooni/devops runs it (ansible/roles/fastpath/tasks/main.yml)
-  fastpath:
+  fastpath: &fastpath
     image: ${FASTPATH_IMAGE:?set FASTPATH_IMAGE to the fastpath image to test}
     command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk"]
     environment:
@@ -36,3 +36,6 @@ services:
       - "8472"
     stop_grace_period: 120s
     profiles: [fastpath]
+
+  # The same, for the test that stops fastpath
+  fastpath-to-stop: *fastpath

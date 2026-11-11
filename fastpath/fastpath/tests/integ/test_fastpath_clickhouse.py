@@ -54,23 +54,41 @@ def wait_for_rows(clickhouse, uids, timeout=120) -> int:
 
 
 @pytest.fixture
-def paused_clickhouse(compose, docker_compose_command):
-    """Pause ClickHouse: fastpath's inserts hang, as when it stops answering"""
+def clickhouse_pauser(compose, docker_compose_command):
+    """pause() ClickHouse so fastpath's inserts hang, as when it stops
+    answering, and unpause() it. Left unpaused after the test."""
     # By container ID: with podman, docker compose unpause leaves it paused
     engine = docker_compose_command.split()[0]
     cid = compose(
         "ps", "-a", "-q", "clickhouse-server", capture_output=True, text=True
     ).stdout.strip()
-    subprocess.run([engine, "pause", cid], check=True, stdout=subprocess.DEVNULL)
-    paused = [True]
+    paused = [False]
 
-    def unpause():
-        if paused[0]:
-            subprocess.run([engine, "unpause", cid], check=True, stdout=subprocess.DEVNULL)
-            paused[0] = False
+    class Pauser:
+        def pause(self):
+            subprocess.run([engine, "pause", cid], check=True, stdout=subprocess.DEVNULL)
+            paused[0] = True
 
-    yield unpause
-    unpause()
+        def unpause(self):
+            if paused[0]:
+                subprocess.run([engine, "unpause", cid], check=True, stdout=subprocess.DEVNULL)
+                paused[0] = False
+
+    pauser = Pauser()
+    yield pauser
+    pauser.unpause()
+
+
+@pytest.fixture
+def fastpath_to_stop(docker_ip, docker_services, compose, clickhouse_service):
+    """A second fastpath container, for a test that stops it: restarting the
+    shared one would give it a new host port under docker"""
+    compose("--profile", "fastpath", "up", "-d", "fastpath-to-stop")
+    port = docker_services.port_for("fastpath-to-stop", 8472)
+    url = f"http://{docker_ip}:{port}"
+    docker_services.wait_until_responsive(timeout=60, pause=0.5, check=lambda: is_up(url))
+    yield url
+    compose("rm", "--stop", "--force", "-v", "fastpath-to-stop")
 
 
 def test_measurement_lands_in_clickhouse(fastpath_service, clickhouse):
@@ -79,10 +97,11 @@ def test_measurement_lands_in_clickhouse(fastpath_service, clickhouse):
     assert wait_for_rows(clickhouse, [uid]) == 1
 
 
-def test_full_queue_answers_503_at_once(fastpath_service, clickhouse, paused_clickhouse):
+def test_full_queue_answers_503_at_once(fastpath_service, clickhouse, clickhouse_pauser):
     # With ClickHouse paused, each worker hangs on an insert and the queue
     # (NUM_WORKERS * 50 = 500) fills. FASTPATH_QUEUE_PUT_TIMEOUT=0 then
     # refuses measurements at once, so ooniprobe can send them elsewhere.
+    clickhouse_pauser.pause()
     accepted = []
     for _ in range(1000):
         uid = new_uid()
@@ -100,29 +119,24 @@ def test_full_queue_answers_503_at_once(fastpath_service, clickhouse, paused_cli
     assert len(accepted) >= 500
 
     # Every measurement fastpath accepted reaches ClickHouse once it answers
-    paused_clickhouse()
+    clickhouse_pauser.unpause()
     assert wait_for_rows(clickhouse, accepted) == len(accepted)
 
 
-def test_stop_drains_the_queue(fastpath_service, clickhouse, compose, paused_clickhouse, docker_services):
+def test_stop_drains_the_queue(fastpath_to_stop, clickhouse, compose, clickhouse_pauser):
     # Measurements still queued when the container is stopped are written
     # before it exits (ooni/backend#1326), within the stop timeout that
     # ooni/devops sets (stop_grace_period here)
+    clickhouse_pauser.pause()
     uids = [new_uid() for _ in range(50)]
     for uid in uids:
-        assert post(fastpath_service, uid).status_code == 200
+        assert post(fastpath_to_stop, uid).status_code == 200
 
-    stop = threading.Thread(target=compose, args=("stop", "fastpath"))
+    stop = threading.Thread(target=compose, args=("stop", "fastpath-to-stop"))
     stop.start()
     time.sleep(3)
-    paused_clickhouse()
+    clickhouse_pauser.unpause()
     stop.join(timeout=150)
     assert not stop.is_alive(), "fastpath didn't stop within its stop timeout"
 
     assert count_rows(clickhouse, uids) == len(uids)
-
-    # Leave fastpath running for the other tests
-    compose("start", "fastpath")
-    docker_services.wait_until_responsive(
-        timeout=60, pause=0.5, check=lambda: is_up(fastpath_service)
-    )
