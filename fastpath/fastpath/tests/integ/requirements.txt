@@ -1,0 +1,5 @@
+# For running the integration tests on the host; fastpath itself runs in its image
+pytest
+pytest-docker
+requests
+clickhouse-driver

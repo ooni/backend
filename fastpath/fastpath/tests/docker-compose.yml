@@ -1,30 +1,41 @@
+# The fastpath image under test against a one-node ClickHouse cluster with
+# production's schema. integ/conftest.py starts ClickHouse, loads the schema,
+# then starts fastpath: fastpath's workers read tables when they start.
 services:
-  fastpath:
-    build:
-      context: ../../
-      dockerfile: Dockerfile
-    ports:
-      - "5000"
-      - "8472"
-    working_dir: /app
-    depends_on:
-      clickhouse-server:
-        condition: service_healthy
-
   clickhouse-server:
-    image: clickhouse/clickhouse-server:latest
+    # CLICKHOUSE_VERSIONS in the makefile lists the versions to test
+    image: docker.io/clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8.6.70}
+    hostname: clickhouse-server
     environment:
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+    volumes:
+      - ./integ/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro,z
     ports:
       - "9000"
-      - "8123"
-      - "9009"
-    volumes:
-       - ../../clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
+    ulimits:
+      nofile: 262144
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "select 1;"]
-      interval: 30s
-      retries: 3
-      start_period: 60s
-      timeout: 10s
+      # healthy once Keeper answers, so ON CLUSTER DDL works
+      test: ["CMD-SHELL", "clickhouse-client --user default --password default -q \"SELECT 1 FROM system.zookeeper WHERE path = '/'\""]
+      interval: 2s
+      retries: 60
+      start_period: 5s
+      timeout: 5s
+
+  # As ooni/devops runs it (ansible/roles/fastpath/tasks/main.yml)
+  fastpath: &fastpath
+    image: ${FASTPATH_IMAGE:?set FASTPATH_IMAGE to the fastpath image to test}
+    command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk"]
+    environment:
+      FASTPATH_QUEUE_PUT_TIMEOUT: "0"
+      FASTPATH_NUM_WORKERS: "10"
+    volumes:
+      - ./integ/fastpath.conf:/etc/ooni/fastpath.conf:ro,z
+    ports:
+      - "8472"
+    stop_grace_period: 120s
+    profiles: [fastpath]
+
+  # The same, for the test that stops fastpath
+  fastpath-to-stop: *fastpath

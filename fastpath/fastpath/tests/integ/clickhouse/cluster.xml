@@ -1,0 +1,24 @@
+<!-- A one-node oonidata_cluster with Keeper, so production's schema.sql
+     (ON CLUSTER, Replicated* engines) loads as it does in production -->
+<clickhouse>
+    <!-- keep the test server small -->
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <remote_servers>
+        <oonidata_cluster>
+            <shard>
+                <replica><host>clickhouse-server</host><port>9000</port><user>default</user><password>default</password></replica>
+            </shard>
+        </oonidata_cluster>
+    </remote_servers>
+    <macros><cluster>oonidata_cluster</cluster><shard>01</shard><replica>clickhouse-server</replica></macros>
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <raft_configuration><server><id>1</id><hostname>clickhouse-server</hostname><port>9234</port></server></raft_configuration>
+    </keeper_server>
+    <zookeeper><node><host>clickhouse-server</host><port>9181</port></node></zookeeper>
+</clickhouse>

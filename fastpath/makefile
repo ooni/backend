@@ -85,8 +85,6 @@ docker-fg:
 # Runs both fastpath and the testing clickhous.
 # Mind the fastpath configuration in fastpath.conf
 docker-all: docker-clickhouse
-	echo "Waiting for clickhouse..."
-	sleep 4
 	docker compose --profile default up --build -d
 
 # Turns off every service
@@ -101,7 +99,13 @@ docker-down:
 # ```
 # You can also use `make docker-all` for that purpose
 docker-clickhouse:
-	docker compose --profile clickhouse up -d
+	docker compose --profile clickhouse up -d --wait
+	fastpath/tests/integ/clickhouse/fetch_schema.sh .schema.sql
+	docker compose exec -T clickhouse-server clickhouse-client --user default --password default \
+		-q "CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster FORMAT Null"
+	docker compose exec -T clickhouse-server clickhouse-client --user default --password default \
+		--database ooni --multiquery < .schema.sql > /dev/null
+	rm .schema.sql
 
 # Use this to login into the fastpath service container, useful for testing
 docker-login:
@@ -136,6 +140,38 @@ docker-push:
 imagedefinitions.json:
 	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
-# Used by other ECS services but not implemented for fastpath yet
-docker-smoketest:
-	echo "Smoketest not yet implemented"
+# Run the test files CI runs inside the image as built, so they use its Python
+# and pip packages (CI uses Debian's). The tests write under var/ and testdata/
+# in the app directory, which the image's fastpath user can't write to.
+docker-test:
+	docker run --rm \
+		--tmpfs /home/fastpath/app/var:rw,mode=1777 \
+		--tmpfs /home/fastpath/app/testdata:rw,mode=1777 \
+		--entrypoint python \
+		${IMAGE_NAME}:${BUILD_LABEL} \
+		-m pytest -p no:cacheprovider \
+		fastpath/tests/test_unit.py \
+		fastpath/tests/test_functional_nodb.py \
+		fastpath/tests/test_functional.py
+
+# ClickHouse versions to run the integration tests on: production's, then each
+# upgrade hop planned in ooni/devops (RECOMMENDED_LTS_HOPS in ooni/devops#477)
+CLICKHOUSE_VERSIONS ?= 24.8.6.70 25.3.14.14 25.8.29.51 26.3.17.110 26.8.9.10
+
+# CLICKHOUSE_VERSIONS as a JSON list, for the GitHub workflow's matrix
+clickhouse-versions-json:
+	@python3 -c 'import json, sys; print(json.dumps(sys.argv[1:]))' ${CLICKHOUSE_VERSIONS}
+
+# Run the integration tests on the built image against each of CLICKHOUSE_VERSIONS
+docker-integ:
+	python3 -m venv .integ-venv
+	.integ-venv/bin/pip install -q -r fastpath/tests/integ/requirements.txt
+	for v in ${CLICKHOUSE_VERSIONS}; do \
+		echo "=== ClickHouse $$v"; \
+		CLICKHOUSE_VERSION=$$v FASTPATH_IMAGE=${IMAGE_NAME}:${BUILD_LABEL} \
+			.integ-venv/bin/pytest -p no:cacheprovider fastpath/tests/integ || exit 1; \
+	done
+
+# CodeBuild (buildspec.yml) runs this between docker-build and docker-push, so
+# an image that fails these tests isn't pushed
+docker-smoketest: docker-test docker-integ

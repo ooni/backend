@@ -40,3 +40,10 @@ def test_fastpath_basic(fastpath_service):
 
     assert response.status_code == 200
     assert response.content == b""
+
+def test_clickhouse_has_production_schema(clickhouse):
+    # The fastpath table as production has it, from ooni/devops' schema.sql
+    rows = clickhouse.execute(
+        "SELECT engine FROM system.tables WHERE database = 'ooni' AND name = 'fastpath'"
+    )
+    assert rows == [("ReplicatedReplacingMergeTree",)]

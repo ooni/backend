@@ -43,103 +43,12 @@ def extract_input_domain(msm: dict, test_name: str) -> Tuple[str, str]:
     return input_, domain
 
 
-def _click_create_table_fastpath() -> None:
-    # TODO: table creation should be done before starting workers
-    sql = """
-    CREATE TABLE IF NOT EXISTS fastpath
-    (
-        `measurement_uid` String,
-        `report_id` String,
-        `input` String,
-        `probe_cc` String,
-        `probe_asn` Int32,
-        `test_name` String,
-        `test_start_time` DateTime,
-        `measurement_start_time` DateTime,
-        `filename` String,
-        `scores` String,
-        `platform` String,
-        `anomaly` String,
-        `confirmed` String,
-        `msm_failure` String,
-        `domain` String,
-        `software_name` String,
-        `software_version` String,
-        `control_failure` String,
-        `blocking_general` Float32,
-        `is_ssl_expected` Int8,
-        `page_len` Int32,
-        `page_len_ratio` Float32,
-        `server_cc` String,
-        `server_asn` Int8,
-        `server_as_name` String,
-        `blocking_type` String,
-        `test_version` String,
-        `test_runtime` Float32,
-        `architecture` String,
-        `engine_name` String,
-        `engine_version` String,
-        `test_helper_address` String,
-        `test_helper_type` String
-    )
-    ENGINE = ReplacingMergeTree
-    ORDER BY (measurement_start_time, report_id, input)
-    SETTINGS index_granularity = 8192;
-    """
-    rows = click_client.execute(sql)
-    log.debug(list(rows))
-
-
-def click_create_table_obs_openvpn() -> None:
-    sql = """
-    CREATE TABLE IF NOT EXISTS obs_openvpn
-    (
-        anomaly Bool,
-        bootstrap_time Float32,
-        confirmed Bool,
-        failure String,
-        input String,
-        last_handshake_transaction_id Uint8,
-        measurement_start_time DateTime,
-        measurement_uid String,
-        minivpn_version String,
-        obfs4_version String,
-        obfuscation String,
-        platform String,
-        probe_asn Int32,
-        probe_cc String,
-        probe_network_name String,
-        provider String,
-        remote String,
-        report_id String,
-        resolver_asn Int32,
-        resolver_ip String,
-        resolver_network_name String,
-        software_name String,
-        software_version String,
-        success Bool,
-        success_handshake Bool,
-        success_icmp Bool,
-        success_urlgrab Bool,
-        test_runtime Float32,
-        test_start_time DateTime,
-        transport String
-    )
-    ENGINE = ReplacingMergeTree
-    ORDER BY (measurement_start_time, report_id, input)
-    SETTINGS index_granularity = 8;
-    """
-    rows = click_client.execute(sql)
-    log.debug(list(rows))
-
-
 def setup_clickhouse(conf) -> None:
     global click_client
     log.info("Connecting to clickhouse")
     click_client = Clickhouse.from_url(conf.clickhouse_url)
     rows = click_client.execute("SELECT version()")
     log.debug(f"Clickhouse version: {rows[0][0]}")
-    # FIXME _click_create_table_fastpath()
 
 
 def _write_rows_to_fastpath(rows: List[Dict]):
