@@ -319,9 +319,21 @@ def clean_faulty_measurements(clickhouse_db: ClickhouseClient):
 class S3ClientMock:
     def __init__(self) -> None:
         self.files = []
+        # f"{Bucket}/{Key}" -> uploaded bytes
+        self.uploads: dict[str, bytes] = {}
 
     def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
         self.files.append(f"{Bucket}/{Key}")
+        self.uploads[f"{Bucket}/{Key}"] = Fileobj.read()
+
+
+class FailingS3ClientMock:
+    """
+    An S3 client whose uploads always fail
+    """
+
+    def upload_fileobj(self, Fileobj, Bucket: str, Key: str):
+        raise ConnectionError("mocked S3 upload failure")
 
 
 def get_s3_client_mock() -> S3ClientMock:
@@ -377,6 +389,10 @@ def client_with_original_manifest(client):
     return setup_user(client)
 
 
+# A fastpath URL MockFastpathClient always fails
+BAD_FASTPATH_URL = "http://fastpath.ooni/bad"
+
+
 class MockFastpathResponse:
     """
     Mocked fastpath response to emulate fastpath client responses
@@ -407,8 +423,11 @@ class MockFastpathClient:
     def __init__(self, success_url_prefix: str = "/good/"):
         self.success_url_prefix = success_url_prefix
         self.uploads: dict[str, bytes] = {}
+        # (url, kwargs) for every post, successful or not
+        self.calls: list[tuple[str, dict]] = []
 
     def post(self, url: str, data: bytes = b"", **kwargs):
+        self.calls.append((url, kwargs))
         if self.success_url_prefix in url:
             self.uploads[url] = data
             return MockFastpathResponse(200)
@@ -471,12 +490,29 @@ async def client_with_one_good_mocked_fastpath(
 
     Yields `(client, mock_fastpath, success_url)`.
     """
-    fail_url = "http://fastpath.ooni/bad"
+    fail_url = BAD_FASTPATH_URL
     success_url = "http://fastpath.ooni/good"
     async with _client_with_mocked_fastpath_urls(
         test_settings, geoip_db_dir, test_creds, [fail_url, success_url]
     ) as (client, mock_fastpath):
         yield client, mock_fastpath, success_url
+
+
+@pytest_asyncio.fixture
+async def client_with_no_working_fastpaths(
+    clickhouse_server, test_settings, geoip_db_dir, test_creds
+):
+    """
+    Client with two failing mocked fastpath URLs, used to test the S3
+    fallback.
+
+    Yields `(client, mock_fastpath, fastpath_urls)`.
+    """
+    fastpath_urls = ["http://fastpath-a.ooni/bad", "http://fastpath-b.ooni/bad"]
+    async with _client_with_mocked_fastpath_urls(
+        test_settings, geoip_db_dir, test_creds, fastpath_urls
+    ) as (client, mock_fastpath):
+        yield client, mock_fastpath, fastpath_urls
 
 
 @pytest_asyncio.fixture
