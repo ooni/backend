@@ -3,7 +3,8 @@
 # then starts fastpath: fastpath's workers read tables when they start.
 services:
   clickhouse-server:
-    image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+    # CLICKHOUSE_VERSIONS in the makefile lists the versions to test
+    image: docker.io/clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8.6.70}
     hostname: clickhouse-server
     environment:
       CLICKHOUSE_USER: default

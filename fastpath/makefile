@@ -154,6 +154,20 @@ docker-test:
 		fastpath/tests/test_functional_nodb.py \
 		fastpath/tests/test_functional.py
 
+# ClickHouse versions to run the integration tests on: production's, then each
+# upgrade hop planned in ooni/devops (RECOMMENDED_LTS_HOPS in ooni/devops#477)
+CLICKHOUSE_VERSIONS ?= 24.8.6.70 25.3.14.14 25.8.29.51 26.3.17.110 26.8.9.10
+
+# Run the integration tests on the built image against each of CLICKHOUSE_VERSIONS
+docker-integ:
+	python3 -m venv .integ-venv
+	.integ-venv/bin/pip install -q -r fastpath/tests/integ/requirements.txt
+	for v in ${CLICKHOUSE_VERSIONS}; do \
+		echo "=== ClickHouse $$v"; \
+		CLICKHOUSE_VERSION=$$v FASTPATH_IMAGE=${IMAGE_NAME}:${BUILD_LABEL} \
+			.integ-venv/bin/pytest -p no:cacheprovider fastpath/tests/integ || exit 1; \
+	done
+
 # Used by other ECS services but not implemented for fastpath yet
 docker-smoketest:
 	echo "Smoketest not yet implemented"
