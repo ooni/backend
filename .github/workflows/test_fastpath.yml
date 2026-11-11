@@ -33,3 +33,42 @@ jobs:
         with:
           name: coverage
           path: fastpath/htmlcov
+
+  # The image as CodeBuild builds and deploys it: its own Python and pip
+  # packages, and the integration tests against each ClickHouse version in
+  # the makefile's CLICKHOUSE_VERSIONS (production's and each planned upgrade)
+  clickhouse_versions:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: versions
+        working-directory: fastpath
+        run: echo "versions=$(make -s clickhouse-versions-json)" >> "$GITHUB_OUTPUT"
+
+  test_image:
+    needs: clickhouse_versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse: ${{ fromJSON(needs.clickhouse_versions.outputs.versions) }}
+    # one label for every make call, so they all refer to the same image
+    env:
+      BUILD_LABEL: ci
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image as CodeBuild does
+        working-directory: fastpath
+        run: make docker-build BUILD_LABEL=$BUILD_LABEL
+
+      - name: Run the tests inside the image
+        if: matrix.clickhouse == fromJSON(needs.clickhouse_versions.outputs.versions)[0]
+        working-directory: fastpath
+        run: make docker-test BUILD_LABEL=$BUILD_LABEL
+
+      - name: Integration tests on ClickHouse ${{ matrix.clickhouse }}
+        working-directory: fastpath
+        run: make docker-integ BUILD_LABEL=$BUILD_LABEL CLICKHOUSE_VERSIONS=${{ matrix.clickhouse }}

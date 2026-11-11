@@ -158,6 +158,10 @@ docker-test:
 # upgrade hop planned in ooni/devops (RECOMMENDED_LTS_HOPS in ooni/devops#477)
 CLICKHOUSE_VERSIONS ?= 24.8.6.70 25.3.14.14 25.8.29.51 26.3.17.110 26.8.9.10
 
+# CLICKHOUSE_VERSIONS as a JSON list, for the GitHub workflow's matrix
+clickhouse-versions-json:
+	@python3 -c 'import json, sys; print(json.dumps(sys.argv[1:]))' ${CLICKHOUSE_VERSIONS}
+
 # Run the integration tests on the built image against each of CLICKHOUSE_VERSIONS
 docker-integ:
 	python3 -m venv .integ-venv
