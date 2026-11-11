@@ -27,7 +27,7 @@ on:
 
 permissions:
   contents: read
-  statuses: write
+  checks: write
 
 concurrency:
   group: bench-oonimeasurements-${{ github.event_name }}-${{ github.ref }}
@@ -36,7 +36,7 @@ concurrency:
 env:
   SERVICE: ooniapi/services/oonimeasurements
   # push and pull request runs of one commit compare different bases
-  STATUS_CONTEXT: benchmark / oonimeasurements (${{ github.event_name }})
+  CHECK_NAME: benchmark / oonimeasurements (${{ github.event_name }})
   OONI_BENCH_ROWS: ${{ inputs.rows || '2000000' }}
   OONI_BENCH_DAYS: ${{ inputs.days || '7' }}
   OONI_BENCH_REPS: ${{ inputs.reps || '5' }}
@@ -98,16 +98,23 @@ jobs:
             echo "run_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           } >> "$GITHUB_OUTPUT"
 
-      # a pull request from a fork gets a read-only token, so status updates are best effort
-      - name: Mark status pending
+      # The result is a check run of its own rather than a commit status: a
+      # check can conclude "neutral", which GitHub shows as a warning that
+      # doesn't block merging, where a status can only succeed or fail. A pull
+      # request from a fork gets a read-only token, so the check is best effort.
+      - name: Start check
+        id: check
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh api "repos/${{ github.repository }}/statuses/${{ steps.commits.outputs.head }}"
-          -f state=pending -f context="$STATUS_CONTEXT"
-          -f description="benchmarking against ${{ steps.commits.outputs.base }}"
-          -f target_url="${{ steps.commits.outputs.run_url }}"
+        run: |
+          id="$(gh api "repos/${{ github.repository }}/check-runs" \
+            -f name="$CHECK_NAME" -f head_sha="${{ steps.commits.outputs.head }}" \
+            -f status=in_progress -f details_url="${{ steps.commits.outputs.run_url }}" \
+            -f "output[title]=benchmarking against ${{ steps.commits.outputs.base }}" \
+            -f "output[summary]=Results appear here when the benchmark completes." \
+            --jq .id)"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
       # base and head run on the same runner and dataset, so bytes read compare
       # exactly; interleaved rounds keep load on the runner from favouring a side
@@ -131,8 +138,9 @@ jobs:
           [ -f "$RUNNER_TEMP/base-1.json" ] || baseline=-
           set +e
           python tests/bench/compare.py "$baseline" "$RUNNER_TEMP/head-1.json,$RUNNER_TEMP/head-2.json" \
-            --markdown --summary-file "$RUNNER_TEMP/summary.txt" >> "$GITHUB_STEP_SUMMARY"
+            --markdown --summary-file "$RUNNER_TEMP/summary.txt" > "$RUNNER_TEMP/compare.md"
           echo "exit=$?" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/compare.md" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -143,25 +151,37 @@ jobs:
             ${{ runner.temp }}/head-*.json
           if-no-files-found: ignore
 
-      - name: Publish status
+      # compare.py exits 1 when a response changed: a warning (neutral), with
+      # the comparison table in the check, as on the run's summary page
+      - name: Finish check
         if: always()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          CHECK_ID: ${{ steps.check.outputs.id }}
         run: |
           case "${{ job.status }}:${{ steps.compare.outputs.exit }}" in
-            cancelled:*) state=error; description="cancelled, superseded by a newer run" ;;
-            *:0) state=success; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
-            *:1) state=failure; description="$(cat "$RUNNER_TEMP/summary.txt")" ;;
-            *) state=error; description="benchmark did not complete" ;;
+            cancelled:*) conclusion=cancelled; title="cancelled, superseded by a newer run" ;;
+            *:0) conclusion=success; title="$(cat "$RUNNER_TEMP/summary.txt")" ;;
+            *:1) conclusion=neutral; title="$(cat "$RUNNER_TEMP/summary.txt")" ;;
+            *) conclusion=failure; title="benchmark did not complete" ;;
           esac
-          gh api "repos/${{ github.repository }}/statuses/${{ steps.commits.outputs.head }}" \
-            -f state="$state" -f context="$STATUS_CONTEXT" \
-            -f description="${description:0:140}" \
-            -f target_url="${{ steps.commits.outputs.run_url }}"
+          summary="$RUNNER_TEMP/check-summary.md"
+          # a check's summary holds at most 65535 characters
+          { head -c 60000 "$RUNNER_TEMP/compare.md" 2>/dev/null || true; } > "$summary"
+          [ -s "$summary" ] || echo "$title" > "$summary"
+          # update the check the run started; if it couldn't, create a finished one
+          if [ -n "$CHECK_ID" ]; then
+            set -- --method PATCH "repos/${{ github.repository }}/check-runs/$CHECK_ID"
+          else
+            set -- "repos/${{ github.repository }}/check-runs" -f head_sha="${{ steps.commits.outputs.head }}"
+          fi
+          gh api "$@" \
+            -f name="$CHECK_NAME" -f status=completed -f conclusion="$conclusion" \
+            -f details_url="${{ steps.commits.outputs.run_url }}" \
+            -f "output[title]=${title:0:140}" -F "output[summary]=@$summary"
 
-      - name: Fail on changed responses
+      - name: Warn on changed responses
         if: steps.compare.outputs.exit == '1'
         run: |
-          echo "a benchmarked endpoint returned a different response than on the base commit"
-          exit 1
+          echo "::warning title=Changed responses::a benchmarked endpoint returned a different response than on the base commit"
