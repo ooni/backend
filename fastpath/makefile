@@ -168,6 +168,6 @@ docker-integ:
 			.integ-venv/bin/pytest -p no:cacheprovider fastpath/tests/integ || exit 1; \
 	done
 
-# Used by other ECS services but not implemented for fastpath yet
-docker-smoketest:
-	echo "Smoketest not yet implemented"
+# CodeBuild (buildspec.yml) runs this between docker-build and docker-push, so
+# an image that fails these tests isn't pushed
+docker-smoketest: docker-test docker-integ
