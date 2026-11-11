@@ -85,8 +85,6 @@ docker-fg:
 # Runs both fastpath and the testing clickhous.
 # Mind the fastpath configuration in fastpath.conf
 docker-all: docker-clickhouse
-	echo "Waiting for clickhouse..."
-	sleep 4
 	docker compose --profile default up --build -d
 
 # Turns off every service
@@ -101,7 +99,13 @@ docker-down:
 # ```
 # You can also use `make docker-all` for that purpose
 docker-clickhouse:
-	docker compose --profile clickhouse up -d
+	docker compose --profile clickhouse up -d --wait
+	fastpath/tests/integ/clickhouse/fetch_schema.sh .schema.sql
+	docker compose exec -T clickhouse-server clickhouse-client --user default --password default \
+		-q "CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster FORMAT Null"
+	docker compose exec -T clickhouse-server clickhouse-client --user default --password default \
+		--database ooni --multiquery < .schema.sql > /dev/null
+	rm .schema.sql
 
 # Use this to login into the fastpath service container, useful for testing
 docker-login:

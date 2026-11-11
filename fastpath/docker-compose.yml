@@ -25,12 +25,14 @@ services:
       - all
 
 
-  # This service is used only for testing, in prod we use the actual clickhouse db
+  # This service is used only for testing, in prod we use the actual clickhouse db.
+  # The same one-node cluster as the integration tests: `make docker-clickhouse`
+  # starts it and loads production's schema from ooni/devops.
   clickhouse-server:
-    image: clickhouse/clickhouse-server:latest
+    image: docker.io/clickhouse/clickhouse-server:24.8.6.70
     container_name: clickhouse-server
+    hostname: clickhouse-server
     environment:
-      - CLICKHOUSE_DB=default
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=default
     ports:
@@ -38,13 +40,15 @@ services:
       - "8123:8123"
       - "9009:9009"
     volumes:
-       - ./clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
+       - ./fastpath/tests/integ/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro,z
+    ulimits:
+      nofile: 262144
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "select 1;"]
-      interval: 30s
-      retries: 3
-      start_period: 60s
-      timeout: 10s
+      test: ["CMD-SHELL", "clickhouse-client --user default --password default -q \"SELECT 1 FROM system.zookeeper WHERE path = '/'\""]
+      interval: 2s
+      retries: 60
+      start_period: 5s
+      timeout: 5s
     profiles:
       - all
       - clickhouse
