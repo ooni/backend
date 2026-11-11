@@ -136,6 +136,20 @@ docker-push:
 imagedefinitions.json:
 	echo '[{"name":"${ECS_CONTAINER_NAME}","imageUri":"${IMAGE_NAME}:${BUILD_LABEL}"}]' > imagedefinitions.json
 
+# Run the test files CI runs inside the image as built, so they use its Python
+# and pip packages (CI uses Debian's). The tests write under var/ and testdata/
+# in the app directory, which the image's fastpath user can't write to.
+docker-test:
+	docker run --rm \
+		--tmpfs /home/fastpath/app/var:rw,mode=1777 \
+		--tmpfs /home/fastpath/app/testdata:rw,mode=1777 \
+		--entrypoint python \
+		${IMAGE_NAME}:${BUILD_LABEL} \
+		-m pytest -p no:cacheprovider \
+		fastpath/tests/test_unit.py \
+		fastpath/tests/test_functional_nodb.py \
+		fastpath/tests/test_functional.py
+
 # Used by other ECS services but not implemented for fastpath yet
 docker-smoketest:
 	echo "Smoketest not yet implemented"
