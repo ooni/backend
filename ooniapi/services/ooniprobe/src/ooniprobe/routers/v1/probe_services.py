@@ -985,7 +985,9 @@ async def submit_measurement(
             try:
                 url = f"{fastpath_url}/{msmt_uid}"
 
-                resp = await run_in_threadpool(client.post, url, data=data_bin)
+                resp = await run_in_threadpool(
+                    client.post, url, data=data_bin, timeout=settings.fastpath_timeout
+                )
                 with resp:
                     resp.raise_for_status()
                 Metrics.SEND_FASTPATH_CNT.labels(
@@ -996,12 +998,13 @@ async def submit_measurement(
                 break
 
             except Exception as e:
+                Metrics.FASTPATH_INSTANCE_FAILURE.labels(
+                    instance=fastpath_url
+                    ).inc()
                 log.exception(
                     f"[{i + 1} / {len(fastpath_urls)}] Unable to send measurement to fastpath "
                     f"({fastpath_url}): {e}"
                 )
-
-        Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
 
     if success:
         # Geoip anomaly detection runs only when the measurement was successfully
@@ -1032,7 +1035,9 @@ async def submit_measurement(
             report_id = rid
         )
 
-    Metrics.SEND_FASTPATH_CNT.labels(status="fail").inc()
+    Metrics.SEND_FASTPATH_CNT.labels(status="fail", instance="NA").inc()
+    log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
+    Metrics.MISSED_MSMNTS.inc()
 
     # wasn't possible to send msmnt to fastpath, try to send it to s3
     ts_prefix = now.strftime("%Y%m%d%H")
@@ -1046,15 +1051,21 @@ async def submit_measurement(
         )
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
+        Metrics.SEND_S3_CNT.labels(status="fail").inc()
         Metrics.SEND_S3_FAILURE.inc()
+        # The measurement is stored nowhere: a 5xx tells the probe to keep
+        # it and submit it again
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "submission_delivery_failed"},
+        )
 
-    log.error(f"Unable to send report to fastpath. measurement_uid: {msmt_uid}")
-    Metrics.MISSED_MSMNTS.inc()
+    Metrics.SEND_S3_CNT.labels(status="ok").inc()
     return SubmitMeasurementResponse(
         measurement_uid=msmt_uid,
         verification_status=verification_status,
         submit_response=submit_response,
-        error=submit_error or "submission_delivery_failed",
+        error=submit_error,
         report_id = rid
     )
 
