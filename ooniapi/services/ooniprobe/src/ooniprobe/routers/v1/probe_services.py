@@ -1052,7 +1052,6 @@ async def submit_measurement(
     except Exception as exc:
         log.error(f"Unable to upload measurement to s3. Error: {exc}")
         Metrics.SEND_S3_CNT.labels(status="fail").inc()
-        Metrics.SEND_S3_FAILURE.inc()
         # The measurement is stored nowhere: a 5xx tells the probe to keep
         # it and submit it again
         raise HTTPException(
