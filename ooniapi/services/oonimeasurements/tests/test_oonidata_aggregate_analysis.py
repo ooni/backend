@@ -1,10 +1,13 @@
 import pytest
+from freezegun import freeze_time
 
 route = "api/v1/aggregation/analysis"
 since = "2024-11-01"
 until = "2024-11-10"
 
 
+# A date with no fixtures in the default 30 days window
+@freeze_time("2070-01-01")
 def test_oonidata_aggregation_analysis(client):
     response = client.get(route)
 
@@ -82,6 +85,8 @@ def test_oonidata_aggregation_analysis_unknown_ooni_run_link_id(
     assert response.json()["results"] == []
 
 
+# A date with no fixtures in the default 30 days window
+@freeze_time("2070-01-01")
 def test_oonidata_aggregation_analysis_measurement_uid_only_skips_default_date_window(
     client,
 ):

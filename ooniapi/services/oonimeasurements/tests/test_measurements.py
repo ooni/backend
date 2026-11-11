@@ -4,7 +4,10 @@ from freezegun import freeze_time
 from clickhouse_driver import Client as Clickhouse
 from oonimeasurements.common.anonymous_credentials import VerificationStatus
 from oonimeasurements.common.clickhouse_utils import query_click_one_row
-from oonimeasurements.routers.v1.measurements import format_msmt_meta
+from oonimeasurements.routers.v1.measurements import (
+    _get_measurement_outcome,
+    format_msmt_meta,
+)
 import oonimeasurements.routers.v1.measurements as measurements
 from sqlalchemy import sql
 from urllib.parse import urlparse, parse_qs
@@ -209,7 +212,7 @@ def test_failure_format(db):
     row = query_click_one_row(ch, sql.text(q), query_params, query_prio=3) or {}
 
     # Validation shouldn't crash
-    format_msmt_meta(row)
+    format_msmt_meta(row, _get_measurement_outcome(ch, row))
 
 
 def test_raw_measurement_args_optional(client, monkeypatch, maybe_download_fixtures):
@@ -396,7 +399,18 @@ def test_get_measurement_meta_basic(client):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
-        "verification_status" : "unverified"
+        "verification_status" : "unverified",
+        "analysis": {
+            "outcome": "anomaly",
+            "fastpath_analysis": {
+                "anomaly": True,
+                "confirmed": False,
+                "failure": False,
+                "blocking_type": ["http-failure"],
+            },
+            "final_analysis": None,
+            "analysis_ready": False,
+        },
     }
 
     # You can also query by measurment uid
@@ -437,7 +451,19 @@ def test_get_measurement_meta_input_none_from_fp(client):
         "scores": '{"blocking_general":0.0,"blocking_global":0.0,"blocking_country":0.0,"blocking_isp":0.0,"blocking_local":0.0}',
         "test_name": "http_invalid_request_line",
         "test_start_time": "2021-07-09T00:00:16Z",
-        "verification_status" : "unverified"
+        "verification_status" : "unverified",
+        "analysis": {
+            "outcome": "ok",
+            "fastpath_analysis": {
+                "anomaly": False,
+                "confirmed": False,
+                "failure": False,
+                "blocking_type": [],
+            },
+            "final_analysis": None,
+            # http_invalid_request_line has no delayed analysis
+            "analysis_ready": True,
+        },
     }
 
 
@@ -466,7 +492,18 @@ def test_get_measurement_meta_full(client, monkeypatch):
         "test_name": "web_connectivity",
         "test_start_time": "2025-07-09T00:43:40Z",
         "category_code": "",
-        "verification_status" : "unverified"
+        "verification_status" : "unverified",
+        "analysis": {
+            "outcome": "anomaly",
+            "fastpath_analysis": {
+                "anomaly": True,
+                "confirmed": False,
+                "failure": False,
+                "blocking_type": ["http-failure"],
+            },
+            "final_analysis": None,
+            "analysis_ready": False,
+        },
     }
     assert raw_msm
 
@@ -823,6 +860,93 @@ def test_list_measurements_pagination_pins_default_window(client, insert_fastpat
     got += [r["measurement_uid"] for r in j["results"]]
 
     assert set(got) == set(r["measurement_uid"] for r in newest + oldest)
+
+
+def test_get_measurement_meta_outcome_from_analysis(client):
+    # From fixtures: fastpath has no anomaly, the analysis says the website was down
+    uid = "20261102235954.625052_IT_webconnectivity_8f3c70c1d4c17f8e"
+    j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
+
+    assert j["anomaly"] is False
+    assert j["analysis"]["outcome"] == "down"
+    assert j["analysis"]["analysis_ready"] is True
+
+    details = j["analysis"]["final_analysis"]
+    # dns blocked is 0.1, below the blocked threshold
+    assert details["blocking_type"] == []
+    assert details["dns"] == {
+        "blocked": pytest.approx(0.1),
+        "down": pytest.approx(0.9),
+        "ok": 0.0,
+        "top_failure": "android_dns_cache_no_data",
+        "top_rule_id": "dns_system_failure_ctrl_also_failing",
+    }
+    assert details["tls"] == {
+        "blocked": 0.0,
+        "down": 0.0,
+        "ok": 0.0,
+        "top_failure": None,
+        "top_rule_id": "no_tls_data",
+    }
+
+
+@pytest.mark.parametrize(
+    "uid, outcome",
+    [
+        ("20261102235959.421505_IT_webconnectivity_ffc43f72327e9e92", "ok"),
+        ("20261102230525.945442_IT_webconnectivity_304a9635f7c75acc", "anomaly"),
+        # dns blocked, tcp and tls ok
+        ("20261102235959.049245_IT_webconnectivity_f56830cb94c52473", "anomaly"),
+        # fastpath says failed, the final analysis says ok
+        ("20261102230555.630901_IT_webconnectivity_6f4be9d2e144d85b", "ok"),
+        ("20261102235954.625052_IT_webconnectivity_8f3c70c1d4c17f8e", "down"),
+        # dns blocked 0.5 is not above the threshold, down wins
+        ("20261102230217.292736_VE_webconnectivity_44e6f996ae10a97d", "down"),
+    ],
+)
+def test_get_measurement_meta_outcomes(client, uid, outcome):
+    j = getj(client, "/api/v1/measurement_meta", params={"measurement_uid": uid})
+    assert j["analysis"]["outcome"] == outcome
+    assert j["analysis"]["analysis_ready"] is True
+    assert j["analysis"]["final_analysis"] is not None
+
+
+@pytest.mark.parametrize(
+    "anomaly, confirmed, msm_failure, outcome",
+    [
+        ("f", "f", "f", "ok"),
+        ("t", "f", "f", "anomaly"),
+        ("t", "t", "f", "confirmed"),
+        ("t", "t", "t", "failed"),
+    ],
+)
+def test_get_measurement_outcome_fastpath_only(db, anomaly, confirmed, msm_failure, outcome):
+    # An analysed test with no analysis row yet: the outcome comes from fastpath
+    row = make_fastpath_row("web_connectivity", "noanalysis", datetime(2026, 11, 2))
+    row.update(anomaly=anomaly, confirmed=confirmed, msm_failure=msm_failure, blocking_type="")
+
+    res = _get_measurement_outcome(Clickhouse.from_url(db), row)
+
+    assert res.outcome == outcome
+    assert res.fastpath_analysis.anomaly == (anomaly == "t")
+    assert res.fastpath_analysis.confirmed == (confirmed == "t")
+    assert res.fastpath_analysis.failure == (msm_failure == "t")
+    assert res.final_analysis is None
+    assert res.analysis_ready is False
+
+
+@pytest.mark.parametrize("include_outcome", [False, True])
+def test_format_msmt_meta_outcome(db, include_outcome):
+    # The outcome requires an extra query, it's only included when given
+    ch = Clickhouse.from_url(db)
+    uid = "20210709005529.664022_MY_webconnectivity_68e5bea1060d1874"
+    row = measurements._get_fastpath_row(ch, measurement_uid=uid)
+    outcome = _get_measurement_outcome(ch, row) if include_outcome else None
+
+    meta = format_msmt_meta(row, outcome)
+
+    assert meta.measurement_uid == uid
+    assert (meta.analysis is not None) == include_outcome
 
 
 def test_get_measurement_observations(client):
