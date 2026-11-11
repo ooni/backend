@@ -20,6 +20,9 @@ services:
     depends_on:
       clickhouse-server:
         condition: service_healthy
+        # clickhouse-server is in other profiles: wait for it when it runs,
+        # and don't refuse to start fastpath alone
+        required: false
     profiles:
       - default
       - all
