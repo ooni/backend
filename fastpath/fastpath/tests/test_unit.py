@@ -1037,3 +1037,50 @@ def test_write_measurement_to_disk_rejects_bad_uid(tmp_path, monkeypatch, uid):
     fp.write_measurement_to_disk((b"{}", None, uid))
     # nothing is created anywhere under the test directory, not even the spool
     assert list(tmp_path.rglob("*")) == []
+
+
+# localhttpfeeder: what the API gets back when it posts a measurement
+
+
+def _feeder_post(app, uid="20221121172249.123456_RO_openvpn_0123456789abcdef"):
+    import io
+
+    status = []
+    environ = {
+        "REQUEST_METHOD": "POST",
+        "PATH_INFO": "/" + uid,
+        "wsgi.input": io.BytesIO(b'{"format": "json", "content": {}}'),
+    }
+    app(environ, lambda s, headers: status.append(s))
+    return status[0]
+
+
+def test_feeder_queues_measurement():
+    import multiprocessing as mp
+    from fastpath.localhttpfeeder import make_handler_app
+
+    q = mp.Queue(1)
+    assert _feeder_post(make_handler_app(q)) == "200 OK"
+    assert q.get(timeout=1)[2] == "20221121172249.123456_RO_openvpn_0123456789abcdef"
+
+
+def test_feeder_503_when_queue_is_full(monkeypatch):
+    # With FASTPATH_QUEUE_PUT_TIMEOUT=0 a full queue answers 503 at once, so
+    # the API tries another fastpath or S3 instead of waiting on this one
+    import multiprocessing as mp
+    from unittest.mock import MagicMock
+    import fastpath.localhttpfeeder as feeder
+
+    monkeypatch.setattr(feeder, "QUEUE_PUT_TIMEOUT", 0)
+    metrics = MagicMock()
+    monkeypatch.setattr(feeder, "metrics", metrics)
+    q = mp.Queue(1)
+    app = feeder.make_handler_app(q)
+
+    assert _feeder_post(app) == "200 OK"
+    assert _feeder_post(app) == "503 Service Unavailable"
+    metrics.incr.assert_called_once_with("queue_full")
+
+    # Only the first measurement was queued
+    q.get(timeout=1)
+    assert q.empty()
