@@ -8,47 +8,31 @@ See ../../oometa/017-fastpath.install.sql for the tables structure
 """
 
 from datetime import datetime
-from enum import IntEnum
 from textwrap import dedent
 from urllib.parse import urlparse
 from typing import List, Tuple, Dict, Optional, Any
 import logging
 import time
 
-# Errors from the connection or the server: worth retrying an insert, except
-# for server errors about the rows' data (BAD_DATA_ERROR_CODES below).
-# NetworkError and ServerException are defined in clickhouse-driver:
-# https://github.com/mymarilyn/clickhouse-driver/blob/0.2.11/clickhouse_driver/errors.py
-RETRIABLE_INSERT_ERRORS: Tuple = (EOFError, OSError)
-try:
-    # debdeps: python3-clickhouse-driver
-    from clickhouse_driver import Client as Clickhouse
-    from clickhouse_driver.errors import NetworkError, ServerException
-
-    RETRIABLE_INSERT_ERRORS += (NetworkError, ServerException)
-except ImportError:
-    pass
+# debdeps: python3-clickhouse-driver
+from clickhouse_driver import Client as Clickhouse
+from clickhouse_driver.errors import ErrorCodes, NetworkError, ServerException
 import ujson
 
 from fastpath.metrics import setup_metrics
+from fastpath.utils import dget_or
+
+# clickhouse-driver's errors and ErrorCodes are defined in:
+# https://github.com/mymarilyn/clickhouse-driver/blob/0.2.11/clickhouse_driver/errors.py
+
+# Errors from the connection or the server: worth retrying an insert, except
+# for server errors about the rows' data (BAD_DATA_ERROR_CODES below).
+RETRIABLE_INSERT_ERRORS = (EOFError, OSError, NetworkError, ServerException)
 
 
-class ClickHouseError(IntEnum):
-    """ClickHouse server error codes, as ServerException.code reports them"""
+class ClickHouseError(ErrorCodes):
+    """clickhouse-driver's ErrorCodes, plus codes it doesn't define"""
 
-    CANNOT_PARSE_TEXT = 6
-    CANNOT_PARSE_INPUT_ASSERTION_FAILED = 27
-    CANNOT_PARSE_DATE = 38
-    CANNOT_PARSE_DATETIME = 41
-    TYPE_MISMATCH = 53
-    CANNOT_CONVERT_TYPE = 70
-    CANNOT_PARSE_NUMBER = 72
-    INCORRECT_DATA = 117
-    CANNOT_READ_ARRAY_FROM_TEXT = 130
-    TOO_LARGE_STRING_SIZE = 131
-    VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE = 321
-    CANNOT_INSERT_NULL_IN_ORDINARY_COLUMN = 349
-    CANNOT_PARSE_UUID = 376
     CANNOT_PARSE_BOOL = 467
     UNICODE_ERROR = 760
 
@@ -90,7 +74,7 @@ def _is_retriable_insert_error(exc: BaseException) -> bool:
     # clickhouse-driver's own errors carry a class-level code too, but none of
     # the retriable ones is a data error code
     return getattr(exc, "code", None) not in BAD_DATA_ERROR_CODES
-from fastpath.utils import dget_or
+
 
 log = logging.getLogger("fastpath.db")
 metrics = setup_metrics(name="fastpath.db")

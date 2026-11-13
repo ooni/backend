@@ -404,12 +404,14 @@ def test_insert_rows_retries_other_server_errors(monkeypatch, code):
     assert [c.args[0] for c in sleep.call_args_list] == [1.0]
 
 
-def test_bad_data_error_codes_are_typed():
-    # The set holds the enum's members, which compare equal to the int codes
-    # ServerException reports
+def test_bad_data_error_codes():
+    # ClickHouseError keeps clickhouse-driver's codes and adds the missing ones;
+    # the set holds the plain int codes ServerException reports
     codes = fastpath.db.BAD_DATA_ERROR_CODES
-    assert all(isinstance(c, fastpath.db.ClickHouseError) for c in codes)
-    assert 53 in codes and fastpath.db.ClickHouseError(53).name == "TYPE_MISMATCH"
+    assert len(codes) == 15
+    assert all(type(c) is int for c in codes)
+    assert fastpath.db.ClickHouseError.TYPE_MISMATCH == 53
+    assert {467, 760} <= codes
 
 
 def test_flush_empty_buffer():
