@@ -359,6 +359,61 @@ def test_insert_rows_gives_up(monkeypatch):
     assert exe.call_count == fastpath.db.INSERT_ATTEMPTS
 
 
+def test_insert_rows_bisects_server_data_errors(monkeypatch):
+    # A data error from the server fails the same way every time: drop only
+    # the bad rows, without retrying
+    from clickhouse_driver.errors import ServerException
+
+    inserted = []
+
+    def execute(sql, rows, settings=None):
+        if any(r["bad"] for r in rows):
+            raise ServerException("Value out of range", code=321)
+        inserted.extend(rows)
+
+    fastpath.db.click_client.execute = Mock(side_effect=execute)
+    sleep = Mock()
+    monkeypatch.setattr(fastpath.db.time, "sleep", sleep)
+    rows = _summary_rows(1_000, bad={3, 500})
+    assert fastpath.db.insert_rows("INSERT", rows, {}) == 2
+    assert len(inserted) == 998
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        242,  # TABLE_IS_READ_ONLY: a replica without Keeper
+        394,  # QUERY_WAS_CANCELLED: the server shutting down
+        999,  # KEEPER_EXCEPTION
+        516,  # AUTHENTICATION_FAILED: keeps the queue backing up so probes fail over
+        99999,  # not a code we know
+    ],
+)
+def test_insert_rows_retries_other_server_errors(monkeypatch, code):
+    from clickhouse_driver.errors import ServerException
+
+    exe = fastpath.db.click_client.execute
+    exe.side_effect = [ServerException("transient", code=code), None]
+    sleep = Mock()
+    monkeypatch.setattr(fastpath.db.time, "sleep", sleep)
+    rows = _summary_rows(3)
+    assert fastpath.db.insert_rows("INSERT", rows, {}) == 0
+    assert exe.call_count == 2
+    assert all(c.args[1] == rows for c in exe.call_args_list)
+    assert [c.args[0] for c in sleep.call_args_list] == [1.0]
+
+
+def test_bad_data_error_codes():
+    # ClickHouseError keeps clickhouse-driver's codes and adds the missing ones;
+    # the set holds the plain int codes ServerException reports
+    codes = fastpath.db.BAD_DATA_ERROR_CODES
+    assert len(codes) == 15
+    assert all(type(c) is int for c in codes)
+    assert fastpath.db.ClickHouseError.TYPE_MISMATCH == 53
+    assert {467, 760} <= codes
+
+
 def test_flush_empty_buffer():
     fastpath.db.fastpath_row_buffer = []
     fastpath.db.flush_fastpath_buffer()

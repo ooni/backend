@@ -14,20 +14,67 @@ from typing import List, Tuple, Dict, Optional, Any
 import logging
 import time
 
-# Errors from the connection or the server: worth retrying an insert
-RETRIABLE_INSERT_ERRORS: Tuple = (EOFError, OSError)
-try:
-    # debdeps: python3-clickhouse-driver
-    from clickhouse_driver import Client as Clickhouse
-    from clickhouse_driver.errors import NetworkError, ServerException
-
-    RETRIABLE_INSERT_ERRORS += (NetworkError, ServerException)
-except ImportError:
-    pass
+# debdeps: python3-clickhouse-driver
+from clickhouse_driver import Client as Clickhouse
+from clickhouse_driver.errors import ErrorCodes, NetworkError, ServerException
 import ujson
 
 from fastpath.metrics import setup_metrics
 from fastpath.utils import dget_or
+
+# clickhouse-driver's errors and ErrorCodes are defined in:
+# https://github.com/mymarilyn/clickhouse-driver/blob/0.2.11/clickhouse_driver/errors.py
+
+# Errors from the connection or the server: worth retrying an insert, except
+# for server errors about the rows' data (BAD_DATA_ERROR_CODES below).
+RETRIABLE_INSERT_ERRORS = (EOFError, OSError, NetworkError, ServerException)
+
+
+class ClickHouseError(ErrorCodes):
+    """clickhouse-driver's ErrorCodes, plus codes it doesn't define"""
+
+    CANNOT_PARSE_BOOL = 467
+    UNICODE_ERROR = 760
+
+
+# Server errors about the data in the rows: retrying fails the same way, so
+# insert_rows splits the batch to drop only the bad rows instead. The codes are
+# from ClickHouse's src/Common/ErrorCodes.cpp, with the same numbers in every
+# version we upgrade through (24.8.6.70 to 26.8.9.10):
+# https://github.com/ClickHouse/ClickHouse/blob/v24.8.6.70-lts/src/Common/ErrorCodes.cpp
+# https://github.com/ClickHouse/ClickHouse/blob/v26.8.9.10-lts/src/Common/ErrorCodes.cpp
+# UNICODE_ERROR appears in 26.3:
+# https://github.com/ClickHouse/ClickHouse/blob/v26.3.17.110-lts/src/Common/ErrorCodes.cpp
+# Every other server error is retried: one that every insert hits (e.g. a bad
+# password) then fills the queue, and probes send to another fastpath.
+BAD_DATA_ERROR_CODES = frozenset(
+    {
+        ClickHouseError.CANNOT_PARSE_TEXT,
+        ClickHouseError.CANNOT_PARSE_INPUT_ASSERTION_FAILED,
+        ClickHouseError.CANNOT_PARSE_DATE,
+        ClickHouseError.CANNOT_PARSE_DATETIME,
+        ClickHouseError.TYPE_MISMATCH,
+        ClickHouseError.CANNOT_CONVERT_TYPE,
+        ClickHouseError.CANNOT_PARSE_NUMBER,
+        ClickHouseError.INCORRECT_DATA,
+        ClickHouseError.CANNOT_READ_ARRAY_FROM_TEXT,
+        ClickHouseError.TOO_LARGE_STRING_SIZE,
+        ClickHouseError.VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE,
+        ClickHouseError.CANNOT_INSERT_NULL_IN_ORDINARY_COLUMN,
+        ClickHouseError.CANNOT_PARSE_UUID,
+        ClickHouseError.CANNOT_PARSE_BOOL,
+        ClickHouseError.UNICODE_ERROR,
+    }
+)
+
+
+def _is_retriable_insert_error(exc: BaseException) -> bool:
+    if not isinstance(exc, RETRIABLE_INSERT_ERRORS):
+        return False
+    # clickhouse-driver's own errors carry a class-level code too, but none of
+    # the retriable ones is a data error code
+    return getattr(exc, "code", None) not in BAD_DATA_ERROR_CODES
+
 
 log = logging.getLogger("fastpath.db")
 metrics = setup_metrics(name="fastpath.db")
@@ -148,8 +195,9 @@ INSERT_BACKOFF_SECONDS = 1.0
 def insert_rows(sql: str, rows: List[Dict], settings: Dict) -> int:
     """Insert rows. Retry errors from the connection or the server with a
     backoff. Other errors come from the rows themselves (the driver could not
-    serialize a value): split the batch to insert every other row and drop
-    the bad ones. Returns the number of rows that were not inserted.
+    serialize a value, or the server rejected one: BAD_DATA_ERROR_CODES): split
+    the batch to insert every other row and drop the bad ones. Returns the
+    number of rows that were not inserted.
     """
     if not rows:
         return 0
@@ -157,7 +205,14 @@ def insert_rows(sql: str, rows: List[Dict], settings: Dict) -> int:
         try:
             click_client.execute(sql, rows, settings=settings)
             return 0
-        except RETRIABLE_INSERT_ERRORS:
+        except Exception as e:
+            if not _is_retriable_insert_error(e):
+                if len(rows) == 1:
+                    uid = rows[0].get("measurement_uid")
+                    log.error(f"Clickhouse insert rejected {uid}", exc_info=True)
+                    metrics.incr("clickhouse_insert_bad_rows")
+                    return 1
+                break
             if attempt == INSERT_ATTEMPTS:
                 log.error(f"Failed Clickhouse insert of {len(rows)} rows", exc_info=True)
                 metrics.incr("clickhouse_insert_dropped_rows", len(rows))
@@ -166,13 +221,6 @@ def insert_rows(sql: str, rows: List[Dict], settings: Dict) -> int:
             log.warning(f"Clickhouse insert failed, retrying in {delay}s", exc_info=True)
             metrics.incr("clickhouse_insert_retry")
             time.sleep(delay)
-        except Exception:
-            if len(rows) == 1:
-                uid = rows[0].get("measurement_uid")
-                log.error(f"Clickhouse insert rejected {uid}", exc_info=True)
-                metrics.incr("clickhouse_insert_bad_rows")
-                return 1
-            break
 
     mid = len(rows) // 2
     return insert_rows(sql, rows[:mid], settings) + insert_rows(sql, rows[mid:], settings)
