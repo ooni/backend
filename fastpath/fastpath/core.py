@@ -70,6 +70,7 @@ metrics = setup_metrics(name="fastpath")
 
 conf = Namespace()
 fingerprints_update_time = 0
+fingerprints_loaded = False
 
 FINGERPRINT_SCOPE_TO_LOCALITY = {
     "inst": "local",
@@ -1884,33 +1885,47 @@ def prepare_fingerprints(dns_fp, http_fp):
     return dict(dns=dns, http=http)
 
 
+# How often workers refresh fingerprints, and how soon they retry a failed
+# refresh
+FINGERPRINTS_REFRESH_SECONDS = 3600
+FINGERPRINTS_RETRY_SECONDS = 60
+
+
 def update_fingerprints_if_needed() -> None:
     """Fetches the fingerprints table, process the fps and updates global vars"""
     global fingerprints
+    global fingerprints_loaded
     global fingerprints_update_time
 
-    if fingerprints_update_time == 0:
-        # first run. Prepare staggered run.
+    now = time.time()
+    if fingerprints_update_time > now:
+        return  # too early
+
+    # The first successful load staggers the following refreshes across
+    # workers
+    delta = 0
+    if not fingerprints_loaded:
         try:
             mp_id = mp.current_process()._identity[0]
             delta = (mp_id * 10) % 600
             log.info(f"Fingerprint update for worker {mp_id} with stagger {delta}s")
         except IndexError:
             delta = 0  # Running without multiprocessing
-        fingerprints_update_time = int(time.time()) + 3600 + delta
-
-    elif fingerprints_update_time < time.time():
-        fingerprints_update_time += 3600
-
-    else:
-        return  # too early
 
     log.info("Updating fingerprints")
     try:
         dns_fp, http_fp = db.fetch_fingerprints()
         fingerprints = prepare_fingerprints(dns_fp, http_fp)
-    except Exception as e:
-        log.error(f"Uncaught exception {e}")
+    except Exception:
+        # Without a retry a worker that failed to load them would score
+        # measurements without fingerprints until the next refresh
+        log.error("Failed to update fingerprints", exc_info=True)
+        metrics.incr("fingerprints_update_failed")
+        fingerprints_update_time = int(now) + FINGERPRINTS_RETRY_SECONDS
+        return
+
+    fingerprints_loaded = True
+    fingerprints_update_time = int(now) + FINGERPRINTS_REFRESH_SECONDS + delta
 
 
 def main():

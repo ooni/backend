@@ -12,10 +12,16 @@ from textwrap import dedent
 from urllib.parse import urlparse
 from typing import List, Tuple, Dict, Optional, Any
 import logging
+import time
 
+# Errors from the connection or the server: worth retrying an insert
+RETRIABLE_INSERT_ERRORS: Tuple = (EOFError, OSError)
 try:
     # debdeps: python3-clickhouse-driver
     from clickhouse_driver import Client as Clickhouse
+    from clickhouse_driver.errors import NetworkError, ServerException
+
+    RETRIABLE_INSERT_ERRORS += (NetworkError, ServerException)
 except ImportError:
     pass
 import ujson
@@ -133,6 +139,45 @@ def click_create_table_obs_openvpn() -> None:
     log.debug(list(rows))
 
 
+# Inserts that fail because of the connection or the server are retried
+# with an exponential backoff: 1, 2 and 4 seconds
+INSERT_ATTEMPTS = 4
+INSERT_BACKOFF_SECONDS = 1.0
+
+
+def insert_rows(sql: str, rows: List[Dict], settings: Dict) -> int:
+    """Insert rows. Retry errors from the connection or the server with a
+    backoff. Other errors come from the rows themselves (the driver could not
+    serialize a value): split the batch to insert every other row and drop
+    the bad ones. Returns the number of rows that were not inserted.
+    """
+    if not rows:
+        return 0
+    for attempt in range(1, INSERT_ATTEMPTS + 1):
+        try:
+            click_client.execute(sql, rows, settings=settings)
+            return 0
+        except RETRIABLE_INSERT_ERRORS:
+            if attempt == INSERT_ATTEMPTS:
+                log.error(f"Failed Clickhouse insert of {len(rows)} rows", exc_info=True)
+                metrics.incr("clickhouse_insert_dropped_rows", len(rows))
+                return len(rows)
+            delay = INSERT_BACKOFF_SECONDS * 2 ** (attempt - 1)
+            log.warning(f"Clickhouse insert failed, retrying in {delay}s", exc_info=True)
+            metrics.incr("clickhouse_insert_retry")
+            time.sleep(delay)
+        except Exception:
+            if len(rows) == 1:
+                uid = rows[0].get("measurement_uid")
+                log.error(f"Clickhouse insert rejected {uid}", exc_info=True)
+                metrics.incr("clickhouse_insert_bad_rows")
+                return 1
+            break
+
+    mid = len(rows) // 2
+    return insert_rows(sql, rows[:mid], settings) + insert_rows(sql, rows[mid:], settings)
+
+
 def setup_clickhouse(conf) -> None:
     global click_client
     log.info("Connecting to clickhouse")
@@ -177,10 +222,7 @@ def _write_rows_to_fastpath(rows: List[Dict]):
         """
     )
     settings = {"priority": 5}
-    try:
-        click_client.execute(sql_insert, rows, settings=settings)
-    except Exception:
-        log.error("Failed Clickhouse insert", exc_info=True)
+    insert_rows(sql_insert, rows, settings)
 
 
 def flush_fastpath_buffer():
@@ -408,10 +450,7 @@ def clickhouse_upsert_openvpn_obs(
     )
 
     settings = {"priority": 5}
-    try:
-        click_client.execute(sql_insert, [row], settings=settings)
-    except Exception:
-        log.error("Failed Clickhouse insert", exc_info=True)
+    insert_rows(sql_insert, [row], settings)
 
 
 def query(query: str, query_params: dict, query_prio=5):
