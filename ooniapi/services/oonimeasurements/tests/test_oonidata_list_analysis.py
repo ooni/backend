@@ -1,10 +1,13 @@
 import pytest
+from freezegun import freeze_time
 
 route = "api/v1/analysis"
 since = "2024-11-01"
 until = "2024-11-02"
 
 
+# A date with no fixtures in the default 30 days window
+@freeze_time("2070-01-01")
 def test_oonidata_list_analysis(client):
     response = client.get(route)
 

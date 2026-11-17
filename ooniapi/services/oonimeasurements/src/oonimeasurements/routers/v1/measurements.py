@@ -8,6 +8,7 @@ import logging
 import string
 import time
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode, urljoin
 from urllib.request import urlopen
@@ -278,6 +279,106 @@ def _fetch_measurement_body(
     raise MeasurementNotFound
 
 
+class MsmtOutcome(str, Enum):
+    """
+    Verdict for the measurement, computed by the backend.
+
+    - `ok`: no anomaly detected
+    - `anomaly`: signs of blocking were detected
+    - `confirmed`: blocking was confirmed (e.g. a known blockpage)
+    - `failed`: the measurement failed
+    - `down`: analysis indicates the target was down rather than blocked
+    - `error`: analysis is inconclusive
+    """
+
+    OK = "ok"
+    ANOMALY = "anomaly"
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+    DOWN = "down"
+    ERROR = "error"
+
+
+class AnalysisLayer(BaseModel):
+    """
+    Analysis details for a specific layer
+    """
+    blocked: float
+    down: float
+    ok: float
+    top_failure: Optional[str] = None
+    top_rule_id: Optional[str] = None
+
+
+class FastpathAnalysis(BaseModel):
+    """
+    Preliminary analysis performed by the fastpath
+    """
+    anomaly: bool
+    confirmed: bool
+    failure: bool
+    # several types of blocking can happen at the same time
+    blocking_type: List[str] = []
+
+
+class FinalAnalysis(BaseModel):
+    """
+    Final analysis performed by the analysis pipeline
+    """
+    # layer of blocking: dns, tcp, tls
+    # several types of blocking can happen at the same time
+    blocking_type: List[str] = []
+    dns: AnalysisLayer
+    tcp: AnalysisLayer
+    tls: AnalysisLayer
+
+
+# Tests analysed by the analysis pipeline, the ones producing web observations.
+# Other tests have no delayed analysis, so their fastpath analysis is final.
+# You can check the list of test_names processed by the pipeline with the
+# following query:
+# SELECT DISTINCT test_name FROM analysis_web_measurement
+# TODO: if oonipipeline is ever imported in the backend, derive this from
+# NETTEST_TRANSFORMERS so it can't drift from the pipeline
+ANALYSED_TEST_NAMES = {
+    "web_connectivity",
+    "dnscheck",
+    "telegram",
+    "whatsapp",
+    "signal",
+    "facebook_messenger",
+    "tor",
+    "echcheck",
+    "browser_web",
+    "stunreachability",
+    "urlgetter",
+}
+
+
+class MeasurementOutcome(BaseModel):
+    outcome: MsmtOutcome = Field(
+        description=(
+            "Analysis outcome for this measurement. It can change over time "
+            "after the measurement is analysed by the pipeline and more "
+            "details are available. This is guaranteed to only change once."
+        )
+    )
+    fastpath_analysis: FastpathAnalysis = Field(
+        description=(
+            "Preliminary analysis performed by the fastpath as soon as the "
+            "measurement is received. Prefer `final_analysis` when available."
+        ),
+    )
+    final_analysis: Optional[FinalAnalysis] = Field(
+        default=None,
+        description=(
+            "Final analysis performed by the analysis pipeline, it takes up to "
+            "1h after the measurement arrives to be available. "
+        ),
+    )
+    analysis_ready: bool
+
+
 class MeasurementMeta(BaseModel):
     input: Optional[str] = None
     measurement_start_time: Optional[datetime] = None
@@ -294,13 +395,16 @@ class MeasurementMeta(BaseModel):
     raw_measurement: Optional[str] = None
     category_code: Optional[str] = None
     verification_status: Optional[VerificationStatus] = _VerificationStatusField
+    analysis: Optional[MeasurementOutcome] = None
 
     @field_serializer("measurement_start_time", "test_start_time")
     def format_ts(self, v: datetime) -> str:
         return v.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
+def format_msmt_meta(
+    msmt_meta: dict, outcome: Optional[MeasurementOutcome] = None
+) -> MeasurementMeta:
     formatted_msmt_meta = MeasurementMeta(
         input=msmt_meta["input"],
         measurement_start_time=msmt_meta["measurement_start_time"],
@@ -317,60 +421,159 @@ def format_msmt_meta(msmt_meta: dict) -> MeasurementMeta:
         category_code=msmt_meta.get("category_code", None),
         verification_status=VerificationStatus.from_code(
             msmt_meta["is_verified"]
-        )
+        ),
     )
+    if outcome is not None:
+        # only set when given, so it's excluded from the response otherwise
+        formatted_msmt_meta.analysis = outcome
     return formatted_msmt_meta
 
 
-def _get_measurement_meta_clickhouse(
-    db: ClickhouseClient, report_id: str, input_: Optional[str]
-) -> MeasurementMeta:
-    # Given report_id + input, fetch measurement data from fastpath table
-    query = "SELECT * FROM fastpath "
-    if input_ is None:
-        # fastpath uses input = '' for empty values
-        query += "WHERE report_id = :report_id AND input = '' "
-    else:
-        # Join citizenlab to return category_code (useful only for web conn)
-        query += """
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
-        WHERE fastpath.input = :input
-        AND fastpath.report_id = :report_id
-        """
-    query_params = dict(input=input_, report_id=report_id)
-    query += "LIMIT 1"
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
-    if not msmt_meta:
-        return MeasurementMeta()  # measurement not found
-    if msmt_meta["probe_asn"] == 0:
-        # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
-        # https://github.com/ooni/explorer/issues/495
-        return MeasurementMeta()  # unwanted
-
-    return format_msmt_meta(msmt_meta)
+def _get_fastpath_analysis(msmt_meta: dict) -> FastpathAnalysis:
+    return FastpathAnalysis(
+        anomaly=msmt_meta["anomaly"] == "t",
+        confirmed=msmt_meta["confirmed"] == "t",
+        failure=msmt_meta["msm_failure"] == "t",
+        # TODO: fastpath only reports one blocking type for now
+        blocking_type=[msmt_meta["blocking_type"]] if msmt_meta.get("blocking_type") else [],
+    )
 
 
-def _get_measurement_meta_by_uid(
-    db: ClickhouseClient, measurement_uid: str
-) -> MeasurementMeta:
-    """
-    Get measurement meta from measurement_uid
-    """
-    query = """SELECT * FROM fastpath
-        LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+# A layer is blocked when its blocked score is above this value
+BLOCKED_THRESHOLD = 0.5
+
+
+def _get_final_analysis(db: ClickhouseClient, measurement_uid: str) -> Optional[FinalAnalysis]:
+    # replacing merge tree, it can be duplicated for a while, most likely
+    # during a backfill.
+    layer_names = ("dns", "tcp", "tls")
+    cols = []
+    for name in layer_names:
+        for col in ("{}_blocked", "{}_down", "{}_ok", "top_{}_failure", "top_{}_rule_id"):
+            cols.append(col.format(name))
+
+    # Only pick the columns we need
+    query = f"""SELECT {", ".join(cols)} FROM analysis_web_measurement
         WHERE measurement_uid = :uid
         LIMIT 1
     """
-    query_params = dict(uid=measurement_uid)
-    msmt_meta = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
-    if not msmt_meta:
-        return MeasurementMeta()  # measurement not found
-    if msmt_meta["probe_asn"] == 0:
+    analysis = query_click_one_row(db, sql.text(query), dict(uid=measurement_uid))
+    if analysis is None:
+        return None
+
+    layers = {
+        name: AnalysisLayer(
+            blocked=analysis[f"{name}_blocked"],
+            down=analysis[f"{name}_down"],
+            ok=analysis[f"{name}_ok"],
+            top_failure=analysis[f"top_{name}_failure"],
+            top_rule_id=analysis[f"top_{name}_rule_id"] or None,
+        )
+        for name in layer_names
+    }
+    # Layers likely blocked, most blocked first
+    blocking_type = [
+        name
+        for name, analysis in layers.items()
+        if analysis.blocked > BLOCKED_THRESHOLD
+    ]
+    blocking_type = sorted(
+        blocking_type,
+        key=lambda name: layers[name].blocked,
+        reverse=True
+    )
+
+    return FinalAnalysis(blocking_type=blocking_type, **layers)
+
+
+def _get_measurement_outcome(
+    db: ClickhouseClient, msmt_meta: dict
+) -> MeasurementOutcome:
+    """
+    Compute outcome, fastpath_analysis, final_analysis and analysis_ready for
+    a fastpath row. The outcome comes from the final analysis when available,
+    and from the fastpath analysis otherwise.
+    """
+    fastpath = _get_fastpath_analysis(msmt_meta)
+    final = _get_final_analysis(db, msmt_meta["measurement_uid"])
+    # tests without delayed analysis are ready with the fastpath analysis only
+    analysis_ready = final is not None or msmt_meta["test_name"] not in ANALYSED_TEST_NAMES
+
+    if fastpath.failure:
+        fastpath_outcome = MsmtOutcome.FAILED
+    elif fastpath.confirmed:
+        fastpath_outcome = MsmtOutcome.CONFIRMED
+    elif fastpath.anomaly:
+        fastpath_outcome = MsmtOutcome.ANOMALY
+    else:
+        fastpath_outcome = MsmtOutcome.OK
+
+    # The final analysis is assumed to be right when available
+    outcome = fastpath_outcome
+    if final is not None:
+        layers = (final.dns, final.tcp, final.tls)
+        down = max(layer.down for layer in layers)
+        ok = max(layer.ok for layer in layers)
+        if final.blocking_type:
+            # any blocked layer makes it an anomaly, even if others are ok
+            outcome = MsmtOutcome.ANOMALY
+        elif down > ok:
+            outcome = MsmtOutcome.DOWN
+        elif ok > down:
+            outcome = MsmtOutcome.OK
+        else:
+            # we don't know what to say here
+            outcome = MsmtOutcome.ERROR
+
+        if outcome != fastpath_outcome:
+            log.info(
+                f"Final analysis outcome '{outcome.value}' differs from fastpath "
+                f"outcome '{fastpath_outcome.value}' for {msmt_meta['measurement_uid']}"
+            )
+
+    return MeasurementOutcome(
+        outcome=outcome,
+        fastpath_analysis=fastpath,
+        final_analysis=final,
+        analysis_ready=analysis_ready,
+    )
+
+
+def _get_fastpath_row(
+    db: ClickhouseClient,
+    measurement_uid: Optional[str] = None,
+    report_id: Optional[str] = None,
+    input_: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Get the fastpath row by measurement_uid, or by report_id + input.
+    None if missing or unwanted
+    """
+    if measurement_uid:
+        query = """SELECT * FROM fastpath
+            LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+            WHERE measurement_uid = :uid
+        """
+    elif input_ is None:
+        # fastpath uses input = '' for empty values
+        query = "SELECT * FROM fastpath WHERE report_id = :report_id AND input = '' "
+    else:
+        # Join citizenlab to return category_code (useful only for web conn)
+        query = """SELECT * FROM fastpath
+            LEFT OUTER JOIN citizenlab ON citizenlab.url = fastpath.input
+            WHERE fastpath.input = :input
+            AND fastpath.report_id = :report_id
+        """
+    query += "LIMIT 1"
+    query_params = dict(uid=measurement_uid, report_id=report_id, input=input_)
+    row = query_click_one_row(db, sql.text(query), query_params, query_prio=3)
+    if not row:
+        return None  # measurement not found
+    if row["probe_asn"] == 0:
         # https://ooni.org/post/2020-ooni-probe-asn-incident-report/
         # https://github.com/ooni/explorer/issues/495
-        return MeasurementMeta()  # unwanted
-
-    return format_msmt_meta(msmt_meta)
+        return None  # unwanted
+    return row
 
 
 @router.get("/v1/raw_measurement")
@@ -404,14 +607,14 @@ async def get_raw_measurement(
     # This is used by Explorer to let users download msmts
     if measurement_uid:
         log.info(f"get_raw_measurement {measurement_uid}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_by_uid, db, measurement_uid
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, measurement_uid=measurement_uid
         )
 
     elif report_id:
         log.info(f"get_raw_measurement {report_id} {input}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_clickhouse, db, report_id, input
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, report_id=report_id, input_=input
         )
     else:
         raise HTTPException(
@@ -419,13 +622,13 @@ async def get_raw_measurement(
             detail="Either report_id or measurement_uid must be provided",
         )
 
-    if msmt_meta.report_id:
+    if row is not None:
         body = await run_in_threadpool(
             _fetch_measurement_body,
             db,
             settings,
-            msmt_meta.report_id,
-            msmt_meta.measurement_uid,
+            row["report_id"],
+            row["measurement_uid"],
         )
     else:
         body = "{}"
@@ -514,19 +717,25 @@ async def get_measurement_meta(
 
     if request.measurement_uid:
         log.info(f"get_measurement_meta {request.measurement_uid}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_by_uid, db, request.measurement_uid
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, measurement_uid=request.measurement_uid
         )
     elif request.report_id:
         log.info(f"get_measurement_meta {request.report_id} {input}")
-        msmt_meta = await run_in_threadpool(
-            _get_measurement_meta_clickhouse, db, request.report_id, request.input
+        row = await run_in_threadpool(
+            _get_fastpath_row, db, report_id=request.report_id, input_=request.input
         )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing measurement_uid or report_id. You should provide at the least one",
         )
+
+    if row is None:
+        msmt_meta = MeasurementMeta()  # measurement not found
+    else:
+        outcome = await run_in_threadpool(_get_measurement_outcome, db, row)
+        msmt_meta = format_msmt_meta(row, outcome)
 
     if msmt_meta.probe_asn is not None and isinstance(msmt_meta.probe_asn, str):
         # Emulates old monolith behaviour of returning int as probe_asn
