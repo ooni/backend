@@ -26,11 +26,8 @@ class ApiToken(Base):
         UtcDateTime(), server_default=sa.func.now()
     )
 
-    # NULL = token never expires
+    # NULL = token never expires. Revoking a token sets this to now()
     expires_at: Mapped[Optional[datetime]] = mapped_column(UtcDateTime())
-
-    # Whether this token is still valid
-    is_valid: Mapped[bool] = mapped_column(server_default=sa.true())
 
     # Public identifier of the token owner.
     # We don't have an user model at the moment
