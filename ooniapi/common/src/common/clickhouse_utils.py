@@ -69,10 +69,15 @@ def insert_click(
     query: Query,
     rows: list,
     max_execution_time: int = 300,
+    settings: Optional[dict] = None,
 ) -> int:
+    """
+    `settings` are extra clickhouse settings, they override the defaults
+    """
     assert isinstance(rows, list)
-    settings = {"priority": 1, "max_execution_time": max_execution_time}  # query_prio
-    return db.execute(query, rows, types_check=True, settings=settings)  # type: ignore
+    query_settings = {"priority": 1, "max_execution_time": max_execution_time}  # query_prio
+    query_settings.update(settings or {})
+    return db.execute(query, rows, types_check=True, settings=query_settings)  # type: ignore
 
 
 def optimize_table(db: clickhouse_driver.Client, tblname: str) -> None:
