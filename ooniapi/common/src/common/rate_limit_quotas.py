@@ -15,6 +15,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .clickhouse_utils import insert_click
 from .apiauth.tokens import TOKEN_PREFIX, ApiTokenCache, CachedToken
 
 log = logging.getLogger(__name__)
@@ -76,11 +77,11 @@ def hash_ipaddr(ipaddr: str, key: str) -> str:
 def insert_token_usage(clickhouse_url: str, row: dict) -> None:
     db = Clickhouse.from_url(clickhouse_url)
     try:
-        db.execute(
+        insert_click(
+            db,
             "INSERT INTO api_token_usage "
             "(ts, user_id, token_hash_prefix, method, route, status_code, cost) VALUES",
             [row],
-            types_check=True,
             # Don't wait for the data to be written, clickhouse batches it
             settings={"async_insert": 1, "wait_for_async_insert": 0},
         )
