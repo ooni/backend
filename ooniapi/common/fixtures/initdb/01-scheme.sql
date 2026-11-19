@@ -350,3 +350,19 @@ CREATE TABLE default.event_detector_changepoints
 ENGINE = ReplacingMergeTree
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
+
+-- Usage of API tokens
+CREATE TABLE default.api_token_usage
+(
+    `ts` DateTime('UTC'),
+    `user_id` String,
+    `token_hash_prefix` String,
+    `method` LowCardinality(String),
+    `route` LowCardinality(String),
+    `status_code` UInt16,
+    `cost` UInt32
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(ts)
+ORDER BY (user_id, ts)
+SETTINGS index_granularity = 8192;

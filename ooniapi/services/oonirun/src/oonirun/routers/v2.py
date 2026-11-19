@@ -27,7 +27,6 @@ from ..common.auth import (
 )
 from ..common.prio import generate_test_list
 from ..common.dependencies import ClickhouseDep, PostgresDep
-from uuid import uuid4
 
 
 log = logging.getLogger(__name__)
