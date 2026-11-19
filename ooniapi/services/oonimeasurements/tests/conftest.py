@@ -14,6 +14,7 @@ from freezegun import freeze_time
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
+from oonimeasurements.common.rate_limit_quotas import RateLimiterMiddleware
 from oonimeasurements.main import create_app, setup_router
 
 THIS_DIR = Path(__file__).parent.resolve()
@@ -158,6 +159,26 @@ def alembic_migration(postgresql):
 
     command.upgrade(alembic_cfg, "head")
     yield db_url
+
+
+@pytest.fixture
+def token_app(app, valkey_server, alembic_migration, db):
+    app.add_middleware(
+        RateLimiterMiddleware,
+        valkey_url=valkey_server,
+        # Low enough to be hit if tokens were rate limited
+        rate_limits="1/minute",
+        postgresql_url=alembic_migration,
+        clickhouse_url=db,
+        api_token_cache_ttl=0,
+    )
+
+    # Helper handler to test the token-based authentication
+    @app.get("/tokentest/{param}")
+    async def tokentest(param: str):
+        return {"param": param}
+
+    return app
 
 
 def make_override_get_settings(**kw):
