@@ -143,6 +143,23 @@ def db(clickhouse_server):
     yield create_db_for_fixture(conn_url=clickhouse_server)
 
 
+@pytest.fixture
+def alembic_migration(postgresql):
+    from alembic import command
+    from alembic.config import Config
+
+    db_url = f"postgresql://{postgresql.info.user}:@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
+
+    migrations_path = (THIS_DIR.parent / "src" / "oonimeasurements" / "common" / "alembic").resolve()
+
+    alembic_cfg = Config()
+    alembic_cfg.set_main_option("script_location", str(migrations_path))
+    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+    command.upgrade(alembic_cfg, "head")
+    yield db_url
+
+
 def make_override_get_settings(**kw):
     def override_get_settings():
         return Settings(**kw)

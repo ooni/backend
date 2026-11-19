@@ -128,4 +128,7 @@ app.add_middleware(
     rate_limits=settings.rate_limits,
     whitelisted_ipaddrs=settings.rate_limits_whitelisted_ipaddrs,
     unmetered_pages=settings.rate_limits_unmetered_pages,
+    postgresql_url=settings.postgresql_url,
+    clickhouse_url=settings.clickhouse_url,
+    api_token_cache_ttl=settings.api_token_cache_ttl,
 )
