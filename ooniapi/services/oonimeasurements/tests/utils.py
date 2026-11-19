@@ -37,3 +37,9 @@ def make_fastpath_row(
         "test_start_time": ts,
         "scores": "{}",
     }
+
+
+def get_postgresql_url(postgresql) -> str:
+    """Connection URL of the database from the `postgresql` fixture"""
+    info = postgresql.info
+    return f"postgresql://{info.user}:@{info.host}:{info.port}/{info.dbname}"
