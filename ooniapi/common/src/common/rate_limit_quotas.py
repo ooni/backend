@@ -146,9 +146,12 @@ class RateLimiterMiddleware:
         if self.token_cache is None:
             return None
         authorization = Headers(scope=scope).get("Authorization", "")
-        if not authorization.startswith("Bearer " + TOKEN_PREFIX):
+        # The scheme is case-insensitive (RFC 7235)
+        scheme, _, token = authorization.partition(" ")
+        token = token.strip()
+        if scheme.lower() != "bearer" or not token.startswith(TOKEN_PREFIX):
             return None
-        return authorization[len("Bearer ") :]
+        return token
 
     def is_unmetered_page(self, path: str) -> bool:
         if path in self._unmetered_pages:
@@ -248,8 +251,9 @@ class RateLimiterMiddleware:
             response = JSONResponse({"error": "invalid token"}, 401)
             return await response(scope, receive, send)
 
-        # Tokens have no limits for now, we only record their usage
-        status_code = 0
+        # Tokens have no limits for now, we only record their usage.
+        # If the app raises, ServerErrorMiddleware answers with a 500
+        status_code = 500
         cost = 0
 
         async def wrapped_send(message: Message) -> None:
@@ -261,7 +265,15 @@ class RateLimiterMiddleware:
                 cost = max([int(tdelta * 100), 1])
             await send(message)
 
-        await self.app(scope, receive, wrapped_send)
+        try:
+            await self.app(scope, receive, wrapped_send)
+        except Exception:
+            # Unhandled errors are often the expensive requests, like timeouts,
+            # so they're recorded too.
+            if not cost:
+                cost = max([int((time.perf_counter() - request_start) * 100), 1])
+            await self.record_token_usage(entry, scope, status_code, cost)
+            raise
         # The response has been sent already, so the client doesn't wait for this
         await self.record_token_usage(entry, scope, status_code, cost)
 
