@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 from clickhouse_driver import Client as ClickhouseClient
+from fastapi.testclient import TestClient
 from limits.aio.storage import RedisStorage
 
 from oonimeasurements.common import rate_limit_quotas
@@ -149,6 +150,23 @@ def test_api_token_unlimited_and_recorded(token_app, client, postgresql, db):
             "status_code": 200,
             "token_hash_prefix": hash_token(token)[:8],
         }
+
+
+def test_api_token_usage_recorded_on_error(token_app, postgresql, db):
+    @token_app.get("/tokenerror")
+    async def tokenerror():
+        raise RuntimeError("boom")
+
+    user_id = "user-" + secrets.token_hex(4)
+    token = add_token(postgresql, user_id)
+    client = TestClient(token_app, raise_server_exceptions=False)
+    resp = client.get("/tokenerror", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 500
+
+    rows = get_token_usage(db, user_id)
+    assert len(rows) == 1
+    assert rows[0]["route"] == "/tokenerror"
+    assert rows[0]["status_code"] == 500
 
 
 def test_api_token_invalid(token_app, client, postgresql):
