@@ -4,8 +4,6 @@ from fastapi.testclient import TestClient
 
 from oonimeasurements.common.dependencies import get_settings
 
-from .utils import get_postgresql_url
-
 
 def test_health_good(client):
     r = client.get("health")
@@ -22,11 +20,7 @@ def test_health_bad(client_with_bad_settings):
     assert r.status_code == 503
 
 
-def test_health_postgresql_reachable(app, client, postgresql):
-    settings = app.dependency_overrides[get_settings]()
-    settings.postgresql_url = get_postgresql_url(postgresql)
-    app.dependency_overrides[get_settings] = lambda: settings
-
+def test_health_postgresql_reachable(client):
     r = client.get("health")
     assert r.status_code == 200
     assert r.json()["warnings"] == []
