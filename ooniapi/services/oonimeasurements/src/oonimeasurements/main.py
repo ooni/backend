@@ -35,8 +35,12 @@ log = logging.getLogger(__name__)
 def get_health_postgresql_engine(postgresql_url: str) -> Engine:
     # PG engine used for the health check specifically.
     # Created once, and with a timeout so an unreachable database doesn't make
-    # the health check hang
-    return create_engine(postgresql_url, connect_args={"connect_timeout": 2})
+    # the health check hang.
+    #
+    # pool_pre_ping replaces dead connections
+    return create_engine(
+        postgresql_url, pool_pre_ping=True, connect_args={"connect_timeout": 2}
+    )
 
 
 def check_postgresql(postgresql_url: str) -> None:
