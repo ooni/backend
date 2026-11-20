@@ -11,10 +11,14 @@ from clickhouse_driver import Client as ClickhouseClient
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from freezegun import freeze_time
+from pytest_postgresql import factories
 
 from oonimeasurements.common.config import Settings
 from oonimeasurements.common.dependencies import get_settings
+from oonimeasurements.common.rate_limit_quotas import RateLimiterMiddleware
 from oonimeasurements.main import create_app, setup_router
+
+from .utils import get_postgresql_url
 
 THIS_DIR = Path(__file__).parent.resolve()
 
@@ -25,13 +29,14 @@ def log():
 
 
 @pytest.fixture
-def app(db, valkey_server):
+def app(db, valkey_server, postgresql):
     app = create_app()
 
     settings_override = make_override_get_settings(
         app_name="oonimeasurements",
         valkey_url=valkey_server,
         clickhouse_url=db,
+        postgresql_url=get_postgresql_url(postgresql),
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
         account_id_hashing_key="super_secure",
@@ -141,6 +146,45 @@ def create_db_for_fixture(conn_url):
 @pytest.fixture(scope="session")
 def db(clickhouse_server):
     yield create_db_for_fixture(conn_url=clickhouse_server)
+
+
+def run_migrations(host, port, user, dbname, password, **kwargs):
+    from alembic import command
+    from alembic.config import Config
+
+    db_url = f"postgresql://{user}:{password or ''}@{host}:{port}/{dbname}"
+    migrations_path = (THIS_DIR.parent / "src" / "oonimeasurements" / "common" / "alembic").resolve()
+
+    alembic_cfg = Config()
+    alembic_cfg.set_main_option("script_location", str(migrations_path))
+    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+    command.upgrade(alembic_cfg, "head")
+
+
+# Migrations run once per session on a template database, and each test gets
+# a fresh copy of it through the `postgresql` fixture
+postgresql_proc = factories.postgresql_proc(load=[run_migrations])
+postgresql = factories.postgresql("postgresql_proc")
+
+
+@pytest.fixture
+def token_app(app, valkey_server, postgresql, db):
+    app.add_middleware(
+        RateLimiterMiddleware,
+        valkey_url=valkey_server,
+        # Low enough to be hit if tokens were rate limited
+        rate_limits="1/minute",
+        postgresql_url=get_postgresql_url(postgresql),
+        clickhouse_url=db,
+        api_token_cache_ttl=0,
+    )
+
+    # Helper handler to test the token-based authentication
+    @app.get("/tokentest/{param}")
+    async def tokentest(param: str):
+        return {"param": param}
+
+    return app
 
 
 def make_override_get_settings(**kw):

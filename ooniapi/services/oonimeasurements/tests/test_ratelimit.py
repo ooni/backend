@@ -1,13 +1,21 @@
 import itertools
+import secrets
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from clickhouse_driver import Client as ClickhouseClient
+from fastapi.testclient import TestClient
 from limits.aio.storage import RedisStorage
 
 from oonimeasurements.common import rate_limit_quotas
+from oonimeasurements.common.clickhouse_utils import query_click
+from oonimeasurements.common.apiauth.tokens import TOKEN_PREFIX, hash_token
 from oonimeasurements.common.rate_limit_quotas import RateLimiterMiddleware
+
+from .utils import get_postgresql_url
 
 
 @pytest.mark.asyncio
@@ -101,3 +109,146 @@ async def test_10_per_minute(valkey_server, app):
             # no rate limit, no header
             assert "x-ratelimit-remaining" not in resp.headers.keys()
             assert resp.status_code == 200
+
+
+def add_token(postgresql, user_id: str, expires_at=None) -> str:
+    token = TOKEN_PREFIX + secrets.token_urlsafe(32)
+    postgresql.execute(
+        "INSERT INTO apitoken (token_hash, user_id, expires_at) VALUES (%s, %s, %s)",
+        (hash_token(token), user_id, expires_at),
+    )
+    postgresql.commit()
+    return token
+
+
+def get_token_usage(clickhouse_url: str, user_id: str):
+    with ClickhouseClient.from_url(clickhouse_url) as click:
+        click.execute("SYSTEM FLUSH ASYNC INSERT QUEUE")
+        return query_click(
+            click,
+            "SELECT method, route, status_code, token_hash_prefix FROM api_token_usage WHERE user_id = %(user_id)s",
+            {"user_id": user_id},
+        )
+
+
+def test_api_token_unlimited_and_recorded(token_app, client, postgresql, db):
+    user_id = "user-" + secrets.token_hex(4)
+    token = add_token(postgresql, user_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for i in range(5):
+        resp = client.get(f"/tokentest/{i}", headers=headers)
+        assert resp.status_code == 200
+        assert "x-ratelimit-remaining" not in resp.headers
+
+    rows = get_token_usage(db, user_id)
+    assert len(rows) == 5
+    for row in rows:
+        assert row == {
+            "method": "GET",
+            "route": "/tokentest/{param}",
+            "status_code": 200,
+            "token_hash_prefix": hash_token(token)[:8],
+        }
+
+
+def test_api_token_usage_recorded_on_error(token_app, postgresql, db):
+    @token_app.get("/tokenerror")
+    async def tokenerror():
+        raise RuntimeError("boom")
+
+    user_id = "user-" + secrets.token_hex(4)
+    token = add_token(postgresql, user_id)
+    client = TestClient(token_app, raise_server_exceptions=False)
+    resp = client.get("/tokenerror", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 500
+
+    rows = get_token_usage(db, user_id)
+    assert len(rows) == 1
+    assert rows[0]["route"] == "/tokenerror"
+    assert rows[0]["status_code"] == 500
+
+
+def test_api_token_invalid(token_app, client, postgresql):
+    past = datetime.now(timezone.utc) - timedelta(days=1)
+    future = datetime.now(timezone.utc) + timedelta(days=1)
+    expired = add_token(postgresql, "expired-user", expires_at=past)
+    valid = add_token(postgresql, "valid-user", expires_at=future)
+
+    for token in (expired, TOKEN_PREFIX + "unknown"):
+        resp = client.get("/tokentest/x", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 401
+
+    resp = client.get("/tokentest/x", headers={"Authorization": f"Bearer {valid}"})
+    assert resp.status_code == 200
+
+    # Revoking is picked up once the cache entry expires (ttl=0 here)
+    postgresql.execute(
+        "UPDATE apitoken SET expires_at = %s WHERE token_hash = %s",
+        (past, hash_token(valid)),
+    )
+    postgresql.commit()
+    resp = client.get("/tokentest/x", headers={"Authorization": f"Bearer {valid}"})
+    assert resp.status_code == 401
+
+
+def test_api_token_header_variants(token_app, client, postgresql):
+    token = add_token(postgresql, "variants-user")
+    for header in (f"bearer {token}", f"BEARER {token}", f"Bearer  {token} "):
+        resp = client.get("/tokentest/x", headers={"Authorization": header})
+        assert resp.status_code == 200, header
+        # Unlimited token path, not IP limits
+        assert "x-ratelimit-remaining" not in resp.headers
+
+
+def test_non_api_token_bearer_uses_ip_limits(token_app, client):
+    resp = client.get(
+        "/tokentest/x",
+        headers={
+            "Authorization": "Bearer some.jwt.token",
+            # A fresh address, so no quota is left over from other tests
+            "X-Forwarded-For": "10.0.0." + secrets.token_hex(4),
+        },
+    )
+    assert resp.status_code == 200
+    assert "x-ratelimit-remaining" in resp.headers
+
+
+def test_api_token_db_down(app, client, valkey_server):
+    """
+    If unable to authenticate tokens, return a server error
+    """
+    app.add_middleware(
+        RateLimiterMiddleware,
+        valkey_url=valkey_server,
+        postgresql_url="postgresql://bad:bad@localhost:1/bad",
+    )
+
+    resp = client.get("/version", headers={"Authorization": f"Bearer {TOKEN_PREFIX}abc"})
+    assert resp.status_code == 503
+
+
+def test_api_token_cached(app, client, valkey_server, postgresql):
+    """
+    Due to our cache implementation, some requests might pass even when the
+    tokens are expired or removed.
+
+    This test documents that behavior.
+    """
+    app.add_middleware(
+        RateLimiterMiddleware,
+        valkey_url=valkey_server,
+        postgresql_url=get_postgresql_url(postgresql),
+        api_token_cache_ttl=60,
+    )
+    token = add_token(postgresql, "cached-user")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.get("/version", headers=headers)
+    assert resp.status_code == 200
+
+    # Served from memory even after the token is gone from the database
+    postgresql.execute("DELETE FROM apitoken WHERE token_hash = %s", (hash_token(token),))
+    postgresql.commit()
+    resp = client.get("/version", headers=headers)
+    assert resp.status_code == 200

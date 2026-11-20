@@ -1,10 +1,13 @@
 import logging
+from functools import lru_cache
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
+from sqlalchemy import Engine, create_engine, text
+from starlette.concurrency import run_in_threadpool
 
 from .common.clickhouse_utils import async_query_click
 from .common.dependencies import get_clickhouse_session, get_settings
@@ -26,6 +29,23 @@ pkg_version = get_pkg_version(pkg_name)
 build_label = get_build_label(pkg_name)
 
 log = logging.getLogger(__name__)
+
+
+@lru_cache
+def get_health_postgresql_engine(postgresql_url: str) -> Engine:
+    # PG engine used for the health check specifically.
+    # Created once, and with a timeout so an unreachable database doesn't make
+    # the health check hang.
+    #
+    # pool_pre_ping replaces dead connections
+    return create_engine(
+        postgresql_url, pool_pre_ping=True, connect_args={"connect_timeout": 2}
+    )
+
+
+def check_postgresql(postgresql_url: str) -> None:
+    with get_health_postgresql_engine(postgresql_url).connect() as conn:
+        conn.execute(text("SELECT 1"))
 
 
 def create_app() -> FastAPI:
@@ -89,6 +109,16 @@ def setup_router(app: FastAPI):
             log.error(exc)
             errors.append("db_error")
 
+        # Postgres is only needed to authenticate API token users. It's reported
+        # as a warning instead of an error, because failing the health check
+        # would make the load balancer take down the API for everyone
+        warnings = []
+        try:
+            await run_in_threadpool(check_postgresql, settings.postgresql_url)
+        except Exception as exc:
+            log.error(exc)
+            warnings.append("postgresql_error")
+
         if settings.jwt_encryption_key == "CHANGEME":
             err = "bad_jwt_secret"
             log.error(err)
@@ -103,6 +133,7 @@ def setup_router(app: FastAPI):
         result = {
             "status": status,
             "errors": errors,
+            "warnings": warnings,
             "version": pkg_version,
             "build_label": build_label,
         }
@@ -128,4 +159,7 @@ app.add_middleware(
     rate_limits=settings.rate_limits,
     whitelisted_ipaddrs=settings.rate_limits_whitelisted_ipaddrs,
     unmetered_pages=settings.rate_limits_unmetered_pages,
+    postgresql_url=settings.postgresql_url,
+    clickhouse_url=settings.clickhouse_url,
+    api_token_cache_ttl=settings.api_token_cache_ttl,
 )

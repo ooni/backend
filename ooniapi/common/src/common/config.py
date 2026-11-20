@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     rate_limits: str = "10/minute;400000/day;200000/7day"
     rate_limits_whitelisted_ipaddrs: List[str] = []
     rate_limits_unmetered_pages: List[str] = []
+    # How long API tokens are cached before being looked up again
+    api_token_cache_ttl: int = 60
 
     admin_emails: List[str] = [
         "admin@ooni.org",
