@@ -174,6 +174,15 @@ def test_api_token_invalid(token_app, client, postgresql):
     assert resp.status_code == 401
 
 
+def test_api_token_header_variants(token_app, client, postgresql):
+    token = add_token(postgresql, "variants-user")
+    for header in (f"bearer {token}", f"BEARER {token}", f"Bearer  {token} "):
+        resp = client.get("/tokentest/x", headers={"Authorization": header})
+        assert resp.status_code == 200, header
+        # Unlimited token path, not IP limits
+        assert "x-ratelimit-remaining" not in resp.headers
+
+
 def test_non_api_token_bearer_uses_ip_limits(token_app, client):
     resp = client.get(
         "/tokentest/x",
