@@ -42,8 +42,13 @@ class ApiTokenCache:
     """
 
     def __init__(self, postgresql_url: str, ttl_seconds: int = 60):
-        # Creates engine once, is reused for many requests
-        self.engine = create_engine(postgresql_url)
+        # Creates engine once, is reused for many requests. 
+        # The timeout keeps an unreachable database from blocking threadpool 
+        # workers.
+        # pool_pre_ping replaces dead connections
+        self.engine = create_engine(
+            postgresql_url, pool_pre_ping=True, connect_args={"connect_timeout": 2}
+        )
         self.ttl_seconds = ttl_seconds
         self._cache: Dict[str, CachedToken] = {}
 
