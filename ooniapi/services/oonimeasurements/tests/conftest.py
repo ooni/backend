@@ -29,13 +29,14 @@ def log():
 
 
 @pytest.fixture
-def app(db, valkey_server):
+def app(db, valkey_server, postgresql):
     app = create_app()
 
     settings_override = make_override_get_settings(
         app_name="oonimeasurements",
         valkey_url=valkey_server,
         clickhouse_url=db,
+        postgresql_url=get_postgresql_url(postgresql),
         jwt_encryption_key="super_secure",
         prometheus_metrics_password="super_secure",
         account_id_hashing_key="super_secure",
