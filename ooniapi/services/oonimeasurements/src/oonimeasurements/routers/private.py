@@ -16,13 +16,13 @@ import math
 
 from sqlalchemy import sql
 
-from fastapi import APIRouter, Depends, Request, Query, HTTPException, Response
+from fastapi import APIRouter, Request, Query, HTTPException, Response
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.domain import DomainStr
 from pydantic import AnyUrl, Field, IPvAnyAddress, BeforeValidator
 
 from ..common.clickhouse_utils import query_click, query_click_one_row
-from ..common.dependencies import role_required, ClickhouseDep
+from ..common.dependencies import ClickhouseDep
 from ..common.routers import BaseModel
 from ..common.countries import lookup_country
 from ..common.utils import setcacheresponse, seconds_until_midnight
@@ -222,20 +222,6 @@ def api_private_countries(
             pass
 
     return CountryStatResponse(countries=c)
-
-
-@router.get(
-    "/quotas_summary",
-    response_model=List[CountryStat],
-    tags=["private"],
-    dependencies=[Depends(role_required(["admin"]))],
-)
-def api_private_quotas_summary() -> List[CountryStat]:
-    """Summary on rate-limiting quotas.
-    [(first ipaddr octet, remaining daily quota), ... ]
-    """
-    # XXX: the new limiter does not provide a way to get summaries by IP
-    raise HTTPException(status_code=501, detail="quotas_summary not implemented yet")
 
 
 class CheckReportIDResponse(BaseModel):
